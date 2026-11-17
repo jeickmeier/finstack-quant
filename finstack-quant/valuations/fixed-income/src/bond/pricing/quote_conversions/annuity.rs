@@ -221,53 +221,34 @@ pub(crate) fn floating_leg_pv_and_annuity(
                         fixing_id, prev
                     ))
                 })?;
-                fixings.value_on_exact(prev)?
+                fixings.get_value_exact(prev)?
             }
             _ => asset_swap_projection_rate(fwd, prev, d, yf)?,
         };
-        float_pv.add((forward + spread) * yf * df);
-        float_ann.add(yf * df);
+        float_pv.add((forward + spread) * yf * df)?;
+        float_ann.add(yf * df)?;
         prev = d;
     }
-    Ok((float_pv.total(), float_ann.total()))
+    Ok((float_pv.get_total()?, float_ann.get_total()?))
 }
 
-/// Project an asset-swap floating coupon from the curve's index convention.
-///
-/// Overnight indices represent observation rates that are averaged over the
-/// coupon window. Term indices instead use the discount-factor-implied simple
-/// forward for the whole accrual period, annualized using the floating leg
-/// accrual fraction rather than the curve's time coordinate.
+/// Project an asset-swap floating coupon from positive projection factors.
 fn asset_swap_projection_rate(
     fwd: &ForwardCurve,
     start: Date,
     end: Date,
     accrual_year_fraction: f64,
 ) -> finstack_quant_core::Result<f64> {
-    const MAX_OVERNIGHT_TENOR_YEARS: f64 = 1.0 / 52.0;
-
-    if fwd.tenor() <= MAX_OVERNIGHT_TENOR_YEARS {
-        if end <= start
-            || start < fwd.base_date()
-            || !accrual_year_fraction.is_finite()
-            || accrual_year_fraction <= 0.0
-        {
-            return Err(finstack_quant_core::Error::Validation(
-                "asset-swap overnight projection requires a future positive accrual period".into(),
-            ));
-        }
-        let curve_accrual = fwd.curve_time(end)? - fwd.curve_time(start)?;
-        let rate =
-            fwd.rate_period_between_dates(start, end)? * (curve_accrual / accrual_year_fraction);
-        if !rate.is_finite() || curve_accrual <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(
-                "asset-swap overnight projection produced an invalid rate or curve accrual".into(),
-            ));
-        }
-        Ok(rate)
-    } else {
-        fwd.rate_between_dates(start, end, accrual_year_fraction)
+    if end <= start
+        || start < fwd.base_date()
+        || !accrual_year_fraction.is_finite()
+        || accrual_year_fraction <= 0.0
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "asset-swap projection requires a future positive accrual period".into(),
+        ));
     }
+    fwd.rate_between_dates(start, end, accrual_year_fraction)
 }
 
 /// Swap par rate from `quote_date` to `horizon` used as the I-spread benchmark,
@@ -478,11 +459,10 @@ pub(crate) fn settlement_asw_components(
         .clone()
         .map(|id| market.get_forward(&id))
         .transpose()?;
-    let frequency = if let Some(curve) = &forward {
-        Tenor::from_years(curve.tenor(), curve.day_count())?
-    } else {
-        params.frequency
-    };
+    let frequency = forward
+        .as_ref()
+        .and_then(|curve| curve.index_tenor())
+        .unwrap_or(params.frequency);
     let calendar = finstack_quant_core::dates::calendar_by_id_strict(&params.calendar_id)?;
     let float_schedule = asw_leg_schedule(
         settlement,
@@ -584,38 +564,44 @@ mod tests {
         let disc = DiscountCurve::builder("USD-DISC")
             .base_date(start)
             .knots([(0.0, 1.0), (1.0, 1.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("zero discounting");
-        for tenor in [0.25, 1.0 / 365.0] {
-            let fwd = ForwardCurve::builder("USD-INDEX", tenor)
-                .base_date(start)
-                .day_count(DayCount::Act365F)
-                .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
-                .knots([(0.0, 0.04), (1.0, 0.07)])
-                .build()
-                .expect("forward curve");
-            let spread_bp = 125.0;
-            let accrual = (end - start).whole_days() as f64 / 360.0;
-            let growth = if tenor > 1.0 / 52.0 {
-                fwd.df_on_date(start).expect("start DF") / fwd.df_on_date(end).expect("end DF")
-                    - 1.0
-            } else {
-                // Exact integral of the linear raw curve on its ACT/365F clock.
-                let curve_time = (end - start).whole_days() as f64 / 365.0;
-                (0.04 + 0.5 * (0.07 - 0.04) * curve_time) * curve_time
-            };
-            let (pv, annuity) = floating_leg_pv_and_annuity(
-                &disc,
-                &fwd,
-                DayCount::Act360,
-                &[start, end],
-                spread_bp,
-                None,
-            )
-            .expect("floating asset swap");
-            assert!((annuity - accrual).abs() < 1e-14);
-            assert!((pv - growth - spread_bp * 1e-4 * accrual).abs() < 1e-14);
-        }
+        let fwd = ForwardCurve::builder("USD-INDEX")
+            .base_date(start)
+            .day_count(DayCount::Act365F)
+            .knots([
+                (0.0, 1.0),
+                (0.125, 0.994779300469571),
+                (0.25, 0.989122096974591),
+                (0.375, 0.983036159174808),
+                (0.5, 0.97652981169682),
+                (0.625, 0.969611915164818),
+                (0.75, 0.962291846100762),
+                (0.875, 0.954579475757754),
+                (1.0, 0.946485147953484),
+            ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .expect("forward curve");
+        let spread_bp = 125.0;
+        let accrual = (end - start).whole_days() as f64 / 360.0;
+        let growth =
+            fwd.df_on_date(start).expect("start DF") / fwd.df_on_date(end).expect("end DF") - 1.0;
+        let (pv, annuity) = floating_leg_pv_and_annuity(
+            &disc,
+            &fwd,
+            DayCount::Act360,
+            &[start, end],
+            spread_bp,
+            None,
+        )
+        .expect("floating asset swap");
+        assert!((annuity - accrual).abs() < 1e-14);
+        assert!((pv - growth - spread_bp * 1e-4 * accrual).abs() < 1e-14);
     }
 
     #[test]
@@ -629,6 +615,8 @@ mod tests {
             .base_date(schedule[0])
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (366.0 / 365.0, 0.97), (731.0 / 365.0, 0.93)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let annuity = fixed_leg_annuity(&disc, DayCount::Act365L, Some(Tenor::annual()), &schedule)
@@ -691,6 +679,8 @@ mod tests {
                 .base_date(start)
                 .day_count(DayCount::Act365F)
                 .knots([(0.0, 1.0), (3.0, 1.0)])
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("flat curve");
             let annuity =
@@ -747,6 +737,8 @@ mod tests {
                 (5.0, (-0.04_f64 * 5.0).exp()),
             ])
             .rate_calibration(recipe)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("calibrated curve");
         let bond = Bond::fixed(

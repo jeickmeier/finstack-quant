@@ -6,7 +6,7 @@
     "description": "Self-test fixture for zero-coupon inflation swap pricing with two-step calibration. Receive-fixed at 2.20% against US-CPI ZCIS for 5Y, 10MM USD notional. Exercises both the discount step (USD-OIS, with ois_compounding override) and the inflation step (US-CPI from 6 ZCIS quotes, against the calibrated discount curve). Closes the inflation calibration step coverage gap (plan \u00a718 follow-up #1).",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Self-test fixture: 6 ZCIS quotes (1Y-10Y, ~2.0-2.4% rising) calibrate the US-CPI inflation curve against a SOFR OIS-bootstrapped discount curve. Expected outputs captured from Finstack Quant's own calibration + pricing pipeline. Round-trip stability: re-running calibrate + price_instrument_with_metrics must reproduce these values within solver tolerance. Guards regressions in the inflation-step bootstrap, the inflation-swap pricing kernel, and the `inflation` step kind's plumbing through engine::calibrate. Re-baselined 2026-07-11 after deterministic bootstrap refinements; no external benchmark source is asserted. Re-baselined 2026-09-18, for three reasons. (1) Commit 413953021 anchors a bootstrapped inflation curve at base_date minus the observation lag rather than at base_date, moving the calibrated US-CPI curve and this swap's projected index ratio. (2) The same commit made a historical reference anchor require a published fixing; that guard is deliberate, so the contract now states its base CPI of 300.0 explicitly - the level the plan's US-CPI inflation step declares at its 2026-04-30 base date, i.e. the same start fixing the bootstrap calibrated against. (3) The contract now follows the USD-CPI market convention (one/one accrual, NYSE calendar, modified following, linear monthly reference interpolation), which is what the bootstrap itself reprices against; the 3M observation lag is resolved from the projection curve's indexation_lag_months rather than restated here, and reproduces an explicit override exactly. With the conventions aligned every ZCIS pillar reprices at its own quote to within 1e-5 USD on a 10MM notional (~1e-12 relative), against 8.9e-4 of notional when day count and lag were left mismatched, so this fixture is now a true round-trip test of the inflation bootstrap.",
+    "source_detail": "Internal regression using six ZCIS quotes and a SOFR OIS discount calibration. Contract lag, interpolation and denominator are explicit. The independent source origin is 2026-01-30 at CPI 300, with an explicit Act/365F clock and flat tails. The immutable 2026-04-30 snapshot declares expected releases for every projected monthly anchor. Expected outputs and tolerances retain their existing internal regression basis; no external benchmark is asserted.",
     "captured_by": "claude",
     "captured_on": "2026-05-09",
     "last_reviewed_by": "claude",
@@ -58,7 +58,7 @@
             "base_date": "2026-04-30",
             "method": "bootstrap",
             "interpolation": "log_linear",
-            "extrapolation": "flat_forward",
+            "extrapolation": "extend",
             "pricing_discount_id": null,
             "pricing_forward_id": null,
             "conventions": {
@@ -81,6 +81,11 @@
             "index": "US-CPI",
             "observation_lag": "3M",
             "base_cpi": 300.0,
+            "source_base_date": "2026-01-30",
+            "source_base_cpi": 300.0,
+            "day_count": "act_365f",
+            "calendar_id": null,
+            "extrapolation": "flat",
             "method": "bootstrap",
             "interpolation": "linear"
           }
@@ -88,6 +93,75 @@
         "settings": {}
       },
       "market_data": [
+        {
+          "kind": "inflation_fixings",
+          "id": "US-CPI",
+          "currency": "USD",
+          "knowledge_date": "2026-04-30",
+          "observations": [],
+          "expected_releases": [
+            {
+              "reference_month": "2027-01-01",
+              "expected_release": "2027-02-15",
+              "known_on": "2026-04-30"
+            },
+            {
+              "reference_month": "2027-02-01",
+              "expected_release": "2027-03-15",
+              "known_on": "2026-04-30"
+            },
+            {
+              "reference_month": "2028-01-01",
+              "expected_release": "2028-02-15",
+              "known_on": "2026-04-30"
+            },
+            {
+              "reference_month": "2028-02-01",
+              "expected_release": "2028-03-15",
+              "known_on": "2026-04-30"
+            },
+            {
+              "reference_month": "2029-01-01",
+              "expected_release": "2029-02-15",
+              "known_on": "2026-04-30"
+            },
+            {
+              "reference_month": "2029-02-01",
+              "expected_release": "2029-03-15",
+              "known_on": "2026-04-30"
+            },
+            {
+              "reference_month": "2031-01-01",
+              "expected_release": "2031-02-15",
+              "known_on": "2026-04-30"
+            },
+            {
+              "reference_month": "2031-02-01",
+              "expected_release": "2031-03-15",
+              "known_on": "2026-04-30"
+            },
+            {
+              "reference_month": "2033-01-01",
+              "expected_release": "2033-02-15",
+              "known_on": "2026-04-30"
+            },
+            {
+              "reference_month": "2033-02-01",
+              "expected_release": "2033-03-15",
+              "known_on": "2026-04-30"
+            },
+            {
+              "reference_month": "2036-01-01",
+              "expected_release": "2036-02-15",
+              "known_on": "2026-04-30"
+            },
+            {
+              "reference_month": "2036-02-01",
+              "expected_release": "2036-03-15",
+              "known_on": "2026-04-30"
+            }
+          ]
+        },
         {
           "kind": "rate_quote",
           "type": "deposit",
@@ -325,15 +399,12 @@
         "discount_curve_id": "USD-OIS",
         "side": "receive",
         "attributes": {
-          "tags": [
-            "golden",
-            "self_test",
-            "inflation_calibration"
-          ],
+          "tags": ["golden", "self_test", "inflation_calibration"],
           "meta": {}
         },
         "day_count": "one_one",
         "base_cpi": 300.0,
+        "lag": { "months": 3 },
         "interpolation": "linear",
         "calendar_id": "nyse",
         "business_day_convention": "modified_following"
@@ -346,10 +417,10 @@
   },
   "tolerances": {
     "npv": {
-      "abs": 1e-05
+      "abs": 1e-5
     },
     "dv01": {
-      "abs": 1e-06
+      "abs": 1e-6
     }
   }
 }

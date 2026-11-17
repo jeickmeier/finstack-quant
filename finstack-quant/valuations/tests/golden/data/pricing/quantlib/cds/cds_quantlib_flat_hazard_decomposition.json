@@ -38,6 +38,7 @@
         "premium_leg": {
           "calendar_id": "weekends_only",
           "coupon_bp": "100.0",
+          "date_regime": "standard",
           "day_count": "act_360",
           "discount_curve_id": "USD-FLAT-2PCT",
           "end": "2030-12-20",
@@ -45,7 +46,6 @@
             "count": 3,
             "unit": "months"
           },
-          "date_regime": "standard",
           "start": "2025-09-22"
         },
         "protection_effective_date": "2026-01-05",
@@ -87,24 +87,17 @@
           "kind": "hazard_curve",
           "knot_points": [
             [
-              0.0,
-              0.01
-            ],
-            [
               10.0,
               0.01
             ]
           ],
-          "par_interp": "linear",
-          "par_points": [],
           "recovery_rate": 0.4,
           "seniority": null
         },
         {
-          "allow_non_monotonic": false,
           "base": "2026-01-05",
           "day_count": "act_365f",
-          "extrapolation": "flat_forward",
+          "extrapolation": "extend",
           "fx_policy": null,
           "id": "USD-FLAT-2PCT",
           "interp_style": "log_linear",
@@ -119,8 +112,6 @@
               0.8187307530779818
             ]
           ],
-          "min_forward_rate": null,
-          "min_forward_tenor": 1e-06,
           "rate_calibration": null
         }
       ],

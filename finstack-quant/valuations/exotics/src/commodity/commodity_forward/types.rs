@@ -618,6 +618,9 @@ mod tests {
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (0.25, 0.99), (0.5, 0.98), (1.0, 0.96)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("Valid discount curve");
 

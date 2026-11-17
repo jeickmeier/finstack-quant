@@ -41,6 +41,8 @@ const discountCurve = () =>
     id: HW.curve.id,
     baseDate: HW.curve.base_date,
     knots: HW.curve.knots,
+    interp: 'monotone_convex',
+    extrapolation: 'extend',
     dayCount: HW.curve.day_count,
   });
 
@@ -187,7 +189,7 @@ const STEPS = {
   forward: () =>
     calibration.calibrationStepForward('USD-SOFR-3M', {
       ...RATES,
-      tenor_years: 0.25,
+      index_tenor: { count: 3, unit: 'months' },
       discount_curve_id: 'USD-OIS',
     }),
   hazard: () =>
@@ -204,6 +206,11 @@ const STEPS = {
       index: 'USA-CPI-U',
       observation_lag: '3M',
       base_cpi: 310.0,
+      source_base_date: '2024-10-01',
+      source_base_cpi: 310.0,
+      day_count: 'act_365f',
+      interpolation: 'linear',
+      extrapolation: 'extend',
     }),
   vol_surface: () =>
     calibration.calibrationStepVolSurface('AAPL-VOL', {
@@ -490,7 +497,12 @@ test('inflationQuote constructors build the Python InflationQuote objects', () =
 
 test('surface validators match the Python validate_* functions', () => {
   const config = GOLDEN.validation_config;
-  const surface = (vols) => new core.VolSurface('EQ-VOL', [1.0, 2.0], [90, 100, 110], vols);
+  const surface = (vols) =>
+    new core.VolSurface('EQ-VOL', [1.0, 2.0], [90, 100, 110], vols, {
+      secondaryAxis: 'strike',
+      quoteType: 'black_lognormal',
+      interpolationMode: 'vol',
+    });
   const clean = surface([0.205, 0.2, 0.205, 0.215, 0.21, 0.215]);
   calibration.validateVolBounds(clean, config);
   calibration.validateSurface(clean, config, [100, 100]);
@@ -550,9 +562,17 @@ test('checked quote constructors match Python and reject invalid fields', () => 
 });
 
 test('surface validation requires forwards even with arbitrage disabled', () => {
-  const expiring = new core.VolSurface('EXPIRING', [0, 1], [90, 100], [0.2, 0.2, 0.2, 0.2]);
+  const expiring = new core.VolSurface('EXPIRING', [1e-6, 1], [90, 100], [0.2, 0.2, 0.2, 0.2], {
+    secondaryAxis: 'strike',
+    quoteType: 'black_lognormal',
+    interpolationMode: 'vol',
+  });
   calibration.validateSurface(expiring, GOLDEN.validation_config, [100, 105]);
-  const surface = new core.VolSurface('INPUTS', [1, 2], [90, 100], [0.2, 0.2, 0.21, 0.21]);
+  const surface = new core.VolSurface('INPUTS', [1, 2], [90, 100], [0.2, 0.2, 0.21, 0.21], {
+    secondaryAxis: 'strike',
+    quoteType: 'black_lognormal',
+    interpolationMode: 'vol',
+  });
   for (const check_arbitrage of [true, false]) {
     const config = { ...GOLDEN.validation_config, check_arbitrage };
     for (const forwards of [[], [100], [100, 0], [100, -1], [100, NaN], [100, Infinity]]) {
@@ -572,7 +592,11 @@ test('surface validation requires forwards even with arbitrage disabled', () => 
 });
 
 test('calendar acceptance uses forward moneyness and the configured tolerance', () => {
-  const surface = new core.VolSurface('MONEYNESS', [1, 2], [100, 200], [0.4, 0.1, 0.3, 0.2]);
+  const surface = new core.VolSurface('MONEYNESS', [1, 2], [100, 200], [0.4, 0.1, 0.3, 0.2], {
+    secondaryAxis: 'strike',
+    quoteType: 'black_lognormal',
+    interpolationMode: 'vol',
+  });
   calibration.validateCalendarSpread(surface, GOLDEN.validation_config, [100, 100]);
   assert.throws(
     () => calibration.validateCalendarSpread(surface, GOLDEN.validation_config, [100, 200]),

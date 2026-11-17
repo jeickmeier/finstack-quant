@@ -168,6 +168,8 @@ fn flat_discount(base: finstack_quant_core::dates::Date, r: f64) -> DiscountCurv
             (10.0_f64, (-r * 10.0).exp()),
             (30.0_f64, (-r * 30.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve")
 }

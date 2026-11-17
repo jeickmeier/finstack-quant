@@ -446,16 +446,16 @@ fn rolling(
             return Ok(());
         }
         output[idx] = match op {
-            RollingOp::Mean => mean(&finite_values),
+            RollingOp::Mean => mean(&finite_values)?,
             RollingOp::Sum => Some(finite_values.iter().sum()),
-            RollingOp::Std => sample_std(&finite_values),
+            RollingOp::Std => sample_std(&finite_values)?,
             RollingOp::Min => finite_values.into_iter().reduce(f64::min),
             RollingOp::Max => finite_values.into_iter().reduce(f64::max),
             RollingOp::Zscore => {
                 let current = finite(values[idx]);
-                let (scale, centered) = scaled_centered(&finite_values);
-                let center = mean(&finite_values).unwrap_or(0.0);
-                let std = sample_std(&centered);
+                let (scale, centered) = scaled_centered(&finite_values)?;
+                let center = mean(&finite_values)?.unwrap_or(0.0);
+                let std = sample_std(&centered)?;
                 match (current, std) {
                     (Some(current), Some(std)) if std > 0.0 => {
                         Some((current / scale - center / scale) / std)
@@ -471,10 +471,10 @@ fn rolling(
                 finite_values.sort_by(f64::total_cmp);
                 quantile_cont(&finite_values, q)
             }
-            RollingOp::Skew => advanced::skewness(&finite_values),
-            RollingOp::Kurtosis => advanced::excess_kurtosis(&finite_values),
-            RollingOp::Slope => advanced::rolling_slope(values, window_indices),
-            RollingOp::Sharpe(risk_free) => advanced::rolling_sharpe(&finite_values, risk_free),
+            RollingOp::Skew => advanced::skewness(&finite_values)?,
+            RollingOp::Kurtosis => advanced::excess_kurtosis(&finite_values)?,
+            RollingOp::Slope => advanced::rolling_slope(values, window_indices)?,
+            RollingOp::Sharpe(risk_free) => advanced::rolling_sharpe(&finite_values, risk_free)?,
             RollingOp::Winsorize { lower, upper } => {
                 finite_values.sort_by(f64::total_cmp);
                 match (

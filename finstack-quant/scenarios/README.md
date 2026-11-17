@@ -86,7 +86,7 @@ through `ScenarioEngine::apply`.
 
 | Phase | Work |
 |-------|------|
-| −1 | Expand hierarchy-targeted operations into concrete market identifiers. Targets that match nothing emit `Warning::HierarchyNoMatch`. |
+| −1 | Expand hierarchy-targeted operations into exact typed market identifiers using the opening hierarchy snapshot. Missing paths, zero matching targets, and missing or wrong-kind active targets return `Err` without partial market mutation. |
 | 0 | `TimeRollForward`, if present. With `apply_shocks = false` the engine returns immediately after this phase. |
 | 1 | Market data. `MarketBump` effects are batched within one operation, then flushed. |
 | 2 | Rate bindings, when `ExecutionContext::rate_bindings` is set. |
@@ -172,8 +172,10 @@ before applying.
 ## Quick start
 
 ```rust
+use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_scenarios::{
     CurveKind, ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec,
 };
@@ -184,6 +186,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut market = MarketContext::new().insert(
         DiscountCurve::builder("USD_SOFR")
             .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Extend)
             .knots([(0.0, 1.0), (5.0, 0.80)])
             .build()?,
     );
@@ -200,7 +205,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let mut ctx = ExecutionContext {
@@ -299,9 +303,9 @@ MIT OR Apache-2.0
 Historical VaR credit-spread scenarios require the existing quote recalibration
 provider and replay the source hazard calibration recipe against the shifted
 dependency market. Valuations does not parse calibration-owned recipe schemas.
-The explicitly selected `first_order_shift` scenario mode converts spread basis
-points to hazard basis points by dividing by `1 - recovery`; its application
-report retains a `hazard_spread_first_order` approximation warning.
+`par_cds` shocks always refit the hazard curve to the shifted CDS quotes; a
+hand-built hazard curve without a calibration recipe is rejected rather than
+shifted by a spread-to-intensity approximation.
 
 Time rolls materialize index observations crossed in `(old_date, new_date]`
 from the pre-roll canonical cashflow schedules before moving curve dates. Rate

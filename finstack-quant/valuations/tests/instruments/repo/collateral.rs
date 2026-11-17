@@ -98,8 +98,10 @@ fn test_collateral_value_different_prices() {
 fn test_collateral_value_requires_currency_price() {
     use finstack_quant_core::market_data::scalars::MarketScalar;
 
-    let context =
-        create_standard_market_context().insert_price("UNITLESS", MarketScalar::Unitless(1.0));
+    let context = create_standard_market_context().insert_price(
+        "UNITLESS",
+        MarketScalar::unitless(1.0).expect("valid scalar"),
+    );
 
     let collateral = CollateralSpec::new("BOND", 1_000_000.0, "UNITLESS");
 
@@ -348,7 +350,7 @@ fn test_collateral_currency_safety() {
     // Mix EUR and USD
     let context = create_standard_market_context().insert_price(
         "EUR_BOND_PRICE",
-        MarketScalar::Price(Money::new(1.0, Currency::EUR).expect("valid money fixture")),
+        MarketScalar::price(Money::new(1.0, Currency::EUR).expect("valid money fixture")),
     );
 
     let eur_collateral = CollateralSpec::new("EUR_BOND", 1_000_000.0, "EUR_BOND_PRICE");

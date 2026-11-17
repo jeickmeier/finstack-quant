@@ -105,6 +105,16 @@ pub struct CmsSpreadOption {
     /// and default leg conventions. Individual leg fields override the index.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_id: Option<IndexId>,
+    /// Explicit CMS benchmark fixing identifier for the long-tenor leg
+    /// (`FIXING:<long_cms_fixing_index_id>`), distinct from `forward_curve_id`,
+    /// `index_id`, and `short_cms_fixing_index_id`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub long_cms_fixing_index_id: Option<IndexId>,
+    /// Explicit CMS benchmark fixing identifier for the short-tenor leg
+    /// (`FIXING:<short_cms_fixing_index_id>`), distinct from `forward_curve_id`,
+    /// `index_id`, and `long_cms_fixing_index_id`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub short_cms_fixing_index_id: Option<IndexId>,
     /// Fixed leg frequency of the underlying CMS swaps (overrides convention).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub swap_fixed_frequency: Option<Tenor>,
@@ -156,16 +166,20 @@ impl CmsSpreadOption {
     /// - Expiry date is before or on payment date
     /// - Correlation is in [-1, 1]
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        // Tenor comparison: long must be > short (compare months if both are month/year based)
-        validation::require_with(
-            self.long_cms_tenor.months() > self.short_cms_tenor.months(),
-            || {
-                format!(
-                    "CmsSpreadOption long_cms_tenor ({}) must be longer than short_cms_tenor ({})",
-                    self.long_cms_tenor, self.short_cms_tenor
-                )
-            },
+        let long_months = crate::cms_common::cms_tenor_months(
+            self.long_cms_tenor,
+            "CmsSpreadOption long_cms_tenor",
         )?;
+        let short_months = crate::cms_common::cms_tenor_months(
+            self.short_cms_tenor,
+            "CmsSpreadOption short_cms_tenor",
+        )?;
+        validation::require_with(long_months > short_months, || {
+            format!(
+                "CmsSpreadOption long_cms_tenor ({}) must be longer than short_cms_tenor ({})",
+                self.long_cms_tenor, self.short_cms_tenor
+            )
+        })?;
 
         validation::require_with(self.payment_date >= self.expiry, || {
             format!(
@@ -180,6 +194,34 @@ impl CmsSpreadOption {
                 self.correlation
             )
         })?;
+
+        if let Some(long_fixing_id) = &self.long_cms_fixing_index_id {
+            crate::cms_common::validate_cms_fixing_index_id(
+                long_fixing_id,
+                &self.forward_curve_id,
+                self.index_id.as_ref(),
+                "CmsSpreadOption long_cms_fixing_index_id",
+            )?;
+        }
+        if let Some(short_fixing_id) = &self.short_cms_fixing_index_id {
+            crate::cms_common::validate_cms_fixing_index_id(
+                short_fixing_id,
+                &self.forward_curve_id,
+                self.index_id.as_ref(),
+                "CmsSpreadOption short_cms_fixing_index_id",
+            )?;
+        }
+        if let (Some(long_fixing_id), Some(short_fixing_id)) = (
+            &self.long_cms_fixing_index_id,
+            &self.short_cms_fixing_index_id,
+        ) && long_fixing_id == short_fixing_id
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CmsSpreadOption long_cms_fixing_index_id ({}) and short_cms_fixing_index_id ({}) must be distinct",
+                long_fixing_id.as_str(),
+                short_fixing_id.as_str()
+            )));
+        }
 
         Ok(())
     }
@@ -219,6 +261,8 @@ impl CmsSpreadOption {
             correlation: 0.85,
             day_count: DayCount::Act360,
             index_id: Some(IndexId::new("USD-SOFR-OIS")),
+            long_cms_fixing_index_id: Some(IndexId::new("USD-SOFR-CMS-10Y")),
+            short_cms_fixing_index_id: Some(IndexId::new("USD-SOFR-CMS-2Y")),
             swap_fixed_frequency: None,
             swap_float_frequency: None,
             swap_fixed_day_count: None,
@@ -249,6 +293,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsSpreadOption
         &self,
     ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
     {
+        self.validate()?;
         let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_forward_curve(self.forward_curve_id.clone());
@@ -266,26 +311,17 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsSpreadOption
                 Some(self.strike_rate()),
             ),
         );
-        let long_tenor_years = f64::from(crate::cms_common::cms_tenor_months(
-            self.long_cms_tenor,
-            "CmsSpreadOption long_cms_tenor",
-        )?) / 12.0;
-        let short_tenor_years = f64::from(crate::cms_common::cms_tenor_months(
-            self.short_cms_tenor,
-            "CmsSpreadOption short_cms_tenor",
-        )?) / 12.0;
-        deps.add_series_id(
-            finstack_quant_core::market_data::fixings::cms_fixing_series_id(
-                self.forward_curve_id.as_str(),
-                long_tenor_years,
-            ),
-        );
-        deps.add_series_id(
-            finstack_quant_core::market_data::fixings::cms_fixing_series_id(
-                self.forward_curve_id.as_str(),
-                short_tenor_years,
-            ),
-        );
+        for fixing_id in [
+            self.long_cms_fixing_index_id.as_ref(),
+            self.short_cms_fixing_index_id.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+                fixing_id.as_str(),
+            ));
+        }
         Ok(deps)
     }
 
@@ -321,7 +357,9 @@ finstack_quant_valuations_core::impl_empty_cashflow_provider!(
 mod tests {
     use super::*;
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_valuations_core::instruments::Instrument;
     use finstack_quant_valuations_core::instruments::PricingOptions;
@@ -334,8 +372,11 @@ mod tests {
 
     fn flat_surface(id: &str, vol: f64) -> VolSurface {
         VolSurface::builder(id)
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.25, 1.0, 5.0])
-            .strikes(&[0.005, 0.04, 0.10])
+            .secondary_values(&[0.005, 0.04, 0.10])
             .row(&[vol; 3])
             .row(&[vol; 3])
             .row(&[vol; 3])
@@ -348,12 +389,66 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (30.0, (-0.035_f64 * 30.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let forward = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+        let forward = ForwardCurve::builder("USD-SOFR-3M")
             .base_date(as_of)
             .day_count(DayCount::Act365F)
-            .knots([(0.0, 0.025), (2.0, 0.030), (10.0, 0.045), (30.0, 0.055)])
+            .knots([
+                (0.0, 1.0),
+                (0.125, 0.996860407610235),
+                (0.25, 0.993691855414605),
+                (0.375, 0.990494682607666),
+                (0.5, 0.987269230647777),
+                (0.625, 0.984015843196548),
+                (0.75, 0.980734866058062),
+                (0.875, 0.977426647117868),
+                (1.0, 0.974091536281781),
+                (1.125, 0.970729885414486),
+                (1.25, 0.967342048277971),
+                (1.375, 0.963928380469801),
+                (1.5, 0.960489239361249),
+                (1.625, 0.957024984035297),
+                (1.75, 0.953535975224525),
+                (1.875, 0.950022575248901),
+                (2.0, 0.946485147953484),
+                (2.5, 0.932175315711368),
+                (3.0, 0.917651582651816),
+                (3.5, 0.902930788212888),
+                (4.0, 0.888029780458446),
+                (4.5, 0.87296538461472),
+                (5.0, 0.857754372171822),
+                (5.5, 0.842413430627045),
+                (6.0, 0.826959133943362),
+                (6.5, 0.811407913793016),
+                (7.0, 0.795776031652245),
+                (7.5, 0.780079551809278),
+                (8.0, 0.764334315343578),
+                (8.5, 0.748555915130064),
+                (9.0, 0.732759671917686),
+                (9.5, 0.716960611527209),
+                (10.0, 0.701173443208572),
+                (11.25, 0.662562341613672),
+                (12.5, 0.625588482654267),
+                (13.75, 0.590216638842076),
+                (15.0, 0.55640991454257),
+                (16.25, 0.524129952213851),
+                (17.5, 0.493337132454724),
+                (18.75, 0.463990767306587),
+                (20.0, 0.436049286321536),
+                (21.25, 0.409470414975912),
+                (22.5, 0.384211345073941),
+                (23.75, 0.360228896849804),
+                (25.0, 0.337479672538155),
+                (26.25, 0.315920201242287),
+                (27.5, 0.295507074985878),
+                (28.75, 0.276197075887997),
+                (30.0, 0.257947294451826),
+            ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("forward curve");
 

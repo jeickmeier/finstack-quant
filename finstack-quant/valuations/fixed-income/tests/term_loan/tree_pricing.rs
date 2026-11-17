@@ -221,7 +221,6 @@ fn oas_round_trip_near_zero_at_model_price() {
 #[test]
 fn credit_tree_higher_hazard_lowers_price() {
     use finstack_quant_core::market_data::term_structures::HazardCurve;
-    use finstack_quant_core::market_data::term_structures::ParInterp;
 
     let as_of = date!(2025 - 01 - 01);
 
@@ -230,16 +229,16 @@ fn credit_tree_higher_hazard_lowers_price() {
     let low_hazard = HazardCurve::builder("USD-HAZ")
         .base_date(as_of)
         .recovery_rate(0.4)
-        .knots([(0.0, 0.01), (5.0, 0.01)])
-        .par_interp(ParInterp::Linear)
+        .knots([(5.0, 0.01)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
 
     let high_hazard = HazardCurve::builder("USD-HAZ")
         .base_date(as_of)
         .recovery_rate(0.4)
-        .knots([(0.0, 0.05), (5.0, 0.05)])
-        .par_interp(ParInterp::Linear)
+        .knots([(5.0, 0.05)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
 
@@ -615,7 +614,6 @@ fn off_cycle_immediate_par_call_includes_accrued() {
 #[test]
 fn term_loan_tree_prices_are_bit_pinned() {
     use finstack_quant_core::market_data::term_structures::HazardCurve;
-    use finstack_quant_core::market_data::term_structures::ParInterp;
 
     let as_of = date!(2025 - 01 - 01);
     let pricer = finstack_quant_valuations_fixed_income::term_loan::TermLoanTreePricer;
@@ -630,8 +628,8 @@ fn term_loan_tree_prices_are_bit_pinned() {
     let hazard = HazardCurve::builder("USD-HAZ")
         .base_date(as_of)
         .recovery_rate(0.4)
-        .knots([(0.0, 0.02), (5.0, 0.03)])
-        .par_interp(ParInterp::Linear)
+        .knots([(5.0, 0.03)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
     loan.credit_curve_id = Some(CurveId::from("USD-HAZ"));
@@ -644,7 +642,7 @@ fn term_loan_tree_prices_are_bit_pinned() {
     // Both lattices move by a few ulps between macOS and the Linux libm on
     // GitHub Actions.
     const PINS: [[u64; 2]; 2] = [
-        [4_711_601_891_810_740_309, 4_711_280_227_318_290_588],
+        [4_711_601_891_810_740_309, 4_711_280_227_318_290_582],
         [4_711_601_891_810_740_308, 4_711_280_227_318_290_583],
     ];
     assert!(

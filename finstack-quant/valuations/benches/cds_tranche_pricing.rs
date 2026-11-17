@@ -96,6 +96,8 @@ fn create_market() -> MarketContext {
             (10.0, 0.60),
         ])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -158,6 +160,8 @@ fn create_market_with_issuers(num_issuers: usize) -> MarketContext {
             (10.0, 0.60),
         ])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -204,6 +208,7 @@ fn create_market_with_issuers(num_issuers: usize) -> MarketContext {
                 (7.0, (0.024 + bump).min(0.05)),
                 (10.0, (0.030 + bump).min(0.05)),
             ])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .unwrap();
         issuer_curves.insert(id, Arc::new(hz));
@@ -394,6 +399,7 @@ fn constant_control_hazard(id: &str, hazard: f64, recovery: f64) -> Arc<HazardCu
             .base_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
             .recovery_rate(recovery)
             .knots([(1.0, hazard)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("constant control hazard"),
     )
@@ -489,6 +495,7 @@ fn create_high_hazard_equal_market() -> MarketContext {
                     (7.0, 5.0 * (0.024 + bump).min(0.05)),
                     (10.0, 5.0 * (0.030 + bump).min(0.05)),
                 ])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .expect("high-hazard issuer curve");
             (id.clone(), Arc::new(curve))
@@ -513,6 +520,7 @@ fn create_high_hazard_homogeneous_market() -> MarketContext {
             .base_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
             .recovery_rate(0.40)
             .knots([(1.0, 0.05), (3.0, 0.075), (5.0, 0.10), (10.0, 0.125)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("high-hazard homogeneous curve"),
     );

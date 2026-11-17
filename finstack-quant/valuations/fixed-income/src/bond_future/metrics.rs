@@ -121,7 +121,7 @@ impl MetricCalculator for ThetaCalculator {
                     rolled_date,
                 )?
             };
-            let rolled_market = held_market.roll_forward(horizon_days)?;
+            let rolled_market = held_market.condition(rolled_date)?;
             let rolled_pv = context.reprice_money(&rolled_market, rolled_date)?;
             (rolled_pv.checked_sub(base_pv)?.amount(), horizon_days)
         };

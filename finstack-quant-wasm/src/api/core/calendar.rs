@@ -128,8 +128,8 @@ impl JsHolidayCalendar {
 
     /// Calendar metadata, or `undefined` for union calendars.
     ///
-    /// A plain `CalendarMetadata` object with `id`, `name` and
-    /// `ignore_weekends`.
+    /// A plain `CalendarMetadata` object with `id`, `name`,
+    /// `ignore_weekends`, and `supported_years`.
     #[wasm_bindgen(getter, js_name = metadata, unchecked_return_type = "CalendarMetadata | undefined")]
     pub fn metadata(&self) -> Result<JsValue, JsValue> {
         match self.calendar.metadata() {

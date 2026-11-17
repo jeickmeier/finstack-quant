@@ -33,7 +33,7 @@ fn flat_hazard(
         .base_date(base)
         .recovery_rate(rec)
         .knots(vec![(1.0, hz), (10.0, hz)])
-        .par_spreads(vec![(1.0, hz * 10000.0 * (1.0 - rec))])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap()
 }

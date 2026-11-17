@@ -302,12 +302,17 @@ it("edits stored FX entries and scalar prices while preserving populated unopene
     fx_delta_vol_surfaces: [
       {
         id: "EURUSD-DELTA-VOL",
+        pair: { base: "EUR", quote: "USD" },
+        delta_convention: "forward_unadjusted",
+        atm_convention: "delta_neutral_straddle",
+        butterfly_convention: "smile",
         expiries: [1],
         atm_vols: [0.08],
         rr_25d: [0.01],
         bf_25d: [0.005],
         rr_10d: null,
         bf_10d: null,
+        expiry_clock: null,
       },
     ],
   };

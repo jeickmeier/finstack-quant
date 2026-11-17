@@ -1503,14 +1503,23 @@ mod haircut_tests {
         let pool = rated_pool();
         let as_of = Date::from_calendar_date(2025, Month::April, 1).expect("date");
         let forward_curve_id = CurveId::new("USD-3M");
-        let forward = ForwardCurve::builder(forward_curve_id.clone(), 0.25)
+        let forward = ForwardCurve::builder(forward_curve_id.clone())
             .base_date(as_of)
             .day_count(DayCount::Act360)
-            .knots([(0.0, 0.04), (1.0, 0.04)])
+            .index_tenor(Tenor::quarterly())
+            .knots([(0.0, 1.0), (1.0, (-0.04_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("forward curve");
-        let fixing = ScalarTimeSeries::new(fixing_series_id("USD-3M"), vec![(as_of, 0.04)], None)
-            .expect("fixing series");
+        let fixing = ScalarTimeSeries::new(
+            fixing_series_id("USD-3M"),
+            vec![(as_of, 0.04)],
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("fixing series");
         let market = MarketContext::new().insert(forward).insert_series(fixing);
         let floating_coupon = RateSpec::Floating(FloatingRateSpec {
             forward_curve_id,

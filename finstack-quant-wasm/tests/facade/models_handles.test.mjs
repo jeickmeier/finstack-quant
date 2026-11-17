@@ -634,6 +634,8 @@ test('rates handles expose their accessors and reject bad input', () => {
     id: 'USD-OIS',
     baseDate: '2025-01-15',
     knots: [0, 1, 1, 0.97, 2, 0.94],
+    interp: 'monotone_convex',
+    extrapolation: 'extend',
     dayCount: 'act_365f',
   });
   const periods = [
@@ -652,6 +654,8 @@ test('rates handles expose their accessors and reject bad input', () => {
     id: 'USD-FWD',
     baseDate: '2025-01-15',
     knots: [0, 1, 1, 0.95, 2, 0.9],
+    interp: 'monotone_convex',
+    extrapolation: 'extend',
     dayCount: 'act_365f',
   });
   const projectedCap = hullWhite.hw1fCapFloorPrice(
@@ -737,7 +741,7 @@ test('volatility helpers take a VolSurface in its canonical wire form', () => {
   const surface = volatility.materializeCubeTenorSlice(cube, 5, [0.02, 0.03, 0.04], 'lognormal');
   assert.ok(surface instanceof core.VolSurface);
   assert.deepEqual(Array.from(surface.expiries), [1, 2]);
-  assert.deepEqual(Array.from(surface.strikes), [0.02, 0.03, 0.04]);
+  assert.deepEqual(Array.from(surface.secondaryValues), [0.02, 0.03, 0.04]);
   assert.equal(surface.vols.length, 6);
   assert.equal(
     volatility.getSurfaceVol(surface, 1, 0.03),
@@ -794,7 +798,12 @@ test('volatility helpers take a VolSurface in its canonical wire form', () => {
 
 test('checkSurface runs the Rust arbitrage suite on a VolSurface handle', () => {
   const surface = (vols, options) =>
-    new core.VolSurface('SPX-VOL', [1, 2], [90, 100, 110], vols, options);
+    new core.VolSurface('SPX-VOL', [1, 2], [90, 100, 110], vols, {
+      secondaryAxis: 'strike',
+      quoteType: 'black_lognormal',
+      interpolationMode: 'vol',
+      ...options,
+    });
   const flat = surface([0.2, 0.2, 0.2, 0.2, 0.2, 0.2]);
   // Omitted config fields take the Rust `ArbitrageCheckConfig` defaults.
   const report = volatility.checkSurface(flat, { forward_prices: [100] });
@@ -842,7 +851,7 @@ test('local volatility is a plain object with free-function twins', () => {
   const impliedWire = (rows) => ({
     id: 'IMPLIED',
     expiries: [0.25, 0.5, 1.0, 2.0],
-    strikes: [80, 90, 100, 110, 120],
+    secondary_values: [80, 90, 100, 110, 120],
     vols_row_major: rows.flat(),
     secondary_axis: 'strike',
     interpolation_mode: 'vol',

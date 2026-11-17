@@ -264,7 +264,7 @@ fn test_collateral_with_zero_quantity() {
 fn test_collateral_with_negative_price() {
     let context = create_standard_market_context().insert_price(
         "NEGATIVE_PRICE",
-        MarketScalar::Price(Money::new(-1.0, Currency::USD).expect("valid money fixture")),
+        MarketScalar::price(Money::new(-1.0, Currency::USD).expect("valid money fixture")),
     );
 
     let collateral = CollateralSpec::new("WEIRD_BOND", 1_000_000.0, "NEGATIVE_PRICE");

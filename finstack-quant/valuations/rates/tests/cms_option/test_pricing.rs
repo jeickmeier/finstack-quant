@@ -3,7 +3,9 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -32,20 +34,22 @@ fn standard_market(as_of: Date) -> MarketContext {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots(knots)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     market = market.insert(discount_curve);
 
-    // Add LIBOR Forward Curve (Flat 3% for simplicity, or slightly different)
+    // Add LIBOR Forward Curve (Flat 3.5%)
     // Let's make it 3.5% to have spread
-    let fwd_knots = vec![(0.0, 0.035), (10.0, 0.035), (30.0, 0.035)];
-    let forward_curve = ForwardCurve::builder(CurveId::new("USD-LIBOR-3M"), 0.25)
-        .base_date(as_of)
-        .day_count(DayCount::Act365F)
-        .knots(fwd_knots)
-        .build()
-        .unwrap();
+    let forward_curve = ForwardCurve::flat(
+        CurveId::new("USD-LIBOR-3M"),
+        as_of,
+        0.035,
+        DayCount::Act365F,
+    )
+    .unwrap();
 
     market = market.insert(forward_curve);
 
@@ -56,8 +60,11 @@ fn standard_market(as_of: Date) -> MarketContext {
     let flat_row = vec![0.20; 5];
 
     let mut builder = VolSurface::builder(CurveId::new("USD-CMS10Y-VOL"))
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&expiries)
-        .strikes(&strikes);
+        .secondary_values(&strikes);
 
     for _ in 0..expiries.len() {
         builder = builder.row(&flat_row);
@@ -274,7 +281,7 @@ fn rho_matches_manual_one_bp_discount_reprice() {
 
     let base_pv = inst.value(&market, as_of).unwrap().amount();
     let bumped = market
-        .bump([MarketBump::Curve {
+        .bump([MarketBump::DiscountCurve {
             id: inst.discount_curve_id.clone(),
             spec: BumpSpec::parallel_bp(1.0),
         }])
@@ -332,6 +339,7 @@ fn test_cms_option_requires_vol_surface_in_market() {
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         index_id: None,
+        cms_fixing_index_id: None,
         swap_fixed_frequency: Some(Tenor::semi_annual()),
         swap_float_frequency: Some(Tenor::quarterly()),
         swap_fixed_day_count: Some(DayCount::Thirty360),
@@ -367,6 +375,7 @@ fn seasoned_cms_option(fixing: Date, payment: Date) -> CmsOption {
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         index_id: None,
+        cms_fixing_index_id: Some(finstack_quant_core::types::IndexId::new("USD-CMS-10Y")),
         swap_fixed_frequency: Some(Tenor::semi_annual()),
         swap_float_frequency: Some(Tenor::quarterly()),
         swap_fixed_day_count: Some(DayCount::Thirty360),
@@ -381,16 +390,20 @@ fn seasoned_cms_option(fixing: Date, payment: Date) -> CmsOption {
     }
 }
 
-/// Insert a CMS fixing series (`FIXING:CMS-10Y:USD-LIBOR-3M`) recording
+/// Insert a CMS fixing series (`FIXING:USD-CMS-10Y`) recording
 /// `observed` on `fixing`.
 fn with_cms_fixing(market: MarketContext, fixing: Date, observed: f64) -> MarketContext {
-    use finstack_quant_core::market_data::fixings::cms_fixing_series_id;
-    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+    use finstack_quant_core::market_data::fixings::fixing_series_id;
+    use finstack_quant_core::market_data::scalars::{
+        ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+    };
 
     let series = ScalarTimeSeries::new(
-        cms_fixing_series_id("USD-LIBOR-3M", 10.0),
+        fixing_series_id("USD-CMS-10Y"),
         vec![(fixing, observed)],
         None,
+        SeriesInterpolation::Step,
+        SeriesExtrapolation::Error,
     )
     .expect("fixing series");
     market.insert_series(series)
@@ -413,7 +426,7 @@ fn test_seasoned_cms_option_uses_historical_fixing() {
         .value(&market, as_of)
         .expect_err("missing CMS fixing series must be a hard error");
     assert!(
-        err.to_string().contains("FIXING:CMS-10Y:USD-LIBOR-3M"),
+        err.to_string().contains("FIXING:USD-CMS-10Y"),
         "error must name the missing series: {err}"
     );
 
@@ -436,6 +449,13 @@ fn test_seasoned_cms_option_uses_historical_fixing() {
         "seasoned CMS caplet must price intrinsic on the recorded fixing: \
          expected {expected}, got {pv}"
     );
+
+    let mut missing_id = inst;
+    missing_id.cms_fixing_index_id = None;
+    let err = missing_id
+        .value(&market, as_of)
+        .expect_err("omitted cms_fixing_index_id must error on seasoned coupon");
+    assert!(err.to_string().contains("cms_fixing_index_id"), "{err}");
 }
 
 /// Same seasoned-fixing contract for the static-replication pricer.
@@ -456,7 +476,7 @@ fn test_seasoned_cms_option_replication_uses_historical_fixing() {
         .price_dyn(&inst, &market, as_of)
         .expect_err("missing CMS fixing series must be a hard error");
     assert!(
-        err.to_string().contains("FIXING:CMS-10Y:USD-LIBOR-3M"),
+        err.to_string().contains("FIXING:USD-CMS-10Y"),
         "error must name the missing series: {err}"
     );
 
@@ -498,8 +518,11 @@ fn skewed_vol_market(as_of: Date, atm_vol: f64, wing_vol: f64) -> MarketContext 
     // Per-strike vols: deep wings carry `wing_vol`, the ATM band carries `atm_vol`.
     let row = vec![wing_vol, wing_vol, atm_vol, atm_vol, atm_vol, atm_vol];
     let mut builder = VolSurface::builder(CurveId::new("USD-CMS10Y-VOL"))
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&expiries)
-        .strikes(&strikes);
+        .secondary_values(&strikes);
     for _ in 0..expiries.len() {
         builder = builder.row(&row);
     }
@@ -589,16 +612,23 @@ fn replication_greeks_reprice_with_the_replication_pricer() {
         "the request must price with static replication"
     );
 
-    for (metric, curve_id) in [
-        (MetricId::Delta, inst.forward_curve_id.clone()),
-        (MetricId::Rho, inst.discount_curve_id.clone()),
-    ] {
-        let bumped = market
-            .bump([MarketBump::Curve {
-                id: curve_id,
+    for (metric, bump) in [
+        (
+            MetricId::Delta,
+            MarketBump::ForwardCurve {
+                id: inst.forward_curve_id.clone(),
                 spec: BumpSpec::parallel_bp(1.0),
-            }])
-            .unwrap();
+            },
+        ),
+        (
+            MetricId::Rho,
+            MarketBump::DiscountCurve {
+                id: inst.discount_curve_id.clone(),
+                spec: BumpSpec::parallel_bp(1.0),
+            },
+        ),
+    ] {
+        let bumped = market.bump([bump]).unwrap();
         let expected = replication(&bumped) - base;
         let actual = result.measures.get(metric.as_str()).copied().unwrap();
         assert!(

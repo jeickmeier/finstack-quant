@@ -91,11 +91,11 @@ impl<'a> std::fmt::Debug for DayCountContext<'a> {
 /// [`DayCountContext::default`].
 pub struct DayCountContextState {
     /// Optional calendar code (e.g. "target2").
-    pub calendar_id: Option<String>,
+    calendar_id: Option<String>,
     /// Optional coupon frequency, required for ACT/ACT ISMA.
-    pub frequency: Option<Tenor>,
+    frequency: Option<Tenor>,
     /// Optional custom business-day divisor (defaults to 252 when `None`).
-    pub bus_basis: Option<u16>,
+    bus_basis: Option<u16>,
     /// Optional unadjusted regular ICMA reference period or ACT/365L enclosing
     /// coupon `(start, end)`, serialized as two ISO dates.
     ///
@@ -106,12 +106,12 @@ pub struct DayCountContextState {
         feature = "json-schema",
         schemars(with = "Option<(crate::wire::DateWire, crate::wire::DateWire)>")
     )]
-    pub coupon_period: Option<(Date, Date)>,
+    coupon_period: Option<(Date, Date)>,
     /// Whether the later accrual endpoint is the contractual termination
     /// date; `None` (omitted or `null` on the wire) means unspecified, which
     /// 30E/360 ISDA rejects.
     #[serde(default)]
-    pub end_is_termination_date: Option<bool>,
+    end_is_termination_date: Option<bool>,
 }
 
 /// Wire fields of [`DayCountContextState`]; deserialization validates them
@@ -186,10 +186,40 @@ impl DayCountContextState {
         })
     }
 
+    /// Optional holiday-calendar identifier (for example `"target2"`).
+    #[must_use]
+    pub fn get_calendar_id(&self) -> Option<&str> {
+        self.calendar_id.as_deref()
+    }
+
+    /// Optional coupon frequency (required by ACT/ACT ICMA).
+    #[must_use]
+    pub const fn get_frequency(&self) -> Option<Tenor> {
+        self.frequency
+    }
+
+    /// Optional custom business-day divisor (`None` selects 252 for Bus/252).
+    #[must_use]
+    pub const fn get_bus_basis(&self) -> Option<u16> {
+        self.bus_basis
+    }
+
+    /// Optional unadjusted ICMA reference period or enclosing ACT/365L coupon `(start, end)`.
+    #[must_use]
+    pub const fn get_coupon_period(&self) -> Option<(Date, Date)> {
+        self.coupon_period
+    }
+
+    /// Whether the later accrual endpoint is the termination date (`None` if unspecified).
+    #[must_use]
+    pub const fn get_end_is_termination_date(&self) -> Option<bool> {
+        self.end_is_termination_date
+    }
+
     /// Build a runtime [`DayCountContext`] using the built-in calendar lookup.
     ///
-    /// The fields are revalidated first, because public fields can be set
-    /// after [`Self::try_new`].
+    /// Validates the stored fields and resolves any `calendar_id` against the
+    /// built-in calendar registry.
     ///
     /// # Errors
     ///

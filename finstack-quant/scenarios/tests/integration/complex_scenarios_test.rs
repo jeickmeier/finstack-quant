@@ -34,6 +34,9 @@ fn test_fx_equity_curve_combo() {
     let curve = DiscountCurve::builder("USD_SOFR")
         .base_date(base_date)
         .knots(vec![(0.0, 1.0), (1.0, 0.98), (5.0, 0.90)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -42,7 +45,7 @@ fn test_fx_equity_curve_combo() {
         .insert(curve)
         .insert_price(
             "SPY",
-            MarketScalar::Price(Money::new(400.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(400.0, Currency::USD).expect("valid money fixture")),
         );
 
     let mut model = FinancialModelSpec::new(
@@ -77,7 +80,6 @@ fn test_fx_equity_curve_combo() {
         ],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -105,18 +107,14 @@ fn test_fx_equity_curve_combo() {
     assert!((rate - 1.155).abs() < 1e-6, "FX should be shocked");
 
     let price = market.get_price("SPY").unwrap();
-    match price {
-        MarketScalar::Price(money) => {
-            assert!(
-                (money.amount() - 340.0).abs() < 1e-6,
-                "Equity should be shocked"
-            );
-        }
-        MarketScalar::Unitless(_) => panic!("Expected Price"),
-    }
+    let money = price.get_price().expect("Expected Price");
+    assert!(
+        (money.amount() - 340.0).abs() < 1e-6,
+        "Equity should be shocked"
+    );
 
     let curve = market.get_discount("USD_SOFR").unwrap();
-    assert!(curve.df(1.0) < 0.98, "Curve should be shocked");
+    assert!(curve.df(1.0).unwrap() < 0.98, "Curve should be shocked");
 }
 
 #[test]
@@ -132,6 +130,8 @@ fn test_statements_rate_bindings_curve() {
         .base_date(base_date)
         .day_count(DayCount::Act365F)
         .knots(vec![(0.0, 1.0), (1.0, 0.98)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -187,7 +187,6 @@ fn test_statements_rate_bindings_curve() {
         ],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -236,7 +235,7 @@ fn test_time_roll_with_market_shocks() {
 
     let mut market = MarketContext::new().insert_price(
         "SPY",
-        MarketScalar::Price(Money::new(450.0, Currency::USD).expect("valid money fixture")),
+        MarketScalar::price(Money::new(450.0, Currency::USD).expect("valid money fixture")),
     );
     let mut model = FinancialModelSpec::new(
         "test",
@@ -264,7 +263,6 @@ fn test_time_roll_with_market_shocks() {
         ],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -287,12 +285,8 @@ fn test_time_roll_with_market_shocks() {
 
     // Price shocked
     let price = market.get_price("SPY").unwrap();
-    match price {
-        MarketScalar::Price(money) => {
-            assert!((money.amount() - 360.0).abs() < 1e-6);
-        }
-        MarketScalar::Unitless(_) => panic!("Expected Price"),
-    }
+    let money = price.get_price().expect("Expected Price");
+    assert!((money.amount() - 360.0).abs() < 1e-6);
 }
 
 #[test]
@@ -301,6 +295,9 @@ fn test_conflicting_operations_last_wins() {
     let curve = DiscountCurve::builder("USD_SOFR")
         .base_date(base_date)
         .knots(vec![(0.0, 1.0), (1.0, 0.98), (5.0, 0.90)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -334,7 +331,6 @@ fn test_conflicting_operations_last_wins() {
         ],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -352,7 +348,7 @@ fn test_conflicting_operations_last_wins() {
 
     // Both shocks applied sequentially: +25bp then +50bp = equivalent to +75bp
     let curve = market.get_discount("USD_SOFR").unwrap();
-    let df = curve.df(1.0);
+    let df = curve.df(1.0).unwrap();
     // Original DF(1Y) = 0.98. Parallel bumps shift continuously-compounded
     // zeros by exactly the requested size and compose additively, so two
     // sequential shocks of +25bp and +50bp are exactly a +75bp shift.
@@ -377,7 +373,6 @@ fn test_three_scenario_composition() {
         }],
         priority: -10,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let s2 = ScenarioSpec {
@@ -390,7 +385,6 @@ fn test_three_scenario_composition() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let s3 = ScenarioSpec {
@@ -403,7 +397,6 @@ fn test_three_scenario_composition() {
         }],
         priority: 10,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let composed = ScenarioSpec::compose(vec![s3, s1, s2]).expect("compose should succeed"); // Intentionally out of order
@@ -470,7 +463,6 @@ fn test_multiple_statement_operations() {
         ],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();

@@ -4,8 +4,8 @@
 //! These tests prove that:
 //! 1. `Money::format_with` uses the documented grouping defaults, and that
 //!    `format(decimals, show_currency)` matches the corresponding `FormatOpts`.
-//! 2. `DiscountCurveBuilder::validation(ValidationMode::*)` covers the
-//!    market-standard, negative-rate-friendly, and raw validation policies.
+//! 2. `DiscountCurveBuilder` covers negative-rate and arbitrary positive-DF
+//!    curves under explicit conventions without `ValidationMode`.
 //! 3. `VolSurface::from_grid` preserves the explicit axis and
 //!    interpolation contract.
 //! 4. `VolSurface::value_checked` and `value_in_bounds` agree on interior
@@ -20,7 +20,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::surfaces::{
     VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
 };
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, ValidationMode};
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::{FormatOpts, Money};
 use finstack_quant_core::types::{Bps, Rate};
@@ -60,35 +60,6 @@ fn format_with_handles_negative_amounts() {
     assert_eq!(amt.format_with(grouped), "USD -1,234.50");
 }
 
-// DiscountCurveBuilder::validation parity
-
-#[test]
-fn validation_mode_resolves_binding_presets_canonically() {
-    for name in [None, Some("market_standard")] {
-        assert_eq!(
-            ValidationMode::from_preset(name, None).expect("market preset"),
-            ValidationMode::MarketStandard
-        );
-    }
-    assert_eq!(
-        ValidationMode::from_preset(Some("negative_rate_friendly"), Some(-0.01))
-            .expect("negative-rate preset"),
-        ValidationMode::NegativeRateFriendly {
-            forward_floor: -0.01
-        }
-    );
-
-    for result in [
-        ValidationMode::from_preset(None, Some(-0.01)),
-        ValidationMode::from_preset(Some("market_standard"), Some(-0.01)),
-        ValidationMode::from_preset(Some("negative_rate_friendly"), None),
-        ValidationMode::from_preset(Some("negative_rate_friendly"), Some(f64::NAN)),
-        ValidationMode::from_preset(Some("unknown"), None),
-    ] {
-        assert!(result.is_err());
-    }
-}
-
 #[test]
 fn validation_market_standard_builds_monotonic_curve() {
     let base = d(2025, 1, 1);
@@ -96,13 +67,15 @@ fn validation_market_standard_builds_monotonic_curve() {
 
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(base)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots(knots)
-        .validation(ValidationMode::MarketStandard)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("market-standard validation build");
 
-    assert!(curve.df(0.25) < 1.0);
-    assert!(curve.df(4.5) < curve.df(0.25));
+    assert!(curve.df(0.25).expect("df") < 1.0);
+    assert!(curve.df(4.5).expect("df") < curve.df(0.25).expect("df"));
 }
 
 #[test]
@@ -112,16 +85,15 @@ fn validation_negative_rate_friendly_builds_increasing_discount_factors() {
 
     let curve = DiscountCurve::builder("EUR-OIS")
         .base_date(base)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots(knots)
         .interp(InterpStyle::LogLinear)
-        .validation(ValidationMode::NegativeRateFriendly {
-            forward_floor: -0.05,
-        })
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("negative-rate validation build");
 
-    assert!(curve.df(0.5) > 1.0);
-    assert!(curve.df(4.5) < curve.df(1.0));
+    assert!(curve.df(0.5).expect("df") > 1.0);
+    assert!(curve.df(4.5).expect("df") < curve.df(1.0).expect("df"));
 }
 
 #[test]
@@ -131,17 +103,15 @@ fn validation_raw_allows_non_monotonic_without_forward_floor() {
 
     let curve = DiscountCurve::builder("RAW")
         .base_date(base)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots(knots)
         .interp(InterpStyle::LogLinear)
-        .validation(ValidationMode::Raw {
-            allow_non_monotonic: true,
-            forward_floor: None,
-        })
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("raw validation build");
 
-    assert!(curve.df(0.5) > 1.0);
-    assert!(curve.df(4.5) < curve.df(1.0));
+    assert!(curve.df(0.5).expect("df") > 1.0);
+    assert!(curve.df(4.5).expect("df") < curve.df(1.0).expect("df"));
 }
 
 // VolSurface construction parity
@@ -155,11 +125,15 @@ fn sample_grid() -> (Vec<f64>, Vec<f64>, Vec<f64>) {
 }
 
 #[test]
-fn from_grid_default_matches_from_grid() {
+fn vol_surface_explicit_grid_opts_construct_consistently() {
     let (exp, strikes, vols) = sample_grid();
-    let a = VolSurface::from_grid("S", &exp, &strikes, &vols, Default::default(), None).unwrap();
-    let b =
-        VolSurface::from_grid("S", &exp, &strikes, &vols, VolGridOpts::default(), None).unwrap();
+    let opts = VolGridOpts {
+        secondary_axis: VolSurfaceAxis::Strike,
+        quote_type: VolQuoteType::BlackLognormal,
+        interpolation_mode: VolInterpolationMode::Vol,
+    };
+    let a = VolSurface::from_grid("S", &exp, &strikes, &vols, opts, None).unwrap();
+    let b = VolSurface::from_grid("S", &exp, &strikes, &vols, opts, None).unwrap();
 
     for &e in &exp {
         for &k in &strikes {
@@ -178,7 +152,7 @@ fn vol_surface_builder_matches_grid_constructor() {
     let (expiries, strikes, vols) = sample_grid();
     let mut builder = VolSurface::builder("S")
         .expiries(&expiries)
-        .strikes(&strikes)
+        .secondary_values(&strikes)
         .secondary_axis(VolSurfaceAxis::Tenor)
         .quote_type(VolQuoteType::Normal)
         .interpolation_mode(VolInterpolationMode::TotalVariance);
@@ -201,7 +175,7 @@ fn vol_surface_builder_matches_grid_constructor() {
     .expect("direct surface");
 
     assert_eq!(built.expiries(), direct.expiries());
-    assert_eq!(built.strikes(), direct.strikes());
+    assert_eq!(built.secondary_values(), direct.secondary_values());
     assert_eq!(built.secondary_axis(), direct.secondary_axis());
     assert_eq!(built.quote_type(), direct.quote_type());
     assert_eq!(built.interpolation_mode(), direct.interpolation_mode());
@@ -256,8 +230,19 @@ fn from_grid_preserves_axis_and_interpolation_mode() {
 #[test]
 fn value_checked_matches_value_clamped_on_interior() {
     let (exp, strikes, vols) = sample_grid();
-    let surface =
-        VolSurface::from_grid("S", &exp, &strikes, &vols, Default::default(), None).unwrap();
+    let surface = VolSurface::from_grid(
+        "S",
+        &exp,
+        &strikes,
+        &vols,
+        VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
+            interpolation_mode: VolInterpolationMode::Vol,
+        },
+        None,
+    )
+    .unwrap();
     // Strictly interior samples (not on grid edges) exercise the
     // shared bilinear kernel used by both evaluators.
     let test_pts = [

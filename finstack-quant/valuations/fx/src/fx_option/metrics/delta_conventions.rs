@@ -50,7 +50,9 @@ mod tests {
     use crate::fx_option::pricer::{COMPUTE_GREEKS_CALLS, compute_greeks};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
@@ -71,6 +73,9 @@ mod tests {
                 DiscountCurve::builder(id)
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, (-rate).exp())])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount curve"),
             );
@@ -78,7 +83,10 @@ mod tests {
         market.insert_surface(
             VolSurface::builder("EURUSD-VOL")
                 .expiries(&[0.5, 1.0])
-                .strikes(&[1.0, 1.2])
+                .secondary_values(&[1.0, 1.2])
+                .secondary_axis(VolSurfaceAxis::Strike)
+                .quote_type(VolQuoteType::BlackLognormal)
+                .interpolation_mode(VolInterpolationMode::Vol)
                 .row(&[0.15, 0.15])
                 .row(&[0.15, 0.15])
                 .build()

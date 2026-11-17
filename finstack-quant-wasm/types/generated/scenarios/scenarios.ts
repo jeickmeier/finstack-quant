@@ -1674,24 +1674,9 @@ export type IndexationMethod = "canadian" | "tips" | "uk" | "french" | "japanese
 /**
  * Contractual observation lag for inflation index reference dates.
  *
- * Inflation indices are published with a delay (typically 2-4 weeks). Securities
- * using these indices incorporate an observation lag to ensure the reference
- * index is published by settlement. This lag does not specify the actual
- * publication date; use [`InflationIndex::with_publication_dates`] for that.
- *
- * # Standard Lags by Market
- *
- * - **US TIPS**: 3-month lag (reference index from 3 months prior)
- * - **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)
- * - **French OATi**: 3-month lag
- * - **German index-linked**: 3-month lag
- *
- * # Rationale
- *
- * The lag ensures:
- * 1. Reference index is published before settlement
- * 2. Index value is known at coupon payment date
- * 3. No estimation or forecasting required for payment calculation
+ * Specifies how far before a contractual reference date the historical or
+ * projected CPI anchor is sampled. Publication and knowledge cutoffs are
+ * tracked separately on [`InflationIndex`].
  */
 export type InflationLag =
   | {
@@ -4236,18 +4221,6 @@ export type RoundingMode = "bankers" | "midpoint_away_from_zero" | "toward_zero"
 export type Warning =
   | {
       /**
-       * Hazard curve affected by the approximate spread shock.
-       */
-      curve_id: string;
-      kind: "hazard_spread_first_order";
-      /**
-       * Decimal recovery fraction used in the loss-given-default conversion.
-       */
-      recovery_rate: number;
-      [k: string]: unknown;
-    }
-  | {
-      /**
        * The discount curve selected by the heuristic.
        */
       chosen_discount: string;
@@ -4448,6 +4421,14 @@ export type Warning =
       [k: string]: unknown;
     }
   | {
+      kind: "vol_surface_bucket_empty_selection";
+      /**
+       * Volatility-surface identifier.
+       */
+      vol_surface_id: string;
+      [k: string]: unknown;
+    }
+  | {
       /**
        * Whether this was a parallel (`false`) or bucket (`true`) shock.
        */
@@ -4461,30 +4442,6 @@ export type Warning =
        * Volatility-surface identifier.
        */
       vol_surface_id: string;
-      [k: string]: unknown;
-    }
-  | {
-      kind: "hierarchy_no_match";
-      /**
-       * Operation `kind` tag (e.g., `"hierarchy_curve_parallel_bp"`).
-       */
-      op_kind: string;
-      /**
-       * Hierarchy path the operation targeted, joined with `/`.
-       */
-      target_path: string;
-      [k: string]: unknown;
-    }
-  | {
-      /**
-       * The resolved identifier that was skipped.
-       */
-      curve_id: string;
-      kind: "hierarchy_resolved_id_skipped";
-      /**
-       * Operation `kind` tag (e.g., `"hierarchy_curve_parallel_bp"`).
-       */
-      op_kind: string;
       [k: string]: unknown;
     }
   | {
@@ -4642,52 +4599,39 @@ export type AttributionMethod =
       taylor: TaylorAttributionConfig;
     };
 /**
- * How ParCDS operations deliver a spread shock onto a hazard curve.
- *
- * [`Self::SolveToPar`] is the production default: implied par CDS spreads are
- * shocked and the hazard is re-bootstrapped so the curve still prices those
- * quotes. [`Self::FirstOrderShift`] converts the spread shock to a hazard
- * shift using `delta_hazard = delta_spread / (1 - recovery)` and emits an
- * approximation warning. It does not reconcile the resulting par quotes.
- */
-export type HazardBumpMode = "solve_to_par" | "first_order_shift";
-/**
  * A predicate for filtering nodes by their tags.
  */
 export type TagPredicate =
   | {
       equals: {
         /**
-         * Tag key to match.
+         * Non-blank tag key to match.
          */
         key: string;
         /**
          * Expected tag value.
          */
         value: string;
-        [k: string]: unknown;
       };
     }
   | {
       in: {
         /**
-         * Tag key to match.
+         * Non-blank tag key to match.
          */
         key: string;
         /**
          * Accepted tag values.
          */
         values: string[];
-        [k: string]: unknown;
       };
     }
   | {
       exists: {
         /**
-         * Tag key that must be present.
+         * Non-blank tag key that must be present.
          */
         key: string;
-        [k: string]: unknown;
       };
     };
 /**
@@ -5089,7 +5033,7 @@ export type TenorMatchMode = "exact" | "interpolate";
  */
 export type TimeRollMode = "business_days" | "calendar_days" | "approximate";
 /**
- * Controls how shocks at multiple hierarchy levels combine for a single curve.
+ * Controls how shocks at multiple hierarchy levels combine for a single market target.
  */
 export type ResolutionMode = "most_specific_wins" | "cumulative";
 /**
@@ -9668,13 +9612,11 @@ export interface InflationSwap {
    */
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
-   * Contractual monthly reference-index interpolation; takes precedence over index metadata;
-   * without either source the default is monthly step interpolation.
+   * Explicit contractual monthly reference-index interpolation; no source default is used.
    */
   interpolation?: SeriesInterpolation | null;
   /**
-   * Contractual CPI observation lag; when `None` the index lag, then the
-   * curve's indexation lag, applies.
+   * Explicit contractual CPI observation lag; missing terms fail reference resolution.
    */
   lag?: InflationLag | null;
   /**
@@ -9754,13 +9696,11 @@ export interface YoYInflationSwap {
    */
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
-   * Contractual monthly reference-index interpolation; takes precedence over index metadata;
-   * without either source the default is monthly step interpolation.
+   * Explicit contractual monthly reference-index interpolation; no source default is used.
    */
   interpolation?: SeriesInterpolation | null;
   /**
-   * Contractual CPI observation lag; when `None` the index lag, then the
-   * curve's indexation lag, applies.
+   * Explicit contractual CPI observation lag; missing terms fail reference resolution.
    */
   lag?: InflationLag | null;
   /**
@@ -9829,13 +9769,12 @@ export interface InflationCapFloor {
    */
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
-   * Contractual monthly CPI interpolation; takes precedence over index metadata.
+   * Explicit contractual monthly CPI interpolation; no source default is used.
    * Defaults to monthly step interpolation when neither source supplies it.
    */
   interpolation?: SeriesInterpolation | null;
   /**
-   * Contractual CPI observation lag; when `None` the index lag, then the
-   * curve's indexation lag, applies.
+   * Explicit contractual CPI observation lag; missing terms fail reference resolution.
    */
   lag?: InflationLag | null;
   /**
@@ -10701,6 +10640,11 @@ export interface CmsSwap {
    */
   cms_cap?: number | null;
   /**
+   * Explicit CMS benchmark fixing identifier used for historical fixings
+   * (`FIXING:<cms_fixing_index_id>`), distinct from `forward_curve_id` and `index_id`.
+   */
+  cms_fixing_index_id?: Id | null;
+  /**
    * Optional floor on the CMS rate (decimal).
    */
   cms_floor?: number | null;
@@ -10823,6 +10767,11 @@ export interface CmsOption {
    * Attributes for scenario selection and grouping
    */
   attributes?: Attributes;
+  /**
+   * Explicit CMS benchmark fixing identifier used for historical fixings
+   * (`FIXING:<cms_fixing_index_id>`), distinct from `forward_curve_id` and `index_id`.
+   */
+  cms_fixing_index_id?: Id | null;
   /**
    * Tenor of the CMS reference swap (e.g. 10Y); must be month- or year-based.
    */
@@ -15482,6 +15431,12 @@ export interface CmsSpreadOption {
    */
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
+   * Explicit CMS benchmark fixing identifier for the long-tenor leg
+   * (`FIXING:<long_cms_fixing_index_id>`), distinct from `forward_curve_id`,
+   * `index_id`, and `short_cms_fixing_index_id`.
+   */
+  long_cms_fixing_index_id?: Id | null;
+  /**
    * Long CMS tenor (e.g., 10Y).
    */
   long_cms_tenor: Tenor;
@@ -15511,6 +15466,12 @@ export interface CmsSpreadOption {
    * Scenario-only pricing adjustments.
    */
   scenario_pricing_overrides?: ScenarioPricingOverrides;
+  /**
+   * Explicit CMS benchmark fixing identifier for the short-tenor leg
+   * (`FIXING:<short_cms_fixing_index_id>`), distinct from `forward_curve_id`,
+   * `index_id`, and `long_cms_fixing_index_id`.
+   */
+  short_cms_fixing_index_id?: Id | null;
   /**
    * Short CMS tenor (e.g., 2Y).
    */
@@ -19594,18 +19555,18 @@ export interface FxAttribution {
   [k: string]: unknown;
 }
 /**
- * A target specifying a hierarchy path with optional tag filtering.
+ * A target specifying a hierarchy path with an optional tag filter.
  */
 export interface HierarchyTarget {
   /**
-   * Path through the hierarchy (e.g., `["Credit", "US", "IG"]`).
+   * Non-empty path through the hierarchy (e.g., `["Credit", "US", "IG"]`).
    */
   path: string[];
   /**
-   * Optional tag filter applied to nodes in the subtree.
+   * Optional tag filter applied to nodes in the subtree; an empty filter
+   * canonicalizes to `None`.
    */
   tag_filter?: TagFilter | null;
-  [k: string]: unknown;
 }
 /**
  * A filter combining multiple tag predicates (AND semantics).
@@ -19615,7 +19576,6 @@ export interface TagFilter {
    * All predicates must match (AND semantics).
    */
   predicates: TagPredicate[];
-  [k: string]: unknown;
 }
 /**
  * Horizon total return: factor-decomposed P&L with scenario context.
@@ -20257,21 +20217,12 @@ export interface ScenarioEnvelope {
  *   to determine merge ordering (lower numbers run first).
  * - `resolution_mode`: Controls how hierarchy-targeted shocks at multiple tree
  *   levels combine for a single curve. Defaults to [`ResolutionMode::MostSpecificWins`].
- * - `hazard_bump_mode`: ParCDS delivery. Defaults to
- *   [`HazardBumpMode::SolveToPar`].
  */
 export interface ScenarioSpec {
   /**
    * Optional description.
    */
   description?: string | null;
-  /**
-   * How ParCDS curve operations rewrite hazard curves.
-   *
-   * Default: [`HazardBumpMode::SolveToPar`]. Omitted from JSON when left
-   * at that default so existing envelopes keep their wire shape.
-   */
-  hazard_bump_mode?: HazardBumpMode;
   /**
    * Unique identifier for this scenario.
    */

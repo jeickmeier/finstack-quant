@@ -4,7 +4,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::{
     DiscountCurve, PriceCurve, PriceCurveKind,
 };
@@ -31,7 +33,6 @@ fn scenario(operations: Vec<OperationSpec>) -> ScenarioSpec {
         operations,
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     }
 }
 
@@ -41,11 +42,17 @@ fn price_and_surface_shocks_preserve_their_collection_with_colliding_ids() {
     let discount = DiscountCurve::builder("AAPL")
         .base_date(as_of)
         .knots([(0.0, 1.0), (1.0, 0.95)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
     let surface = VolSurface::builder("AAPL")
         .expiries(&[0.5, 1.0])
-        .strikes(&[100.0])
+        .secondary_values(&[100.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[0.20])
         .row(&[0.20])
         .build()
@@ -55,7 +62,7 @@ fn price_and_surface_shocks_preserve_their_collection_with_colliding_ids() {
         .insert_surface(surface)
         .insert_price(
             "AAPL",
-            MarketScalar::Price(Money::from((100_i64, Currency::USD))),
+            MarketScalar::price(Money::from((100_i64, Currency::USD))),
         );
     let mut ctx = ExecutionContext {
         market: &mut market,
@@ -74,9 +81,12 @@ fn price_and_surface_shocks_preserve_their_collection_with_colliding_ids() {
             &mut ctx,
         )
         .expect("price shock");
-    let MarketScalar::Price(price) = ctx.market.get_price("AAPL").expect("price") else {
-        panic!("monetary price");
-    };
+    let price = ctx
+        .market
+        .get_price("AAPL")
+        .expect("price")
+        .get_price()
+        .expect("monetary price");
     assert!((price.amount() - 110.0).abs() < 1e-12);
     assert_eq!(
         report.changes.market_targets,
@@ -85,7 +95,11 @@ fn price_and_surface_shocks_preserve_their_collection_with_colliding_ids() {
         }]
     );
     assert_eq!(
-        ctx.market.get_discount("AAPL").expect("discount").df(1.0),
+        ctx.market
+            .get_discount("AAPL")
+            .expect("discount")
+            .df(1.0)
+            .expect("df"),
         0.95
     );
     let unshocked_vol = finstack_quant_models::volatility::get_surface_vol(
@@ -111,12 +125,19 @@ fn price_and_surface_shocks_preserve_their_collection_with_colliding_ids() {
             &mut ctx,
         )
         .expect("surface and composed price shocks");
-    let MarketScalar::Price(price) = ctx.market.get_price("AAPL").expect("price") else {
-        panic!("monetary price");
-    };
+    let price = ctx
+        .market
+        .get_price("AAPL")
+        .expect("price")
+        .get_price()
+        .expect("monetary price");
     assert!((price.amount() - 121.0).abs() < 1e-12);
     assert_eq!(
-        ctx.market.get_discount("AAPL").expect("discount").df(1.0),
+        ctx.market
+            .get_discount("AAPL")
+            .expect("discount")
+            .df(1.0)
+            .expect("df"),
         0.95
     );
     let shocked_vol = finstack_quant_models::volatility::get_surface_vol(
@@ -141,7 +162,10 @@ fn price_and_surface_shocks_preserve_their_collection_with_colliding_ids() {
 
 #[test]
 fn absent_base_correlation_targets_do_not_bump_an_unrelated_price() {
-    let mut market = MarketContext::new().insert_price("COLLISION", MarketScalar::Unitless(0.2));
+    let mut market = MarketContext::new().insert_price(
+        "COLLISION",
+        MarketScalar::unitless(0.2).expect("valid scalar"),
+    );
     let mut ctx = ExecutionContext {
         market: &mut market,
         model: None,
@@ -160,7 +184,11 @@ fn absent_base_correlation_targets_do_not_bump_an_unrelated_price() {
         )
         .expect_err("base-correlation target must exist");
     assert!(
-        matches!(market.get_price("COLLISION").expect("price remains"), MarketScalar::Unitless(v) if *v == 0.2)
+        market
+            .get_price("COLLISION")
+            .expect("price remains")
+            .get_unitless()
+            == Some(0.2)
     );
 }
 

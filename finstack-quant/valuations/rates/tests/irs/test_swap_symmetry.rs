@@ -26,21 +26,29 @@ fn create_test_market(base_date: Date, short_rate: f64, long_rate: f64) -> Marke
             (5.0, (-short_rate * 3.0 - long_rate * 2.0).exp()), // Blend to long rate
             (10.0, (-long_rate * 10.0).exp()),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     // Forward curve with slightly different rates
     let fwd_rate = (short_rate + long_rate) / 2.0;
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(base_date)
-        .knots([
+    let fwd = ForwardCurve::from_zero_rates(
+        "USD-SOFR-3M",
+        base_date,
+        &[
             (0.0, fwd_rate),
             (1.0, fwd_rate * 1.05),
             (5.0, fwd_rate * 1.10),
             (10.0, fwd_rate * 1.15),
-        ])
-        .build()
-        .unwrap();
+        ],
+        finstack_quant_core::math::Compounding::Continuous,
+        finstack_quant_core::dates::DayCount::Act365F,
+        finstack_quant_core::math::interp::InterpStyle::LogLinear,
+        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+    )
+    .unwrap();
 
     MarketContext::new().insert(disc).insert(fwd)
 }

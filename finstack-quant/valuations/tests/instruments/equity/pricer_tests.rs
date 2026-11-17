@@ -12,7 +12,7 @@ use finstack_quant_valuations::instruments::pricing::GenericInstrumentPricer;
 use finstack_quant_valuations::pricer::{InstrumentType, ModelKey, Pricer};
 
 fn build_flat_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve {
-    let mut builder = DiscountCurve::builder(curve_id)
+    let builder = DiscountCurve::builder(curve_id)
         .base_date(base_date)
         .day_count(DayCount::Act365F)
         .knots([
@@ -21,18 +21,9 @@ fn build_flat_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve
             (0.5, (-rate * 0.5).exp()),
             (1.0, (-rate).exp()),
             (2.0, (-rate * 2.0).exp()),
-        ]);
-
-    // For zero or negative rates, the curve may be flat or increasing
-    // which requires allow_non_monotonic()
-    if rate.abs() < 1e-10 || rate < 0.0 {
-        builder = builder.validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        );
-    }
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend);
 
     builder.build().expect("Failed to build discount curve")
 }
@@ -65,7 +56,7 @@ fn test_equity_pricer_from_market_data() {
 
     let market = MarketContext::new().insert_price(
         "AAPL",
-        MarketScalar::Price(Money::new(200.0, Currency::USD).expect("valid money fixture")),
+        MarketScalar::price(Money::new(200.0, Currency::USD).expect("valid money fixture")),
     );
 
     let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
@@ -86,7 +77,7 @@ fn test_equity_pricer_with_custom_price_id() {
 
     let market = MarketContext::new().insert_price(
         "CUSTOM_PRICE_ID",
-        MarketScalar::Price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
+        MarketScalar::price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
     );
 
     let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
@@ -111,7 +102,10 @@ fn test_equity_dividend_yield_default() {
 #[test]
 fn test_equity_dividend_yield_from_market() {
     let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_div_yield_id("AAPL-DIVYIELD");
-    let market = MarketContext::new().insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.025)); // 2.5% dividend yield
+    let market = MarketContext::new().insert_price(
+        "AAPL-DIVYIELD",
+        MarketScalar::unitless(0.025).expect("valid scalar"),
+    ); // 2.5% dividend yield
 
     let div_yield = equity.dividend_yield(&market).unwrap();
     assert_eq!(div_yield, 0.025);
@@ -122,8 +116,10 @@ fn test_equity_dividend_yield_with_custom_id() {
     let equity =
         Equity::new("EQUITY1", "AAPL", Currency::USD).with_div_yield_id("CUSTOM_DIV_YIELD");
 
-    let market =
-        MarketContext::new().insert_price("CUSTOM_DIV_YIELD", MarketScalar::Unitless(0.03)); // 3% dividend yield
+    let market = MarketContext::new().insert_price(
+        "CUSTOM_DIV_YIELD",
+        MarketScalar::unitless(0.03).expect("valid scalar"),
+    ); // 3% dividend yield
 
     let div_yield = equity.dividend_yield(&market).unwrap();
     assert_eq!(div_yield, 0.03);
@@ -139,9 +135,10 @@ fn test_equity_forward_price() {
     let base_date = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let curve = build_flat_curve(0.05, base_date, "USD");
 
-    let market = MarketContext::new()
-        .insert(curve)
-        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
+    let market = MarketContext::new().insert(curve).insert_price(
+        "AAPL-DIVYIELD",
+        MarketScalar::unitless(0.02).expect("valid scalar"),
+    );
 
     // Forward price at t=1 year: S0 * exp((r - q) * t) = 100 * exp((0.05 - 0.02) * 1)
     let forward_price = equity
@@ -291,9 +288,10 @@ fn test_equity_forward_price_high_dividend() {
     let curve = build_flat_curve(0.05, base_date, "USD");
 
     // High dividend yield (10%) exceeds risk-free rate
-    let market = MarketContext::new()
-        .insert(curve)
-        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.10));
+    let market = MarketContext::new().insert(curve).insert_price(
+        "AAPL-DIVYIELD",
+        MarketScalar::unitless(0.10).expect("valid scalar"),
+    );
 
     // Forward should be lower than spot when div yield > r
     let forward_price = equity

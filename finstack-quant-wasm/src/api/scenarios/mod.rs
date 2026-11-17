@@ -68,7 +68,7 @@ pub fn parse_scenario_spec(
 /// Rejects malformed structured specs, any input spec that fails
 /// `ScenarioSpec` validation (blank ID, non-finite numbers, invalid
 /// identifiers, tenors or operations; the message names the scenario), input
-/// specs with mixed `hazard_bump_mode` values, composition that contains more
+/// specs with mixed `resolution_mode` values, composition that contains more
 /// than one time-roll operation, or failure to convert the composed
 /// specification.
 /// @param specs - ScenarioSpec objects to validate and compose in priority order.
@@ -399,7 +399,7 @@ pub fn compute_horizon_return(
 #[cfg(test)]
 mod tests {
     use finstack_quant_core::market_data::hierarchy::ResolutionMode;
-    use finstack_quant_scenarios::{HazardBumpMode, OperationSpec, ScenarioSpec, TimeRollMode};
+    use finstack_quant_scenarios::{OperationSpec, ScenarioSpec, TimeRollMode};
 
     fn empty_spec(id: &str, priority: i32) -> ScenarioSpec {
         ScenarioSpec {
@@ -409,7 +409,6 @@ mod tests {
             operations: Vec::new(),
             priority,
             resolution_mode: ResolutionMode::default(),
-            hazard_bump_mode: Default::default(),
         }
     }
 
@@ -448,25 +447,6 @@ mod tests {
         let error = error.to_string();
         assert!(
             error.contains("TimeRollForward"),
-            "unexpected error: {error}"
-        );
-    }
-
-    #[test]
-    fn compose_helper_rejects_mixed_hazard_bump_modes() {
-        let mut first_order = empty_spec("first-order", 0);
-        first_order.hazard_bump_mode = HazardBumpMode::FirstOrderShift;
-        let solve_to_par = empty_spec("solve-to-par", 1);
-
-        let error =
-            finstack_quant_scenarios::ScenarioSpec::compose(vec![first_order, solve_to_par])
-                .expect_err("mixed hazard bump modes should be rejected")
-                .to_string();
-        assert!(
-            error.contains("first-order")
-                && error.contains("first_order_shift")
-                && error.contains("solve-to-par")
-                && error.contains("solve_to_par"),
             "unexpected error: {error}"
         );
     }

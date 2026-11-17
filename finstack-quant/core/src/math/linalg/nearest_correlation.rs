@@ -96,9 +96,11 @@ impl Default for NearestCorrelationOpts {
 ///   `1e-6` at any off-diagonal entry.
 /// * [`CorrelationError::DiagonalNotOne`] if any diagonal entry is further than `1e-3`
 ///   from `1.0`.
-/// * [`CorrelationError::EigenDecompositionFailed`] if `input` contains a non-finite entry
-///   or a PSD projection cannot decompose its symmetric input.
-/// * [`CorrelationError::InvalidOptions`] if `opts.tol` is non-finite or non-positive.
+/// * [`CorrelationError::OutOfBounds`] if `input` contains a non-finite entry.
+/// * [`CorrelationError::EigenDecompositionFailed`] if a PSD projection cannot decompose its
+///   symmetric input or its reconstruction overflows.
+/// * [`CorrelationError::InvalidOptions`] if `opts.max_iter == 0` or `opts.tol` is
+///   non-finite, non-positive, or `>= 1.0`.
 /// * [`CorrelationError::DidNotConverge`] if the algorithm fails to converge within
 ///   `opts.max_iter` iterations.
 pub fn nearest_correlation(
@@ -106,7 +108,7 @@ pub fn nearest_correlation(
     n: usize,
     opts: NearestCorrelationOpts,
 ) -> Result<Vec<f64>, CorrelationError> {
-    if !opts.tol.is_finite() || opts.tol <= 0.0 {
+    if opts.max_iter == 0 || !opts.tol.is_finite() || opts.tol <= 0.0 || opts.tol >= 1.0 {
         return Err(CorrelationError::InvalidOptions {
             max_iter: opts.max_iter,
             tol: opts.tol,
@@ -122,8 +124,16 @@ pub fn nearest_correlation(
     if n == 0 {
         return Ok(Vec::new());
     }
-    if input.iter().any(|value| !value.is_finite()) {
-        return Err(CorrelationError::EigenDecompositionFailed);
+    if let Some((idx, &value)) = input
+        .iter()
+        .enumerate()
+        .find(|(_, value)| !value.is_finite())
+    {
+        return Err(CorrelationError::OutOfBounds {
+            i: idx / n,
+            j: idx % n,
+            value,
+        });
     }
 
     // Sanity gates: reject pathological inputs. Small defects are fine —
@@ -151,8 +161,7 @@ pub fn nearest_correlation(
     // Preserve the original off-diagonal objective. Projecting the diagonal
     // to one is the exact solution whenever that matrix is already a valid
     // correlation matrix; congruence rescaling would change the target.
-    let y = symmetrize(input, n);
-    let mut unit_diagonal = y.clone();
+    let mut unit_diagonal = symmetrize(input, n);
     for i in 0..n {
         unit_diagonal[i * n + i] = 1.0;
     }
@@ -165,7 +174,8 @@ pub fn nearest_correlation(
     // per-iteration `clone()`.
     let mut s = vec![0.0_f64; size];
     let mut r = vec![0.0_f64; size];
-    let mut prev = y;
+    let mut prev_x = unit_diagonal.clone();
+    let mut prev = unit_diagonal;
     let mut next = vec![0.0_f64; size];
     for _ in 0..opts.max_iter {
         // Dykstra correction: r = prev - s
@@ -185,11 +195,18 @@ pub fn nearest_correlation(
             next[i * n + i] = 1.0;
         }
 
-        if frobenius_diff(&next, &prev) < opts.tol
-            && super::validate_correlation_matrix(&next, n).is_ok()
+        let dx = relative_frobenius_diff(&x, &prev_x, &x);
+        let dy = relative_frobenius_diff(&next, &prev, &next);
+        let dxy = relative_frobenius_diff(&next, &x, &next);
+        if matches!(
+            (dx, dy, dxy),
+            (Some(dx), Some(dy), Some(dxy))
+                if dx <= opts.tol && dy <= opts.tol && dxy <= opts.tol
+        ) && super::validate_correlation_matrix(&next, n).is_ok()
         {
             return Ok(next);
         }
+        prev_x = x;
         std::mem::swap(&mut prev, &mut next);
     }
 
@@ -221,14 +238,15 @@ fn project_psd(matrix: &[f64], n: usize) -> Result<Vec<f64>, CorrelationError> {
     let mut out = vec![0.0_f64; n * n];
     for i in 0..n {
         for j in i..n {
-            let mut sum = 0.0_f64;
-            for k in 0..n {
+            let sum = crate::math::summation::neumaier_sum((0..n).filter_map(|k| {
                 let lambda = eigenvalues[k].max(0.0);
                 if lambda == 0.0 {
-                    continue;
+                    None
+                } else {
+                    Some(lambda * eigenvectors[i * n + k] * eigenvectors[j * n + k])
                 }
-                sum += lambda * eigenvectors[i * n + k] * eigenvectors[j * n + k];
-            }
+            }))
+            .map_err(|_| CorrelationError::EigenDecompositionFailed)?;
             out[i * n + j] = sum;
             out[j * n + i] = sum;
         }
@@ -239,21 +257,61 @@ fn project_psd(matrix: &[f64], n: usize) -> Result<Vec<f64>, CorrelationError> {
 fn symmetrize(matrix: &[f64], n: usize) -> Vec<f64> {
     let mut out = vec![0.0; n * n];
     for i in 0..n {
-        for j in 0..n {
-            out[i * n + j] = 0.5 * (matrix[i * n + j] + matrix[j * n + i]);
+        out[i * n + i] = matrix[i * n + i];
+        for j in (i + 1)..n {
+            let val = 0.5 * matrix[i * n + j] + 0.5 * matrix[j * n + i];
+            out[i * n + j] = val;
+            out[j * n + i] = val;
         }
     }
     out
 }
 
-fn frobenius_diff(a: &[f64], b: &[f64]) -> f64 {
+/// Scaled relative Frobenius difference `||a - b||_F / ||denom||_F`.
+///
+/// Returns `Some(0.0)` for `0 / 0`, `None` for nonzero numerator over zero
+/// denominator or non-finite inputs, and `None` if the scaled ratio overflows.
+fn relative_frobenius_diff(a: &[f64], b: &[f64], denom: &[f64]) -> Option<f64> {
     debug_assert_eq!(a.len(), b.len());
-    let mut acc = 0.0;
-    for (x, y) in a.iter().zip(b.iter()) {
-        let d = x - y;
-        acc += d * d;
+    debug_assert_eq!(a.len(), denom.len());
+
+    let mut max_den = 0.0_f64;
+    for &d in denom {
+        if !d.is_finite() {
+            return None;
+        }
+        max_den = max_den.max(d.abs());
     }
-    acc.sqrt()
+
+    let mut max_half = 0.0_f64;
+    for (&x, &y) in a.iter().zip(b.iter()) {
+        let half_d = 0.5 * x - 0.5 * y;
+        if !half_d.is_finite() {
+            return None;
+        }
+        max_half = max_half.max(half_d.abs());
+    }
+    if max_half == 0.0 {
+        return Some(0.0);
+    }
+    if max_den == 0.0 {
+        return None;
+    }
+
+    let mut num_ss = 0.0_f64;
+    for (&x, &y) in a.iter().zip(b.iter()) {
+        let scaled = (0.5 * x - 0.5 * y) / max_half;
+        num_ss += scaled * scaled;
+    }
+
+    let mut den_ss = 0.0_f64;
+    for &d in denom {
+        let scaled = d / max_den;
+        den_ss += scaled * scaled;
+    }
+
+    let ratio = 2.0 * (max_half / max_den) * (num_ss / den_ss).sqrt();
+    if ratio.is_finite() { Some(ratio) } else { None }
 }
 
 #[cfg(test)]
@@ -347,21 +405,26 @@ mod tests {
     }
 
     #[test]
-    fn non_finite_input_reports_eigendecomposition_failure() {
+    fn non_finite_input_reports_out_of_bounds() {
         let input = vec![1.0, f64::NAN, f64::NAN, 1.0];
         let err = nearest_correlation(&input, 2, NearestCorrelationOpts::default())
-            .expect_err("eigendecomposition failure must be reported");
+            .expect_err("non-finite off-diagonal must be reported");
 
-        assert!(matches!(err, CorrelationError::EigenDecompositionFailed));
-        assert_eq!(err.to_string(), "Symmetric eigendecomposition failed");
+        assert!(matches!(
+            err,
+            CorrelationError::OutOfBounds { i: 0, j: 1, value } if value.is_nan()
+        ));
     }
 
     #[test]
-    fn non_finite_diagonal_reports_eigendecomposition_failure() {
+    fn non_finite_diagonal_reports_out_of_bounds() {
         let err = nearest_correlation(&[f64::NAN], 1, NearestCorrelationOpts::default())
             .expect_err("non-finite diagonal must be reported");
 
-        assert!(matches!(err, CorrelationError::EigenDecompositionFailed));
+        assert!(matches!(
+            err,
+            CorrelationError::OutOfBounds { i: 0, j: 0, value } if value.is_nan()
+        ));
     }
 
     /// The algorithm is Higham (2002) Algorithm 3.3: the Dykstra correction is
@@ -391,11 +454,11 @@ mod tests {
 
         // It must be "nearby" — the Frobenius distance must be strictly less
         // than the input's own Frobenius norm (i.e. not a wild extrapolation).
-        let frob_dist = frobenius_diff(&input, &repaired);
-        let frob_input = frobenius_diff(&input, &[0.0; 9]);
+        let rel_dist =
+            relative_frobenius_diff(&input, &repaired, &input).expect("finite relative distance");
         assert!(
-            frob_dist < frob_input,
-            "Frobenius distance to repaired ({frob_dist:.6}) should be less than input norm ({frob_input:.6})"
+            rel_dist < 1.0,
+            "Relative Frobenius distance to repaired ({rel_dist:.6}) should be less than 1.0"
         );
 
         // All off-diagonals converge to the analytic Frobenius-nearest
@@ -477,31 +540,19 @@ mod tests {
     #[test]
     fn rejects_invalid_options() {
         let input = vec![1.0, 0.5, 0.5, 1.0];
-        assert_eq!(
-            nearest_correlation(
-                &input,
-                2,
-                NearestCorrelationOpts {
-                    max_iter: 0,
-                    tol: 1e-8,
-                },
-            )
-            .expect("valid correlation matrix needs zero iterations"),
-            input
-        );
-        let indefinite = vec![1.0, 0.9, 0.9, 0.9, 1.0, -0.9, 0.9, -0.9, 1.0];
-        assert!(matches!(
-            nearest_correlation(
-                &indefinite,
-                3,
-                NearestCorrelationOpts {
-                    max_iter: 0,
-                    tol: 1e-8,
-                },
-            ),
-            Err(CorrelationError::DidNotConverge { max_iter: 0, .. })
-        ));
         for opts in [
+            NearestCorrelationOpts {
+                max_iter: 0,
+                tol: 1e-8,
+            },
+            NearestCorrelationOpts {
+                max_iter: 100,
+                tol: 1.0,
+            },
+            NearestCorrelationOpts {
+                max_iter: 100,
+                tol: 1.5,
+            },
             NearestCorrelationOpts {
                 max_iter: 100,
                 tol: 0.0,
@@ -519,11 +570,34 @@ mod tests {
                 tol: f64::INFINITY,
             },
         ] {
-            assert!(matches!(
-                nearest_correlation(&input, 2, opts),
-                Err(CorrelationError::InvalidOptions { .. })
-            ));
+            assert!(
+                matches!(
+                    nearest_correlation(&input, 2, opts),
+                    Err(CorrelationError::InvalidOptions { .. })
+                ),
+                "expected InvalidOptions for {opts:?}"
+            );
+            assert!(
+                matches!(
+                    nearest_correlation(&[], 0, opts),
+                    Err(CorrelationError::InvalidOptions { .. })
+                ),
+                "expected InvalidOptions even for n=0 with {opts:?}"
+            );
         }
+    }
+
+    #[test]
+    fn relative_frobenius_diff_handles_extreme_scales_and_zero_denominators() {
+        let big = [f64::MAX, 0.0];
+        let neg_big = [-f64::MAX, 0.0];
+        assert_eq!(relative_frobenius_diff(&big, &neg_big, &big), Some(2.0));
+        assert_eq!(relative_frobenius_diff(&big, &big, &[0.0, 0.0]), Some(0.0));
+        assert_eq!(
+            relative_frobenius_diff(&big, &[0.0, 0.0], &[0.0, 0.0]),
+            None
+        );
+        assert_eq!(relative_frobenius_diff(&big, &big, &[f64::NAN, 0.0]), None);
     }
 
     /// Smoke test for the `n > 40` regime: the divide-and-conquer

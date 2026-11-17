@@ -7,7 +7,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_core::market_data::term_structures::InflationCurve;
-use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use time::Month;
 
 // Test Fixtures
@@ -22,15 +22,18 @@ pub(crate) fn sample_discount_curve(id: &str) -> DiscountCurve {
         .day_count(DayCount::Act365F) // Explicit day count convention
         .knots([(0.0, 1.0), (1.0, 0.98), (2.0, 0.96)])
         .interp(InterpStyle::Linear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
 
 pub(crate) fn sample_forward_curve(id: &str) -> ForwardCurve {
-    ForwardCurve::builder(id, 0.25)
+    ForwardCurve::builder(id)
         .base_date(sample_base_date())
-        .day_count(DayCount::Act360) // Explicit day count (LIBOR/SOFR convention)
-        .knots([(0.0, 0.02), (1.0, 0.021), (2.0, 0.022)])
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 1.0), (1.0, 0.98), (2.0, 0.96)])
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -38,6 +41,7 @@ pub(crate) fn sample_forward_curve(id: &str) -> ForwardCurve {
 pub(crate) fn sample_hazard_curve(id: &str) -> HazardCurve {
     HazardCurve::builder(id)
         .base_date(sample_base_date())
+        .day_count(DayCount::Act365F)
         .knots([(1.0, 0.01), (3.0, 0.015), (5.0, 0.02)])
         .recovery_rate(0.40)
         .build()
@@ -46,9 +50,11 @@ pub(crate) fn sample_hazard_curve(id: &str) -> HazardCurve {
 
 pub(crate) fn sample_inflation_curve(id: &str) -> InflationCurve {
     InflationCurve::builder(id)
-        .base_cpi(100.0)
         .base_date(sample_base_date())
+        .day_count(DayCount::Act365F)
         .knots([(0.0, 100.0), (1.0, 102.0), (2.0, 104.0)])
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Flat)
         .build()
         .unwrap()
 }
@@ -61,9 +67,15 @@ pub(crate) fn sample_base_correlation_curve(id: &str) -> BaseCorrelationCurve {
 }
 
 pub(crate) fn sample_vol_surface() -> VolSurface {
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
+    };
     VolSurface::builder("EQ-VOL")
         .expiries(&[0.25, 0.5, 1.0])
-        .strikes(&[0.9, 1.0, 1.1])
+        .secondary_values(&[0.9, 1.0, 1.1])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[0.25, 0.24, 0.23])
         .row(&[0.22, 0.21, 0.2])
         .row(&[0.2, 0.19, 0.18])

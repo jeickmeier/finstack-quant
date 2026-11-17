@@ -36,7 +36,7 @@ pub(crate) fn bond_coupon_dates(bond: &Bond) -> Result<Vec<(Date, Date, Date)>> 
                     "ACT/365L bond timing requires contractual coupon accrual metadata".into(),
                 )
             })?;
-            let period = accrual.get_context().coupon_period.ok_or_else(|| {
+            let period = accrual.get_context().get_coupon_period().ok_or_else(|| {
                 finstack_quant_core::Error::Validation(
                     "ACT/365L custom bond timing requires explicit full coupon_period metadata"
                         .into(),
@@ -138,10 +138,10 @@ pub(crate) fn act365l_year_fraction(
                 coupon_period: Some((coupon_start, coupon_end)),
                 ..DayCountContext::default()
             },
-        )?);
+        )?)?;
         current = slice_end;
     }
-    Ok(total.total())
+    total.get_total()
 }
 
 /// Remaining contractual coupon grid of a bond on the bond model clock.
@@ -317,15 +317,19 @@ mod tests {
         accrual: &finstack_quant_core::cashflow::CashFlowAccrual,
         coupon_period: Option<(Date, Date)>,
     ) -> finstack_quant_core::Result<finstack_quant_core::cashflow::CashFlowAccrual> {
+        let ctx = accrual.get_context();
         finstack_quant_core::cashflow::CashFlowAccrual::new(
             accrual.get_start(),
             accrual.get_end(),
             accrual.get_day_count(),
             accrual.get_projected_index_rate(),
-            finstack_quant_core::dates::DayCountContextState {
+            finstack_quant_core::dates::DayCountContextState::try_new(
+                ctx.get_calendar_id().map(str::to_owned),
+                ctx.get_frequency(),
+                ctx.get_bus_basis(),
                 coupon_period,
-                ..accrual.get_context().clone()
-            },
+                ctx.get_end_is_termination_date(),
+            )?,
         )
     }
     use finstack_quant_core::currency::Currency;
@@ -424,6 +428,9 @@ mod tests {
         let curve = DiscountCurve::builder("MODEL-DATES")
             .base_date(as_of)
             .knots([(0.0, 1.0), (3.0, 0.88)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("model discount curve");
         let dfs = bond_cashflow_dfs_on_model_grid(&curve, as_of, &delayed_model, 12)
@@ -443,10 +450,23 @@ mod tests {
         );
         // A subinterval cannot identify its enclosing coupon without full
         // boundaries, and overlapping full coupons are ambiguous.
+        {
+            let flow_accrual = custom
+                .get_flows()
+                .iter()
+                .find_map(|flow| {
+                    flow.get_kind()
+                        .is_coupon()
+                        .then_some(flow.get_accrual().as_ref())
+                        .flatten()
+                })
+                .expect("coupon accrual");
+            assert!(with_coupon_period(flow_accrual, None).is_err());
+        }
         custom
             .update_flows(|flow| {
-                if let Some(accrual) = &mut flow.accrual {
-                    *accrual = with_coupon_period(accrual, None)?;
+                if flow.kind.is_coupon() {
+                    flow.accrual = None;
                 }
                 Ok(())
             })

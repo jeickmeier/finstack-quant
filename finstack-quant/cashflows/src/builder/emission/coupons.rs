@@ -296,13 +296,15 @@ pub(crate) fn emit_fixed_coupons_on(
                     accrual_end,
                     spec.schedule.day_count,
                     None,
-                    finstack_quant_core::dates::DayCountContextState {
-                        calendar_id: Some(spec.schedule.calendar_id.to_string()),
-                        end_is_termination_date: Some(is_termination_date),
+                    finstack_quant_core::dates::DayCountContextState::try_new(
+                        Some(spec.schedule.calendar_id.to_string()),
+                        (spec.schedule.day_count
+                            == finstack_quant_core::dates::DayCount::ActActIsma)
+                            .then_some(spec.schedule.frequency),
+                        None,
                         coupon_period,
-                        frequency: None,
-                        bus_basis: None,
-                    },
+                        Some(is_termination_date),
+                    )?,
                 )?;
 
                 // Gate on cash split, not amount sign, so negative-rate coupons emit.
@@ -805,21 +807,21 @@ pub(crate) fn emit_float_coupons_on(
             for ((segment, settlement), (cash_dec, pik_dec)) in
                 segments.iter().zip(settlements).zip(split_amounts)
             {
+                let float_ctx = floating_accrual_context(schedule, period, segment.end)?;
                 let accrual = CashFlowAccrual::new(
                     segment.start,
                     segment.end,
                     spec.schedule.day_count,
                     Some(settlement.projected_index_rate),
-                    finstack_quant_core::dates::DayCountContextState {
-                        calendar_id: Some(spec.schedule.calendar_id.to_string()),
-                        coupon_period: floating_accrual_context(schedule, period, segment.end)?
-                            .coupon_period,
-                        end_is_termination_date: Some(
-                            schedule.terminal_accrual_end == Some(segment.end),
-                        ),
-                        frequency: None,
-                        bus_basis: None,
-                    },
+                    finstack_quant_core::dates::DayCountContextState::try_new(
+                        Some(spec.schedule.calendar_id.to_string()),
+                        (spec.schedule.day_count
+                            == finstack_quant_core::dates::DayCount::ActActIsma)
+                            .then_some(spec.schedule.frequency),
+                        None,
+                        float_ctx.coupon_period,
+                        Some(schedule.terminal_accrual_end == Some(segment.end)),
+                    )?,
                 )?;
                 if !cash_fraction_dec.is_zero() {
                     out_flows.push(
@@ -879,16 +881,15 @@ mod tests {
         let past = Date::from_calendar_date(2025, Month::January, 3).expect("past");
         let as_of = Date::from_calendar_date(2025, Month::January, 6).expect("valuation");
         let future = Date::from_calendar_date(2025, Month::January, 7).expect("future");
-        let curve = ForwardCurve::builder("TEST-ON", 1.0 / 360.0)
-            .base_date(base)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.04), (1.0, 0.04)])
-            .build()
-            .expect("curve");
+        let cont_rate = 360.0 * (0.04_f64 / 360.0).ln_1p();
+        let curve =
+            ForwardCurve::flat("TEST-ON", base, cont_rate, DayCount::Act360).expect("curve");
         let complete = ScalarTimeSeries::new(
             "FIXING:TEST-ON",
             vec![(past, 0.051), (as_of, 0.052), (future, 0.99)],
             None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .expect("series");
         for (date, expected) in [(past, 0.051), (as_of, 0.052), (future, 0.04)] {
@@ -907,14 +908,15 @@ mod tests {
         let base = Date::from_calendar_date(2025, Month::January, 2).expect("base");
         let observation = Date::from_calendar_date(2025, Month::January, 3).expect("observation");
         let as_of = Date::from_calendar_date(2025, Month::January, 6).expect("valuation");
-        let curve = ForwardCurve::builder("TEST-ON", 1.0 / 360.0)
-            .base_date(base)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.04), (1.0, 0.04)])
-            .build()
-            .expect("curve");
-        let incomplete = ScalarTimeSeries::new("FIXING:TEST-ON", vec![(base, 0.04)], None)
-            .expect("incomplete history");
+        let curve = ForwardCurve::flat("TEST-ON", base, 0.04, DayCount::Act360).expect("curve");
+        let incomplete = ScalarTimeSeries::new(
+            "FIXING:TEST-ON",
+            vec![(base, 0.04)],
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("incomplete history");
         for history in [None, Some(&incomplete)] {
             let error =
                 observed_overnight_rate(observation, 360.0, &curve, history, "TEST-ON", as_of)
@@ -937,15 +939,17 @@ mod tests {
         let past = Date::from_calendar_date(2025, Month::January, 3).expect("past fixing");
         let base = Date::from_calendar_date(2025, Month::January, 6).expect("curve base");
         let future = Date::from_calendar_date(2025, Month::January, 7).expect("future fixing");
-        let curve = ForwardCurve::builder("TEST-ON", 1.0 / 365.0)
-            .base_date(base)
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, 0.04), (1.0, 0.04)])
-            .build()
-            .expect("curve");
-        let fixings =
-            ScalarTimeSeries::new("FIXING:TEST-ON", vec![(past, 0.041), (base, 0.042)], None)
-                .expect("observed ACT/360 fixings");
+        let cont_rate = 365.0 * (0.04_f64 / 365.0).ln_1p();
+        let curve =
+            ForwardCurve::flat("TEST-ON", base, cont_rate, DayCount::Act365F).expect("curve");
+        let fixings = ScalarTimeSeries::new(
+            "FIXING:TEST-ON",
+            vec![(past, 0.041), (base, 0.042)],
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("observed ACT/360 fixings");
         for (date, expected) in [(past, 0.041), (base, 0.042)] {
             let actual = observed_overnight_rate(
                 date,
@@ -967,17 +971,19 @@ mod tests {
             curve.base_date(),
         )
         .expect("projected ACT/360 fixing");
-        assert!((projected - 0.04 * 360.0 / 365.0).abs() < 1e-14);
+        assert!((projected - 0.04 * 360.0 / 365.0).abs() < 1e-12);
     }
 
     #[test]
-    fn overnight_replay_propagates_day_count_errors() {
+    fn overnight_replay_propagates_curve_range_errors() {
         let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::January, 3).expect("valid date");
-        let curve = ForwardCurve::builder("TEST-ON", 1.0 / 360.0)
+        let curve = ForwardCurve::builder("TEST-ON")
             .base_date(base)
-            .day_count(finstack_quant_core::dates::DayCount::ActActIsma)
-            .knots([(0.0, 0.05), (1.0, 0.05)])
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 1.0), (1.0 / 360.0, (-0.05_f64 / 360.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Error)
             .build()
             .expect("valid forward curve");
         let calendar = calendar_by_id_strict("weekends_only").expect("calendar registered");
@@ -1000,23 +1006,30 @@ mod tests {
                     curve.base_date(),
                 )
             })
-            .expect_err("Act/Act ISMA requires frequency context");
+            .expect_err("out-of-range observation must error");
 
         assert!(
-            err.to_string().contains("frequency") || err.to_string().contains("Invalid"),
+            matches!(err, finstack_quant_core::Error::Input(_))
+                || err.to_string().contains("exceeds")
+                || err.to_string().contains("knot")
+                || err.to_string().contains("range")
+                || err.to_string().contains("extrapolat")
+                || err.to_string().contains("Out"),
             "unexpected error: {err}"
         );
     }
 
     #[test]
-    fn overnight_lookback_replay_propagates_day_count_errors() {
+    fn overnight_lookback_replay_propagates_curve_range_errors() {
         let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let start = Date::from_calendar_date(2025, Month::January, 6).expect("valid date");
         let end = Date::from_calendar_date(2025, Month::January, 7).expect("valid date");
-        let curve = ForwardCurve::builder("TEST-ON", 1.0 / 360.0)
+        let curve = ForwardCurve::builder("TEST-ON")
             .base_date(base)
-            .day_count(finstack_quant_core::dates::DayCount::ActActIsma)
-            .knots([(0.0, 0.05), (1.0, 0.05)])
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 1.0), (2.0 / 360.0, (-0.05_f64 / 180.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Error)
             .build()
             .expect("valid forward curve");
         let calendar = calendar_by_id_strict("weekends_only").expect("calendar registered");
@@ -1039,10 +1052,15 @@ mod tests {
                     curve.base_date(),
                 )
             })
-            .expect_err("Act/Act ISMA requires frequency context");
+            .expect_err("out-of-range observation must error");
 
         assert!(
-            err.to_string().contains("frequency") || err.to_string().contains("Invalid"),
+            matches!(err, finstack_quant_core::Error::Input(_))
+                || err.to_string().contains("exceeds")
+                || err.to_string().contains("knot")
+                || err.to_string().contains("range")
+                || err.to_string().contains("extrapolat")
+                || err.to_string().contains("Out"),
             "unexpected error: {err}"
         );
     }

@@ -76,8 +76,8 @@ fn parallel_bp_many(
 ///
 /// Specs are stably sorted by ascending ``priority`` (equal priorities keep
 /// input order) and their operations concatenated in that order. Every input
-/// must use the same ``hazard_bump_mode``; mixed hazard delivery conventions
-/// are rejected rather than silently selecting one.
+/// must use the same ``resolution_mode``; mixed resolution modes are rejected
+/// rather than silently selecting one.
 ///
 /// The composed spec takes its ``id`` and ``name`` from the inputs joined
 /// with ``+`` / ``" + "``, its ``description`` from the present input
@@ -99,7 +99,7 @@ fn parallel_bp_many(
 /// Raises
 /// ------
 /// ValueError
-///     If `specs` contain mixed ``hazard_bump_mode`` values or more than one
+///     If `specs` contain mixed ``resolution_mode`` values or more than one
 ///     time-roll operation.
 ///
 /// Examples

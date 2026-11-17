@@ -24,22 +24,14 @@ use time::macros::date;
 fn flat_discount(id: &str, as_of: finstack_quant_core::dates::Date, rate: f64) -> DiscountCurve {
     let tenors = [0.0, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0];
     let knots: Vec<(f64, f64)> = tenors.iter().map(|&t| (t, (-rate * t).exp())).collect();
-    let builder = DiscountCurve::builder(id)
+    DiscountCurve::builder(id)
         .base_date(as_of)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots(knots)
-        .interp(InterpStyle::Linear);
-    // Negative rates produce DF > 1 (non-monotone): use the documented
-    // negative-rate validation preset, as a production EUR/CHF curve would.
-    let builder = if rate < 0.0 {
-        builder.validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::NegativeRateFriendly {
-                forward_floor: -0.02,
-            },
-        )
-    } else {
-        builder
-    };
-    builder.build().unwrap()
+        .interp(InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+        .build()
+        .unwrap()
 }
 
 /// A coupon paying strictly inside `(T0, T1]` must satisfy the
@@ -198,12 +190,13 @@ fn metrics_based_attributes_forward_curve_basis_move() {
     let as_of_t1 = date!(2025 - 01 - 16);
 
     let fwd = |as_of: finstack_quant_core::dates::Date, rate: f64| {
-        ForwardCurve::builder("USD-SOFR-3M", 0.25)
-            .base_date(as_of)
-            .knots([(0.0, rate), (1.0, rate), (5.0, rate), (10.0, rate)])
-            .interp(InterpStyle::Linear)
-            .build()
-            .unwrap()
+        ForwardCurve::flat(
+            "USD-SOFR-3M",
+            as_of,
+            rate,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .unwrap()
     };
 
     // Discount unchanged; forward +10bp — a pure basis move.

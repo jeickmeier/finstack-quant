@@ -451,6 +451,10 @@ export type D_826Db27Dbb673D9F5F86 =
        */
       currency?: Currency3 | null;
       /**
+       * Right-tail extrapolation policy
+       */
+      extrapolation: "flat" | "error";
+      /**
        * Series identifier
        */
       id: string;
@@ -467,41 +471,19 @@ export type D_826Db27Dbb673D9F5F86 =
   | {
       currency: Currency4;
       /**
-       * Unique identifier
+       * Distinct strictly ascending monthly expected-release schedule assumptions.
+       */
+      expected_releases?: DDd7456D16C4914754Fab[];
+      /**
+       * Unique identifier.
        */
       id: string;
-      /**
-       * Interpolation method
-       */
-      interpolation: "step" | "linear";
       kind: "inflation_fixings";
+      knowledge_date: Date13;
       /**
-       * Lag policy
+       * Strictly ascending canonical monthly fixing observations.
        */
-      lag:
-        | {
-            months: number;
-          }
-        | {
-            days: number;
-          }
-        | "none";
-      /**
-       * Observations as (date, value) pairs
-       */
-      observations: [Date, number][];
-      /**
-       * Explicit monthly observation availability; no release dates are inferred.
-       */
-      publication_dates?: D_7Badbe6D060A37Bc56Dc[];
-      /**
-       * Optional seasonality factors
-       *
-       * @minItems 12
-       * @maxItems 12
-       */
-      seasonality?:
-        [number, number, number, number, number, number, number, number, number, number, number, number] | null;
+      observations: D_0B2Cf6C063Ea8082C33E[];
     }
   | {
       /**
@@ -546,23 +528,40 @@ export type D_826Db27Dbb673D9F5F86 =
     }
   | {
       /**
+       * At-the-money strike convention.
+       */
+      atm_convention: "delta_neutral_straddle";
+      /**
        * ATM delta-neutral straddle vols per expiry.
        */
       atm_vols: number[];
       /**
-       * Optional 10-delta butterfly per expiry.
+       * Optional 10-delta arithmetic smile butterfly per expiry.
        */
       bf_10d?: number[] | null;
       /**
-       * 25-delta butterfly per expiry.
+       * 25-delta arithmetic smile butterfly per expiry.
        */
       bf_25d: number[];
+      /**
+       * Butterfly quote convention.
+       */
+      butterfly_convention: "smile";
+      /**
+       * Delta convention governing wing delta-to-strike conversion.
+       */
+      delta_convention: "forward_unadjusted";
       /**
        * Expiry times in years.
        */
       expiries: number[];
+      /**
+       * Optional volatility clock translating calendar expiry dates to `expiries`.
+       */
+      expiry_clock?: D_04Fbc100264B0Ba64E0F | null;
       id: Id5;
       kind: "fx_vol_surface";
+      pair: D_438246Cb8Efc61E5Dba2;
       /**
        * Optional 10-delta risk reversal per expiry.
        */
@@ -1494,9 +1493,377 @@ export type Date10 = string;
  */
 export type Date11 = string;
 /**
+ * ISO 8601 calendar date string.
+ */
+export type Date12 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date13 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date14 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date15 = string;
+/**
+ * Day-count convention used to measure expiry times from `reference_date`.
+ */
+export type DayCount =
+  | "one_one"
+  | "act_360"
+  | "act_365f"
+  | "act_365l"
+  | "30_360"
+  | "30_360_isda"
+  | "30e_360"
+  | "30e_360_isda"
+  | "30_360_it"
+  | "nl_365"
+  | "act_act"
+  | "act_act_isma"
+  | "act_act_afb"
+  | "bus_252";
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date16 = string;
+/**
  * Surface identifier.
  */
 export type Id5 = string;
+/**
+ * ISO 4217 currency code.
+ */
+export type Currency5 =
+  | "AED"
+  | "AFN"
+  | "ALL"
+  | "AMD"
+  | "ANG"
+  | "AOA"
+  | "ARS"
+  | "AUD"
+  | "AWG"
+  | "AZN"
+  | "BAM"
+  | "BBD"
+  | "BDT"
+  | "BGN"
+  | "BHD"
+  | "BIF"
+  | "BMD"
+  | "BND"
+  | "BOB"
+  | "BRL"
+  | "BSD"
+  | "BTN"
+  | "BWP"
+  | "BYN"
+  | "BZD"
+  | "CAD"
+  | "CDF"
+  | "CHF"
+  | "CLF"
+  | "CLP"
+  | "CNY"
+  | "COP"
+  | "CRC"
+  | "CUC"
+  | "CUP"
+  | "CVE"
+  | "CZK"
+  | "DJF"
+  | "DKK"
+  | "DOP"
+  | "DZD"
+  | "EGP"
+  | "ERN"
+  | "ETB"
+  | "EUR"
+  | "FJD"
+  | "FKP"
+  | "GBP"
+  | "GEL"
+  | "GHS"
+  | "GIP"
+  | "GMD"
+  | "GNF"
+  | "GTQ"
+  | "GYD"
+  | "HKD"
+  | "HNL"
+  | "HRK"
+  | "HTG"
+  | "HUF"
+  | "IDR"
+  | "ILS"
+  | "INR"
+  | "IQD"
+  | "IRR"
+  | "ISK"
+  | "JMD"
+  | "JOD"
+  | "JPY"
+  | "KES"
+  | "KGS"
+  | "KHR"
+  | "KMF"
+  | "KPW"
+  | "KRW"
+  | "KWD"
+  | "KYD"
+  | "KZT"
+  | "LAK"
+  | "LBP"
+  | "LKR"
+  | "LRD"
+  | "LSL"
+  | "LYD"
+  | "MAD"
+  | "MDL"
+  | "MGA"
+  | "MKD"
+  | "MMK"
+  | "MNT"
+  | "MOP"
+  | "MRU"
+  | "MUR"
+  | "MVR"
+  | "MWK"
+  | "MXN"
+  | "MYR"
+  | "MZN"
+  | "NAD"
+  | "NGN"
+  | "NIO"
+  | "NOK"
+  | "NPR"
+  | "NZD"
+  | "OMR"
+  | "PAB"
+  | "PEN"
+  | "PGK"
+  | "PHP"
+  | "PKR"
+  | "PLN"
+  | "PYG"
+  | "QAR"
+  | "RON"
+  | "RSD"
+  | "RUB"
+  | "RWF"
+  | "SAR"
+  | "SBD"
+  | "SCR"
+  | "SDG"
+  | "SEK"
+  | "SGD"
+  | "SHP"
+  | "SLE"
+  | "SLL"
+  | "SOS"
+  | "SRD"
+  | "SSP"
+  | "STN"
+  | "SYP"
+  | "SZL"
+  | "THB"
+  | "TJS"
+  | "TMT"
+  | "TND"
+  | "TOP"
+  | "TRY"
+  | "TTD"
+  | "TWD"
+  | "TZS"
+  | "UAH"
+  | "UGX"
+  | "USD"
+  | "UYU"
+  | "UZS"
+  | "VED"
+  | "VES"
+  | "VND"
+  | "VUV"
+  | "WST"
+  | "XAF"
+  | "XCD"
+  | "XCG"
+  | "XOF"
+  | "XPF"
+  | "YER"
+  | "ZAR"
+  | "ZMW"
+  | "ZWG"
+  | "ZWL";
+/**
+ * ISO 4217 currency code.
+ */
+export type Currency6 =
+  | "AED"
+  | "AFN"
+  | "ALL"
+  | "AMD"
+  | "ANG"
+  | "AOA"
+  | "ARS"
+  | "AUD"
+  | "AWG"
+  | "AZN"
+  | "BAM"
+  | "BBD"
+  | "BDT"
+  | "BGN"
+  | "BHD"
+  | "BIF"
+  | "BMD"
+  | "BND"
+  | "BOB"
+  | "BRL"
+  | "BSD"
+  | "BTN"
+  | "BWP"
+  | "BYN"
+  | "BZD"
+  | "CAD"
+  | "CDF"
+  | "CHF"
+  | "CLF"
+  | "CLP"
+  | "CNY"
+  | "COP"
+  | "CRC"
+  | "CUC"
+  | "CUP"
+  | "CVE"
+  | "CZK"
+  | "DJF"
+  | "DKK"
+  | "DOP"
+  | "DZD"
+  | "EGP"
+  | "ERN"
+  | "ETB"
+  | "EUR"
+  | "FJD"
+  | "FKP"
+  | "GBP"
+  | "GEL"
+  | "GHS"
+  | "GIP"
+  | "GMD"
+  | "GNF"
+  | "GTQ"
+  | "GYD"
+  | "HKD"
+  | "HNL"
+  | "HRK"
+  | "HTG"
+  | "HUF"
+  | "IDR"
+  | "ILS"
+  | "INR"
+  | "IQD"
+  | "IRR"
+  | "ISK"
+  | "JMD"
+  | "JOD"
+  | "JPY"
+  | "KES"
+  | "KGS"
+  | "KHR"
+  | "KMF"
+  | "KPW"
+  | "KRW"
+  | "KWD"
+  | "KYD"
+  | "KZT"
+  | "LAK"
+  | "LBP"
+  | "LKR"
+  | "LRD"
+  | "LSL"
+  | "LYD"
+  | "MAD"
+  | "MDL"
+  | "MGA"
+  | "MKD"
+  | "MMK"
+  | "MNT"
+  | "MOP"
+  | "MRU"
+  | "MUR"
+  | "MVR"
+  | "MWK"
+  | "MXN"
+  | "MYR"
+  | "MZN"
+  | "NAD"
+  | "NGN"
+  | "NIO"
+  | "NOK"
+  | "NPR"
+  | "NZD"
+  | "OMR"
+  | "PAB"
+  | "PEN"
+  | "PGK"
+  | "PHP"
+  | "PKR"
+  | "PLN"
+  | "PYG"
+  | "QAR"
+  | "RON"
+  | "RSD"
+  | "RUB"
+  | "RWF"
+  | "SAR"
+  | "SBD"
+  | "SCR"
+  | "SDG"
+  | "SEK"
+  | "SGD"
+  | "SHP"
+  | "SLE"
+  | "SLL"
+  | "SOS"
+  | "SRD"
+  | "SSP"
+  | "STN"
+  | "SYP"
+  | "SZL"
+  | "THB"
+  | "TJS"
+  | "TMT"
+  | "TND"
+  | "TOP"
+  | "TRY"
+  | "TTD"
+  | "TWD"
+  | "TZS"
+  | "UAH"
+  | "UGX"
+  | "USD"
+  | "UYU"
+  | "UZS"
+  | "VED"
+  | "VES"
+  | "VND"
+  | "VUV"
+  | "WST"
+  | "XAF"
+  | "XCD"
+  | "XCG"
+  | "XOF"
+  | "XPF"
+  | "YER"
+  | "ZAR"
+  | "ZMW"
+  | "ZWG"
+  | "ZWL";
 /**
  * A stable identifier for a market quote (e.g., "USD-OIS-SWAP-5Y").
  *
@@ -1519,6 +1886,76 @@ export type Id5 = string;
  */
 export type D_5Faecdb7B217A77D4Df7 = string;
 /**
+ * Canonical family-typed identifier for an addressable entry in
+ * [`MarketContext`](crate::market_data::context::MarketContext).
+ *
+ * Identifiers in `MarketContext` are namespace-local: the same `CurveId` may
+ * coexist across distinct stores (for example a `VolSurface` and a
+ * `ScalarTimeSeries`). `MarketDataTarget` pairs an exact [`CurveId`] with the
+ * exact store and subkind to select without multi-store probing.
+ */
+export type DE98120A9Ebcd8Bce537A =
+  | {
+      id: Id6;
+      kind: "discount_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id6;
+      kind: "forward_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id6;
+      kind: "parametric_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id6;
+      kind: "hazard_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id6;
+      kind: "inflation_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id6;
+      kind: "price_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id6;
+      kind: "vol_index_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id6;
+      kind: "base_correlation";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id6;
+      kind: "vol_surface";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id6;
+      kind: "price_scalar";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id6;
+      kind: "unitless_scalar";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id6;
+      kind: "series";
+      [k: string]: unknown;
+    };
+/**
  * Opaque string identifier.
  */
 export type Id6 = string;
@@ -1538,14 +1975,14 @@ export type D_08Aea844Abd10Cb00E40 =
        * Reference to a named quote set in the parent plan.
        */
       quote_set: string;
-      base_date: Date12;
+      base_date: Date17;
       conventions?: D_5F0B38036294B8235C6A;
-      currency: Currency5;
+      currency: Currency7;
       curve_id: Id7;
       /**
        * Extrapolation policy for the curve.
        */
-      extrapolation?: "flat_zero" | "flat_forward" | "none";
+      extrapolation?: "flat" | "extend" | "error";
       /**
        * Interpolation style for the constructed discount curve.
        *
@@ -1587,18 +2024,26 @@ export type D_08Aea844Abd10Cb00E40 =
        * Reference to a named quote set in the parent plan.
        */
       quote_set: string;
-      base_date: Date13;
+      base_date: Date18;
       conventions?: D_5F0B38036294B8235C6A1;
-      currency: Currency6;
+      currency: Currency8;
       curve_id: Id8;
       discount_curve_id: Id9;
       /**
-       * Interpolation style for the constructed forward curve.
+       * Policy controlling queries beyond the final calibrated pillar time.
+       */
+      extrapolation?: "flat" | "extend" | "error";
+      /**
+       * Contractual index tenor metadata attached to the calibrated forward curve.
+       */
+      index_tenor?: Tenor | null;
+      /**
+       * Interpolation style for the constructed forward curve's projection factors.
        *
-       * Defaults to monotone cubic Hermite (Fritsch-Carlson) interpolation for a
-       * smooth, shape-preserving forward term structure that admits zero and
-       * negative rates. `Linear` remains explicitly opt-in; `MonotoneConvex` is
-       * rejected because it is defined on discount factors, not forward rates.
+       * Defaults to log-linear factor interpolation (`log_linear`). All five
+       * [`InterpStyle`] variants (`linear`, `log_linear`, `cubic_hermite`,
+       * `piecewise_quadratic_forward`, `monotone_convex`) are supported on the
+       * underlying positive projection-factor evaluator.
        */
       interpolation?: "linear" | "log_linear" | "monotone_convex" | "cubic_hermite" | "piecewise_quadratic_forward";
       kind: "forward";
@@ -1621,10 +2066,6 @@ export type D_08Aea844Abd10Cb00E40 =
               [k: string]: unknown;
             };
           };
-      /**
-       * Tenor in years for the forward curve.
-       */
-      tenor_years: number;
     }
   | {
       /**
@@ -1635,13 +2076,13 @@ export type D_08Aea844Abd10Cb00E40 =
        * Reference to a named quote set in the parent plan.
        */
       quote_set: string;
-      base_date: Date14;
+      base_date: Date19;
       /**
        * Optional CDS valuation convention used by synthetic CDS instruments
        * during hazard calibration and rebootstrap.
        */
       cds_valuation_convention?: D_3D7928F8797773779Aed | null;
-      currency: Currency7;
+      currency: Currency9;
       curve_id: Id10;
       discount_curve_id: Id11;
       /**
@@ -1679,14 +2120,6 @@ export type D_08Aea844Abd10Cb00E40 =
        */
       notional?: number;
       /**
-       * Interpolation method for par spreads reported by the calibrated curve.
-       *
-       * Note: this is used for *quoting/interpolation of stored par spreads* and does not affect
-       * survival no-arbitrage, which is enforced via non-negative hazards together with the
-       * required log-linear survival interpolation.
-       */
-      par_interp?: "linear" | "log_linear";
-      /**
        * Required recovery-rate assumption as a decimal fraction in `[0, 1]`.
        */
       recovery_rate: number;
@@ -1705,18 +2138,23 @@ export type D_08Aea844Abd10Cb00E40 =
        */
       quote_set: string;
       /**
-       * Base CPI level used as the curve's reference CPI at t=0.
-       *
-       * This is the contractual reference CPI at the start date after applying
-       * observation lag and monthly interpolation. Its curve date is
-       * `base_date - observation_lag`. Supplied index observations must reproduce
-       * this value, including seasonality; a mismatch is rejected.
+       * Explicit contractual reference CPI at the start date, after lag and interpolation.
+       * This denominator is independent of the projection source's origin CPI.
        */
       base_cpi: number;
-      base_date: Date15;
-      currency: Currency8;
+      base_date: Date20;
+      /**
+       * Source-clock holiday calendar; required for business-day clocks.
+       */
+      calendar_id?: string | null;
+      currency: Currency10;
       curve_id: Id12;
+      day_count: DayCount2;
       discount_curve_id: Id13;
+      /**
+       * Explicit scalar CPI tail policy, applied without lag or normalization.
+       */
+      extrapolation: "flat" | "extend" | "error";
       /**
        * Reference index (e.g. "USA-CPI-U").
        */
@@ -1724,7 +2162,7 @@ export type D_08Aea844Abd10Cb00E40 =
       /**
        * Interpolation style for the curve.
        */
-      interpolation?: "linear" | "log_linear" | "monotone_convex" | "cubic_hermite" | "piecewise_quadratic_forward";
+      interpolation: "linear" | "log_linear" | "monotone_convex" | "cubic_hermite" | "piecewise_quadratic_forward";
       kind: "inflation";
       /**
        * Calibration method to use.
@@ -1748,14 +2186,15 @@ export type D_08Aea844Abd10Cb00E40 =
        */
       notional?: number;
       /**
-       * Month observation lag (e.g. "3M"); "none" means zero months.
-       * Day-based lags are unsupported because output curves carry month lags.
-       *
-       * Overrides the quote convention's lag and must match any supplied index
-       * lag. The same lag determines the output curve's reference-date origin and the dates
-       * of the CPI observations consumed by calibration instruments.
+       * Explicit contractual month observation lag (e.g. "3M"); "none" means zero months.
+       * Overrides the quote convention's lag without changing the projection source origin.
        */
       observation_lag: string;
+      /**
+       * Finite positive absolute CPI level at the projection source's origin.
+       */
+      source_base_cpi: number;
+      source_base_date: Date21;
     }
   | {
       /**
@@ -1766,7 +2205,7 @@ export type D_08Aea844Abd10Cb00E40 =
        * Reference to a named quote set in the parent plan.
        */
       quote_set: string;
-      base_date: Date16;
+      base_date: Date22;
       /**
        * SABR Beta parameter.
        */
@@ -1828,18 +2267,18 @@ export type D_08Aea844Abd10Cb00E40 =
        * silently substituting a nearby bucket.
        */
       allow_sabr_missing_bucket_fallback?: boolean;
-      base_date: Date17;
+      base_date: Date23;
       /**
        * Optional calendar identifier for date adjustments.
        */
       calendar_id?: string | null;
-      currency: Currency9;
+      currency: Currency11;
       discount_curve_id: Id14;
       /**
        * Optional day count convention for fixed-leg coupon accrual only.
        * Option expiry and variance always use ACT/365F.
        */
-      fixed_day_count?: DayCount | null;
+      fixed_day_count?: DayCount1 | null;
       /**
        * Optional forward curve identifier (if different from discount curve).
        */
@@ -1912,7 +2351,7 @@ export type D_08Aea844Abd10Cb00E40 =
        * Reference to a named quote set in the parent plan.
        */
       quote_set: string;
-      base_date: Date18;
+      base_date: Date24;
       /**
        * Business day convention for synthetic tranche schedule adjustments.
        */
@@ -1921,7 +2360,7 @@ export type D_08Aea844Abd10Cb00E40 =
        * Optional calendar identifier for schedule generation and date adjustments.
        */
       calendar_id?: string | null;
-      currency: Currency10;
+      currency: Currency12;
       /**
        * Contractual date regime of the synthetic tranches (record
        * CALIBRATION-FRAMEWORK-007, O7): `standard` CDS roll dates (20th of
@@ -1932,7 +2371,7 @@ export type D_08Aea844Abd10Cb00E40 =
       /**
        * Day count convention for synthetic tranche premium accrual.
        */
-      day_count?: DayCount | null;
+      day_count?: DayCount1 | null;
       /**
        * Expected tranche detachment points as decimals in `(0, 1]` (e.g. `0.03`
        * for 3%), the same unit as `CdsTrancheQuote.detachment`. When non-empty,
@@ -2018,8 +2457,8 @@ export type D_08Aea844Abd10Cb00E40 =
        * Reference to a named quote set in the parent plan.
        */
       quote_set: string;
-      base_date: Date19;
-      currency: Currency11;
+      base_date: Date25;
+      currency: Currency13;
       curve_id: Id16;
       /**
        * Required positive maximum implied-quote error in quoted volatility units.
@@ -2046,8 +2485,8 @@ export type D_08Aea844Abd10Cb00E40 =
        * Reference to a named quote set in the parent plan.
        */
       quote_set: string;
-      base_date: Date20;
-      currency: Currency12;
+      base_date: Date26;
+      currency: Currency14;
       discount_curve_id: Id17;
       /**
        * Required positive maximum implied-quote error in quoted volatility units.
@@ -2084,7 +2523,7 @@ export type D_08Aea844Abd10Cb00E40 =
        * Reference to a named quote set in the parent plan.
        */
       quote_set: string;
-      base_date: Date21;
+      base_date: Date27;
       /**
        * Discount curve ID (optional).
        */
@@ -2127,19 +2566,15 @@ export type D_08Aea844Abd10Cb00E40 =
        * Reference to a named quote set in the parent plan.
        */
       quote_set: string;
-      base_date: Date22;
-      /**
-       * Optional ID for the byproduct basis spread curve.
-       */
-      basis_spread_curve_id?: Id6 | null;
+      base_date: Date28;
       conventions?: D_5F0B38036294B8235C6A2;
-      currency: Currency13;
+      currency: Currency15;
       curve_id: Id20;
       domestic_discount_id: Id21;
       /**
        * Extrapolation policy for the foreign curve.
        */
-      extrapolation?: "flat_zero" | "flat_forward" | "none";
+      extrapolation?: "flat" | "extend" | "error";
       /**
        * T+0 cash FX rate (domestic per foreign), used when a quote omits `spot_fx`.
        *
@@ -2182,7 +2617,7 @@ export type D_08Aea844Abd10Cb00E40 =
        * Reference to a named quote set in the parent plan.
        */
       quote_set: string;
-      base_date: Date23;
+      base_date: Date29;
       curve_id: Id22;
       /**
        * Optional initial parameter guesses.
@@ -2197,11 +2632,11 @@ export type D_08Aea844Abd10Cb00E40 =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date12 = string;
+export type Date17 = string;
 /**
  * Day-count convention.
  */
-export type DayCount =
+export type DayCount1 =
   | "one_one"
   | "act_360"
   | "act_365f"
@@ -2284,7 +2719,7 @@ export type D_9F40E937966E31F97B30 =
 /**
  * ISO 4217 currency code.
  */
-export type Currency5 =
+export type Currency7 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -2453,11 +2888,11 @@ export type Id7 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date13 = string;
+export type Date18 = string;
 /**
  * ISO 4217 currency code.
  */
-export type Currency6 =
+export type Currency8 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -2630,7 +3065,7 @@ export type Id9 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date14 = string;
+export type Date19 = string;
 /**
  * Valuation presentation and pricing policy for CDS marks.
  *
@@ -2645,7 +3080,7 @@ export type D_3D7928F8797773779Aed =
 /**
  * ISO 4217 currency code.
  */
-export type Currency7 =
+export type Currency9 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -2818,366 +3253,7 @@ export type Id11 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date15 = string;
-/**
- * ISO 4217 currency code.
- */
-export type Currency8 =
-  | "AED"
-  | "AFN"
-  | "ALL"
-  | "AMD"
-  | "ANG"
-  | "AOA"
-  | "ARS"
-  | "AUD"
-  | "AWG"
-  | "AZN"
-  | "BAM"
-  | "BBD"
-  | "BDT"
-  | "BGN"
-  | "BHD"
-  | "BIF"
-  | "BMD"
-  | "BND"
-  | "BOB"
-  | "BRL"
-  | "BSD"
-  | "BTN"
-  | "BWP"
-  | "BYN"
-  | "BZD"
-  | "CAD"
-  | "CDF"
-  | "CHF"
-  | "CLF"
-  | "CLP"
-  | "CNY"
-  | "COP"
-  | "CRC"
-  | "CUC"
-  | "CUP"
-  | "CVE"
-  | "CZK"
-  | "DJF"
-  | "DKK"
-  | "DOP"
-  | "DZD"
-  | "EGP"
-  | "ERN"
-  | "ETB"
-  | "EUR"
-  | "FJD"
-  | "FKP"
-  | "GBP"
-  | "GEL"
-  | "GHS"
-  | "GIP"
-  | "GMD"
-  | "GNF"
-  | "GTQ"
-  | "GYD"
-  | "HKD"
-  | "HNL"
-  | "HRK"
-  | "HTG"
-  | "HUF"
-  | "IDR"
-  | "ILS"
-  | "INR"
-  | "IQD"
-  | "IRR"
-  | "ISK"
-  | "JMD"
-  | "JOD"
-  | "JPY"
-  | "KES"
-  | "KGS"
-  | "KHR"
-  | "KMF"
-  | "KPW"
-  | "KRW"
-  | "KWD"
-  | "KYD"
-  | "KZT"
-  | "LAK"
-  | "LBP"
-  | "LKR"
-  | "LRD"
-  | "LSL"
-  | "LYD"
-  | "MAD"
-  | "MDL"
-  | "MGA"
-  | "MKD"
-  | "MMK"
-  | "MNT"
-  | "MOP"
-  | "MRU"
-  | "MUR"
-  | "MVR"
-  | "MWK"
-  | "MXN"
-  | "MYR"
-  | "MZN"
-  | "NAD"
-  | "NGN"
-  | "NIO"
-  | "NOK"
-  | "NPR"
-  | "NZD"
-  | "OMR"
-  | "PAB"
-  | "PEN"
-  | "PGK"
-  | "PHP"
-  | "PKR"
-  | "PLN"
-  | "PYG"
-  | "QAR"
-  | "RON"
-  | "RSD"
-  | "RUB"
-  | "RWF"
-  | "SAR"
-  | "SBD"
-  | "SCR"
-  | "SDG"
-  | "SEK"
-  | "SGD"
-  | "SHP"
-  | "SLE"
-  | "SLL"
-  | "SOS"
-  | "SRD"
-  | "SSP"
-  | "STN"
-  | "SYP"
-  | "SZL"
-  | "THB"
-  | "TJS"
-  | "TMT"
-  | "TND"
-  | "TOP"
-  | "TRY"
-  | "TTD"
-  | "TWD"
-  | "TZS"
-  | "UAH"
-  | "UGX"
-  | "USD"
-  | "UYU"
-  | "UZS"
-  | "VED"
-  | "VES"
-  | "VND"
-  | "VUV"
-  | "WST"
-  | "XAF"
-  | "XCD"
-  | "XCG"
-  | "XOF"
-  | "XPF"
-  | "YER"
-  | "ZAR"
-  | "ZMW"
-  | "ZWG"
-  | "ZWL";
-/**
- * Opaque string identifier.
- */
-export type Id12 = string;
-/**
- * Opaque string identifier.
- */
-export type Id13 = string;
-/**
- * ISO 8601 calendar date string.
- */
-export type Date16 = string;
-/**
- * ISO 8601 calendar date string.
- */
-export type Date17 = string;
-/**
- * ISO 4217 currency code.
- */
-export type Currency9 =
-  | "AED"
-  | "AFN"
-  | "ALL"
-  | "AMD"
-  | "ANG"
-  | "AOA"
-  | "ARS"
-  | "AUD"
-  | "AWG"
-  | "AZN"
-  | "BAM"
-  | "BBD"
-  | "BDT"
-  | "BGN"
-  | "BHD"
-  | "BIF"
-  | "BMD"
-  | "BND"
-  | "BOB"
-  | "BRL"
-  | "BSD"
-  | "BTN"
-  | "BWP"
-  | "BYN"
-  | "BZD"
-  | "CAD"
-  | "CDF"
-  | "CHF"
-  | "CLF"
-  | "CLP"
-  | "CNY"
-  | "COP"
-  | "CRC"
-  | "CUC"
-  | "CUP"
-  | "CVE"
-  | "CZK"
-  | "DJF"
-  | "DKK"
-  | "DOP"
-  | "DZD"
-  | "EGP"
-  | "ERN"
-  | "ETB"
-  | "EUR"
-  | "FJD"
-  | "FKP"
-  | "GBP"
-  | "GEL"
-  | "GHS"
-  | "GIP"
-  | "GMD"
-  | "GNF"
-  | "GTQ"
-  | "GYD"
-  | "HKD"
-  | "HNL"
-  | "HRK"
-  | "HTG"
-  | "HUF"
-  | "IDR"
-  | "ILS"
-  | "INR"
-  | "IQD"
-  | "IRR"
-  | "ISK"
-  | "JMD"
-  | "JOD"
-  | "JPY"
-  | "KES"
-  | "KGS"
-  | "KHR"
-  | "KMF"
-  | "KPW"
-  | "KRW"
-  | "KWD"
-  | "KYD"
-  | "KZT"
-  | "LAK"
-  | "LBP"
-  | "LKR"
-  | "LRD"
-  | "LSL"
-  | "LYD"
-  | "MAD"
-  | "MDL"
-  | "MGA"
-  | "MKD"
-  | "MMK"
-  | "MNT"
-  | "MOP"
-  | "MRU"
-  | "MUR"
-  | "MVR"
-  | "MWK"
-  | "MXN"
-  | "MYR"
-  | "MZN"
-  | "NAD"
-  | "NGN"
-  | "NIO"
-  | "NOK"
-  | "NPR"
-  | "NZD"
-  | "OMR"
-  | "PAB"
-  | "PEN"
-  | "PGK"
-  | "PHP"
-  | "PKR"
-  | "PLN"
-  | "PYG"
-  | "QAR"
-  | "RON"
-  | "RSD"
-  | "RUB"
-  | "RWF"
-  | "SAR"
-  | "SBD"
-  | "SCR"
-  | "SDG"
-  | "SEK"
-  | "SGD"
-  | "SHP"
-  | "SLE"
-  | "SLL"
-  | "SOS"
-  | "SRD"
-  | "SSP"
-  | "STN"
-  | "SYP"
-  | "SZL"
-  | "THB"
-  | "TJS"
-  | "TMT"
-  | "TND"
-  | "TOP"
-  | "TRY"
-  | "TTD"
-  | "TWD"
-  | "TZS"
-  | "UAH"
-  | "UGX"
-  | "USD"
-  | "UYU"
-  | "UZS"
-  | "VED"
-  | "VES"
-  | "VND"
-  | "VUV"
-  | "WST"
-  | "XAF"
-  | "XCD"
-  | "XCG"
-  | "XOF"
-  | "XPF"
-  | "YER"
-  | "ZAR"
-  | "ZMW"
-  | "ZWG"
-  | "ZWL";
-/**
- * Opaque string identifier.
- */
-export type Id14 = string;
-/**
- * ISO 8601 calendar date string.
- */
-export type Date18 = string;
-/**
- * Business-day adjustment convention.
- */
-export type BusinessDayConvention =
-  "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
+export type Date20 = string;
 /**
  * ISO 4217 currency code.
  */
@@ -3346,11 +3422,41 @@ export type Currency10 =
 /**
  * Opaque string identifier.
  */
-export type Id15 = string;
+export type Id12 = string;
+/**
+ * Day-count convention.
+ */
+export type DayCount2 =
+  | "one_one"
+  | "act_360"
+  | "act_365f"
+  | "act_365l"
+  | "30_360"
+  | "30_360_isda"
+  | "30e_360"
+  | "30e_360_isda"
+  | "30_360_it"
+  | "nl_365"
+  | "act_act"
+  | "act_act_isma"
+  | "act_act_afb"
+  | "bus_252";
+/**
+ * Opaque string identifier.
+ */
+export type Id13 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date19 = string;
+export type Date21 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date22 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date23 = string;
 /**
  * ISO 4217 currency code.
  */
@@ -3519,15 +3625,366 @@ export type Currency11 =
 /**
  * Opaque string identifier.
  */
-export type Id16 = string;
+export type Id14 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date20 = string;
+export type Date24 = string;
+/**
+ * Business-day adjustment convention.
+ */
+export type BusinessDayConvention =
+  "unadjusted" | "following" | "modified_following" | "preceding" | "modified_preceding" | "nearest";
 /**
  * ISO 4217 currency code.
  */
 export type Currency12 =
+  | "AED"
+  | "AFN"
+  | "ALL"
+  | "AMD"
+  | "ANG"
+  | "AOA"
+  | "ARS"
+  | "AUD"
+  | "AWG"
+  | "AZN"
+  | "BAM"
+  | "BBD"
+  | "BDT"
+  | "BGN"
+  | "BHD"
+  | "BIF"
+  | "BMD"
+  | "BND"
+  | "BOB"
+  | "BRL"
+  | "BSD"
+  | "BTN"
+  | "BWP"
+  | "BYN"
+  | "BZD"
+  | "CAD"
+  | "CDF"
+  | "CHF"
+  | "CLF"
+  | "CLP"
+  | "CNY"
+  | "COP"
+  | "CRC"
+  | "CUC"
+  | "CUP"
+  | "CVE"
+  | "CZK"
+  | "DJF"
+  | "DKK"
+  | "DOP"
+  | "DZD"
+  | "EGP"
+  | "ERN"
+  | "ETB"
+  | "EUR"
+  | "FJD"
+  | "FKP"
+  | "GBP"
+  | "GEL"
+  | "GHS"
+  | "GIP"
+  | "GMD"
+  | "GNF"
+  | "GTQ"
+  | "GYD"
+  | "HKD"
+  | "HNL"
+  | "HRK"
+  | "HTG"
+  | "HUF"
+  | "IDR"
+  | "ILS"
+  | "INR"
+  | "IQD"
+  | "IRR"
+  | "ISK"
+  | "JMD"
+  | "JOD"
+  | "JPY"
+  | "KES"
+  | "KGS"
+  | "KHR"
+  | "KMF"
+  | "KPW"
+  | "KRW"
+  | "KWD"
+  | "KYD"
+  | "KZT"
+  | "LAK"
+  | "LBP"
+  | "LKR"
+  | "LRD"
+  | "LSL"
+  | "LYD"
+  | "MAD"
+  | "MDL"
+  | "MGA"
+  | "MKD"
+  | "MMK"
+  | "MNT"
+  | "MOP"
+  | "MRU"
+  | "MUR"
+  | "MVR"
+  | "MWK"
+  | "MXN"
+  | "MYR"
+  | "MZN"
+  | "NAD"
+  | "NGN"
+  | "NIO"
+  | "NOK"
+  | "NPR"
+  | "NZD"
+  | "OMR"
+  | "PAB"
+  | "PEN"
+  | "PGK"
+  | "PHP"
+  | "PKR"
+  | "PLN"
+  | "PYG"
+  | "QAR"
+  | "RON"
+  | "RSD"
+  | "RUB"
+  | "RWF"
+  | "SAR"
+  | "SBD"
+  | "SCR"
+  | "SDG"
+  | "SEK"
+  | "SGD"
+  | "SHP"
+  | "SLE"
+  | "SLL"
+  | "SOS"
+  | "SRD"
+  | "SSP"
+  | "STN"
+  | "SYP"
+  | "SZL"
+  | "THB"
+  | "TJS"
+  | "TMT"
+  | "TND"
+  | "TOP"
+  | "TRY"
+  | "TTD"
+  | "TWD"
+  | "TZS"
+  | "UAH"
+  | "UGX"
+  | "USD"
+  | "UYU"
+  | "UZS"
+  | "VED"
+  | "VES"
+  | "VND"
+  | "VUV"
+  | "WST"
+  | "XAF"
+  | "XCD"
+  | "XCG"
+  | "XOF"
+  | "XPF"
+  | "YER"
+  | "ZAR"
+  | "ZMW"
+  | "ZWG"
+  | "ZWL";
+/**
+ * Opaque string identifier.
+ */
+export type Id15 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date25 = string;
+/**
+ * ISO 4217 currency code.
+ */
+export type Currency13 =
+  | "AED"
+  | "AFN"
+  | "ALL"
+  | "AMD"
+  | "ANG"
+  | "AOA"
+  | "ARS"
+  | "AUD"
+  | "AWG"
+  | "AZN"
+  | "BAM"
+  | "BBD"
+  | "BDT"
+  | "BGN"
+  | "BHD"
+  | "BIF"
+  | "BMD"
+  | "BND"
+  | "BOB"
+  | "BRL"
+  | "BSD"
+  | "BTN"
+  | "BWP"
+  | "BYN"
+  | "BZD"
+  | "CAD"
+  | "CDF"
+  | "CHF"
+  | "CLF"
+  | "CLP"
+  | "CNY"
+  | "COP"
+  | "CRC"
+  | "CUC"
+  | "CUP"
+  | "CVE"
+  | "CZK"
+  | "DJF"
+  | "DKK"
+  | "DOP"
+  | "DZD"
+  | "EGP"
+  | "ERN"
+  | "ETB"
+  | "EUR"
+  | "FJD"
+  | "FKP"
+  | "GBP"
+  | "GEL"
+  | "GHS"
+  | "GIP"
+  | "GMD"
+  | "GNF"
+  | "GTQ"
+  | "GYD"
+  | "HKD"
+  | "HNL"
+  | "HRK"
+  | "HTG"
+  | "HUF"
+  | "IDR"
+  | "ILS"
+  | "INR"
+  | "IQD"
+  | "IRR"
+  | "ISK"
+  | "JMD"
+  | "JOD"
+  | "JPY"
+  | "KES"
+  | "KGS"
+  | "KHR"
+  | "KMF"
+  | "KPW"
+  | "KRW"
+  | "KWD"
+  | "KYD"
+  | "KZT"
+  | "LAK"
+  | "LBP"
+  | "LKR"
+  | "LRD"
+  | "LSL"
+  | "LYD"
+  | "MAD"
+  | "MDL"
+  | "MGA"
+  | "MKD"
+  | "MMK"
+  | "MNT"
+  | "MOP"
+  | "MRU"
+  | "MUR"
+  | "MVR"
+  | "MWK"
+  | "MXN"
+  | "MYR"
+  | "MZN"
+  | "NAD"
+  | "NGN"
+  | "NIO"
+  | "NOK"
+  | "NPR"
+  | "NZD"
+  | "OMR"
+  | "PAB"
+  | "PEN"
+  | "PGK"
+  | "PHP"
+  | "PKR"
+  | "PLN"
+  | "PYG"
+  | "QAR"
+  | "RON"
+  | "RSD"
+  | "RUB"
+  | "RWF"
+  | "SAR"
+  | "SBD"
+  | "SCR"
+  | "SDG"
+  | "SEK"
+  | "SGD"
+  | "SHP"
+  | "SLE"
+  | "SLL"
+  | "SOS"
+  | "SRD"
+  | "SSP"
+  | "STN"
+  | "SYP"
+  | "SZL"
+  | "THB"
+  | "TJS"
+  | "TMT"
+  | "TND"
+  | "TOP"
+  | "TRY"
+  | "TTD"
+  | "TWD"
+  | "TZS"
+  | "UAH"
+  | "UGX"
+  | "USD"
+  | "UYU"
+  | "UZS"
+  | "VED"
+  | "VES"
+  | "VND"
+  | "VUV"
+  | "WST"
+  | "XAF"
+  | "XCD"
+  | "XCG"
+  | "XOF"
+  | "XPF"
+  | "YER"
+  | "ZAR"
+  | "ZMW"
+  | "ZWG"
+  | "ZWL";
+/**
+ * Opaque string identifier.
+ */
+export type Id16 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date26 = string;
+/**
+ * ISO 4217 currency code.
+ */
+export type Currency14 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -3704,15 +4161,15 @@ export type Id19 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date21 = string;
+export type Date27 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date22 = string;
+export type Date28 = string;
 /**
  * ISO 4217 currency code.
  */
-export type Currency13 =
+export type Currency15 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -3885,64 +4342,30 @@ export type Id21 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date23 = string;
+export type Date29 = string;
 /**
  * Opaque string identifier.
  */
 export type Id22 = string;
 /**
- * Nelson-Siegel model parameters.
- *
- * Stores either the 4-parameter NS or 6-parameter NSS specification.
+ * Validated Nelson-Siegel or Nelson-Siegel-Svensson model parameters.
  */
 export type D_769F53B41C63A40F226A =
   | {
-      /**
-       * Long-term rate level.
-       */
       beta0: number;
-      /**
-       * Short-term component.
-       */
       beta1: number;
-      /**
-       * Medium-term hump.
-       */
       beta2: number;
-      /**
-       * Decay factor (must be > 0).
-       */
       tau: number;
       variant: "ns";
-      [k: string]: unknown;
     }
   | {
-      /**
-       * Long-term rate level.
-       */
       beta0: number;
-      /**
-       * Short-term component.
-       */
       beta1: number;
-      /**
-       * Medium-term hump.
-       */
       beta2: number;
-      /**
-       * Second hump.
-       */
       beta3: number;
-      /**
-       * First decay factor (must be > 0).
-       */
       tau1: number;
-      /**
-       * Second decay factor (must be > 0, ≠ τ₁).
-       */
       tau2: number;
       variant: "nss";
-      [k: string]: unknown;
     };
 /**
  * A pre-built calibrated market object.
@@ -3953,22 +4376,16 @@ export type D_769F53B41C63A40F226A =
  */
 export type DE988Ea453181Acf6E6F1 =
   | {
+      base: Date30;
       /**
-       * Whether non-monotonic DFs are allowed (dangerous override)
-       */
-      allow_non_monotonic: boolean;
-      base: Date24;
-      /**
-       * Registered holiday calendar id of the business-day time axis (for
-       * example `"brbd"` for a Bus/252 curve). Omitted when the day count needs
-       * no calendar.
+       * Registered holiday calendar id of the business-day time axis.
        */
       calendar_id?: string | null;
-      day_count: DayCount1;
+      day_count: DayCount3;
       /**
        * Extrapolation policy
        */
-      extrapolation: "flat_zero" | "flat_forward" | "none";
+      extrapolation: "flat" | "extend" | "error";
       /**
        * Opaque FX policy stamp; see [`DiscountCurve::fx_policy`].
        */
@@ -3983,17 +4400,9 @@ export type DE988Ea453181Acf6E6F1 =
       interp_style: "linear" | "log_linear" | "monotone_convex" | "cubic_hermite" | "piecewise_quadratic_forward";
       kind: "discount_curve";
       /**
-       * Time/value pairs used to construct the curve
+       * Time/value pairs stored on the curve (must already contain origin `(0.0, 1.0)`).
        */
       knot_points: [number, number][];
-      /**
-       * Minimum forward rate floor (if set)
-       */
-      min_forward_rate?: number | null;
-      /**
-       * Minimum tenor for forward rate calculations
-       */
-      min_forward_tenor: number;
       /**
        * Exact typed calibration replay recipe.
        */
@@ -4004,59 +4413,57 @@ export type DE988Ea453181Acf6E6F1 =
       transform?: D_44550D6839F96Bb19179 | null;
     }
   | {
-      base: Date26;
-      day_count: DayCount3;
+      base: Date33;
       /**
-       * Extrapolation policy
+       * Registered holiday calendar id of the business-day time axis.
        */
-      extrapolation: "flat_zero" | "flat_forward" | "none";
+      calendar_id?: string | null;
+      day_count: DayCount5;
       /**
-       * Opaque FX policy stamp; see [`crate::market_data::term_structures::DiscountCurve::fx_policy`].
+       * Extrapolation policy.
+       */
+      extrapolation: "flat" | "extend" | "error";
+      /**
+       * Opaque FX policy stamp; see [`ForwardCurve::fx_policy`].
        */
       fx_policy?: string | null;
       /**
-       * Curve identifier
+       * Curve identifier.
        */
       id: string;
       /**
-       * Interpolation style
+       * Optional index accrual tenor metadata.
+       */
+      index_tenor?: Tenor | null;
+      /**
+       * Interpolation style.
        */
       interp_style: "linear" | "log_linear" | "monotone_convex" | "cubic_hermite" | "piecewise_quadratic_forward";
       kind: "forward_curve";
       /**
-       * Time/value pairs used to construct the curve
+       * Time/factor pairs stored on the curve (must already contain origin `(0.0, 1.0)`).
        */
       knot_points: [number, number][];
-      /**
-       * Optional contractual reset/end-date boundaries.
-       *
-       * `None` selects fixed numeric-tenor discount-factor stepping.
-       */
-      projection_grid?: number[] | null;
       /**
        * Exact typed calibration replay recipe.
        */
       rate_calibration?: D_1Da7F2B6C0211Ad55Af2 | null;
       /**
-       * Reset lag in business days
-       */
-      reset_lag: number;
-      /**
-       * Index tenor in years
-       */
-      tenor: number;
-      /**
-       * Canonical source interpolation and cumulative continuous transformations.
+       * Canonical source interpolation and accumulated continuous transformations.
        */
       transform?: DFb5D44C23C59Cc156917 | null;
     }
   | {
-      base: Date27;
+      base: Date35;
       /**
-       * Currency
+       * Registered holiday calendar id of the business-day time axis.
+       */
+      calendar_id?: string | null;
+      /**
+       * Currency.
        */
       currency?: Currency3 | null;
-      day_count: DayCount4;
+      day_count: DayCount6;
       /**
        * Opaque FX policy stamp; see [`crate::market_data::term_structures::DiscountCurve::fx_policy`].
        */
@@ -4066,72 +4473,55 @@ export type DE988Ea453181Acf6E6F1 =
        */
       hazard_calibration?: DCf02F1E5E1Bb843Fa7A7 | null;
       /**
-       * Curve identifier
+       * Curve identifier.
        */
       id: string;
       /**
-       * Optional issuer
+       * Optional issuer.
        */
       issuer?: string | null;
       kind: "hazard_curve";
       /**
-       * Time/value pairs used to construct the curve
+       * Strictly positive ending `(time_years, hazard_rate)` pillars.
        */
       knot_points: [number, number][];
       /**
-       * Hazard-rate cap the curve was built with, when it differs from the
-       * default of 10; absent for curves built with the default.
-       */
-      max_hazard_rate?: number | null;
-      /**
-       * Par interpolation method
-       */
-      par_interp?: "linear" | "log_linear";
-      /**
-       * Par spread points for reporting
-       */
-      par_points: [number, number][];
-      /**
-       * Recovery rate
+       * Recovery rate in `[0, 1]`.
        */
       recovery_rate: number;
       /**
-       * Seniority
+       * Seniority.
        */
       seniority?: DA299B05259471B8097A2 | null;
+      /**
+       * Source coordinate anchor for conditioned curves.
+       */
+      source?: DCee80Fbbfb572F341766 | null;
     }
   | {
+      base_date: Date38;
       /**
-       * Base CPI level at t=0
+       * Optional registered holiday calendar identifier (`"brbd"`, `"usny+target2"`, etc.).
        */
-      base_cpi: number;
-      base_date: Date29;
-      day_count?: DayCount5;
+      calendar_id?: string | null;
+      day_count: DayCount7;
       /**
-       * Extrapolation policy
+       * Explicit extrapolation policy (`flat`, `extend`, or `error`).
        */
-      extrapolation: "flat_zero" | "flat_forward" | "none";
+      extrapolation: "flat" | "extend" | "error";
       /**
-       * Curve identifier
+       * Curve identifier.
        */
       id: string;
       /**
-       * Indexation lag in months
-       */
-      indexation_lag_months?: number;
-      /**
-       * Interpolation style
+       * Explicit scalar interpolation style (`linear`, `cubic_hermite`, or `log_linear`).
        */
       interp_style: "linear" | "log_linear" | "monotone_convex" | "cubic_hermite" | "piecewise_quadratic_forward";
       kind: "inflation_curve";
       /**
-       * Time/value pairs used to construct the curve
+       * Strictly increasing `(time_years, cpi_level)` pillars starting at `0.0`.
        */
       knot_points: [number, number][];
-      /**
-       * Source interpolation and accumulated time origin for a rolled curve.
-       */
-      roll_transform?: DB539D636Bb6F89D140E2 | null;
     }
   | {
       correlations: number[];
@@ -4140,105 +4530,53 @@ export type DE988Ea453181Acf6E6F1 =
       kind: "base_correlation_curve";
     }
   | {
-      base: Date30;
-      day_count: DayCount6;
       /**
-       * Extrapolation policy.
+       * Accumulated continuous-zero shock adjustment on the source clock.
        */
-      extrapolation: "flat_zero" | "flat_forward" | "none";
+      adjustment?: DF1A590578006650Bb43D2 | null;
+      base_date: Date39;
       /**
-       * Curve identifier.
+       * Registered holiday calendar id for Bus/252.
        */
-      id: string;
-      /**
-       * Interpolation style.
-       */
-      interp_style: "linear" | "log_linear" | "monotone_convex" | "cubic_hermite" | "piecewise_quadratic_forward";
-      kind: "basis_spread_curve";
-      /**
-       * Time/value pairs used to construct the curve.
-       */
-      knot_points: [number, number][];
-      /**
-       * Source interpolation and accumulated time origin for a rolled curve.
-       */
-      roll_transform?: DB539D636Bb6F89D140E2 | null;
-    }
-  | {
-      base_date: Date31;
-      day_count: DayCount7;
+      calendar_id?: string | null;
+      day_count: DayCount8;
       /**
        * Curve identifier.
        */
       id: string;
       kind: "parametric_curve";
       /**
-       * Nelson-Siegel model parameters.
-       *
-       * Stores either the 4-parameter NS or 6-parameter NSS specification.
+       * Validated Nelson-Siegel or Nelson-Siegel-Svensson model parameters.
        */
       model:
         | {
-            /**
-             * Long-term rate level.
-             */
             beta0: number;
-            /**
-             * Short-term component.
-             */
             beta1: number;
-            /**
-             * Medium-term hump.
-             */
             beta2: number;
-            /**
-             * Decay factor (must be > 0).
-             */
             tau: number;
             variant: "ns";
-            [k: string]: unknown;
           }
         | {
-            /**
-             * Long-term rate level.
-             */
             beta0: number;
-            /**
-             * Short-term component.
-             */
             beta1: number;
-            /**
-             * Medium-term hump.
-             */
             beta2: number;
-            /**
-             * Second hump.
-             */
             beta3: number;
-            /**
-             * First decay factor (must be > 0).
-             */
             tau1: number;
-            /**
-             * Second decay factor (must be > 0, ≠ τ₁).
-             */
             tau2: number;
             variant: "nss";
-            [k: string]: unknown;
           };
       /**
-       * Current origin in the source model's year-fraction coordinates;
-       * omitted means `0.0` (a curve that has never been rolled).
+       * Original anchor date when the curve has been conditioned.
        */
-      time_offset?: number;
+      source_base_date?: Date | null;
     }
   | {
-      base: Date32;
-      day_count: DayCount8;
+      base: Date40;
+      day_count: DayCount9;
       /**
        * Extrapolation policy
        */
-      extrapolation: "flat_zero" | "flat_forward" | "none";
+      extrapolation: "flat" | "extend" | "error";
       /**
        * Curve identifier
        */
@@ -4253,10 +4591,6 @@ export type DE988Ea453181Acf6E6F1 =
        */
       knot_points: [number, number][];
       /**
-       * Source interpolation and accumulated time origin for a rolled curve.
-       */
-      roll_transform?: DB539D636Bb6F89D140E2 | null;
-      /**
        * Spot index level (volatility index curves)
        */
       spot_level?: number | null;
@@ -4266,12 +4600,12 @@ export type DE988Ea453181Acf6E6F1 =
       spot_price?: number | null;
     }
   | {
-      base: Date33;
-      day_count: DayCount9;
+      base: Date41;
+      day_count: DayCount10;
       /**
        * Extrapolation policy
        */
-      extrapolation: "flat_zero" | "flat_forward" | "none";
+      extrapolation: "flat" | "extend" | "error";
       /**
        * Curve identifier
        */
@@ -4285,10 +4619,6 @@ export type DE988Ea453181Acf6E6F1 =
        * Time/value pairs used to construct the curve
        */
       knot_points: [number, number][];
-      /**
-       * Source interpolation and accumulated time origin for a rolled curve.
-       */
-      roll_transform?: DB539D636Bb6F89D140E2 | null;
       /**
        * Spot index level (volatility index curves)
        */
@@ -4304,11 +4634,15 @@ export type DE988Ea453181Acf6E6F1 =
        */
       displacements?: number[] | null;
       /**
-       * Expiry times in years
+       * Strictly positive option expiry times in years.
        */
       expiries: number[];
       /**
-       * Surface identifier
+       * Optional calibration clock mapping calendar dates to source expiry year fractions.
+       */
+      expiry_clock?: D_04Fbc100264B0Ba64E0F | null;
+      /**
+       * Surface identifier.
        */
       id: string;
       /**
@@ -4325,22 +4659,22 @@ export type DE988Ea453181Acf6E6F1 =
        */
       secondary_axis: "strike" | "tenor";
       /**
-       * Strike prices
+       * Secondary-axis coordinates (absolute strikes or positive underlying tenors).
        */
-      strikes: number[];
+      secondary_values: number[];
       /**
-       * Volatility values in row-major order
+       * Volatility values in row-major order.
        */
       vols_row_major: number[];
     };
 /**
  * ISO 8601 calendar date string.
  */
-export type Date24 = string;
+export type Date30 = string;
 /**
  * Day-count convention.
  */
-export type DayCount1 =
+export type DayCount3 =
   | "one_one"
   | "act_360"
   | "act_365f"
@@ -4358,7 +4692,7 @@ export type DayCount1 =
 /**
  * ISO 4217 currency code.
  */
-export type Currency14 =
+export type Currency16 =
   | "AED"
   | "AFN"
   | "ALL"
@@ -4523,7 +4857,7 @@ export type Currency14 =
 /**
  * Day-count convention.
  */
-export type DayCount2 =
+export type DayCount4 =
   | "one_one"
   | "act_360"
   | "act_365f"
@@ -4629,7 +4963,7 @@ export type D_35C617761984E0696394 =
          * Optional pre-computed convexity adjustment.
          */
         convexity_adjustment?: number | null;
-        expiry: Date25;
+        expiry: Date31;
         /**
          * Quoted futures price.
          */
@@ -4693,7 +5027,7 @@ export type Id25 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date25 = string;
+export type Date31 = string;
 /**
  * Opaque string identifier.
  */
@@ -4713,68 +5047,11 @@ export type Id29 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date26 = string;
-/**
- * Day-count convention.
- */
-export type DayCount3 =
-  | "one_one"
-  | "act_360"
-  | "act_365f"
-  | "act_365l"
-  | "30_360"
-  | "30_360_isda"
-  | "30e_360"
-  | "30e_360_isda"
-  | "30_360_it"
-  | "nl_365"
-  | "act_act"
-  | "act_act_isma"
-  | "act_act_afb"
-  | "bus_252";
+export type Date32 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date27 = string;
-/**
- * Day-count convention.
- */
-export type DayCount4 =
-  | "one_one"
-  | "act_360"
-  | "act_365f"
-  | "act_365l"
-  | "30_360"
-  | "30_360_isda"
-  | "30e_360"
-  | "30e_360_isda"
-  | "30_360_it"
-  | "nl_365"
-  | "act_act"
-  | "act_act_isma"
-  | "act_act_afb"
-  | "bus_252";
-/**
- * ISO 8601 calendar date string.
- */
-export type Date28 = string;
-/**
- * Seniority level for credit exposures.
- *
- * Used to tag a hazard curve with the seniority of the issuer's debt
- * observed by the curve. Drives the recovery-rate prior in default
- * modelling and selects the right LGD prior in
- * `finstack_quant_models::credit::lgd::seniority`.
- *
- * Order is **not** total — `SeniorSecured` is strictly senior to `Senior`,
- * `Subordinated`, and `Junior`, but the relative ordering of `Subordinated`
- * vs. `Junior` is jurisdiction-dependent. Do not rely on `Ord` semantics.
- */
-export type DA299B05259471B8097A2 = "senior_secured" | "senior" | "subordinated" | "junior";
-/**
- * ISO 8601 calendar date string.
- */
-export type Date29 = string;
+export type Date33 = string;
 /**
  * Day-count convention.
  */
@@ -4796,7 +5073,11 @@ export type DayCount5 =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date30 = string;
+export type Date34 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date35 = string;
 /**
  * Day-count convention.
  */
@@ -4818,7 +5099,23 @@ export type DayCount6 =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date31 = string;
+export type Date36 = string;
+/**
+ * Seniority level for credit exposures.
+ *
+ * Order is **not** total — `SeniorSecured` is strictly senior to `Senior`,
+ * `Subordinated`, and `Junior`, but the relative ordering of `Subordinated`
+ * vs. `Junior` is jurisdiction-dependent. Do not rely on `Ord` semantics.
+ */
+export type DA299B05259471B8097A2 = "senior_secured" | "senior" | "subordinated" | "junior";
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date37 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date38 = string;
 /**
  * Day-count convention.
  */
@@ -4840,7 +5137,7 @@ export type DayCount7 =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date32 = string;
+export type Date39 = string;
 /**
  * Day-count convention.
  */
@@ -4862,11 +5159,33 @@ export type DayCount8 =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date33 = string;
+export type Date40 = string;
 /**
  * Day-count convention.
  */
 export type DayCount9 =
+  | "one_one"
+  | "act_360"
+  | "act_365f"
+  | "act_365l"
+  | "30_360"
+  | "30_360_isda"
+  | "30e_360"
+  | "30e_360_isda"
+  | "30_360_it"
+  | "nl_365"
+  | "act_act"
+  | "act_act_isma"
+  | "act_act_afb"
+  | "bus_252";
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date41 = string;
+/**
+ * Day-count convention.
+ */
+export type DayCount10 =
   | "one_one"
   | "act_360"
   | "act_365f"
@@ -5171,9 +5490,95 @@ export interface D_63A8Cdf0B3369D8089A3 {
       };
   [k: string]: unknown;
 }
-export interface D_7Badbe6D060A37Bc56Dc {
-  publication_date: Date10;
-  reference_month: Date11;
+/**
+ * One expected-release schedule assumption for a monthly CPI/RPI reference period.
+ */
+export interface DDd7456D16C4914754Fab {
+  expected_release: Date10;
+  known_on: Date11;
+  reference_month: Date12;
+}
+/**
+ * One published monthly CPI/RPI fixing record inside an [`InflationIndex`] snapshot.
+ */
+export interface D_0B2Cf6C063Ea8082C33E {
+  available_on: Date14;
+  reference_month: Date15;
+  /**
+   * Published finite, strictly positive index level.
+   */
+  value: number;
+}
+/**
+ * Explicit day-count clock translating calendar expiry dates into year fractions
+ * relative to a surface or cube reference date.
+ *
+ * Market data objects such as [`FxDeltaVolSurface`](crate::market_data::surfaces::FxDeltaVolSurface)
+ * attach an optional `VolatilityClock` so downstream pricers can validate that
+ * the surface anchor matches `as_of` and bridge between instrument day-counts
+ * and surface variance time without silently assuming a day-count convention.
+ *
+ * # Examples
+ *
+ * ```rust
+ * use finstack_quant_core::dates::{DayCount, DayCountContextState, VolatilityClock};
+ * use time::macros::date;
+ *
+ * let clock = VolatilityClock::try_new(
+ *     date!(2025 - 01 - 15),
+ *     DayCount::Act365F,
+ *     DayCountContextState::default(),
+ * )?;
+ * let t = clock.expiry_time(date!(2026 - 01 - 15))?;
+ * assert!((t - 1.0).abs() < 1e-12);
+ * # Ok::<(), finstack_quant_core::Error>(())
+ * ```
+ */
+export interface D_04Fbc100264B0Ba64E0F {
+  context?: DCd1309Ede7Abd3F53244;
+  day_count: DayCount;
+  reference_date: Date16;
+}
+/**
+ * Owned, canonicalized day-count context parameters.
+ */
+export interface DCd1309Ede7Abd3F53244 {
+  /**
+   * Optional custom business-day divisor (defaults to 252 when `None`).
+   */
+  bus_basis?: number | null;
+  /**
+   * Optional calendar code (e.g. "target2").
+   */
+  calendar_id?: string | null;
+  /**
+   * Optional unadjusted regular ICMA reference period or ACT/365L enclosing
+   * coupon `(start, end)`, serialized as two ISO dates.
+   *
+   * Required for exact ICMA accrual on round-trip. `None` selects the
+   * frequency-only ICMA calculation path; ACT/365L requires these dates.
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  coupon_period?: [Date, Date] | null;
+  /**
+   * Whether the later accrual endpoint is the contractual termination
+   * date; `None` (omitted or `null` on the wire) means unspecified, which
+   * 30E/360 ISDA rejects.
+   */
+  end_is_termination_date?: boolean | null;
+  /**
+   * Optional coupon frequency, required for ACT/ACT ISMA.
+   */
+  frequency?: Tenor | null;
+}
+/**
+ * Currency pair (`base/quote`) matching quoted FX forward orientation.
+ */
+export interface D_438246Cb8Efc61E5Dba2 {
+  base: Currency5;
+  quote: Currency6;
 }
 /**
  * Data-only SABR parameters for one volatility-cube node.
@@ -5455,48 +5860,47 @@ export interface DA7E08397Fba9E91716B7 {
   weighting_scheme?: "equal" | "linear_time" | "sqrt_time" | "inverse_duration";
 }
 /**
- * The top-level market data hierarchy containing root nodes.
+ * Top-level market-data hierarchy containing ordered root entries.
  *
- * Each root represents a major asset class or category (e.g., "Rates", "Credit",
- * "FX", "Equity", "Volatility"). The hierarchy is fully serializable and can be
- * loaded from JSON configuration files.
+ * Each root represents a major organizational branch (such as `"Rates"`,
+ * `"Credit"`, `"FX"`, `"Equity"`, or `"Volatility"`). Roots and child levels
+ * use explicit name/node entry arrays so numeric-looking names retain their
+ * authored sequence across Rust, Python, and JavaScript.
  */
 export interface DEa48C773Aa37A19B3Aa2 {
   /**
-   * Top-level nodes, keyed by their name. The key becomes each node's
-   * `name` during deserialization. Insertion order is preserved.
+   * Top-level ordered `(name, node)` entries.
    */
-  roots: {
-    [k: string]: D_749Ad577A783A3D90610;
-  };
-  [k: string]: unknown;
+  roots: D_64F58200C6756Dc5845D[];
 }
 /**
- * A single node in the market data hierarchy tree.
- *
- * Nodes form a tree: each is named by its key in the parent map, and carries
- * optional key-value tags for cross-cutting queries, ordered children, and
- * leaf `CurveId` references.
+ * Named child or root entry preserving authored sequence order at a hierarchy level.
+ */
+export interface D_64F58200C6756Dc5845D {
+  /**
+   * Exact node segment name at this hierarchy level.
+   */
+  name: string;
+  node: D_749Ad577A783A3D90610;
+}
+/**
+ * Node metadata tags, child entries, and typed market-data associations.
  */
 export interface D_749Ad577A783A3D90610 {
   /**
-   * Child nodes, keyed by their name. The key becomes the child's `name`
-   * during deserialization. Insertion order is preserved.
+   * Ordered child entries at this level.
    */
-  children?: {
-    [k: string]: D_749Ad577A783A3D90610;
-  };
+  children?: D_64F58200C6756Dc5845D[];
   /**
-   * Curves attached directly to this node. Serialized as `curves`.
-   */
-  curves?: Id6[];
-  /**
-   * Free-form key/value labels on this node, used for selection and
-   * reporting. Insertion order is preserved.
+   * Metadata tags for tag-filter selection.
    */
   tags?: {
     [k: string]: string;
   };
+  /**
+   * Typed market-data targets stored directly at this node in authored order.
+   */
+  targets?: DE98120A9Ebcd8Bce537A[];
 }
 /**
  * Inflation-curve specific solver configuration.
@@ -5675,7 +6079,7 @@ export interface D_5F0B38036294B8235C6A {
   /**
    * Day count used to map dates to year fractions for curve knot times.
    */
-  curve_day_count?: DayCount | null;
+  curve_day_count?: DayCount1 | null;
   /**
    * Optional override for the OIS floating-leg compounding mode used by
    * the calibration's bootstrap-internal swaps.
@@ -5699,7 +6103,7 @@ export interface D_5F0B38036294B8235C6A1 {
   /**
    * Day count used to map dates to year fractions for curve knot times.
    */
-  curve_day_count?: DayCount | null;
+  curve_day_count?: DayCount1 | null;
   /**
    * Optional override for the OIS floating-leg compounding mode used by
    * the calibration's bootstrap-internal swaps.
@@ -5723,7 +6127,7 @@ export interface D_5F0B38036294B8235C6A2 {
   /**
    * Day count used to map dates to year fractions for curve knot times.
    */
-  curve_day_count?: DayCount | null;
+  curve_day_count?: DayCount1 | null;
   /**
    * Optional override for the OIS floating-leg compounding mode used by
    * the calibration's bootstrap-internal swaps.
@@ -5744,8 +6148,8 @@ export interface D_5F0B38036294B8235C6A2 {
  * Typed conventions required to replay a rate-curve calibration.
  */
 export interface D_1Da7F2B6C0211Ad55Af2 {
-  currency: Currency14;
-  curve_day_count: DayCount2;
+  currency: Currency16;
+  curve_day_count: DayCount4;
   /**
    * Numerical calibration method.
    */
@@ -5793,17 +6197,14 @@ export interface D_1Da7F2B6C0211Ad55Af2 {
  */
 export interface D_44550D6839F96Bb19179 {
   adjustment: DF1A590578006650Bb43D;
-  /**
-   * Current origin in the source interpolation's year-fraction coordinates.
-   */
-  offset: number;
+  source_base_date: Date32;
   /**
    * Original, untransformed interpolation pillars.
    */
   source_points: [number, number][];
 }
 /**
- * Cumulative derivative of the additive log-discount adjustment.
+ * Cumulative derivative of the additive log-factor adjustment.
  */
 export interface DF1A590578006650Bb43D {
   /**
@@ -5829,23 +6230,22 @@ export interface D_1A0C0B834C9E63A93Be3 {
    */
   value: number;
 }
+/**
+ * Source interpolation and a single accumulated transformation, never a chain
+ * of nested curves. The adjustment is stored as its piecewise-linear derivative
+ * so evaluating beyond a completed triangular shock does not subtract large
+ * quadratic polynomials.
+ */
 export interface DFb5D44C23C59Cc156917 {
   adjustment: DF1A590578006650Bb43D1;
+  source_base_date: Date34;
   /**
-   * Current curve origin in the source curve's year-fraction coordinates.
-   */
-  offset: number;
-  /**
-   * Accumulated parallel multiplicative factor on the source interpolation.
-   */
-  scale: number;
-  /**
-   * Original interpolation pillars, independent of current curve samples.
+   * Original, untransformed interpolation pillars.
    */
   source_points: [number, number][];
 }
 /**
- * Cumulative additive rate adjustment in source time coordinates.
+ * Cumulative derivative of the additive log-factor adjustment.
  */
 export interface DF1A590578006650Bb43D1 {
   /**
@@ -5892,7 +6292,7 @@ export interface DCf02F1E5E1Bb843Fa7A7 {
  * One atomic quote binding retained for hazard calibration replay.
  */
 export interface D_6B0044A7Dc5Fa1F3E1De {
-  pillar_date: Date28;
+  pillar_date: Date36;
   /**
    * Frozen year-fraction pillar time used by the original solve.
    */
@@ -5905,15 +6305,28 @@ export interface D_6B0044A7Dc5Fa1F3E1De {
   };
 }
 /**
- * Serialized source grid and time origin of a rolled curve.
+ * Source coordinate anchor and original piecewise-constant hazard schedule
+ * retained across [`HazardCurve::condition`] transformations so dated survival
+ * integrates directly on the retained source timeline.
  */
-export interface DB539D636Bb6F89D140E2 {
+export interface DCee80Fbbfb572F341766 {
+  base_date: Date37;
   /**
-   * Current origin in the source interpolation's year-fraction coordinates.
+   * Original `(time_years, hazard_rate)` pillars from `base_date`.
    */
-  offset: number;
+  knot_points: [number, number][];
+}
+/**
+ * A flat function representation: repeated shocks merge on a breakpoint union
+ * rather than forming a recursively nested transformation history.
+ */
+export interface DF1A590578006650Bb43D2 {
   /**
-   * Source pillars `(time, value)` in the source curve's own coordinates.
+   * Constant value before the first breakpoint.
    */
-  source_points: [number, number][];
+  initial_value: number;
+  /**
+   * Sorted, merged linear segments.
+   */
+  segments: D_1A0C0B834C9E63A93Be3[];
 }

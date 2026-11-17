@@ -29,12 +29,12 @@ pub fn cf_kind_parse(
     to_js_value(&kind)
 }
 
-/// Whether a cashflow kind is interest-like (fixed, floating, inflation or stub coupon).
+/// Whether a cashflow kind is a coupon flow (fixed, floating, inflation or stub coupon).
 ///
 /// @param kind - `CFKind` wire string.
 /// @returns `true` for coupon-type kinds; fees, principal and margin kinds are `false`.
 /// @throws If `kind` is not a `CFKind` wire string (kind `validation`).
-#[wasm_bindgen(js_name = cfKindIsInterestLike)]
+#[wasm_bindgen(js_name = cfKindIsCoupon)]
 pub fn cf_kind_is_coupon(
     #[wasm_bindgen(unchecked_param_type = "generated.cashflows.CFKind")] kind: JsValue,
 ) -> Result<bool, JsValue> {

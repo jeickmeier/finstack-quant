@@ -426,7 +426,7 @@ def test_python_curve_phase4_members_are_live() -> None:
     module = importlib.import_module("finstack_quant.core.market_data")
     for class_name, members in {
         "DiscountCurve": ["forward"],
-        "ForwardCurve": ["rate_between", "projection_grid", "reset_lag"],
+        "ForwardCurve": ["rate_between", "index_tenor", "factors"],
     }.items():
         cls = getattr(module, class_name)
         for member in members:

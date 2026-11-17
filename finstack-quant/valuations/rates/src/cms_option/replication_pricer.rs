@@ -120,7 +120,7 @@ pub(crate) fn replicated_cms_optionlet(
     let mut splits = vec![-width, 0.0, width];
     for k in inputs
         .vol_surface
-        .strikes()
+        .secondary_values()
         .iter()
         .copied()
         .chain(std::iter::once(strike))
@@ -229,8 +229,9 @@ impl CmsReplicationPricer {
             if fixing_date < as_of {
                 let observed = crate::cms_common::historical_cms_fixing(
                     curves,
+                    inst.cms_fixing_index_id.as_ref(),
                     &inst.forward_curve_id,
-                    inst.cms_tenor.to_years_approx(),
+                    inst.index_id.as_ref(),
                     fixing_date,
                 )?;
                 let df_pay = discount_curve

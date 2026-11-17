@@ -43,17 +43,12 @@ impl MetricCalculator for ImpliedVolCalculator {
         };
         // Check model/domain errors before entering the scalar solver.
         price(0.0)?;
-        let objective =
-            |sigma: f64| price(sigma).map_or(f64::NAN, |pv| (pv.amount() - target) / notional);
+        let objective = |sigma: f64| price(sigma).map(|pv| (pv.amount() - target) / notional);
         let upper = match option.vol_model {
             VolatilityModel::Normal => 1.0,
             VolatilityModel::Black => 5.0,
         };
-        let sigma = BrentSolver::new().with_tolerance(1e-12).solve_in_bracket(
-            |x| Ok(objective(x)),
-            0.0,
-            upper,
-        )?;
+        let sigma = BrentSolver::new(1e-12, 100)?.solve_in_bracket(objective, 0.0, upper)?;
         let residual = price(sigma)?.amount() - target;
         let tolerance = 1e-8 * target.abs().max(1.0);
         if residual.abs() > tolerance {
@@ -73,7 +68,9 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -93,17 +90,18 @@ mod tests {
                 (5.0, (-rate * 5.0).exp()),
                 (10.0, (-rate * 10.0).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let fwd = ForwardCurve::builder("USD_LIBOR_3M", 0.25)
-            .base_date(as_of)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, rate), (10.0, rate)])
-            .build()
+        let fwd = ForwardCurve::flat("USD_LIBOR_3M", as_of, rate, DayCount::Act360)
             .expect("forward curve");
         let surface = VolSurface::builder("USD_SWAPTION_VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.25, 1.0, 5.0, 10.0])
-            .strikes(&[0.02, 0.03, 0.05, 0.07])
+            .secondary_values(&[0.02, 0.03, 0.05, 0.07])
             .row(&[vol, vol, vol, vol])
             .row(&[vol, vol, vol, vol])
             .row(&[vol, vol, vol, vol])

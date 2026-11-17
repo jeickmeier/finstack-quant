@@ -167,6 +167,9 @@ mod tests {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (5.0, 0.82)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount curve should build"),
             )
@@ -174,7 +177,8 @@ mod tests {
                 HazardCurve::builder("USD-CREDIT")
                     .base_date(as_of)
                     .recovery_rate(0.4)
-                    .knots([(0.0, 0.02), (5.0, 0.02)])
+                    .knots([(5.0, 0.02)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
                     .build()
                     .expect("hazard curve should build"),
             );
@@ -255,10 +259,20 @@ mod tests {
                     .day_count(finstack_quant_core::dates::DayCount::Act365F)
                     .knots([(0.0, 1.0), (1.0, 0.97), (40.0, 0.3)])
                     .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount curve should build"),
             )
-            .insert(HazardCurve::flat("ACME-HAZARD", base, 0.02, 0.4).expect("hazard curve"));
+            .insert(
+                HazardCurve::flat(
+                    "ACME-HAZARD",
+                    base,
+                    0.02,
+                    0.4,
+                    finstack_quant_core::dates::DayCount::Act365F,
+                )
+                .expect("hazard curve"),
+            );
         let mut context = MetricContext::new(
             Arc::new(bond),
             Arc::new(market),
@@ -307,6 +321,9 @@ mod tests {
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (5.0, 0.82), (10.0, 0.65)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("discount curve should build"),
         );

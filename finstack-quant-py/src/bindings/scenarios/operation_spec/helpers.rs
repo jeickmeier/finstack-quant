@@ -95,6 +95,5 @@ pub(super) fn extract_hierarchy_target(obj: &Bound<'_, PyAny>) -> PyResult<Hiera
             obj.get_type()
         ))
     })?;
-    serde_json::from_str(&json)
-        .map_err(|e| crate::errors::value_error(format!("Invalid HierarchyTarget JSON: {e}")))
+    HierarchyTarget::from_json(&json).map_err(crate::errors::core_to_py)
 }

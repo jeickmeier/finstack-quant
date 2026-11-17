@@ -82,6 +82,8 @@ fn sloped_discount_curve(as_of: Date) -> DiscountCurve {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots(knots)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("sloped discount curve")
 }
@@ -90,9 +92,12 @@ fn market(as_of: Date) -> MarketContext {
     let discount = sloped_discount_curve(as_of);
     // Use a projection curve consistent with the discount curve so this test
     // isolates MC-vs-tree discretization rather than a deterministic basis.
-    let forward = discount
-        .to_forward_curve("USD-SOFR-6M", 0.5, None)
-        .expect("forward curve");
+    let forward =
+        finstack_quant_core::market_data::term_structures::ForwardCurve::from_discount_curve(
+            "USD-SOFR-6M",
+            &discount,
+            Some(finstack_quant_core::dates::Tenor::semi_annual()),
+        );
     MarketContext::new().insert(discount).insert(forward)
 }
 

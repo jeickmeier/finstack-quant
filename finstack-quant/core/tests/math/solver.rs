@@ -15,8 +15,10 @@ mod brent {
     fn finds_root_simple_quadratic() {
         // f(x) = x^2 - 2 ⇒ root = sqrt(2)
         let f = |x: f64| x * x - 2.0;
-        let solver = BrentSolver::new().with_tolerance(1e-12);
-        let r = solver.solve(f, 1.5).unwrap();
+        let solver = BrentSolver::new(1e-12, 100).unwrap();
+        let r = solver
+            .solve(|x| Ok(f(x)), 1.5, -1e6, 1e6, 0.015, 20)
+            .unwrap();
 
         assert!(
             f(r).abs() < 1e-11,
@@ -30,8 +32,10 @@ mod brent {
     fn handles_cubic() {
         // f(x)=x^3 - x, roots at -1, 0, 1 ⇒ 1
         let f = |x: f64| x * x * x - x;
-        let solver = BrentSolver::new().with_tolerance(1e-12);
-        let r = solver.solve(f, 0.85).unwrap();
+        let solver = BrentSolver::new(1e-12, 100).unwrap();
+        let r = solver
+            .solve(|x| Ok(f(x)), 0.85, -1e6, 1e6, 0.01, 20)
+            .unwrap();
 
         assert!(
             f(r).abs() < 1e-11,
@@ -44,9 +48,11 @@ mod brent {
     #[test]
     fn simple_quadratic() {
         let f = |x: f64| x * x - 4.0; // root at x = 2
-        let solver = BrentSolver::new().with_tolerance(1e-12);
+        let solver = BrentSolver::new(1e-12, 100).unwrap();
 
-        let root = solver.solve(f, 1.8).unwrap();
+        let root = solver
+            .solve(|x| Ok(f(x)), 1.8, -1e6, 1e6, 0.018, 20)
+            .unwrap();
 
         assert!(
             f(root).abs() < 1e-11,
@@ -60,10 +66,12 @@ mod brent {
     fn with_distant_guess() {
         // Case where initial guess is far from root
         let f = |x: f64| x * x * x - x - 2.0; // Cubic with root near 1.5
-        let solver = BrentSolver::new().with_tolerance(1e-12);
+        let solver = BrentSolver::new(1e-12, 100).unwrap();
 
         // Bad initial guess that would cause Newton to diverge
-        let root = solver.solve(f, 100.0).unwrap();
+        let root = solver
+            .solve(|x| Ok(f(x)), 100.0, -1e6, 1e6, 1.0, 20)
+            .unwrap();
 
         assert!(
             f(root).abs() < 1e-11,
@@ -90,8 +98,10 @@ mod brent {
             annuity_pv + principal_pv - target_price
         };
 
-        let solver = BrentSolver::new().with_tolerance(1e-10);
-        let yield_result = solver.solve(f, 0.06).unwrap();
+        let solver = BrentSolver::new(1e-10, 100).unwrap();
+        let yield_result = solver
+            .solve(|y| Ok(f(y)), 0.06, -0.5, 10.0, 0.01, 20)
+            .unwrap();
 
         // 5% coupon, $95 price, 5-period bond YTM ≈ 6.20%
         assert!(yield_result > 0.061 && yield_result < 0.063);
@@ -106,9 +116,11 @@ mod brent {
     fn sqrt_function() {
         // Pathological case where derivative is problematic
         let f = |x: f64| (x - 1.5).signum() * (x - 1.5).abs().powf(0.5);
-        let solver = BrentSolver::new().with_tolerance(1e-6);
+        let solver = BrentSolver::new(1e-6, 100).unwrap();
 
-        let root = solver.solve(f, 2.0).unwrap();
+        let root = solver
+            .solve(|x| Ok(f(x)), 2.0, -1e6, 1e6, 0.02, 20)
+            .unwrap();
         assert!(
             f(root).abs() < 1e-5,
             "f(root) = {} exceeds tolerance",
@@ -128,9 +140,9 @@ mod error_diagnostics {
     fn brent_no_bracket_found_error() {
         // Function with no roots
         let f = |x: f64| x * x + 1.0;
-        let solver = BrentSolver::new().with_tolerance(1e-12);
+        let solver = BrentSolver::new(1e-12, 100).unwrap();
 
-        let result = solver.solve(f, 0.0);
+        let result = solver.solve(|x| Ok(f(x)), 0.0, -1e6, 1e6, 0.01, 20);
         assert!(result.is_err());
 
         let err = result.unwrap_err();

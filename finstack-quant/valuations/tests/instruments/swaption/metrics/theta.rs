@@ -22,8 +22,8 @@ fn test_theta_matches_one_day_rolled_reprice() {
 
     let tomorrow = as_of.checked_add(time::Duration::days(1)).unwrap();
     let rolled_market = market
-        .roll_forward(1)
-        .expect("flat swaption market should roll forward one day");
+        .condition(tomorrow)
+        .expect("flat swaption market should condition one day forward");
     let base_pv = swaption.value(&market, as_of).unwrap().amount();
     let rolled_pv = swaption.value(&rolled_market, tomorrow).unwrap().amount();
     let expected_theta = rolled_pv - base_pv;

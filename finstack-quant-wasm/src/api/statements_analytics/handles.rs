@@ -283,7 +283,7 @@ impl JsCorkscrewExtension {
 /// builder.valueScalar("ebitda", { "2025Q1": 100 });
 /// const model = builder.build();
 /// const results = new statements.Evaluator().evaluate(model);
-/// const scale = core.scorecardScaleTryNew("Internal", undefined, [
+/// const scale = core.scorecardScaleTryNew("Internal", [
 ///   core.ratingLevelTryNew("AAA", 95, 90),
 ///   core.ratingLevelTryNew("BBB", 60, 0),
 /// ]);

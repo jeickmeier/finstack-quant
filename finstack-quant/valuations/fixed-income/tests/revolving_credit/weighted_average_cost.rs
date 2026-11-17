@@ -8,7 +8,6 @@ use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
-use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations_core::metrics::MetricId;
@@ -47,12 +46,22 @@ fn facility(maturity: Date) -> RevolvingCredit {
 
 fn market_with(forward: ForwardCurve) -> MarketContext {
     let fixings: Vec<(Date, f64)> = (0..25)
+        .rev()
         .map(|days| (AS_OF - time::Duration::days(days), 0.02))
         .collect();
     MarketContext::new()
         .insert(flat_discount_curve(0.03, AS_OF, "USD-OIS"))
         .insert(forward)
-        .insert_series(ScalarTimeSeries::new("FIXING:USD-SOFR-3M", fixings, None).expect("fixings"))
+        .insert_series(
+            ScalarTimeSeries::new(
+                "FIXING:USD-SOFR-3M",
+                fixings,
+                None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .expect("fixings"),
+        )
 }
 
 fn weighted_average_cost(facility: &RevolvingCredit, market: &MarketContext) -> f64 {
@@ -75,10 +84,30 @@ fn weighted_average_cost(facility: &RevolvingCredit, market: &MarketContext) -> 
 /// ≈200bp gap into a ≈40bp difference in the weighted average cost.
 #[test]
 fn rising_forward_curve_raises_the_cost_of_a_longer_facility() {
-    let rising = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let rising = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(AS_OF)
-        .knots(vec![(0.0, 0.02), (5.0, 0.07)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (0.3125, 0.993284370061577),
+            (0.625, 0.98565082003172),
+            (0.9375, 0.977121249011583),
+            (1.25, 0.967719990077532),
+            (1.5625, 0.957473694654899),
+            (1.875, 0.946411206689668),
+            (2.1875, 0.93456342744914),
+            (2.5, 0.921963171837898),
+            (2.8125, 0.908645017163215),
+            (3.125, 0.894645145324014),
+            (3.4375, 0.880001179429489),
+            (3.75, 0.864752015877161),
+            (4.0625, 0.848937652935618),
+            (4.375, 0.832599016884203),
+            (4.6875, 0.815777786760778),
+            (5.0, 0.798516218759377),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("forward curve");
     let market = market_with(rising);
@@ -91,14 +120,15 @@ fn rising_forward_curve_raises_the_cost_of_a_longer_facility() {
     );
 }
 
-/// A flat index leaves the horizon irrelevant: both facilities cost the same.
+/// A flat index leaves the horizon irrelevant: both facilities cost the same
+/// (up to sub-bp quarter-length convexity between 90/91/92-day quarters on a continuous curve).
 #[test]
 fn flat_forward_curve_makes_the_cost_independent_of_the_horizon() {
     let market = market_with(flat_forward_curve(0.04, AS_OF, "USD-SOFR-3M"));
     let one_year = weighted_average_cost(&facility(date!(2025 - 01 - 15)), &market);
     let five_years = weighted_average_cost(&facility(date!(2029 - 01 - 15)), &market);
     assert!(
-        (five_years - one_year).abs() < 1e-12,
+        (five_years - one_year).abs() < 1e-6,
         "five-year {five_years} vs one-year {one_year}"
     );
 }

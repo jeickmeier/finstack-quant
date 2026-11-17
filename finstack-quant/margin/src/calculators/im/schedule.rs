@@ -537,8 +537,8 @@ impl ScheduleImCalculator {
         if gross_notional == 0.0 {
             return Ok(None);
         }
-        let signed_mtm = neumaier_sum(positions.iter().map(|p| p.0.amount()));
-        let positive_mtm = neumaier_sum(positions.iter().map(|p| p.0.amount().max(0.0)));
+        let signed_mtm = neumaier_sum(positions.iter().map(|p| p.0.amount()))?;
+        let positive_mtm = neumaier_sum(positions.iter().map(|p| p.0.amount().max(0.0)))?;
         let ngr = if positive_mtm == 0.0 {
             0.0
         } else {
@@ -550,7 +550,7 @@ impl ScheduleImCalculator {
             breakdown.insert(key, Money::new(gross * reduction, currency)?);
         }
         let amount = Money::new(
-            neumaier_sum(breakdown.values().map(|m| m.amount())),
+            neumaier_sum(breakdown.values().map(|m| m.amount()))?,
             currency,
         )?;
         Ok(Some(ImResult::with_breakdown(

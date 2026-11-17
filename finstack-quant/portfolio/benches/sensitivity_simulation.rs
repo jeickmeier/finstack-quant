@@ -61,7 +61,7 @@ impl CurveZeroInstrument {
         Ok(market.get_discount(self.curve_id.as_str())?.zero_rate(
             self.tenor_years,
             finstack_quant_core::math::Compounding::Continuous,
-        ) * self.scale)
+        )? * self.scale)
     }
 }
 
@@ -117,6 +117,8 @@ fn repricing_market(as_of: Date) -> MarketContext {
         .base_date(as_of)
         .interp(InterpStyle::MonotoneConvex)
         .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.80), (10.0, 0.60)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("bench: discount curve should build");
     MarketContext::new().insert(curve)
@@ -155,6 +157,8 @@ fn sparse_repricing_market(as_of: Date, n_factors: usize) -> MarketContext {
             .base_date(as_of)
             .interp(InterpStyle::MonotoneConvex)
             .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.80), (10.0, 0.60)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("bench: sparse discount curve should build");
         market.insert(curve)

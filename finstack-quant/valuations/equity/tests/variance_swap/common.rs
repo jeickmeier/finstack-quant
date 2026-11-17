@@ -6,7 +6,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
     MarketScalar, ScalarTimeSeries, SeriesInterpolation,
 };
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::stats::RealizedVarMethod;
 use finstack_quant_core::money::Money;
@@ -78,11 +80,15 @@ pub fn base_context_without_vol() -> MarketContext {
             (0.75, 0.965),
             (1.0, 0.95),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    MarketContext::new()
-        .insert(disc_curve)
-        .insert_price(UNDERLYING_ID, MarketScalar::Unitless(5_000.0))
+    MarketContext::new().insert(disc_curve).insert_price(
+        UNDERLYING_ID,
+        MarketScalar::unitless(5_000.0).expect("valid scalar"),
+    )
 }
 
 /// Build a complete base market context with a replication-quality volatility surface.
@@ -91,15 +97,20 @@ pub fn base_context() -> MarketContext {
         .insert_surface(sample_surface())
         .insert_price(
             format!("{}-DIVYIELD", UNDERLYING_ID),
-            MarketScalar::Unitless(0.0),
+            MarketScalar::unitless(0.0).expect("valid scalar"),
         )
 }
 
 /// Add a time series to the market context.
 pub fn add_series(ctx: MarketContext, prices: &[(Date, f64)]) -> MarketContext {
-    let series = ScalarTimeSeries::new(UNDERLYING_ID, prices.to_vec(), None)
-        .unwrap()
-        .with_interpolation(SeriesInterpolation::Step);
+    let series = ScalarTimeSeries::new(
+        UNDERLYING_ID,
+        prices.to_vec(),
+        None,
+        SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+    )
+    .unwrap();
     ctx.insert_series(series)
 }
 /// Add a unitless scalar. Legacy test inputs named `*_IMPL_VOL` are converted
@@ -112,7 +123,10 @@ pub fn add_unitless(ctx: MarketContext, id: impl AsRef<str>, value: f64) -> Mark
         ];
         let mut surface = VolSurface::builder(VOL_SURFACE_ID)
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&strikes);
+            .secondary_values(&strikes)
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol);
         for _ in 0..4 {
             surface = surface.row(&[value; 7]);
         }
@@ -120,10 +134,10 @@ pub fn add_unitless(ctx: MarketContext, id: impl AsRef<str>, value: f64) -> Mark
             .insert_surface(surface.build().expect("flat test surface"))
             .insert_price(
                 format!("{}-DIVYIELD", UNDERLYING_ID),
-                MarketScalar::Unitless(0.0),
+                MarketScalar::unitless(0.0).expect("valid scalar"),
             );
     }
-    ctx.insert_price(id, MarketScalar::Unitless(value))
+    ctx.insert_price(id, MarketScalar::unitless(value).expect("valid scalar"))
 }
 
 /// Add a volatility surface to the market context.
@@ -135,7 +149,10 @@ pub fn add_surface(ctx: MarketContext, surface: VolSurface) -> MarketContext {
 pub fn sample_surface() -> VolSurface {
     VolSurface::builder(VOL_SURFACE_ID)
         .expiries(&[0.25, 0.50, 0.75, 1.0])
-        .strikes(&[4_500.0, 4_800.0, 5_000.0, 5_200.0, 5_500.0])
+        .secondary_values(&[4_500.0, 4_800.0, 5_000.0, 5_200.0, 5_500.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[0.32, 0.30, 0.29, 0.28, 0.27])
         .row(&[0.30, 0.28, 0.27, 0.26, 0.25])
         .row(&[0.29, 0.27, 0.26, 0.25, 0.24])

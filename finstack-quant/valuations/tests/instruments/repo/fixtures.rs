@@ -33,7 +33,8 @@ pub fn create_usd_discount_curve() -> DiscountCurve {
         ])
         .interp(InterpStyle::Linear)
         // Preserve in-range interpolation and a positive long-tenor risk tail.
-        .extrapolation(ExtrapolationPolicy::FlatZero)
+        .extrapolation(ExtrapolationPolicy::Flat)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap()
 }
@@ -45,6 +46,8 @@ pub fn create_steep_discount_curve() -> DiscountCurve {
         .base_date(base_date())
         .knots([(0.0, 1.0), (0.25, 0.98), (1.0, 0.92), (5.0, 0.70)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -56,12 +59,8 @@ pub fn create_flat_discount_curve() -> DiscountCurve {
         .base_date(base_date())
         .knots([(0.0, 1.0), (10.0, 1.0)])
         .interp(InterpStyle::Linear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        )
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -72,23 +71,23 @@ pub fn create_standard_market_context() -> MarketContext {
         .insert(create_usd_discount_curve())
         .insert_price(
             "TREASURY_BOND_PRICE",
-            MarketScalar::Price(Money::new(1.02, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(1.02, Currency::USD).expect("valid money fixture")),
         )
         .insert_price(
             "CORPORATE_BOND_PRICE",
-            MarketScalar::Price(Money::new(0.98, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(0.98, Currency::USD).expect("valid money fixture")),
         )
         .insert_price(
             "SPECIAL_BOND_PRICE",
-            MarketScalar::Price(Money::new(1.05, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(1.05, Currency::USD).expect("valid money fixture")),
         )
         .insert_price(
             "HIGH_YIELD_PRICE",
-            MarketScalar::Price(Money::new(0.85, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(0.85, Currency::USD).expect("valid money fixture")),
         )
         .insert_price(
             "EQUITY_PRICE",
-            MarketScalar::Price(Money::new(150.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(150.0, Currency::USD).expect("valid money fixture")),
         )
 }
 

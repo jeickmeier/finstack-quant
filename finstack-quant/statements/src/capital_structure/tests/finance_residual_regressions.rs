@@ -16,7 +16,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::capital_structure::{
-    CapitalStructureState, EcfSweepSpec, PrincipalClaim, WaterfallSpec,
+    CapitalStructureState, EcfSweepSpec, PaymentPriority, PrincipalClaim, WaterfallSpec,
 };
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{AmountOrScalar, FinancialStatementInstrument};
@@ -411,6 +411,9 @@ fn model_preserves_economic_amortization_across_quarter_end_with_optional_sweep(
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(issue)
         .knots([(0.0, 1.0), (2.0, 0.9)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
     let market = MarketContext::new().insert(discount);
@@ -464,9 +467,16 @@ fn model_preserves_economic_amortization_across_quarter_end_with_optional_sweep(
             );
             model_builder
         };
-        if waterfall {
+        if sweep {
             builder.waterfall(WaterfallSpec {
-                ecf_sweep: sweep.then_some(EcfSweepSpec {
+                priority_of_payments: vec![
+                    PaymentPriority::Fees,
+                    PaymentPriority::Interest,
+                    PaymentPriority::Amortization,
+                    PaymentPriority::Sweep,
+                    PaymentPriority::Equity,
+                ],
+                ecf_sweep: Some(EcfSweepSpec {
                     ebitda_node: "ebitda".into(),
                     taxes_node: None,
                     capex_node: None,
@@ -477,6 +487,8 @@ fn model_preserves_economic_amortization_across_quarter_end_with_optional_sweep(
                 }),
                 ..Default::default()
             });
+        } else if waterfall {
+            builder.waterfall(WaterfallSpec::default());
         }
         let model = {
             let mut model_builder_1 = builder;
@@ -647,6 +659,9 @@ fn loan_funded_inside_the_model_repays_its_face_once() {
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots([(0.0, 1.0), (2.0, 0.9)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
     let market = MarketContext::new().insert(discount);

@@ -227,9 +227,17 @@ mod tests {
         };
         let mut stats = OnlineStats::new();
         for stream in 0..paths.num_paths {
-            stats.update(0.5 * (payoff(2 * stream) + payoff(2 * stream + 1)));
+            stats
+                .update(0.5 * (payoff(2 * stream) + payoff(2 * stream + 1)))
+                .expect("finite payoff");
         }
-        (stats.mean(), stats.stderr())
+        (
+            stats.get_mean().expect("finite mean").expect("non-empty"),
+            stats
+                .get_stderr()
+                .expect("finite stderr")
+                .expect("at least 2 paths"),
+        )
     }
 
     #[test]

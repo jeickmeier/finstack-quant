@@ -23,9 +23,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::{MarketContext, MarketContextState};
-use finstack_quant_core::market_data::term_structures::{
-    NelsonSiegelModel, NsVariant, ParInterp, Seniority,
-};
+use finstack_quant_core::market_data::term_structures::{NelsonSiegelModel, NsVariant, Seniority};
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::{CurveId, IndexId};
 use finstack_quant_valuations_core::market::conventions::CdsValuationConvention;
@@ -707,16 +705,10 @@ impl StepParams {
                     .collect(),
                 writes: vec![p.vol_surface_id.clone()],
             },
-            StepParams::XccyBasis(p) => {
-                let mut writes = vec![p.curve_id.to_string()];
-                if let Some(basis_id) = &p.basis_spread_curve_id {
-                    writes.push(basis_id.to_string());
-                }
-                StepIo {
-                    reads: vec![p.domestic_discount_id.to_string()],
-                    writes,
-                }
-            }
+            StepParams::XccyBasis(p) => StepIo {
+                reads: vec![p.domestic_discount_id.to_string()],
+                writes: vec![p.curve_id.to_string()],
+            },
             StepParams::Parametric(p) => StepIo {
                 reads: Vec::new(),
                 writes: vec![p.curve_id.to_string()],
@@ -753,7 +745,7 @@ pub struct DiscountCurveParams {
     #[serde(default = "default_interp_log_linear")]
     pub interpolation: InterpStyle,
     /// Extrapolation policy for the curve.
-    #[serde(default = "default_extrap_flat")]
+    #[serde(default = "default_extrap_extend")]
     pub extrapolation: ExtrapolationPolicy,
     /// Optional separate ID for pricing logic (defaults to curve_id).
     #[serde(default)]
@@ -782,8 +774,9 @@ pub struct ForwardCurveParams {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub base_date: Date,
-    /// Tenor in years for the forward curve.
-    pub tenor_years: f64,
+    /// Contractual index tenor metadata attached to the calibrated forward curve.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index_tenor: Option<Tenor>,
     /// Identifier for the discount curve to use.
     pub discount_curve_id: CurveId,
     /// Calibration method to use.
@@ -794,14 +787,17 @@ pub struct ForwardCurveParams {
     /// through projection discount factors.
     #[serde(default = "default_forward_method")]
     pub method: CalibrationMethod,
-    /// Interpolation style for the constructed forward curve.
+    /// Interpolation style for the constructed forward curve's projection factors.
     ///
-    /// Defaults to monotone cubic Hermite (Fritsch-Carlson) interpolation for a
-    /// smooth, shape-preserving forward term structure that admits zero and
-    /// negative rates. `Linear` remains explicitly opt-in; `MonotoneConvex` is
-    /// rejected because it is defined on discount factors, not forward rates.
-    #[serde(default = "default_interp_cubic_hermite")]
+    /// Defaults to log-linear factor interpolation (`log_linear`). All five
+    /// [`InterpStyle`] variants (`linear`, `log_linear`, `cubic_hermite`,
+    /// `piecewise_quadratic_forward`, `monotone_convex`) are supported on the
+    /// underlying positive projection-factor evaluator.
+    #[serde(default = "default_interp_log_linear")]
     pub interpolation: InterpStyle,
+    /// Policy controlling queries beyond the final calibrated pillar time.
+    #[serde(default = "default_extrap_extend")]
+    pub extrapolation: ExtrapolationPolicy,
 
     /// Step-level conventions for pricing and curve time axis.
     #[serde(default)]
@@ -840,13 +836,6 @@ pub struct HazardCurveParams {
     /// Calibration method to use.
     #[serde(default)]
     pub method: CalibrationMethod,
-    /// Interpolation method for par spreads reported by the calibrated curve.
-    ///
-    /// Note: this is used for *quoting/interpolation of stored par spreads* and does not affect
-    /// survival no-arbitrage, which is enforced via non-negative hazards together with the
-    /// required log-linear survival interpolation.
-    #[serde(default = "default_par_interp_linear")]
-    pub par_interp: ParInterp,
 
     /// Optional CDS documentation-clause assertion.
     ///
@@ -870,8 +859,7 @@ pub struct InflationCurveParams {
     pub curve_id: CurveId,
     /// Currency of the curve.
     pub currency: Currency,
-    /// Valuation and calibration-instrument start date. The output curve's
-    /// zero-time reference CPI date is this date minus `observation_lag`.
+    /// Valuation and calibration-instrument start date, independent of the source origin.
     #[cfg_attr(
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
@@ -881,20 +869,24 @@ pub struct InflationCurveParams {
     pub discount_curve_id: CurveId,
     /// Reference index (e.g. "USA-CPI-U").
     pub index: String,
-    /// Month observation lag (e.g. "3M"); "none" means zero months.
-    /// Day-based lags are unsupported because output curves carry month lags.
-    ///
-    /// Overrides the quote convention's lag and must match any supplied index
-    /// lag. The same lag determines the output curve's reference-date origin and the dates
-    /// of the CPI observations consumed by calibration instruments.
+    /// Explicit contractual month observation lag (e.g. "3M"); "none" means zero months.
+    /// Overrides the quote convention's lag without changing the projection source origin.
     pub observation_lag: String,
-    /// Base CPI level used as the curve's reference CPI at t=0.
-    ///
-    /// This is the contractual reference CPI at the start date after applying
-    /// observation lag and monthly interpolation. Its curve date is
-    /// `base_date - observation_lag`. Supplied index observations must reproduce
-    /// this value, including seasonality; a mismatch is rejected.
+    /// Explicit contractual reference CPI at the start date, after lag and interpolation.
+    /// This denominator is independent of the projection source's origin CPI.
     pub base_cpi: f64,
+    /// Explicit original date of the absolute CPI projection source.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub source_base_date: Date,
+    /// Finite positive absolute CPI level at the projection source's origin.
+    pub source_base_cpi: f64,
+    /// Complete source-clock convention used for every projected anchor.
+    pub day_count: DayCount,
+    /// Source-clock holiday calendar; required for business-day clocks.
+    pub calendar_id: Option<String>,
     /// Notional used to price synthetic inflation swaps during calibration.
     ///
     /// Calibration normalizes residuals by notional, so this is typically left as
@@ -905,8 +897,9 @@ pub struct InflationCurveParams {
     #[serde(default)]
     pub method: CalibrationMethod,
     /// Interpolation style for the curve.
-    #[serde(default = "default_interp_linear")]
     pub interpolation: InterpStyle,
+    /// Explicit scalar CPI tail policy, applied without lag or normalization.
+    pub extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy,
 }
 
 /// Parameters for volatility surface calibration step.
@@ -1305,24 +1298,12 @@ fn default_forward_method() -> CalibrationMethod {
     }
 }
 
-fn default_interp_linear() -> InterpStyle {
-    InterpStyle::Linear
-}
-
 fn default_interp_log_linear() -> InterpStyle {
     InterpStyle::LogLinear
 }
 
-fn default_interp_cubic_hermite() -> InterpStyle {
-    InterpStyle::CubicHermite
-}
-
-fn default_par_interp_linear() -> ParInterp {
-    ParInterp::Linear
-}
-
-fn default_extrap_flat() -> ExtrapolationPolicy {
-    ExtrapolationPolicy::FlatForward
+fn default_extrap_extend() -> ExtrapolationPolicy {
+    ExtrapolationPolicy::Extend
 }
 
 fn default_unit_notional() -> f64 {
@@ -1373,14 +1354,11 @@ pub struct XccyBasisParams {
     #[serde(default = "default_interp_log_linear")]
     pub interpolation: InterpStyle,
     /// Extrapolation policy for the foreign curve.
-    #[serde(default = "default_extrap_flat")]
+    #[serde(default = "default_extrap_extend")]
     pub extrapolation: ExtrapolationPolicy,
     /// Step-level conventions for pricing and curve time axis.
     #[serde(default)]
     pub conventions: RatesStepConventions,
-    /// Optional ID for the byproduct basis spread curve.
-    #[serde(default)]
-    pub basis_spread_curve_id: Option<CurveId>,
 }
 
 // Parametric (NS / NSS) Curve
@@ -1427,11 +1405,11 @@ mod interpolation_default_tests {
             "curve_id": "USD-SOFR-3M",
             "currency": "USD",
             "base_date": "2025-01-01",
-            "tenor_years": 0.25,
             "discount_curve_id": "USD-OIS"
         }))
         .expect("forward params");
-        assert_eq!(forward.interpolation, InterpStyle::CubicHermite);
+        assert_eq!(forward.interpolation, InterpStyle::LogLinear);
+        assert_eq!(forward.extrapolation, ExtrapolationPolicy::Extend);
 
         let xccy: XccyBasisParams = serde_json::from_value(serde_json::json!({
             "curve_id": "EUR-OIS",

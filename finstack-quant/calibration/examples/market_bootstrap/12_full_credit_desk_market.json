@@ -38,7 +38,7 @@
         "base_date": "2026-05-08",
         "method": "bootstrap",
         "interpolation": "linear",
-        "extrapolation": "flat_forward",
+        "extrapolation": "extend",
         "pricing_discount_id": null,
         "pricing_forward_id": null,
         "conventions": {
@@ -57,8 +57,7 @@
         "discount_curve_id": "USD-OIS",
         "recovery_rate": 0.4,
         "notional": 1.0,
-        "method": "bootstrap",
-        "par_interp": "linear"
+        "method": "bootstrap"
       },
       {
         "id": "CDX-NA-IG-46-BASE-CORR-STEP",
@@ -371,10 +370,6 @@
       "base": "2026-05-08",
       "knot_points": [
         [
-          0.0,
-          0.001
-        ],
-        [
           5.0,
           0.0012
         ],
@@ -387,9 +382,7 @@
       "issuer": null,
       "seniority": null,
       "currency": null,
-      "day_count": "act_365f",
-      "par_points": [],
-      "par_interp": "linear"
+      "day_count": "act_365f"
     },
     {
       "kind": "base_correlation_curve",

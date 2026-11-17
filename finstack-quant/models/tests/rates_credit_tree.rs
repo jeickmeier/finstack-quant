@@ -13,7 +13,7 @@
 //! triggering an integration regression.
 
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve, ParInterp};
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_models::trees::tree_framework::{NodeState, TreeValuator};
@@ -48,6 +48,7 @@ fn base_date() -> Date {
 fn discount_curve() -> DiscountCurve {
     DiscountCurve::builder("USD-OIS")
         .base_date(base_date())
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots([
             (0.0, 1.0),
             (1.0, 0.96),
@@ -56,6 +57,7 @@ fn discount_curve() -> DiscountCurve {
             (5.0, 0.78),
         ])
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("disc curve")
 }
@@ -64,9 +66,9 @@ fn hazard_curve(spread_bp: f64, recovery: f64) -> HazardCurve {
     let lambda = spread_bp / 10_000.0; // ≈ flat constant hazard
     HazardCurve::builder("TEST-HAZ")
         .base_date(base_date())
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .recovery_rate(recovery)
-        .knots([(0.0, lambda), (5.0, lambda), (10.0, lambda)])
-        .par_interp(ParInterp::Linear)
+        .knots([(1.0, lambda), (5.0, lambda), (10.0, lambda)])
         .build()
         .expect("hazard curve")
 }
@@ -77,19 +79,19 @@ fn calibration_targets(
     steps: usize,
     horizon: f64,
 ) -> RatesCreditCalibrationTargets {
-    let discount_at_origin = discount.df(0.0);
-    let survival_at_origin = hazard.sp(0.0);
+    let discount_at_origin = discount.df(0.0).expect("df(0)");
+    let survival_at_origin = hazard.sp(0.0).expect("sp(0)");
     let times: Vec<f64> = (0..=steps)
         .map(|step| step as f64 * horizon / steps as f64)
         .collect();
     RatesCreditCalibrationTargets {
         discount_factors: times
             .iter()
-            .map(|&time| discount.df(time) / discount_at_origin)
+            .map(|&time| discount.df(time).expect("df") / discount_at_origin)
             .collect(),
         survival_probabilities: times
             .iter()
-            .map(|&time| hazard.sp(time) / survival_at_origin)
+            .map(|&time| hazard.sp(time).expect("sp") / survival_at_origin)
             .collect(),
         times,
         recovery_rate: hazard.recovery_rate(),

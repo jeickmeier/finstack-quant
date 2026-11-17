@@ -3,8 +3,11 @@
 use crate::bindings::core::dates::tenor::{PyTenor, extract_tenor};
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::{label_enum, typed_or_label, wire_methods};
+use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
-use finstack_quant_core::dates::{DayCount, DayCountContext, DayCountContextState};
+use finstack_quant_core::dates::{
+    DayCount, DayCountContext, DayCountContextState, VolatilityClock,
+};
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
@@ -229,6 +232,11 @@ pub struct PyDayCountContext {
 }
 
 impl PyDayCountContext {
+    /// Wrap an existing [`DayCountContextState`].
+    pub(crate) const fn from_inner(inner: DayCountContextState) -> Self {
+        Self { inner }
+    }
+
     /// Resolve to a runtime [`DayCountContext`] using the global calendar registry.
     ///
     /// # Errors
@@ -272,19 +280,19 @@ impl PyDayCountContext {
     /// Optional calendar identifier.
     #[getter]
     fn calendar_id(&self) -> Option<&str> {
-        self.inner.calendar_id.as_deref()
+        self.inner.get_calendar_id()
     }
 
     /// Optional coupon frequency.
     #[getter]
     fn frequency(&self) -> Option<PyTenor> {
-        self.inner.frequency.map(PyTenor::from_inner)
+        self.inner.get_frequency().map(PyTenor::from_inner)
     }
 
     /// Optional custom business-day divisor.
     #[getter]
     fn bus_basis(&self) -> Option<u16> {
-        self.inner.bus_basis
+        self.inner.get_bus_basis()
     }
 
     /// Optional unadjusted ICMA reference or ACT/365L enclosing coupon as ``(start, end)`` dates.
@@ -294,7 +302,7 @@ impl PyDayCountContext {
         py: Python<'py>,
     ) -> PyResult<Option<(Bound<'py, PyAny>, Bound<'py, PyAny>)>> {
         self.inner
-            .coupon_period
+            .get_coupon_period()
             .map(|(s, e)| Ok((date_to_py(py, s)?, date_to_py(py, e)?)))
             .transpose()
     }
@@ -302,27 +310,27 @@ impl PyDayCountContext {
     /// Whether the later accrual endpoint is the termination date; ``None`` if unspecified.
     #[getter]
     fn end_is_termination_date(&self) -> Option<bool> {
-        self.inner.end_is_termination_date
+        self.inner.get_end_is_termination_date()
     }
 
     fn __repr__(&self) -> String {
         let state = &self.inner;
-        let calendar_id = match &state.calendar_id {
+        let calendar_id = match state.get_calendar_id() {
             Some(s) => format!("'{s}'"),
             None => "None".to_string(),
         };
-        let frequency = match state.frequency {
+        let frequency = match state.get_frequency() {
             Some(t) => format!("Tenor('{t}')"),
             None => "None".to_string(),
         };
         let bus_basis = state
-            .bus_basis
+            .get_bus_basis()
             .map_or_else(|| "None".to_string(), |b| b.to_string());
-        let coupon_period = match state.coupon_period {
+        let coupon_period = match state.get_coupon_period() {
             Some((s, e)) => format!("('{s}', '{e}')"),
             None => "None".to_string(),
         };
-        let flag = match state.end_is_termination_date {
+        let flag = match state.get_end_is_termination_date() {
             Some(true) => "True",
             Some(false) => "False",
             None => "None",
@@ -335,12 +343,89 @@ impl PyDayCountContext {
 
 wire_methods!(PyDayCountContext, DayCountContextState, "DayCountContext");
 
+#[derive(Clone)]
+#[pyclass(
+    name = "VolatilityClock",
+    module = "finstack_quant.core.dates",
+    from_py_object
+)]
+#[doc = pydoc!("finstack_quant.core.dates._daycount", "VolatilityClock")]
+pub struct PyVolatilityClock {
+    /// Inner volatility clock.
+    pub(crate) inner: VolatilityClock,
+}
+
+impl PyVolatilityClock {
+    /// Wrap an existing [`VolatilityClock`].
+    pub(crate) const fn from_inner(inner: VolatilityClock) -> Self {
+        Self { inner }
+    }
+}
+
+#[pymethods]
+impl PyVolatilityClock {
+    #[new]
+    #[pyo3(signature = (reference_date, day_count, context=None))]
+    #[doc = pydoc!("finstack_quant.core.dates._daycount", "VolatilityClock.__init__")]
+    fn new(
+        reference_date: &Bound<'_, PyAny>,
+        day_count: &Bound<'_, PyAny>,
+        context: Option<PyRef<'_, PyDayCountContext>>,
+    ) -> PyResult<Self> {
+        let reference = py_to_date(reference_date)?;
+        let dc = extract_day_count(day_count)?;
+        let ctx = context.map(|c| c.inner.clone()).unwrap_or_default();
+        let inner = VolatilityClock::try_new(reference, dc, ctx).map_err(core_to_py)?;
+        Ok(Self { inner })
+    }
+
+    #[getter]
+    #[doc = pydoc!("finstack_quant.core.dates._daycount", "VolatilityClock.reference_date")]
+    fn reference_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.get_reference_date())
+    }
+
+    #[getter]
+    #[doc = pydoc!("finstack_quant.core.dates._daycount", "VolatilityClock.day_count")]
+    fn day_count(&self) -> PyDayCount {
+        PyDayCount::from_inner(self.inner.get_day_count())
+    }
+
+    #[getter]
+    #[doc = pydoc!("finstack_quant.core.dates._daycount", "VolatilityClock.context")]
+    fn context(&self) -> PyDayCountContext {
+        PyDayCountContext::from_inner(self.inner.get_context().clone())
+    }
+
+    #[doc = pydoc!("finstack_quant.core.dates._daycount", "VolatilityClock.expiry_time")]
+    fn expiry_time(&self, expiry_date: &Bound<'_, PyAny>) -> PyResult<f64> {
+        let expiry = py_to_date(expiry_date)?;
+        self.inner.expiry_time(expiry).map_err(core_to_py)
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "VolatilityClock(reference_date={}, day_count='{}')",
+            self.inner.get_reference_date(),
+            self.inner.get_day_count()
+        )
+    }
+}
+
+wire_methods!(
+    PyVolatilityClock,
+    VolatilityClock,
+    "VolatilityClock",
+    module = "finstack_quant.core.dates._daycount"
+);
+
 /// Register day-count types on the `finstack_quant.core.dates` module.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDayCount>()?;
     m.add_class::<PyDayCountContext>()?;
+    m.add_class::<PyVolatilityClock>()?;
     Ok(())
 }
 
 /// Names exported from this submodule.
-pub const EXPORTS: &[&str] = &["DayCount", "DayCountContext"];
+pub const EXPORTS: &[&str] = &["DayCount", "DayCountContext", "VolatilityClock"];

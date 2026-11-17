@@ -70,7 +70,7 @@ impl PyPriceCurve {
     ///     An explicit spot is inserted at zero if that knot is absent and
     ///     must match any supplied zero-time knot.
     /// extrapolation : str, optional
-    ///     Extrapolation policy; default ``"flat_zero"``.
+    ///     Extrapolation policy; default ``"flat"``.
     /// interp : str, optional
     ///     Interpolation style; default ``"linear"``.
     /// day_count : DayCount | str, optional
@@ -223,7 +223,7 @@ impl PyPriceCurve {
         self.inner.interp_style().to_string()
     }
 
-    /// Extrapolation policy label (e.g. ``"flat_zero"``).
+    /// Extrapolation policy label (e.g. ``"flat"``).
     #[getter]
     fn extrapolation(&self) -> String {
         self.inner.extrapolation().to_string()

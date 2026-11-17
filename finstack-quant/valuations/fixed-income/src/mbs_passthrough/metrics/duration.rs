@@ -120,11 +120,11 @@ pub(crate) fn duration_convexity(
     }
 
     // Create bumped markets using shared calibration bump helpers (parallel bump in bp).
-    let market_up = market.bump([MarketBump::Curve {
+    let market_up = market.bump([MarketBump::DiscountCurve {
         id: mbs.discount_curve_id.clone(),
         spec: BumpSpec::parallel_bp(shock_bp),
     }])?;
-    let market_down = market.bump([MarketBump::Curve {
+    let market_down = market.bump([MarketBump::DiscountCurve {
         id: mbs.discount_curve_id.clone(),
         spec: BumpSpec::parallel_bp(-shock_bp),
     }])?;
@@ -204,6 +204,8 @@ mod tests {
                 (30.0, 0.30),
             ])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid curve");
 
@@ -220,6 +222,8 @@ mod tests {
                 ),
             ],
             None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .expect("fixing series");
 
@@ -373,8 +377,8 @@ mod tests {
         let bumped = bumped_market.get_discount(&curve_id).expect("bumped");
 
         // Bumped curve should have lower discount factors (higher rates)
-        let df_original = original.df(5.0);
-        let df_bumped = bumped.df(5.0);
+        let df_original = original.df(5.0).expect("df");
+        let df_bumped = bumped.df(5.0).expect("df");
 
         assert!(df_bumped < df_original);
     }
@@ -397,6 +401,9 @@ mod production_mortgage_audit {
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
         );
@@ -423,6 +430,9 @@ mod production_mortgage_audit {
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
         );
@@ -451,6 +461,9 @@ mod production_mortgage_audit {
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
         );

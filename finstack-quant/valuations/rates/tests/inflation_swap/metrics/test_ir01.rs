@@ -5,6 +5,7 @@ use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_valuations_test_support::inflation::*;
 use rust_decimal::Decimal;
 
+use finstack_quant_core::market_data::scalars::{InflationLag, SeriesInterpolation};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::MetricId;
@@ -28,6 +29,8 @@ fn test_ir01_finite_difference_validation() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -44,13 +47,13 @@ fn test_ir01_finite_difference_validation() {
     let dv01_analytic = *result.measures.get("dv01").unwrap();
 
     let ctx_up = ctx
-        .bump([MarketBump::Curve {
+        .bump([MarketBump::DiscountCurve {
             id: "USD-OIS".into(),
             spec: BumpSpec::parallel_bp(1.0),
         }])
         .unwrap();
     let ctx_down = ctx
-        .bump([MarketBump::Curve {
+        .bump([MarketBump::DiscountCurve {
             id: "USD-OIS".into(),
             spec: BumpSpec::parallel_bp(-1.0),
         }])
@@ -95,6 +98,8 @@ fn test_ir01_sign_pay_fixed() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -131,6 +136,8 @@ fn test_ir01_sign_receive_fixed() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Receive)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();

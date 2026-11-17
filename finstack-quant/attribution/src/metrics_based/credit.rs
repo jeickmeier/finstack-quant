@@ -20,8 +20,8 @@ pub(super) fn apply(
     // METRIC DEFINITION:
     // - Cs01 / BucketedCs01: $ per bp of credit-curve move ($ / bp).
     // - Formula: PnL = Σ_curve Σ_tenor BucketedCs01_{curve,tenor} × Δs_{curve,tenor}
-    //   where Δs is the credit-curve move from `measure_credit_curve_shift` /
-    //   `measure_per_tenor_credit_curve_shift`. Those measure the move in
+    //   where Δs is the credit-curve move from `measure_credit_curve_shift_bp` /
+    //   `measure_per_tenor_credit_curve_shift_bp`. Those measure the move in
     //   whichever basis the instrument's CS01 is defined on: a par CDS spread
     //   move for a hazard curve, or a zero-rate move for a discount-style
     //   credit curve. Pairing a par-spread CS01 with a hazard-rate move would
@@ -46,6 +46,8 @@ pub(super) fn apply(
         // before this stage; every supplied bucket contributes once.
         let mut credit_acc = NeumaierAccumulator::new();
         let mut shift_acc = NeumaierAccumulator::new();
+        let mut credit_valid = true;
+        let mut shift_valid = true;
         let mut shift_terms = 0usize;
         let mut curves_with_data = 0usize;
         for curve_id in credit_curve_ids {
@@ -53,13 +55,30 @@ pub(super) fn apply(
                 continue;
             };
             let mut curve_acc = NeumaierAccumulator::new();
+            let mut curve_valid = true;
             for bucket in buckets {
-                credit_acc.add(bucket.sensitivity * bucket.move_bp);
-                curve_acc.add(bucket.sensitivity * bucket.move_bp);
-                shift_acc.add(bucket.move_bp);
+                let term = bucket.sensitivity * bucket.move_bp;
+                if credit_acc.add(term).is_err() {
+                    credit_valid = false;
+                }
+                if curve_acc.add(term).is_err() {
+                    curve_valid = false;
+                }
+                if shift_acc.add(bucket.move_bp).is_err() {
+                    shift_valid = false;
+                }
                 shift_terms += 1;
             }
             curves_with_data += 1;
+            let curve_pnl = if curve_valid {
+                curve_acc.get_total().unwrap_or_else(|_| {
+                    *non_finite_detected = true;
+                    f64::NAN
+                })
+            } else {
+                *non_finite_detected = true;
+                f64::NAN
+            };
             push_first_order_step(
                 attribution,
                 &format!("Credit:{curve_id}"),
@@ -70,19 +89,37 @@ pub(super) fn apply(
                         .map(|bucket| (bucket.tenor_years, bucket.sensitivity, bucket.move_bp))
                         .collect(),
                 },
-                curve_acc.total(),
+                curve_pnl,
             );
         }
         if curves_with_data > 0 {
+            let credit_pnl = if credit_valid {
+                credit_acc.get_total().unwrap_or_else(|_| {
+                    *non_finite_detected = true;
+                    f64::NAN
+                })
+            } else {
+                *non_finite_detected = true;
+                f64::NAN
+            };
             attribution.credit_curves_pnl = inputs.money(
-                credit_acc.total(),
+                credit_pnl,
                 "credit curves P&L (key-rate)",
                 attribution,
                 non_finite_detected,
             );
             credit_has_data = true;
             if shift_terms > 0 {
-                credit_convexity_avg_shift_bp = Some(shift_acc.total() / shift_terms as f64);
+                let shift_total = if shift_valid {
+                    shift_acc.get_total().unwrap_or_else(|_| {
+                        *non_finite_detected = true;
+                        f64::NAN
+                    })
+                } else {
+                    *non_finite_detected = true;
+                    f64::NAN
+                };
+                credit_convexity_avg_shift_bp = Some(shift_total / shift_terms as f64);
             }
             attribution.meta.notes.push(format!(
                 "Credit attribution computed using key-rate (per-tenor) BucketedCs01 across \
@@ -131,16 +168,119 @@ pub(super) fn apply(
                     inputs.shifts.credit_curves_measured
                 ));
             }
+        } else if !inputs.hazard_keyrates.is_empty() {
+            let mut hazard_acc = NeumaierAccumulator::new();
+            let mut hazard_valid = true;
+            let mut curves_with_data = 0usize;
+            for curve_id in credit_curve_ids {
+                let Some(buckets) = inputs.hazard_keyrates.get(curve_id) else {
+                    continue;
+                };
+                let mut curve_acc = NeumaierAccumulator::new();
+                let mut curve_valid = true;
+                for bucket in buckets {
+                    let term = bucket.sensitivity * bucket.move_bp;
+                    if hazard_acc.add(term).is_err() {
+                        hazard_valid = false;
+                    }
+                    if curve_acc.add(term).is_err() {
+                        curve_valid = false;
+                    }
+                }
+                curves_with_data += 1;
+                let curve_pnl = if curve_valid {
+                    curve_acc.get_total().unwrap_or_else(|_| {
+                        *non_finite_detected = true;
+                        f64::NAN
+                    })
+                } else {
+                    *non_finite_detected = true;
+                    f64::NAN
+                };
+                push_first_order_step(
+                    attribution,
+                    &format!("Hazard:{curve_id}"),
+                    FactorWorking::KeyRate {
+                        unit: MoveUnit::BasisPoint,
+                        buckets: buckets
+                            .iter()
+                            .map(|bucket| (bucket.tenor_years, bucket.sensitivity, bucket.move_bp))
+                            .collect(),
+                    },
+                    curve_pnl,
+                );
+            }
+            if curves_with_data > 0 {
+                let hazard_pnl = if hazard_valid {
+                    hazard_acc.get_total().unwrap_or_else(|_| {
+                        *non_finite_detected = true;
+                        f64::NAN
+                    })
+                } else {
+                    *non_finite_detected = true;
+                    f64::NAN
+                };
+                attribution.credit_curves_pnl = inputs.money(
+                    hazard_pnl,
+                    "hazard intensity P&L (key-rate)",
+                    attribution,
+                    non_finite_detected,
+                );
+                credit_has_data = true;
+                attribution.meta.notes.push(format!(
+                    "Credit attribution computed using direct intensity BucketedHazard01 across {} curve(s)",
+                    curves_with_data
+                ));
+            }
+        } else if let Some(hazard01) = inputs.val_t0.measures.get(MetricId::Hazard01.as_str()) {
+            let avg_shift = if let Some(avg_shift) = inputs.shifts.avg_hazard_shift_bp {
+                avg_shift
+            } else {
+                note_warning(
+                    attribution,
+                    "Credit attribution has Hazard01 but no measurable hazard intensity shift; credit P&L set to zero",
+                    inputs.instrument.id(),
+                    "credit_curves",
+                );
+                0.0
+            };
+            attribution.credit_curves_pnl = inputs.money(
+                hazard01 * avg_shift,
+                "hazard intensity P&L",
+                attribution,
+                non_finite_detected,
+            );
+            push_first_order_step(
+                attribution,
+                "Hazard",
+                FactorWorking::Scalar {
+                    unit: MoveUnit::BasisPoint,
+                    sensitivity: *hazard01,
+                    market_move: avg_shift,
+                },
+                hazard01 * avg_shift,
+            );
+            credit_has_data = true;
+            if inputs.shifts.hazard_curves_measured > 1 {
+                attribution.meta.notes.push(format!(
+                    "Credit attribution uses aggregate Hazard01 with average hazard intensity shift across {} curves",
+                    inputs.shifts.hazard_curves_measured
+                ));
+            }
         } else if inputs
             .shifts
             .avg_credit_shift_bp
             .is_some_and(|s| s.abs() > 0.0)
+            || inputs
+                .shifts
+                .avg_hazard_shift_bp
+                .is_some_and(|s| s.abs() > 0.0)
         {
-            // No CS01 metric at all while the credit curves measurably moved —
+            // No credit sensitivity metric at all while credit curves measurably moved —
             // note the silent zero (see the rates-ladder counterpart above).
             note_warning(
                 attribution,
-                "Credit attribution skipped: no Cs01/BucketedCs01 metric in the T0 valuation \
+                "Credit attribution skipped: no Cs01/BucketedCs01/Hazard01/BucketedHazard01 metric in the T0 valuation \
                  while the credit curves moved; credit P&L set to zero (move flows to residual)",
                 inputs.instrument.id(),
                 "credit_curves",

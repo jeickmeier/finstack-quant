@@ -359,10 +359,13 @@ impl Hw1fNote for Tarn {
                 let tenor = inst.index_tenor.to_years_approx();
                 let coeffs = term_forward.period_coeffs(fixing_time, tenor)?;
                 let discount_forward = term_forward.curve_forward(fixing_time, tenor)?;
-                let basis = finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_on_date(
-                    forward_curve.as_ref(),
-                    start,
-                )? - discount_forward;
+                let basis =
+                    finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_for_period(
+                        forward_curve.as_ref(),
+                        start,
+                        end,
+                        accrual_fraction,
+                    )? - discount_forward;
                 events.push(CouponEvent {
                     accrual_fraction,
                     discount_factor,
@@ -375,10 +378,16 @@ impl Hw1fNote for Tarn {
                 // historical observation. Use the projection curve for that
                 // fixing; discount-curve reconstruction alone would erase the
                 // projection/discount basis precisely at inception.
+                let proj_start = start.max(as_of);
+                let proj_accrual =
+                    inst.day_count
+                        .year_fraction(proj_start, end, DayCountContext::default())?;
                 let projected_rate =
-                    finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_on_date(
+                    finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_for_period(
                         forward_curve.as_ref(),
-                        start,
+                        proj_start,
+                        end,
+                        proj_accrual,
                     )?;
                 PeriodForwardCoeffs::from_flat_rate(projected_rate, accrual_fraction)
             };
@@ -536,12 +545,17 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots(knots)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let forward = ForwardCurve::builder("USD-SOFR-6M", 0.5)
+        let forward = ForwardCurve::builder("USD-SOFR-6M")
             .base_date(as_of)
             .day_count(DayCount::Act365F)
-            .knots([(0.0, forward_rate), (3.0, forward_rate)])
+            .index_tenor(Tenor::semi_annual())
+            .knots([(0.0, 1.0), (1.0, (-forward_rate).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("forward curve");
         MarketContext::new().insert(discount).insert(forward)
@@ -627,11 +641,9 @@ mod tests {
             }
             let accrual = day_count.year_fraction(start, end, ctx).expect("accrual");
             let p_end = disc.as_ref().df_between_dates(as_of, end).expect("p_end");
-            let projection_time = projection
-                .day_count()
-                .signed_year_fraction(projection.base_date(), start.max(as_of), ctx)
-                .expect("projection time");
-            let floating_rate = projection.rate(projection_time);
+            let floating_rate = projection
+                .rate_between_dates(start.max(as_of), end, accrual)
+                .expect("projection rate");
 
             let fixed_rate = tarn.fixed_rate.as_f64();
             let coupon = (fixed_rate - floating_rate).max(tarn.coupon_floor) * accrual;

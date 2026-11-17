@@ -8,7 +8,7 @@ use finstack_quant_core::market_data::bumps::{
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::{Error, Result};
+use finstack_quant_core::{Error, InputError, Result};
 use finstack_quant_factor::{BumpSizeConfig, FactorDefinition, MarketMapping, SensitivityMatrix};
 use finstack_quant_valuations::instruments::Instrument;
 
@@ -42,12 +42,14 @@ impl DeltaBasedEngine {
         let (bump_size, bump_units) = factor_bump(bump_config, factor)?;
 
         let up_market = market.bump(mapping_to_market_bumps(
+            market,
             &factor.market_mapping,
             bump_size,
             bump_units,
             as_of,
         )?)?;
         let down_market = market.bump(mapping_to_market_bumps(
+            market,
             &factor.market_mapping,
             -bump_size,
             bump_units,
@@ -93,15 +95,16 @@ impl DeltaBasedEngine {
 /// the `EquitySpot` branch (which applies a fractional multiplier), or vice
 /// versa.
 ///
-/// Branches that already carry their own `BumpUnits` (`CurveParallel`,
-/// `VolShift`) require `bump_units` to equal the mapping's declared units, and
+/// Branches that carry their own `BumpUnits` (`CurveParallel`, `VolShift`)
+/// require `bump_units` to equal the mapping's declared units, and
 /// `CurveBucketed` requires `RateBp`; mismatches are rejected with
 /// [`Error::Validation`] so the disagreement surfaces at bump construction
 /// rather than propagating a silently mis-scaled shock.
 ///
-/// `EquitySpot` and `FxRate` do not carry `BumpUnits`; they reduce the additive
-/// magnitude to a fraction (`RateBp` ÷ 10 000, `Percent` ÷ 100, `Fraction` as
-/// is) before applying the multiplier / FX percent shock.
+/// `EquitySpot`, `FxRate`, and `VolShift` reduce the additive magnitude to a
+/// fraction (`RateBp` ÷ 10 000, `Percent` ÷ 100, `Fraction` as is) before
+/// applying the multiplier / FX percent / native `BumpUnits::Fraction`
+/// surface vol delta.
 ///
 /// [`FactorType::bump_units`]: finstack_quant_factor::FactorType::bump_units
 ///
@@ -116,11 +119,16 @@ impl DeltaBasedEngine {
 ///
 /// * `mapping` - Factor-to-market mapping that selects the curve, surface, or
 ///   scalar to bump and its declared bump convention.
+/// # Arguments
+///
+/// * `market` - Market context used to resolve canonical curve, scalar, and series target variants.
+/// * `mapping` - Mapping specification from factor definition to market identifiers.
 /// * `bump_size` - Requested bump magnitude expressed in `bump_units`.
 /// * `bump_units` - Unit of `bump_size`; it must equal the units declared by
 ///   curve or volatility mappings.
 /// * `as_of` - Valuation date attached to generated dated market bumps.
 pub(crate) fn mapping_to_market_bumps(
+    market: &MarketContext,
     mapping: &MarketMapping,
     bump_size: f64,
     bump_units: BumpUnits,
@@ -154,19 +162,16 @@ pub(crate) fn mapping_to_market_bumps(
     match mapping {
         MarketMapping::CurveParallel { curve_ids, units } => {
             require_units(*units)?;
-            Ok(curve_ids
+            let spec = BumpSpec {
+                mode: BumpMode::Additive,
+                units: *units,
+                value: bump_size,
+                bump_type: BumpType::Parallel,
+            };
+            curve_ids
                 .iter()
-                .cloned()
-                .map(|id| MarketBump::Curve {
-                    id,
-                    spec: BumpSpec {
-                        mode: BumpMode::Additive,
-                        units: *units,
-                        value: bump_size,
-                        bump_type: BumpType::Parallel,
-                    },
-                })
-                .collect())
+                .map(|id| Ok(market.curve_target(id)?.into_bump(spec)))
+                .collect()
         }
         MarketMapping::CurveBucketed {
             curve_id,
@@ -179,6 +184,7 @@ pub(crate) fn mapping_to_market_bumps(
                     "MarketMapping::CurveBucketed requires RateBp bump units, got {bump_units:?}"
                 )));
             }
+            let target = market.curve_target(curve_id)?;
             Ok(tenor_weights
                 .iter()
                 .enumerate()
@@ -196,10 +202,7 @@ pub(crate) fn mapping_to_market_bumps(
                         tenor_weights.get(idx + 1).map(|&(next, _)| next),
                         scaled_bp,
                     );
-                    MarketBump::Curve {
-                        id: curve_id.clone(),
-                        spec,
-                    }
+                    target.clone().into_bump(spec)
                 })
                 .collect())
         }
@@ -207,13 +210,32 @@ pub(crate) fn mapping_to_market_bumps(
             // Equity spot expects a *multiplicative* shock: reduce the
             // additive magnitude to a fraction, then wrap as `1.0 + fraction`.
             let fraction = additive_fraction()?;
-            Ok(tickers
+            let spec = BumpSpec::multiplier(1.0 + fraction);
+            tickers
                 .iter()
-                .map(|ticker| MarketBump::Curve {
-                    id: CurveId::new(ticker),
-                    spec: BumpSpec::multiplier(1.0 + fraction),
+                .map(|ticker| {
+                    if let Ok(scalar) = market.get_price(ticker.as_str()) {
+                        if scalar.is_price() {
+                            Ok(MarketBump::PriceScalar {
+                                id: CurveId::new(ticker),
+                                spec,
+                            })
+                        } else {
+                            Ok(MarketBump::UnitlessScalar {
+                                id: CurveId::new(ticker),
+                                spec,
+                            })
+                        }
+                    } else if market.get_series(ticker.as_str()).is_ok() {
+                        Ok(MarketBump::Series {
+                            id: CurveId::new(ticker),
+                            spec,
+                        })
+                    } else {
+                        Err(Error::Input(InputError::NotFound { id: ticker.clone() }))
+                    }
                 })
-                .collect())
+                .collect()
         }
         MarketMapping::FxRate { pair } => {
             // `MarketBump::FxPct::pct` is a *percent* scalar, so convert
@@ -232,14 +254,15 @@ pub(crate) fn mapping_to_market_bumps(
             units,
         } => {
             require_units(*units)?;
+            let delta = additive_fraction()?;
             Ok(vol_surface_ids
                 .iter()
-                .map(|vol_surface_id| MarketBump::Curve {
+                .map(|vol_surface_id| MarketBump::VolSurface {
                     id: CurveId::new(vol_surface_id),
                     spec: BumpSpec {
                         mode: BumpMode::Additive,
-                        units: *units,
-                        value: bump_size,
+                        units: BumpUnits::Fraction,
+                        value: delta,
                         bump_type: BumpType::Parallel,
                     },
                 })
@@ -438,13 +461,17 @@ mod tests {
                 } => Ok(market.get_discount(curve_id.as_str())?.zero_rate(
                     *tenor_years,
                     finstack_quant_core::math::Compounding::Continuous,
-                ) * self.scale),
+                )? * self.scale),
                 MockKind::Spot { spot_id } => {
-                    let price = market.get_price(spot_id)?.clone();
-                    let value = match price {
-                        MarketScalar::Unitless(v) => v,
-                        MarketScalar::Price(money) => money.amount(),
-                    };
+                    let price = market.get_price(spot_id)?;
+                    let value = price
+                        .get_unitless()
+                        .or_else(|| price.get_price().map(|money| money.amount()))
+                        .ok_or_else(|| {
+                            finstack_quant_core::Error::Validation(format!(
+                                "unsupported scalar for '{spot_id}'"
+                            ))
+                        })?;
                     Ok(value * self.scale)
                 }
                 MockKind::FxCross { base, quote } => Ok(market
@@ -544,11 +571,13 @@ mod tests {
             .base_date(as_of)
             .interp(InterpStyle::MonotoneConvex)
             .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.80), (10.0, 0.60)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
 
         Ok(MarketContext::new()
             .insert(curve)
-            .insert_price("SPOT", MarketScalar::Unitless(100.0)))
+            .insert_price("SPOT", MarketScalar::unitless(100.0).expect("valid scalar")))
     }
 
     fn test_market_with_other_curve(as_of: Date) -> Result<MarketContext> {
@@ -556,6 +585,8 @@ mod tests {
             .base_date(as_of)
             .interp(InterpStyle::MonotoneConvex)
             .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.75), (10.0, 0.55)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
         Ok(test_market(as_of)?.insert(other_curve))
     }
@@ -571,17 +602,18 @@ mod tests {
 
     #[test]
     fn test_mapping_to_market_bumps_curve_parallel() -> Result<()> {
+        let as_of = date!(2025 - 01 - 01);
+        let market = test_market(as_of)?;
         let mapping = MarketMapping::CurveParallel {
             curve_ids: vec![CurveId::new("USD-OIS")],
             units: BumpUnits::RateBp,
         };
 
-        let bumps =
-            mapping_to_market_bumps(&mapping, 1.0, BumpUnits::RateBp, date!(2025 - 01 - 01))?;
+        let bumps = mapping_to_market_bumps(&market, &mapping, 1.0, BumpUnits::RateBp, as_of)?;
 
         assert_eq!(bumps.len(), 1);
-        assert!(matches!(bumps[0], MarketBump::Curve { .. }));
-        if let MarketBump::Curve { id, spec } = &bumps[0] {
+        assert!(matches!(bumps[0], MarketBump::DiscountCurve { .. }));
+        if let MarketBump::DiscountCurve { id, spec } = &bumps[0] {
             assert_eq!(id.as_str(), "USD-OIS");
             assert_eq!(spec.value, 1.0);
             assert_eq!(spec.units, BumpUnits::RateBp);
@@ -591,17 +623,18 @@ mod tests {
 
     #[test]
     fn test_mapping_to_market_bumps_curve_bucketed() -> Result<()> {
+        let as_of = date!(2025 - 01 - 01);
+        let market = test_market(as_of)?;
         let mapping = MarketMapping::CurveBucketed {
             curve_id: CurveId::new("USD-OIS"),
             tenor_weights: vec![(2.0, 0.5), (5.0, 1.0), (10.0, 0.5)],
         };
 
-        let bumps =
-            mapping_to_market_bumps(&mapping, 1.0, BumpUnits::RateBp, date!(2025 - 01 - 01))?;
+        let bumps = mapping_to_market_bumps(&market, &mapping, 1.0, BumpUnits::RateBp, as_of)?;
 
         assert_eq!(bumps.len(), 3);
-        assert!(matches!(bumps[1], MarketBump::Curve { .. }));
-        if let MarketBump::Curve { spec, .. } = &bumps[1] {
+        assert!(matches!(bumps[1], MarketBump::DiscountCurve { .. }));
+        if let MarketBump::DiscountCurve { spec, .. } = &bumps[1] {
             assert_eq!(spec.value, 1.0);
             assert_eq!(
                 spec.bump_type,
@@ -622,12 +655,13 @@ mod tests {
     /// silently.
     #[test]
     fn mapping_rejects_bump_unit_mismatch_on_curve_parallel() -> Result<()> {
+        let as_of = date!(2025 - 01 - 01);
+        let market = test_market(as_of)?;
         let mapping = MarketMapping::CurveParallel {
             curve_ids: vec![CurveId::new("USD-OIS")],
             units: BumpUnits::RateBp,
         };
-        let result =
-            mapping_to_market_bumps(&mapping, 1.0, BumpUnits::Percent, date!(2025 - 01 - 01));
+        let result = mapping_to_market_bumps(&market, &mapping, 1.0, BumpUnits::Percent, as_of);
         assert!(result.is_err(), "unit mismatch must be rejected");
         let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
         assert!(
@@ -644,21 +678,33 @@ mod tests {
     /// percent).
     #[test]
     fn equity_spot_converts_any_unit_to_fractional_multiplier() -> Result<()> {
+        let market = MarketContext::new()
+            .insert_price("SPX", MarketScalar::unitless(100.0).expect("valid scalar"));
         let mapping = MarketMapping::EquitySpot {
             tickers: vec!["SPX".into()],
         };
-        let pct =
-            mapping_to_market_bumps(&mapping, 2.0, BumpUnits::Percent, date!(2025 - 01 - 01))?;
-        let frac =
-            mapping_to_market_bumps(&mapping, 0.02, BumpUnits::Fraction, date!(2025 - 01 - 01))?;
+        let pct = mapping_to_market_bumps(
+            &market,
+            &mapping,
+            2.0,
+            BumpUnits::Percent,
+            date!(2025 - 01 - 01),
+        )?;
+        let frac = mapping_to_market_bumps(
+            &market,
+            &mapping,
+            0.02,
+            BumpUnits::Fraction,
+            date!(2025 - 01 - 01),
+        )?;
         // Both should yield a multiplier bump of 1.02.
         for bumps in [&pct, &frac] {
             assert_eq!(bumps.len(), 1);
             let spec = match &bumps[0] {
-                MarketBump::Curve { spec, .. } => spec,
+                MarketBump::UnitlessScalar { spec, .. } => spec,
                 other => {
                     return Err(Error::Validation(format!(
-                        "expected Curve bump, got {other:?}"
+                        "expected UnitlessScalar bump, got {other:?}"
                     )));
                 }
             };

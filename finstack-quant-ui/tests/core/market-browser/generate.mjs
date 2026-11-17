@@ -27,11 +27,10 @@ const curves = [
     (v) => !calibrated.curves.some((c) => c.type === v.type && c.id === v.id),
   ),
 ];
+// Negative rates: discount factors above one need no opt-in flag.
 const discount = {
   ...variants.curves.find((c) => c.type === "discount"),
   id: "NEG-RATES",
-  allow_non_monotonic: true,
-  min_forward_rate: -1,
   knot_points: [
     [0, 1],
     [1, 1.01],
@@ -43,14 +42,23 @@ const supplemental = {
   curves: [...curves, discount],
   prices: { ...calibrated.prices, "USD/CSA": { unitless: 1.25 } },
   hierarchy: {
-    roots: {
-      Rates: {
-        tags: { desk: "Credit" },
-        children: {
-          Negative: { curves: ["NEG-RATES"], tags: { policy: "nonstandard" } },
+    roots: [
+      {
+        name: "Rates",
+        node: {
+          tags: { desk: "Credit" },
+          children: [
+            {
+              name: "Negative",
+              node: {
+                targets: [{ kind: "discount_curve", id: "NEG-RATES" }],
+                tags: { policy: "nonstandard" },
+              },
+            },
+          ],
         },
       },
-    },
+    ],
   },
   fx: {
     config: {

@@ -10,7 +10,6 @@ import pytest
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import (
     DiscountCurve,
-    ForwardCurve,
     MarketContext,
     ScalarTimeSeries,
 )
@@ -23,6 +22,7 @@ from finstack_quant.valuations.instruments import (
 )
 from tests.tests_typed_helpers import (
     canonical_structured_credit_json,
+    projection_curve,
     structured_credit_pool as _pool,
     structured_credit_tranches as _tranches,
 )
@@ -45,18 +45,10 @@ def _market() -> MarketContext:
     as_of = datetime.date(2024, 1, 1)
     market = (
         MarketContext()
-        .insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
-        .insert(
-            ForwardCurve(
-                "SOFR-3M",
-                0.25,
-                as_of,
-                [(0.0, 0.04), (10.0, 0.04)],
-                day_count="act_360",
-            )
-        )
+        .insert(DiscountCurve.flat("USD-OIS", as_of, 0.04, "act_365f"))
+        .insert(projection_curve("SOFR-3M", as_of, [(10.0, 0.04)]))
     )
-    market.insert_series(ScalarTimeSeries("FIXING:SOFR-3M", [(datetime.date(2023, 12, 28), 0.04)]))
+    market.insert_series(ScalarTimeSeries("FIXING:SOFR-3M", [(datetime.date(2023, 12, 28), 0.04)], "step", "error"))
     return market
 
 
@@ -249,7 +241,7 @@ def test_simulation_returns_complete_result() -> None:
 
     deal = StructuredCredit.example()
     as_of = datetime.date(2024, 1, 1)
-    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.03))
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.03, "act_365f"))
     run = deal.run_simulation(market, as_of)
     assert isinstance(run, SimulationRun)
     assert "CLONOTES-A" in run.tranches

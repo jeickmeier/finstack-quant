@@ -31,18 +31,21 @@ fn flat_curve(id: &str, as_of: Date, rate: f64) -> DiscountCurve {
         .base_date(as_of)
         .knots(knots)
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("flat curve should build")
 }
 
 /// Build a flat forward curve at a given rate.
 fn flat_forward(id: &str, as_of: Date, rate: f64) -> ForwardCurve {
-    ForwardCurve::builder(id, 0.25)
-        .base_date(as_of)
-        .knots([(0.0, rate), (10.0, rate)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .expect("flat forward curve should build")
+    ForwardCurve::flat(
+        id,
+        as_of,
+        rate,
+        finstack_quant_core::dates::DayCount::Act365F,
+    )
+    .expect("flat forward curve should build")
 }
 
 fn test_market(as_of: Date, rate: f64) -> MarketContext {

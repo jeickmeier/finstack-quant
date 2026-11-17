@@ -110,6 +110,17 @@
     }
   ],
   "properties": {
+    "cms_fixing_index_id": {
+      "anyOf": [
+        {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Optional explicit CMS benchmark fixing identifier used for historical fixings."
+    },
     "cms_frequency": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
       "description": "Payment and fixing frequency of both the CMS and funding schedules."

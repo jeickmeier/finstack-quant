@@ -7,7 +7,19 @@ from typing import Any
 
 import QuantLib as ql  # type: ignore[import-not-found]  # noqa: N813
 
-from .common import SCHEMA, VALUATION_DATE, central_difference, market_snapshot, metadata, ql_date, tolerance
+from .common import (
+    SCHEMA,
+    VALUATION_DATE,
+    central_difference,
+    chained_simple_discounts,
+    forward_curve,
+    market_snapshot,
+    metadata,
+    projection_knots,
+    ql_date,
+    ql_projection_curve,
+    tolerance,
+)
 
 
 def _bond_discount_curve(curve_id: str, rate: float, *, day_count: str = "30_360") -> dict[str, Any]:
@@ -19,10 +31,7 @@ def _bond_discount_curve(curve_id: str, rate: float, *, day_count: str = "30_360
         "day_count": day_count,
         "knot_points": [[0.0, 1.0], [30.0, math.exp(-rate * 30.0)]],
         "interp_style": "log_linear",
-        "extrapolation": "flat_forward",
-        "min_forward_rate": None,
-        "allow_non_monotonic": False,
-        "min_forward_tenor": 1e-6,
+        "extrapolation": "extend",
         "rate_calibration": None,
     }
 
@@ -116,14 +125,12 @@ def _hazard_curve(curve_id: str, hazard_rate: float) -> dict[str, Any]:
         "type": "hazard",
         "id": curve_id,
         "base": VALUATION_DATE,
-        "knot_points": [[0.0, hazard_rate], [30.0, hazard_rate]],
+        "knot_points": [[30.0, hazard_rate]],
         "recovery_rate": 0.0,
         "issuer": None,
         "seniority": None,
         "currency": "USD",
         "day_count": "act_365f",
-        "par_points": [],
-        "par_interp": "linear",
         "fx_policy": None,
     }
 
@@ -239,44 +246,43 @@ def _floating_bond_spec(*, credit_curve_id: str | None) -> dict[str, Any]:
     }
 
 
-def _quantlib_floating_bond_npv(discount: float, projection: float, hazard: float | None) -> float:
-    """Price the shared floating-rate bond with native QuantLib engines."""
-    evaluation_date = ql_date(VALUATION_DATE)
-    ql.Settings.instance().evaluationDate = evaluation_date
-    discount_handle = ql.YieldTermStructureHandle(
-        ql.FlatForward(evaluation_date, discount, ql.Actual365Fixed(), ql.Continuous)
-    )
-    calendar = ql.WeekendsOnly()
-    projection_day_count = ql.Actual360()
-    schedule = ql.Schedule(
+def _floating_bond_schedule() -> ql.Schedule:
+    return ql.Schedule(
         ql.Date(6, 5, 2026),
         ql.Date(6, 5, 2031),
         ql.Period(3, ql.Months),
-        calendar,
+        ql.WeekendsOnly(),
         ql.Following,
         ql.Following,
         ql.DateGeneration.Backward,
         False,
     )
 
-    # Finstack's ForwardCurve stores simple index forwards. Construct the
-    # independent QuantLib projection curve from the same quote basis so that a
-    # parallel bump means the same thing in both engines.
-    projection_dates = [evaluation_date]
-    projection_dfs = [1.0]
-    previous_date = evaluation_date
-    projection_df = 1.0
-    for date in schedule:
-        if date <= evaluation_date:
-            continue
-        accrual = projection_day_count.yearFraction(previous_date, date)
-        projection_df /= 1.0 + projection * accrual
-        projection_dates.append(date)
-        projection_dfs.append(projection_df)
-        previous_date = date
-    projection_handle = ql.YieldTermStructureHandle(
-        ql.DiscountCurve(projection_dates, projection_dfs, ql.Actual365Fixed(), calendar)
+
+def _floating_bond_projection(projection_rate: float) -> tuple[list[ql.Date], list[float]]:
+    """Projection factors quoting ``projection_rate`` as the simple Act/360 forward of every coupon period."""
+    evaluation_date = ql_date(VALUATION_DATE)
+    dates = [evaluation_date, *(date for date in _floating_bond_schedule() if date > evaluation_date)]
+    return dates, chained_simple_discounts(dates, projection_rate, ql.Actual360())
+
+
+def _quantlib_floating_bond_npv(
+    discount_rate: float, projection_rate: float, hazard: float | None, *, rate_shift: float = 0.0
+) -> float:
+    """Price the shared floating-rate bond with native QuantLib engines.
+
+    ``rate_shift`` is Finstack's parallel DV01 bump: a continuously compounded
+    zero shift applied to the discount curve and to the projection factors.
+    """
+    evaluation_date = ql_date(VALUATION_DATE)
+    ql.Settings.instance().evaluationDate = evaluation_date
+    discount_handle = ql.YieldTermStructureHandle(
+        ql.FlatForward(evaluation_date, discount_rate + rate_shift, ql.Actual365Fixed(), ql.Continuous)
     )
+    calendar = ql.WeekendsOnly()
+    projection_day_count = ql.Actual360()
+    schedule = _floating_bond_schedule()
+    projection_handle = ql_projection_curve(*_floating_bond_projection(projection_rate), shift=rate_shift)
     index = ql.IborIndex(
         "USD-Term-SOFR-3M",
         ql.Period(3, ql.Months),
@@ -316,7 +322,7 @@ def build_floating_risk_free_bond() -> dict[str, Any]:
     projection_rate = 0.043
     expected = {
         "dv01": central_difference(
-            lambda shift: _quantlib_floating_bond_npv(discount_rate + shift, projection_rate + shift, None),
+            lambda shift: _quantlib_floating_bond_npv(discount_rate, projection_rate, None, rate_shift=shift),
             0.0,
         ),
         "npv": _quantlib_floating_bond_npv(discount_rate, projection_rate, None),
@@ -337,18 +343,11 @@ def build_floating_risk_free_bond() -> dict[str, Any]:
         "model": "discounting",
         "market": market_snapshot([
             _bond_discount_curve("USD-OIS", discount_rate, day_count="act_365f"),
-            {
-                "type": "forward",
-                "id": "USD-SOFR-3M",
-                "base": VALUATION_DATE,
-                "reset_lag": 2,
-                "day_count": "act_360",
-                "tenor": 0.25,
-                "knot_points": [[0.0, projection_rate], [30.0, projection_rate]],
-                "interp_style": "linear",
-                "extrapolation": "flat_forward",
-                "rate_calibration": None,
-            },
+            forward_curve(
+                "USD-SOFR-3M",
+                projection_knots(*_floating_bond_projection(projection_rate)),
+                index_months=3,
+            ),
         ]),
         "instrument": _floating_bond_spec(credit_curve_id=None),
         "expected": expected,
@@ -367,7 +366,7 @@ def build_floating_hazard_bond() -> dict[str, Any]:
     hazard_rate = 0.02
     expected = {
         "dv01": central_difference(
-            lambda shift: _quantlib_floating_bond_npv(discount_rate + shift, projection_rate + shift, hazard_rate),
+            lambda shift: _quantlib_floating_bond_npv(discount_rate, projection_rate, hazard_rate, rate_shift=shift),
             0.0,
         ),
         "npv": _quantlib_floating_bond_npv(discount_rate, projection_rate, hazard_rate),

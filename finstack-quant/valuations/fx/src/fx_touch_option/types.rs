@@ -615,7 +615,9 @@ mod tests {
         use finstack_quant_core::currency::Currency;
         use finstack_quant_core::dates::Date;
         use finstack_quant_core::market_data::context::MarketContext;
-        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::market_data::surfaces::{
+            VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+        };
         use finstack_quant_core::market_data::term_structures::DiscountCurve;
         use finstack_quant_core::money::fx::{FxMatrix, FxQuery, SimpleFxProvider};
         use finstack_quant_valuations_core::instruments::{Instrument, OptionGreeksProvider};
@@ -628,16 +630,25 @@ mod tests {
         let usd = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, (-0.04_f64).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("usd curve");
         let eur = DiscountCurve::builder("EUR-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, (-0.02_f64).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("eur curve");
         let surface = VolSurface::builder("EURUSD-VOL")
             .expiries(&[1.0])
-            .strikes(&[1.05])
+            .secondary_values(&[1.05])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.11])
             .build()
             .expect("vol surface");

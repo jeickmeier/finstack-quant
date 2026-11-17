@@ -73,7 +73,9 @@ def _portfolio_spec_json(position_count: int) -> str:
 
 def _market(as_of: date = AS_OF, rate: float = 0.04) -> MarketContext:
     knots = [(year, math.exp(-rate * year)) for year in (0.0, 0.5, 1.0, 2.0)]
-    return MarketContext().insert(DiscountCurve("USD-OIS", as_of, knots))
+    return MarketContext().insert(
+        DiscountCurve("USD-OIS", as_of, knots, interp="monotone_convex", extrapolation="extend", day_count="act_365f")
+    )
 
 
 def _replay_snapshots_json(snapshot_count: int) -> str:

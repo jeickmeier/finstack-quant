@@ -34,10 +34,12 @@ def build_fra() -> dict[str, Any]:
     ql.Settings.instance().evaluationDate = evaluation_date
     ql.IndexManager.instance().clearHistories()
 
-    def forward_handle(simple_rate: float) -> ql.YieldTermStructureHandle:
-        accrual = day_count.yearFraction(start_date, maturity_date)
-        curve_time = ql.Actual365Fixed().yearFraction(start_date, maturity_date)
-        continuous_rate = math.log1p(simple_rate * accrual) / curve_time
+    # Continuous Act/365F projection rate whose Act/360 3M index fixing is `forward_rate`.
+    accrual = day_count.yearFraction(start_date, maturity_date)
+    curve_time = ql.Actual365Fixed().yearFraction(start_date, maturity_date)
+    projection_rate = math.log1p(forward_rate * accrual) / curve_time
+
+    def forward_handle(continuous_rate: float) -> ql.YieldTermStructureHandle:
         return ql.YieldTermStructureHandle(
             ql.FlatForward(evaluation_date, continuous_rate, ql.Actual365Fixed(), ql.Continuous)
         )
@@ -46,7 +48,7 @@ def build_fra() -> dict[str, Any]:
         discount_curve = ql.YieldTermStructureHandle(
             ql.FlatForward(evaluation_date, discount_rate + shift, ql.Actual365Fixed(), ql.Continuous)
         )
-        forward_curve = forward_handle(forward_rate + shift)
+        forward_curve = forward_handle(projection_rate + shift)
         index = ql.IborIndex(
             "USD-Term-SOFR-3M",
             ql.Period(3, ql.Months),
@@ -68,7 +70,7 @@ def build_fra() -> dict[str, Any]:
         )
         return fra.NPV()
 
-    forward_curve = forward_handle(forward_rate)
+    forward_curve = forward_handle(projection_rate)
     index = ql.IborIndex(
         "USD-Term-SOFR-3M",
         ql.Period(3, ql.Months),
@@ -99,11 +101,7 @@ def build_fra() -> dict[str, Any]:
         "model": "discounting",
         "market": market_snapshot([
             flat_discount_curve("USD-OIS", discount_rate),
-            flat_forward_curve(
-                "USD-SOFR-3M",
-                forward_rate,
-                projection_dates=["2026-08-03", "2026-11-03"],
-            ),
+            flat_forward_curve("USD-SOFR-3M", projection_rate),
         ]),
         "instrument": {
             "schema": "finstack_quant.instrument/1",
@@ -269,16 +267,30 @@ def build_irs() -> dict[str, Any]:
 
 def build_sofr_future() -> dict[str, Any]:
     """Build a native SOFR future-rate-helper quote fixture."""
-    ql.Settings.instance().evaluationDate = ql_date(VALUATION_DATE)
+    evaluation_date = ql_date(VALUATION_DATE)
+    ql.Settings.instance().evaluationDate = evaluation_date
     quoted_price = 95.7
+    contract_scale = 10.0 * 2500.0
     helper = ql.SofrFutureRateHelper(quoted_price, ql.June, 2026, ql.Quarterly, 0.0)
     if not math.isclose(helper.quote().value(), quoted_price):
         raise RuntimeError("QuantLib SOFR future helper did not retain its input quote")
+    implied_forward = (100.0 - quoted_price) / 100.0
+    period_start = ql.Date(19, 6, 2026)
+    period_end = ql.Date(18, 9, 2026)
+    accrual = ql.Actual360().yearFraction(period_start, period_end)
+    # Continuous Act/365F projection rate whose Act/360 period forward is the quoted rate.
+    projection_rate = math.log1p(implied_forward * accrual) / ql.Actual365Fixed().yearFraction(period_start, period_end)
+
+    def contract_value(shift: float) -> float:
+        projection = ql.FlatForward(evaluation_date, projection_rate + shift, ql.Actual365Fixed(), ql.Continuous)
+        forward = projection.forwardRate(period_start, period_end, ql.Actual360(), ql.Simple).rate()
+        return contract_scale * (100.0 * (1.0 - forward) - quoted_price)
+
     expected = {
         "convexity_adjustment": 0.0,
-        "dv01": -250.0,
+        "dv01": central_difference(contract_value, 0.0),
         "futures_price": quoted_price,
-        "implied_forward": (100.0 - quoted_price) / 100.0,
+        "implied_forward": implied_forward,
         "npv": 0.0,
     }
     zero_reason = "At-market QuantLib SofrFutureRateHelper quote with explicit zero convexity adjustment."
@@ -294,11 +306,7 @@ def build_sofr_future() -> dict[str, Any]:
         "model": "discounting",
         "market": market_snapshot([
             flat_discount_curve("USD-OIS", 0.04),
-            flat_forward_curve(
-                "USD-SOFR-3M",
-                0.043,
-                projection_dates=["2026-06-19", "2026-09-18"],
-            ),
+            flat_forward_curve("USD-SOFR-3M", projection_rate),
         ]),
         "instrument": {
             "schema": "finstack_quant.instrument/1",

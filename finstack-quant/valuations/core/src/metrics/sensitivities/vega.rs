@@ -157,7 +157,7 @@ where
                     id,
                     surface,
                     source_grid(&self.expiries, surface.expiries(), "expiry")?,
-                    source_grid(&self.strikes, surface.strikes(), "strike")?,
+                    source_grid(&self.strikes, surface.secondary_values(), "strike")?,
                 ))
             })
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
@@ -209,13 +209,13 @@ where
                             (up - down?) / (2.0 * bump_pct * VOL_POINTS_PER_ABSOLUTE_VOL)
                         };
                         row[column] = vega;
-                        total.add(vega);
+                        total.add(vega)?;
                     }
                     rows.push(format!("{id}::{expiry}y"));
                     matrix.push(row);
                 }
             }
-            Ok((matrix, total.total(), rows))
+            Ok((matrix, total.get_total()?, rows))
         })?;
 
         let residual = target_total - raw_total;
@@ -275,7 +275,9 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::CurveId;
@@ -367,7 +369,10 @@ mod tests {
     fn flat_surface(id: &str, vol: f64) -> VolSurface {
         VolSurface::builder(id)
             .expiries(&[1.0])
-            .strikes(&[100.0])
+            .secondary_values(&[100.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[vol])
             .build()
             .expect("surface")

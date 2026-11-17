@@ -74,7 +74,7 @@ def test_theta_equals_spot_held_reprice(case: str) -> None:
     observed = _with_spec(envelope, observed_barrier_breached=False)
 
     theta = _theta(instrument, market)
-    rolled_pv = float(price_instrument(observed, market.roll_forward(1), ROLLED).price)
+    rolled_pv = float(price_instrument(observed, market.condition(ROLLED), ROLLED).price)
     base_pv = float(price_instrument(instrument, market, AS_OF).price)
     assert theta == pytest.approx(rolled_pv - base_pv, rel=1e-9, abs=1e-9)
     assert theta == _theta(observed, market)

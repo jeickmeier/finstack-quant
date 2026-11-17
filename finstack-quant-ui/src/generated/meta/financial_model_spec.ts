@@ -5372,7 +5372,7 @@ export default [
   {
     "path": "#/$defs/d_7d9f94bbd332b01035f6/properties/ecf_sweep",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/WaterfallSpec/properties/ecf_sweep",
-    "description": "Excess Cash Flow (ECF) sweep specification.\nA positive sweep percentage requires the `Sweep` payment priority."
+    "description": "Excess Cash Flow (ECF) sweep specification.\nThis specification and the `Sweep` payment priority must be supplied together."
   },
   {
     "path": "#/$defs/d_7d9f94bbd332b01035f6/properties/ecf_sweep/anyOf/0",
@@ -5422,10 +5422,9 @@ export default [
       "fees",
       "interest",
       "amortization",
-      "sweep",
       "equity"
     ],
-    "description": "Priority order of payments (default: Fees > Interest > Amortization > Sweep > Equity)"
+    "description": "Priority order of payments (default: Fees > Interest > Amortization > Equity).\nInclude each prepayment priority explicitly alongside its sizing configuration."
   },
   {
     "path": "#/$defs/d_7d9f94bbd332b01035f6/properties/priority_of_payments/items",

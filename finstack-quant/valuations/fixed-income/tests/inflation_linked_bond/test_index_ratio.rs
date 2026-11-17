@@ -10,7 +10,7 @@
 
 use super::common::*;
 use finstack_quant_core::dates::DateExt;
-use finstack_quant_core::market_data::scalars::{InflationLag, SeriesInterpolation};
+use finstack_quant_core::market_data::scalars::InflationLag;
 use finstack_quant_valuations_fixed_income::inflation_linked_bond::{
     DeflationProtection, IndexationMethod,
 };
@@ -20,9 +20,6 @@ fn test_index_ratio_basic_linear_interpolation() {
     // Arrange
     let ilb = sample_tips();
     let (_, index) = market_context_with_index();
-
-    // Verify interpolation method matches TIPS requirements
-    assert_eq!(index.interpolation(), SeriesInterpolation::Linear);
 
     // Act - calculate index ratio for a date with 3-month lag
     let ratio = ilb.index_ratio(d(2025, 4, 1), &index).unwrap();
@@ -36,7 +33,7 @@ fn test_index_ratio_basic_linear_interpolation() {
 fn test_index_ratio_with_3month_lag() {
     // Arrange
     let mut ilb = sample_tips();
-    ilb.lag = InflationLag::Months(3);
+    ilb.lag = InflationLag::months(3);
     ilb.base_cpi = 300.0;
     ilb.base_date = d(2024, 12, 1);
 
@@ -45,13 +42,13 @@ fn test_index_ratio_with_3month_lag() {
         (d(2024, 12, 1), 300.0), // Reference for Jan 1 (3mo lag)
         (d(2025, 1, 1), 301.0),  // Reference for Apr 1 (3mo lag)
     ];
-    let index = finstack_quant_core::market_data::scalars::InflationIndex::new(
+    let index = fixing_snapshot(
         "US-CPI-U",
         observations,
         finstack_quant_core::currency::Currency::USD,
+        d(2025, 4, 1),
     )
-    .unwrap()
-    .with_interpolation(SeriesInterpolation::Linear);
+    .unwrap();
 
     // Act - valuation date Apr 1, 2025 → reference date Jan 1, 2025 (3-month lag)
     let ratio = ilb.index_ratio(d(2025, 4, 1), &index).unwrap();
@@ -64,7 +61,7 @@ fn test_index_ratio_with_3month_lag() {
 fn test_index_ratio_with_8month_lag_uk() {
     // Arrange
     let mut ilb = sample_uk_linker();
-    ilb.lag = InflationLag::Months(8);
+    ilb.lag = InflationLag::months(8);
     ilb.base_cpi = 320.0;
     ilb.base_date = d(2024, 6, 1);
 
@@ -73,13 +70,13 @@ fn test_index_ratio_with_8month_lag_uk() {
         (d(2024, 6, 1), 320.0), // Reference for Feb 1 (8mo lag)
         (d(2025, 2, 1), 326.4), // Reference for Oct 1 (8mo lag)
     ];
-    let index = finstack_quant_core::market_data::scalars::InflationIndex::new(
+    let index = fixing_snapshot(
         "UK-RPI",
         observations,
         finstack_quant_core::currency::Currency::GBP,
+        d(2025, 10, 1),
     )
-    .unwrap()
-    .with_interpolation(SeriesInterpolation::Step);
+    .unwrap();
 
     // Act - valuation date Oct 1, 2025 → reference date Feb 1, 2025 (8-month lag)
     let ratio = ilb.index_ratio(d(2025, 10, 1), &index).unwrap();
@@ -97,13 +94,13 @@ fn cpi_2019_index() -> finstack_quant_core::market_data::scalars::InflationIndex
         (d(2019, 3, 1), 254.202), // CPI-U Mar 2019
         (d(2019, 4, 1), 255.548), // CPI-U Apr 2019
     ];
-    finstack_quant_core::market_data::scalars::InflationIndex::new(
+    fixing_snapshot(
         "US-CPI-U",
         observations,
         finstack_quant_core::currency::Currency::USD,
+        d(2019, 6, 1),
     )
     .unwrap()
-    .with_interpolation(SeriesInterpolation::Linear)
 }
 
 #[test]
@@ -112,7 +109,8 @@ fn test_ref_cpi_mid_month_matches_treasury_golden() {
     // RefCPI = CPI(Jan) + (15−1)/30 × [CPI(Feb) − CPI(Jan)]
     //        = 251.712 + 14/30 × 1.064 = 252.20853 (Treasury-published value).
     let index = cpi_2019_index();
-    let ref_cpi = index.ref_cpi_months_lag(d(2019, 4, 15), 3).unwrap();
+    let bond = sample_tips();
+    let ref_cpi = bond.index_ratio(d(2019, 4, 15), &index).unwrap() * bond.base_cpi;
     let expected = 251.712 + 14.0 / 30.0 * (252.776 - 251.712);
     relative_eq(ref_cpi, expected, 1e-12, "mid-month RefCPI");
     assert!(
@@ -122,7 +120,7 @@ fn test_ref_cpi_mid_month_matches_treasury_golden() {
 
     // index_ratio routes through the same formula for TIPS-style bonds.
     let mut ilb = sample_tips();
-    ilb.lag = InflationLag::Months(3);
+    ilb.lag = InflationLag::months(3);
     ilb.base_cpi = 251.712;
     let ratio = ilb.index_ratio(d(2019, 4, 15), &index).unwrap();
     relative_eq(ratio, expected / 251.712, 1e-12, "mid-month index ratio");
@@ -135,12 +133,13 @@ fn test_ref_cpi_end_of_month_31_day_month() {
     // Feb 31 → Feb 28 and interpolated on the calendar axis, producing a kink
     // at month ends; the official formula weights by the settlement month.
     let index = cpi_2019_index();
-    let ref_cpi = index.ref_cpi_months_lag(d(2019, 5, 31), 3).unwrap();
+    let bond = sample_tips();
+    let ref_cpi = bond.index_ratio(d(2019, 5, 31), &index).unwrap() * bond.base_cpi;
     let expected = 252.776 + 30.0 / 31.0 * (254.202 - 252.776);
     relative_eq(ref_cpi, expected, 1e-12, "end-of-month RefCPI");
 
     // One day later (June 1) the anchors roll to Mar/Apr with weight 0.
-    let ref_cpi_next = index.ref_cpi_months_lag(d(2019, 6, 1), 3).unwrap();
+    let ref_cpi_next = bond.index_ratio(d(2019, 6, 1), &index).unwrap() * bond.base_cpi;
     relative_eq(ref_cpi_next, 254.202, 1e-12, "first-of-month RefCPI");
     // Continuity across the month boundary: the jump must be small (one
     // day's interpolation step), not a day-clamping artifact.
@@ -162,13 +161,13 @@ fn test_index_ratio_no_deflation_protection() {
         (d(2024, 10, 1), 295.0), // Deflation scenario
         (d(2025, 1, 1), 295.0),
     ];
-    let index = finstack_quant_core::market_data::scalars::InflationIndex::new(
+    let index = fixing_snapshot(
         "US-CPI-U",
         observations,
         finstack_quant_core::currency::Currency::USD,
+        d(2025, 1, 1),
     )
-    .unwrap()
-    .with_interpolation(SeriesInterpolation::Linear);
+    .unwrap();
 
     // Act - calculate ratio when CPI drops below base
     let ratio = ilb.index_ratio(d(2025, 1, 1), &index).unwrap();
@@ -191,15 +190,14 @@ fn test_index_ratio_maturity_only_deflation_protection() {
         (d(2024, 10, 1), 295.0), // Deflation
         (d(2024, 11, 1), 295.0),
         (d(2025, 1, 1), 295.0),
-        (d(2025, 1, 15), 295.0),
     ];
-    let index = finstack_quant_core::market_data::scalars::InflationIndex::new(
+    let index = fixing_snapshot(
         "US-CPI-U",
         observations,
         finstack_quant_core::currency::Currency::USD,
+        d(2025, 1, 15),
     )
-    .unwrap()
-    .with_interpolation(SeriesInterpolation::Linear);
+    .unwrap();
 
     // index_ratio now returns the RAW ratio (no deflation floor).
     // Deflation protection is applied when building the cashflow schedule.
@@ -231,13 +229,13 @@ fn test_index_ratio_all_payments_deflation_protection() {
         (d(2024, 10, 1), 295.0), // Deflation
         (d(2025, 1, 1), 295.0),
     ];
-    let index = finstack_quant_core::market_data::scalars::InflationIndex::new(
+    let index = fixing_snapshot(
         "US-CPI-U",
         observations,
         finstack_quant_core::currency::Currency::USD,
+        d(2025, 1, 1),
     )
-    .unwrap()
-    .with_interpolation(SeriesInterpolation::Linear);
+    .unwrap();
 
     // index_ratio now returns the RAW ratio (no deflation floor).
     // Deflation protection is applied when building the cashflow schedule.
@@ -254,10 +252,12 @@ fn test_index_ratio_from_curve() {
     ilb.base_cpi = 300.0;
     ilb.base_date = d(2024, 12, 1);
 
-    let (_, curve) = market_context_with_curve();
+    let (market, curve) = market_context_with_curve();
 
     // Act - calculate ratio using inflation curve (forward projection)
-    let ratio = ilb.index_ratio_from_curve(d(2026, 12, 1), &curve).unwrap();
+    let ratio = ilb
+        .index_ratio_from_market(d(2026, 12, 1), &market, curve.base_date())
+        .unwrap();
 
     // Assert - ratio should reflect 2-year inflation at ~2% p.a.
     assert!(ratio > 1.03); // > 4% total
@@ -272,13 +272,15 @@ fn test_index_ratio_from_curve_official_weighting() {
     let mut ilb = sample_tips();
     ilb.base_cpi = 300.0;
 
-    let (_, curve) = market_context_with_curve();
+    let (market, curve) = market_context_with_curve();
 
     let cpi_feb = curve.cpi_on_date(d(2025, 2, 1)).unwrap();
     let cpi_mar = curve.cpi_on_date(d(2025, 3, 1)).unwrap();
     let expected_ref_cpi = cpi_feb + 14.0 / 31.0 * (cpi_mar - cpi_feb);
 
-    let ratio = ilb.index_ratio_from_curve(d(2025, 5, 15), &curve).unwrap();
+    let ratio = ilb
+        .index_ratio_from_market(d(2025, 5, 15), &market, curve.base_date())
+        .unwrap();
 
     relative_eq(
         ratio,
@@ -318,7 +320,7 @@ fn test_index_ratio_from_market_routes_to_curve() {
     let ratio_from_market = ilb
         .index_ratio_from_market(d(2025, 7, 1), &ctx, curve.base_date())
         .unwrap();
-    let ratio_from_curve = ilb.index_ratio_from_curve(d(2025, 7, 1), &curve).unwrap();
+    let ratio_from_curve = curve.cpi_on_date(d(2025, 4, 1)).unwrap() / ilb.base_cpi;
 
     relative_eq(
         ratio_from_market,
@@ -332,11 +334,15 @@ fn test_index_ratio_from_market_routes_to_curve() {
 fn test_index_ratio_consistency_between_sources() {
     // Arrange: use a date whose 3-month lagged reference falls within both sources
     let ilb = sample_tips();
-    let (_ctx_index, index) = market_context_with_index();
-    let (_ctx_curve, curve) = market_context_with_curve();
+    let (ctx_index, _) = market_context_with_index();
+    let (ctx_curve, curve) = market_context_with_curve();
 
-    let ratio_index = ilb.index_ratio(d(2025, 7, 1), &index).unwrap();
-    let ratio_curve = ilb.index_ratio_from_curve(d(2025, 7, 1), &curve).unwrap();
+    let ratio_index = ilb
+        .index_ratio_from_market(d(2025, 7, 1), &ctx_index, curve.base_date())
+        .unwrap();
+    let ratio_curve = ilb
+        .index_ratio_from_market(d(2025, 7, 1), &ctx_curve, curve.base_date())
+        .unwrap();
 
     // Assert - should be consistent (within tolerance due to different representations)
     // Index uses observations, curve uses forward projection - can differ significantly
@@ -349,17 +355,17 @@ fn test_index_ratio_consistency_between_sources() {
 }
 
 #[test]
-fn test_index_ratio_tips_requires_linear_interpolation() {
+fn test_index_ratio_tips_requires_matching_reference_month() {
     // Arrange
     let ilb = sample_tips();
     let observations = vec![(d(2024, 12, 1), 300.0)];
-    let index = finstack_quant_core::market_data::scalars::InflationIndex::new(
+    let index = fixing_snapshot(
         "US-CPI-U",
         observations,
         finstack_quant_core::currency::Currency::USD,
+        d(2025, 1, 1),
     )
-    .unwrap()
-    .with_interpolation(SeriesInterpolation::Step); // Wrong for TIPS
+    .unwrap();
 
     // Act & Assert - should fail validation
     let result = ilb.index_ratio(d(2025, 1, 1), &index);
@@ -367,19 +373,19 @@ fn test_index_ratio_tips_requires_linear_interpolation() {
 }
 
 #[test]
-fn test_index_ratio_uk_requires_step_interpolation() {
+fn test_index_ratio_uk_requires_matching_reference_month() {
     // Arrange
     let mut ilb = sample_uk_linker();
     ilb.indexation_method = IndexationMethod::Uk;
 
     let observations = vec![(d(2024, 6, 1), 320.0)];
-    let index = finstack_quant_core::market_data::scalars::InflationIndex::new(
+    let index = fixing_snapshot(
         "UK-RPI",
         observations,
         finstack_quant_core::currency::Currency::GBP,
+        d(2025, 1, 1),
     )
-    .unwrap()
-    .with_interpolation(SeriesInterpolation::Linear); // Wrong for UK
+    .unwrap();
 
     // Act & Assert - should fail validation
     let result = ilb.index_ratio(d(2025, 1, 1), &index);
@@ -387,19 +393,19 @@ fn test_index_ratio_uk_requires_step_interpolation() {
 }
 
 #[test]
-fn test_index_ratio_canadian_requires_linear_interpolation() {
+fn test_index_ratio_requires_matching_index_identity() {
     // Arrange
     let mut ilb = sample_tips();
     ilb.indexation_method = IndexationMethod::Canadian;
 
     let observations = vec![(d(2024, 9, 1), 140.0)];
-    let index = finstack_quant_core::market_data::scalars::InflationIndex::new(
+    let index = fixing_snapshot(
         "CA-CPI",
         observations,
         finstack_quant_core::currency::Currency::CAD,
+        d(2025, 1, 1),
     )
-    .unwrap()
-    .with_interpolation(SeriesInterpolation::Step); // Wrong for Canadian
+    .unwrap();
 
     // Act & Assert - should fail validation
     let result = ilb.index_ratio(d(2025, 1, 1), &index);
@@ -443,13 +449,13 @@ fn test_index_ratio_extreme_inflation() {
         (d(2024, 10, 1), 500.0), // 400% inflation
         (d(2025, 1, 1), 500.0),
     ];
-    let index = finstack_quant_core::market_data::scalars::InflationIndex::new(
+    let index = fixing_snapshot(
         "US-CPI-U",
         observations,
         finstack_quant_core::currency::Currency::USD,
+        d(2025, 1, 1),
     )
-    .unwrap()
-    .with_interpolation(SeriesInterpolation::Linear);
+    .unwrap();
 
     // Act
     let ratio = ilb.index_ratio(d(2025, 1, 1), &index).unwrap();
@@ -463,7 +469,7 @@ fn test_index_ratio_time_series() {
     // Arrange
     let mut ilb = sample_tips();
     ilb.base_cpi = 300.0;
-    ilb.lag = InflationLag::Months(3);
+    ilb.lag = InflationLag::months(3);
 
     // Build a time series with steady 0.5% monthly inflation
     // Extend to 18 months (Jan 2024 to June 2025) to cover lagged query dates
@@ -473,13 +479,13 @@ fn test_index_ratio_time_series() {
         let value = 300.0 * (1.005_f64).powi(i);
         observations.push((month_date, value));
     }
-    let index = finstack_quant_core::market_data::scalars::InflationIndex::new(
+    let index = fixing_snapshot(
         "US-CPI-U",
         observations,
         finstack_quant_core::currency::Currency::USD,
+        d(2025, 7, 1),
     )
-    .unwrap()
-    .with_interpolation(SeriesInterpolation::Linear);
+    .unwrap();
 
     // Act - calculate ratios over time
     // April 2025 with 3mo lag → Jan 2025 (i=12)

@@ -28,28 +28,27 @@ pub fn standard_fra_dates() -> (Date, Date, Date) {
 
 /// Creates a flat forward curve at the given rate
 pub fn build_flat_forward_curve(rate: f64, base_date: Date, curve_id: &str) -> ForwardCurve {
-    let projection_grid = (0..=40)
-        .map(|quarter| {
-            DayCount::Act360
-                .year_fraction(
-                    base_date,
-                    base_date.add_months(quarter * 3).expect("valid date shift"),
-                    DayCountContext::default(),
-                )
-                .expect("valid quarterly projection boundary")
-        })
-        .collect::<Vec<_>>();
-    let last_time = *projection_grid
-        .last()
-        .expect("projection grid is non-empty");
-    ForwardCurve::builder(curve_id, 0.25)
-        .base_date(base_date)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, rate), (last_time, rate)])
-        .projection_grid(projection_grid)
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap()
+    let mut points = vec![(base_date, 1.0)];
+    let mut prev = base_date;
+    let mut factor = 1.0;
+    for quarter in 1..=40 {
+        let next = base_date.add_months(quarter * 3).expect("valid date shift");
+        let yf = DayCount::Act360
+            .year_fraction(prev, next, DayCountContext::default())
+            .expect("valid quarterly accrual");
+        factor /= 1.0 + rate * yf;
+        points.push((next, factor));
+        prev = next;
+    }
+    ForwardCurve::from_dates(
+        curve_id,
+        base_date,
+        &points,
+        DayCount::Act360,
+        InterpStyle::LogLinear,
+        ExtrapolationPolicy::Extend,
+    )
+    .unwrap()
 }
 
 /// Creates a flat discount curve at the given rate
@@ -66,32 +65,69 @@ pub fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> 
         ])
         .interp(InterpStyle::Linear)
         // Long-tenor risk buckets must see positive DFs beyond the last pillar.
-        .extrapolation(ExtrapolationPolicy::FlatZero);
-    let builder = if rate < 0.0 {
-        builder.validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::NegativeRateFriendly {
-                forward_floor: -0.05,
-            },
-        )
-    } else {
-        builder
-    };
+        .extrapolation(ExtrapolationPolicy::Flat);
     builder.build().unwrap()
 }
 
 /// Creates an upward sloping forward curve (normal term structure)
 #[allow(dead_code)]
 pub fn build_upward_forward_curve(base_date: Date, curve_id: &str) -> ForwardCurve {
-    ForwardCurve::builder(curve_id, 0.25)
+    ForwardCurve::builder(curve_id)
         .base_date(base_date)
         .day_count(DayCount::Act360)
         .knots([
-            (0.0, 0.03),  // 3% at short end
-            (2.0, 0.04),  // 4% at 2Y
-            (5.0, 0.045), // 4.5% at 5Y
-            (10.0, 0.05), // 5% at 10Y
+            (0.0, 1.0),
+            (0.125, 0.996218106939305),
+            (0.25, 0.992372984425763),
+            (0.375, 0.98846547612484),
+            (0.5, 0.984496437005408),
+            (0.625, 0.980466733028608),
+            (0.75, 0.976377240833651),
+            (0.875, 0.972228847420751),
+            (1.0, 0.968022449831306),
+            (1.125, 0.963758954825533),
+            (1.25, 0.959439278557683),
+            (1.375, 0.955064346249016),
+            (1.5, 0.950635091858698),
+            (1.625, 0.946152457752782),
+            (1.75, 0.941617394371427),
+            (1.875, 0.937030859894532),
+            (2.0, 0.932393819905948),
+            (2.1875, 0.925399912673928),
+            (2.375, 0.918404652549806),
+            (2.5625, 0.911408866395109),
+            (2.75, 0.904413374889132),
+            (2.9375, 0.897418992384432),
+            (3.125, 0.890426526765256),
+            (3.3125, 0.883436779308968),
+            (3.5, 0.876450544550457),
+            (3.6875, 0.869468610149596),
+            (3.875, 0.862491756761729),
+            (4.0625, 0.855520757911249),
+            (4.25, 0.848556379868256),
+            (4.4375, 0.841599381528326),
+            (4.625, 0.834650514295413),
+            (4.8125, 0.827710521967885),
+            (5.0, 0.820780140627725),
+            (5.3125, 0.809279180503689),
+            (5.625, 0.797861454516039),
+            (5.9375, 0.786528002540189),
+            (6.25, 0.775279825217673),
+            (6.5625, 0.764117884125373),
+            (6.875, 0.753043101961267),
+            (7.1875, 0.742056362746364),
+            (7.5, 0.731158512042463),
+            (7.8125, 0.720350357185388),
+            (8.125, 0.709632667533337),
+            (8.4375, 0.699006174729978),
+            (8.75, 0.688471572981913),
+            (9.0625, 0.678029519350152),
+            (9.375, 0.667680634055198),
+            (9.6875, 0.657425500795382),
+            (10.0, 0.647264667078035),
         ])
-        .interp(InterpStyle::Linear)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -99,16 +135,46 @@ pub fn build_upward_forward_curve(base_date: Date, curve_id: &str) -> ForwardCur
 /// Creates an inverted forward curve (stressed scenario)
 #[allow(dead_code)]
 pub fn build_inverted_forward_curve(base_date: Date, curve_id: &str) -> ForwardCurve {
-    ForwardCurve::builder(curve_id, 0.25)
+    ForwardCurve::builder(curve_id)
         .base_date(base_date)
         .day_count(DayCount::Act360)
         .knots([
-            (0.0, 0.06), // 6% at short end
-            (1.0, 0.05), // 5% at 1Y
-            (2.0, 0.04), // 4% at 2Y
-            (5.0, 0.03), // 3% at 5Y
+            (0.0, 1.0),
+            (0.125, 0.992605599102455),
+            (0.25, 0.985419835190368),
+            (0.375, 0.978438960281303),
+            (0.5, 0.971659348942016),
+            (0.625, 0.965077495162132),
+            (0.75, 0.958690009342707),
+            (0.875, 0.952493615396068),
+            (1.0, 0.946485147953484),
+            (1.125, 0.940661549677314),
+            (1.25, 0.935019868674477),
+            (1.375, 0.929557256008159),
+            (1.5, 0.924270963304852),
+            (1.625, 0.919158340453891),
+            (1.75, 0.91421683339682),
+            (1.875, 0.909443982003995),
+            (2.0, 0.90483741803596),
+            (2.1875, 0.89812914566372),
+            (2.375, 0.891575082330825),
+            (2.5625, 0.885172572109236),
+            (2.75, 0.878919031389447),
+            (2.9375, 0.872811947154315),
+            (3.125, 0.866848875306405),
+            (3.3125, 0.861027439047309),
+            (3.5, 0.855345327307423),
+            (3.6875, 0.849800293224752),
+            (3.875, 0.844390152671351),
+            (4.0625, 0.83911278282603),
+            (4.25, 0.833966120792056),
+            (4.4375, 0.828948162258568),
+            (4.625, 0.824056960204514),
+            (4.8125, 0.819290623643926),
+            (5.0, 0.814647316411415),
         ])
-        .interp(InterpStyle::Linear)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }

@@ -27,7 +27,7 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen(js_name = FxConversionPolicy)]
 #[derive(Clone, Copy, Debug)]
 pub struct JsFxConversionPolicy {
-    inner: RustFxConversionPolicy,
+    pub(crate) inner: RustFxConversionPolicy,
 }
 
 #[wasm_bindgen(js_class = FxConversionPolicy)]

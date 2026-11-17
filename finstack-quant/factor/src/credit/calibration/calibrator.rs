@@ -261,7 +261,7 @@ impl CreditCalibrator {
                 &inventory.bucket_paths,
                 &inputs.idiosyncratic_overrides,
                 self.config.hierarchy.levels.len(),
-            );
+            )?;
             let fit_quality = peel_outcome.fit_quality.get(issuer_id).cloned();
             let level_fit_quality = peel_outcome
                 .level_fit_quality

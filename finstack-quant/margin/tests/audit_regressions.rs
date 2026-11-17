@@ -189,6 +189,9 @@ fn opening_exposure_is_not_halved_in_funding_integral() {
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(date)
         .knots([(0.0, 1.0), (2.0, 1.0)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
     for times in [vec![1.0], vec![0.0, 1.0]] {

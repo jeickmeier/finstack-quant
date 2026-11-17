@@ -36,15 +36,12 @@ fn build_test_curves() -> MarketContext {
             (5.0, (-0.05_f64 * 5.0).exp()),
             (10.0, (-0.05_f64 * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let fwd_curve_sofr = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(as_of)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.05), (10.0, 0.05)])
-        .build()
-        .unwrap();
+    let fwd_curve_sofr = ForwardCurve::flat("USD-SOFR-3M", as_of, 0.05, DayCount::Act360).unwrap();
 
     // Curve IDs for manual builder tests (USD_OIS and USD_LIBOR_3M)
     let disc_curve_manual = DiscountCurve::builder("USD_OIS")
@@ -56,15 +53,13 @@ fn build_test_curves() -> MarketContext {
             (5.0, (-0.05_f64 * 5.0).exp()),
             (10.0, (-0.05_f64 * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let fwd_curve_libor = ForwardCurve::builder("USD_LIBOR_3M", 0.25)
-        .base_date(as_of)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.05), (10.0, 0.05)])
-        .build()
-        .unwrap();
+    let fwd_curve_libor =
+        ForwardCurve::flat("USD_LIBOR_3M", as_of, 0.05, DayCount::Act360).unwrap();
 
     MarketContext::new()
         .insert(disc_curve_usd_ois)

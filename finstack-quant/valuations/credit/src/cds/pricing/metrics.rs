@@ -389,8 +389,8 @@ impl CdsPricer {
             disc_day_count.year_fraction(disc_base, as_of, DayCountContext::default())?;
         let t_asof_haz =
             haz_day_count.year_fraction(haz_base, as_of, DayCountContext::default())?;
-        let df_asof = disc.df(t_asof_disc);
-        let sp_asof = surv.sp(t_asof_haz);
+        let df_asof = disc.df(t_asof_disc)?;
+        let sp_asof = surv.sp(t_asof_haz)?;
         let sp_floor = credit::SURVIVAL_PROBABILITY_FLOOR;
         let sp_cond_denom = (sp_asof > sp_floor).then_some(sp_asof);
 
@@ -414,7 +414,7 @@ impl CdsPricer {
                 payment_date,
                 DayCountContext::default(),
             )?;
-            let df = disc.df(t_pay) / df_asof;
+            let df = disc.df(t_pay)? / df_asof;
 
             // Completed coupons are fixed receivables even if historical
             // absolute survival lies below the conditional-ratio floor.
@@ -423,7 +423,7 @@ impl CdsPricer {
             } else if let Some(denom) = sp_cond_denom {
                 let t_end =
                     haz_day_count.year_fraction(haz_base, end_date, DayCountContext::default())?;
-                surv.sp(t_end) / denom
+                surv.sp(t_end)? / denom
             } else {
                 0.0
             };

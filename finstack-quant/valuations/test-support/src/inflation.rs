@@ -5,9 +5,10 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationLag, SeriesInterpolation,
+    InflationExpectedRelease, InflationIndex, InflationObservation,
 };
 use finstack_quant_core::market_data::term_structures::InflationCurve;
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::money::Money;
 
 /// Build a flat inflation curve with constant CPI growth rate
@@ -16,7 +17,7 @@ use finstack_quant_core::money::Money;
 ///
 /// * `id` - Curve identifier the market context is keyed by.
 /// * `base` - Curve base date; knot times (1, 5, 10, 30 years) are measured from it.
-/// * `base_cpi` - CPI index level at `base`; floored at `1e-10`.
+/// * `base_cpi` - Finite positive CPI index level at `base`, without clamping.
 /// * `annual_inflation_rate` - Annually compounded CPI growth rate, as a decimal, applied to every knot.
 ///
 /// # Errors
@@ -28,7 +29,7 @@ pub fn flat_inflation_curve(
     base_cpi: f64,
     annual_inflation_rate: f64,
 ) -> finstack_quant_core::Result<InflationCurve> {
-    let mut knots = vec![
+    let knots = vec![
         (0.0, base_cpi),
         (1.0, base_cpi * (1.0 + annual_inflation_rate)),
         (5.0, base_cpi * (1.0 + annual_inflation_rate).powf(5.0)),
@@ -36,15 +37,11 @@ pub fn flat_inflation_curve(
         (30.0, base_cpi * (1.0 + annual_inflation_rate).powf(30.0)),
     ];
 
-    // Ensure all CPI values are positive (handle floating point precision issues and extreme deflation)
-    knots = knots
-        .into_iter()
-        .map(|(t, cpi)| (t, cpi.max(1e-10))) // Ensure minimum positive value
-        .collect();
-
     InflationCurve::builder(id)
         .base_date(base)
-        .base_cpi(base_cpi.max(1e-10)) // Also ensure base_cpi is positive
+        .day_count(DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Flat)
         .knots(knots)
         .build()
 }
@@ -70,7 +67,9 @@ pub fn realistic_inflation_curve(id: &str, base: Date, base_cpi: f64) -> Inflati
     ];
     InflationCurve::builder(id)
         .base_date(base)
-        .base_cpi(base_cpi)
+        .day_count(DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Flat)
         .knots(knots)
         .build()
         .unwrap()
@@ -81,32 +80,48 @@ pub fn realistic_inflation_curve(id: &str, base: Date, base_cpi: f64) -> Inflati
 /// # Arguments
 ///
 /// * `id` - Index identifier the market context is keyed by.
-/// * `base` - Date of the most recent observation; earlier monthly prints are generated backwards from it.
+/// * `base` - Explicit knowledge cutoff. This synthetic fixture releases each
+///   monthly print on its first day and declares that schedule for thirty years.
 /// * `base_cpi` - CPI level at `base`.
 /// * `ccy` - Currency the index is quoted in.
-/// * `lag` - Publication lag convention attached to the index.
-pub fn simple_index(
-    id: &str,
-    base: Date,
-    base_cpi: f64,
-    ccy: Currency,
-    lag: InflationLag,
-) -> InflationIndex {
+pub fn simple_index(id: &str, base: Date, base_cpi: f64, ccy: Currency) -> InflationIndex {
     // Provide two years of monthly history so lagged seasoned swaps can use
     // realized fixings rather than falling back to projected curve values.
     let monthly_growth = 1.002_f64;
     let observations = (0..=24)
         .rev()
         .map(|months_back| {
-            let date = base.add_months(-months_back).expect("valid date shift");
+            let date = base
+                .replace_day(1)
+                .expect("valid monthly anchor")
+                .add_months(-months_back)
+                .expect("valid date shift");
             let value = base_cpi / monthly_growth.powf(months_back as f64);
-            (date, value)
+            InflationObservation {
+                reference_month: date,
+                value,
+                available_on: date,
+            }
         })
         .collect();
-    InflationIndex::new(id, observations, ccy)
+    let expected_releases = (1..=360)
+        .map(|months| {
+            let reference_month = base
+                .replace_day(1)
+                .expect("valid monthly anchor")
+                .add_months(months)
+                .expect("valid monthly shift");
+            InflationExpectedRelease {
+                reference_month,
+                expected_release: reference_month,
+                known_on: base,
+            }
+        })
+        .collect();
+    InflationIndex::new(id, observations, ccy, base)
         .unwrap()
-        .with_interpolation(SeriesInterpolation::Linear)
-        .with_lag(lag)
+        .with_expected_releases(expected_releases)
+        .unwrap()
 }
 
 /// Build a comprehensive market context for testing
@@ -126,13 +141,7 @@ pub fn standard_market(as_of: Date, inflation_rate: f64, discount_rate: f64) -> 
                 inflation_rate
             )
         });
-    let index = simple_index(
-        "US-CPI-U",
-        as_of,
-        300.0,
-        Currency::USD,
-        InflationLag::Months(3),
-    );
+    let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD);
 
     MarketContext::new()
         .insert(disc)
@@ -148,13 +157,7 @@ pub fn standard_market(as_of: Date, inflation_rate: f64, discount_rate: f64) -> 
 pub fn realistic_market(as_of: Date) -> MarketContext {
     let disc = flat_discount_curve_with_day_count(0.045, as_of, "USD-OIS", DayCount::Act365F); // 4.5% nominal rate
     let infl_curve = realistic_inflation_curve("US-CPI-U", as_of, 300.0);
-    let index = simple_index(
-        "US-CPI-U",
-        as_of,
-        300.0,
-        Currency::USD,
-        InflationLag::Months(3),
-    );
+    let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD);
 
     MarketContext::new()
         .insert(disc)

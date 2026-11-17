@@ -126,7 +126,7 @@ impl ShortRateTree {
         let mut candidate = Self::new(self.config.clone());
         candidate.time_steps = (0..=self.config.steps).map(|i| i as f64 * dt).collect();
         for &time in &candidate.time_steps {
-            let target = discount_curve.df(time);
+            let target = discount_curve.df(time)?;
             if !target.is_finite() || target <= 0.0 {
                 return Err(Error::Validation(format!(
                     "short-rate tree discount factor must be finite and positive at time {time}, got {target}"

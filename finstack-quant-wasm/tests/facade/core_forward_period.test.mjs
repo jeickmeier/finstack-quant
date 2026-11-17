@@ -7,25 +7,38 @@ await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
 });
 
-test('forward period validates endpoints and arithmetic through Rust', () => {
-  const curve = core.ForwardCurve.flat('USD-SOFR-3M', 0.25, '2025-01-01', 0.04);
-  for (const [start, end] of [
-    [1, 0.5],
-    [NaN, 1],
-    [0, NaN],
-    [-Infinity, 1],
-    [0, Infinity],
-    [-1e308, 1e308],
-  ]) {
-    assert.throws(
-      () => curve.ratePeriod(start, end),
-      (error) => error.kind === 'validation'
-    );
+test('forward interval validates endpoints, accrual and arithmetic through Rust', () => {
+  const curve = core.ForwardCurve.flat('USD-SOFR-3M', '2025-01-01', 0.04, 'act_360');
+  try {
+    for (const [start, end] of [
+      [1, 0.5],
+      [1, 1],
+      [NaN, 1],
+      [0, NaN],
+      [-Infinity, 1],
+      [0, Infinity],
+    ]) {
+      assert.throws(
+        () => curve.rateBetween(start, end, 0.25),
+        (error) => error.kind === 'validation' && /requires finite t1 < t2/.test(error.message)
+      );
+    }
+    for (const accrual of [0, -0.25, NaN, Infinity]) {
+      assert.throws(
+        () => curve.rateBetween(0, 0.25, accrual),
+        (error) => error.kind === 'validation' && /accrual_year_fraction/.test(error.message)
+      );
+    }
+    for (const [start, end] of [
+      [0, 1],
+      [-1, -0.5],
+      [2, 2.25],
+    ]) {
+      const tau = end - start;
+      const expected = Math.expm1(0.04 * tau) / tau;
+      assert.ok(Math.abs(curve.rateBetween(start, end, tau) - expected) < 1e-14);
+    }
+  } finally {
+    curve.free();
   }
-  for (const time of [-1, 0, 1]) {
-    assert.equal(curve.ratePeriod(time, time), curve.rate(time));
-    assert.equal(curve.ratePeriod(time, time + 1e-13), curve.rate(time));
-  }
-  assert.ok(Math.abs(curve.ratePeriod(-1, -0.5) - 0.04) < 1e-14);
-  curve.free();
 });

@@ -185,6 +185,7 @@ fn fixture(index: usize) -> Fixture {
         .day_count(DayCount::Act365F)
         .interp(InterpStyle::LogLinear)
         .knots([(0.0, 1.0), (40.0, (-0.05_f64 * 40.0).exp())])
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("B4 flat discount curve");
     Fixture {
@@ -363,37 +364,49 @@ fn paired_record(
     let mut max_abs_difference = 0.0_f64;
     for (&x, &y) in reference.iter().zip(candidate) {
         assert!(x.is_finite() && y.is_finite());
-        pairs.update(x, y);
-        differences.update(y - x);
+        pairs.update(x, y).expect("finite pair");
+        differences.update(y - x).expect("finite difference");
         max_abs_difference = max_abs_difference.max((y - x).abs());
     }
     let n = reference.len();
     assert!(n >= 2);
-    assert_eq!(pairs.count(), n);
-    assert_eq!(differences.count(), n);
-    let vx = pairs.variance_x();
-    let vy = pairs.variance_y();
-    let vd = differences.variance();
+    assert_eq!(pairs.get_count(), n);
+    assert_eq!(differences.get_count(), n);
+    let vx = pairs
+        .get_variance_x()
+        .expect("finite var_x")
+        .expect("n >= 2");
+    let vy = pairs
+        .get_variance_y()
+        .expect("finite var_y")
+        .expect("n >= 2");
+    let vd = differences
+        .get_variance()
+        .expect("finite var_diff")
+        .expect("n >= 2");
+    let mean_x = pairs.get_mean_x().expect("finite mean_x").expect("n >= 2");
+    let mean_y = pairs.get_mean_y().expect("finite mean_y").expect("n >= 2");
+    let mean_diff = differences
+        .get_mean()
+        .expect("finite mean_diff")
+        .expect("n >= 2");
+    let cov = pairs.get_covariance().expect("finite cov").expect("n >= 2");
     assert!([vx, vy, vd].iter().all(|v| v.is_finite() && *v >= 0.0));
-    assert!(pairs.covariance().is_finite());
+    assert!(cov.is_finite());
     json!({
         "physical_paths": n, "independent_estimators": n, "paired_observations": n,
-        "mean_reference": pairs.mean_x(), "mean_candidate_path": pairs.mean_y(),
-        "mean_difference": differences.mean(), "variance_reference": vx,
-        "variance_candidate": vy, "covariance": pairs.covariance(), "variance_difference": vd,
+        "mean_reference": mean_x, "mean_candidate_path": mean_y,
+        "mean_difference": mean_diff, "variance_reference": vx,
+        "variance_candidate": vy, "covariance": cov, "variance_difference": vd,
         "se_reference": (vx / n as f64).sqrt(), "se_candidate": (vy / n as f64).sqrt(),
         "se_difference": (vd / n as f64).sqrt(), "max_abs_path_difference": max_abs_difference,
-        "reference_reduction_residual": reference_value - pairs.mean_x(),
-        "candidate_reduction_residual": candidate_value - pairs.mean_y(),
+        "reference_reduction_residual": reference_value - mean_x,
+        "candidate_reduction_residual": candidate_value - mean_y,
     })
 }
 
 fn solver() -> BrentSolver {
-    BrentSolver::new()
-        .with_tolerance(OAS_TOLERANCE)
-        .with_max_iterations(200)
-        .with_bracket_bounds(-0.10, 0.20)
-        .with_initial_bracket_size(Some(0.05))
+    BrentSolver::new(OAS_TOLERANCE, 200).expect("valid solver")
 }
 
 fn run_case(index: usize, scenario: &str) {
@@ -524,9 +537,13 @@ fn run_case(index: usize, scenario: &str) {
         .solve(
             |spread| {
                 reference_calls.set(reference_calls.get() + 1);
-                direct_mean(&pool, &paths, rate, spread, &steps) - target
+                Ok(direct_mean(&pool, &paths, rate, spread, &steps) - target)
             },
             0.0,
+            -0.10,
+            0.20,
+            0.05,
+            10,
         )
         .expect("direct-reference OAS root");
     assert!(reference_root.is_finite() && (-0.10..=0.20).contains(&reference_root));
@@ -535,9 +552,13 @@ fn run_case(index: usize, scenario: &str) {
         .solve(
             |spread| {
                 prototype_calls.set(prototype_calls.get() + 1);
-                factorized_value(&mean_coefficients, &taus, spread) - target
+                Ok(factorized_value(&mean_coefficients, &taus, spread) - target)
             },
             0.0,
+            -0.10,
+            0.20,
+            0.05,
+            10,
         )
         .expect("test-factorization OAS root");
     let production_helper_calls = Cell::new(0_usize);
@@ -545,9 +566,13 @@ fn run_case(index: usize, scenario: &str) {
         .solve(
             |spread| {
                 production_helper_calls.set(production_helper_calls.get() + 1);
-                spread_value(&production_coefficients, &production_times, spread) - target
+                Ok(spread_value(&production_coefficients, &production_times, spread) - target)
             },
             0.0,
+            -0.10,
+            0.20,
+            0.05,
+            10,
         )
         .expect("production-helper OAS root");
     let production_root = calculate_mc_oas(

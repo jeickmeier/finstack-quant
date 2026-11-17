@@ -241,11 +241,12 @@ fn resolve_volatility(
     strike: f64,
 ) -> Result<f64> {
     match ctx.get_price(vol_surface_id) {
-        Ok(MarketScalar::Unitless(vol)) => return Ok(*vol),
-        Ok(MarketScalar::Price(_)) => {
-            return Err(Error::Validation(format!(
-                "ConvertibleBond vol_surface_id '{vol_surface_id}' scalar must be unitless"
-            )));
+        Ok(scalar) => {
+            return scalar.get_unitless().ok_or_else(|| {
+                Error::Validation(format!(
+                    "ConvertibleBond vol_surface_id '{vol_surface_id}' scalar must be unitless"
+                ))
+            });
         }
         Err(Error::Input(InputError::NotFound { .. })) => {}
         Err(err) => return Err(err),
@@ -281,11 +282,10 @@ impl PricingInputs {
         market: &MarketContext,
         spot: f64,
     ) -> Result<MarketContext> {
-        let scalar = match &self.spot_scalar {
-            MarketScalar::Price(money) => {
-                MarketScalar::Price(Money::from_model_value(spot, money.currency())?)
-            }
-            MarketScalar::Unitless(_) => MarketScalar::Unitless(spot),
+        let scalar = if let Some(money) = self.spot_scalar.get_price() {
+            MarketScalar::price(Money::from_model_value(spot, money.currency())?)
+        } else {
+            MarketScalar::unitless(spot)?
         };
         Ok(market.clone().insert_price(self.spot_id.as_str(), scalar))
     }
@@ -757,17 +757,15 @@ pub fn calculate_convertible_greeks(
         if inputs.time_to_maturity > 1.0 / 365.25
             && let Some(next_day) = as_of.next_day()
         {
-            // `roll_forward(1)` realizes one day of forwards on every
-            // curve (discount curves renormalize by DF(1d), hazard
-            // curves preserve hazard rates via conditional survival), so
-            // theta = price(rolled, t+1d) - price(t) captures both carry
-            // and roll-down. See module documentation
-            // (realized-forward roll semantics).
+            // `condition(next_day)` evaluates every discount/forward/hazard
+            // curve from the next day as its conditional reference date while
+            // leaving frozen curves unchanged, so theta = price(conditioned, t+1d) - price(t)
+            // captures carry and roll-down.
             //
-            // A roll fails when a curve is too sparse to retain ≥ 2 knots
-            // after the shift; that error propagates rather than
-            // repricing on a market still anchored at `t`.
-            let rolled_market = market.roll_forward(1)?;
+            // Conditioning fails when a curve cannot support the horizon
+            // (for example, `ExtrapolationPolicy::None` past the final knot);
+            // that error propagates rather than repricing on `t`.
+            let rolled_market = market.condition(next_day)?;
             let fwd_price = price_convertible_bond(bond, &rolled_market, next_day)?;
             // Theta = P(t+1d) - P(t), reported as change per calendar day.
             greeks.theta = fwd_price.amount() - greeks.price;
@@ -928,13 +926,18 @@ pub(super) fn accrual_index(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolGridOpts, VolInterpolationMode, VolSurface,
+    };
 
     #[test]
     fn volatility_resolution_rejects_incompatible_surface_contracts() {
         let base = VolSurface::builder("EQUITY-VOL")
             .expiries(&[1.0])
-            .strikes(&[100.0])
+            .secondary_values(&[100.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.2])
             .build()
             .expect("Black surface");
@@ -954,20 +957,31 @@ mod tests {
                 "black_lognormal",
             ),
             (
-                base.clone()
-                    .with_displacements(&[10.0])
-                    .expect("shifted surface"),
+                VolSurface::from_grid(
+                    base.id(),
+                    base.expiries(),
+                    base.secondary_values(),
+                    base.vols(),
+                    VolGridOpts {
+                        secondary_axis: base.secondary_axis(),
+                        quote_type: VolQuoteType::ShiftedBlackLognormal,
+                        interpolation_mode: base.interpolation_mode(),
+                    },
+                    Some(&[10.0]),
+                )
+                .expect("shifted surface"),
                 "black_lognormal",
             ),
             (
-                finstack_quant_core::market_data::surfaces::VolSurface::from_grid(
+                VolSurface::from_grid(
                     base.id(),
                     base.expiries(),
-                    base.strikes(),
+                    base.secondary_values(),
                     base.vols(),
-                    finstack_quant_core::market_data::surfaces::VolGridOpts {
+                    VolGridOpts {
                         secondary_axis: VolSurfaceAxis::Tenor,
-                        ..finstack_quant_core::market_data::surfaces::VolGridOpts::default()
+                        quote_type: base.quote_type(),
+                        interpolation_mode: base.interpolation_mode(),
                     },
                     None,
                 )

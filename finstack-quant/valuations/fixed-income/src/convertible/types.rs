@@ -666,17 +666,21 @@ impl ConvertibleBond {
         &self,
         scalar: &finstack_quant_core::market_data::scalars::MarketScalar,
     ) -> finstack_quant_core::Result<f64> {
-        use finstack_quant_core::market_data::scalars::MarketScalar;
-        match scalar {
-            MarketScalar::Unitless(value) => Ok(*value),
-            MarketScalar::Price(money) if money.currency() == self.notional.currency() => {
-                Ok(money.amount())
+        if let Some(value) = scalar.get_unitless() {
+            return Ok(value);
+        }
+        if let Some(money) = scalar.get_price() {
+            if money.currency() == self.notional.currency() {
+                return Ok(money.amount());
             }
-            MarketScalar::Price(money) => Err(Error::CurrencyMismatch {
+            return Err(Error::CurrencyMismatch {
                 expected: self.notional.currency(),
                 actual: money.currency(),
-            }),
+            });
         }
+        Err(Error::Validation(
+            "Unsupported market scalar variant".into(),
+        ))
     }
 
     /// Calculate policy-specific equity conversion value divided by notional.
@@ -968,7 +972,7 @@ mod tests {
         assert_eq!(bond.notional.currency(), Currency::USD);
         let market = MarketContext::new().insert_price(
             bond.spot_id.as_str(),
-            MarketScalar::Price(Money::new(50.0, Currency::EUR).expect("money")),
+            MarketScalar::price(Money::new(50.0, Currency::EUR).expect("money")),
         );
 
         let expected = Error::CurrencyMismatch {
@@ -980,7 +984,7 @@ mod tests {
 
         let usd_market = MarketContext::new().insert_price(
             bond.spot_id.as_str(),
-            MarketScalar::Price(Money::new(50.0, Currency::USD).expect("money")),
+            MarketScalar::price(Money::new(50.0, Currency::USD).expect("money")),
         );
         assert!(bond.parity(&usd_market).is_ok());
     }

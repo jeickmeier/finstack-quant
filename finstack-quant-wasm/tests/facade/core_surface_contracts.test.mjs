@@ -45,6 +45,7 @@ test('a Bus/252 discount curve counts business days on its own calendar', () => 
     baseDate: '2025-01-06',
     knots: [0, 1, 1, 0.9],
     interp: 'log_linear',
+    extrapolation: 'extend',
     dayCount: 'bus_252',
     calendarId: 'brbd',
   });
@@ -62,6 +63,8 @@ test('a Bus/252 discount curve counts business days on its own calendar', () => 
         id: 'BRL-CDI',
         baseDate: '2025-01-06',
         knots: [0, 1, 1, 0.9],
+        interp: 'log_linear',
+        extrapolation: 'extend',
         dayCount: 'bus_252',
       }),
     /requires a holiday calendar/

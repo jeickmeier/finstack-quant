@@ -57,7 +57,7 @@ impl RateSpec {
     /// business days on the fixing calendar) is on or before `as_of` reads the
     /// fixing series (consulting `fallback` when the series itself is absent);
     /// later resets project from the forward curve at the reset date, enforcing
-    /// `index_tenor` against `ForwardCurve::tenor()` and consulting `fallback`
+    /// `index_tenor` against `ForwardCurve::index_tenor()` and consulting `fallback`
     /// only when the curve is absent or does not reach `reset_date`.
     ///
     /// # Differences from the cashflow builder
@@ -146,7 +146,6 @@ impl RateSpec {
                                 Some(fixings),
                                 spec.forward_curve_id.as_str(),
                                 reset_date,
-                                as_of,
                             )?;
                             return Ok(crate::builder::calculate_floating_rate(raw, &params));
                         }
@@ -242,16 +241,23 @@ mod tests {
     use time::Month;
 
     #[test]
-    fn try_rate_for_period_validates_inputs_and_uses_reset_date_for_projection() {
-        let base = Date::from_calendar_date(2025, Month::January, 2).expect("valid date");
-        let start = Date::from_calendar_date(2025, Month::April, 4).expect("valid date");
-        let end = Date::from_calendar_date(2025, Month::July, 4).expect("valid date");
-        let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-            .base_date(base)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.03), (0.25, 0.05), (1.0, 0.08)])
-            .build()
-            .expect("valid curve");
+    fn try_rate_for_period_validates_inputs_and_enforces_reset_date_cutoff() {
+        let base = Date::from_calendar_date(2025, Month::April, 4).expect("valid date");
+        let start = Date::from_calendar_date(2025, Month::April, 7).expect("valid date");
+        let end = Date::from_calendar_date(2025, Month::July, 7).expect("valid date");
+        let fwd = ForwardCurve::from_zero_rates(
+            "USD-SOFR-3M",
+            base,
+            &[(0.0, 0.03), (0.25, 0.05), (1.0, 0.08)],
+            finstack_quant_core::math::Compounding::Continuous,
+            DayCount::Act360,
+            finstack_quant_core::math::interp::InterpStyle::LogLinear,
+            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+        )
+        .expect("valid curve");
+        let expected_proj = fwd
+            .rate_between_dates(start, end, 91.0 / 360.0)
+            .expect("factor projection");
         let market = MarketContext::new().insert(fwd);
 
         assert!(
@@ -298,15 +304,18 @@ mod tests {
 
         let mut zero_lag = base_float.clone();
         zero_lag.reset_lag_days = 0;
-        let r_lag2 = RateSpec::Floating(base_float)
-            .try_rate_for_period(start, end, 91.0 / 360.0, base, &market)
-            .expect("lag 2 projection");
+
+        // With reset_lag_days = 2, reset_date precedes curve base_date (2025-04-04) and errors without FIXING:
+        assert!(
+            RateSpec::Floating(base_float)
+                .try_rate_for_period(start, end, 91.0 / 360.0, base, &market)
+                .is_err(),
+            "reset_lag_days = 2 shifts reset before base_date and requires observed fixing"
+        );
+
         let r_lag0 = RateSpec::Floating(zero_lag)
             .try_rate_for_period(start, end, 91.0 / 360.0, base, &market)
             .expect("lag 0 projection");
-        assert!(
-            (r_lag2 - r_lag0).abs() > 1e-6,
-            "projection must evaluate forward curve at reset_date rather than accrual_start"
-        );
+        assert!((r_lag0 - expected_proj).abs() < 1e-14);
     }
 }

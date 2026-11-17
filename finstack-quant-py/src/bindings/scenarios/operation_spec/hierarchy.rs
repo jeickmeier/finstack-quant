@@ -55,7 +55,7 @@ impl PyHierarchyTarget {
             })
             .transpose()?;
         Ok(Self {
-            inner: HierarchyTarget { path, tag_filter },
+            inner: HierarchyTarget::new(path, tag_filter).map_err(crate::errors::core_to_py)?,
         })
     }
 
@@ -77,7 +77,7 @@ impl PyHierarchyTarget {
 
     /// Serialize to canonical JSON (``{"path": [...], "tag_filter": {...}}``).
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(crate::errors::display_to_py)
+        self.inner.to_json().map_err(crate::errors::core_to_py)
     }
 
     /// Deserialize from canonical JSON, including ``in`` / ``exists`` tag
@@ -90,9 +90,7 @@ impl PyHierarchyTarget {
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner: HierarchyTarget = serde_json::from_str(json).map_err(|e| {
-            crate::errors::value_error(format!("Invalid HierarchyTarget JSON: {e}"))
-        })?;
+        let inner = HierarchyTarget::from_json(json).map_err(crate::errors::core_to_py)?;
         Ok(Self { inner })
     }
 

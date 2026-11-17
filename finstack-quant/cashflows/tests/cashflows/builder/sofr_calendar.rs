@@ -51,13 +51,15 @@ fn sofr_preset_carries_thursday_fixing_across_repo_market_holidays() {
 fn historical_sofr_coupon(start: Date, end: Date) -> f64 {
     // Only the Thursday fixing exists. The base date after the entire coupon
     // ensures every required observation must resolve from supplied history.
-    let forward = ForwardCurve::builder("USD-SOFR", 1.0 / 360.0)
-        .base_date(end)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.07), (1.0, 0.07)])
-        .build()
-        .unwrap();
-    let fixings = ScalarTimeSeries::new("FIXING:USD-SOFR", vec![(start, 0.05)], None).unwrap();
+    let forward = ForwardCurve::flat("USD-SOFR", end, 0.07, DayCount::Act360).unwrap();
+    let fixings = ScalarTimeSeries::new(
+        "FIXING:USD-SOFR",
+        vec![(start, 0.05)],
+        None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+    )
+    .unwrap();
     let market = MarketContext::new().insert(forward).insert_series(fixings);
     let spec = FloatingCouponSpec {
         rate_spec: FloatingRateSpec::sofr(dec!(0)),

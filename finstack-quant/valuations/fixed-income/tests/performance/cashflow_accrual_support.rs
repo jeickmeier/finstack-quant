@@ -95,6 +95,8 @@ pub(super) fn bond_market() -> MarketContext {
             (30.0, 0.40),
         ])
         .interp(InterpStyle::MonotoneConvex)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("windowed bond market");
     MarketContext::new().insert(curve)

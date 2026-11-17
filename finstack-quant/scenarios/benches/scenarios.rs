@@ -8,22 +8,29 @@
 //! - Serde serialization/deserialization
 //! - Time roll-forward operations
 
+#[path = "support/fixtures.rs"]
+mod fixtures;
+
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::build_periods;
+use finstack_quant_core::dates::{
+    BusinessDayConvention, DayCount, DayCountContextState, Tenor, VolatilityClock, build_periods,
+};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::Compounding;
-use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::FxMatrix;
 use finstack_quant_core::money::fx::SimpleFxProvider;
 use finstack_quant_scenarios::{
-    CurveKind, ExecutionContext, HazardBumpMode, OperationSpec, RateBindingSpec, ScenarioEngine,
-    ScenarioSpec, TenorMatchMode,
+    CurveKind, ExecutionContext, OperationSpec, RateBindingSpec, ScenarioEngine, ScenarioSpec,
+    TenorMatchMode,
 };
 use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::{AmountOrScalar, NodeSpec, NodeType};
@@ -39,6 +46,7 @@ fn create_base_market() -> MarketContext {
     // USD discount curve
     let usd_curve = DiscountCurve::builder("USD_SOFR")
         .base_date(base)
+        .day_count(DayCount::Act365F)
         .knots([
             (0.0, 1.0),
             (0.25, 0.99),
@@ -50,12 +58,14 @@ fn create_base_market() -> MarketContext {
             (30.0, 0.35),
         ])
         .interp(InterpStyle::Linear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     // EUR discount curve
     let eur_curve = DiscountCurve::builder("EUR_ESTR")
         .base_date(base)
+        .day_count(DayCount::Act365F)
         .knots([
             (0.0, 1.0),
             (0.25, 0.985),
@@ -67,6 +77,7 @@ fn create_base_market() -> MarketContext {
             (30.0, 0.34),
         ])
         .interp(InterpStyle::Linear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -83,10 +94,27 @@ fn create_base_market() -> MarketContext {
     });
     let fx_matrix = FxMatrix::new(fx_provider, None);
 
+    let vol_clock =
+        VolatilityClock::try_new(base, DayCount::Act365F, DayCountContextState::default()).unwrap();
+    let vol_expiries: Vec<f64> = ["3M", "6M", "1Y"]
+        .iter()
+        .map(|s| {
+            let d = Tenor::parse(s)
+                .unwrap()
+                .add_to_date(base, None, BusinessDayConvention::Unadjusted)
+                .unwrap();
+            vol_clock.expiry_time(d).unwrap()
+        })
+        .collect();
+
     // Vol surface
     let vol_surface = VolSurface::builder("SPX_VOL")
-        .expiries(&[0.25, 0.5, 1.0])
-        .strikes(&[90.0, 100.0, 110.0])
+        .expiries(&vol_expiries)
+        .secondary_values(&[90.0, 100.0, 110.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
+        .expiry_clock(vol_clock.clone())
         .row(&[0.25, 0.20, 0.22])
         .row(&[0.24, 0.19, 0.21])
         .row(&[0.23, 0.18, 0.20])
@@ -100,38 +128,30 @@ fn create_base_market() -> MarketContext {
         .unwrap();
 
     // Hazard curves (credit)
-    let hazard_ig = HazardCurve::builder("CDX_IG_HAZARD")
-        .base_date(base)
-        .recovery_rate(0.40)
-        .knots([
-            (0.0, 0.0),
-            (1.0, 0.01),
-            (3.0, 0.015),
-            (5.0, 0.02),
-            (10.0, 0.025),
-        ])
-        .par_spreads([(1.0, 60.0), (3.0, 90.0), (5.0, 120.0), (10.0, 150.0)])
-        .build()
-        .unwrap();
+    let hazard_ig = fixtures::calibrate_hazard(
+        base,
+        &usd_curve,
+        "CDX_IG_HAZARD",
+        0.40,
+        &[("1Y", 60.0), ("3Y", 90.0), ("5Y", 120.0), ("10Y", 150.0)],
+    );
 
-    let hazard_hy = HazardCurve::builder("CDX_HY_HAZARD")
-        .base_date(base)
-        .recovery_rate(0.30)
-        .knots([
-            (0.0, 0.0),
-            (1.0, 0.05),
-            (3.0, 0.06),
-            (5.0, 0.07),
-            (10.0, 0.08),
-        ])
-        .par_spreads([(1.0, 350.0), (3.0, 420.0), (5.0, 490.0), (10.0, 560.0)])
-        .build()
-        .unwrap();
+    let hazard_hy = fixtures::calibrate_hazard(
+        base,
+        &usd_curve,
+        "CDX_HY_HAZARD",
+        0.30,
+        &[("1Y", 350.0), ("3Y", 420.0), ("5Y", 490.0), ("10Y", 560.0)],
+    );
 
     // Credit vol surface
     let credit_vol = VolSurface::builder("CDX_IG_VOL")
-        .expiries(&[0.25, 0.5, 1.0])
-        .strikes(&[90.0, 100.0, 110.0])
+        .expiries(&vol_expiries)
+        .secondary_values(&[90.0, 100.0, 110.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
+        .expiry_clock(vol_clock)
         .row(&[0.35, 0.30, 0.32])
         .row(&[0.34, 0.29, 0.31])
         .row(&[0.33, 0.28, 0.30])
@@ -149,15 +169,15 @@ fn create_base_market() -> MarketContext {
         .insert(hazard_hy)
         .insert_price(
             "SPY",
-            MarketScalar::Price(Money::new(450.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(450.0, Currency::USD).expect("valid money fixture")),
         )
         .insert_price(
             "QQQ",
-            MarketScalar::Price(Money::new(380.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(380.0, Currency::USD).expect("valid money fixture")),
         )
         .insert_price(
             "EWU",
-            MarketScalar::Price(Money::new(32.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(32.0, Currency::USD).expect("valid money fixture")),
         )
 }
 
@@ -227,7 +247,6 @@ fn create_scenarios_for_composition(count: usize) -> Vec<ScenarioSpec> {
             ],
             priority: (i % 3) as i32,
             resolution_mode: Default::default(),
-            hazard_bump_mode: HazardBumpMode::FirstOrderShift,
         };
         scenarios.push(scenario);
     }
@@ -276,7 +295,6 @@ fn bench_curve_parallel_shock(c: &mut Criterion) {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     group.bench_function("single_curve", |b| {
@@ -337,7 +355,6 @@ fn bench_curve_node_shock(c: &mut Criterion) {
             }],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: HazardBumpMode::FirstOrderShift,
         };
 
         group.bench_with_input(
@@ -391,7 +408,6 @@ fn bench_fx_shock(c: &mut Criterion) {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     group.bench_function("single_pair", |b| {
@@ -441,7 +457,6 @@ fn bench_equity_shock(c: &mut Criterion) {
             operations: vec![OperationSpec::EquityPricePct { ids, pct: -10.0 }],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: HazardBumpMode::FirstOrderShift,
         };
 
         group.bench_with_input(
@@ -496,7 +511,6 @@ fn bench_vol_surface_shock(c: &mut Criterion) {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     group.bench_function("parallel", |b| {
@@ -540,7 +554,6 @@ fn bench_vol_surface_shock(c: &mut Criterion) {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     group.bench_function("bucket", |b| {
@@ -590,7 +603,6 @@ fn bench_base_correlation_shock(c: &mut Criterion) {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     group.bench_function("parallel", |b| {
@@ -633,7 +645,6 @@ fn bench_base_correlation_shock(c: &mut Criterion) {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     group.bench_function("bucket", |b| {
@@ -683,7 +694,6 @@ fn bench_statement_operations(c: &mut Criterion) {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     group.bench_function("forecast_percent", |b| {
@@ -718,7 +728,6 @@ fn bench_statement_operations(c: &mut Criterion) {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     group.bench_function("forecast_assign", |b| {
@@ -794,7 +803,6 @@ fn bench_complex_multi_operation(c: &mut Criterion) {
             operations,
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: HazardBumpMode::FirstOrderShift,
         };
 
         group.bench_with_input(
@@ -898,7 +906,6 @@ fn bench_serde_roundtrip(c: &mut Criterion) {
         ],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     group.bench_function("serialize", |b| {
@@ -948,7 +955,6 @@ fn bench_rate_bindings(c: &mut Criterion) {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     group.bench_function("with_rate_bindings", |b| {
@@ -993,7 +999,6 @@ fn bench_hazard_curve_shock(c: &mut Criterion) {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     group.bench_function("parallel_ig", |b| {
@@ -1038,7 +1043,6 @@ fn bench_hazard_curve_shock(c: &mut Criterion) {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     group.bench_function("node_hy", |b| {
@@ -1088,7 +1092,6 @@ fn bench_credit_vol_shock(c: &mut Criterion) {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     group.bench_function("parallel", |b| {
@@ -1132,7 +1135,6 @@ fn bench_credit_vol_shock(c: &mut Criterion) {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     group.bench_function("bucket", |b| {
@@ -1188,7 +1190,6 @@ fn bench_instrument_spread_shock(c: &mut Criterion) {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     group.bench_function("by_type", |b| {
@@ -1265,7 +1266,6 @@ fn bench_comprehensive_credit_scenario(c: &mut Criterion) {
         ],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     group.bench_function("credit_stress", |b| {

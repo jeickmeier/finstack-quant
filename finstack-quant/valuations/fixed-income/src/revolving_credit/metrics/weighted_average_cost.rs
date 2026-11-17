@@ -156,17 +156,24 @@ mod tests {
             .expect("facility");
         // The curve is based inside the first coupon: annualization must
         // retain its full contractual dates even when the start is historical.
+        // Construct identical discount factors across clocks so both periods
+        // project a 4% simple ACT/360 rate regardless of curve day count.
         let as_of = date!(2025 - 02 - 03);
-        for (day_count, rate) in [
-            (DayCount::Act360, 0.04),
-            (DayCount::Act365F, 0.04 * 365.0 / 360.0),
-        ] {
-            let curve = ForwardCurve::builder("TERM", 0.25)
-                .base_date(as_of)
-                .day_count(day_count)
-                .knots([(0.0, rate), (1.0, rate)])
-                .build()
-                .expect("forward curve");
+        let q1_end = date!(2025 - 04 - 02);
+        let q2_end = date!(2025 - 07 - 02);
+        let f1_full = 1.0_f64 + 0.04 * 90.0 / 360.0;
+        let df_q1_end = f1_full.powf(-(58.0 / 90.0));
+        let df_q2_end = df_q1_end / (1.0 + 0.04 * 91.0 / 360.0);
+        for day_count in [DayCount::Act360, DayCount::Act365F] {
+            let curve = ForwardCurve::from_dates(
+                "TERM",
+                as_of,
+                &[(as_of, 1.0), (q1_end, df_q1_end), (q2_end, df_q2_end)],
+                day_count,
+                finstack_quant_core::math::interp::InterpStyle::LogLinear,
+                finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+            )
+            .expect("forward curve");
             let projected = average_forward_rate(&curve, &facility, as_of).expect("average rate");
             assert!(
                 (projected - 0.04).abs() < 1e-14,

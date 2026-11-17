@@ -22,6 +22,8 @@ fn build_market_context() -> MarketContext {
         .base_date(date!(2025 - 01 - 01))
         .knots([(0.0, 1.0), (5.0, 0.85)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     MarketContext::new().insert(disc)
@@ -781,12 +783,8 @@ mod margin_stepup_period_semantics {
     }
 
     fn market_with_forward() -> MarketContext {
-        let fwd = ForwardCurve::builder("USD-SOFR", 0.25)
-            .base_date(date!(2025 - 01 - 01))
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.045), (10.0, 0.045)])
-            .build()
-            .unwrap();
+        let fwd =
+            ForwardCurve::flat("USD-SOFR", date!(2025 - 01 - 01), 0.045, DayCount::Act360).unwrap();
         build_market_context().insert(fwd)
     }
 
@@ -916,19 +914,19 @@ mod margin_stepup_period_semantics {
         assert_eq!(
             base,
             vec![
-                4684823470322745344,
-                4684885508739243121,
-                4684947547155740900,
-                4684947547155740900
+                4684845295361791607,
+                4684907822405077267,
+                4684970354878489699,
+                4684970354878489726
             ]
         );
         assert_eq!(
             stepped,
             vec![
-                4684823470322745344,
-                4684885508739243121,
-                4685825629358478676,
-                4685825629358478676
+                4684845295361791607,
+                4684907822405077267,
+                4685848437081227477,
+                4685848437081227504
             ]
         );
     }

@@ -53,7 +53,7 @@ pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -
     Money::new(price * inst.notional.amount(), inst.quote_currency)
 }
 
-fn input_request<'a>(
+pub(crate) fn input_request<'a>(
     inst: &'a FxOption,
     curves: &'a MarketContext,
     as_of: Date,
@@ -254,7 +254,9 @@ mod delegation_tests {
     use crate::fx_option::{FxDeltaConvention, FxDeltaConventionKind};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::types::Attributes;
@@ -268,17 +270,24 @@ mod delegation_tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("usd curve");
         let eur_curve = DiscountCurve::builder("EUR-OIS")
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, (-0.01_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("eur curve");
         let vol_surface = VolSurface::builder("EURUSD-VOL")
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&[0.9, 1.0, 1.1, 1.2, 1.3])
+            .secondary_values(&[0.9, 1.0, 1.1, 1.2, 1.3])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.15; 5])
             .row(&[0.15; 5])
             .row(&[0.15; 5])
@@ -428,8 +437,11 @@ mod delegation_tests {
 
     #[test]
     fn fx_delta_vol_surface_propagates_cirp_forward_instead_of_expiry() {
-        use finstack_quant_core::dates::DayCountContext;
-        use finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;
+        use finstack_quant_core::dates::{DayCountContext, DayCountContextState, VolatilityClock};
+        use finstack_quant_core::market_data::surfaces::{
+            FxAtmConvention, FxButterflyConvention, FxDeltaConvention, FxDeltaVolSurface,
+        };
+        use finstack_quant_core::money::fx::CurrencyPair;
         use finstack_quant_models::volatility::{VolSource, get_fx_delta_vol};
 
         let as_of = date!(2024 - 01 - 01);
@@ -438,16 +450,21 @@ mod delegation_tests {
         option.strike = 1.25;
         option.vol_surface_id = CurveId::new("EURUSD-DELTA");
 
-        let fx_delta = FxDeltaVolSurface::new(
-            "EURUSD-DELTA",
-            vec![0.10, 0.25, 0.50, 1.0],
-            vec![0.09, 0.10, 0.11, 0.12],
-            vec![0.025, 0.025, 0.025, 0.025],
-            vec![0.008, 0.008, 0.008, 0.008],
-            None,
-            None,
-        )
-        .expect("fx delta surface");
+        let eurusd = CurrencyPair::try_new(Currency::EUR, Currency::USD).expect("eur/usd");
+        let clock =
+            VolatilityClock::try_new(as_of, DayCount::Act365F, DayCountContextState::default())
+                .expect("clock");
+        let fx_delta = FxDeltaVolSurface::builder("EURUSD-DELTA", eurusd)
+            .delta_convention(FxDeltaConvention::ForwardUnadjusted)
+            .atm_convention(FxAtmConvention::DeltaNeutralStraddle)
+            .butterfly_convention(FxButterflyConvention::Smile)
+            .expiries(&[0.10, 0.25, 0.50, 1.0])
+            .atm_vols(&[0.09, 0.10, 0.11, 0.12])
+            .rr_25d(&[0.025, 0.025, 0.025, 0.025])
+            .bf_25d(&[0.008, 0.008, 0.008, 0.008])
+            .expiry_clock(clock)
+            .build()
+            .expect("fx delta surface");
         let source = VolSource::FxDelta(Arc::new(fx_delta.clone()));
         assert!(source.get_vol(0.25, 1.20, option.strike).is_err());
 
@@ -456,8 +473,16 @@ mod delegation_tests {
             .day_count
             .year_fraction(as_of, expiry, DayCountContext::default())
             .expect("year fraction");
-        let df_dom = market.get_discount("USD-OIS").expect("usd").df(t);
-        let df_for = market.get_discount("EUR-OIS").expect("eur").df(t);
+        let df_dom = market
+            .get_discount("USD-OIS")
+            .expect("usd")
+            .df(t)
+            .expect("df");
+        let df_for = market
+            .get_discount("EUR-OIS")
+            .expect("eur")
+            .df(t)
+            .expect("df");
         let cirp_fwd = 1.20 * df_for / df_dom;
 
         let expected_vol = get_fx_delta_vol(&fx_delta, t, option.strike, cirp_fwd)
@@ -480,5 +505,105 @@ mod delegation_tests {
         let pv = compute_pv(&option, &market, as_of).expect("fx option pv from fx delta surface");
         let recovered = implied_vol(&option, &market, as_of, pv.amount()).expect("implied vol");
         assert!((recovered - expected_vol).abs() < 1e-6);
+    }
+
+    #[test]
+    fn fx_delta_vol_surface_checks_pair_clock_and_variance_bridge() {
+        use finstack_quant_core::dates::{DayCountContextState, VolatilityClock};
+        use finstack_quant_core::market_data::surfaces::{
+            FxAtmConvention, FxButterflyConvention, FxDeltaConvention, FxDeltaVolSurface,
+        };
+        use finstack_quant_core::money::fx::CurrencyPair;
+        use finstack_quant_valuations_core::instruments::pricing_overrides::{
+            InstrumentPricingOverrides, MarketQuoteOverrides,
+        };
+
+        let as_of = date!(2025 - 01 - 02);
+        let expiry = date!(2025 - 02 - 01); // 30 calendar days
+        let mut option = build_option(expiry);
+        option.vol_surface_id = CurveId::new("EURUSD-DELTA");
+        option.day_count = DayCount::Act360;
+
+        let eurusd = CurrencyPair::try_new(Currency::EUR, Currency::USD).expect("eur/usd");
+        let usdeur = CurrencyPair::try_new(Currency::USD, Currency::EUR).expect("usd/eur");
+        let matching_clock =
+            VolatilityClock::try_new(as_of, DayCount::Act365F, DayCountContextState::default())
+                .expect("clock");
+        let wrong_date_clock = VolatilityClock::try_new(
+            date!(2025 - 01 - 03),
+            DayCount::Act365F,
+            DayCountContextState::default(),
+        )
+        .expect("wrong date clock");
+
+        // 1. Pair mismatch errors.
+        let reversed = FxDeltaVolSurface::builder("EURUSD-DELTA", usdeur)
+            .delta_convention(FxDeltaConvention::ForwardUnadjusted)
+            .atm_convention(FxAtmConvention::DeltaNeutralStraddle)
+            .butterfly_convention(FxButterflyConvention::Smile)
+            .expiries(&[0.05, 0.50, 1.0])
+            .atm_vols(&[0.20, 0.20, 0.20])
+            .rr_25d(&[0.0, 0.0, 0.0])
+            .bf_25d(&[0.0, 0.0, 0.0])
+            .expiry_clock(matching_clock.clone())
+            .build()
+            .expect("reversed");
+        let market_rev = build_market(as_of).insert_fx_delta_vol_surface(reversed);
+        assert!(compute_pv(&option, &market_rev, as_of).is_err());
+
+        // 2. Missing expiry_clock errors.
+        let clockless = FxDeltaVolSurface::builder("EURUSD-DELTA", eurusd)
+            .delta_convention(FxDeltaConvention::ForwardUnadjusted)
+            .atm_convention(FxAtmConvention::DeltaNeutralStraddle)
+            .butterfly_convention(FxButterflyConvention::Smile)
+            .expiries(&[0.05, 0.50, 1.0])
+            .atm_vols(&[0.20, 0.20, 0.20])
+            .rr_25d(&[0.0, 0.0, 0.0])
+            .bf_25d(&[0.0, 0.0, 0.0])
+            .build()
+            .expect("clockless");
+        let market_clockless = build_market(as_of).insert_fx_delta_vol_surface(clockless);
+        assert!(compute_pv(&option, &market_clockless, as_of).is_err());
+
+        // 3. Stale reference_date != as_of errors.
+        let stale = FxDeltaVolSurface::builder("EURUSD-DELTA", eurusd)
+            .delta_convention(FxDeltaConvention::ForwardUnadjusted)
+            .atm_convention(FxAtmConvention::DeltaNeutralStraddle)
+            .butterfly_convention(FxButterflyConvention::Smile)
+            .expiries(&[0.05, 0.50, 1.0])
+            .atm_vols(&[0.20, 0.20, 0.20])
+            .rr_25d(&[0.0, 0.0, 0.0])
+            .bf_25d(&[0.0, 0.0, 0.0])
+            .expiry_clock(wrong_date_clock)
+            .build()
+            .expect("stale");
+        let market_stale = build_market(as_of).insert_fx_delta_vol_surface(stale);
+        assert!(compute_pv(&option, &market_stale, as_of).is_err());
+
+        // 4. Active Act/365F clock bridges variance to Act/360 option clock.
+        let bridged = FxDeltaVolSurface::builder("EURUSD-DELTA", eurusd)
+            .delta_convention(FxDeltaConvention::ForwardUnadjusted)
+            .atm_convention(FxAtmConvention::DeltaNeutralStraddle)
+            .butterfly_convention(FxButterflyConvention::Smile)
+            .expiries(&[0.05, 0.50, 1.0])
+            .atm_vols(&[0.20, 0.20, 0.20])
+            .rr_25d(&[0.0, 0.0, 0.0])
+            .bf_25d(&[0.0, 0.0, 0.0])
+            .expiry_clock(matching_clock)
+            .build()
+            .expect("bridged");
+        let market_ok = build_market(as_of).insert_fx_delta_vol_surface(bridged);
+        let pv_bridged = compute_pv(&option, &market_ok, as_of).expect("bridged pv");
+
+        let mut override_opt = option;
+        override_opt.instrument_pricing_overrides = InstrumentPricingOverrides {
+            market_quotes: MarketQuoteOverrides {
+                implied_volatility: Some(0.20 * (360.0_f64 / 365.0).sqrt()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let pv_override = compute_pv(&override_opt, &market_ok, as_of).expect("override pv");
+        assert!((pv_bridged.amount() - pv_override.amount()).abs() < 1e-10);
     }
 }

@@ -62,6 +62,9 @@ fn discount_curve(base_date: Date) -> DiscountCurve {
     DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
         .knots(vec![(0.0, 1.0), (5.0, 0.95)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve")
 }
@@ -557,6 +560,9 @@ fn mc_variance_no_catastrophic_cancellation_on_large_pv_deal() {
         DiscountCurve::builder("USD-OIS")
             .base_date(close)
             .knots(vec![(0.0, 1.0), (2.0, 0.96), (5.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap(),
     );
@@ -663,6 +669,9 @@ fn philox_rng_discipline_determinism_and_stream_sanity() {
         DiscountCurve::builder("USD-OIS")
             .base_date(close)
             .knots(vec![(0.0, 1.0), (2.0, 0.96), (5.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap(),
     );
@@ -951,6 +960,9 @@ fn stochastic_waterfall_matches_independent_cashflow_vectors() {
         DiscountCurve::builder("USD-OIS")
             .base_date(start)
             .knots([(0.0, 1.0), (5.0, 1.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap(),
     );

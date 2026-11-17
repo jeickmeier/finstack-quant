@@ -61,6 +61,8 @@ pub fn setup_standard_market(as_of: Date) -> MarketContext {
         .base_date(as_of)
         .knots([(0.0, 1.0), (1.0, 0.99), (10.0, 0.9)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -68,6 +70,8 @@ pub fn setup_standard_market(as_of: Date) -> MarketContext {
         .base_date(as_of)
         .knots([(0.0, 1.0), (1.0, 0.995), (10.0, 0.95)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -90,6 +94,8 @@ pub fn setup_steep_curve_market(as_of: Date) -> MarketContext {
         .base_date(as_of)
         .knots([(0.0, 1.0), (1.0, 0.95), (10.0, 0.60)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -97,6 +103,8 @@ pub fn setup_steep_curve_market(as_of: Date) -> MarketContext {
         .base_date(as_of)
         .knots([(0.0, 1.0), (1.0, 0.97), (10.0, 0.74)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -115,12 +123,9 @@ pub fn setup_inverted_curve_market(as_of: Date) -> MarketContext {
         .base_date(as_of)
         .knots([(0.0, 1.0), (0.25, 0.99), (10.0, 1.05)])
         .interp(InterpStyle::Linear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        ) // DFs increase for negative rates
+        // DFs increase for negative rates
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -128,12 +133,9 @@ pub fn setup_inverted_curve_market(as_of: Date) -> MarketContext {
         .base_date(as_of)
         .knots([(0.0, 1.0), (0.25, 0.995), (10.0, 1.02)])
         .interp(InterpStyle::Linear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        ) // DFs increase for negative rates
+        // DFs increase for negative rates
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 

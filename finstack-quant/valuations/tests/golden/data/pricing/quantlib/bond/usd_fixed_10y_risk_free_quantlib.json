@@ -28,7 +28,6 @@
             "stub": "short_front"
           }
         },
-        "quote_compounding": {"periodic": 2},
         "credit_curve_id": null,
         "discount_curve_id": "USD-OIS",
         "ex_coupon_days": 0,
@@ -38,6 +37,9 @@
         "notional": {
           "amount": "100",
           "currency": "USD"
+        },
+        "quote_compounding": {
+          "periodic": 2
         },
         "settlement_days": 2
       },
@@ -51,10 +53,9 @@
       "credit_indices": [],
       "curves": [
         {
-          "allow_non_monotonic": false,
           "base": "2026-04-30",
           "day_count": "30_360",
-          "extrapolation": "flat_forward",
+          "extrapolation": "extend",
           "id": "USD-OIS",
           "interp_style": "log_linear",
           "knot_points": [
@@ -67,8 +68,6 @@
               0.30119421191220214
             ]
           ],
-          "min_forward_rate": null,
-          "min_forward_tenor": 1e-06,
           "rate_calibration": null,
           "type": "discount"
         }

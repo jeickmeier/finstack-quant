@@ -11,10 +11,7 @@
         [1.0, 0.9607894391523232]
       ],
       "interp_style": "log_linear",
-      "extrapolation": "flat_forward",
-      "min_forward_rate": null,
-      "allow_non_monotonic": false,
-      "min_forward_tenor": 1e-6,
+      "extrapolation": "extend",
       "rate_calibration": null,
       "fx_policy": null
     },
@@ -22,17 +19,29 @@
       "type": "forward",
       "id": "USD-SOFR-3M",
       "base": "2025-01-01",
-      "reset_lag": 2,
       "day_count": "act_360",
-      "tenor": 0.25,
+      "index_tenor": {
+        "count": 3,
+        "unit": "months"
+      },
       "knot_points": [
-        [0.0, 0.04],
-        [1.0, 0.045],
-        [3.0, 0.05]
+        [0.0, 1.0],
+        [0.25, 0.9900990099009901],
+        [0.5, 0.9799928338024028],
+        [0.75, 0.9696898788397307],
+        [1.0, 0.9591986436745404],
+        [1.25, 0.9485277069711153],
+        [1.5, 0.9378305769527481],
+        [1.75, 0.9271108576610423],
+        [2.0, 0.9163721218580186],
+        [2.25, 0.9056179091864297],
+        [2.5, 0.8948517243775128],
+        [2.75, 0.884077035507268],
+        [3.0, 0.8732972723022866],
+        [3.25, 0.8625158244960855]
       ],
-      "projection_grid": null,
-      "interp_style": "linear",
-      "extrapolation": "flat_forward",
+      "interp_style": "log_linear",
+      "extrapolation": "extend",
       "rate_calibration": null,
       "fx_policy": null
     }

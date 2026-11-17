@@ -144,6 +144,8 @@ fn sloped_discount_curve(as_of: Date) -> DiscountCurve {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots(knots)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("sloped discount curve")
 }
@@ -362,6 +364,7 @@ fn fitted_theta_reprices_every_interpolation_style() {
             .day_count(DayCount::Act365F)
             .knots(pillars.map(|(t, zero)| (t, (-zero * t).exp())))
             .interp(style)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let params = prepare_hw1f_params(hw, &curve, as_of, 10.0).expect("θ(t) preparation");

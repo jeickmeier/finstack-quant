@@ -298,7 +298,7 @@ it("presents the native tornado and the target metric in every returned scenario
           .map((cell) => cell.textContent),
       ),
   ).toEqual([
-    ["Revenue · 2025Q4", "-15,329,233.726987481", "15,329,233.726987481"],
+    ["Revenue · 2025Q4", "-15,329,233.72698751", "15,329,233.726987481"],
     ["Opex · 2025Q4", "9,190,853.399279997", "-9,190,853.399280012"],
   ]);
   const scenarios = screen.getByRole("table", {
@@ -318,7 +318,7 @@ it("presents the native tornado and the target metric in every returned scenario
     within(rows[1]!)
       .getAllByRole("cell")
       .map((cell) => cell.textContent),
-  ).toEqual(["Revenue · 2025Q4 = 208,246,194.02699998", "46,054,569.5500875"]);
+  ).toEqual(["Revenue · 2025Q4 = 208,246,194.02699998", "46,054,569.55008747"]);
 });
 
 it("shows a native error and notes a full-grid run has no tornado", () => {

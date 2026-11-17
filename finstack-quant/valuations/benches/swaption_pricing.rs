@@ -15,7 +15,9 @@ use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
@@ -135,20 +137,83 @@ fn create_market() -> MarketContext {
             (30.0, 0.40),
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let fwd = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(base)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots([
-            (0.0, 0.035),
-            (1.0, 0.038),
-            (2.0, 0.040),
-            (5.0, 0.045),
-            (10.0, 0.050),
-            (30.0, 0.055),
+            (0.0, 1.0),
+            (0.125, 0.995611221459588),
+            (0.25, 0.991195240930358),
+            (0.375, 0.986752592135641),
+            (0.5, 0.982283810160798),
+            (0.625, 0.977789431347014),
+            (0.75, 0.973269993185277),
+            (0.875, 0.968726034210573),
+            (1.0, 0.964158093896324),
+            (1.125, 0.959574209193318),
+            (1.25, 0.954982273933355),
+            (1.375, 0.950382612946264),
+            (1.5, 0.945775550224929),
+            (1.625, 0.941161408888927),
+            (1.75, 0.936540511148462),
+            (1.875, 0.93191317826863),
+            (2.0, 0.927279730533999),
+            (2.1875, 0.920324184202576),
+            (2.375, 0.913367292399534),
+            (2.5625, 0.906409877451143),
+            (2.75, 0.899452755535353),
+            (2.9375, 0.892496736538075),
+            (3.125, 0.885542623912392),
+            (3.3125, 0.878591214540736),
+            (3.5, 0.871643298600053),
+            (3.6875, 0.864699659429976),
+            (3.875, 0.857761073404031),
+            (4.0625, 0.850828309803906),
+            (4.25, 0.843902130696782),
+            (4.4375, 0.836983290815769),
+            (4.625, 0.830072537443442),
+            (4.8125, 0.823170610298508),
+            (5.0, 0.81627824142561),
+            (5.3125, 0.804840362948709),
+            (5.625, 0.793485262077054),
+            (5.9375, 0.782213972982446),
+            (6.25, 0.771027490817996),
+            (6.5625, 0.759926771886431),
+            (6.875, 0.74891273382482),
+            (7.1875, 0.737986255805403),
+            (7.5, 0.727148178752154),
+            (7.8125, 0.71639930557274),
+            (8.125, 0.705740401405505),
+            (8.4375, 0.695172193881119),
+            (8.75, 0.684695373398532),
+            (9.0625, 0.674310593414836),
+            (9.375, 0.664018470748686),
+            (9.6875, 0.653819585896884),
+            (10.0, 0.643714483363737),
+            (11.25, 0.604595697764404),
+            (12.5, 0.567632401630785),
+            (13.75, 0.532720803704493),
+            (15.0, 0.499761147348737),
+            (16.25, 0.468657613416832),
+            (17.5, 0.439318221663474),
+            (18.75, 0.411654731012661),
+            (20.0, 0.385582538979713),
+            (21.25, 0.361020580528505),
+            (22.5, 0.337891226628893),
+            (23.75, 0.316120182763365),
+            (25.0, 0.29563638761626),
+            (26.25, 0.276371912163538),
+            (27.5, 0.258261859365997),
+            (28.75, 0.241244264654134),
+            (30.0, 0.225259997378556),
         ])
-        .interp(InterpStyle::Linear)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -168,7 +233,11 @@ fn create_market() -> MarketContext {
         &expiries,
         &[0.02, 0.03, 0.04, 0.05, 0.06], // Strike rates
         &[0.20; 30],                     // Flat 20% vol
-        Default::default(),
+        VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
+            interpolation_mode: VolInterpolationMode::Vol,
+        },
         None,
     )
     .unwrap();

@@ -17,7 +17,7 @@ use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve, ParInterp};
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -45,6 +45,9 @@ fn discount_curve() -> DiscountCurve {
             (5.0, (-0.20_f64).exp()),
             (10.0, (-0.40_f64).exp()),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -53,8 +56,8 @@ fn hazard_curve() -> HazardCurve {
     HazardCurve::builder("USD-HAZ")
         .base_date(as_of())
         .recovery_rate(0.4)
-        .knots([(0.0, 0.03), (5.0, 0.03), (10.0, 0.03)])
-        .par_interp(ParInterp::Linear)
+        .knots([(5.0, 0.03), (10.0, 0.03)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap()
 }
@@ -496,8 +499,8 @@ fn callable_credit_term_loan_structural_baselines() {
     let high_hazard = HazardCurve::builder("USD-HAZ")
         .base_date(as_of())
         .recovery_rate(0.4)
-        .knots([(0.0, 0.08), (5.0, 0.08), (10.0, 0.08)])
-        .par_interp(ParInterp::Linear)
+        .knots([(5.0, 0.08), (10.0, 0.08)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
     let stressed = MarketContext::new()

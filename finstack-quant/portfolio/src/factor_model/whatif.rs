@@ -327,12 +327,12 @@ impl FactorModel {
 
         let mut total_pnl_acc = NeumaierAccumulator::new();
         for (_, pnl) in &position_pnl {
-            total_pnl_acc.add(*pnl);
+            total_pnl_acc.add(*pnl)?;
         }
 
         Ok((
             StressPnl {
-                total_pnl: total_pnl_acc.total(),
+                total_pnl: total_pnl_acc.get_total()?,
                 position_pnl,
             },
             stressed_market,
@@ -942,6 +942,9 @@ mod tests {
         let other_curve = DiscountCurve::builder("USD-OTHER")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("other discount curve");
         let market = base_market.insert(other_curve);
@@ -1167,7 +1170,7 @@ mod tests {
             let pv = self.raw_offset
                 + market
                     .get_discount(self.discount_curve.as_str())?
-                    .zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous)
+                    .zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous)?
                     * self.scale;
             Ok(Money::new(pv, self.currency).expect("valid money fixture"))
         }
@@ -1180,7 +1183,7 @@ mod tests {
             Ok(self.raw_offset
                 + market
                     .get_discount(self.discount_curve.as_str())?
-                    .zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous)
+                    .zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous)?
                     * self.scale)
         }
 

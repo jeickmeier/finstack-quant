@@ -9,7 +9,7 @@ use crate::cms_option::pricer::convexity_adjustment_with_frequency;
 use crate::cms_option::types::CmsOption;
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::DayCountContext;
-use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::special_functions::norm_pdf;
 use finstack_quant_models::closed_form::d1_d2_black76;
@@ -59,10 +59,10 @@ impl MetricCalculator for DeltaCalculator {
             context.reprice_raw(&std::sync::Arc::clone(&context.curves), context.as_of)?;
 
         // Parallel shift of the curve that drives the forward swap rate.
-        let curves_bumped = context.curves.bump([MarketBump::Curve {
-            id: forward_curve_id,
-            spec: BumpSpec::parallel_bp(bump_bp),
-        }])?;
+        let target = context.curves.curve_target(&forward_curve_id)?;
+        let curves_bumped = context
+            .curves
+            .bump([target.into_bump(BumpSpec::parallel_bp(bump_bp))])?;
 
         let pv_bumped = context.reprice_raw(&curves_bumped, context.as_of)?;
 
@@ -173,14 +173,13 @@ impl MetricCalculator for VannaCalculator {
                     option.vol_surface_id.clone(),
                 )
             };
-            let curves_ru = context.curves.bump([MarketBump::Curve {
-                id: forward_curve_id.clone(),
-                spec: BumpSpec::parallel_bp(rate_bump_bp),
-            }])?;
-            let curves_rd = context.curves.bump([MarketBump::Curve {
-                id: forward_curve_id,
-                spec: BumpSpec::parallel_bp(-rate_bump_bp),
-            }])?;
+            let target = context.curves.curve_target(&forward_curve_id)?;
+            let curves_ru = context.curves.bump([target
+                .clone()
+                .into_bump(BumpSpec::parallel_bp(rate_bump_bp))])?;
+            let curves_rd = context
+                .curves
+                .bump([target.into_bump(BumpSpec::parallel_bp(-rate_bump_bp))])?;
             let curves_uu =
                 bump_surface_vol_absolute(&curves_ru, vol_surface_id.as_str(), vol_bump)?;
             let curves_ud =

@@ -133,31 +133,14 @@ fn compute_cva_internal(
         let epe_t = exposure_profile.epe[i];
         let ene_t = exposure_profile.ene[i];
 
-        let survival_t = counterparty_hazard_curve.sp(t);
-        if !survival_t.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "CVA: non-finite survival probability at t={t}: S(t)={survival_t}"
-            )));
-        }
+        let survival_t = counterparty_hazard_curve.sp(t)?;
 
-        let own_survival_t = if let Some(curve) = own_survival_curve {
-            let sp = curve.sp(t);
-            if !sp.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CVA: non-finite own survival probability at t={t}: S_own(t)={sp}"
-                )));
-            }
-            sp
-        } else {
-            1.0
+        let own_survival_t = match own_survival_curve {
+            Some(curve) => curve.sp(t)?,
+            None => 1.0,
         };
 
-        let df_t = discount_curve.df(t);
-        if !df_t.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "CVA: non-finite discount factor at t={t}: DF(t)={df_t}"
-            )));
-        }
+        let df_t = discount_curve.df(t)?;
 
         let marginal_pd = (prev_survival - survival_t).max(0.0);
         let epe_mid = 0.5 * (prev_epe + epe_t);
@@ -255,31 +238,14 @@ fn compute_dva_internal(
         let im_t = posted_im.map_or(0.0, |profile| im_at(profile, t));
         let ene_t = (exposure_profile.ene[i] - im_t).max(0.0);
 
-        let survival_t = own_hazard_curve.sp(t);
-        if !survival_t.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "DVA: non-finite survival probability at t={t}: S_own(t)={survival_t}"
-            )));
-        }
+        let survival_t = own_hazard_curve.sp(t)?;
 
-        let counterparty_survival_t = if let Some(curve) = counterparty_survival_curve {
-            let sp = curve.sp(t);
-            if !sp.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "DVA: non-finite counterparty survival probability at t={t}: S_c(t)={sp}"
-                )));
-            }
-            sp
-        } else {
-            1.0
+        let counterparty_survival_t = match counterparty_survival_curve {
+            Some(curve) => curve.sp(t)?,
+            None => 1.0,
         };
 
-        let df_t = discount_curve.df(t);
-        if !df_t.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "DVA: non-finite discount factor at t={t}: DF(t)={df_t}"
-            )));
-        }
+        let df_t = discount_curve.df(t)?;
 
         let marginal_pd = (prev_survival - survival_t).max(0.0);
         let ene_mid = 0.5 * (prev_ene + ene_t);
@@ -337,36 +303,17 @@ fn compute_fva_internal(
         let epe_t = exposure_profile.epe[i];
         let ene_t = exposure_profile.ene[i];
 
-        let counterparty_survival_t = if let Some(curve) = counterparty_hazard_curve {
-            let sp = curve.sp(t);
-            if !sp.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "FVA: non-finite counterparty survival probability at t={t}: S_c(t)={sp}"
-                )));
-            }
-            sp
-        } else {
-            1.0
+        let counterparty_survival_t = match counterparty_hazard_curve {
+            Some(curve) => curve.sp(t)?,
+            None => 1.0,
         };
 
-        let own_survival_t = if let Some(curve) = own_hazard_curve {
-            let sp = curve.sp(t);
-            if !sp.is_finite() {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "FVA: non-finite own survival probability at t={t}: S_own(t)={sp}"
-                )));
-            }
-            sp
-        } else {
-            1.0
+        let own_survival_t = match own_hazard_curve {
+            Some(curve) => curve.sp(t)?,
+            None => 1.0,
         };
 
-        let df_t = discount_curve.df(t);
-        if !df_t.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "FVA: non-finite discount factor at t={t}: DF(t)={df_t}"
-            )));
-        }
+        let df_t = discount_curve.df(t)?;
 
         let dt = t - prev_t;
         let epe_mid = 0.5 * (prev_epe + epe_t);
@@ -444,7 +391,7 @@ fn compute_fva_internal(
 /// - The exposure profile is empty
 /// - Exposure profile vectors have inconsistent lengths
 /// - Recovery rate is not in `[0, 1]`
-/// - Curve evaluations return non-finite values (NaN/infinity)
+/// - A discount or survival curve evaluation fails at an exposure time
 ///
 /// # Examples
 ///
@@ -531,7 +478,7 @@ pub fn compute_cva(
 /// - The exposure profile is empty
 /// - Exposure profile vectors have inconsistent lengths
 /// - Recovery rate is not in `[0, 1]`
-/// - Curve evaluations return non-finite values
+/// - A discount or survival curve evaluation fails at an exposure time
 ///
 /// # References
 ///
@@ -588,7 +535,7 @@ pub fn compute_dva(
 /// - Exposure profile vectors have inconsistent lengths
 /// - Either funding spread is negative or non-finite
 /// - The funding benefit spread exceeds the funding cost spread
-/// - Curve evaluations return non-finite values
+/// - A discount or survival curve evaluation fails at an exposure time
 ///
 /// # References
 ///
@@ -764,8 +711,9 @@ mod tests {
         let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
         HazardCurve::builder("COUNTERPARTY")
             .base_date(base)
-            .knots([(0.0, lambda), (30.0, lambda)])
+            .knots([(30.0, lambda)])
             .recovery_rate(0.40)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("HazardCurve should build")
     }
@@ -784,6 +732,8 @@ mod tests {
             .base_date(base)
             .knots(knots)
             .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("DiscountCurve should build")
     }
@@ -872,7 +822,7 @@ mod tests {
 
         // Sanity check: CVA should be less than (1-R) * EPE * total default probability
         // Upper bound: (1-R) × EPE × (1 - S(T))
-        let total_dp = 1.0 - hazard.sp(10.0); // last time = 10.0
+        let total_dp = 1.0 - hazard.sp(10.0).expect("survival"); // last time = 10.0
         let upper_bound = 0.60 * 1_000_000.0 * total_dp;
         assert!(
             result.cva < upper_bound,
@@ -1507,8 +1457,11 @@ mod tests {
             let mut prev_survival = 1.0;
             for (row, t) in rows.iter().zip(&times) {
                 assert_eq!(row.time, *t);
-                assert_eq!(row.discount_factor, discount.df(*t));
-                assert_eq!(row.survival_probability, hazard.sp(*t));
+                assert_eq!(
+                    row.discount_factor,
+                    discount.df(*t).expect("discount factor")
+                );
+                assert_eq!(row.survival_probability, hazard.sp(*t).expect("survival"));
                 assert_eq!(
                     row.marginal_default_probability,
                     (prev_survival - row.survival_probability).max(0.0)

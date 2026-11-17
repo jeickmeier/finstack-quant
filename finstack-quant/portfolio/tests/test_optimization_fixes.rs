@@ -37,6 +37,9 @@ fn build_mock_market() -> finstack_quant_core::market_data::context::MarketConte
     let flat_curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots(vec![(0.0, 1.0), (10.0, 0.6065)]) // exp(-0.05 * 10) = 0.6065
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("Curve build failed");
 
@@ -87,11 +90,17 @@ fn build_multi_currency_market() -> finstack_quant_core::market_data::context::M
     let usd_curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots(vec![(0.0, 1.0), (10.0, 0.6065)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("USD curve should build");
     let eur_curve = DiscountCurve::builder("EUR-OIS")
         .base_date(as_of)
         .knots(vec![(0.0, 1.0), (10.0, 0.6065)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("EUR curve should build");
 

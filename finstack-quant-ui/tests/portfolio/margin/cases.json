@@ -3,7 +3,7 @@
   "sources": [
     {
       "path": "finstack-quant-ui/tests/valuations/instruments/pricing-cases.json",
-      "sha256": "c365fa9a064cfb1d380e6f281887992c84f6b9c46c8c8616e1caad92ad5788a4"
+      "sha256": "b8a4fcf4ed2ac76b00c8450c13c27d76b36b09747384de1d3e2b1cfa4c6dfbd4"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
@@ -15,7 +15,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-      "sha256": "3ee1b64c7eb259dfa64ffbcc2d253995ca398d7c10794631a247b6f7111ee2c3"
+      "sha256": "91b9c85cfc0472093142fed8ccd69a008c068f3cfd8b484c7d9d09495ae91b89"
     }
   ],
   "asOf": "2023-12-28",
@@ -29,13 +29,13 @@
         "as_of": "2023-12-28",
         "base_currency": "USD",
         "total_initial_margin": {
-          "amount": "846166.1350841024",
+          "amount": "844986.3136094112",
           "currency": "USD"
         },
         "by_csa": {
           "CSA-B": {
             "gross_initial_margin": {
-              "amount": "564110.7567227349",
+              "amount": "563324.2090729409",
               "currency": "USD"
             },
             "required_collateral": {
@@ -54,7 +54,7 @@
           },
           "USD-REGULATORY-CSA": {
             "gross_initial_margin": {
-              "amount": "282055.37836136745",
+              "amount": "281662.10453647043",
               "currency": "USD"
             },
             "required_collateral": {
@@ -89,7 +89,7 @@
           "currency": "USD"
         },
         "total_margin": {
-          "amount": "846166.1350841024",
+          "amount": "844986.3136094112",
           "currency": "USD"
         },
         "netting_sets": [
@@ -102,7 +102,7 @@
             "csa_id": "CSA-B",
             "as_of": "2023-12-28",
             "initial_margin": {
-              "amount": "564110.7567227349",
+              "amount": "563324.2090729409",
               "currency": "USD"
             },
             "variation_margin": {
@@ -110,7 +110,7 @@
               "currency": "USD"
             },
             "total_margin": {
-              "amount": "564110.7567227349",
+              "amount": "563324.2090729409",
               "currency": "USD"
             },
             "position_count": 1,
@@ -119,15 +119,15 @@
             "sensitivities": {
               "base_currency": "USD",
               "ir_delta": [
-                ["USD", "10Y", 0.820545670343563],
+                ["USD", "10Y", 84.38926881272346],
                 ["USD", "15Y", 0],
-                ["USD", "1Y", 1428.7517443501856],
+                ["USD", "1Y", 51.145708264783025],
                 ["USD", "20Y", 0],
-                ["USD", "2Y", 1868.2138248251285],
+                ["USD", "2Y", 113.98388471640646],
                 ["USD", "30Y", 0],
-                ["USD", "3Y", 2694.962377194781],
-                ["USD", "5Y", 1589.7264185966924],
-                ["USD", "6M", 1709.9543057531118]
+                ["USD", "3Y", 272.7286331381183],
+                ["USD", "5Y", 8875.76004466461],
+                ["USD", "6M", -12.971304634818807]
               ],
               "ir_vega": [],
               "credit_qualifying_delta": [],
@@ -144,7 +144,7 @@
             },
             "im_breakdown": {
               "IR_Delta": {
-                "amount": "564110.7567227349",
+                "amount": "563324.2090729409",
                 "currency": "USD"
               }
             }
@@ -158,7 +158,7 @@
             "csa_id": "USD-REGULATORY-CSA",
             "as_of": "2023-12-28",
             "initial_margin": {
-              "amount": "282055.37836136745",
+              "amount": "281662.10453647043",
               "currency": "USD"
             },
             "variation_margin": {
@@ -166,7 +166,7 @@
               "currency": "USD"
             },
             "total_margin": {
-              "amount": "282055.37836136745",
+              "amount": "281662.10453647043",
               "currency": "USD"
             },
             "position_count": 1,
@@ -175,15 +175,15 @@
             "sensitivities": {
               "base_currency": "USD",
               "ir_delta": [
-                ["USD", "10Y", 0.4102728351717815],
+                ["USD", "10Y", 42.19463440636173],
                 ["USD", "15Y", 0],
-                ["USD", "1Y", 714.3758721750928],
+                ["USD", "1Y", 25.572854132391512],
                 ["USD", "20Y", 0],
-                ["USD", "2Y", 934.1069124125643],
+                ["USD", "2Y", 56.99194235820323],
                 ["USD", "30Y", 0],
-                ["USD", "3Y", 1347.4811885973904],
-                ["USD", "5Y", 794.8632092983462],
-                ["USD", "6M", 854.9771528765559]
+                ["USD", "3Y", 136.36431656905916],
+                ["USD", "5Y", 4437.880022332305],
+                ["USD", "6M", -6.485652317409404]
               ],
               "ir_vega": [],
               "credit_qualifying_delta": [],
@@ -200,7 +200,7 @@
             },
             "im_breakdown": {
               "IR_Delta": {
-                "amount": "282055.37836136745",
+                "amount": "281662.10453647043",
                 "currency": "USD"
               }
             }
@@ -224,13 +224,13 @@
         "as_of": "2023-12-28",
         "base_currency": "USD",
         "total_initial_margin": {
-          "amount": "846166.1350841024",
+          "amount": "844986.3136094112",
           "currency": "USD"
         },
         "by_csa": {
           "CSA-B": {
             "gross_initial_margin": {
-              "amount": "564110.7567227349",
+              "amount": "563324.2090729409",
               "currency": "USD"
             },
             "required_collateral": {
@@ -249,7 +249,7 @@
           },
           "USD-REGULATORY-CSA": {
             "gross_initial_margin": {
-              "amount": "282055.37836136745",
+              "amount": "281662.10453647043",
               "currency": "USD"
             },
             "required_collateral": {
@@ -284,7 +284,7 @@
           "currency": "USD"
         },
         "total_margin": {
-          "amount": "846166.1350841024",
+          "amount": "844986.3136094112",
           "currency": "USD"
         },
         "netting_sets": [
@@ -297,7 +297,7 @@
             "csa_id": "CSA-B",
             "as_of": "2023-12-28",
             "initial_margin": {
-              "amount": "564110.7567227349",
+              "amount": "563324.2090729409",
               "currency": "USD"
             },
             "variation_margin": {
@@ -305,7 +305,7 @@
               "currency": "USD"
             },
             "total_margin": {
-              "amount": "564110.7567227349",
+              "amount": "563324.2090729409",
               "currency": "USD"
             },
             "position_count": 1,
@@ -314,15 +314,15 @@
             "sensitivities": {
               "base_currency": "USD",
               "ir_delta": [
-                ["USD", "10Y", 0.820545670343563],
+                ["USD", "10Y", 84.38926881272346],
                 ["USD", "15Y", 0],
-                ["USD", "1Y", 1428.7517443501856],
+                ["USD", "1Y", 51.145708264783025],
                 ["USD", "20Y", 0],
-                ["USD", "2Y", 1868.2138248251285],
+                ["USD", "2Y", 113.98388471640646],
                 ["USD", "30Y", 0],
-                ["USD", "3Y", 2694.962377194781],
-                ["USD", "5Y", 1589.7264185966924],
-                ["USD", "6M", 1709.9543057531118]
+                ["USD", "3Y", 272.7286331381183],
+                ["USD", "5Y", 8875.76004466461],
+                ["USD", "6M", -12.971304634818807]
               ],
               "ir_vega": [],
               "credit_qualifying_delta": [],
@@ -339,7 +339,7 @@
             },
             "im_breakdown": {
               "IR_Delta": {
-                "amount": "564110.7567227349",
+                "amount": "563324.2090729409",
                 "currency": "USD"
               }
             }
@@ -353,7 +353,7 @@
             "csa_id": "USD-REGULATORY-CSA",
             "as_of": "2023-12-28",
             "initial_margin": {
-              "amount": "282055.37836136745",
+              "amount": "281662.10453647043",
               "currency": "USD"
             },
             "variation_margin": {
@@ -361,7 +361,7 @@
               "currency": "USD"
             },
             "total_margin": {
-              "amount": "282055.37836136745",
+              "amount": "281662.10453647043",
               "currency": "USD"
             },
             "position_count": 1,
@@ -370,15 +370,15 @@
             "sensitivities": {
               "base_currency": "USD",
               "ir_delta": [
-                ["USD", "10Y", 0.4102728351717815],
+                ["USD", "10Y", 42.19463440636173],
                 ["USD", "15Y", 0],
-                ["USD", "1Y", 714.3758721750928],
+                ["USD", "1Y", 25.572854132391512],
                 ["USD", "20Y", 0],
-                ["USD", "2Y", 934.1069124125643],
+                ["USD", "2Y", 56.99194235820323],
                 ["USD", "30Y", 0],
-                ["USD", "3Y", 1347.4811885973904],
-                ["USD", "5Y", 794.8632092983462],
-                ["USD", "6M", 854.9771528765559]
+                ["USD", "3Y", 136.36431656905916],
+                ["USD", "5Y", 4437.880022332305],
+                ["USD", "6M", -6.485652317409404]
               ],
               "ir_vega": [],
               "credit_qualifying_delta": [],
@@ -395,7 +395,7 @@
             },
             "im_breakdown": {
               "IR_Delta": {
-                "amount": "282055.37836136745",
+                "amount": "281662.10453647043",
                 "currency": "USD"
               }
             }

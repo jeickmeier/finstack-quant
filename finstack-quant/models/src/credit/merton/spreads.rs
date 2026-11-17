@@ -73,7 +73,7 @@ fn par_spread_from_survival(
     let mut prev_survival = 1.0;
     for i in 1..=(periods as usize) {
         let t = i as f64 * dt;
-        let survival = hazard.sp(t);
+        let survival = hazard.sp(t)?;
         let default_mass = (prev_survival - survival).max(0.0);
         let df_end = (-risk_free_rate * t).exp();
         let df_mid = (-risk_free_rate * (t - 0.5 * dt)).exp();

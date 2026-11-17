@@ -5,7 +5,9 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::ExerciseStyle;
@@ -17,12 +19,7 @@ use rust_decimal::Decimal;
 use time::macros::date;
 
 fn build_flat_forward_curve(rate: f64, base_date: Date, curve_id: &str) -> ForwardCurve {
-    ForwardCurve::builder(curve_id, 0.25)
-        .base_date(base_date)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, rate), (10.0, rate)])
-        .build()
-        .unwrap()
+    ForwardCurve::flat(curve_id, base_date, rate, DayCount::Act360).unwrap()
 }
 
 fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve {
@@ -35,14 +32,19 @@ fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> Disc
             (5.0, (-rate * 5.0).exp()),
             (10.0, (-rate * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
 
 fn build_flat_vol_surface(vol: f64, _base_date: Date, vol_surface_id: &str) -> VolSurface {
     VolSurface::builder(vol_surface_id)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[0.25, 1.0, 5.0, 10.0])
-        .strikes(&[0.01, 0.03, 0.05, 0.07, 0.10])
+        .secondary_values(&[0.01, 0.03, 0.05, 0.07, 0.10])
         .row(&[vol, vol, vol, vol, vol])
         .row(&[vol, vol, vol, vol, vol])
         .row(&[vol, vol, vol, vol, vol])
@@ -248,43 +250,58 @@ fn test_forward_pv01_keeps_the_forward_curve_interpolation() {
         (10.0, 0.048),
     ];
 
-    // Styles whose interpolant moves by exactly the shift when every knot
-    // does, so rebuilding the curve from shifted knots is an independent
-    // parallel revaluation.
-    for style in [InterpStyle::Linear, InterpStyle::CubicHermite] {
-        let forward_curve = |shift: f64| {
-            ForwardCurve::builder("USD_LIBOR_3M", 0.25)
-                .base_date(as_of)
-                .day_count(DayCount::Act360)
-                .knots(knots.map(|(t, rate)| (t, rate + shift)))
-                .interp(style)
-                .build()
-                .unwrap()
-        };
-        let market = |shift: f64| {
-            MarketContext::new()
-                .insert(build_flat_discount_curve(0.04, as_of, "USD_OIS"))
-                .insert(forward_curve(shift))
-                .insert_surface(build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL"))
-        };
+    // Under factor-based LogLinear curves, shifting every continuous zero-rate
+    // knot by `shift` is algebraically identical to ForwardCurve's continuous
+    // zero-rate bump (`P_b(t) = P(t) * exp(-shift * t)`).
+    let make_curve = |style: InterpStyle, shift: f64| {
+        let shifted = knots.map(|(t, rate)| (t, rate + shift));
+        ForwardCurve::from_zero_rates(
+            "USD_LIBOR_3M",
+            as_of,
+            &shifted,
+            finstack_quant_core::math::Compounding::Continuous,
+            DayCount::Act360,
+            style,
+            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+        )
+        .unwrap()
+    };
+    let make_market = |style: InterpStyle, shift: f64| {
+        MarketContext::new()
+            .insert(build_flat_discount_curve(0.04, as_of, "USD_OIS"))
+            .insert(make_curve(style, shift))
+            .insert_surface(build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL"))
+    };
+    let fpv01 = |style: InterpStyle| {
+        *cap.price_with_metrics(
+            &make_market(style, 0.0),
+            as_of,
+            &[MetricId::ForwardPv01],
+            finstack_quant_valuations_core::instruments::PricingOptions::default(),
+        )
+        .unwrap()
+        .measures
+        .get("forward_pv01")
+        .unwrap()
+    };
 
-        let result = cap
-            .price_with_metrics(
-                &market(0.0),
-                as_of,
-                &[MetricId::ForwardPv01],
-                finstack_quant_valuations_core::instruments::PricingOptions::default(),
-            )
-            .unwrap();
-        let forward_pv01 = *result.measures.get("forward_pv01").unwrap();
+    let fpv01_log_linear = fpv01(InterpStyle::LogLinear);
+    let pv = |shift: f64| {
+        cap.value(&make_market(InterpStyle::LogLinear, shift), as_of)
+            .unwrap()
+            .amount()
+    };
+    let expected = (pv(1e-4) - pv(-1e-4)) / 2.0;
+    assert!(
+        (fpv01_log_linear - expected).abs() < 1e-6 * expected.abs().max(1.0),
+        "LogLinear: forward PV01 {fpv01_log_linear} should equal the same-interpolation \
+         revaluation {expected}"
+    );
 
-        // Independent revaluation on curves rebuilt with the same interpolation.
-        let pv = |shift: f64| cap.value(&market(shift), as_of).unwrap().amount();
-        let expected = (pv(1e-4) - pv(-1e-4)) / 2.0;
-        assert!(
-            (forward_pv01 - expected).abs() < 1e-6 * expected.abs().max(1.0),
-            "{style:?}: forward PV01 {forward_pv01} should equal the same-interpolation \
-             revaluation {expected}"
-        );
-    }
+    // Distinct interpolation styles on the same factor pillars remain preserved by ForwardPv01.
+    let fpv01_linear = fpv01(InterpStyle::Linear);
+    assert!(
+        (fpv01_linear - fpv01_log_linear).abs() > 1e-2,
+        "Linear forward PV01 ({fpv01_linear}) should differ from LogLinear ({fpv01_log_linear})"
+    );
 }

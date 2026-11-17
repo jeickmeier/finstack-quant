@@ -10,13 +10,25 @@ use super::results::EvalWarning;
 use crate::error::Result;
 use finstack_quant_core::dates::{PeriodId, PeriodKind};
 use finstack_quant_core::expr::{Expr, Function};
-use finstack_quant_core::math::stats::{
-    mean_or_nan, median_or_nan, sample_std_or_nan, sample_variance_or_nan,
-};
+use finstack_quant_core::math::stats::{mean, median, variance};
 use finstack_quant_core::math::{
-    stats::{finite_count, finite_max_or_nan, finite_min_or_nan},
+    stats::{finite_count, finite_max, finite_min},
     summation::neumaier_sum,
 };
+
+#[inline]
+fn eval_opt_stat(
+    res: finstack_quant_core::Result<Option<f64>>,
+    node_id: Option<&str>,
+) -> Result<f64> {
+    res.map(|opt| opt.unwrap_or(f64::NAN))
+        .map_err(|e| eval_error(node_id, e.to_string()))
+}
+
+#[inline]
+fn eval_sum(res: finstack_quant_core::Result<f64>, node_id: Option<&str>) -> Result<f64> {
+    res.map_err(|e| eval_error(node_id, e.to_string()))
+}
 
 /// NaN policy for aggregate helpers: **skip non-finite values** (pandas
 /// `skipna=True`).
@@ -51,12 +63,12 @@ fn collect_all_values(
 /// cumulative aggregates (`evaluate_rolling_function`,
 /// `evaluate_cumulative_function`).
 #[inline]
-fn sum_finite_or_nan(values: &[f64]) -> f64 {
+fn sum_finite_or_nan(values: &[f64], node_id: Option<&str>) -> Result<f64> {
     let filtered = retain_finite(values);
     if filtered.is_empty() {
-        f64::NAN
+        Ok(f64::NAN)
     } else {
-        neumaier_sum(filtered.iter().copied())
+        eval_sum(neumaier_sum(filtered.iter().copied()), node_id)
     }
 }
 
@@ -68,7 +80,7 @@ fn sum_expression_range(
     node_id: Option<&str>,
 ) -> Result<f64> {
     let values = collect_expression_range_values(expr, context, start, end, node_id)?;
-    Ok(sum_finite_or_nan(&values))
+    sum_finite_or_nan(&values, node_id)
 }
 
 pub(crate) fn evaluate_rolling_function(
@@ -120,13 +132,15 @@ pub(crate) fn evaluate_rolling_function(
     }
 
     match func {
-        Function::RollingMean => Ok(mean_or_nan(&values)),
-        Function::RollingSum => Ok(neumaier_sum(values.iter().copied())),
-        Function::RollingStd => Ok(sample_std_or_nan(&values)),
-        Function::RollingVar => Ok(sample_variance_or_nan(&values)),
-        Function::RollingMedian => Ok(median_or_nan(&values)),
-        Function::RollingMin => Ok(finite_min_or_nan(&values)),
-        Function::RollingMax => Ok(finite_max_or_nan(&values)),
+        Function::RollingMean => eval_opt_stat(mean(&values), node_id),
+        Function::RollingSum => eval_sum(neumaier_sum(values.iter().copied()), node_id),
+        Function::RollingStd => {
+            eval_opt_stat(variance(&values).map(|opt| opt.map(f64::sqrt)), node_id)
+        }
+        Function::RollingVar => eval_opt_stat(variance(&values), node_id),
+        Function::RollingMedian => eval_opt_stat(median(&values), node_id),
+        Function::RollingMin => Ok(finite_min(&values).unwrap_or(f64::NAN)),
+        Function::RollingMax => Ok(finite_max(&values).unwrap_or(f64::NAN)),
         Function::RollingCount => Ok(finite_count(&values) as f64),
         _ => Err(eval_error(
             node_id,
@@ -147,9 +161,9 @@ pub(crate) fn evaluate_statistical_function(
     let values = retain_finite(&raw_values);
 
     match func {
-        Function::Std => Ok(sample_std_or_nan(&values)),
-        Function::Var => Ok(sample_variance_or_nan(&values)),
-        Function::Median => Ok(median_or_nan(&values)),
+        Function::Std => eval_opt_stat(variance(&values).map(|opt| opt.map(f64::sqrt)), node_id),
+        Function::Var => eval_opt_stat(variance(&values), node_id),
+        Function::Median => eval_opt_stat(median(&values), node_id),
         _ => Err(eval_error(
             node_id,
             format!("Function {:?} is not a statistical function", func),
@@ -173,7 +187,7 @@ pub(crate) fn evaluate_cumulative_function(
     }
 
     match func {
-        Function::CumSum => Ok(neumaier_sum(values.iter().copied())),
+        Function::CumSum => eval_sum(neumaier_sum(values.iter().copied()), node_id),
         Function::CumProd => {
             let mut product = 1.0_f64;
             for &v in &values {
@@ -195,8 +209,8 @@ pub(crate) fn evaluate_cumulative_function(
             }
             Ok(product)
         }
-        Function::CumMin => Ok(finite_min_or_nan(&values)),
-        Function::CumMax => Ok(finite_max_or_nan(&values)),
+        Function::CumMin => Ok(finite_min(&values).unwrap_or(f64::NAN)),
+        Function::CumMax => Ok(finite_max(&values).unwrap_or(f64::NAN)),
         _ => Err(eval_error(
             node_id,
             format!("Function {:?} is not a cumulative function", func),
@@ -301,7 +315,7 @@ pub(crate) fn evaluate_period_aggregate_function(
                 }
                 values.push(value);
             }
-            Ok(sum_finite_or_nan(&values))
+            sum_finite_or_nan(&values, node_id)
         }
         _ => Err(eval_error(
             node_id,

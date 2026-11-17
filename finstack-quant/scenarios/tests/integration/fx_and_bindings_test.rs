@@ -49,7 +49,6 @@ fn test_fx_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     // Apply scenario
@@ -118,7 +117,6 @@ fn test_fx_shock_preserves_other_quotes() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
@@ -159,6 +157,9 @@ fn test_rate_binding() {
             (1.0, 0.98), // ~2% rate
             (5.0, 0.90),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -209,7 +210,6 @@ fn test_rate_binding() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     // Apply scenario with rate binding

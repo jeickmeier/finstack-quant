@@ -10,14 +10,14 @@ use crate::market_data::term_structures::CreditIndexData;
 use crate::money::fx::FxMatrix;
 use crate::types::CurveId;
 
-use super::{CreditIndexState, CurveStorage, MarketContext, VolRegistry};
+use super::{CreditIndexState, CurveStorage, MarketContext};
 
 impl MarketContext {
     /// Insert a generic curve storage entry.
     ///
-    /// This is primarily intended for downstream crates that operate on heterogeneous
-    /// curve types (e.g., calibration pipelines) and want to update the context
-    /// without matching on concrete curve variants.
+    /// Mirrors [`Self::try_insert`] as a fluent builder helper; if insertion is rejected
+    /// (blank ID, mismatched curve type, or failed credit-index rebinding), the context
+    /// is left unchanged. Prefer [`Self::try_insert`] when insertion errors should be propagated.
     ///
     /// # Arguments
     ///
@@ -30,17 +30,17 @@ impl MarketContext {
         self
     }
 
-    /// Insert a generic curve storage entry, failing atomically if credit-index rebinding fails.
+    /// Insert a generic curve storage entry, failing atomically if validation or credit-index rebinding fails.
     ///
     /// # Arguments
     ///
     /// * `curve` - Any curve type convertible into [`CurveStorage`], keyed by its own id;
-    ///   replaces an existing curve with the same ID and atomically rebinds dependent credit indices.
+    ///   replaces an existing curve of the same curve type and atomically rebinds dependent credit indices.
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::Validation`] if replacing an existing curve invalidates
-    /// a bound credit index.
+    /// Returns [`crate::Error::Validation`] if the curve id is empty/blank, attempts to
+    /// replace a curve of a different type, or invalidates a bound credit index.
     pub fn try_insert<C>(mut self, curve: C) -> crate::Result<Self>
     where
         C: Into<CurveStorage>,
@@ -54,17 +54,21 @@ impl MarketContext {
     /// Accepts either an owned [`VolSurface`] or an `Arc<VolSurface>`.
     /// When passing an owned value, it will be wrapped in an `Arc` automatically.
     /// When passing an `Arc`, it is used directly (enabling surface sharing between contexts).
-    /// Any conflicting entry under the same ID in `vol_cubes` or `fx_delta_vol_surfaces`
-    /// is evicted; use [`Self::try_insert_surface`] to reject cross-registry volatility collisions.
+    /// Volatility identifiers are namespace-local to `surfaces`.
     ///
     /// # Examples
     /// ```rust
     /// # use finstack_quant_core::market_data::context::MarketContext;
-    /// # use finstack_quant_core::market_data::surfaces::VolSurface;
+    /// # use finstack_quant_core::market_data::surfaces::{
+    /// #     VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    /// # };
     /// # use std::sync::Arc;
     /// # let surface = VolSurface::builder("IR-Swaption")
     /// #     .expiries(&[1.0, 2.0])
-    /// #     .strikes(&[90.0, 100.0])
+    /// #     .secondary_values(&[90.0, 100.0])
+    /// #     .secondary_axis(VolSurfaceAxis::Strike)
+    /// #     .quote_type(VolQuoteType::BlackLognormal)
+    /// #     .interpolation_mode(VolInterpolationMode::Vol)
     /// #     .row(&[0.2, 0.2])
     /// #     .row(&[0.2, 0.2])
     /// #     .build()
@@ -76,7 +80,10 @@ impl MarketContext {
     /// // Pre-wrapped Arc (for sharing across contexts)
     /// # let surface2 = VolSurface::builder("EQ-Vol")
     /// #     .expiries(&[1.0, 2.0])
-    /// #     .strikes(&[90.0, 100.0])
+    /// #     .secondary_values(&[90.0, 100.0])
+    /// #     .secondary_axis(VolSurfaceAxis::Strike)
+    /// #     .quote_type(VolQuoteType::BlackLognormal)
+    /// #     .interpolation_mode(VolInterpolationMode::Vol)
     /// #     .row(&[0.2, 0.2])
     /// #     .row(&[0.2, 0.2])
     /// #     .build()
@@ -93,7 +100,10 @@ impl MarketContext {
         self
     }
 
-    /// Insert a volatility surface, rejecting cross-registry volatility ID collisions.
+    /// Insert a volatility surface, validating its identifier.
+    ///
+    /// Volatility identifiers are namespace-local to `surfaces` and may coexist with
+    /// matching identifiers in `vol_cubes` or `fx_delta_vol_surfaces`.
     ///
     /// # Arguments
     ///
@@ -102,8 +112,7 @@ impl MarketContext {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::Validation`] if `surface.id()` is already registered in
-    /// `vol_cubes` or `fx_delta_vol_surfaces`.
+    /// Returns [`crate::Error::Validation`] if `surface.id()` is empty or blank.
     pub fn try_insert_surface(
         mut self,
         surface: impl Into<Arc<VolSurface>>,
@@ -115,6 +124,7 @@ impl MarketContext {
     /// Insert an FX delta-quoted volatility surface.
     ///
     /// Accepts either an owned [`FxDeltaVolSurface`] or an `Arc<FxDeltaVolSurface>`.
+    /// Volatility identifiers are namespace-local to `fx_delta_vol_surfaces`.
     ///
     /// # Arguments
     ///
@@ -127,7 +137,9 @@ impl MarketContext {
         self
     }
 
-    /// Insert an FX delta-quoted volatility surface, rejecting cross-registry volatility ID collisions.
+    /// Insert an FX delta-quoted volatility surface, validating its identifier.
+    ///
+    /// Volatility identifiers are namespace-local to `fx_delta_vol_surfaces`.
     ///
     /// # Arguments
     ///
@@ -136,8 +148,7 @@ impl MarketContext {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::Validation`] if `surface.id()` is already registered in
-    /// `surfaces` or `vol_cubes`.
+    /// Returns [`crate::Error::Validation`] if `surface.id()` is empty or blank.
     pub fn try_insert_fx_delta_vol_surface(
         mut self,
         surface: impl Into<Arc<FxDeltaVolSurface>>,
@@ -151,6 +162,7 @@ impl MarketContext {
     /// Accepts either an owned [`VolCube`] or an `Arc<VolCube>`.
     /// When passing an owned value, it will be wrapped in an `Arc` automatically.
     /// When passing an `Arc`, it is used directly (enabling cube sharing between contexts).
+    /// Volatility identifiers are namespace-local to `vol_cubes`.
     ///
     /// # Arguments
     ///
@@ -160,7 +172,9 @@ impl MarketContext {
         self
     }
 
-    /// Insert a SABR volatility cube, rejecting cross-registry volatility ID collisions.
+    /// Insert a SABR volatility cube, validating its identifier.
+    ///
+    /// Volatility identifiers are namespace-local to `vol_cubes`.
     ///
     /// # Arguments
     ///
@@ -169,8 +183,7 @@ impl MarketContext {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::Validation`] if `cube.id()` is already registered in
-    /// `surfaces` or `fx_delta_vol_surfaces`.
+    /// Returns [`crate::Error::Validation`] if `cube.id()` is empty or blank.
     pub fn try_insert_vol_cube(mut self, cube: impl Into<Arc<VolCube>>) -> crate::Result<Self> {
         self.try_insert_vol_cube_mut(cube)?;
         Ok(self)
@@ -220,28 +233,44 @@ impl MarketContext {
     /// # Examples
     /// ```rust
     /// use finstack_quant_core::market_data::context::MarketContext;
-    /// use finstack_quant_core::market_data::scalars::{InflationIndex, SeriesInterpolation};
+    /// use finstack_quant_core::market_data::scalars::{InflationIndex, InflationObservation};
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::dates::Date;
     /// use std::sync::Arc;
     /// use time::Month;
     ///
     /// let observations = vec![
-    ///     (Date::from_calendar_date(2024, Month::January, 31).expect("Valid date"), 100.0),
-    ///     (Date::from_calendar_date(2024, Month::February, 29).expect("Valid date"), 101.0),
+    ///     InflationObservation {
+    ///         reference_month: Date::from_calendar_date(2024, Month::January, 1).expect("Valid date"),
+    ///         value: 100.0,
+    ///         available_on: Date::from_calendar_date(2024, Month::February, 13).expect("Valid date"),
+    ///     },
+    ///     InflationObservation {
+    ///         reference_month: Date::from_calendar_date(2024, Month::February, 1).expect("Valid date"),
+    ///         value: 101.0,
+    ///         available_on: Date::from_calendar_date(2024, Month::March, 12).expect("Valid date"),
+    ///     },
     /// ];
-    /// let index = InflationIndex::new("US-CPI", observations, Currency::USD)
-    ///     .expect("InflationIndex creation should succeed")
-    ///     .with_interpolation(SeriesInterpolation::Linear);
+    /// let cutoff = Date::from_calendar_date(2024, Month::April, 1).expect("Valid date");
+    /// let index = InflationIndex::new("US-CPI", observations, Currency::USD, cutoff)
+    ///     .expect("InflationIndex creation should succeed");
     /// let ctx = MarketContext::new().insert_inflation_index(index);
     /// assert!(ctx.get_inflation_index("US-CPI").is_ok());
     ///
     /// // With Arc for sharing
     /// # let observations2 = vec![
-    /// #     (Date::from_calendar_date(2024, Month::January, 31).expect("Valid date"), 100.0),
-    /// #     (Date::from_calendar_date(2024, Month::February, 29).expect("Valid date"), 101.0),
+    /// #     InflationObservation {
+    /// #         reference_month: Date::from_calendar_date(2024, Month::January, 1).expect("Valid date"),
+    /// #         value: 100.0,
+    /// #         available_on: Date::from_calendar_date(2024, Month::February, 13).expect("Valid date"),
+    /// #     },
+    /// #     InflationObservation {
+    /// #         reference_month: Date::from_calendar_date(2024, Month::February, 1).expect("Valid date"),
+    /// #         value: 101.0,
+    /// #         available_on: Date::from_calendar_date(2024, Month::March, 12).expect("Valid date"),
+    /// #     },
     /// # ];
-    /// # let index2 = InflationIndex::new("EU-HICP", observations2, Currency::EUR)
+    /// # let index2 = InflationIndex::new("EU-HICP", observations2, Currency::EUR, cutoff)
     /// #     .expect("InflationIndex creation should succeed");
     /// let shared = Arc::new(index2);
     /// let ctx2 = MarketContext::new().insert_inflation_index(Arc::clone(&shared));
@@ -278,7 +307,8 @@ impl MarketContext {
     /// let hazard = Arc::new(HazardCurve::builder("CDX")
     ///     .base_date(Date::from_calendar_date(2024, Month::January, 1).expect("Valid date"))
     ///     .recovery_rate(0.40)
-    ///     .knots([(0.0, 0.01), (5.0, 0.015)])
+    ///     .knots([(1.0, 0.01), (5.0, 0.015)])
+    ///     .day_count(finstack_quant_core::dates::DayCount::Act365F)
     ///     .build()
     ///     .expect("HazardCurve builder should succeed"));
     /// let base_corr = Arc::new(BaseCorrelationCurve::builder("CDX-BC")
@@ -374,39 +404,55 @@ impl MarketContext {
     // The behaviour is identical to the fluent variants — same storage layout,
     // same credit-index rebinding — just with `&mut self` instead of `mut self`.
     /// Insert a generic curve storage entry, mutating in place.
+    /// Mirrors [`Self::insert`] / [`Self::try_insert_mut`] as an in-place builder helper.
     ///
-    /// Mirrors [`Self::insert`] but takes `&mut self`.
+    /// If insertion is rejected (blank id, cross-type curve replacement, or failed
+    /// credit-index rebinding), `self` is left unchanged.
+    ///
+    /// # Arguments
+    ///
+    /// * `curve` - Any curve type convertible into [`CurveStorage`], keyed by its own id.
     pub fn insert_mut<C>(&mut self, curve: C) -> &mut Self
     where
         C: Into<CurveStorage>,
     {
-        let curve: CurveStorage = curve.into();
-        let id = curve.id().to_owned();
-        let affects_credit_indices = self.curve_affects_credit_indices(&id);
-        Arc::make_mut(&mut self.curves).insert(id, curve);
-        if affects_credit_indices {
-            let _invalidated = self.prune_invalidated_credit_indices();
+        if let Err(err) = self.try_insert_mut(curve) {
+            tracing::warn!(error = %err, "ignoring failed MarketContext::insert_mut");
         }
         self
     }
 
-    /// Insert a generic curve storage entry in place, failing atomically if credit-index rebinding fails.
+    /// Insert a generic curve storage entry in place, failing atomically if validation or credit-index rebinding fails.
     ///
     /// # Arguments
     ///
     /// * `curve` - Any curve type convertible into [`CurveStorage`], keyed by its own id;
-    ///   replaces an existing curve with the same ID and atomically rebinds dependent credit indices.
+    ///   replaces an existing curve of the same type and atomically rebinds dependent credit indices.
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::Validation`] if replacing an existing curve invalidates
-    /// a bound credit index.
+    /// Returns [`crate::Error::Validation`] if the curve id is empty/blank, attempts to replace
+    /// a curve of a different type, or invalidates a bound credit index.
     pub fn try_insert_mut<C>(&mut self, curve: C) -> crate::Result<&mut Self>
     where
         C: Into<CurveStorage>,
     {
         let curve: CurveStorage = curve.into();
         let id = curve.id().to_owned();
+        if id.as_str().trim().is_empty() {
+            return Err(crate::Error::Validation(
+                "MarketContext curve id cannot be empty or blank".to_string(),
+            ));
+        }
+        if let Some(existing) = self.curves.get(id.as_str())
+            && existing.curve_type() != curve.curve_type()
+        {
+            return Err(crate::Error::Validation(format!(
+                "Cannot replace curve '{id}' of type '{}' with curve of type '{}'",
+                existing.curve_type(),
+                curve.curve_type(),
+            )));
+        }
         let affects_credit_indices = self.curve_affects_credit_indices(&id);
         let previous = Arc::make_mut(&mut self.curves).insert(id.clone(), curve);
         if affects_credit_indices && let Err(err) = self.rebind_all_credit_indices() {
@@ -421,21 +467,27 @@ impl MarketContext {
             }
             return Err(err);
         }
+        self.invalidate_scratch_tokens();
         Ok(self)
     }
 
     /// Insert a volatility surface, mutating in place.
     ///
     /// Mirrors [`Self::insert_surface`] but takes `&mut self`.
+    ///
+    /// # Arguments
+    ///
+    /// * `surface` - Owned or shared volatility surface stored under `surface.id()`.
     pub fn insert_surface_mut(&mut self, surface: impl Into<Arc<VolSurface>>) -> &mut Self {
-        let arc_surface = surface.into();
-        let id = arc_surface.id().to_owned();
-        self.evict_conflicting_vol_registries(id.as_str(), VolRegistry::Surfaces);
-        Arc::make_mut(&mut self.surfaces).insert(id, arc_surface);
+        if let Err(err) = self.try_insert_surface_mut(surface) {
+            tracing::warn!(error = %err, "ignoring failed MarketContext::insert_surface_mut");
+        }
         self
     }
 
-    /// Insert a volatility surface in place, rejecting cross-registry volatility ID collisions.
+    /// Insert a volatility surface in place, validating its identifier.
+    ///
+    /// Volatility identifiers are namespace-local to `surfaces`.
     ///
     /// # Arguments
     ///
@@ -444,16 +496,20 @@ impl MarketContext {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::Validation`] if `surface.id()` is already registered in
-    /// `vol_cubes` or `fx_delta_vol_surfaces`.
+    /// Returns [`crate::Error::Validation`] if `surface.id()` is empty or blank.
     pub fn try_insert_surface_mut(
         &mut self,
         surface: impl Into<Arc<VolSurface>>,
     ) -> crate::Result<&mut Self> {
         let arc_surface = surface.into();
         let id = arc_surface.id().to_owned();
-        self.ensure_vol_id_available(id.as_str(), VolRegistry::Surfaces)?;
+        if id.as_str().trim().is_empty() {
+            return Err(crate::Error::Validation(
+                "MarketContext VolSurface id cannot be empty or blank".to_string(),
+            ));
+        }
         Arc::make_mut(&mut self.surfaces).insert(id, arc_surface);
+        self.invalidate_scratch_tokens();
         Ok(self)
     }
 
@@ -465,16 +521,22 @@ impl MarketContext {
     /// # Examples
     /// ```rust
     /// # use finstack_quant_core::market_data::context::MarketContext;
-    /// # use finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;
-    /// let surface = FxDeltaVolSurface::new(
-    ///     "EURUSD-DELTA-VOL",
-    ///     vec![0.25, 0.5, 1.0],
-    ///     vec![0.08, 0.085, 0.09],
-    ///     vec![0.01, 0.012, 0.015],
-    ///     vec![0.005, 0.006, 0.007],
-    ///     None,
-    ///     None,
-    /// ).expect("surface should build");
+    /// # use finstack_quant_core::currency::Currency;
+    /// # use finstack_quant_core::market_data::surfaces::{
+    /// #     FxAtmConvention, FxButterflyConvention, FxDeltaConvention, FxDeltaVolSurface,
+    /// # };
+    /// # use finstack_quant_core::money::fx::CurrencyPair;
+    /// # let pair = CurrencyPair::try_new(Currency::EUR, Currency::USD).expect("valid pair");
+    /// let surface = FxDeltaVolSurface::builder("EURUSD-DELTA-VOL", pair)
+    ///     .delta_convention(FxDeltaConvention::ForwardUnadjusted)
+    ///     .atm_convention(FxAtmConvention::DeltaNeutralStraddle)
+    ///     .butterfly_convention(FxButterflyConvention::Smile)
+    ///     .expiries(&[0.25, 0.5, 1.0])
+    ///     .atm_vols(&[0.08, 0.085, 0.09])
+    ///     .rr_25d(&[0.01, 0.012, 0.015])
+    ///     .bf_25d(&[0.005, 0.006, 0.007])
+    ///     .build()
+    ///     .expect("surface should build");
     /// let mut ctx = MarketContext::new();
     /// ctx.insert_fx_delta_vol_surface_mut(surface);
     /// assert!(ctx.get_fx_delta_vol_surface("EURUSD-DELTA-VOL").is_ok());
@@ -487,14 +549,18 @@ impl MarketContext {
         &mut self,
         surface: impl Into<Arc<FxDeltaVolSurface>>,
     ) -> &mut Self {
-        let arc_surface = surface.into();
-        let id = arc_surface.id().to_owned();
-        self.evict_conflicting_vol_registries(id.as_str(), VolRegistry::FxDeltaVolSurfaces);
-        Arc::make_mut(&mut self.fx_delta_vol_surfaces).insert(id, arc_surface);
+        if let Err(err) = self.try_insert_fx_delta_vol_surface_mut(surface) {
+            tracing::warn!(
+                error = %err,
+                "ignoring failed MarketContext::insert_fx_delta_vol_surface_mut"
+            );
+        }
         self
     }
 
-    /// Insert an FX delta-quoted volatility surface in place, rejecting cross-registry volatility ID collisions.
+    /// Insert an FX delta-quoted volatility surface in place, validating its identifier.
+    ///
+    /// Volatility identifiers are namespace-local to `fx_delta_vol_surfaces`.
     ///
     /// # Arguments
     ///
@@ -503,31 +569,40 @@ impl MarketContext {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::Validation`] if `surface.id()` is already registered in
-    /// `surfaces` or `vol_cubes`.
+    /// Returns [`crate::Error::Validation`] if `surface.id()` is empty or blank.
     pub fn try_insert_fx_delta_vol_surface_mut(
         &mut self,
         surface: impl Into<Arc<FxDeltaVolSurface>>,
     ) -> crate::Result<&mut Self> {
         let arc_surface = surface.into();
         let id = arc_surface.id().to_owned();
-        self.ensure_vol_id_available(id.as_str(), VolRegistry::FxDeltaVolSurfaces)?;
+        if id.as_str().trim().is_empty() {
+            return Err(crate::Error::Validation(
+                "MarketContext FxDeltaVolSurface id cannot be empty or blank".to_string(),
+            ));
+        }
         Arc::make_mut(&mut self.fx_delta_vol_surfaces).insert(id, arc_surface);
+        self.invalidate_scratch_tokens();
         Ok(self)
     }
 
     /// Insert a SABR volatility cube, mutating in place.
     ///
     /// Mirrors [`Self::insert_vol_cube`] but takes `&mut self`.
+    ///
+    /// # Arguments
+    ///
+    /// * `cube` - Owned or shared SABR vol cube stored under `cube.id()`.
     pub fn insert_vol_cube_mut(&mut self, cube: impl Into<Arc<VolCube>>) -> &mut Self {
-        let arc = cube.into();
-        let id = arc.id().to_owned();
-        self.evict_conflicting_vol_registries(id.as_str(), VolRegistry::VolCubes);
-        Arc::make_mut(&mut self.vol_cubes).insert(id, arc);
+        if let Err(err) = self.try_insert_vol_cube_mut(cube) {
+            tracing::warn!(error = %err, "ignoring failed MarketContext::insert_vol_cube_mut");
+        }
         self
     }
 
-    /// Insert a SABR volatility cube in place, rejecting cross-registry volatility ID collisions.
+    /// Insert a SABR volatility cube in place, validating its identifier.
+    ///
+    /// Volatility identifiers are namespace-local to `vol_cubes`.
     ///
     /// # Arguments
     ///
@@ -536,22 +611,30 @@ impl MarketContext {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::Validation`] if `cube.id()` is already registered in
-    /// `surfaces` or `fx_delta_vol_surfaces`.
+    /// Returns [`crate::Error::Validation`] if `cube.id()` is empty or blank.
     pub fn try_insert_vol_cube_mut(
         &mut self,
         cube: impl Into<Arc<VolCube>>,
     ) -> crate::Result<&mut Self> {
         let arc = cube.into();
         let id = arc.id().to_owned();
-        self.ensure_vol_id_available(id.as_str(), VolRegistry::VolCubes)?;
+        if id.as_str().trim().is_empty() {
+            return Err(crate::Error::Validation(
+                "MarketContext VolCube id cannot be empty or blank".to_string(),
+            ));
+        }
         Arc::make_mut(&mut self.vol_cubes).insert(id, arc);
+        self.invalidate_scratch_tokens();
         Ok(self)
     }
 
     /// Insert a dividend schedule, mutating in place.
     ///
     /// Mirrors [`Self::insert_dividends`] but takes `&mut self`.
+    ///
+    /// # Arguments
+    ///
+    /// * `schedule` - Owned or shared dividend schedule stored under `schedule.get_id()`.
     pub fn insert_dividends_mut(
         &mut self,
         schedule: impl Into<Arc<DividendSchedule>>,
@@ -559,24 +642,36 @@ impl MarketContext {
         let arc_schedule = schedule.into();
         let id = arc_schedule.get_id().to_owned();
         Arc::make_mut(&mut self.dividends).insert(id, arc_schedule);
+        self.invalidate_scratch_tokens();
         self
     }
 
     /// Insert a market scalar/price, mutating in place.
     ///
     /// Mirrors [`Self::insert_price`] but takes `&mut self`.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Lookup key stored as [`CurveId`].
+    /// * `price` - Scalar observable such as a spot price, spread, or unitless parameter.
     pub fn insert_price_mut(&mut self, id: impl AsRef<str>, price: MarketScalar) -> &mut Self {
         let id = CurveId::from(id.as_ref());
         Arc::make_mut(&mut self.prices).insert(id, price);
+        self.invalidate_scratch_tokens();
         self
     }
 
     /// Insert a scalar time series, mutating in place.
     ///
     /// Mirrors [`Self::insert_series`] but takes `&mut self`.
+    ///
+    /// # Arguments
+    ///
+    /// * `series` - Dated scalar series stored under `series.id()`.
     pub fn insert_series_mut(&mut self, series: ScalarTimeSeries) -> &mut Self {
         let id = series.id().to_owned();
         Arc::make_mut(&mut self.series).insert(id, series);
+        self.invalidate_scratch_tokens();
         self
     }
 
@@ -594,6 +689,7 @@ impl MarketContext {
         let index = index.into();
         let key = CurveId::from(index.id());
         Arc::make_mut(&mut self.inflation_indices).insert(key, index);
+        self.invalidate_scratch_tokens();
         self
     }
 
@@ -611,17 +707,53 @@ impl MarketContext {
     ///
     /// # Errors
     ///
-    /// Returns an error when a required curve is absent or has the wrong type;
-    /// the aggregate's own invariants were checked by its builder.
+    /// Returns an error when `id` is empty/blank or a required curve is absent or has
+    /// the wrong type; the aggregate's own invariants were checked by its builder.
     pub fn insert_credit_index_mut(
         &mut self,
         id: impl AsRef<str>,
         data: CreditIndexData,
     ) -> crate::Result<&mut Self> {
+        let key = id.as_ref();
+        if key.trim().is_empty() {
+            return Err(crate::Error::Validation(
+                "MarketContext credit index id cannot be empty or blank".to_string(),
+            ));
+        }
         let data = self.rebind_credit_index_data(&data)?;
-        let key = CurveId::from(id.as_ref());
+        let key = CurveId::from(key);
         Arc::make_mut(&mut self.credit_indices).insert(key, Arc::new(data));
+        self.invalidate_scratch_tokens();
         Ok(self)
+    }
+
+    /// Remove a credit index aggregate by identifier, mutating in place.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Lookup key of the credit index aggregate to remove.
+    ///
+    /// # Returns
+    ///
+    /// The removed shared [`CreditIndexData`] if present, or `None` when absent.
+    pub fn remove_credit_index_mut(&mut self, id: impl AsRef<str>) -> Option<Arc<CreditIndexData>> {
+        let removed = Arc::make_mut(&mut self.credit_indices).remove(id.as_ref());
+        self.invalidate_scratch_tokens();
+        removed
+    }
+
+    /// Retain only the credit index aggregates for which `pred` returns `true`, mutating in place.
+    ///
+    /// # Arguments
+    ///
+    /// * `pred` - Predicate evaluated once per `(id, data)` pair; `true` keeps the entry.
+    pub fn retain_credit_indices_mut(
+        &mut self,
+        mut pred: impl FnMut(&CurveId, &Arc<CreditIndexData>) -> bool,
+    ) -> &mut Self {
+        Arc::make_mut(&mut self.credit_indices).retain(|id, data| pred(id, data));
+        self.invalidate_scratch_tokens();
+        self
     }
 
     /// Restore and insert a credit index from its persisted curve references.
@@ -646,6 +778,11 @@ impl MarketContext {
     /// Returns an error if a referenced curve is absent or has the wrong type,
     /// or constituent counts, recoveries, issuer maps or weights are invalid.
     pub fn insert_credit_index_state(&mut self, state: &CreditIndexState) -> crate::Result<()> {
+        if state.id.trim().is_empty() {
+            return Err(crate::Error::Validation(
+                "MarketContext credit index state id cannot be empty or blank".to_string(),
+            ));
+        }
         let index_curve = self.get_hazard(&state.index_credit_curve_id)?;
         let base_corr = self.get_base_correlation(&state.base_correlation_curve_id)?;
         let mut builder = CreditIndexData::builder()
@@ -676,20 +813,27 @@ impl MarketContext {
         let data = builder.build()?;
         Arc::make_mut(&mut self.credit_indices)
             .insert(CurveId::from(state.id.as_str()), Arc::new(data));
+        self.invalidate_scratch_tokens();
         Ok(())
     }
 
     /// Insert an FX matrix, mutating in place.
     ///
     /// Mirrors [`Self::insert_fx`] but takes `&mut self`.
+    ///
+    /// # Arguments
+    ///
+    /// * `fx` - Owned or shared FX matrix used for currency conversion.
     pub fn insert_fx_mut(&mut self, fx: impl Into<Arc<FxMatrix>>) -> &mut Self {
         self.fx = Some(fx.into());
+        self.invalidate_scratch_tokens();
         self
     }
 
     /// Clear the FX matrix, mutating in place.
     pub fn clear_fx_mut(&mut self) -> &mut Self {
         self.fx = None;
+        self.invalidate_scratch_tokens();
         self
     }
 }

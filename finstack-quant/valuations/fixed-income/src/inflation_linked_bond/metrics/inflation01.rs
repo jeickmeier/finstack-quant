@@ -47,7 +47,7 @@ pub(super) fn bumped_inflation_market(
         .get_inflation_curve(bond.inflation_index_id.as_str())
         .is_ok()
     {
-        return market.bump([MarketBump::Curve {
+        return market.bump([MarketBump::InflationCurve {
             id: bond.inflation_index_id.clone(),
             spec,
         }]);
@@ -107,15 +107,30 @@ mod tests {
         let discount = DiscountCurve::builder("US-CPI-DISC")
             .base_date(as_of)
             .knots([(0.0, 1.0), (10.0, 0.7)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let inflation = InflationCurve::builder("US-CPI")
             .base_date(as_of)
-            .base_cpi(100.0)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .knots([(0.0, 100.0), (5.0, 112.0), (10.0, 125.0)])
             .build()
             .expect("inflation curve");
-        MarketContext::new().insert(discount).insert(inflation)
+        MarketContext::new()
+            .insert(discount)
+            .insert(inflation)
+            .insert_inflation_index(
+                finstack_quant_valuations_test_support::inflation::simple_index(
+                    "US-CPI",
+                    as_of,
+                    100.0,
+                    finstack_quant_core::currency::Currency::USD,
+                ),
+            )
     }
 
     fn sample_bond() -> InflationLinkedBond {
@@ -143,13 +158,13 @@ mod tests {
         // Compute the two bumped PVs the same way the calculator does.
         let bump = ONE_BASIS_POINT;
         let curves_up = market
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::InflationCurve {
                 id: bond.inflation_index_id.clone(),
                 spec: BumpSpec::inflation_shift_pct(bump * 100.0),
             }])
             .expect("bump up");
         let curves_down = market
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::InflationCurve {
                 id: bond.inflation_index_id.clone(),
                 spec: BumpSpec::inflation_shift_pct(-bump * 100.0),
             }])
@@ -217,30 +232,22 @@ mod tests {
     #[test]
     fn inflation01_supports_index_backed_linker() {
         use finstack_quant_core::currency::Currency;
-        use finstack_quant_core::dates::DateExt;
-        use finstack_quant_core::market_data::scalars::{
-            InflationIndex, InflationLag, SeriesInterpolation,
-        };
 
         let as_of = date!(2024 - 01 - 15);
         let discount = DiscountCurve::builder("US-CPI-DISC")
             .base_date(as_of)
             .knots([(0.0, 1.0), (15.0, 0.65)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let first = date!(2023 - 10 - 01);
-        let observations = (0..=122)
-            .map(|month| {
-                (
-                    first.add_months(month).expect("valid date shift"),
-                    100.0 + f64::from(month) * 0.2,
-                )
-            })
-            .collect();
-        let index = InflationIndex::new("US-CPI", observations, Currency::USD)
-            .expect("inflation index")
-            .with_interpolation(SeriesInterpolation::Linear)
-            .with_lag(InflationLag::None);
+        let index = finstack_quant_valuations_test_support::inflation::simple_index(
+            "US-CPI",
+            as_of,
+            100.6,
+            Currency::USD,
+        );
         let market = MarketContext::new()
             .insert(discount)
             .insert_inflation_index(index);
@@ -259,7 +266,9 @@ mod tests {
 
         let projected_curve = InflationCurve::builder("US-CPI")
             .base_date(as_of)
-            .base_cpi(100.6)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .knots([(0.0, 100.6), (10.0, 125.0)])
             .build()
             .expect("projected inflation curve");

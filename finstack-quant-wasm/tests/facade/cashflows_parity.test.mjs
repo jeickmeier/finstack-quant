@@ -368,7 +368,7 @@ const cases = {
         core.cfKindParse(name)
       ),
       interest_like: ['fixed', 'floating', 'fee', 'notional'].map((kind) =>
-        core.cfKindIsInterestLike(kind)
+        core.cfKindIsCoupon(kind)
       ),
       principal_like: ['fixed', 'pik', 'amortization', 'recovery'].map((kind) =>
         core.cfKindIsPrincipalLike(kind)
@@ -625,8 +625,8 @@ test('spec functions validate through Rust and reject wrong host types', () => {
     cashflows.notionalValidate(JSON.stringify(cashflows.notionalPar(100, 'USD'))),
     undefined
   );
-  assert.equal(core.cfKindIsInterestLike('"fixed"'), true);
-  assert.equal(core.cfKindIsInterestLike('fixed'), true);
+  assert.equal(core.cfKindIsCoupon('"fixed"'), true);
+  assert.equal(core.cfKindIsCoupon('fixed'), true);
   assert.equal(cashflows.scheduleParamsValidate(cashflows.scheduleParamsUsdSofrSwap()), undefined);
   assert.throws(
     () =>
@@ -714,7 +714,7 @@ test('spec functions validate through Rust and reject wrong host types', () => {
   assert.throws(() => core.cfKindParse('coupon-ish'), kind('validation', /unknown cashflow kind/));
   assert.throws(() => core.cfKindParse(3), kind('invalid_type', /^name: /));
   assert.throws(
-    () => core.cfKindIsInterestLike('coupon-ish'),
+    () => core.cfKindIsCoupon('coupon-ish'),
     kind('validation', /kind: unknown variant `coupon-ish`/)
   );
   assert.throws(
@@ -829,7 +829,9 @@ test('explicit observation cutoff requires and consumes post-anchor fixings', ()
       .principal(usd('1000000'), ISSUE, '2026-01-15')
       .floatingCf(spec);
   assert.throws(() => builder().buildAsOf(market, '2025-02-01'), /fixing|FIXING/);
-  market.insertSeries(new core.ScalarTimeSeries('FIXING:USD-SOFR-3M', [['2025-01-15', 0.06]]));
+  market.insertSeries(
+    new core.ScalarTimeSeries('FIXING:USD-SOFR-3M', [['2025-01-15', 0.06]], 'step', 'error')
+  );
   const result = builder().buildAsOf(market, '2025-02-01');
   const coupon = result.getFlows().find((flow) => flow.kind === 'floating');
   assert.ok(coupon);

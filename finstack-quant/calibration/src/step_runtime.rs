@@ -44,7 +44,6 @@ use std::sync::Arc;
 /// Normalized output payload for a step.
 pub(crate) enum StepOutput {
     Curve(CurveStorage),
-    Curves(Vec<CurveStorage>),
     Surface(Arc<VolSurface>),
     VolCube(Arc<VolCube>),
     Scalars(Vec<(String, MarketScalar)>),
@@ -279,11 +278,6 @@ pub(crate) fn apply_output(
         StepOutput::Curve(curve) => {
             context.try_insert_mut(curve)?;
         }
-        StepOutput::Curves(curves) => {
-            for curve in curves {
-                context.try_insert_mut(curve)?;
-            }
-        }
         StepOutput::Surface(surface) => {
             context.try_insert_surface_mut(surface)?;
         }
@@ -390,7 +384,7 @@ fn execute_params(
             Ok(StepOutcome {
                 output: StepOutput::Scalars(vec![(
                     scalar_key,
-                    MarketScalar::Unitless(calibrated_df),
+                    MarketScalar::unitless(calibrated_df)?,
                 )]),
                 credit_index_update: None,
                 report,
@@ -442,8 +436,8 @@ fn execute_params(
             let (kappa_key, sigma_key) = hw1f_scalar_keys(p.curve_id.as_str());
             Ok(StepOutcome {
                 output: StepOutput::Scalars(vec![
-                    (kappa_key, MarketScalar::Unitless(hw_params.kappa)),
-                    (sigma_key, MarketScalar::Unitless(hw_params.sigma)),
+                    (kappa_key, MarketScalar::unitless(hw_params.kappa)?),
+                    (sigma_key, MarketScalar::unitless(hw_params.sigma)?),
                 ]),
                 credit_index_update: None,
                 report,
@@ -538,8 +532,8 @@ fn execute_params(
                     )?;
                     Ok(StepOutcome {
                         output: StepOutput::Scalars(vec![
-                            (kappa_key, MarketScalar::Unitless(hw_params.kappa)),
-                            (sigma_key, MarketScalar::Unitless(hw_params.sigma)),
+                            (kappa_key, MarketScalar::unitless(hw_params.kappa)?),
+                            (sigma_key, MarketScalar::unitless(hw_params.sigma)?),
                         ]),
                         credit_index_update: None,
                         report,
@@ -580,10 +574,12 @@ fn execute_params(
                         capfloor_hw1f_sigma_schedule_key(p.discount_curve_id.as_str()),
                         observations,
                         None,
+                        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Flat,
                     )?;
                     Ok(StepOutcome {
                         output: StepOutput::ScalarsAndSeries {
-                            scalars: vec![(kappa_key, MarketScalar::Unitless(model.kappa))],
+                            scalars: vec![(kappa_key, MarketScalar::unitless(model.kappa)?)],
                             series,
                         },
                         credit_index_update: None,
@@ -601,19 +597,14 @@ fn execute_params(
             })
         }
         StepParams::XccyBasis(p) => {
-            let (curve, spread_curve, report) =
-                XccyBasisTarget::solve(p, quotes, context, global_config)?;
+            let (curve, report) = XccyBasisTarget::solve(p, quotes, context, global_config)?;
             let report = attach_validation_result(
                 report,
                 curve.validate(&global_config.validation),
                 global_config,
             );
-            let output = match spread_curve {
-                Some(spread) => StepOutput::Curves(vec![curve.into(), spread.into()]),
-                None => StepOutput::Curve(curve.into()),
-            };
             Ok(StepOutcome {
-                output,
+                output: StepOutput::Curve(curve.into()),
                 credit_index_update: None,
                 report,
             })
@@ -710,6 +701,8 @@ mod tests {
                 (5.0, (-rate * 5.0).exp()),
                 (10.0, (-rate * 10.0).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("flat discount curve should build")
     }
@@ -845,9 +838,9 @@ mod tests {
         assert_eq!(values.len(), 1);
         let (key, value) = values.into_iter().next().expect("one scalar");
         assert_eq!(key, "TRANCHE-1_STUDENT_T_DF");
-        let MarketScalar::Unitless(calibrated_df) = value else {
-            unreachable!("Student-t degrees of freedom should be unitless");
-        };
+        let calibrated_df = value
+            .get_unitless()
+            .expect("Student-t degrees of freedom should be unitless");
         assert!(
             (calibrated_df - 6.0).abs() < 0.5,
             "expected calibrated df near 6.0, got {calibrated_df}"
@@ -1013,6 +1006,8 @@ mod tests {
                     .base_date(base_date - time::Duration::days(days_before))
                     .day_count(day_count)
                     .knots([(0.0, 1.0), (10.0 * scale, (-0.3_f64).exp())])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("equivalent curve");
                 let (other_quote, other_schedule) =
@@ -1187,13 +1182,13 @@ mod tests {
                 .any(|(key, _)| key == "USD-OIS_CAPFLOOR_HW1F_SIGMA"),
             "expected calibrated cap/floor sigma scalar output"
         );
-        let (_, MarketScalar::Unitless(sigma)) = values
+        let sigma = values
             .iter()
             .find(|(key, _)| key == "USD-OIS_CAPFLOOR_HW1F_SIGMA")
             .expect("sigma scalar")
-        else {
-            unreachable!("sigma must be unitless");
-        };
+            .1
+            .get_unitless()
+            .expect("sigma must be unitless");
         assert!((sigma - 0.0095).abs() < 1e-9);
     }
 

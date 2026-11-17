@@ -57,25 +57,22 @@ pub(crate) fn build_initial_context(
     for obj in prior {
         match obj {
             PriorMarketObject::DiscountCurve(c) => {
-                ctx.insert_mut(c.clone());
+                ctx.try_insert_mut(c.clone())?;
             }
             PriorMarketObject::ForwardCurve(c) => {
-                ctx.insert_mut(c.clone());
+                ctx.try_insert_mut(c.clone())?;
             }
             PriorMarketObject::HazardCurve(c) => {
-                ctx.insert_mut(c.clone());
+                ctx.try_insert_mut(c.clone())?;
             }
             PriorMarketObject::InflationCurve(c) => {
-                ctx.insert_mut(c.clone());
+                ctx.try_insert_mut(c.clone())?;
             }
             PriorMarketObject::BaseCorrelationCurve(c) => {
-                ctx.insert_mut(c.clone());
-            }
-            PriorMarketObject::BasisSpreadCurve(c) => {
-                ctx.insert_mut(c.clone());
+                ctx.try_insert_mut(c.clone())?;
             }
             PriorMarketObject::ParametricCurve(c) => {
-                ctx.insert_mut(c.clone());
+                ctx.try_insert_mut(c.clone())?;
             }
             PriorMarketObject::PriceCurve(c) | PriorMarketObject::VolatilityIndexCurve(c) => {
                 // The tag states the curve family; a vol-index curve is the one
@@ -92,10 +89,10 @@ pub(crate) fn build_initial_context(
                         c.kind()
                     )));
                 }
-                ctx.insert_mut(c.clone());
+                ctx.try_insert_mut(c.clone())?;
             }
             PriorMarketObject::VolSurface(s) => {
-                ctx.insert_surface_mut(s.clone());
+                ctx.try_insert_surface_mut(s.clone())?;
             }
         }
     }
@@ -208,6 +205,8 @@ mod tests {
             .base_date(Date::from_calendar_date(2025, Month::January, 1).expect("valid date"))
             .knots([(0.0, 1.0), (5.0, 0.9)])
             .interp(InterpStyle::MonotoneConvex)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("DiscountCurve builder should succeed");
         let prior = vec![PriorMarketObject::DiscountCurve(curve)];
@@ -282,6 +281,7 @@ mod tests {
             .base_date(base)
             .knots([(1.0, 0.01), (5.0, 0.02)])
             .recovery_rate(0.40)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard");
         let correlation = BaseCorrelationCurve::builder("CDX-CORRELATION")

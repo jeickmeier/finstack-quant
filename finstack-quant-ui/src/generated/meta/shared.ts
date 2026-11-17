@@ -5546,6 +5546,21 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json#"
   },
   {
+    "path": "#/$defs/CmsOption/properties/cms_fixing_index_id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsOption/properties/cms_fixing_index_id",
+    "description": "Explicit CMS benchmark fixing identifier used for historical fixings\n(`FIXING:<cms_fixing_index_id>`), distinct from `forward_curve_id` and `index_id`."
+  },
+  {
+    "path": "#/$defs/CmsOption/properties/cms_fixing_index_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsOption/properties/cms_fixing_index_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/CmsOption/properties/cms_fixing_index_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsOption/properties/cms_fixing_index_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/CmsOption/properties/cms_tenor",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsOption/properties/cms_tenor",
     "description": "Tenor of the CMS reference swap (e.g. 10Y); must be month- or year-based.",
@@ -5803,6 +5818,21 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
   },
   {
+    "path": "#/$defs/CmsSpreadOption/properties/long_cms_fixing_index_id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSpreadOption/properties/long_cms_fixing_index_id",
+    "description": "Explicit CMS benchmark fixing identifier for the long-tenor leg\n(`FIXING:<long_cms_fixing_index_id>`), distinct from `forward_curve_id`,\n`index_id`, and `short_cms_fixing_index_id`."
+  },
+  {
+    "path": "#/$defs/CmsSpreadOption/properties/long_cms_fixing_index_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSpreadOption/properties/long_cms_fixing_index_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/CmsSpreadOption/properties/long_cms_fixing_index_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSpreadOption/properties/long_cms_fixing_index_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/CmsSpreadOption/properties/long_cms_tenor",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSpreadOption/properties/long_cms_tenor",
     "description": "Long CMS tenor (e.g., 10Y).",
@@ -5850,6 +5880,21 @@ export default [
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/CmsSpreadOption/properties/short_cms_fixing_index_id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSpreadOption/properties/short_cms_fixing_index_id",
+    "description": "Explicit CMS benchmark fixing identifier for the short-tenor leg\n(`FIXING:<short_cms_fixing_index_id>`), distinct from `forward_curve_id`,\n`index_id`, and `long_cms_fixing_index_id`."
+  },
+  {
+    "path": "#/$defs/CmsSpreadOption/properties/short_cms_fixing_index_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSpreadOption/properties/short_cms_fixing_index_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/CmsSpreadOption/properties/short_cms_fixing_index_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSpreadOption/properties/short_cms_fixing_index_id/anyOf/1"
   },
   {
     "path": "#/$defs/CmsSpreadOption/properties/short_cms_tenor",
@@ -5960,6 +6005,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSwap/properties/cms_cap",
     "description": "Optional cap on the CMS rate (decimal).",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/CmsSwap/properties/cms_fixing_index_id",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSwap/properties/cms_fixing_index_id",
+    "description": "Explicit CMS benchmark fixing identifier used for historical fixings\n(`FIXING:<cms_fixing_index_id>`), distinct from `forward_curve_id` and `index_id`."
+  },
+  {
+    "path": "#/$defs/CmsSwap/properties/cms_fixing_index_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSwap/properties/cms_fixing_index_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/CmsSwap/properties/cms_fixing_index_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CmsSwap/properties/cms_fixing_index_id/anyOf/1"
   },
   {
     "path": "#/$defs/CmsSwap/properties/cms_floor",
@@ -20310,7 +20370,7 @@ export default [
   {
     "path": "#/$defs/InflationCapFloor/properties/interpolation",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationCapFloor/properties/interpolation",
-    "description": "Contractual monthly CPI interpolation; takes precedence over index metadata.\nDefaults to monthly step interpolation when neither source supplies it."
+    "description": "Explicit contractual monthly CPI interpolation; no source default is used.\nDefaults to monthly step interpolation when neither source supplies it."
   },
   {
     "path": "#/$defs/InflationCapFloor/properties/interpolation/anyOf/0",
@@ -20325,7 +20385,7 @@ export default [
   {
     "path": "#/$defs/InflationCapFloor/properties/lag",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationCapFloor/properties/lag",
-    "description": "Contractual CPI observation lag; when `None` the index lag, then the\ncurve's indexation lag, applies."
+    "description": "Explicit contractual CPI observation lag; missing terms fail reference resolution."
   },
   {
     "path": "#/$defs/InflationCapFloor/properties/lag/anyOf/0",
@@ -20412,37 +20472,37 @@ export default [
   {
     "path": "#/$defs/InflationLag",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationLag",
-    "description": "Contractual observation lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate an observation lag to ensure the reference\nindex is published by settlement. This lag does not specify the actual\npublication date; use [`InflationIndex::with_publication_dates`] for that.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```"
+    "description": "Contractual observation lag for inflation index reference dates.\n\nSpecifies how far before a contractual reference date the historical or\nprojected CPI anchor is sampled. Publication and knowledge cutoffs are\ntracked separately on [`InflationIndex`].\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::months(3);\nlet day_lag = InflationLag::days(90);\nlet no_lag = InflationLag::None;\nassert_eq!(tips_lag.to_string(), \"3M\");\nassert_eq!(day_lag.to_string(), \"90D\");\nassert_eq!(no_lag.to_string(), \"none\");\n```"
   },
   {
     "path": "#/$defs/InflationLag/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationLag/oneOf/0",
-    "description": "Lag by specified number of months.\n\nStandard: 3 months for TIPS and most inflation-linked bonds."
+    "description": "Lag by a strictly positive number of whole calendar months."
   },
   {
     "path": "#/$defs/InflationLag/oneOf/0/properties/months",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationLag/oneOf/0/properties/months",
     "format": "uint8",
     "maximum": 255,
-    "minimum": 0
+    "minimum": 1
   },
   {
     "path": "#/$defs/InflationLag/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationLag/oneOf/1",
-    "description": "Lag by specified number of calendar days.\n\nAlternative specification for non-standard contracts."
+    "description": "Lag by a strictly positive number of literal calendar days."
   },
   {
     "path": "#/$defs/InflationLag/oneOf/1/properties/days",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationLag/oneOf/1/properties/days",
     "format": "uint16",
     "maximum": 65535,
-    "minimum": 0
+    "minimum": 1
   },
   {
     "path": "#/$defs/InflationLag/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationLag/oneOf/2",
     "const": "none",
-    "description": "No lag applied.\n\nUsed for inflation swaps where forecast indices are used."
+    "description": "Zero contractual shift."
   },
   {
     "path": "#/$defs/InflationLinkedBond",
@@ -20706,7 +20766,7 @@ export default [
   {
     "path": "#/$defs/InflationSwap/properties/interpolation",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationSwap/properties/interpolation",
-    "description": "Contractual monthly reference-index interpolation; takes precedence over index metadata;\nwithout either source the default is monthly step interpolation."
+    "description": "Explicit contractual monthly reference-index interpolation; no source default is used."
   },
   {
     "path": "#/$defs/InflationSwap/properties/interpolation/anyOf/0",
@@ -20721,7 +20781,7 @@ export default [
   {
     "path": "#/$defs/InflationSwap/properties/lag",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InflationSwap/properties/lag",
-    "description": "Contractual CPI observation lag; when `None` the index lag, then the\ncurve's indexation lag, applies."
+    "description": "Explicit contractual CPI observation lag; missing terms fail reference resolution."
   },
   {
     "path": "#/$defs/InflationSwap/properties/lag/anyOf/0",
@@ -27874,7 +27934,7 @@ export default [
   {
     "path": "#/$defs/SeriesInterpolation",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/SeriesInterpolation",
-    "description": "Interpolation strategy for [`ScalarTimeSeries`].\n\n# Examples\n```rust\nuse finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"TS\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\"), 100.0),\n        (Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\"), 105.0),\n    ],\n    None,\n)\n.expect(\"Series creation should succeed\");\nlet stepped = series.clone().with_interpolation(SeriesInterpolation::Step);\nlet mid_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nassert_eq!(stepped.value_on(mid_date).expect(\"Value lookup should succeed\"), 100.0);\n```"
+    "description": "Interpolation strategy for [`ScalarTimeSeries`].\n\n# Examples\n```rust\nuse finstack_quant_core::market_data::scalars::{\n    ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,\n};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"TS\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\"), 100.0),\n        (Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\"), 105.0),\n    ],\n    None,\n    SeriesInterpolation::Step,\n    SeriesExtrapolation::Error,\n)\n.expect(\"Series creation should succeed\");\nlet mid_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nassert_eq!(series.get_value(mid_date).expect(\"Value lookup should succeed\"), 100.0);\n```"
   },
   {
     "path": "#/$defs/SeriesInterpolation/oneOf/0",
@@ -31570,7 +31630,7 @@ export default [
   {
     "path": "#/$defs/YoYInflationSwap/properties/interpolation",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/YoYInflationSwap/properties/interpolation",
-    "description": "Contractual monthly reference-index interpolation; takes precedence over index metadata;\nwithout either source the default is monthly step interpolation."
+    "description": "Explicit contractual monthly reference-index interpolation; no source default is used."
   },
   {
     "path": "#/$defs/YoYInflationSwap/properties/interpolation/anyOf/0",
@@ -31585,7 +31645,7 @@ export default [
   {
     "path": "#/$defs/YoYInflationSwap/properties/lag",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/YoYInflationSwap/properties/lag",
-    "description": "Contractual CPI observation lag; when `None` the index lag, then the\ncurve's indexation lag, applies."
+    "description": "Explicit contractual CPI observation lag; missing terms fail reference resolution."
   },
   {
     "path": "#/$defs/YoYInflationSwap/properties/lag/anyOf/0",

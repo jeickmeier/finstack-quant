@@ -839,6 +839,9 @@ mod tests {
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(base)
             .knots([(0.5, 0.99), (1.0, 0.98), (5.0, 0.90), (10.0, 0.80)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         MarketContext::new().insert(disc)

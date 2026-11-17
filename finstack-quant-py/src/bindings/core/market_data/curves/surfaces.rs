@@ -2,6 +2,7 @@
 
 use finstack_quant_core::market_data::surfaces::{
     FxDeltaVolSurface, SabrParameterData, VolCube, VolGridOpts, VolInterpolationMode, VolSurface,
+    VolSurfaceAxis,
 };
 use finstack_quant_core::wire::{serde_label, serde_parse};
 use pyo3::types::PyDict;
@@ -42,7 +43,7 @@ fn extract_vol_grid(obj: &Bound<'_, PyAny>) -> PyResult<VolInput> {
     ))
 }
 
-/// Two-dimensional implied volatility surface on an expiry x strike grid.
+/// Two-dimensional implied volatility surface on an expiry x secondary-coordinate grid.
 ///
 /// Volatilities are decimal annualised standard deviations (``0.20`` is 20%)
 /// stored row-major by expiry. The secondary axis is a strike, a tenor or a
@@ -51,7 +52,15 @@ fn extract_vol_grid(obj: &Bound<'_, PyAny>) -> PyResult<VolInput> {
 /// Example
 /// -------
 /// >>> from finstack_quant.core.market_data import VolSurface
-/// >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.22, 0.20, 0.21], [0.23, 0.21, 0.22]])
+/// >>> surface = VolSurface(
+/// ...     "EQ-VOL",
+/// ...     [1.0, 2.0],
+/// ...     [90.0, 100.0, 110.0],
+/// ...     [[0.22, 0.20, 0.21], [0.23, 0.21, 0.22]],
+/// ...     secondary_axis="strike",
+/// ...     quote_type="black_lognormal",
+/// ...     interpolation_mode="vol",
+/// ... )
 /// >>> surface.grid_shape
 /// (2, 3)
 /// >>> from finstack_quant.models.volatility import get_surface_vol
@@ -78,7 +87,7 @@ impl PyVolSurface {
 
 #[pymethods]
 impl PyVolSurface {
-    /// Construct a vol surface from an expiry x strike grid.
+    /// Construct a vol surface from an expiry x secondary-coordinate grid.
     ///
     /// Parameters
     /// ----------
@@ -86,19 +95,22 @@ impl PyVolSurface {
     ///     Unique surface identifier.
     /// expiries : list[float]
     ///     Strictly increasing expiry times in years.
-    /// strikes : list[float]
+    /// secondary_values : list[float]
     ///     Strictly increasing secondary-axis coordinates (strikes, tenors or moneyness).
     /// vols : list[float] | list[list[float]] | numpy.ndarray
     ///     Volatilities as decimals, either flat row-major (``len(expiries) *
-    ///     len(strikes)``) or as ``len(expiries)`` rows of ``len(strikes)`` values.
-    /// secondary_axis : str, optional
-    ///     ``"strike"`` (default) or ``"tenor"``.
-    /// interpolation_mode : str, optional
-    ///     ``"vol"`` (default, bilinear in vol) or ``"total_variance"``.
-    /// quote_type : str, optional
-    ///     ``"black_lognormal"`` (default), ``"shifted_black_lognormal"``, or ``"normal"``.
+    ///     len(secondary_values)``) or as ``len(expiries)`` rows of
+    ///     ``len(secondary_values)`` values.
+    /// secondary_axis : str
+    ///     ``"strike"`` or ``"tenor"``.
+    /// quote_type : str
+    ///     ``"black_lognormal"``, ``"shifted_black_lognormal"``, or ``"normal"``.
+    /// interpolation_mode : str
+    ///     ``"vol"`` (bilinear in vol) or ``"total_variance"``.
     /// displacements : list[float] | None, optional
     ///     Shifted-Black rate displacements, one per expiry; absent for other conventions.
+    /// expiry_clock : VolatilityClock | None, optional
+    ///     Calendar/day-count clock for resolving expiry dates to year fractions.
     ///
     /// Raises
     /// ------
@@ -106,61 +118,127 @@ impl PyVolSurface {
     ///     If the grid size does not match the axes, an axis is not strictly
     ///     increasing, a vol is non-finite or negative, or a label is unknown.
     /// TypeError
-    ///     If ``vols`` is not a list, nested list or array-like.
+    ///     If ``vols`` is not a list, nested list or array-like, or a required
+    ///     convention keyword argument is missing or unknown.
     ///
     /// Example
     /// -------
     /// >>> from finstack_quant.core.market_data import VolSurface
-    /// >>> VolSurface("EQ-VOL", [1.0], [90.0, 100.0], [0.22, 0.20]).strikes
+    /// >>> VolSurface(
+    /// ...     "EQ-VOL",
+    /// ...     [1.0],
+    /// ...     [90.0, 100.0],
+    /// ...     [0.22, 0.20],
+    /// ...     secondary_axis="strike",
+    /// ...     quote_type="black_lognormal",
+    /// ...     interpolation_mode="vol",
+    /// ... ).secondary_values
     /// [90.0, 100.0]
     #[new]
-    #[pyo3(signature = (id, expiries, strikes, vols, *, secondary_axis=None, interpolation_mode=None, quote_type=None, displacements=None))]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "keyword-only grid options mirror the Rust VolGridOpts fields"
+    #[pyo3(
+        signature = (id, expiries, secondary_values, vols, **options),
+        text_signature = "(id, expiries, secondary_values, vols, *, secondary_axis, quote_type, interpolation_mode, displacements=None, expiry_clock=None)"
     )]
     fn new(
         id: &str,
         expiries: Vec<f64>,
-        strikes: Vec<f64>,
+        secondary_values: Vec<f64>,
         vols: &Bound<'_, PyAny>,
-        secondary_axis: Option<&str>,
-        interpolation_mode: Option<&str>,
-        quote_type: Option<&str>,
-        displacements: Option<Vec<f64>>,
+        options: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
-        // Rust `VolGridOpts::default()` is the single source of the defaults.
-        let mut opts = VolGridOpts::default();
-        if let Some(axis) = secondary_axis {
-            opts.secondary_axis = serde_parse(axis).map_err(core_to_py)?;
+        let mut secondary_axis: Option<VolSurfaceAxis> = None;
+        let mut quote_type: Option<VolQuoteType> = None;
+        let mut interpolation_mode: Option<VolInterpolationMode> = None;
+        let mut displacements: Option<Vec<f64>> = None;
+        let mut expiry_clock: Option<finstack_quant_core::dates::VolatilityClock> = None;
+
+        if let Some(opts) = options {
+            for (key, value) in opts.iter() {
+                let key_str: String = key.extract()?;
+                match key_str.as_str() {
+                    "secondary_axis" => {
+                        let raw: String = value.extract()?;
+                        secondary_axis = Some(serde_parse(&raw).map_err(core_to_py)?);
+                    }
+                    "quote_type" => {
+                        let raw: String = value.extract()?;
+                        quote_type = Some(raw.parse::<VolQuoteType>().map_err(core_to_py)?);
+                    }
+                    "interpolation_mode" => {
+                        let raw: String = value.extract()?;
+                        interpolation_mode = Some(serde_parse(&raw).map_err(core_to_py)?);
+                    }
+                    "displacements" => {
+                        displacements = value.extract::<Option<Vec<f64>>>()?;
+                    }
+                    "expiry_clock" => {
+                        expiry_clock = value
+                            .extract::<Option<
+                                PyRef<
+                                    '_,
+                                    crate::bindings::core::dates::daycount::PyVolatilityClock,
+                                >,
+                            >>()?
+                            .map(|clock| clock.inner.clone());
+                    }
+                    other => {
+                        return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+                            "VolSurface() got an unexpected keyword argument '{other}'"
+                        )));
+                    }
+                }
+            }
         }
-        if let Some(mode) = interpolation_mode {
-            opts.interpolation_mode = serde_parse(mode).map_err(core_to_py)?;
-        }
-        if let Some(quote) = quote_type {
-            opts.quote_type = quote.parse::<VolQuoteType>().map_err(core_to_py)?;
-        }
+
+        let secondary_axis = secondary_axis.ok_or_else(|| {
+            pyo3::exceptions::PyTypeError::new_err(
+                "VolSurface() missing required keyword-only argument: 'secondary_axis'",
+            )
+        })?;
+        let quote_type = quote_type.ok_or_else(|| {
+            pyo3::exceptions::PyTypeError::new_err(
+                "VolSurface() missing required keyword-only argument: 'quote_type'",
+            )
+        })?;
+        let interpolation_mode = interpolation_mode.ok_or_else(|| {
+            pyo3::exceptions::PyTypeError::new_err(
+                "VolSurface() missing required keyword-only argument: 'interpolation_mode'",
+            )
+        })?;
+
         let grid = extract_vol_grid(vols)?;
         let surface = match grid {
             VolInput::Flat(values) => VolSurface::from_grid(
                 id,
                 &expiries,
-                &strikes,
+                &secondary_values,
                 &values,
-                opts,
+                VolGridOpts {
+                    secondary_axis,
+                    quote_type,
+                    interpolation_mode,
+                },
                 displacements.as_deref(),
-            ),
+            )
+            .map(|surface| match expiry_clock {
+                Some(clock) => surface.with_expiry_clock(clock),
+                None => surface,
+            }),
             VolInput::Rows(rows) => {
                 let mut builder = VolSurface::builder(id)
                     .expiries(&expiries)
-                    .strikes(&strikes)
-                    .secondary_axis(opts.secondary_axis)
-                    .interpolation_mode(opts.interpolation_mode)
+                    .secondary_values(&secondary_values)
+                    .secondary_axis(secondary_axis)
+                    .interpolation_mode(interpolation_mode)
+                    .quote_type(quote_type)
                     .rows(&rows);
                 if let Some(shifts) = displacements.as_deref() {
                     builder = builder.displacements(shifts);
                 }
-                builder.quote_type(opts.quote_type).build()
+                if let Some(clock) = expiry_clock {
+                    builder = builder.expiry_clock(clock);
+                }
+                builder.build()
             }
         }
         .map_err(core_to_py)?;
@@ -170,19 +248,26 @@ impl PyVolSurface {
         })
     }
 
-    /// Export the grid in long form with columns ``expiry``, ``strike`` and ``vol``.
+    /// Export the grid in long form with columns ``expiry``, ``secondary_value`` and ``vol``.
     ///
     /// Returns
     /// -------
     /// pandas.DataFrame
-    ///     One row per grid node, expiries outer and strikes inner.
+    ///     One row per grid node, expiries outer and secondary values inner.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let (expiry, (strike, vol)): (Vec<f64>, (Vec<f64>, Vec<f64>)) = self
+        let (expiry, (secondary_value, vol)): (Vec<f64>, (Vec<f64>, Vec<f64>)) = self
             .inner
             .grid_points()
-            .map(|(expiry, strike, vol)| (expiry, (strike, vol)))
+            .map(|(expiry, secondary_value, vol)| (expiry, (secondary_value, vol)))
             .unzip();
-        columns_to_dataframe(py, &[("expiry", expiry), ("strike", strike), ("vol", vol)])
+        columns_to_dataframe(
+            py,
+            &[
+                ("expiry", expiry),
+                ("secondary_value", secondary_value),
+                ("vol", vol),
+            ],
+        )
     }
 
     /// Surface identifier string.
@@ -197,19 +282,19 @@ impl PyVolSurface {
         self.inner.expiries().to_vec()
     }
 
-    /// Secondary axis (strikes, tenors or moneyness) of the stored grid.
+    /// Secondary-axis coordinates (strikes, tenors or moneyness) of the stored grid.
     #[getter]
-    fn strikes(&self) -> Vec<f64> {
-        self.inner.strikes().to_vec()
+    fn secondary_values(&self) -> Vec<f64> {
+        self.inner.secondary_values().to_vec()
     }
 
-    /// Volatility grid (decimal) as ``len(expiries)`` rows of ``len(strikes)`` values.
+    /// Volatility grid (decimal) as ``len(expiries)`` rows of ``len(secondary_values)`` values.
     #[getter]
     fn vols(&self) -> Vec<Vec<f64>> {
-        let n_strikes = self.inner.strikes().len().max(1);
+        let n_secondary = self.inner.secondary_values().len().max(1);
         self.inner
             .vols()
-            .chunks(n_strikes)
+            .chunks(n_secondary)
             .map(<[f64]>::to_vec)
             .collect()
     }
@@ -232,29 +317,13 @@ impl PyVolSurface {
         self.inner.displacements().map(<[f64]>::to_vec)
     }
 
-    /// Return a shifted-Black surface retaining one displacement per expiry.
-    ///
-    /// Parameters
-    /// ----------
-    /// displacements : list[float]
-    ///     Finite displacements in strike/rate units, aligned to the expiry axis.
-    ///
-    /// Returns
-    /// -------
-    /// VolSurface
-    ///     New validated surface with shifted-Black quote metadata.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the displacement count differs from the expiry count or a shift is non-finite.
-    fn with_displacements(&self, displacements: Vec<f64>) -> PyResult<Self> {
+    /// Calendar/day-count volatility clock attached to this surface, or ``None``.
+    #[getter]
+    fn expiry_clock(&self) -> Option<crate::bindings::core::dates::daycount::PyVolatilityClock> {
         self.inner
-            .as_ref()
-            .clone()
-            .with_displacements(&displacements)
-            .map(|surface| Self::from_inner(Arc::new(surface)))
-            .map_err(core_to_py)
+            .expiry_clock()
+            .cloned()
+            .map(crate::bindings::core::dates::daycount::PyVolatilityClock::from_inner)
     }
 
     /// Interpolation contract between grid points (``"vol"`` or ``"total_variance"``).
@@ -263,7 +332,7 @@ impl PyVolSurface {
         serde_label(&self.inner.interpolation_mode()).map_err(core_to_py)
     }
 
-    /// Surface grid shape as ``(n_expiries, n_strikes)``.
+    /// Surface grid shape as ``(n_expiries, n_secondary_values)``.
     #[getter]
     fn grid_shape(&self) -> (usize, usize) {
         self.inner.grid_shape()
@@ -294,7 +363,7 @@ impl_repr_html_via_dataframe!(PyVolSurface);
 /// Example
 /// -------
 /// >>> from finstack_quant.core.market_data import FxDeltaVolSurface
-/// >>> surface = FxDeltaVolSurface("EURUSD", [0.25, 1.0], [0.08, 0.09], [0.01, 0.015], [0.005, 0.007])
+/// >>> surface = FxDeltaVolSurface("EURUSD", "EUR/USD", [0.25, 1.0], [0.08, 0.09], [0.01, 0.015], [0.005, 0.007])
 /// >>> len(surface.expiries)
 /// 2
 #[pyclass(
@@ -324,6 +393,8 @@ impl PyFxDeltaVolSurface {
     /// ----------
     /// id : str
     ///     Unique surface identifier.
+    /// pair : str | tuple[Currency | str, Currency | str]
+    ///     Currency pair (e.g. ``"EUR/USD"``, ``"EURUSD"``, or ``(Currency.EUR, Currency.USD)``).
     /// expiries : list[float]
     ///     Strictly increasing positive expiry times in years.
     /// atm_vols : list[float]
@@ -331,38 +402,129 @@ impl PyFxDeltaVolSurface {
     /// rr_25d : list[float]
     ///     25-delta risk reversal per expiry (decimal, call vol - put vol).
     /// bf_25d : list[float]
-    ///     25-delta butterfly per expiry (decimal, wing average - ATM).
+    ///     25-delta smile butterfly per expiry (decimal, wing average - ATM).
     /// rr_10d : list[float], optional
     ///     10-delta risk reversal per expiry; requires ``bf_10d``.
     /// bf_10d : list[float], optional
-    ///     10-delta butterfly per expiry; requires ``rr_10d``.
+    ///     10-delta smile butterfly per expiry; requires ``rr_10d``.
+    /// delta_convention : str, default="forward_unadjusted"
+    ///     FX option delta quoting convention.
+    /// atm_convention : str, default="delta_neutral_straddle"
+    ///     FX option ATM quoting convention.
+    /// butterfly_convention : str, default="smile"
+    ///     FX option butterfly quoting convention.
+    /// expiry_clock : VolatilityClock, optional
+    ///     Calendar/day-count clock for resolving expiry dates to year fractions.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If only one of ``rr_10d`` / ``bf_10d`` is given, any vector is empty
-    ///     or mismatched in length, expiries are not strictly increasing and
-    ///     positive, or a quote is non-finite (ATM vols must be positive).
+    ///     If ``pair`` or conventions are invalid, only one of ``rr_10d`` / ``bf_10d``
+    ///     is given, any vector is empty or mismatched in length, expiries are not
+    ///     strictly increasing and positive, or a quote is non-finite.
     ///
     /// Example
     /// -------
     /// >>> from finstack_quant.core.market_data import FxDeltaVolSurface
-    /// >>> FxDeltaVolSurface("EURUSD", [1.0], [0.09], [0.015], [0.007]).atm_vols
+    /// >>> FxDeltaVolSurface("EURUSD", "EUR/USD", [1.0], [0.09], [0.015], [0.007]).atm_vols
     /// [0.09]
     #[new]
-    #[pyo3(signature = (id, expiries, atm_vols, rr_25d, bf_25d, rr_10d=None, bf_10d=None))]
+    #[pyo3(
+        signature = (id, pair, expiries, atm_vols, rr_25d, bf_25d, **options),
+        text_signature = "(id, pair, expiries, atm_vols, rr_25d, bf_25d, *, rr_10d=None, bf_10d=None, delta_convention='forward_unadjusted', atm_convention='delta_neutral_straddle', butterfly_convention='smile', expiry_clock=None)"
+    )]
     fn new(
         id: &str,
+        pair: &Bound<'_, PyAny>,
         expiries: Vec<f64>,
         atm_vols: Vec<f64>,
         rr_25d: Vec<f64>,
         bf_25d: Vec<f64>,
-        rr_10d: Option<Vec<f64>>,
-        bf_10d: Option<Vec<f64>>,
+        options: Option<&Bound<'_, pyo3::types::PyDict>>,
     ) -> PyResult<Self> {
-        let surface =
-            FxDeltaVolSurface::new(id, expiries, atm_vols, rr_25d, bf_25d, rr_10d, bf_10d)
-                .map_err(core_to_py)?;
+        use finstack_quant_core::market_data::surfaces::{
+            FxAtmConvention, FxButterflyConvention, FxDeltaConvention, FxDeltaVolSurfaceParams,
+        };
+        use finstack_quant_core::money::fx::CurrencyPair;
+        use finstack_quant_core::types::CurveId;
+
+        let parsed_pair = if let Ok(s) = pair.extract::<String>() {
+            let parsed: CurrencyPair = s.trim().parse().map_err(core_to_py)?;
+            CurrencyPair::try_new(parsed.base, parsed.quote).map_err(core_to_py)?
+        } else if let Ok(items) = pair.extract::<Vec<Bound<'_, PyAny>>>() {
+            if items.len() != 2 {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "pair sequence must contain exactly 2 currencies (base, quote)",
+                ));
+            }
+            let base = crate::bindings::core::currency::extract_currency(&items[0])?;
+            let quote = crate::bindings::core::currency::extract_currency(&items[1])?;
+            CurrencyPair::try_new(base, quote).map_err(core_to_py)?
+        } else {
+            return Err(pyo3::exceptions::PyTypeError::new_err(
+                "pair must be a currency pair string like 'EUR/USD' or a 2-tuple (base, quote)",
+            ));
+        };
+
+        let mut rr_10d: Option<Vec<f64>> = None;
+        let mut bf_10d: Option<Vec<f64>> = None;
+        let mut delta_convention = FxDeltaConvention::ForwardUnadjusted;
+        let mut atm_convention = FxAtmConvention::DeltaNeutralStraddle;
+        let mut butterfly_convention = FxButterflyConvention::Smile;
+        let mut expiry_clock: Option<finstack_quant_core::dates::VolatilityClock> = None;
+
+        if let Some(opts) = options {
+            for (key, value) in opts.iter() {
+                let key_str: String = key.extract()?;
+                match key_str.as_str() {
+                    "rr_10d" => rr_10d = value.extract::<Option<Vec<f64>>>()?,
+                    "bf_10d" => bf_10d = value.extract::<Option<Vec<f64>>>()?,
+                    "delta_convention" => {
+                        let raw: String = value.extract()?;
+                        delta_convention = raw.parse().map_err(core_to_py)?;
+                    }
+                    "atm_convention" => {
+                        let raw: String = value.extract()?;
+                        atm_convention = raw.parse().map_err(core_to_py)?;
+                    }
+                    "butterfly_convention" => {
+                        let raw: String = value.extract()?;
+                        butterfly_convention = raw.parse().map_err(core_to_py)?;
+                    }
+                    "expiry_clock" => {
+                        expiry_clock = value
+                            .extract::<Option<
+                                PyRef<
+                                    '_,
+                                    crate::bindings::core::dates::daycount::PyVolatilityClock,
+                                >,
+                            >>()?
+                            .map(|clock| clock.inner.clone());
+                    }
+                    other => {
+                        return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+                            "FxDeltaVolSurface() got an unexpected keyword argument '{other}'"
+                        )));
+                    }
+                }
+            }
+        }
+
+        let surface = FxDeltaVolSurface::from_params(FxDeltaVolSurfaceParams {
+            id: CurveId::from(id),
+            pair: parsed_pair,
+            delta_convention,
+            atm_convention,
+            butterfly_convention,
+            expiries,
+            atm_vols,
+            rr_25d,
+            bf_25d,
+            rr_10d,
+            bf_10d,
+            expiry_clock,
+        })
+        .map_err(core_to_py)?;
         Ok(Self {
             inner: Arc::new(surface),
         })
@@ -432,10 +594,50 @@ impl PyFxDeltaVolSurface {
         self.inner.bf_10d().map(<[f64]>::to_vec)
     }
 
+    /// Canonical currency pair in ``"BASE/QUOTE"`` notation.
+    #[getter]
+    fn pair(&self) -> String {
+        self.inner.pair().to_string()
+    }
+
+    /// Delta quoting convention (e.g. ``"forward_unadjusted"``).
+    #[getter]
+    fn delta_convention(&self) -> String {
+        self.inner.delta_convention().to_string()
+    }
+
+    /// ATM quoting convention (e.g. ``"delta_neutral_straddle"``).
+    #[getter]
+    fn atm_convention(&self) -> String {
+        self.inner.atm_convention().to_string()
+    }
+
+    /// Butterfly quoting convention (e.g. ``"smile"``).
+    #[getter]
+    fn butterfly_convention(&self) -> String {
+        self.inner.butterfly_convention().to_string()
+    }
+
+    /// Quote convention stored by this surface (``"black_lognormal"``).
+    #[getter]
+    fn quote_type(&self) -> String {
+        self.inner.quote_type().to_string()
+    }
+
+    /// Calendar/day-count volatility clock attached to this surface, or ``None``.
+    #[getter]
+    fn expiry_clock(&self) -> Option<crate::bindings::core::dates::daycount::PyVolatilityClock> {
+        self.inner
+            .expiry_clock()
+            .cloned()
+            .map(crate::bindings::core::dates::daycount::PyVolatilityClock::from_inner)
+    }
+
     fn __repr__(&self) -> String {
         format!(
-            "FxDeltaVolSurface(id='{}', num_expiries={}, has_10d={})",
+            "FxDeltaVolSurface(id='{}', pair='{}', num_expiries={}, has_10d={})",
             self.inner.id().as_str(),
+            self.inner.pair(),
             self.inner.expiries().len(),
             if self.inner.rr_10d().is_some() {
                 "True"

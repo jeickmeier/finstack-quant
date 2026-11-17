@@ -54,10 +54,22 @@ mod tests {
     #[test]
     fn strict_resolution_names_a_partially_missing_scalar_set() {
         let market = MarketContext::new()
-            .insert_price("HESTON_KAPPA", MarketScalar::Unitless(1.5))
-            .insert_price("HESTON_THETA", MarketScalar::Unitless(0.06))
-            .insert_price("HESTON_SIGMA_V", MarketScalar::Unitless(0.4))
-            .insert_price("HESTON_RHO", MarketScalar::Unitless(-0.5));
+            .insert_price(
+                "HESTON_KAPPA",
+                MarketScalar::unitless(1.5).expect("valid scalar"),
+            )
+            .insert_price(
+                "HESTON_THETA",
+                MarketScalar::unitless(0.06).expect("valid scalar"),
+            )
+            .insert_price(
+                "HESTON_SIGMA_V",
+                MarketScalar::unitless(0.4).expect("valid scalar"),
+            )
+            .insert_price(
+                "HESTON_RHO",
+                MarketScalar::unitless(-0.5).expect("valid scalar"),
+            );
         let error = heston_params_from_market_strict(&market, 0.0, 0.0)
             .expect_err("missing HESTON_V0 must fail");
         assert!(error.to_string().contains("HESTON_V0"));
@@ -66,11 +78,26 @@ mod tests {
     #[test]
     fn strict_resolution_preserves_complete_market_parameters() {
         let market = MarketContext::new()
-            .insert_price("HESTON_KAPPA", MarketScalar::Unitless(1.5))
-            .insert_price("HESTON_THETA", MarketScalar::Unitless(0.06))
-            .insert_price("HESTON_SIGMA_V", MarketScalar::Unitless(0.4))
-            .insert_price("HESTON_RHO", MarketScalar::Unitless(-0.5))
-            .insert_price("HESTON_V0", MarketScalar::Unitless(0.05));
+            .insert_price(
+                "HESTON_KAPPA",
+                MarketScalar::unitless(1.5).expect("valid scalar"),
+            )
+            .insert_price(
+                "HESTON_THETA",
+                MarketScalar::unitless(0.06).expect("valid scalar"),
+            )
+            .insert_price(
+                "HESTON_SIGMA_V",
+                MarketScalar::unitless(0.4).expect("valid scalar"),
+            )
+            .insert_price(
+                "HESTON_RHO",
+                MarketScalar::unitless(-0.5).expect("valid scalar"),
+            )
+            .insert_price(
+                "HESTON_V0",
+                MarketScalar::unitless(0.05).expect("valid scalar"),
+            );
         let params = heston_params_from_market_strict(&market, 0.03, 0.01)
             .expect("complete Heston inputs must resolve");
         assert_eq!(params.model.kappa, 1.5);

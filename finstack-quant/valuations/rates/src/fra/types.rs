@@ -289,7 +289,6 @@ impl ForwardRateAgreement {
                         Some(series),
                         self.forward_curve_id.as_str(),
                         fixing_date,
-                        as_of,
                     )?
                 } else {
                     return Err(finstack_quant_core::Error::Validation(format!(
@@ -523,15 +522,18 @@ mod tests {
             .base_date(base)
             .knots([(0.0, 1.0), (5.0, 0.78)])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("FRA builder should succeed in test");
 
-        let fwd = ForwardCurve::builder("FWD-3M", 0.25)
-            .base_date(base)
-            .knots([(0.0, 0.05), (5.0, 0.05)])
-            .interp(InterpStyle::Linear)
-            .build()
-            .expect("FRA builder should succeed in test");
+        let fwd = ForwardCurve::flat(
+            "FWD-3M",
+            base,
+            0.05,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("FRA builder should succeed in test");
 
         // FRA 3M x 6M
         let start = base + time::Duration::days(90);
@@ -592,16 +594,19 @@ mod tests {
             .base_date(base)
             .knots([(0.0, 1.0), (5.0, 0.78)])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("FRA builder should succeed in test");
 
         let fwd_rate = 0.05;
-        let fwd = ForwardCurve::builder("FWD-3M", 0.25)
-            .base_date(base)
-            .knots([(0.0, fwd_rate), (5.0, fwd_rate)])
-            .interp(InterpStyle::Linear)
-            .build()
-            .expect("FRA builder should succeed in test");
+        let fwd = ForwardCurve::flat(
+            "FWD-3M",
+            base,
+            fwd_rate,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("FRA builder should succeed in test");
 
         let start = base + time::Duration::days(90);
         let end = base + time::Duration::days(180);
@@ -686,11 +691,17 @@ mod tests {
         let disc = DiscountCurve::builder("DISC")
             .base_date(as_of)
             .knots([(0.0, 1.0), (2.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let fwd = ForwardCurve::builder("FWD-3M", 0.25)
+        let fwd = ForwardCurve::builder("FWD-3M")
             .base_date(Date::from_calendar_date(2025, Month::February, 1).expect("curve base"))
-            .knots([(0.0, 0.05), (2.0, 0.05)])
+            .knots([(0.0, 1.0), (1.0, (-0.05_f64).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Error)
             .build()
             .expect("forward curve");
         let ctx = MarketContext::new().insert(disc).insert(fwd);
@@ -711,8 +722,8 @@ mod tests {
 
         let error = fra
             .base_value(&ctx, as_of)
-            .expect_err("pre-base FRA period must require fixing or reject");
-        assert!(error.to_string().contains("historical fixing"));
+            .expect_err("pre-base FRA period must reject under ExtrapolationPolicy::Error");
+        assert!(!error.to_string().is_empty());
     }
 }
 

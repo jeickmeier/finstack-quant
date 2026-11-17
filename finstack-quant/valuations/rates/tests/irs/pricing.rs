@@ -429,6 +429,8 @@ fn test_irs_theta_calculation() {
             "FIXING:USD-SOFR-3M",
             vec![(as_of, 0.05)],
             None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .expect("fixing series"),
     );
@@ -550,18 +552,30 @@ fn theta_receives_final_coupon_on_roll_date_and_survives_payment_lag() {
                         (1.0, (-rate).exp()),
                         (10.0, (-10.0 * rate).exp()),
                     ])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .unwrap(),
             )
             .insert(
-                ForwardCurve::builder("USD-SOFR-3M", 0.25)
-                    .base_date(as_of)
-                    .knots([(0.0, 0.05), (1.0, 0.05), (10.0, 0.05)])
-                    .build()
-                    .unwrap(),
+                ForwardCurve::flat(
+                    "USD-SOFR-3M",
+                    as_of,
+                    0.05,
+                    finstack_quant_core::dates::DayCount::Act365F,
+                )
+                .unwrap(),
             )
             .insert_series(
-                ScalarTimeSeries::new("FIXING:USD-SOFR-3M", vec![(start, 0.05)], None).unwrap(),
+                ScalarTimeSeries::new(
+                    "FIXING:USD-SOFR-3M",
+                    vec![(start, 0.05)],
+                    None,
+                    finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                    finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+                )
+                .unwrap(),
             );
         let result = swap
             .price_with_metrics(

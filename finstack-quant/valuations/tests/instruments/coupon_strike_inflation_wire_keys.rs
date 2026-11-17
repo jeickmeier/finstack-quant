@@ -86,28 +86,25 @@ enum PvReference {
 const PINNED_PV: &[(&str, PvReference)] = &[
     ("asset_backed_facility", PvReference::CanonicalRoundtrip),
     ("cap_floor", PvReference::ContractualRate),
-    // Independently reconciled with QuantLib schedules, Black pricing and an
-    // annuity-measure convexity calculation: reference floating-leg growth
-    // uses contractual ACT/360 accrual, rather than the ACT/365F curve clock.
-    ("cms_option", PvReference::Recorded("147738.44880219188")),
+    // Recorded on the factor-native projection curve: floating-leg growth is
+    // the projection-factor ratio annualized on the contractual ACT/360
+    // accrual, rather than the ACT/365F curve clock.
+    ("cms_option", PvReference::Recorded("147739.45717150686")),
     (
         "cms_spread_option",
-        PvReference::Recorded("14329.015318119422"),
+        PvReference::Recorded("14329.171454284997"),
     ),
-    ("cms_swap", PvReference::Recorded("-99606.93593120069")),
-    (
-        "commodity_swap",
-        PvReference::Recorded("57241.779109393014"),
-    ),
+    ("cms_swap", PvReference::Recorded("-99607.96611350501")),
+    ("commodity_swap", PvReference::Recorded("57241.7791093929")),
     ("deposit", PvReference::Recorded("725.21946906583275")),
     ("forward_rate_agreement", PvReference::ContractualRate),
     (
         "inflation_cap_floor",
-        PvReference::Recorded("3742.8532056101494"),
+        PvReference::Recorded("3742.8532056101503"),
     ),
     ("inflation_linked_bond", PvReference::CanonicalRoundtrip),
     ("inflation_swap", PvReference::Recorded("-4080.80319999993")),
-    ("quanto_option", PvReference::Recorded("257243.97126877733")),
+    ("quanto_option", PvReference::Recorded("257243.97126877715")),
     // These wire tests check the current canonical contract exactly; model
     // discretization/RNG evolution is covered by the dedicated model tests.
     ("snowball", PvReference::CanonicalRoundtrip),
@@ -291,8 +288,15 @@ fn price_case(
             serde_json::json!("US-CPI-RATIO-VOL");
         market = market.insert_surface(
             finstack_quant_core::market_data::surfaces::VolSurface::builder("US-CPI-RATIO-VOL")
+                .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+                .quote_type(
+                    finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+                )
+                .interpolation_mode(
+                    finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+                )
                 .expiries(&[0.1, 20.0])
-                .strikes(&[0.5, 1.0, 2.0])
+                .secondary_values(&[0.5, 1.0, 2.0])
                 .row(&[0.05; 3])
                 .row(&[0.05; 3])
                 .build()
@@ -422,9 +426,9 @@ fn rescaled_inputs_reprice_to_recorded_reference() {
                     }),
                 ),
             ],
-            // Independent reconciliation includes the explicit funding
-            // accruals (0.25), distinct from the 92/92/91/90-day curve spans.
-            PvReference::Recorded("-19227.15357332345"),
+            // The funding leg accrues its explicit 0.25 fractions, distinct
+            // from the 92/92/91/90-day projection-factor spans.
+            PvReference::Recorded("-19228.070089784625"),
         ),
         (
             // A floating pool asset at SOFR + 450bp with a 5000bp index floor

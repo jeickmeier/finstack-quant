@@ -20,6 +20,9 @@ fn bond_quote_set()
     let curve = DiscountCurve::builder(bond.discount_curve_id.as_str())
         .base_date(as_of)
         .knots([(0.0, 1.0), (10.0, 0.70)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
     compute_quotes(

@@ -139,6 +139,9 @@ fn test_ecf_sweep_basic() {
     let disc_curve = DiscountCurve::builder("USD-OIS")
         .base_date(issue)
         .knots([(0.0, 1.0), (5.0, 0.9)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve should build");
     let market_ctx = MarketContext::new().insert(disc_curve);
@@ -299,7 +302,6 @@ mod period_flow_waterfall_integration {
                 finstack_quant_statements::capital_structure::PaymentPriority::Fees,
                 finstack_quant_statements::capital_structure::PaymentPriority::Interest,
                 finstack_quant_statements::capital_structure::PaymentPriority::Amortization,
-                finstack_quant_statements::capital_structure::PaymentPriority::Sweep,
                 finstack_quant_statements::capital_structure::PaymentPriority::Equity,
             ],
             available_cash_node: "cash".into(),

@@ -58,7 +58,7 @@ fn observed_fx_reset(
     context
         .get_series(&series_id)
         .ok()?
-        .value_on_exact(reset_date)
+        .get_value_exact(reset_date)
         .ok()
 }
 
@@ -121,9 +121,9 @@ pub(crate) fn pv_mtm_reset_raw(
                 ))?
                 .rate
         };
-        pv.add(converted);
+        pv.add(converted)?;
     }
-    Ok(pv.total())
+    pv.get_total()
 }
 
 /// Enumerate the complete MtM-resetting cashflow stream for `cashflow_schedule`.
@@ -538,6 +538,8 @@ mod tests {
             mtm_fx_fixing_series_id(Currency::EUR, Currency::USD),
             vec![(reset_date, 1.08)],
             None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .expect("valid FX fixing series");
         let market = MarketContext::new().insert_series(series);
@@ -575,7 +577,7 @@ mod tests {
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.0, 1.0), (5.0, (-0.02_f64 * 5.0).exp())])
             .interp(InterpStyle::Linear)
-            .extrapolation(ExtrapolationPolicy::FlatZero)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .build()
             .expect("build USD curve");
         let disc_r = DiscountCurve::builder(CurveId::new("EUR-OIS"))
@@ -583,7 +585,7 @@ mod tests {
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.0, 1.0), (5.0, (-0.01_f64 * 5.0).exp())])
             .interp(InterpStyle::Linear)
-            .extrapolation(ExtrapolationPolicy::FlatZero)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .build()
             .expect("build EUR curve");
 
@@ -635,7 +637,7 @@ mod tests {
                 (5.0, (-0.02_f64 * 5.0).exp()),
             ])
             .interp(InterpStyle::Linear)
-            .extrapolation(ExtrapolationPolicy::FlatZero)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .build()
             .expect("build USD curve");
         let disc_r = DiscountCurve::builder(CurveId::new("EUR-OIS"))
@@ -647,7 +649,7 @@ mod tests {
                 (5.0, (-0.01_f64 * 5.0).exp()),
             ])
             .interp(InterpStyle::Linear)
-            .extrapolation(ExtrapolationPolicy::FlatZero)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .build()
             .expect("build EUR curve");
 

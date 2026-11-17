@@ -13,13 +13,14 @@ import json
 
 import pytest
 
-from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, HazardCurve, MarketContext
+from finstack_quant.core.market_data import DiscountCurve, HazardCurve, MarketContext
 from finstack_quant.valuations.instruments import (
     InstrumentCashflowEnvelope,
     instrument_cashflows,
     price_instrument,
     validate_instrument_json,
 )
+from tests.tests_typed_helpers import projection_curve
 
 
 def _instrument_json(instrument: dict[str, object]) -> str:
@@ -50,6 +51,8 @@ def _build_deposit_market() -> tuple[str, MarketContext]:
             date(2025, 1, 15),
             [(0.0, 1.0), (0.5, 0.975), (1.0, 0.95)],
             day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
         )
     )
     return inst_json, mc
@@ -203,19 +206,15 @@ def _revolving_credit_market(*, credit_curve: bool = False) -> MarketContext:
             date(2024, 1, 1),
             [(0.0, 1.0), (1.0, 0.97), (5.0, 0.85)],
             day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
         )
     )
-    market.insert(
-        ForwardCurve(
-            "USD-SOFR-3M",
-            0.25,
-            date(2024, 1, 1),
-            [(0.0, 0.03), (5.0, 0.03)],
-            day_count="act_360",
-        )
-    )
+    market.insert(projection_curve("USD-SOFR-3M", date(2024, 1, 1), [(5.0, 0.03)]))
     if credit_curve:
-        market.insert(HazardCurve("USD-HZ", date(2024, 1, 1), [(1.0, 0.02), (5.0, 0.02)], recovery_rate=0.4))
+        market.insert(
+            HazardCurve("USD-HZ", date(2024, 1, 1), [(1.0, 0.02), (5.0, 0.02)], recovery_rate=0.4, day_count="act_365f")
+        )
     return market
 
 

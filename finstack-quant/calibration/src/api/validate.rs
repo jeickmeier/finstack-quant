@@ -644,11 +644,11 @@ mod tests {
         envelope.market_data = vec![
             MarketDatum::Price(PriceDatum {
                 id: "SPX".into(),
-                scalar: MarketScalar::Unitless(5_000.0),
+                scalar: MarketScalar::unitless(5_000.0).expect("valid scalar"),
             }),
             MarketDatum::Price(PriceDatum {
                 id: "SPX".into(),
-                scalar: MarketScalar::Unitless(5_001.0),
+                scalar: MarketScalar::unitless(5_001.0).expect("valid scalar"),
             }),
         ];
         envelope
@@ -786,7 +786,7 @@ mod tests {
                 "curve_id": "USD-3M-LIBOR",
                 "currency": "USD",
                 "base_date": "2026-05-08",
-                "tenor_years": 0.25,
+                "index_tenor": {"count": 3, "unit": "months"},
                 "discount_curve_id": "USD-OIS",
             }))
             .expect("forward params");
@@ -1233,11 +1233,11 @@ mod canonical_validation_tests {
             market_data: vec![
                 MarketDatum::Price(PriceDatum {
                     id: "AAPL".into(),
-                    scalar: MarketScalar::Unitless(100.0),
+                    scalar: MarketScalar::unitless(100.0).expect("valid scalar"),
                 }),
                 MarketDatum::Price(PriceDatum {
                     id: "AAPL".into(),
-                    scalar: MarketScalar::Unitless(101.0),
+                    scalar: MarketScalar::unitless(101.0).expect("valid scalar"),
                 }),
             ],
             prior_market: vec![],

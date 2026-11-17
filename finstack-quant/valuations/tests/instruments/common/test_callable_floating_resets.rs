@@ -21,10 +21,7 @@ use finstack_quant_cashflows::builder::{AmortizationSpec, RateSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{
-    DiscountCurve, ForwardCurve, HazardCurve, ParInterp,
-};
-use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve, HazardCurve};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::bond::{
@@ -51,25 +48,29 @@ fn discount_curve() -> DiscountCurve {
             (5.0, (-0.20_f64).exp()),
             (10.0, (-0.40_f64).exp()),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
 
 fn index_curve() -> ForwardCurve {
-    ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(as_of())
-        .knots([(0.0, 0.04), (10.0, 0.04)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap()
+    ForwardCurve::flat(
+        "USD-SOFR-3M",
+        as_of(),
+        0.04,
+        finstack_quant_core::dates::DayCount::Act365F,
+    )
+    .unwrap()
 }
 
 fn hazard_curve() -> HazardCurve {
     HazardCurve::builder("USD-HAZ")
         .base_date(as_of())
         .recovery_rate(0.4)
-        .knots([(0.0, 0.03), (5.0, 0.03), (10.0, 0.03)])
-        .par_interp(ParInterp::Linear)
+        .knots([(5.0, 0.03), (10.0, 0.03)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap()
 }

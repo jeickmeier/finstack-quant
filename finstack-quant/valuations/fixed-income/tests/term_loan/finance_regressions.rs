@@ -51,6 +51,9 @@ fn discount_market(as_of: Date) -> MarketContext {
         DiscountCurve::builder("D")
             .base_date(as_of)
             .knots([(0.0, 1.0), (10.0, 1.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount"),
     )
@@ -68,12 +71,9 @@ fn overnight_loan(mode: FloatingLegCompounding) -> (TermLoan, MarketContext, Dat
     spec.fixing_calendar_id = Some("weekends_only".into());
     loan.rate = RateSpec::Floating(spec);
     let as_of = date!(2025 - 01 - 15);
-    let forward = ForwardCurve::builder("TEST-ON", 1.0 / 365.0)
-        .base_date(as_of)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.1), (1.0, 0.1)])
-        .build()
-        .expect("forward");
+    let daily_cont = 360.0 * (1.0_f64 + 0.1 / 360.0).ln();
+    let forward =
+        ForwardCurve::flat("TEST-ON", as_of, daily_cont, DayCount::Act360).expect("forward");
     // Include the lookback before issue; only the first accrual observation is low.
     let observations = (-7..14)
         .map(|day| {
@@ -81,7 +81,14 @@ fn overnight_loan(mode: FloatingLegCompounding) -> (TermLoan, MarketContext, Dat
             (d, if day == 0 { 0.01 } else { 0.1 })
         })
         .collect();
-    let history = ScalarTimeSeries::new("FIXING:TEST-ON", observations, None).expect("history");
+    let history = ScalarTimeSeries::new(
+        "FIXING:TEST-ON",
+        observations,
+        None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+    )
+    .expect("history");
     (
         loan,
         discount_market(as_of)
@@ -203,6 +210,9 @@ fn make_whole_market(as_of: Date, reference_rate: f64) -> MarketContext {
         DiscountCurve::builder("REF")
             .base_date(as_of)
             .knots([(0.0, 1.0), (10.0, (-10.0 * reference_rate).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("reference"),
     )

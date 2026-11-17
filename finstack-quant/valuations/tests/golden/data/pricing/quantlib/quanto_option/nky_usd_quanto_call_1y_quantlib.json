@@ -45,10 +45,9 @@
       "credit_indices": [],
       "curves": [
         {
-          "allow_non_monotonic": false,
           "base": "2026-04-30",
           "day_count": "act_365f",
-          "extrapolation": "flat_forward",
+          "extrapolation": "extend",
           "id": "USD-OIS",
           "interp_style": "log_linear",
           "knot_points": [
@@ -61,16 +60,13 @@
               0.30119421191220214
             ]
           ],
-          "min_forward_rate": null,
-          "min_forward_tenor": 1e-06,
           "rate_calibration": null,
           "type": "discount"
         },
         {
-          "allow_non_monotonic": false,
           "base": "2026-04-30",
           "day_count": "act_365f",
-          "extrapolation": "flat_forward",
+          "extrapolation": "extend",
           "id": "JPY-OIS",
           "interp_style": "log_linear",
           "knot_points": [
@@ -83,8 +79,6 @@
               0.7408182206817179
             ]
           ],
-          "min_forward_rate": null,
-          "min_forward_tenor": 1e-06,
           "rate_calibration": null,
           "type": "discount"
         }
@@ -96,6 +90,7 @@
           "pivot_currency": "USD"
         },
         "pinned_quotes": [],
+        "provider_pinned_quotes": [],
         "provider_quotes": [],
         "quotes": [
           [
@@ -103,8 +98,7 @@
             "USD",
             0.01
           ]
-        ],
-        "provider_pinned_quotes": []
+        ]
       },
       "fx_delta_vol_surfaces": [],
       "hierarchy": null,
@@ -136,7 +130,7 @@
           "interpolation_mode": "vol",
           "quote_type": "black_lognormal",
           "secondary_axis": "strike",
-          "strikes": [
+          "secondary_values": [
             50.0,
             100.0,
             150.0
@@ -163,7 +157,7 @@
           "interpolation_mode": "vol",
           "quote_type": "black_lognormal",
           "secondary_axis": "strike",
-          "strikes": [
+          "secondary_values": [
             0.005,
             0.01,
             0.02

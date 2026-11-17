@@ -198,7 +198,10 @@ pub(crate) fn generate_three_factor_paths(
                     // Use deterministic forward curve
                     let fwd = market.get_forward(spec.forward_curve_id.as_str())?;
                     let times = fwd.knots().to_vec();
-                    let rates = fwd.forwards().to_vec();
+                    let rates = times
+                        .iter()
+                        .map(|&t| fwd.instantaneous_forward(t))
+                        .collect::<Result<Vec<f64>>>()?;
                     let curve_offset = fwd.day_count().signed_year_fraction(
                         fwd.base_date(),
                         facility.issue_date,
@@ -212,7 +215,7 @@ pub(crate) fn generate_three_factor_paths(
                                 date,
                                 DayCountContext::default(),
                             )?;
-                            Ok(fwd.rate(t.max(0.0)))
+                            fwd.instantaneous_forward(t.max(0.0))
                         })
                         .collect::<Result<Vec<f64>>>()?;
                     (
@@ -543,13 +546,13 @@ pub fn build_credit_spread_params(
             // and the hazard↔spread mapping, both from the shared
             // market-anchored helpers so the callable lattice and this Monte
             // Carlo path cannot drift apart.
-            let sp_0 = hazard.sp(t_anchor).max(f64::MIN_POSITIVE);
-            let sp_t = hazard.sp(t_anchor + t).max(f64::MIN_POSITIVE);
+            let sp_0 = hazard.sp(t_anchor)?.max(f64::MIN_POSITIVE);
+            let sp_t = hazard.sp(t_anchor + t)?.max(f64::MIN_POSITIVE);
             let avg_lambda =
                 finstack_quant_models::credit::market_anchored::conditional_average_hazard(
                     sp_0, sp_t, t,
                 )?;
-            let lambda0 = hazard.hazard_rate(t_anchor).max(0.0);
+            let lambda0 = hazard.hazard_rate(t_anchor)?.max(0.0);
 
             // Credit triangle: s ≈ (1 − R) · λ, using the facility recovery
             // rate for consistency with pricing. The `1e-6` guard keeps a
@@ -699,6 +702,7 @@ mod tests {
                 .base_date(date!(2024 - 01 - 01))
                 .knots([(0.5, 0.01), (5.0, 0.05)])
                 .recovery_rate(0.40)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .expect("hazard curve"),
         );
@@ -744,6 +748,7 @@ mod tests {
             .base_date(date!(2024 - 01 - 01))
             .knots([(0.5, 0.01), (5.0, 0.05)])
             .recovery_rate(0.40)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard curve");
         let market = MarketContext::new().insert(hazard.clone());
@@ -772,10 +777,10 @@ mod tests {
         let horizon = day_count
             .year_fraction(as_of, facility.maturity, DayCountContext::default())
             .expect("remaining horizon");
-        let sp_0 = hazard.sp(t_anchor);
-        let sp_t = hazard.sp(t_anchor + horizon);
+        let sp_0 = hazard.sp(t_anchor).expect("sp");
+        let sp_t = hazard.sp(t_anchor + horizon).expect("sp");
         let avg_lambda = -(sp_t / sp_0).ln() / horizon;
-        let lambda0 = hazard.hazard_rate(t_anchor);
+        let lambda0 = hazard.hazard_rate(t_anchor).expect("hazard_rate");
         let one_minus_r = 1.0 - facility.recovery_rate;
         let s0 = one_minus_r * lambda0;
         let s_bar = one_minus_r * avg_lambda;
@@ -823,6 +828,8 @@ mod tests {
                     (1.0, (-0.03_f64).exp()),
                     (5.0, (-0.15_f64).exp()),
                 ])
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("discount curve"),
         );

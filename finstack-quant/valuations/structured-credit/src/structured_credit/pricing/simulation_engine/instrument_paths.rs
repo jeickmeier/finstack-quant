@@ -444,23 +444,36 @@ mod tests {
                 (1.0, (-0.03_f64).exp()),
                 (10.0, (-0.30_f64).exp()),
             ])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let forward = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+        let forward = ForwardCurve::builder("USD-SOFR-3M")
             .base_date(AS_OF)
             .day_count(DayCount::Act360)
-            .reset_lag(2)
-            .knots([(0.0, 0.04), (10.0, 0.04)])
+            .index_tenor(Tenor::quarterly())
+            .knots([(0.0, 1.0), (10.0, (-0.4_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("forward curve");
         let fixings: Vec<(Date, f64)> = (0..25)
+            .rev()
             .map(|days| (AS_OF - time::Duration::days(days), 0.04))
             .collect();
         MarketContext::new()
             .insert(discount)
             .insert(forward)
             .insert_series(
-                ScalarTimeSeries::new("FIXING:USD-SOFR-3M", fixings, None).expect("fixings"),
+                ScalarTimeSeries::new(
+                    "FIXING:USD-SOFR-3M",
+                    fixings,
+                    None,
+                    finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                    finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+                )
+                .expect("fixings"),
             )
     }
 

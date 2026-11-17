@@ -35,8 +35,8 @@ fn discount_curve_parallel_bump_applies_rate_shift() {
         .apply_bump(BumpSpec::parallel_bp(10.0))
         .expect("bump should succeed");
     assert_eq!(bumped.id().as_str(), "USD-OIS_bump_10bp");
-    let original = curve.df(1.0);
-    let bumped_df = bumped.df(1.0);
+    let original = curve.df(1.0).expect("df");
+    let bumped_df = bumped.df(1.0).expect("bumped df");
     assert!(
         bumped_df < original,
         "Additive parallel bump should decrease DF values"
@@ -44,7 +44,7 @@ fn discount_curve_parallel_bump_applies_rate_shift() {
 }
 
 #[test]
-fn forward_curve_supports_additive_and_multiplicative_bumps() {
+fn forward_curve_supports_additive_zero_bumps_and_rejects_multiplier() {
     let curve = sample_forward_curve("USD-LIBOR");
 
     let additive = curve
@@ -58,38 +58,54 @@ fn forward_curve_supports_additive_and_multiplicative_bumps() {
     // Fractional magnitudes keep one decimal so ±0.4bp-style bumps get
     // distinct IDs instead of colliding at "{:.0}" rounding.
     assert_eq!(additive.id().as_str(), "USD-LIBOR_bump_1.5pct");
+    assert!(additive.df(1.0).expect("df") < curve.df(1.0).expect("df"));
 
-    let multiplicative = curve
-        .apply_bump(BumpSpec::multiplier(1.1))
-        .expect("factor bumps supported");
     assert!(
-        multiplicative.forwards()[1] > curve.forwards()[1],
-        "multiplicative bumps scale rates upward"
+        curve.apply_bump(BumpSpec::multiplier(1.1)).is_err(),
+        "multiplicative bumps are rejected on ForwardCurve"
     );
 }
 
 #[test]
-fn forward_curve_parallel_bump_bp_is_additive_in_rate_space() {
-    let curve = ForwardCurve::builder("USD-SOFR3M", 0.25)
+fn forward_curve_parallel_bump_bp_is_additive_in_continuous_zero_space() {
+    let curve = ForwardCurve::builder("USD-SOFR3M")
         .base_date(sample_base_date())
-        .knots([(0.0, 0.03), (1.0, 0.04), (2.0, 0.05)])
+        .day_count(finstack_quant_core::dates::DayCount::Act360)
+        .knots([
+            (0.0, 1.0),
+            (1.0, (-0.04_f64).exp()),
+            (2.0, (-0.08_f64).exp()),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     let bumped = curve.apply_bump(BumpSpec::parallel_bp(10.0)).unwrap();
-    // 10bp = 0.001
-    for (orig, b) in curve.forwards().iter().zip(bumped.forwards().iter()) {
-        assert!((*b - (*orig + 0.001)).abs() < 1e-15);
+    // 10bp = 0.001 continuous zero shift: P_b(t) = P(t) * exp(-0.001 * t)
+    for (&t, (&orig, &b)) in curve
+        .knots()
+        .iter()
+        .zip(curve.factors().iter().zip(bumped.factors().iter()))
+    {
+        let expected = orig * (-0.001 * t).exp();
+        assert!((b - expected).abs() < 1e-12);
     }
 }
 
 #[test]
 fn forward_curve_triangular_key_rate_weights_match_market_standard() {
-    let curve = ForwardCurve::builder("USD-SOFR3M", 0.25)
+    let curve = ForwardCurve::builder("USD-SOFR3M")
         .base_date(sample_base_date())
-        // Include knots across the bucket grid so weights are visible at 0.5 and 1.0
-        .knots([(0.0, 0.03), (0.5, 0.032), (1.0, 0.035), (2.0, 0.04)])
-        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act360)
+        .knots([
+            (0.0, 1.0),
+            (0.5, (-0.015_f64).exp()),
+            (1.0, (-0.032_f64).exp()),
+            (2.0, (-0.070_f64).exp()),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -100,21 +116,15 @@ fn forward_curve_triangular_key_rate_weights_match_market_standard() {
         .unwrap();
 
     let bump_rate = bp / 10_000.0;
-
-    // Market-standard triangular weights (defined on bucket grid):
-    // w(0.0)=0, w(0.5)=0.5, w(1.0)=1.0, w(2.0)=0
-    let expected = [(0.0, 0.0), (0.5, 0.5), (1.0, 1.0), (2.0, 0.0)];
+    let expected = [(0.5, 0.5), (1.0, 1.0), (2.0, 0.0)];
 
     for (t, w) in expected {
-        let base = curve.rate(t);
-        let bumped_rate = bumped.rate(t);
+        let base_zero = -curve.df(t).unwrap().ln() / t;
+        let bumped_zero = -bumped.df(t).unwrap().ln() / t;
         assert!(
-            (bumped_rate - (base + bump_rate * w)).abs() < 1e-12,
-            "t={}: expected {}, got {} (w={})",
-            t,
-            base + bump_rate * w,
-            bumped_rate,
-            w
+            (bumped_zero - (base_zero + bump_rate * w)).abs() < 1e-12,
+            "t={t}: expected {}, got {bumped_zero} (w={w})",
+            base_zero + bump_rate * w
         );
     }
 }
@@ -132,19 +142,19 @@ fn hazard_curve_requires_additive_fraction() {
 }
 
 #[test]
-fn hazard_curve_rejects_invalid_recovery_for_bumps() {
+fn hazard_curve_direct_bump_works_at_full_recovery() {
     let curve = HazardCurve::builder("CDX-RISKLESS")
         .base_date(sample_base_date())
         .recovery_rate(1.0)
         .knots([(1.0, 0.01), (3.0, 0.015)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("hazard curve construction should succeed in test");
 
-    let bumped = curve.apply_bump(BumpSpec::parallel_bp(25.0));
-    assert!(
-        bumped.is_err(),
-        "curves with recovery >= 100% cannot convert par spread bumps"
-    );
+    let bumped = curve
+        .apply_bump(BumpSpec::parallel_bp(25.0))
+        .expect("direct hazard intensity bumps do not divide by (1 - recovery_rate)");
+    assert!((bumped.hazard_rate(1.0).unwrap() - 0.0125).abs() < 1e-12);
 }
 
 #[test]
@@ -153,9 +163,9 @@ fn inflation_curve_supports_percent_shifts() {
     let bumped = curve
         .apply_bump(BumpSpec::inflation_shift_pct(2.0))
         .expect("inflation shift should succeed");
-    assert_eq!(bumped.id().as_str(), "USD-CPI_bump_2pct");
+    assert_eq!(bumped.id(), curve.id());
     assert!(
-        bumped.cpi(1.0) > curve.cpi(1.0),
+        bumped.cpi(1.0).expect("bumped CPI") > curve.cpi(1.0).expect("base CPI"),
         "additive percent shifts increase CPI levels"
     );
 }
@@ -198,6 +208,9 @@ fn discount_curve_rebuild_paths_preserve_fx_policy() {
         .base_date(sample_base_date())
         .knots([(0.0, 1.0), (1.0, 0.98), (2.0, 0.96), (5.0, 0.90)])
         .fx_policy("triangulate_via_usd")
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -209,7 +222,9 @@ fn discount_curve_rebuild_paths_preserve_fx_policy() {
         .unwrap();
     assert_eq!(key_rate.fx_policy(), Some("triangulate_via_usd"));
 
-    let rolled = curve.roll_forward(183).unwrap();
+    let rolled = curve
+        .condition(sample_base_date() + time::Duration::days(183))
+        .unwrap();
     assert_eq!(rolled.fx_policy(), Some("triangulate_via_usd"));
 
     let via_trait = curve.apply_bump(BumpSpec::parallel_bp(10.0)).unwrap();
@@ -218,9 +233,12 @@ fn discount_curve_rebuild_paths_preserve_fx_policy() {
 
 #[test]
 fn forward_curve_rebuild_paths_preserve_fx_policy() {
-    let curve = ForwardCurve::builder("USD-SOFR-3M-FX", 0.25)
+    let curve = ForwardCurve::builder("USD-SOFR-3M-FX")
         .base_date(sample_base_date())
-        .knots([(0.0, 0.02), (1.0, 0.021), (2.0, 0.022), (5.0, 0.025)])
+        .day_count(finstack_quant_core::dates::DayCount::Act360)
+        .knots([(0.0, 1.0), (1.0, 0.98), (2.0, 0.96), (5.0, 0.88)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .fx_policy("triangulate_via_usd")
         .build()
         .unwrap();
@@ -233,31 +251,33 @@ fn forward_curve_rebuild_paths_preserve_fx_policy() {
         .unwrap();
     assert_eq!(key_rate.fx_policy(), Some("triangulate_via_usd"));
 
-    let rolled = curve.roll_forward(183).unwrap();
+    let rolled = curve
+        .condition(sample_base_date() + time::Duration::days(183))
+        .unwrap();
     assert_eq!(rolled.fx_policy(), Some("triangulate_via_usd"));
 
     let via_trait = curve.apply_bump(BumpSpec::parallel_bp(10.0)).unwrap();
     assert_eq!(via_trait.fx_policy(), Some("triangulate_via_usd"));
 
-    let via_trait_mult = curve.apply_bump(BumpSpec::multiplier(1.1)).unwrap();
-    assert_eq!(via_trait_mult.fx_policy(), Some("triangulate_via_usd"));
+    assert!(curve.apply_bump(BumpSpec::multiplier(1.1)).is_err());
 }
 
 #[test]
-fn hazard_curve_apply_bump_preserves_metadata_and_drops_stale_quotes() {
+fn hazard_curve_apply_bump_preserves_metadata_and_shifts_intensity() {
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::market_data::term_structures::{ParInterp, Seniority};
+    use finstack_quant_core::dates::DayCount;
+    use finstack_quant_core::market_data::term_structures::Seniority;
 
     let recovery = 0.40;
     let curve = HazardCurve::builder("ACME-SNR")
         .base_date(sample_base_date())
+        .day_count(DayCount::Act365F)
         .recovery_rate(recovery)
         .issuer("ACME Corp")
         .seniority(Seniority::Senior)
         .currency(Currency::USD)
         .fx_policy("triangulate_via_usd")
         .knots([(1.0, 0.01), (5.0, 0.01)])
-        .par_spreads([(1.0, 60.0), (5.0, 60.0)])
         .build()
         .unwrap();
 
@@ -271,14 +291,13 @@ fn hazard_curve_apply_bump_preserves_metadata_and_drops_stale_quotes() {
     assert_eq!(bumped.day_count(), curve.day_count());
     assert_eq!(bumped.recovery_rate(), recovery);
 
-    // Stale par quotes are cleared: cds_quote_bp falls back to the
-    // hazard-based approximation λ·(1−R)·1e4 reflecting the bumped curve:
-    // (0.01 + 0.001/0.6)·0.6·1e4 = 70bp (vs the stale stored 60bp).
-    assert_eq!(bumped.par_spread_points().count(), 0);
-    let quote = bumped.cds_quote_bp(3.0, ParInterp::Linear);
+    // Parallel bump shifts the raw hazard intensity directly by +10bp (0.0010),
+    // without fabricating CDS par spreads or dividing by (1 - R).
+    let bumped_lambda = bumped.hazard_rate(3.0).unwrap();
+    let expected = 0.01 + 0.0010;
     assert!(
-        (quote - 70.0).abs() < 1e-9,
-        "bumped quote must reflect bumped hazards, got {quote}"
+        (bumped_lambda - expected).abs() < 1e-12,
+        "bumped hazard rate must equal {expected}, got {bumped_lambda}"
     );
 }
 
@@ -295,10 +314,13 @@ fn hazard_curve_roll_forward_preserves_metadata() {
         .fx_policy("triangulate_via_usd")
         .knots([(1.0, 0.01), (3.0, 0.015), (5.0, 0.02)])
         .recovery_rate(0.40)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
 
-    let rolled = curve.roll_forward(183).unwrap();
+    let rolled = curve
+        .condition(sample_base_date() + time::Duration::days(183))
+        .unwrap();
     assert_eq!(rolled.issuer(), Some("ACME Corp"));
     assert_eq!(rolled.seniority(), Some(Seniority::Senior));
     assert_eq!(rolled.currency(), Some(Currency::USD));

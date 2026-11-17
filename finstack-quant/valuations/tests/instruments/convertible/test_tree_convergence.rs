@@ -106,14 +106,25 @@ fn create_test_market(base_date: Date) -> MarketContext {
             (10.0, (-0.05 * 10.0_f64).exp()),
         ])
         .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("should build curve");
 
     MarketContext::new()
         .insert(discount_curve)
-        .insert_price("EQUITY", MarketScalar::Unitless(100.0)) // ATM
-        .insert_price("EQUITY-VOL", MarketScalar::Unitless(0.25)) // 25% vol
-        .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(0.02)) // 2% div yield
+        .insert_price(
+            "EQUITY",
+            MarketScalar::unitless(100.0).expect("valid scalar"),
+        ) // ATM
+        .insert_price(
+            "EQUITY-VOL",
+            MarketScalar::unitless(0.25).expect("valid scalar"),
+        ) // 25% vol
+        .insert_price(
+            "EQUITY-DIVYIELD",
+            MarketScalar::unitless(0.02).expect("valid scalar"),
+        ) // 2% div yield
 }
 
 #[test]

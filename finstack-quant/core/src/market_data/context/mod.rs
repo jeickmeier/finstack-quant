@@ -36,8 +36,10 @@
 //! let base_date = Date::from_calendar_date(2024, Month::January, 1).expect("Valid date");
 //! let curve = DiscountCurve::builder("USD-OIS")
 //!     .base_date(base_date)
+//!     .day_count(finstack_quant_core::dates::DayCount::Act365F)
 //!     .knots([(0.0, 1.0), (1.0, 0.98)])
 //!     .interp(InterpStyle::Linear)
+//!     .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
 //!     .build()
 //!     .expect("DiscountCurve builder should succeed");
 //!
@@ -62,14 +64,17 @@ pub use curve_storage::CurveStorage;
 pub(crate) use curve_storage::for_each_context_curve;
 pub use stats::ContextStats;
 
-use std::sync::Arc;
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
+};
 
 use crate::FxHashMap;
 use crate::InputError;
 use crate::currency::Currency;
 use crate::dates::Date;
 use crate::money::Money;
-use crate::money::fx::{FxMatrix, FxQuery};
+use crate::money::fx::{FxConversionPolicy, FxMatrix, FxQuery};
 use crate::types::CurveId;
 
 use super::{
@@ -79,6 +84,12 @@ use super::{
     surfaces::{FxDeltaVolSurface, VolCube, VolSurface},
     term_structures::CreditIndexData,
 };
+
+static NEXT_CONTEXT_ID: AtomicU64 = AtomicU64::new(1);
+
+fn next_context_id() -> u64 {
+    NEXT_CONTEXT_ID.fetch_add(1, Ordering::Relaxed)
+}
 
 /// Outcome of [`MarketContext::convert_money`]: the converted amount and the
 /// FX rate it used, so callers can stamp the applied policy (including whether
@@ -97,8 +108,22 @@ pub struct ConvertedMoney {
 /// This is intended for hot-path finite-difference calculations that need to
 /// apply a small number of bumps to a reusable scratch `MarketContext` and then
 /// restore the previous state without cloning the full context.
-#[derive(Clone)]
-pub enum ContextScratchBump {
+pub struct ContextScratchBump {
+    pub(super) context_id: u64,
+    pub(super) token_id: u64,
+    pub(super) state: ScratchBumpState,
+}
+
+impl std::fmt::Debug for ContextScratchBump {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ContextScratchBump")
+            .field("context_id", &self.context_id)
+            .field("token_id", &self.token_id)
+            .finish()
+    }
+}
+
+pub(super) enum ScratchBumpState {
     /// A bumped curve plus the credit-index snapshot needed to restore it.
     Curve {
         /// Curve identifier that was bumped.
@@ -118,17 +143,6 @@ pub enum ContextScratchBump {
         /// Pre-bump surface.
         previous: Arc<VolSurface>,
     },
-    /// One bumped volatility-surface grid point.
-    SurfacePoint {
-        /// Surface identifier that was bumped.
-        id: CurveId,
-        /// Expiry coordinate used to select the nearest grid point.
-        expiry: f64,
-        /// Strike coordinate used to select the nearest grid point.
-        strike: f64,
-        /// Original volatility restored when the token is reverted.
-        original_vol: f64,
-    },
     /// A bumped scalar/price.
     Price {
         /// Scalar identifier that was bumped.
@@ -146,7 +160,6 @@ pub use state_serde::{CreditIndexState, CurveState, MarketContextState};
 /// and is cheap to clone thanks to pervasive `Arc` usage. Typical workflows
 /// construct a base context at scenario initialisation and reuse it across
 /// pricing engines.
-#[derive(Clone, Default)]
 pub struct MarketContext {
     // Each map is wrapped in `Arc` so cloning the context (e.g. per finite-
     // difference greek bump) is a refcount bump rather than re-allocating and
@@ -184,6 +197,57 @@ pub struct MarketContext {
 
     /// Optional market data hierarchy for organizational grouping.
     hierarchy: Option<MarketDataHierarchy>,
+
+    /// Unique identifier for scratch-token ownership verification.
+    context_id: u64,
+
+    /// Monotonic token counter for in-place scratch bumps.
+    next_scratch_token: u64,
+
+    /// LIFO stack of active scratch bump token IDs on this context instance.
+    active_scratch_tokens: Vec<u64>,
+}
+
+impl Default for MarketContext {
+    fn default() -> Self {
+        Self {
+            curves: Arc::default(),
+            fx: None,
+            surfaces: Arc::default(),
+            prices: Arc::default(),
+            series: Arc::default(),
+            inflation_indices: Arc::default(),
+            credit_indices: Arc::default(),
+            dividends: Arc::default(),
+            fx_delta_vol_surfaces: Arc::default(),
+            vol_cubes: Arc::default(),
+            hierarchy: None,
+            context_id: next_context_id(),
+            next_scratch_token: 0,
+            active_scratch_tokens: Vec::new(),
+        }
+    }
+}
+
+impl Clone for MarketContext {
+    fn clone(&self) -> Self {
+        Self {
+            curves: Arc::clone(&self.curves),
+            fx: self.fx.clone(),
+            surfaces: Arc::clone(&self.surfaces),
+            prices: Arc::clone(&self.prices),
+            series: Arc::clone(&self.series),
+            inflation_indices: Arc::clone(&self.inflation_indices),
+            credit_indices: Arc::clone(&self.credit_indices),
+            dividends: Arc::clone(&self.dividends),
+            fx_delta_vol_surfaces: Arc::clone(&self.fx_delta_vol_surfaces),
+            vol_cubes: Arc::clone(&self.vol_cubes),
+            hierarchy: self.hierarchy.clone(),
+            context_id: next_context_id(),
+            next_scratch_token: 0,
+            active_scratch_tokens: Vec::new(),
+        }
+    }
 }
 
 impl std::fmt::Debug for MarketContext {
@@ -247,6 +311,7 @@ impl MarketContext {
     /// * `amount` - Monetary amount to convert.
     /// * `target_currency` - Destination currency.
     /// * `as_of` - Date used for the FX rate lookup.
+    /// * `policy` - FX conversion policy (e.g. [`FxConversionPolicy::CashflowDate`] or [`FxConversionPolicy::PeriodAverage`]).
     ///
     /// # Errors
     ///
@@ -258,6 +323,7 @@ impl MarketContext {
         amount: Money,
         target_currency: Currency,
         as_of: Date,
+        policy: FxConversionPolicy,
     ) -> crate::Result<ConvertedMoney> {
         if amount.currency() == target_currency {
             return Ok(ConvertedMoney { amount, rate: None });
@@ -267,7 +333,7 @@ impl MarketContext {
             amount.currency(),
             target_currency,
             as_of,
-            crate::money::fx::FxConversionPolicy::CashflowDate,
+            policy,
         ))?;
         Ok(ConvertedMoney {
             amount: amount.convert_at_rate_f64(target_currency, rate.rate)?,
@@ -300,8 +366,42 @@ impl MarketContext {
 
     /// Attach a market data hierarchy.
     pub fn set_hierarchy(&mut self, h: MarketDataHierarchy) {
+        self.invalidate_scratch_tokens();
         self.hierarchy = Some(h);
     }
+
+    pub(super) fn invalidate_scratch_tokens(&mut self) {
+        self.active_scratch_tokens.clear();
+    }
+
+    pub(super) fn allocate_scratch_token(&mut self) -> (u64, u64) {
+        let token_id = self.next_scratch_token;
+        self.next_scratch_token = self.next_scratch_token.wrapping_add(1);
+        self.active_scratch_tokens.push(token_id);
+        (self.context_id, token_id)
+    }
+
+    pub(super) fn pop_scratch_token(
+        &mut self,
+        context_id: u64,
+        token_id: u64,
+    ) -> crate::Result<()> {
+        if context_id != self.context_id {
+            return Err(crate::Error::Validation(format!(
+                "Cannot revert scratch bump token {token_id} from context {context_id} on context {}",
+                self.context_id
+            )));
+        }
+        if self.active_scratch_tokens.last().copied() != Some(token_id) {
+            return Err(crate::Error::Validation(format!(
+                "Cannot revert scratch bump token {token_id} on context {}: token is stale, already reverted, or out of LIFO order",
+                self.context_id
+            )));
+        }
+        self.active_scratch_tokens.pop();
+        Ok(())
+    }
+
     /// Returns `true` if any credit index references the given curve ID
     /// as its hazard curve, base correlation curve, or issuer curve.
     fn curve_affects_credit_indices(&self, curve_id: &CurveId) -> bool {
@@ -317,75 +417,15 @@ impl MarketContext {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum VolRegistry {
-    Surfaces,
-    VolCubes,
-    FxDeltaVolSurfaces,
-}
-
-impl VolRegistry {
-    pub(crate) const fn label(self) -> &'static str {
-        match self {
-            Self::Surfaces => "surfaces",
-            Self::VolCubes => "vol_cubes",
-            Self::FxDeltaVolSurfaces => "fx_delta_vol_surfaces",
-        }
-    }
-}
-
 impl MarketContext {
-    pub(crate) fn conflicting_vol_registry(
-        &self,
-        id: &str,
-        target: VolRegistry,
-    ) -> Option<VolRegistry> {
-        if target != VolRegistry::Surfaces && self.surfaces.contains_key(id) {
-            return Some(VolRegistry::Surfaces);
-        }
-        if target != VolRegistry::VolCubes && self.vol_cubes.contains_key(id) {
-            return Some(VolRegistry::VolCubes);
-        }
-        if target != VolRegistry::FxDeltaVolSurfaces && self.fx_delta_vol_surfaces.contains_key(id)
-        {
-            return Some(VolRegistry::FxDeltaVolSurfaces);
-        }
-        None
-    }
-
-    pub(crate) fn ensure_vol_id_available(
-        &self,
-        id: &str,
-        target: VolRegistry,
-    ) -> crate::Result<()> {
-        if let Some(existing) = self.conflicting_vol_registry(id, target) {
-            return Err(crate::Error::Validation(format!(
-                "MarketContext volatility id '{id}' cannot be inserted into '{}': already registered in '{}'",
-                target.label(),
-                existing.label()
-            )));
-        }
-        Ok(())
-    }
-
-    pub(crate) fn evict_conflicting_vol_registries(&mut self, id: &str, target: VolRegistry) {
-        if target != VolRegistry::Surfaces && self.surfaces.contains_key(id) {
-            Arc::make_mut(&mut self.surfaces).remove(id);
-        }
-        if target != VolRegistry::VolCubes && self.vol_cubes.contains_key(id) {
-            Arc::make_mut(&mut self.vol_cubes).remove(id);
-        }
-        if target != VolRegistry::FxDeltaVolSurfaces && self.fx_delta_vol_surfaces.contains_key(id)
-        {
-            Arc::make_mut(&mut self.fx_delta_vol_surfaces).remove(id);
-        }
-    }
-
     pub(crate) fn unsupported_vol_surface_bump_error(
         &self,
         id: &str,
         operation: &str,
     ) -> Option<crate::Error> {
+        if self.surfaces.contains_key(id) {
+            return None;
+        }
         if self.vol_cubes.contains_key(id) {
             return Some(crate::Error::Validation(format!(
                 "Cannot apply {operation} to '{id}': registered as VolCube, which does not support VolSurface grid bumps"
@@ -397,36 +437,6 @@ impl MarketContext {
             )));
         }
         None
-    }
-
-    /// Rebind all credit indices to current curves, dropping any whose dependencies
-    /// were removed or replaced with an incompatible curve type.
-    pub(crate) fn prune_invalidated_credit_indices(&mut self) -> Vec<CurveId> {
-        if self.credit_indices.is_empty() {
-            return Vec::new();
-        }
-        let mut rebuilt = FxHashMap::default();
-        rebuilt.reserve(self.credit_indices.len());
-        let mut invalidated = Vec::new();
-
-        for (id, data) in self.credit_indices.iter() {
-            match self.rebind_credit_index_data(data) {
-                Ok(index) => {
-                    rebuilt.insert(id.clone(), Arc::new(index));
-                }
-                Err(err) => {
-                    invalidated.push(id.clone());
-                    tracing::warn!(
-                        credit_index_id = id.as_str(),
-                        error = %err,
-                        "dropping credit index after failed curve rebinding"
-                    );
-                }
-            }
-        }
-
-        self.credit_indices = Arc::new(rebuilt);
-        invalidated
     }
 
     /// Rebind all credit indices to current curves atomically.
@@ -458,7 +468,7 @@ mod tests {
     use crate::InputError;
     use crate::currency::Currency;
     use crate::money::Money;
-    use crate::money::fx::{FxMatrix, SimpleFxProvider};
+    use crate::money::fx::{FxConversionPolicy, FxMatrix, SimpleFxProvider};
     use std::sync::Arc;
     use time::macros::date;
 
@@ -489,7 +499,12 @@ mod tests {
         let ctx = MarketContext::new();
         let amount = Money::from((1_000_i64, Currency::USD));
         let out = ctx
-            .convert_money(amount, Currency::USD, date!(2025 - 01 - 15))
+            .convert_money(
+                amount,
+                Currency::USD,
+                date!(2025 - 01 - 15),
+                FxConversionPolicy::CashflowDate,
+            )
             .expect("same-ccy conversion should not consult FX")
             .amount;
         assert_eq!(out, amount);
@@ -504,7 +519,12 @@ mod tests {
         let ctx = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(provider), None));
         let eur = Money::from((1_000_i64, Currency::EUR));
         let usd = ctx
-            .convert_money(eur, Currency::USD, date!(2025 - 01 - 15))
+            .convert_money(
+                eur,
+                Currency::USD,
+                date!(2025 - 01 - 15),
+                FxConversionPolicy::CashflowDate,
+            )
             .expect("EUR->USD should succeed")
             .amount;
         assert_eq!(usd.currency(), Currency::USD);
@@ -524,7 +544,12 @@ mod tests {
         let eur = Money::from_decimal(amount, Currency::EUR);
 
         let usd = ctx
-            .convert_money(eur, Currency::USD, date!(2025 - 01 - 15))
+            .convert_money(
+                eur,
+                Currency::USD,
+                date!(2025 - 01 - 15),
+                FxConversionPolicy::CashflowDate,
+            )
             .expect("EUR->USD should succeed")
             .amount;
         assert_eq!(
@@ -538,7 +563,12 @@ mod tests {
         let ctx = MarketContext::new();
         let eur = Money::from((1_000_i64, Currency::EUR));
         let err = ctx
-            .convert_money(eur, Currency::USD, date!(2025 - 01 - 15))
+            .convert_money(
+                eur,
+                Currency::USD,
+                date!(2025 - 01 - 15),
+                FxConversionPolicy::CashflowDate,
+            )
             .unwrap_err();
         assert!(
             matches!(

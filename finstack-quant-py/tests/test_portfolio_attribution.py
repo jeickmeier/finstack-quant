@@ -54,6 +54,8 @@ def _market(currency: str, as_of: str, shift: float = 0.0, fx: float | None = No
             date.fromisoformat(as_of),
             [(0.0, 1.0), (0.5, 0.98 - shift), (1.0, 0.95 - shift)],
             day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
         )
     )
     if fx is not None:

@@ -1,9 +1,15 @@
 //! Discount-curve construction, queries, and forward derivation.
 
-use super::super::forward_curve::ForwardCurve;
-use super::{DEFAULT_MIN_FORWARD_TENOR, DiscountCurve, DiscountCurveBuilder, ValidationMode};
+use super::super::common::factor::{
+    FactorTransformSnapshot, dated_points_to_factors,
+    instantaneous_forward as factor_instantaneous_forward, zero_rate_points_to_factors,
+};
+use super::super::common::{
+    signed_curve_year_fraction, stable_positive_log_ratio, validate_curve_clock,
+};
+use super::{DiscountCurve, DiscountCurveBuilder};
 use crate::math::Compounding;
-use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
+use crate::math::interp::{ExtrapolationPolicy, InterpStyle, exact_f64_eq};
 use crate::{
     dates::{Date, DayCount},
     types::CurveId,
@@ -12,186 +18,130 @@ use crate::{
 impl DiscountCurve {
     /// Construct a flat continuously-compounded discount curve.
     ///
-    /// The curve uses the minimal two-knot representation
-    /// `(0, 1)` and `(1, exp(-rate))`, log-linear interpolation, and
-    /// flat-forward extrapolation. This preserves `DF(t) = exp(-rate * t)`
-    /// for every non-negative maturity.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Unique curve identifier (for example `"USD-OIS"`).
-    /// * `base_date` - Valuation date anchoring `t = 0`; the curve day count
-    ///   is `Act/365F`.
-    /// * `continuous_rate` - Continuously-compounded zero rate as a decimal
-    ///   fraction (`0.05` is 5%). Magnitudes above `1.0` are rejected because
-    ///   they almost always mean a percentage was passed where a decimal was
-    ///   expected.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when `continuous_rate` is non-finite, has magnitude
-    /// greater than `1.0`, or its one-year discount factor cannot be
-    /// represented as a finite positive value.
-    pub fn flat(id: impl AsRef<str>, base_date: Date, continuous_rate: f64) -> crate::Result<Self> {
-        if !continuous_rate.is_finite() {
-            return Err(crate::Error::Validation(
-                "DiscountCurve: flat continuous rate must be finite".to_string(),
-            ));
-        }
-        if continuous_rate.abs() > 1.0 {
-            return Err(crate::Error::Validation(format!(
-                "DiscountCurve: flat continuous rate {continuous_rate} is outside [-1, 1]; \
-                 rates are decimal fractions (pass 0.05 for 5%, not 5.0)"
-            )));
-        }
-        let one_year_df = crate::math::Compounding::Continuous.df_from_rate(continuous_rate, 1.0);
-        if !one_year_df.is_finite() || one_year_df <= 0.0 {
-            return Err(crate::Error::Validation(format!(
-                "DiscountCurve: flat continuous rate {continuous_rate} produces an invalid discount factor"
-            )));
-        }
-
-        Self::builder(id.as_ref())
-            .base_date(base_date)
-            .knots([(0.0, 1.0), (1.0, one_year_df)])
-            .interp(InterpStyle::LogLinear)
-            .extrapolation(ExtrapolationPolicy::FlatForward)
-            .validation(ValidationMode::Raw {
-                allow_non_monotonic: continuous_rate < 0.0,
-                forward_floor: None,
-            })
-            .build()
-    }
-
-    /// Construct a discount curve from zero-rate pillars.
-    ///
-    /// Each `(t, r)` pillar is converted to a discount factor under
-    /// `compounding` (`DF = exp(-r t)` for continuous, `(1 + r)^-t` for
-    /// annual, and so on). A pillar at `t = 0` maps to `DF = 1` provided `r`
-    /// is finite and inside `compounding`'s valid rate domain. The curve uses
-    /// the builder defaults: `Act/365F` day count, monotone-convex
-    /// interpolation, and flat-forward extrapolation. When all zero rates are
-    /// non-negative, market-standard validation applies; when negative zero
-    /// rates are supplied (`r < 0`, `DF > 1`), non-monotonic discount factors
-    /// are permitted so negative-rate curves build cleanly.
+    /// Uses a two-knot log-linear representation `(0, 1)` and
+    /// `(1, exp(-continuous_rate))` with [`ExtrapolationPolicy::Extend`] on the
+    /// supplied `day_count`, preserving `DF(t) = exp(-continuous_rate * t)`
+    /// across all representable times.
     ///
     /// # Arguments
     ///
     /// * `id` - Unique curve identifier (for example `"USD-OIS"`).
     /// * `base_date` - Valuation date anchoring `t = 0`.
-    /// * `points` - `(time_years, zero_rate)` pillars with the rate as a
-    ///   decimal fraction (`0.05` is 5%); times must be finite, non-negative
-    ///   and distinct. Any order is accepted.
-    /// * `compounding` - Compounding convention under which `zero_rate` is
-    ///   quoted.
+    /// * `continuous_rate` - Continuously-compounded zero rate as a decimal
+    ///   fraction (`0.05` is 5%, `-0.01` is -1%).
+    /// * `day_count` - Explicit supported curve day-count convention (cannot be
+    ///   `ActActIsma`, `Act365L`, `ThirtyE360Isda`, or calendarless `Bus252`).
     ///
     /// # Errors
     ///
-    /// Returns an error when `points` is empty, a time is negative or
-    /// non-finite, a rate is non-finite or outside `compounding`'s domain
-    /// (`DF <= 0`), or the resulting knots fail curve validation.
+    /// Returns an error when `continuous_rate` is non-finite, its 1-year
+    /// discount factor overflows or underflows to zero, or `day_count` is not
+    /// supported as a standalone curve clock.
+    pub fn flat(
+        id: impl AsRef<str>,
+        base_date: Date,
+        continuous_rate: f64,
+        day_count: DayCount,
+    ) -> crate::Result<Self> {
+        let one_year_df = Compounding::Continuous.df_from_rate(continuous_rate, 1.0)?;
+
+        Self::builder(id.as_ref())
+            .base_date(base_date)
+            .day_count(day_count)
+            .knots([(0.0, 1.0), (1.0, one_year_df)])
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Extend)
+            .build()
+    }
+
+    /// Construct a discount curve from strictly ordered zero-rate pillars.
+    ///
+    /// Converts each `(t, r)` pillar via `compounding`, validates strict
+    /// ascending order without sorting or merging, and prepends `(0, 1)` when
+    /// the first time is strictly positive. Any finite positive DF (including
+    /// `DF > 1` for negative rates) is accepted.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique curve identifier (for example `"USD-OIS"`).
+    /// * `base_date` - Valuation date anchoring `t = 0`.
+    /// * `points` - Strictly increasing `(time_years, zero_rate)` pillars with
+    ///   finite `time_years >= 0` and decimal zero rates (`0.05` is 5%).
+    /// * `compounding` - Explicit compounding convention of the input rates.
+    /// * `day_count` - Explicit supported curve day-count convention.
+    /// * `style` - Explicit interpolation strategy.
+    /// * `extrapolation` - Explicit out-of-range tail policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `points` is empty, unsorted or contains duplicate
+    /// times, a rate is outside `compounding`'s valid domain, `day_count` is
+    /// invalid, or interpolation setup fails.
     pub fn from_zero_rates(
         id: impl Into<CurveId>,
         base_date: Date,
         points: &[(f64, f64)],
         compounding: Compounding,
+        day_count: DayCount,
+        style: InterpStyle,
+        extrapolation: ExtrapolationPolicy,
     ) -> crate::Result<Self> {
-        if points.is_empty() {
-            return Err(crate::InputError::TooFewPoints.into());
-        }
-        let mut knots = Vec::with_capacity(points.len() + 1);
-        let mut has_negative_rate = false;
-        for &(t, r) in points {
-            if !t.is_finite() || t < 0.0 || !r.is_finite() {
-                return Err(crate::Error::Validation(format!(
-                    "DiscountCurve::from_zero_rates requires finite non-negative times and finite rates, got (t={t}, r={r})"
-                )));
-            }
-            let df = compounding.df_from_rate(r, t);
-            if !df.is_finite() || df <= 0.0 {
-                return Err(crate::Error::Validation(format!(
-                    "DiscountCurve::from_zero_rates pillar (t={t}, r={r}) under {compounding:?} produced invalid discount factor {df}"
-                )));
-            }
-            if r < 0.0 || df > 1.0 {
-                has_negative_rate = true;
-            }
-            knots.push((t, df));
-        }
-        if !knots.iter().any(|&(t, _)| t == 0.0) {
-            knots.push((0.0, 1.0));
-        }
-        let mut builder = Self::builder(id).base_date(base_date).knots(knots);
-        if has_negative_rate {
-            builder = builder.validation(ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            });
-        }
-        builder.build()
+        let knots = zero_rate_points_to_factors("DiscountCurve", points, compounding)?;
+        Self::builder(id)
+            .base_date(base_date)
+            .day_count(day_count)
+            .knots(knots)
+            .interp(style)
+            .extrapolation(extrapolation)
+            .build()
     }
 
-    /// Construct a discount curve from dated discount-factor pillars.
+    /// Construct a discount curve from strictly ordered dated discount-factor
+    /// pillars.
     ///
-    /// Each pillar date is converted to a year fraction from `base_date`
-    /// under `day_count`, and a `(0, 1)` anchor is added when no pillar falls
-    /// on `base_date`. Other settings use the builder defaults (monotone-convex
-    /// interpolation, flat-forward extrapolation, market-standard validation).
+    /// Each pillar date is mapped from `base_date` using `day_count`, preserving
+    /// input order (unsorted or colliding mapped times error), and `(0, 1)` is
+    /// prepended when the first pillar time is strictly positive.
     ///
     /// # Arguments
     ///
     /// * `id` - Unique curve identifier (for example `"USD-OIS"`).
     /// * `base_date` - Valuation date anchoring `t = 0`.
-    /// * `points` - `(date, discount_factor)` pillars; dates must not precede
-    ///   `base_date` and discount factors must be finite and positive. Any
-    ///   order is accepted.
-    /// * `day_count` - Day-count convention used to convert pillar dates to
-    ///   curve times; `None` uses the `Act/365F` builder default.
+    /// * `points` - Strictly ascending `(date, discount_factor)` pillars with
+    ///   `date >= base_date` and finite strictly positive discount factors.
+    /// * `day_count` - Explicit supported curve day-count convention.
+    /// * `style` - Explicit interpolation strategy.
+    /// * `extrapolation` - Explicit out-of-range tail policy.
     ///
     /// # Errors
     ///
-    /// Returns an error when `points` is empty, a pillar date precedes
-    /// `base_date`, a year fraction cannot be computed, or the resulting knots
-    /// fail curve validation.
+    /// Returns an error when `points` is empty, any date precedes `base_date`,
+    /// mapped pillar times are not strictly increasing, `day_count` is invalid
+    /// or requires an absent calendar, or any discount factor is non-positive.
     pub fn from_dates(
         id: impl Into<CurveId>,
         base_date: Date,
         points: &[(Date, f64)],
-        day_count: Option<DayCount>,
+        day_count: DayCount,
+        style: InterpStyle,
+        extrapolation: ExtrapolationPolicy,
     ) -> crate::Result<Self> {
-        if points.is_empty() {
-            return Err(crate::InputError::TooFewPoints.into());
-        }
-        let day_count = day_count.unwrap_or(DayCount::Act365F);
-        let mut knots = Vec::with_capacity(points.len() + 1);
-        for &(date, df) in points {
-            if date < base_date {
-                return Err(crate::Error::Validation(format!(
-                    "DiscountCurve::from_dates pillar {date} precedes base date {base_date}"
-                )));
-            }
-            let t = day_count.signed_year_fraction(
-                base_date,
-                date,
-                crate::dates::DayCountContext::default(),
-            )?;
-            knots.push((t, df));
-        }
-        if !knots.iter().any(|&(t, _)| t == 0.0) {
-            knots.push((0.0, 1.0));
-        }
-        let has_above_unit_df = knots.iter().any(|&(_, df)| df > 1.0);
-        let mut builder = Self::builder(id)
+        let id: CurveId = id.into();
+        let calendar = validate_curve_clock("DiscountCurve", id.as_str(), day_count, None)?;
+        let knots = dated_points_to_factors(
+            "DiscountCurve",
+            base_date,
+            points,
+            day_count,
+            calendar.as_ref(),
+        )?;
+        Self::builder(id)
             .base_date(base_date)
             .day_count(day_count)
-            .knots(knots);
-        if has_above_unit_df {
-            builder = builder.validation(ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            });
-        }
-        builder.build()
+            .knots(knots)
+            .interp(style)
+            .extrapolation(extrapolation)
+            .build()
     }
 
     /// Unique identifier of the curve.
@@ -212,33 +162,32 @@ impl DiscountCurve {
         self.day_count
     }
 
-    /// Interpolation style used by this curve.
+    /// Interpolation style configured for this curve.
     #[inline]
     pub fn interp_style(&self) -> InterpStyle {
         self.interp.style()
     }
 
-    /// Extrapolation policy used by this curve.
+    /// Extrapolation policy configured for out-of-bounds queries.
     #[inline]
     pub fn extrapolation(&self) -> ExtrapolationPolicy {
         self.interp.extrapolation()
     }
 
-    /// Exact typed conventions and quotes used to calibrate this curve.
+    /// Exact typed inputs used to bootstrap this curve, when available.
     #[inline]
+    #[must_use]
     pub fn rate_calibration(&self) -> Option<&super::super::RateCalibrationRecipe> {
         self.rate_calibration.as_ref()
     }
 
-    /// Opaque FX policy stamp from curve construction, if any.
-    ///
-    /// Propagated onto `ResultsMeta.fx_policy_applied` for dependent instruments.
+    /// Opaque FX policy stamp set by calibration, if any.
     #[inline]
     pub fn fx_policy(&self) -> Option<&str> {
         self.fx_policy.as_deref()
     }
 
-    /// Number of knot points in the curve.
+    /// Number of visible knot points stored on this curve.
     #[inline]
     #[must_use]
     pub fn len(&self) -> usize {
@@ -254,50 +203,19 @@ impl DiscountCurve {
 
     /// Continuously-compounded forward rate between `t1` and `t2`.
     ///
-    /// The forward rate `f(t1, t2)` satisfies `DF(t2) = DF(t1) · exp(-f · (t2 − t1))`,
-    /// so equivalently
-    ///
-    /// ```text
-    /// f(t1, t2) = -ln(DF(t2) / DF(t1)) / (t2 - t1).
-    /// ```
-    ///
-    /// This is the form evaluated here. The algebraically equivalent
-    /// zero-rate form `(z2·t2 − z1·t1) / (t2 − t1)` (with `z·t =
-    /// -ln(DF)`) round-trips each endpoint through an extra division
-    /// and multiplication — two wasted ulps — and costs two `ln`
-    /// evaluations instead of one. The current form avoids both and
-    /// matches the canonical identity to ~1 ulp even at sub-
-    /// millisecond tenors.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// - `t1` or `t2` is non-finite
-    /// - `t2 <= t1`
-    /// - `(t2 − t1) < min_forward_tenor` (configurable, default ~30 seconds) to avoid
-    ///   numerical precision issues from catastrophic cancellation
-    /// - either `DF(t1)` or `DF(t2)` is non-positive (pathological curve)
-    ///
-    /// # Configuring Minimum Tenor
-    ///
-    /// The minimum forward tenor can be customized when building the curve:
-    /// ```
-    /// use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    /// # use time::macros::date;
-    /// # fn main() -> finstack_quant_core::Result<()> {
-    /// let curve = DiscountCurve::builder("USD")
-    ///     .base_date(date!(2025-01-01))
-    ///     .knots([(0.0, 1.0), (1.0, 0.95)])
-    ///     .min_forward_tenor(1e-8)  // Allow very short tenors
-    ///     .build()?;
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// Computes `-ln(DF(t2) / DF(t1)) / (t2 - t1)` using stable log-difference
+    /// arithmetic after admitting both endpoint discount factors.
     ///
     /// # Arguments
     ///
-    /// * `t1` - Start year-fraction of the forward or rate interval being queried
-    /// * `t2` - End year-fraction of the forward or rate interval being queried
+    /// * `t1` - Start year fraction from the curve base date.
+    /// * `t2` - End year fraction from the curve base date; must satisfy `t2 > t1`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `t1` or `t2` is non-finite, `t2 <= t1`, either
+    /// endpoint discount factor fails domain or tail admission, or the quotient
+    /// division overflows or underflows non-equal factors to zero.
     #[inline]
     #[must_use = "computed forward rate should not be discarded"]
     pub fn forward(&self, t1: f64, t2: f64) -> crate::Result<f64> {
@@ -306,183 +224,124 @@ impl DiscountCurve {
                 "forward interval must be finite with t2 > t1, got [{t1}, {t2}]"
             )));
         }
-        if (t2 - t1) < self.min_forward_tenor {
+        let df1 = self.df(t1)?;
+        let df2 = self.df(t2)?;
+        let dt = t2 - t1;
+        if !dt.is_finite() || dt <= 0.0 {
             return Err(crate::Error::Validation(format!(
-                "forward interval [{t1}, {t2}] is shorter than min_forward_tenor {}",
-                self.min_forward_tenor
+                "forward interval width must be finite and positive, got {dt}"
             )));
         }
-        let df1 = self.df(t1);
-        let df2 = self.df(t2);
-        if !(df1.is_finite() && df1 > 0.0 && df2.is_finite() && df2 > 0.0) {
+        let neg_log_ratio = stable_positive_log_ratio(df1, df2)?;
+        let rate = neg_log_ratio / dt;
+        if !rate.is_finite() || (!exact_f64_eq(neg_log_ratio, 0.0) && exact_f64_eq(rate, 0.0)) {
             return Err(crate::Error::Validation(format!(
-                "discount factors over [{t1}, {t2}] must be finite and positive"
+                "forward rate overflowed or underflowed over [{t1}, {t2}]"
             )));
         }
-        Ok(-(df2 / df1).ln() / (t2 - t1))
+        Ok(if exact_f64_eq(rate, 0.0) { 0.0 } else { rate })
     }
 
-    /// Get the minimum forward tenor configured for this curve.
+    /// Original untransformed anchor date for conditioned curves, or `base_date()` otherwise.
     #[inline]
-    pub fn min_forward_tenor(&self) -> f64 {
-        self.min_forward_tenor
+    #[must_use]
+    pub fn source_base_date(&self) -> Date {
+        self.transform
+            .as_ref()
+            .map_or(self.base, |transform| transform.source_base_date())
     }
 
-    /// Whether validation permits increasing discount factors.
-    #[inline]
-    pub fn allows_non_monotonic(&self) -> bool {
-        self.allow_non_monotonic
-    }
-
-    /// Minimum implied forward rate accepted by validation, if configured.
-    #[inline]
-    pub fn min_forward_rate(&self) -> Option<f64> {
-        self.min_forward_rate
-    }
-
-    /// Fallible: discount factor on a specific date `date` using the curve's day-count.
+    /// Discount factor on a specific date `date` using the curve's clock.
+    ///
+    /// Conditioned curves map `date` on [`source_base_date`](Self::source_base_date)
+    /// using [`day_count`](Self::day_count) and [`day_count_context`](Self::day_count_context).
     ///
     /// # Arguments
     ///
-    /// * `date` - Target calendar date converted to a year fraction from [`base_date`](Self::base_date) using [`day_count`](Self::day_count).
+    /// * `date` - Target calendar date for the discount factor query.
     ///
     /// # Errors
     ///
-    /// Propagates a failure while computing the curve day-count fraction from
-    /// the base date to `date`.
+    /// Returns an error if day-count calculation fails or the factor at the
+    /// mapped coordinate cannot be admitted under the curve's interpolation and
+    /// tail policy.
     #[inline]
     #[must_use = "computed discount factor should not be discarded"]
     pub fn df_on_date(&self, date: Date) -> crate::Result<f64> {
+        if let Some(transform) = &self.transform {
+            let source_t = signed_curve_year_fraction(
+                transform.source_base_date(),
+                date,
+                self.day_count,
+                self.calendar.as_ref(),
+            )?;
+            return transform.df_at_source_time(&self.interp, source_t);
+        }
         let t = self.year_fraction_to(date)?;
-        Ok(self.df(t))
+        self.df(t)
     }
 
-    /// Returns the zero rate for a given date with specified compounding convention.
+    /// Zero rate on `date` under the explicit `compounding` convention.
     ///
-    /// This is the unified method for obtaining zero rates under any compounding convention.
+    /// Requires `date` to map strictly past `base_date` (`t > 0`) on the curve's
+    /// clock (`t <= 0`, including `date <= base_date`, returns an error because
+    /// `D(0) = 1` identifies no finite-horizon zero rate).
     ///
     /// # Arguments
-    /// * `date` - Target date for the zero rate
-    /// * `compounding` - Compounding convention (Continuous, Periodic(n), Simple)
     ///
-    /// # Mathematical Formulas
-    ///
-    /// For a discount factor `df` and time `t`:
-    ///
-    /// | Compounding | Formula | Use Case |
-    /// |-------------|---------|----------|
-    /// | Continuous | r = -ln(df) / t | Internal calculations, curve building |
-    /// | Periodic(1) | r = df^(-1/t) - 1 | Annual: bond markets (UK, Europe) |
-    /// | Periodic(n) | r = n × (df^(-1/(n×t)) - 1) | US Treasuries (n=2), corporates |
-    /// | Simple | r = (1/df - 1) / t | Money market (< 1Y) |
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    /// use finstack_quant_core::math::Compounding;
-    /// use finstack_quant_core::dates::Date;
-    /// use time::Month;
-    ///
-    /// let anchor = Date::from_calendar_date(2024, Month::January, 2).unwrap();
-    /// // Build a flat 5% curve (df at 1Y = exp(-0.05 * 1) ≈ 0.9512)
-    /// let curve = DiscountCurve::builder("USD-OIS")
-    ///     .base_date(anchor)
-    ///     .knots([(0.0, 1.0), (1.0, (-0.05_f64).exp())])
-    ///     .build()?;
-    /// let target = Date::from_calendar_date(2025, Month::January, 2).unwrap();
-    ///
-    /// // Continuous rate (default for internal calculations)
-    /// let r_cont = curve.zero_rate_on_date(target, Compounding::Continuous)?;
-    ///
-    /// // Annual rate (for European bonds)
-    /// let r_ann = curve.zero_rate_on_date(target, Compounding::Periodic(std::num::NonZeroU32::MIN))?;
-    ///
-    /// // Semi-annual rate (for US Treasuries)
-    /// let r_semi = curve.zero_rate_on_date(target, Compounding::SEMI_ANNUAL)?;
-    ///
-    /// // Simple rate (for money market)
-    /// let r_simple = curve.zero_rate_on_date(target, Compounding::Simple)?;
-    /// # Ok::<(), finstack_quant_core::Error>(())
-    /// ```
+    /// * `date` - Target calendar date strictly after the curve anchor.
+    /// * `compounding` - Explicit compounding convention (`Continuous`,
+    ///   `Periodic(m)`, or `Simple`).
     ///
     /// # Errors
-    /// Propagates a failure while computing the curve day-count fraction from
-    /// the base date to `date`. A date before the base date is not an error: it
-    /// maps to a negative year fraction and the curve extrapolates.
+    ///
+    /// Returns an error if day-count mapping fails, `t <= 0`, endpoint
+    /// discount-factor admission fails, or inverse rate conversion fails.
     #[inline]
     #[must_use = "computed zero rate should not be discarded"]
-    pub fn zero_rate_on_date(
-        &self,
-        date: Date,
-        compounding: crate::math::Compounding,
-    ) -> crate::Result<f64> {
+    pub fn zero_rate_on_date(&self, date: Date, compounding: Compounding) -> crate::Result<f64> {
         let t = self.year_fraction_to(date)?;
-        Ok(self.zero_rate(t, compounding))
+        if !t.is_finite() || t <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "zero_rate_on_date requires mapped time t > 0, got t={t} for date {date} (base {})",
+                self.base
+            )));
+        }
+        let df = self.df_on_date(date)?;
+        compounding.rate_from_df(df, t)
     }
 
-    /// Returns the zero rate for a given year fraction with specified compounding.
-    ///
-    /// This is the unified method for obtaining zero rates under any compounding
-    /// convention. For a discount factor `DF` at time `t`:
-    ///
-    /// | Convention      | Formula                          | Typical use                              |
-    /// |-----------------|----------------------------------|------------------------------------------|
-    /// | `Continuous`    | `r = -ln(DF) / t`                | Curve internals                          |
-    /// | `Periodic(1)`   | `r = DF^(-1/t) - 1`              | Bond-equivalent yields (Bloomberg zeros) |
-    /// | `Periodic(n)`   | `r = n · (DF^(-1/(n·t)) - 1)`    | `n = 2` US Treasury, `n = 12` monthly    |
-    /// | `Simple`        | `r = (1/DF - 1) / t`             | Money markets < 1Y (SOFR, €STR, SONIA,   |
-    /// |                 |                                  | deposits, T-bills); no compounding       |
-    ///
-    /// For positive rates and `t > 0`: `r_simple > r_annual > r_cc`. The
-    /// `Simple` convention matches Bloomberg's zero output with compounding
-    /// set to "Simple" (SWPM/SWCV) and is typically paired with ACT/360
-    /// (USD, EUR) or ACT/365F (GBP).
+    /// Zero rate at time `t > 0` under the explicit `compounding` convention.
     ///
     /// # Arguments
-    /// * `t` - Year fraction from the anchor date
-    /// * `compounding` - Compounding convention (Continuous, Periodic(n), Simple)
     ///
-    /// # Edge Cases
-    /// - For t = 0, all compounding conventions return 0.0 (instantaneous rate is undefined)
+    /// * `t` - Strictly positive year fraction from [`base_date`](Self::base_date).
+    /// * `compounding` - Explicit compounding convention (`Continuous`,
+    ///   `Periodic(m)`, or `Simple`).
     ///
-    /// # Example
+    /// # Errors
     ///
-    /// ```
-    /// use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    /// use finstack_quant_core::math::Compounding;
-    /// use finstack_quant_core::dates::Date;
-    /// use time::Month;
-    ///
-    /// let curve = DiscountCurve::builder("USD-OIS")
-    ///     .base_date(Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"))
-    ///     .knots([(0.0, 1.0), (0.25, 0.99), (1.0, 0.95), (5.0, 0.80)])
-    ///     .build()
-    ///     .expect("DiscountCurve should build");
-    ///
-    /// // At 1Y, DF = 0.95, so the annual rate = 0.95^(-1) - 1 ≈ 5.26%
-    /// assert!((curve.zero_rate(1.0, Compounding::Periodic(std::num::NonZeroU32::MIN)) - 0.0526).abs() < 0.001);
-    /// // At 3M, DF = 0.99, so the simple rate = (1/0.99 - 1) / 0.25 ≈ 4.04%
-    /// assert!((curve.zero_rate(0.25, Compounding::Simple) - 0.0404).abs() < 0.001);
-    /// ```
+    /// Returns an error if `t` is non-finite or `t <= 0.0`, if `df(t)` cannot
+    /// be admitted, or if inverse rate conversion fails.
     #[inline]
-    #[must_use]
-    pub fn zero_rate(&self, t: f64, compounding: Compounding) -> f64 {
-        if t == 0.0 {
-            return 0.0;
+    #[must_use = "computed zero rate should not be discarded"]
+    pub fn zero_rate(&self, t: f64, compounding: Compounding) -> crate::Result<f64> {
+        if !t.is_finite() || t <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "zero_rate requires finite strictly positive horizon t > 0, got t={t}"
+            )));
         }
-        compounding.rate_from_df(self.df(t), t)
+        let df = self.df(t)?;
+        compounding.rate_from_df(df, t)
     }
 
-    /// Helper: compute year fraction from base date to target date using curve's day-count.
+    /// Compute signed year fraction from `self.base` using the curve's calendar context.
     #[inline]
     fn year_fraction_to(&self, date: Date) -> crate::Result<f64> {
-        self.day_count
-            .signed_year_fraction(self.base, date, self.day_count_context())
+        signed_curve_year_fraction(self.base, date, self.day_count, self.calendar.as_ref())
     }
 
-    /// Day-count context of the curve's time axis: its holiday calendar, if
-    /// any, and no coupon metadata.
+    /// Day-count context of the curve's time axis: its holiday calendar, if any.
     #[must_use]
     pub fn day_count_context(&self) -> crate::dates::DayCountContext<'static> {
         crate::dates::DayCountContext {
@@ -497,84 +356,87 @@ impl DiscountCurve {
         self.calendar.as_ref().map(|calendar| calendar.id.as_str())
     }
 
-    /// Discount factor at time `t` (helper calling the underlying interpolator).
-    #[must_use]
+    /// Discount factor at time `t` in years from [`base_date`](Self::base_date).
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Finite curve time coordinate in years.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `t` is non-finite, out of range under
+    /// [`ExtrapolationPolicy::Error`], or evaluates to a non-finite or
+    /// non-positive value.
+    #[must_use = "computed discount factor should not be discarded"]
     #[inline]
-    pub fn df(&self, t: f64) -> f64 {
-        self.transform.as_ref().map_or_else(
-            || self.interp.interp(t),
-            |transform| transform.df(&self.interp, t),
-        )
+    pub fn df(&self, t: f64) -> crate::Result<f64> {
+        if !t.is_finite() {
+            return Err(crate::Error::Validation(format!(
+                "DiscountCurve::df requires finite time t, got {t}"
+            )));
+        }
+        if let Some(transform) = &self.transform {
+            return transform.df(&self.interp, t);
+        }
+        let val = self.interp.interp(t)?;
+        if !val.is_finite() || val <= 0.0 {
+            return Err(crate::InputError::NonPositiveValue.into());
+        }
+        Ok(val)
     }
 
-    /// Raw knot times (t) in **years** passed at construction.
+    /// Analytic instantaneous forward rate `-D'(t) / D(t)` at time `t`.
+    ///
+    /// Uses the derivative of the curve's actual evaluator with one-sided
+    /// limits at interpolation knots and continuous-shock breakpoints.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Finite curve time coordinate in years.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `t` is non-finite, factor admission at `t` fails, or
+    /// the derivative quotient overflows.
+    #[inline]
+    #[must_use = "computed instantaneous forward rate should not be discarded"]
+    pub fn instantaneous_forward(&self, t: f64) -> crate::Result<f64> {
+        if let Some(transform) = &self.transform {
+            return transform.instantaneous_forward(&self.interp, t);
+        }
+        factor_instantaneous_forward(&self.interp, None, t, "DiscountCurve")
+    }
+
+    /// Knot times (t) in **years** stored on this curve.
     #[inline]
     pub fn knots(&self) -> &[f64] {
         &self.knots
     }
 
-    /// Raw discount factors corresponding to each knot.
+    /// Discount factors corresponding to each knot.
     #[inline]
     pub fn dfs(&self) -> &[f64] {
         &self.dfs
     }
 
-    /// Builder entry-point.
-    ///
-    /// Takes the curve identifier as a required argument because every curve
-    /// is uniquely keyed by its `CurveId`, and the remaining parameters
-    /// (`base`, `day_count`, interpolation, etc.) all have sensible defaults.
-    /// This makes `DiscountCurve::builder("USD-OIS")` both concise and
-    /// self-documenting.
-    ///
-    /// **Design note:** This `Type::builder(id)` pattern is used consistently
-    /// across all `finstack-quant-core` term structures (discount, forward, hazard,
-    /// inflation, price, vol-index, vol-surface, base-correlation). Instrument
-    /// types in `finstack-quant-valuations` use a different convention —
-    /// `Type::builder()` with no args — because instruments have many
-    /// required fields where named setters are more practical than positional
-    /// arguments. See the `FinancialBuilder` derive macro docs for the full
-    /// rationale.
-    ///
-    /// **Note:** Monotonic discount factor validation is enabled by default to ensure
-    /// no-arbitrage conditions. Use [`DiscountCurveBuilder::validation`] with
-    /// [`ValidationMode::Raw`] if you need to disable this validation (not
-    /// recommended for production use).
-    ///
-    /// **Defaults:** Day count is [`DayCount::Act365F`] (QuantLib-style curve
-    /// time basis). Set [`DiscountCurveBuilder::day_count`] when the curve must
-    /// use a different time axis (for example Act/360). Interpolation defaults
-    /// to MonotoneConvex with FlatForward extrapolation. Validation defaults to
-    /// [`ValidationMode::MarketStandard`]: monotonic discount factors and a
-    /// −50bp implied-forward floor.
-    ///
-    /// **Negative rates:** for deeply negative-rate markets (CHF, JPY, EUR
-    /// historical), pass [`ValidationMode::NegativeRateFriendly`] (or `Raw`) via
-    /// [`DiscountCurveBuilder::validation`]. All interpolation styles —
-    /// including the default MonotoneConvex — support increasing-DF
-    /// (negative-rate) inputs; MonotoneConvex auto-detects negative discrete
-    /// forwards and skips its Hagan-West positivity amelioration so negative
-    /// rates interpolate faithfully.
+    /// Create a builder for a [`DiscountCurve`] with explicit required choices.
     #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> DiscountCurveBuilder {
         DiscountCurveBuilder {
             id: id.into(),
             base: None,
-            day_count: DayCount::Act365F,
+            day_count: None,
             calendar_id: None,
             points: Vec::new(),
-            style: InterpStyle::MonotoneConvex,
-            extrapolation: ExtrapolationPolicy::FlatForward,
-            min_forward_rate: Some(-0.005),
-            allow_non_monotonic: false,
-            min_forward_tenor: DEFAULT_MIN_FORWARD_TENOR,
+            style: None,
+            extrapolation: None,
             rate_calibration: None,
             fx_policy: None,
             transform: None,
         }
     }
 
-    /// Create a builder pre-populated with this curve's data but a new ID.
+    /// Create a builder pre-populated with this curve's data under a new ID.
     pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> DiscountCurveBuilder {
         let mut builder = self
             .metadata_builder(new_id)
@@ -585,21 +447,14 @@ impl DiscountCurve {
 
     /// Rebuild this curve with replacement knots while preserving structural metadata.
     ///
-    /// This retains interpolation, extrapolation, validation policy, minimum
-    /// forward tenor, and FX policy, while clearing stale calibration
-    /// provenance (`rate_calibration`) because replacement pillars no longer
-    /// match the original calibration quotes. Previous roll and shock
-    /// transformations are not reapplied to these replacement discount factors.
-    ///
     /// # Arguments
     ///
-    /// * `knots` - Replacement `(time, discount_factor)` pillars in years from
-    ///   [`base_date`](Self::base_date) under [`day_count`](Self::day_count).
+    /// * `knots` - Replacement strictly increasing `(time, discount_factor)` pillars
+    ///   in years from [`base_date`](Self::base_date) under [`day_count`](Self::day_count).
     ///
     /// # Errors
     ///
-    /// Returns an error when replacement knots violate the preserved curve
-    /// validation, interpolation, or forward-rate constraints.
+    /// Returns an error when replacement knots violate curve or interpolation invariants.
     pub fn rebuild_with_knots<I>(&self, knots: I) -> crate::Result<Self>
     where
         I: IntoIterator<Item = (f64, f64)>,
@@ -610,10 +465,7 @@ impl DiscountCurve {
             .build()
     }
 
-    /// Builder pre-populated with this curve's full metadata but **no** knots.
-    /// Shared by all rebuild-style operations (bumps, rolls) so that no
-    /// metadata field (day-count, interpolation, extrapolation, calibration
-    /// settings, fx_policy, non-monotonic settings) is dropped.
+    /// Builder pre-populated with this curve's metadata and no knots.
     pub(super) fn metadata_builder(&self, new_id: impl Into<CurveId>) -> DiscountCurveBuilder {
         DiscountCurve::builder(new_id)
             .base_date(self.base)
@@ -621,72 +473,14 @@ impl DiscountCurve {
             .calendar_id_opt(self.calendar.as_ref().map(|calendar| calendar.id.clone()))
             .interp(self.interp.style())
             .extrapolation(self.interp.extrapolation())
-            .min_forward_tenor(self.min_forward_tenor)
             .rate_calibration_opt(self.rate_calibration.clone())
             .fx_policy_opt(self.fx_policy.clone())
-            .validation(ValidationMode::Raw {
-                allow_non_monotonic: self.allow_non_monotonic,
-                forward_floor: self.min_forward_rate,
-            })
     }
 
-    /// Create a forward curve from this discount curve.
-    ///
-    /// For single-curve bootstrapping, this creates a fixed-tenor simple-rate
-    /// forward curve using:
-    /// `F(t, t+tau) = (DF(t) / DF(t+tau) - 1) / tau`.
-    ///
-    /// # Arguments
-    ///
-    /// * `forward_id` - Identifier for the resulting forward curve
-    /// * `tenor_years` - Tenor of the forward rate in years
-    /// * `interp_style` - Optional interpolation style; defaults to `Linear` if `None`
-    ///
-    /// # Errors
-    ///
-    /// Returns `Error::Validation` when `tenor_years` is non-finite or not
-    /// strictly positive, or an error when the derived forward curve fails
-    /// validation.
-    pub fn to_forward_curve(
-        &self,
-        forward_id: impl Into<CurveId>,
-        tenor_years: f64,
-        interp_style: Option<InterpStyle>,
-    ) -> crate::Result<ForwardCurve> {
-        if !tenor_years.is_finite() || tenor_years <= 0.0 {
-            return Err(crate::Error::Validation(format!(
-                "forward tenor must be finite and positive, got {tenor_years}"
-            )));
-        }
-
-        // Monotone-convex is a discount-factor interpolation strategy and must
-        // not be applied to already-derived forward-rate ordinates.
-        let style = interp_style.unwrap_or(InterpStyle::Linear);
-        let mut forward_rates = Vec::with_capacity(self.knots.len());
-
-        for &t in self.knots.iter() {
-            let df_start = self.df(t);
-            let df_end = self.df(t + tenor_years);
-            if !df_start.is_finite() || !df_end.is_finite() || df_start <= 0.0 || df_end <= 0.0 {
-                return Err(crate::Error::Validation(format!(
-                    "cannot derive forward at t={t}: invalid discount factors \
-                     DF(t)={df_start}, DF(t+tenor)={df_end}"
-                )));
-            }
-            let forward_rate = (df_start / df_end - 1.0) / tenor_years;
-            if !forward_rate.is_finite() {
-                return Err(crate::Error::Validation(format!(
-                    "derived non-finite forward rate at t={t}"
-                )));
-            }
-            forward_rates.push((t, forward_rate));
-        }
-
-        ForwardCurve::builder(forward_id, tenor_years)
-            .base_date(self.base)
-            .day_count(self.day_count)
-            .knots(forward_rates)
-            .interp(style)
-            .build()
+    /// Export the retained evaluation transform snapshot, if present.
+    pub(crate) fn transform_snapshot(&self) -> Option<FactorTransformSnapshot> {
+        self.transform
+            .as_ref()
+            .map(super::evaluation::CurveTransform::to_snapshot)
     }
 }

@@ -18,7 +18,7 @@ import pytest
 
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
-from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext, ScalarTimeSeries
+from finstack_quant.core.market_data import DiscountCurve, MarketContext, ScalarTimeSeries
 from finstack_quant.core.money import Money
 from finstack_quant.valuations.composite import (
     CompositeInstrument,
@@ -43,7 +43,7 @@ from finstack_quant.valuations.market import (
     ConventionRegistry,
     RateIndexConventions,
 )
-from tests.tests_typed_helpers import canonical_structured_credit_json
+from tests.tests_typed_helpers import canonical_structured_credit_json, projection_curve
 
 
 def _equity_envelope(instrument_id: str, price: float) -> str:
@@ -287,10 +287,10 @@ def _market() -> MarketContext:
     as_of = dt.date(2024, 1, 1)
     market = (
         MarketContext()
-        .insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
-        .insert(ForwardCurve("SOFR-3M", 0.25, as_of, [(0.0, 0.04), (10.0, 0.04)], day_count="act_360"))
+        .insert(DiscountCurve.flat("USD-OIS", as_of, 0.04, "act_365f"))
+        .insert(projection_curve("SOFR-3M", as_of, [(10.0, 0.04)]))
     )
-    market.insert_series(ScalarTimeSeries("FIXING:SOFR-3M", [(dt.date(2023, 12, 28), 0.04)]))
+    market.insert_series(ScalarTimeSeries("FIXING:SOFR-3M", [(dt.date(2023, 12, 28), 0.04)], "step", "error"))
     return market
 
 

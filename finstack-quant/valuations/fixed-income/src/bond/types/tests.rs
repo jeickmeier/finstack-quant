@@ -79,6 +79,8 @@ fn test_bond_with_custom_cashflows() {
         .base_date(issue)
         .knots([(0.0, 1.0), (3.0, 0.95)])
         .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("CashFlowSchedule builder should succeed with valid test data");
     let curves = MarketContext::new().insert(disc_curve);
@@ -276,6 +278,8 @@ fn test_custom_cashflows_override_regular_generation() {
         .base_date(issue)
         .knots([(0.0, 1.0), (2.0, 0.98)])
         .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("CashFlowSchedule builder should succeed with valid test data");
     let curves = MarketContext::new().insert(disc_curve);
@@ -305,12 +309,34 @@ fn test_bond_floating_value() {
         .base_date(issue)
         .knots([(0.0, 1.0), (2.0, 0.95)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("CashFlowSchedule builder should succeed with valid test data");
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let fwd = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(issue - time::Duration::days(10))
-        .knots([(0.0, 0.05), (2.0, 0.055)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.993750081252576),
+            (0.25, 0.987500648991988),
+            (0.375, 0.98125218685104),
+            (0.5, 0.975005175298418),
+            (0.625, 0.968760091583874),
+            (0.75, 0.962517409684391),
+            (0.875, 0.956277600251324),
+            (1.0, 0.950041130558528),
+            (1.125, 0.943808464451487),
+            (1.25, 0.93758006229743),
+            (1.375, 0.931356380936457),
+            (1.5, 0.925137873633673),
+            (1.625, 0.918924990032329),
+            (1.75, 0.912718176107991),
+            (1.875, 0.906517874123716),
+            (2.0, 0.900324522586266),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("CashFlowSchedule builder should succeed with valid test data");
     let ctx = MarketContext::new().insert(disc).insert(fwd);
@@ -349,13 +375,34 @@ fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
         .base_date(issue)
         .knots([(0.0, 1.0), (2.0, 0.95)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("DiscountCurve builder should succeed in test");
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let fwd = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(issue - time::Duration::days(10))
         .day_count(DayCount::Act360)
-        .knots([(0.0, 0.05), (2.0, 0.055)])
-        .interp(InterpStyle::Linear)
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.993750081252576),
+            (0.25, 0.987500648991988),
+            (0.375, 0.98125218685104),
+            (0.5, 0.975005175298418),
+            (0.625, 0.968760091583874),
+            (0.75, 0.962517409684391),
+            (0.875, 0.956277600251324),
+            (1.0, 0.950041130558528),
+            (1.125, 0.943808464451487),
+            (1.25, 0.93758006229743),
+            (1.375, 0.931356380936457),
+            (1.5, 0.925137873633673),
+            (1.625, 0.918924990032329),
+            (1.75, 0.912718176107991),
+            (1.875, 0.906517874123716),
+            (2.0, 0.900324522586266),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("ForwardCurve builder should succeed in test");
     let ctx = MarketContext::new().insert(disc).insert(fwd);
@@ -504,6 +551,8 @@ fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
         .base_date(issue)
         .knots([(0.0, 1.0), (3.0, 0.9)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("DiscountCurve builder should succeed in test");
     let ctx = MarketContext::new().insert(disc_curve);
@@ -599,13 +648,27 @@ fn test_bond_frn_dated_cashflows_uses_builder() {
         .base_date(issue)
         .knots([(0.0, 1.0), (1.0, 0.95)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("CashFlowSchedule builder should succeed with valid test data");
 
-    let fwd_curve = ForwardCurve::builder("USD-SOFR", 0.25)
+    let fwd_curve = ForwardCurve::builder("USD-SOFR")
         .base_date(issue - time::Duration::days(10))
         .day_count(DayCount::Act360)
-        .knots([(0.0, 0.03), (1.0, 0.035)])
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.996218106939305),
+            (0.25, 0.992372984425763),
+            (0.375, 0.98846547612484),
+            (0.5, 0.984496437005408),
+            (0.625, 0.980466733028608),
+            (0.75, 0.976377240833651),
+            (0.875, 0.972228847420751),
+            (1.0, 0.968022449831306),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("CashFlowSchedule builder should succeed with valid test data");
 
@@ -676,6 +739,8 @@ fn test_bond_amortization_signed_schedule_preserves_all_flows() {
         .base_date(issue)
         .knots([(0.0, 1.0), (2.0, 0.95)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("CashFlowSchedule builder should succeed with valid test data");
     let market = MarketContext::new().insert(disc_curve);
@@ -758,6 +823,8 @@ fn test_amortizing_bond_pv_greater_than_bullet_for_same_yield() {
         .base_date(issue)
         .knots([(0.0, 1.0), (1.0, 0.97), (2.0, 0.94), (3.0, 0.91)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("DiscountCurve builder should succeed in test");
     let market = MarketContext::new().insert(disc_curve);

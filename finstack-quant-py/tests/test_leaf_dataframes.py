@@ -432,53 +432,52 @@ def test_fx_rate_result_to_dataframe_is_one_row() -> None:
 
 def test_scalar_time_series_to_dataframe_is_date_indexed() -> None:
     observations = [
-        (datetime.date(2025, 1, 3), 0.04),
         (datetime.date(2025, 1, 1), 0.03),
         (datetime.date(2025, 1, 2), 0.035),
+        (datetime.date(2025, 1, 3), 0.04),
     ]
-    series = ScalarTimeSeries("SOFR", observations)
+    series = ScalarTimeSeries("SOFR", observations, "step", "flat")
     df = series.to_dataframe()
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["value"]
     assert len(df) == len(series.observations)
     assert isinstance(df.index, pd.DatetimeIndex)
-    # Rows are chronological, not insertion order.
-    assert list(df.index) == [pd.Timestamp(d) for d, _ in sorted(observations)]
+    assert list(df.index) == [pd.Timestamp(d) for d, _ in observations]
     assert list(df["value"]) == pytest.approx([0.03, 0.035, 0.04])
 
 
-def test_scalar_time_series_ordering_ignores_the_insertion_order() -> None:
-    """Two insertion orders of the same observations give the identical frame.
-
-    That is the content behind the chronological guarantee. Exporting one
-    frozen series twice — the previous assertion — could only fail on
-    intra-process nondeterminism.
-    """
+def test_scalar_time_series_rejects_unsorted_observations_and_supports_empty_dataframe() -> None:
     observations = [
         (datetime.date(2025, 1, 1), 0.03),
         (datetime.date(2025, 1, 2), 0.035),
         (datetime.date(2025, 1, 3), 0.04),
     ]
-    chronological = ScalarTimeSeries("SOFR", observations).to_dataframe()
-    shuffled = ScalarTimeSeries("SOFR", list(reversed(observations))).to_dataframe()
-    pd.testing.assert_frame_equal(chronological, shuffled)
-    assert list(chronological["value"]) == pytest.approx([0.03, 0.035, 0.04])
+    with pytest.raises(ValueError, match="strictly increasing"):
+        ScalarTimeSeries("SOFR", list(reversed(observations)), "step", "flat")
+    empty_df = ScalarTimeSeries("SOFR-EMPTY", [], "step", "error").to_dataframe()
+    assert len(empty_df) == 0
+    assert list(empty_df.columns) == ["value"]
 
 
 def test_inflation_index_to_dataframe_is_date_indexed() -> None:
+    from finstack_quant.core.market_data import InflationObservation
+
     observations = [
-        (datetime.date(2025, 3, 1), 303.0),
-        (datetime.date(2025, 1, 1), 300.0),
-        (datetime.date(2025, 2, 1), 301.5),
+        InflationObservation("2025-01-01", 300.0, "2025-02-12"),
+        InflationObservation("2025-02-01", 301.5, "2025-03-12"),
+        InflationObservation("2025-03-01", 303.0, "2025-04-10"),
     ]
-    index = InflationIndex("US-CPI", observations, "USD")
+    index = InflationIndex("US-CPI", observations, "USD", "2025-05-01")
     df = index.to_dataframe()
     assert isinstance(df, pd.DataFrame)
-    assert list(df.columns) == ["value"]
+    assert list(df.columns) == ["value", "available_on"]
     assert isinstance(df.index, pd.DatetimeIndex)
-    assert list(df.index) == [pd.Timestamp(d) for d, _ in sorted(observations)]
+    assert list(df.index) == [pd.Timestamp(obs.reference_month) for obs in observations]
+    assert list(df["available_on"]) == [pd.Timestamp(obs.available_on) for obs in observations]
     assert list(df["value"]) == pytest.approx([300.0, 301.5, 303.0])
     assert index._repr_html_() is not None
+    with pytest.raises(ValueError, match="strictly increasing"):
+        InflationIndex("US-CPI", list(reversed(observations)), "USD", "2025-05-01")
 
 
 # models.factor.credit

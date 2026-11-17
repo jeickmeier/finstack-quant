@@ -60,6 +60,7 @@
     { "type": "exact_date", "name": "National Day Golden Week 2009 extended closure", "year": 2009, "month": "october", "day": 8 },
     { "type": "span", "name": "Mid-Autumn Festival 2010 published closure tail", "start": { "type": "fixed", "month": "september", "day": 23, "observed": "none" }, "len": 2, "offset": 0, "from_year": 2010, "to_year": 2010 },
     { "type": "span", "name": "70th anniversary commemoration closure", "start": { "type": "fixed", "month": "september", "day": 3, "observed": "none" }, "len": 2, "offset": 0, "from_year": 2015, "to_year": 2015 },
+    { "type": "exact_date", "name": "National Day / Mid-Autumn merged 8th day (2020)", "year": 2020, "month": "october", "day": 8 },
     { "type": "exact_date", "name": "National Day / Mid-Autumn merged 8th day (2025)", "year": 2025, "month": "october", "day": 8 }
   ]
 }

@@ -49,10 +49,7 @@ const discountCurve = (id, base, rate) => ({
   day_count: 'act_365f',
   knot_points: [0.0, 1.0, 5.0, 10.0].map((t) => [t, Math.exp(-rate * t)]),
   interp_style: 'monotone_convex',
-  extrapolation: 'flat_forward',
-  min_forward_rate: -0.005,
-  allow_non_monotonic: false,
-  min_forward_tenor: 1e-6,
+  extrapolation: 'extend',
   rate_calibration: null,
   fx_policy: null,
 });
@@ -71,10 +68,7 @@ const FLAT_USD_MARKET = JSON.stringify({
         [1.0, 0.9607894391523232],
       ],
       interp_style: 'log_linear',
-      extrapolation: 'flat_forward',
-      min_forward_rate: null,
-      allow_non_monotonic: false,
-      min_forward_tenor: 1e-6,
+      extrapolation: 'extend',
       rate_calibration: null,
       fx_policy: null,
     },
@@ -103,7 +97,7 @@ const FX_MARKET = JSON.stringify({
     {
       id: 'EURUSD-VOL',
       expiries: [0.5, 1.0, 2.0],
-      strikes: [1.0, 1.12, 1.3],
+      secondary_values: [1.0, 1.12, 1.3],
       secondary_axis: 'strike',
       quote_type: 'black_lognormal',
       interpolation_mode: 'vol',
@@ -672,7 +666,7 @@ test('calibration content hashes match the Python/Rust hashes', () => {
   );
   assert.equal(
     calibration.calibrationEnvelopeContentHash(envelope),
-    'sha256:a1a010587b1cd2855db0e2ad1900568f0219cc65dfb0864d122f81da00fc7872'
+    'sha256:07251d39c36f2f88940c4b0a9ea339f809144bcbc09c195bbdfbe7ac40a0405b'
   );
   // The solved residuals differ from the native build in the last bits
   // (wasm32 libm), so the result hash is pinned against its own JSON text:

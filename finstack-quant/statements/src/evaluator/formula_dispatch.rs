@@ -101,7 +101,7 @@ pub(crate) fn evaluate_function(
             if values.is_empty() {
                 Ok(f64::NAN)
             } else {
-                Ok(kahan_sum(values.iter().copied()))
+                kahan_sum(values.iter().copied()).map_err(|e| eval_error(node_id, e.to_string()))
             }
         }
 
@@ -111,7 +111,9 @@ pub(crate) fn evaluate_function(
             if values.is_empty() {
                 Ok(f64::NAN)
             } else {
-                Ok(kahan_sum(values.iter().copied()) / values.len() as f64)
+                kahan_sum(values.iter().copied())
+                    .map(|sum| sum / values.len() as f64)
+                    .map_err(|e| eval_error(node_id, e.to_string()))
             }
         }
 
@@ -352,7 +354,9 @@ fn eval_quantile(
     if values.is_empty() {
         return Ok(f64::NAN);
     }
-    Ok(quantile(&mut values, q))
+    quantile(&mut values, q)
+        .map(|opt| opt.unwrap_or(f64::NAN))
+        .map_err(|e| eval_error(node_id, e.to_string()))
 }
 
 /// Annualise a flow value (cash flows, income, expenses) by multiplying by

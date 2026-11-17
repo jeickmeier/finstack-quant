@@ -124,19 +124,33 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(date!(2025 - 01 - 01))
             .knots([(0.0, 1.0), (3.0, 1.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let surface = VolSurface::builder("EQUITY-VOL")
             .expiries(&[1.0])
-            .strikes(&[100.0])
+            .secondary_values(&[100.0])
+            .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+            .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             .row(&[0.20])
             .build()
             .expect("surface");
         let mut market = MarketContext::new()
             .insert(curve)
             .insert_surface(surface)
-            .insert_price("EQUITY-SPOT", MarketScalar::Unitless(100.0))
-            .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(0.0));
+            .insert_price(
+                "EQUITY-SPOT",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "EQUITY-DIVYIELD",
+                MarketScalar::unitless(0.0).expect("valid scalar"),
+            );
         for (name, value) in [
             ("HESTON_KAPPA", 2.0),
             ("HESTON_THETA", 0.04),
@@ -144,7 +158,8 @@ mod tests {
             ("HESTON_RHO", -0.7),
             ("HESTON_V0", 0.04),
         ] {
-            market = market.insert_price(name, MarketScalar::Unitless(value));
+            market =
+                market.insert_price(name, MarketScalar::unitless(value).expect("valid scalar"));
         }
         (option, market)
     }
@@ -174,16 +189,18 @@ mod tests {
         // simply reproducing the calculator's chosen bump.
         let up = price(
             &option,
-            &market
-                .clone()
-                .insert_price("EQUITY-SPOT", MarketScalar::Unitless(100.01)),
+            &market.clone().insert_price(
+                "EQUITY-SPOT",
+                MarketScalar::unitless(100.01).expect("valid scalar"),
+            ),
             model,
         );
         let down = price(
             &option,
-            &market
-                .clone()
-                .insert_price("EQUITY-SPOT", MarketScalar::Unitless(99.99)),
+            &market.clone().insert_price(
+                "EQUITY-SPOT",
+                MarketScalar::unitless(99.99).expect("valid scalar"),
+            ),
             model,
         );
         let delta = (up - down) / 0.02;
@@ -256,7 +273,8 @@ mod tests {
             ("ROUGH_BERGOMI_HURST", 0.1),
             ("ROUGH_BERGOMI_RHO", -0.7),
         ] {
-            market = market.insert_price(name, MarketScalar::Unitless(value));
+            market =
+                market.insert_price(name, MarketScalar::unitless(value).expect("valid scalar"));
         }
         // This is a dispatch/CRN regression, not a statistical certification
         // of each model: all three stencil prices use the same sampled paths.
@@ -269,16 +287,18 @@ mod tests {
             let base = price(&option, &market, model);
             let up = price(
                 &option,
-                &market
-                    .clone()
-                    .insert_price("EQUITY-SPOT", MarketScalar::Unitless(101.0)),
+                &market.clone().insert_price(
+                    "EQUITY-SPOT",
+                    MarketScalar::unitless(101.0).expect("valid scalar"),
+                ),
                 model,
             );
             let down = price(
                 &option,
-                &market
-                    .clone()
-                    .insert_price("EQUITY-SPOT", MarketScalar::Unitless(99.0)),
+                &market.clone().insert_price(
+                    "EQUITY-SPOT",
+                    MarketScalar::unitless(99.0).expect("valid scalar"),
+                ),
                 model,
             );
             let result = crate::EQUITY

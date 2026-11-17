@@ -24,15 +24,12 @@ use super::operation_spec::PyOperationSpec;
 ///     Composition priority; lower values execute first.
 /// resolution_mode : str, default "most_specific_wins"
 ///     Hierarchy conflict policy: ``"most_specific_wins"`` or ``"cumulative"``.
-/// hazard_bump_mode : str, default "solve_to_par"
-///     ParCDS delivery: ``"solve_to_par"`` re-bootstraps hazard from shocked
-///     par spreads; ``"first_order_shift"`` shifts hazard knots in place.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If the resolution mode, hazard bump mode, or resulting scenario is
-///     invalid (empty id, more than one time roll, invalid operation).
+///     If the resolution mode or resulting scenario is invalid (empty id, more
+///     than one time roll, invalid operation).
 ///
 /// Examples
 /// --------
@@ -70,8 +67,7 @@ impl PyScenarioSpec {
         name=None,
         description=None,
         priority=0,
-        resolution_mode="most_specific_wins",
-        hazard_bump_mode="solve_to_par"
+        resolution_mode="most_specific_wins"
     ))]
     fn new(
         id: &str,
@@ -80,7 +76,6 @@ impl PyScenarioSpec {
         description: Option<&str>,
         priority: i32,
         resolution_mode: &str,
-        hazard_bump_mode: &str,
     ) -> PyResult<Self> {
         let inner = finstack_quant_scenarios::ScenarioSpec {
             id: id.to_string(),
@@ -94,9 +89,6 @@ impl PyScenarioSpec {
             resolution_mode: parse_label::<
                 finstack_quant_core::market_data::hierarchy::ResolutionMode,
             >(resolution_mode)?,
-            hazard_bump_mode: parse_label::<finstack_quant_scenarios::HazardBumpMode>(
-                hazard_bump_mode,
-            )?,
         };
         inner.validate().map_err(scenarios_to_py)?;
         Ok(Self { inner })
@@ -176,13 +168,6 @@ impl PyScenarioSpec {
     #[getter]
     fn resolution_mode(&self) -> PyResult<String> {
         finstack_quant_core::wire::serde_label(&self.inner.resolution_mode)
-            .map_err(crate::errors::core_to_py)
-    }
-
-    /// ParCDS hazard delivery as its canonical snake-case label.
-    #[getter]
-    fn hazard_bump_mode(&self) -> PyResult<String> {
-        finstack_quant_core::wire::serde_label(&self.inner.hazard_bump_mode)
             .map_err(crate::errors::core_to_py)
     }
 

@@ -135,6 +135,23 @@ class CalendarMetadata:
         """
         ...
 
+    @property
+    def supported_years(self) -> Optional[tuple[Optional[int], Optional[int]]]:
+        """
+        Optional inclusive ``(from_year, to_year)`` bounds of declared calendar coverage.
+
+        Returns
+        -------
+        tuple[int | None, int | None] | None
+            Inclusive year bounds when finite coverage is declared, or ``None``
+            when the calendar applies unbounded recurring rules.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
     def __repr__(self) -> str: ...
     def __eq__(self, other: object) -> bool: ...
     def __ne__(self, other: object) -> bool: ...

@@ -250,14 +250,16 @@ impl PyPortfolioCashflows {
     /// -------
     /// list[tuple[str, float]]
     ///     ``(ISO date, net amount)`` pairs in ladder date order; dates with
-    ///     no flows in ``currency`` are omitted. Non-finite amounts are
-    ///     skipped and totals use compensated summation.
+    ///     no flows in ``currency`` are omitted. Totals use compensated
+    ///     summation and fail on non-finite or overflowing sums.
     #[pyo3(text_signature = "(self, currency)")]
     fn net_in_currency_by_date(&self, currency: &Bound<'_, PyAny>) -> PyResult<Vec<(String, f64)>> {
         let ccy = extract_currency(currency)?;
-        Ok(self
+        let rows = self
             .inner
             .net_in_currency_by_date(ccy)
+            .map_err(portfolio_to_py)?;
+        Ok(rows
             .into_iter()
             .map(|(date, amount)| (date.to_string(), amount))
             .collect())
@@ -502,8 +504,10 @@ fn net_in_currency_by_date(
             .map_err(portfolio_to_py);
     }
     let ladder = extract_cashflows_ref(py, cashflows)?;
-    Ok(ladder
+    let rows = ladder
         .net_in_currency_by_date(ccy)
+        .map_err(portfolio_to_py)?;
+    Ok(rows
         .into_iter()
         .map(|(date, amount)| (date.to_string(), amount))
         .collect())

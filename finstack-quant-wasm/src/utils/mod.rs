@@ -49,6 +49,7 @@ macro_rules! kinded_js_error {
 
 kinded_js_error!(
     finstack_quant_core::Error,
+    finstack_quant_core::math::linalg::CholeskyError,
     finstack_quant_statements::Error,
     finstack_quant_factor::credit::decomposition::DecompositionError,
     finstack_quant_models::credit::migration::MigrationError,
@@ -158,7 +159,6 @@ validation_js_error!(
     std::num::ParseFloatError,
     std::num::ParseIntError,
     std::fmt::Error,
-    finstack_quant_core::math::linalg::CholeskyError,
 );
 
 impl<T: IntoJsError + ?Sized> IntoJsError for &T {

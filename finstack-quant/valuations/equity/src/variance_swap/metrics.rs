@@ -43,7 +43,7 @@ impl MetricCalculator for Dv01Calculator {
                 .rate_bump_bp;
 
         let base_pv = context.base_value.amount();
-        let bumped_ctx = context.curves.as_ref().bump([MarketBump::Curve {
+        let bumped_ctx = context.curves.as_ref().bump([MarketBump::DiscountCurve {
             id: swap.discount_curve_id.clone(),
             spec: BumpSpec::parallel_bp(bump_bp),
         }])?;
@@ -285,10 +285,20 @@ mod expected_variance_tests {
             .enumerate()
             .map(|(i, d)| (d, 100.0 * (1.0 + 0.002 * (i as f64 % 4.0 - 1.5))))
             .collect();
-        let series = ScalarTimeSeries::new("SPX", obs, None).expect("series");
+        let series = ScalarTimeSeries::new(
+            "SPX",
+            obs,
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("series");
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, 0.96)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let market = MarketContext::new().insert(disc).insert_series(series);

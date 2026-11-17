@@ -1,9 +1,10 @@
 use super::context::MetricsContext;
-use super::shifts::{average_over, inflation_source_abs_shift_bp, note_twist};
+use super::shifts::{
+    average_over, inflation_curve_abs_shift_bp, measure_inflation_curve_shift_bp, note_twist,
+};
 use super::{push_first_order_step, push_second_order_step};
 use crate::helpers::FactorWorking;
 use crate::{MoveUnit, PnlAttribution};
-use finstack_quant_core::market_data::diff::measure_inflation_source_shift;
 use finstack_quant_valuations::metrics::MetricId;
 
 pub(super) fn apply(
@@ -18,8 +19,9 @@ pub(super) fn apply(
 
         let mut measurement_failed = false;
         let (avg_shift, _) =
-            average_over(curve_ids, |curve_id| {
-                match measure_inflation_source_shift(
+            average_over(
+                curve_ids,
+                |curve_id| match measure_inflation_curve_shift_bp(
                     curve_id.as_str(),
                     inputs.market_t0,
                     inputs.market_t1,
@@ -33,8 +35,8 @@ pub(super) fn apply(
                         ));
                         None
                     }
-                }
-            });
+                },
+            );
 
         if measurement_failed || curve_ids.is_empty() {
             *non_finite_detected = true;
@@ -95,7 +97,7 @@ pub(super) fn apply(
                 "Inflation convexity",
                 avg_shift,
                 curve_ids,
-                |id| inflation_source_abs_shift_bp(id, inputs.market_t0, inputs.market_t1),
+                |id| inflation_curve_abs_shift_bp(id, inputs.market_t0, inputs.market_t1),
             );
         }
     }

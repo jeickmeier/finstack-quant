@@ -103,6 +103,9 @@ fn flat_discount_curve(rate: f64, base: Date) -> DiscountCurve {
             (1.0, (-rate).exp()),
             (5.0, (-rate * 5.0).exp()),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }

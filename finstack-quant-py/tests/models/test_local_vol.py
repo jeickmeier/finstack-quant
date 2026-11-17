@@ -18,11 +18,27 @@ FORWARDS = [100.5, 101.0, 102.0, 104.0]
 
 
 def _skew() -> VolSurface:
-    return VolSurface("SKEW", EXPIRIES, STRIKES, [SMILE] * len(EXPIRIES))
+    return VolSurface(
+        "SKEW",
+        EXPIRIES,
+        STRIKES,
+        [SMILE] * len(EXPIRIES),
+        secondary_axis="strike",
+        quote_type="black_lognormal",
+        interpolation_mode="vol",
+    )
 
 
 def _flat(vol: float = 0.2) -> VolSurface:
-    return VolSurface("FLAT", EXPIRIES, STRIKES, [[vol] * len(STRIKES)] * len(EXPIRIES))
+    return VolSurface(
+        "FLAT",
+        EXPIRIES,
+        STRIKES,
+        [[vol] * len(STRIKES)] * len(EXPIRIES),
+        secondary_axis="strike",
+        quote_type="black_lognormal",
+        interpolation_mode="vol",
+    )
 
 
 def test_flat_implied_vol_is_its_own_local_vol() -> None:
@@ -71,7 +87,7 @@ def test_explicit_grid_round_trips_and_tabulates() -> None:
     assert frame.loc[2.0, 100.0] == 0.3
     assert "<table" in local._repr_html_()
     # Same layout as the implied surface it came from.
-    implied = _skew().to_dataframe().pivot(index="expiry", columns="strike", values="vol")
+    implied = _skew().to_dataframe().pivot(index="expiry", columns="secondary_value", values="vol")
     extracted = LocalVolSurface.from_implied_vol(_skew(), FORWARDS).to_dataframe()
     assert list(extracted.index) == list(implied.index)
     assert list(extracted.columns) == list(implied.columns)
@@ -107,15 +123,37 @@ def test_extraction_errors_are_value_errors() -> None:
     with pytest.raises(ValueError, match="sigma_strikes"):
         LocalVolSurface.from_implied_vol_smoothed(_flat(), FORWARDS, -1.0)
 
-    calendar = VolSurface("BAD", [0.5, 1.0, 2.0], STRIKES, [[0.25] * 5, [0.25] * 5, [0.15] * 5])
+    calendar = VolSurface(
+        "BAD",
+        [0.5, 1.0, 2.0],
+        STRIKES,
+        [[0.25] * 5, [0.25] * 5, [0.15] * 5],
+        secondary_axis="strike",
+        quote_type="black_lognormal",
+        interpolation_mode="vol",
+    )
     with pytest.raises(ValueError, match="calendar arbitrage"):
         LocalVolSurface.from_implied_vol(calendar, [100.0] * 3)
     butterfly = VolSurface(
-        "BAD", [0.5, 1.0, 2.0], [70.0, 85.0, 100.0, 115.0, 130.0], [[0.20, 0.45, 0.20, 0.45, 0.20]] * 3
+        "BAD",
+        [0.5, 1.0, 2.0],
+        [70.0, 85.0, 100.0, 115.0, 130.0],
+        [[0.20, 0.45, 0.20, 0.45, 0.20]] * 3,
+        secondary_axis="strike",
+        quote_type="black_lognormal",
+        interpolation_mode="vol",
     )
     with pytest.raises(ValueError, match="butterfly arbitrage"):
         LocalVolSurface.from_implied_vol(butterfly, [100.0] * 3)
-    normal = VolSurface("N", EXPIRIES, STRIKES, [SMILE] * 4, quote_type="normal")
+    normal = VolSurface(
+        "N",
+        EXPIRIES,
+        STRIKES,
+        [SMILE] * 4,
+        secondary_axis="strike",
+        quote_type="normal",
+        interpolation_mode="vol",
+    )
     with pytest.raises(ValueError, match="stores 'normal' quotes"):
         LocalVolSurface.from_implied_vol(normal, FORWARDS)
 

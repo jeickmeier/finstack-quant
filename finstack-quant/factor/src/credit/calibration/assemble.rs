@@ -164,7 +164,7 @@ pub(crate) fn assemble_factor_model_config(
                 )));
             }
             // Sample correlation ρ (PSD-repaired if needed); Σ = D·ρ·D + α·I.
-            let rho_flat = sample_correlation_flat(factor_id_order, factor_returns);
+            let rho_flat = sample_correlation_flat(factor_id_order, factor_returns)?;
             // Repair ρ to PSD if needed (e.g. when n_factors > n_obs).
             let rho_flat = if validate_correlation_matrix(&rho_flat, n).is_ok() {
                 rho_flat
@@ -190,7 +190,7 @@ pub(crate) fn assemble_factor_model_config(
         }
         CovarianceStrategy::FullSampleRepaired => {
             // Sample correlation ρ; repair if not PSD; Σ = D·ρ_repaired·D.
-            let rho_flat = sample_correlation_flat(factor_id_order, factor_returns);
+            let rho_flat = sample_correlation_flat(factor_id_order, factor_returns)?;
             let rho_repaired = if validate_correlation_matrix(&rho_flat, n).is_ok() {
                 rho_flat
             } else {

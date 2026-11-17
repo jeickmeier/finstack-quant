@@ -175,6 +175,8 @@ fn taylor_credit_detail_reconciles_to_credit_curves_pnl() {
                 (10.0_f64, (-r * 10.0).exp()),
                 (30.0_f64, (-r * 30.0).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve")
     };
@@ -224,25 +226,31 @@ fn taylor_credit_detail_reconciles_to_credit_curves_pnl() {
             }
         };
     let prices_t0 = BTreeMap::from([
-        ("cdx.ig.5y".to_string(), MarketScalar::Unitless(100.0)),
+        (
+            "cdx.ig.5y".to_string(),
+            MarketScalar::unitless(100.0).expect("valid scalar"),
+        ),
         (
             "credit::level0::Rating::IG".to_string(),
-            MarketScalar::Unitless(0.0),
+            MarketScalar::unitless(0.0).expect("valid scalar"),
         ),
         (
             "credit::level1::Rating.Region::IG.EU".to_string(),
-            MarketScalar::Unitless(0.0),
+            MarketScalar::unitless(0.0).expect("valid scalar"),
         ),
     ]);
     let prices_t1 = BTreeMap::from([
-        ("cdx.ig.5y".to_string(), MarketScalar::Unitless(110.0)),
+        (
+            "cdx.ig.5y".to_string(),
+            MarketScalar::unitless(110.0).expect("valid scalar"),
+        ),
         (
             "credit::level0::Rating::IG".to_string(),
-            MarketScalar::Unitless(25.0),
+            MarketScalar::unitless(25.0).expect("valid scalar"),
         ),
         (
             "credit::level1::Rating.Region::IG.EU".to_string(),
-            MarketScalar::Unitless(15.0),
+            MarketScalar::unitless(15.0).expect("valid scalar"),
         ),
     ]);
 
@@ -345,6 +353,8 @@ fn twisted_hazard_curve_does_not_omit_or_explode_credit_detail() {
                 (10.0_f64, (-r * 10.0).exp()),
                 (30.0_f64, (-r * 30.0).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve")
     };
@@ -413,14 +423,17 @@ fn twisted_hazard_curve_does_not_omit_or_explode_credit_detail() {
         };
     let prices = || {
         BTreeMap::from([
-            ("cdx.ig.5y".to_string(), MarketScalar::Unitless(100.0)),
+            (
+                "cdx.ig.5y".to_string(),
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            ),
             (
                 "credit::level0::Rating::IG".to_string(),
-                MarketScalar::Unitless(0.0),
+                MarketScalar::unitless(0.0).expect("valid scalar"),
             ),
             (
                 "credit::level1::Rating.Region::IG.EU".to_string(),
-                MarketScalar::Unitless(0.0),
+                MarketScalar::unitless(0.0).expect("valid scalar"),
             ),
         ])
     };

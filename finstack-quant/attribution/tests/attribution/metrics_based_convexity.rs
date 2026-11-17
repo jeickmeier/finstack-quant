@@ -32,6 +32,8 @@ fn build_flat_curve(
         .base_date(as_of)
         .knots(knots)
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -68,6 +70,9 @@ fn test_default_metrics_attribute_long_bond_curve_twist() {
         DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots(knots)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve")
     };
@@ -303,12 +308,39 @@ fn test_convexity_formula_correctness() {
     assert!((ir_convexity_pnl - convexity_pnl).abs() < 1e-9);
 }
 
-#[test]
-fn test_metrics_based_convexity_reduces_residual() {
+fn measure_discount_curve_shift_bp(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> f64 {
     use finstack_quant_core::market_data::diff::{
-        TenorSamplingMethod, measure_discount_curve_shift,
+        RateDiffScale, ZeroRateDiffParams, zero_rate_difference,
     };
 
+    const TENORS: [f64; 9] = [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 30.0];
+    let c0 = market_t0.get_discount(curve_id).expect("discount t0");
+    let c1 = market_t1.get_discount(curve_id).expect("discount t1");
+    let shifts: Vec<f64> = TENORS
+        .iter()
+        .map(|&t| {
+            zero_rate_difference(ZeroRateDiffParams {
+                d0_anchor: 1.0,
+                d0_maturity: c0.df(t).expect("df t0"),
+                d1_anchor: 1.0,
+                d1_maturity: c1.df(t).expect("df t1"),
+                alpha: t,
+                scale: RateDiffScale::BasisPoints,
+            })
+            .expect("zero rate diff")
+        })
+        .collect();
+    finstack_quant_core::math::stats::mean(&shifts)
+        .expect("finite shift mean")
+        .expect("non-empty shifts")
+}
+
+#[test]
+fn test_metrics_based_convexity_reduces_residual() {
     let as_of_t0 = date!(2025 - 01 - 15);
     let as_of_t1 = date!(2025 - 01 - 16);
 
@@ -319,13 +351,7 @@ fn test_metrics_based_convexity_reduces_residual() {
 
     // Measure the actual shift from the curves (may differ slightly from 100bp
     // due to interpolation artifacts and tenor sampling)
-    let measured_shift_bp = measure_discount_curve_shift(
-        "USD-OIS",
-        &market_t0,
-        &market_t1,
-        TenorSamplingMethod::Standard,
-    )
-    .unwrap();
+    let measured_shift_bp = measure_discount_curve_shift_bp("USD-OIS", &market_t0, &market_t1);
 
     let instrument: Arc<dyn Instrument> = Arc::new(
         TestInstrument::new(
@@ -451,23 +477,13 @@ fn test_metrics_based_convexity_reduces_residual() {
 /// convexity P&L by ~the instrument PV (and zeroing it for par swaps).
 #[test]
 fn test_metrics_based_ir_convexity_uses_dollar_convention() {
-    use finstack_quant_core::market_data::diff::{
-        TenorSamplingMethod, measure_discount_curve_shift,
-    };
-
     let as_of_t0 = date!(2025 - 01 - 15);
     let as_of_t1 = date!(2025 - 01 - 16);
 
     let market_t0 = MarketContext::new().insert(build_flat_curve("USD-OIS", as_of_t0, 0.04));
     let market_t1 = MarketContext::new().insert(build_flat_curve("USD-OIS", as_of_t1, 0.05));
 
-    let measured_shift_bp = measure_discount_curve_shift(
-        "USD-OIS",
-        &market_t0,
-        &market_t1,
-        TenorSamplingMethod::Standard,
-    )
-    .unwrap();
+    let measured_shift_bp = measure_discount_curve_shift_bp("USD-OIS", &market_t0, &market_t1);
 
     let instrument: Arc<dyn Instrument> = Arc::new(
         TestInstrument::new(

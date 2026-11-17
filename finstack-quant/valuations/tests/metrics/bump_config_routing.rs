@@ -28,7 +28,9 @@ use finstack_quant_core::market_data::bumps::{
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::interp::InterpStyle;
@@ -107,18 +109,20 @@ fn assert_pins(pins: &[(&str, f64, u64)]) {
 }
 
 fn bump_price(market: &MarketContext, id: &str, pct: f64) -> MarketContext {
-    let bumped = match market.get_price(id).expect("price scalar") {
-        MarketScalar::Unitless(v) => MarketScalar::Unitless(v * (1.0 + pct)),
-        MarketScalar::Price(m) => {
-            MarketScalar::Price(Money::new(m.amount() * (1.0 + pct), m.currency()).expect("money"))
-        }
+    let current = market.get_price(id).expect("price scalar");
+    let bumped = if let Some(v) = current.get_unitless() {
+        MarketScalar::unitless(v * (1.0 + pct)).expect("valid scalar")
+    } else if let Some(m) = current.get_price() {
+        MarketScalar::price(Money::new(m.amount() * (1.0 + pct), m.currency()).expect("money"))
+    } else {
+        panic!("unsupported MarketScalar variant");
     };
     market.clone().insert_price(id, bumped)
 }
 
 fn bump_vol(market: &MarketContext, id: &str, abs: f64) -> MarketContext {
     market
-        .bump([MarketBump::Curve {
+        .bump([MarketBump::VolSurface {
             id: CurveId::from(id),
             spec: BumpSpec {
                 mode: BumpMode::Additive,
@@ -132,18 +136,19 @@ fn bump_vol(market: &MarketContext, id: &str, abs: f64) -> MarketContext {
 
 fn bump_rate(market: &MarketContext, id: &str, bp: f64) -> MarketContext {
     market
-        .bump([MarketBump::Curve {
-            id: CurveId::from(id),
-            spec: BumpSpec::parallel_bp(bp),
-        }])
+        .bump([market
+            .curve_target(id)
+            .expect("curve target")
+            .into_bump(BumpSpec::parallel_bp(bp))])
         .expect("rate bump")
 }
 
 fn spot_value(market: &MarketContext, id: &str) -> f64 {
-    match market.get_price(id).expect("price scalar") {
-        MarketScalar::Unitless(v) => *v,
-        MarketScalar::Price(m) => m.amount(),
-    }
+    let scalar = market.get_price(id).expect("price scalar");
+    scalar
+        .get_unitless()
+        .or_else(|| scalar.get_price().map(|m| m.amount()))
+        .expect("spot scalar")
 }
 
 fn overrides(spot: Option<f64>, vol: Option<f64>, rate: Option<f64>) -> MetricPricingOverrides {
@@ -173,8 +178,14 @@ fn equity_market(as_of: Date) -> MarketContext {
     MarketContext::new()
         .insert(flat_discount_with_tenor("USD-OIS", as_of, EQ_RATE, 5.0))
         .insert_surface(flat_vol_surface("EQUITY-VOL", &expiries, &strikes, EQ_VOL))
-        .insert_price("EQUITY-SPOT", MarketScalar::Unitless(EQ_SPOT))
-        .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(EQ_DIV))
+        .insert_price(
+            "EQUITY-SPOT",
+            MarketScalar::unitless(EQ_SPOT).expect("valid scalar"),
+        )
+        .insert_price(
+            "EQUITY-DIVYIELD",
+            MarketScalar::unitless(EQ_DIV).expect("valid scalar"),
+        )
 }
 
 fn equity_fixture_with_strike(strike: f64) -> (EquityOption, MarketContext, Date) {
@@ -223,7 +234,7 @@ fn equity_option_defaults_are_bit_identical() {
         (
             "speed",
             measure(&opt, &market, as_of, MetricId::Speed, d()),
-            0xbfac6cb09b99b000,
+            0xbfac6cb09b99c000,
         ),
         (
             "color",
@@ -512,8 +523,11 @@ const QUANTO_AS_OF: Date = time::macros::date!(2026 - 01 - 02);
 fn flat_surface(id: &str, strikes: &[f64], level: f64) -> VolSurface {
     let tenors = [0.25, 0.5, 1.0, 2.0, 5.0];
     let mut b = VolSurface::builder(CurveId::new(id))
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&tenors)
-        .strikes(strikes);
+        .secondary_values(strikes);
     for _ in 0..tenors.len() {
         b = b.row(&vec![level; strikes.len()]);
     }
@@ -525,12 +539,16 @@ fn quanto_market() -> MarketContext {
         .base_date(QUANTO_AS_OF)
         .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.85)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("usd");
     let jpy = DiscountCurve::builder("JPY-OIS")
         .base_date(QUANTO_AS_OF)
         .knots([(0.0, 1.0), (1.0, 0.999), (5.0, 0.995)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("jpy");
     let provider = Arc::new(SimpleFxProvider::new());
@@ -547,9 +565,18 @@ fn quanto_market() -> MarketContext {
         ))
         .insert_surface(flat_surface("JPYUSD-VOL", &[0.5, 0.8, 1.0, 1.2, 1.5], 0.10))
         .insert_fx(FxMatrix::new(provider, None))
-        .insert_price("NKY-DIV", MarketScalar::Unitless(0.01))
-        .insert_price("NKY-SPOT", MarketScalar::Unitless(35_000.0))
-        .insert_price("JPYUSD-SPOT", MarketScalar::Unitless(1.0 / 150.0))
+        .insert_price(
+            "NKY-DIV",
+            MarketScalar::unitless(0.01).expect("valid scalar"),
+        )
+        .insert_price(
+            "NKY-SPOT",
+            MarketScalar::unitless(35_000.0).expect("valid scalar"),
+        )
+        .insert_price(
+            "JPYUSD-SPOT",
+            MarketScalar::unitless(1.0 / 150.0).expect("valid scalar"),
+        )
 }
 
 fn quanto_option() -> QuantoOption {
@@ -644,7 +671,10 @@ fn barrier_fixture() -> (FxBarrierOption, MarketContext, Date) {
         .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
         .insert(flat_discount_with_tenor("EUR-OIS", as_of, 0.01, 5.0))
         .insert_surface(flat_vol_surface("EURUSD-VOL", &expiries, &strikes, 0.15))
-        .insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.10));
+        .insert_price(
+            "EURUSD-SPOT",
+            MarketScalar::unitless(1.10).expect("valid scalar"),
+        );
     let option = FxBarrierOption::builder()
         .id(InstrumentId::new("FXBAR-ROUTING"))
         .strike(1.10)
@@ -724,14 +754,20 @@ fn lookback_fixture() -> (LookbackOption, MarketContext, Date) {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (10.0, (-0.05_f64 * 10.0).exp())])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
     let surface = VolSurface::from_grid(
         "SPX-VOL",
-        &[0.0, 10.0],
+        &[0.01, 10.0],
         &[1.0, 10_000.0],
         &[0.20, 0.20, 0.20, 0.20],
-        Default::default(),
+        VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
+            interpolation_mode: VolInterpolationMode::Vol,
+        },
         None,
     )
     .expect("surface");
@@ -740,9 +776,12 @@ fn lookback_fixture() -> (LookbackOption, MarketContext, Date) {
         .insert_surface(surface)
         .insert_price(
             "SPX-SPOT",
-            MarketScalar::Price(Money::new(100.0, Currency::USD).expect("money")),
+            MarketScalar::price(Money::new(100.0, Currency::USD).expect("money")),
         )
-        .insert_price("SPX-DIV", MarketScalar::Unitless(0.0));
+        .insert_price(
+            "SPX-DIV",
+            MarketScalar::unitless(0.0).expect("valid scalar"),
+        );
     let option = LookbackOption::builder()
         .id(InstrumentId::new("LOOKBACK-ROUTING"))
         .underlying_ticker("SPX".to_string())

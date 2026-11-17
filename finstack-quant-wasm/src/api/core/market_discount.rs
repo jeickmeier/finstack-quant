@@ -1,30 +1,26 @@
 //! WASM binding for `finstack_quant_core::market_data::term_structures::DiscountCurve`.
 
-use crate::utils::input::{from_js_json, js_f64, js_f64_seq, js_opt_string, js_string};
+use crate::utils::input::{from_js_json, js_f64, js_f64_seq, js_string};
 use finstack_quant_core::market_data::traits::Discounting;
 use std::sync::Arc;
 
 use crate::utils::wire::js_date;
 use crate::utils::{date_to_iso, parse_iso_date, to_js_err};
 use finstack_quant_core::dates::DayCount;
-use finstack_quant_core::market_data::term_structures::{
-    DiscountCurve as RustDiscountCurve, ValidationMode,
-};
+use finstack_quant_core::market_data::term_structures::DiscountCurve as RustDiscountCurve;
 use finstack_quant_core::math::Compounding;
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
 use crate::api::core::curve_args::{TimePoint, flat_pairs, js_time_point};
-use crate::api::core::market_forward::JsForwardCurve;
 
 /// Discount factor curve for present-value calculations.
 ///
 /// Built from `(time, discount_factor)` pillars where `time` is a year
-/// fraction from `baseDate` and `df` is the price today of $1 paid at that
-/// time. Defaults reflect the most common practitioner convention
-/// (Hagan-West monotone-convex interpolation, flat-forward extrapolation,
-/// Act/365 fixed day-count).
+/// fraction from `baseDate` and `df` is the positive price today of $1 paid at
+/// that time. All curve conventions (`interp`, `extrapolation`, and `dayCount`)
+/// must be specified explicitly.
 ///
 /// @example
 /// ```javascript
@@ -36,11 +32,11 @@ use crate::api::core::market_forward::JsForwardCurve;
 ///   baseDate: "2025-01-02",
 ///   knots: [0.0, 1.0, 1.0, 0.95, 5.0, 0.78],
 ///   interp: "monotone_convex",
-///   extrapolation: "flat_forward",
+///   extrapolation: "extend",
 ///   dayCount: "act_365f",
 /// });
-/// curve.df(2.5);          // discount factor at 2.5y
-/// curve.zeroRate(2.5);    // continuously-compounded zero rate at 2.5y
+/// curve.df(2.5);                  // discount factor at 2.5y
+/// curve.zeroRate(2.5, "continuous"); // continuously-compounded zero rate at 2.5y
 /// ```
 #[wasm_bindgen(js_name = DiscountCurve)]
 pub struct JsDiscountCurve {
@@ -54,18 +50,11 @@ struct DiscountCurveOptions {
     id: String,
     base_date: String,
     knots: Vec<f64>,
-    #[serde(default)]
-    interp: Option<String>,
-    #[serde(default)]
-    extrapolation: Option<String>,
-    #[serde(default)]
-    day_count: Option<String>,
+    interp: String,
+    extrapolation: String,
+    day_count: String,
     #[serde(default)]
     calendar_id: Option<String>,
-    #[serde(default)]
-    validation_mode: Option<String>,
-    #[serde(default)]
-    forward_floor: Option<f64>,
 }
 
 impl JsDiscountCurve {
@@ -78,30 +67,23 @@ impl JsDiscountCurve {
     fn build(options: DiscountCurveOptions) -> Result<JsDiscountCurve, JsValue> {
         let base = parse_iso_date(&options.base_date)?;
         let pairs = flat_pairs(&options.knots, "knots")?;
+        let interp = options.interp.parse::<InterpStyle>().map_err(to_js_err)?;
+        let extrapolation = options
+            .extrapolation
+            .parse::<ExtrapolationPolicy>()
+            .map_err(to_js_err)?;
+        let day_count = options.day_count.parse::<DayCount>().map_err(to_js_err)?;
 
-        let mut builder = RustDiscountCurve::builder(options.id)
+        RustDiscountCurve::builder(options.id)
             .base_date(base)
             .knots(pairs)
-            .calendar_id_opt(options.calendar_id);
-        if let Some(interp) = options.interp.as_deref() {
-            builder = builder.interp(interp.parse::<InterpStyle>().map_err(to_js_err)?);
-        }
-        if let Some(extrapolation) = options.extrapolation.as_deref() {
-            builder = builder.extrapolation(
-                extrapolation
-                    .parse::<ExtrapolationPolicy>()
-                    .map_err(to_js_err)?,
-            );
-        }
-        if let Some(day_count) = options.day_count.as_deref() {
-            builder = builder.day_count(day_count.parse::<DayCount>().map_err(to_js_err)?);
-        }
-        builder = builder.validation(
-            ValidationMode::from_preset(options.validation_mode.as_deref(), options.forward_floor)
-                .map_err(to_js_err)?,
-        );
-
-        builder.build().map(Self::from_inner).map_err(to_js_err)
+            .calendar_id_opt(options.calendar_id)
+            .interp(interp)
+            .extrapolation(extrapolation)
+            .day_count(day_count)
+            .build()
+            .map(Self::from_inner)
+            .map_err(to_js_err)
     }
 }
 
@@ -115,29 +97,23 @@ impl JsDiscountCurve {
     ///   `id` (curve identifier, the `MarketContext` lookup key); `baseDate`
     ///   (ISO-8601 `"YYYY-MM-DD"`; knot times are year fractions from it under
     ///   `dayCount`); `knots` (flat `[t0, df0, t1, df1, …]` array or typed
-    ///   array, `t` in years, `df` strictly positive, even length); and the
-    ///   optional `interp` (`"linear"`, `"log_linear"`, `"monotone_convex"`,
-    ///   `"cubic_hermite"`, `"piecewise_quadratic_forward"`), `extrapolation`
-    ///   (`"flat_zero"`, `"flat_forward"`, or `"none"`, which returns NaN
-    ///   outside the pillar range), `dayCount` (used to convert dates to curve
-    ///   time; not inferred from the ID), `calendarId` (registered holiday
-    ///   calendar of the curve's time axis, e.g. `"brbd"`; required with
-    ///   `"bus_252"`),
-    ///   `validationMode` (`"market_standard"` or `"negative_rate_friendly"`)
-    ///   and `forwardFloor` (decimal minimum implied forward, required with
-    ///   `"negative_rate_friendly"` and rejected otherwise). Omitted options use
-    ///   the Rust builder defaults: `monotone_convex`, `flat_forward`,
-    ///   `act_365f` and `market_standard`. Unknown keys are rejected.
+    ///   array, `t` in years, `df` strictly positive, even length); `interp`
+    ///   (`"linear"`, `"log_linear"`, `"monotone_convex"`, `"cubic_hermite"`,
+    ///   `"piecewise_quadratic_forward"`); `extrapolation` (`"flat"`,
+    ///   `"extend"`, or `"error"`, which rejects queries outside the pillar
+    ///   range); `dayCount` (used to convert dates to curve time; not inferred
+    ///   from the ID); and optional `calendarId` (registered holiday calendar
+    ///   of the curve's time axis, e.g. `"brbd"`; required with `"bus_252"`).
+    ///   Unknown keys are rejected.
     ///
     /// @returns The constructed `DiscountCurve`.
     /// @throws `TypeError` (kind `invalid_type`) if `options` is not a JSON
     /// string or plain object; `FinstackError` (kind `validation`) for an
-    /// unknown or mistyped key, an odd `knots` length, a malformed date, an
-    /// unknown interpolation/extrapolation/day-count/validation name, a
-    /// misplaced or missing `forwardFloor`, a `"bus_252"` curve without
-    /// `calendarId`, or discount factors the curve validation rejects;
+    /// unknown, missing, or mistyped key, an odd `knots` length, a malformed
+    /// date, an unknown interpolation/extrapolation/day-count name, a
+    /// `"bus_252"` curve without `calendarId`, or invalid discount factors;
     /// `FinstackError` (kind `not_found`) for an unknown `calendarId`.
-    /// @param options - DiscountCurveOptions object (or its JSON text) with: `id` (curve identifier, the `MarketContext` lookup key); `baseDate` (ISO-8601 `"YYYY-MM-DD"`; knot times are year fractions from it under `dayCount`); `knots` (flat `[t0, df0, t1, df1, …]` array or typed array, `t` in years, `df` strictly positive, even length); and the optional `interp` (`"linear"`, `"log_linear"`, `"monotone_convex"`, `"cubic_hermite"`, `"piecewise_quadratic_forward"`), `extrapolation` (`"flat_zero"`, `"flat_forward"`, or `"none"`, which returns NaN outside the pillar range), `dayCount` (used to convert dates to curve time; not inferred from the ID), `calendarId` (registered holiday calendar of the curve's time axis, e.g. `"brbd"`; required with `"bus_252"`), `validationMode` (`"market_standard"` or `"negative_rate_friendly"`) and `forwardFloor` (decimal minimum implied forward, required with `"negative_rate_friendly"` and rejected otherwise). Omitted options use the Rust builder defaults: `monotone_convex`, `flat_forward`, `act_365f` and `market_standard`. Unknown keys are rejected.
+    /// @param options - DiscountCurveOptions object (or its JSON text) with `id`, `baseDate`, `knots`, `interp`, `extrapolation`, `dayCount`, and optional `calendarId`. Unknown keys are rejected.
     #[wasm_bindgen(constructor)]
     pub fn new(
         #[wasm_bindgen(unchecked_param_type = "DiscountCurveOptions | string")] options: JsValue,
@@ -149,13 +125,14 @@ impl JsDiscountCurve {
     /// @param id - Curve identifier stored on the constructed discount curve.
     /// @param baseDate - ISO-8601 curve base date from which time coordinates are measured.
     /// @param continuousRate - Flat continuously compounded zero rate expressed as a decimal.
+    /// @param dayCount - Explicit curve day-count convention label (for example `"act_365f"` or `"act_360"`).
     ///
     /// # Errors
     ///
     /// Throws a JavaScript exception if `baseDate` is not a valid ISO date,
-    /// `continuousRate` is non-finite or `|continuousRate| > 1` (rates are
-    /// decimals: `0.05` is 5%), or the implied discount factors are not finite
-    /// and strictly positive.
+    /// `dayCount` is unsupported or unknown, `continuousRate` is non-finite or
+    /// `|continuousRate| > 1` (rates are decimals: `0.05` is 5%), or the implied
+    /// discount factors are not finite and strictly positive.
     /// @returns A `DiscountCurve` handle.
     #[wasm_bindgen(js_name = flat)]
     pub fn flat(
@@ -163,32 +140,41 @@ impl JsDiscountCurve {
         #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
         #[wasm_bindgen(js_name = "continuousRate", unchecked_param_type = "number")]
         continuous_rate: JsValue,
+        #[wasm_bindgen(js_name = "dayCount", unchecked_param_type = "string")] day_count: JsValue,
     ) -> Result<JsDiscountCurve, JsValue> {
         let continuous_rate = js_f64(&continuous_rate, "continuousRate")?;
         let id = js_string(&id, "id")?;
-        RustDiscountCurve::flat(id, js_date(&base_date, "baseDate")?, continuous_rate)
-            .map(Self::from_inner)
-            .map_err(to_js_err)
+        let day_count = js_string(&day_count, "dayCount")?
+            .parse::<DayCount>()
+            .map_err(to_js_err)?;
+        RustDiscountCurve::flat(
+            id,
+            js_date(&base_date, "baseDate")?,
+            continuous_rate,
+            day_count,
+        )
+        .map(Self::from_inner)
+        .map_err(to_js_err)
     }
 
     /// Discount factor at year fraction `t` or on an ISO-8601 date.
     ///
     /// # Arguments
     ///
-    /// * `t` - Time from the curve base date in years (`number`) or an ISO-8601
-    ///   target date (`"YYYY-MM-DD"`, converted with the curve day count).
+    /// * `t` - Time from the curve base date in years (`number`, must be non-negative)
+    ///   or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
     ///
     /// @returns The discount factor from the base date to `t`.
     /// @throws `TypeError` if `t` is neither a number nor a string;
-    /// `FinstackError` (kind `validation`) for a malformed date or a year
-    /// fraction that cannot be computed.
+    /// `FinstackError` (kind `validation`) for a malformed date, negative time,
+    /// out-of-range `"error"` tail query, or a year fraction that cannot be computed.
     /// @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
     pub fn df(
         &self,
         #[wasm_bindgen(unchecked_param_type = "number | string")] t: JsValue,
     ) -> Result<f64, JsValue> {
         match js_time_point(&t, "t")? {
-            TimePoint::Years(t) => Ok(self.inner.df(t)),
+            TimePoint::Years(t) => self.inner.df(t).map_err(to_js_err),
             TimePoint::Date(d) => self.inner.df_on_date(d).map_err(to_js_err),
         }
     }
@@ -223,33 +209,60 @@ impl JsDiscountCurve {
     /// * `points` - Flat `[t0, z0, t1, z1, …]` array: times in years and
     ///   zero rates as decimals (`0.05` is 5%), with strictly increasing times.
     /// * `compounding` - Compounding of the zero rates: `"continuous"`,
-    ///   `"simple"`, `"periodic(1)"`, `"semi_annual"`, `"quarterly"` or `"monthly"`;
-    ///   omitted means `"continuous"`.
+    ///   `"simple"`, `"periodic(1)"`, `"semi_annual"`, `"quarterly"` or `"monthly"`.
+    /// * `day_count` - Day-count convention label (`"act_365f"`, `"act_360"`, etc.).
+    /// * `interp` - Interpolation style (`"linear"`, `"log_linear"`,
+    ///   `"monotone_convex"`, `"cubic_hermite"`, `"piecewise_quadratic_forward"`).
+    /// * `extrapolation` - Tail extrapolation policy (`"flat"`, `"extend"`, or `"error"`).
     ///
     /// @returns Curve whose discount factors reproduce every zero rate.
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
     /// `validation`) for an empty or odd-length `points`, a malformed date, an
-    /// unknown compounding, or discount factors the curve validation rejects.
+    /// unknown compounding/day-count/interpolation/extrapolation label, or
+    /// invalid zero rates.
     /// @param id - Curve identifier stored on the curve.
     /// @param baseDate - ISO-8601 valuation date anchoring `t = 0`.
     /// @param points - Flat `[t0, z0, t1, z1, …]` array: times in years and zero rates as decimals (`0.05` is 5%), with strictly increasing times.
-    /// @param compounding - Compounding of the zero rates: `"continuous"`, `"simple"`, `"periodic(1)"`, `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means `"continuous"`.
+    /// @param compounding - Compounding of the zero rates: `"continuous"`, `"simple"`, `"periodic(1)"`, `"semi_annual"`, `"quarterly"` or `"monthly"`.
+    /// @param dayCount - Explicit curve day-count convention label.
+    /// @param interp - Explicit interpolation style label.
+    /// @param extrapolation - Explicit tail extrapolation policy label.
     #[wasm_bindgen(js_name = fromZeroRates)]
     pub fn from_zero_rates(
         #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
         #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
         #[wasm_bindgen(unchecked_param_type = "NumericArray")] points: JsValue,
-        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] compounding: Option<
-            JsValue,
-        >,
+        #[wasm_bindgen(unchecked_param_type = "string")] compounding: JsValue,
+        #[wasm_bindgen(js_name = "dayCount", unchecked_param_type = "string")] day_count: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] interp: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] extrapolation: JsValue,
     ) -> Result<JsDiscountCurve, JsValue> {
         let id = js_string(&id, "id")?;
         let base_date = js_date(&base_date, "baseDate")?;
         let points = flat_pairs(&js_f64_seq(&points, "points")?, "points")?;
-        let compounding = compounding_arg(compounding.as_ref())?;
-        RustDiscountCurve::from_zero_rates(id, base_date, &points, compounding)
-            .map(Self::from_inner)
-            .map_err(to_js_err)
+        let compounding = js_string(&compounding, "compounding")?
+            .parse::<Compounding>()
+            .map_err(to_js_err)?;
+        let day_count = js_string(&day_count, "dayCount")?
+            .parse::<DayCount>()
+            .map_err(to_js_err)?;
+        let interp = js_string(&interp, "interp")?
+            .parse::<InterpStyle>()
+            .map_err(to_js_err)?;
+        let extrapolation = js_string(&extrapolation, "extrapolation")?
+            .parse::<ExtrapolationPolicy>()
+            .map_err(to_js_err)?;
+        RustDiscountCurve::from_zero_rates(
+            id,
+            base_date,
+            &points,
+            compounding,
+            day_count,
+            interp,
+            extrapolation,
+        )
+        .map(Self::from_inner)
+        .map_err(to_js_err)
     }
 
     /// Construct a curve from dated discount factors (Rust `DiscountCurve::from_dates`).
@@ -261,25 +274,29 @@ impl JsDiscountCurve {
     /// * `points` - Array of `[isoDate, discountFactor]` pairs with strictly
     ///   increasing dates on or after `baseDate` and strictly positive
     ///   discount factors.
-    /// * `day_count` - Day count that converts each date to curve time;
-    ///   omitted uses the Rust default (`"act_365f"`).
+    /// * `day_count` - Day count that converts each date to curve time.
+    /// * `interp` - Explicit interpolation style label.
+    /// * `extrapolation` - Explicit tail extrapolation policy label.
     ///
     /// @returns Curve with one pillar per dated point.
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-    /// `validation`) for empty `points`, a malformed date, an unknown day
-    /// count, or discount factors the curve validation rejects.
+    /// `validation`) for empty `points`, a malformed date, an unknown
+    /// day-count/interpolation/extrapolation label, or invalid discount factors.
     /// @param id - Curve identifier stored on the curve.
     /// @param baseDate - ISO-8601 valuation date anchoring `t = 0`.
     /// @param points - Array of `[isoDate, discountFactor]` pairs with strictly increasing dates on or after `baseDate` and strictly positive discount factors.
-    /// @param dayCount - Day count that converts each date to curve time; omitted uses the Rust default (`"act_365f"`).
+    /// @param dayCount - Explicit day count that converts each date to curve time.
+    /// @param interp - Explicit interpolation style label.
+    /// @param extrapolation - Explicit tail extrapolation policy label.
     #[wasm_bindgen(js_name = fromDates)]
     pub fn from_dates(
         #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
         #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
         #[wasm_bindgen(unchecked_param_type = "readonly (readonly [string, number])[] | string")]
         points: JsValue,
-        #[wasm_bindgen(js_name = "dayCount", unchecked_optional_param_type = "string | null")]
-        day_count: Option<JsValue>,
+        #[wasm_bindgen(js_name = "dayCount", unchecked_param_type = "string")] day_count: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] interp: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] extrapolation: JsValue,
     ) -> Result<JsDiscountCurve, JsValue> {
         let id = js_string(&id, "id")?;
         let base_date = js_date(&base_date, "baseDate")?;
@@ -287,11 +304,16 @@ impl JsDiscountCurve {
             .into_iter()
             .map(|(date, df)| Ok((parse_iso_date(&date)?, df)))
             .collect::<Result<Vec<_>, JsValue>>()?;
-        let day_count = js_opt_string(day_count.as_ref(), "dayCount")?
-            .map(|name| name.parse::<DayCount>())
-            .transpose()
+        let day_count = js_string(&day_count, "dayCount")?
+            .parse::<DayCount>()
             .map_err(to_js_err)?;
-        RustDiscountCurve::from_dates(id, base_date, &points, day_count)
+        let interp = js_string(&interp, "interp")?
+            .parse::<InterpStyle>()
+            .map_err(to_js_err)?;
+        let extrapolation = js_string(&extrapolation, "extrapolation")?
+            .parse::<ExtrapolationPolicy>()
+            .map_err(to_js_err)?;
+        RustDiscountCurve::from_dates(id, base_date, &points, day_count, interp, extrapolation)
             .map(Self::from_inner)
             .map_err(to_js_err)
     }
@@ -324,34 +346,34 @@ impl JsDiscountCurve {
         serde_json::to_string(&*self.inner).map_err(to_js_err)
     }
 
-    /// Zero rate at year fraction `t` or on an ISO-8601 date under a compounding
-    /// convention (Rust `DiscountCurve::zero_rate` / `DiscountCurve::zero_rate_on_date`).
+    /// Zero rate at year fraction `t` or on an ISO-8601 date under an explicit
+    /// compounding convention (Rust `DiscountCurve::zero_rate` / `DiscountCurve::zero_rate_on_date`).
     ///
     /// # Arguments
     ///
-    /// * `t` - Time from the curve base date in years (`number`) or an ISO-8601
-    ///   target date (`"YYYY-MM-DD"`, converted with the curve day count).
+    /// * `t` - Strictly positive time from the curve base date in years (`number`)
+    ///   or an ISO-8601 target date strictly after `baseDate` (`"YYYY-MM-DD"`,
+    ///   converted with the curve day count).
     /// * `compounding` - `"continuous"`, `"simple"`, `"periodic(1)"`,
-    ///   `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means
-    ///   `"continuous"`.
+    ///   `"semi_annual"`, `"quarterly"` or `"monthly"`.
     ///
-    /// @returns The zero rate as a decimal; `0` at `t = 0`.
+    /// @returns The zero rate as a decimal.
     /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-    /// `validation`) for a malformed date, an unknown compounding, or a year
-    /// fraction that cannot be computed.
-    /// @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
-    /// @param compounding - `"continuous"`, `"simple"`, `"periodic(1)"`, `"semi_annual"`, `"quarterly"` or `"monthly"`; omitted means `"continuous"`.
+    /// `validation`) for `t <= 0`, a date on or before `baseDate`, a malformed
+    /// date, an unknown compounding, or a year fraction that cannot be computed.
+    /// @param t - Strictly positive time from the curve base date in years (`number`) or an ISO-8601 target date strictly after `baseDate`.
+    /// @param compounding - `"continuous"`, `"simple"`, `"periodic(1)"`, `"semi_annual"`, `"quarterly"` or `"monthly"`.
     #[wasm_bindgen(js_name = zeroRate)]
     pub fn zero_rate(
         &self,
         #[wasm_bindgen(unchecked_param_type = "number | string")] t: JsValue,
-        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] compounding: Option<
-            JsValue,
-        >,
+        #[wasm_bindgen(unchecked_param_type = "string")] compounding: JsValue,
     ) -> Result<f64, JsValue> {
-        let comp = compounding_arg(compounding.as_ref())?;
+        let comp = js_string(&compounding, "compounding")?
+            .parse::<Compounding>()
+            .map_err(to_js_err)?;
         match js_time_point(&t, "t")? {
-            TimePoint::Years(t) => Ok(self.inner.zero_rate(t, comp)),
+            TimePoint::Years(t) => self.inner.zero_rate(t, comp).map_err(to_js_err),
             TimePoint::Date(d) => self.inner.zero_rate_on_date(d, comp).map_err(to_js_err),
         }
     }
@@ -381,43 +403,6 @@ impl JsDiscountCurve {
         let to_date = js_date(&to_date, "toDate")?;
         self.inner
             .df_between_dates(from_date, to_date)
-            .map_err(to_js_err)
-    }
-
-    /// Derive a single-curve forward curve from this discount curve (Rust
-    /// `DiscountCurve::to_forward_curve`).
-    ///
-    /// # Arguments
-    ///
-    /// * `forward_id` - Identifier of the new forward curve.
-    /// * `tenor` - Index tenor in years (for example `0.25` for 3M); finite
-    ///   and strictly positive.
-    /// * `interp` - Interpolation style of the forward curve (for example
-    ///   `"linear"`); omitted uses the Rust default.
-    ///
-    /// @returns A `ForwardCurve` of simple forward rates implied by this curve.
-    /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
-    /// `validation`) for a non-positive tenor, an unknown interpolation style,
-    /// or forwards the forward-curve builder rejects.
-    /// @param forwardId - Identifier of the new forward curve.
-    /// @param tenor - Index tenor in years (for example `0.25` for 3M); finite and strictly positive.
-    /// @param interp - Interpolation style of the forward curve (for example `"linear"`); omitted uses the Rust default.
-    #[wasm_bindgen(js_name = toForwardCurve)]
-    pub fn to_forward_curve(
-        &self,
-        #[wasm_bindgen(js_name = "forwardId", unchecked_param_type = "string")] forward_id: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "number")] tenor: JsValue,
-        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] interp: Option<JsValue>,
-    ) -> Result<JsForwardCurve, JsValue> {
-        let forward_id = js_string(&forward_id, "forwardId")?;
-        let tenor = js_f64(&tenor, "tenor")?;
-        let interp = js_opt_string(interp.as_ref(), "interp")?
-            .map(|name| name.parse::<InterpStyle>())
-            .transpose()
-            .map_err(to_js_err)?;
-        self.inner
-            .to_forward_curve(forward_id, tenor, interp)
-            .map(JsForwardCurve::from_inner)
             .map_err(to_js_err)
     }
 
@@ -464,7 +449,7 @@ impl JsDiscountCurve {
         self.inner.interp_style().to_string()
     }
 
-    /// Extrapolation policy beyond the last pillar, such as `"flat_forward"`.
+    /// Extrapolation policy beyond the last pillar, such as `"extend"`.
     #[wasm_bindgen(getter, js_name = extrapolation)]
     pub fn extrapolation(&self) -> String {
         self.inner.extrapolation().to_string()
@@ -484,13 +469,5 @@ impl JsDiscountCurve {
             Some(recipe) => crate::utils::to_js_value(recipe),
             None => Ok(JsValue::UNDEFINED),
         }
-    }
-}
-
-/// Parse an optional compounding name; omitted means continuous.
-fn compounding_arg(value: Option<&JsValue>) -> Result<Compounding, JsValue> {
-    match js_opt_string(value, "compounding")? {
-        Some(name) => name.parse::<Compounding>().map_err(to_js_err),
-        None => Ok(Compounding::default()),
     }
 }

@@ -314,7 +314,6 @@ def test_tenor_constructor_forms_and_context_helpers() -> None:
     assert Tenor.parse("3M") == Tenor(3, "M") == Tenor(3, TenorUnit.MONTHS)
     assert Tenor.parse(" 1d ") == Tenor.daily()
     assert Tenor.parse("3M").payments_per_year() == 4.0
-    assert str(Tenor.from_years(0.5, "act_365f")) == "6M"
     assert Tenor.parse("1M").add_to_date("2025-01-31", business_day_convention="unadjusted") == date(2025, 2, 28)
     assert Tenor.parse("1M").add_to_date("2025-01-31", calendar="usny", business_day_convention="following") == date(
         2025, 2, 28
@@ -414,15 +413,23 @@ def test_business_day_shift_rejects_calendar_boundary() -> None:
 
 
 @pytest.mark.parametrize(
-    ("days", "match"),
+    ("anchor", "match"),
     [
-        (-(2**63), "non-negative days"),
-        (2**63 - 1, "supported date range"),
+        ("not-a-date", "date"),
+        ("2030-01-01", "extrapolation|range|positive|exceeds maximum knot"),
     ],
 )
-def test_market_roll_rejects_extreme_day_offsets(days: int, match: str) -> None:
+def test_market_condition_rejects_invalid_anchor_or_unextrapolated_range(anchor: str, match: str) -> None:
     from finstack_quant.core.market_data import DiscountCurve, MarketContext
 
-    context = MarketContext().insert(DiscountCurve.flat("USD-OIS", "2025-01-01", 0.05))
+    curve = DiscountCurve(
+        "USD-OIS",
+        "2025-01-01",
+        [(0.0, 1.0), (2.0, 0.90)],
+        extrapolation="error",
+        interp="monotone_convex",
+        day_count="act_365f",
+    )
+    context = MarketContext().insert(curve)
     with pytest.raises(ValueError, match=match):
-        context.roll_forward(days)
+        context.condition(anchor)

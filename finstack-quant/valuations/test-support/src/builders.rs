@@ -76,6 +76,8 @@ impl TestMarketBuilder {
                 (1.0_f64, (-self.rate).exp()),
                 (TENOR_YEARS, (-self.rate * TENOR_YEARS).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve should build in tests");
 
@@ -89,10 +91,16 @@ impl TestMarketBuilder {
         let mut market = MarketContext::new()
             .insert(disc_curve)
             .insert_surface(vol_surface)
-            .insert_price(SPOT_ID, MarketScalar::Unitless(self.spot));
+            .insert_price(
+                SPOT_ID,
+                MarketScalar::unitless(self.spot).expect("test spot scalar should be finite"),
+            );
 
         if let Some(div) = self.div_yield {
-            market = market.insert_price(DIV_YIELD_ID, MarketScalar::Unitless(div));
+            market = market.insert_price(
+                DIV_YIELD_ID,
+                MarketScalar::unitless(div).expect("test dividend yield should be finite"),
+            );
         }
 
         market

@@ -84,7 +84,7 @@ pub(crate) trait InterpolationStrategy: Send + Sync + Debug {
         knots: &[f64],
         values: &[f64],
         extrapolation: ExtrapolationPolicy,
-    ) -> f64;
+    ) -> crate::Result<f64>;
 
     /// First derivative at `x` using the strategy's algorithm.
     ///
@@ -99,5 +99,5 @@ pub(crate) trait InterpolationStrategy: Send + Sync + Debug {
         knots: &[f64],
         values: &[f64],
         extrapolation: ExtrapolationPolicy,
-    ) -> f64;
+    ) -> crate::Result<f64>;
 }

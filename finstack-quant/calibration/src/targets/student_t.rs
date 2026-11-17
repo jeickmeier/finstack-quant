@@ -48,7 +48,7 @@ use std::collections::BTreeMap;
 ///
 /// Searches over the `df` parameter space to match observed tranche upfront
 /// quotes using Brent root-finding. The calibrated `df` is stored in the
-/// market context as a `MarketScalar::Unitless` under a key derived from
+/// market context as a `MarketScalar::unitless` under a key derived from
 /// the step configuration.
 pub(crate) struct StudentTTarget {
     /// Parameters defining the calibration structure.
@@ -401,7 +401,8 @@ mod tests {
     }
 
     fn fixture_market(base_date: Date, rate: f64) -> MarketContext {
-        let discount = DiscountCurve::flat("USD-OIS", base_date, rate).expect("discount curve");
+        let discount = DiscountCurve::flat("USD-OIS", base_date, rate, DayCount::Act365F)
+            .expect("discount curve");
         let hazard = HazardCurve::builder("CDX_HAZARD")
             .base_date(base_date)
             .day_count(DayCount::Act365F)

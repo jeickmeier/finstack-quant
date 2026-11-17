@@ -32,6 +32,8 @@ fn flat_curve(id: &str, base_date: finstack_quant_core::dates::Date, rate: f64) 
         .base_date(base_date)
         .knots(knots)
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -61,6 +63,8 @@ fn test_bond_attribution_parallel() {
         .base_date(as_of_t0)
         .knots(vec![(0.0, 1.0), (5.0, 0.82)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -69,6 +73,8 @@ fn test_bond_attribution_parallel() {
         .base_date(as_of_t1)
         .knots(vec![(0.0, 1.0), (5.0, 0.78)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -156,6 +162,8 @@ fn test_bond_attribution_structure() {
         .base_date(as_of_t0)
         .knots(vec![(0.0, 1.0), (5.0, 0.82)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -436,7 +444,8 @@ fn test_bond_metrics_based_on_unreplayable_hazard_curve() {
         HazardCurve::builder("HZ")
             .base_date(base_date)
             .recovery_rate(0.4)
-            .knots([(0.0, rate), (5.0, rate)])
+            .knots([(5.0, rate)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard curve")
     };

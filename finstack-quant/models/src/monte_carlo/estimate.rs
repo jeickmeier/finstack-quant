@@ -31,14 +31,14 @@ pub fn independent_estimator_stats(
     let mut stats = finstack_quant_core::math::stats::OnlineStats::new();
     if antithetic {
         for pair in values.chunks_exact(2) {
-            stats.update(0.5 * pair[0] + 0.5 * pair[1]);
+            stats.update(0.5 * pair[0] + 0.5 * pair[1])?;
         }
     } else {
         for &value in values {
-            stats.update(value);
+            stats.update(value)?;
         }
     }
-    if stats.count() < 2 {
+    if stats.get_count() < 2 {
         return Err(finstack_quant_core::Error::Validation(
             "Monte Carlo statistics require at least two independent estimators".into(),
         ));
@@ -124,10 +124,9 @@ impl Estimate {
     /// Summarize an accumulator of independent estimators.
     ///
     /// Takes the sample mean, standard error, Student-t 95% confidence
-    /// interval ([`OnlineStats::confidence_interval`] with `alpha = 0.05`),
-    /// observation count and sample standard deviation. `num_simulated_paths`
-    /// defaults to the count; chain [`Self::with_num_simulated_paths`] for
-    /// antithetic runs.
+    /// interval from `get_ci_half_width(0.05)`, observation count and sample
+    /// standard deviation. `num_simulated_paths` defaults to the count; chain
+    /// [`Self::with_num_simulated_paths`] for antithetic runs.
     ///
     /// # Arguments
     ///
@@ -140,15 +139,31 @@ impl Estimate {
     /// An estimate with `std_dev` set and no captured-path diagnostics. With
     /// fewer than two observations the standard error and interval are `NaN`.
     ///
-    /// [`OnlineStats::confidence_interval`]: finstack_quant_core::math::stats::OnlineStats::confidence_interval
-    pub fn from_stats(stats: &finstack_quant_core::math::stats::OnlineStats) -> Self {
-        Self::new(
-            stats.mean(),
-            stats.stderr(),
-            stats.confidence_interval(0.05),
-            stats.count(),
-        )
-        .with_std_dev(stats.std_dev())
+    /// # Errors
+    ///
+    /// Propagates accumulator errors when internal summary statistics are not
+    /// finite or interval endpoints overflow.
+    pub fn from_stats(
+        stats: &finstack_quant_core::math::stats::OnlineStats,
+    ) -> finstack_quant_core::Result<Self> {
+        let mean_opt = stats.get_mean()?;
+        let mean = mean_opt.unwrap_or(f64::NAN);
+        let stderr = stats.get_stderr()?.unwrap_or(f64::NAN);
+        let ci_95 = match (mean_opt, stats.get_ci_half_width(0.05)?) {
+            (Some(m), Some(h)) => {
+                let lo = m - h;
+                let hi = m + h;
+                if !lo.is_finite() || !hi.is_finite() {
+                    return Err(finstack_quant_core::Error::Internal(
+                        "Monte Carlo 95% confidence interval bounds overflowed".into(),
+                    ));
+                }
+                (lo, hi)
+            }
+            _ => (f64::NAN, f64::NAN),
+        };
+        let std_dev = stats.get_std_dev()?.unwrap_or(f64::NAN);
+        Ok(Self::new(mean, stderr, ci_95, stats.get_count()).with_std_dev(std_dev))
     }
 
     /// Record the total number of simulated sample paths.
@@ -227,15 +242,25 @@ mod tests {
     fn independent_pair_statistics() {
         let stats =
             independent_estimator_stats(&[10.0, 14.0, 20.0, 24.0], true).expect("complete pairs");
-        assert_eq!(stats.count(), 2);
-        assert_eq!(stats.mean(), 17.0);
-        assert!((stats.stderr() - 5.0).abs() < 1e-12);
+        assert_eq!(stats.get_count(), 2);
+        assert_eq!(stats.get_mean().expect("finite mean"), Some(17.0));
+        let stderr = stats
+            .get_stderr()
+            .expect("finite stderr")
+            .expect("two pairs yield stderr");
+        assert!((stderr - 5.0).abs() < 1e-12);
         assert!(independent_estimator_stats(&[1.0, 2.0, 3.0], true).is_err());
         assert!(independent_estimator_stats(&[1.0, 2.0], true).is_err());
         assert!(independent_estimator_stats(&[1.0], false).is_err());
         let large = independent_estimator_stats(&[f64::MAX, f64::MAX, f64::MAX, f64::MAX], true)
             .expect("finite pairs");
-        assert!(large.mean().is_finite());
+        assert!(
+            large
+                .get_mean()
+                .expect("finite mean")
+                .expect("non-empty")
+                .is_finite()
+        );
     }
 
     #[test]

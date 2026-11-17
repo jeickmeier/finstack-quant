@@ -189,14 +189,14 @@ const displays = [
     api: "models.volatility.materializeFxDeltaSurface",
     route: "returned-surface",
     convention:
-      "Returned VolSurface JSON (expiry by strike, Rust quote type and interpolation metadata); spot domestic per unit of foreign and continuously compounded decimal rates are explicit caller input, never defaulted or looked up.",
+      "Returned VolSurface JSON (expiry by strike, Rust quote type and interpolation metadata); qualified delivery forwards aligned with surface.expiries (quote per base) are explicit caller input, never defaulted or looked up.",
   },
   {
     id: "fx-delta-pillars",
     api: "models.volatility.getFxDeltaPillarVols",
     route: "typed-array",
     convention:
-      "Float64Array: ATM, 25-delta put, 25-delta call annualized decimal vols.",
+      "Float64Array: ATM, 25-delta put, 25-delta call annualized decimal vols, plus 10-delta put and 10-delta call when 10-delta wings are present.",
   },
   {
     id: "fx-matrix-grid",

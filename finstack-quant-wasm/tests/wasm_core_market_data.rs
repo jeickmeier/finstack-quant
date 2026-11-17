@@ -2,7 +2,9 @@
 
 #![cfg(target_arch = "wasm32")]
 
-use finstack_quant_wasm::api::core::dates::{JsDayCount, JsDayCountContext, create_date};
+use finstack_quant_wasm::api::core::dates::{
+    JsDayCount, JsDayCountContext, JsVolatilityClock, create_date,
+};
 use finstack_quant_wasm::api::core::market_discount::JsDiscountCurve;
 use finstack_quant_wasm::api::core::market_forward::JsForwardCurve;
 use finstack_quant_wasm::api::core::market_fx::*;
@@ -11,7 +13,6 @@ use finstack_quant_wasm::api::core::surfaces::{JsFxDeltaVolSurface, JsVolCube};
 use finstack_quant_wasm::api::models::volatility::{
     get_cube_vol, get_cube_vol_clamped, get_fx_delta_pillar_vols, get_fx_delta_vol,
 };
-use js_sys::Float64Array;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
@@ -36,57 +37,37 @@ fn fx_matrix_rate_returns_structured_result() {
 }
 
 #[wasm_bindgen_test]
-fn forward_curve_projection_grid_and_rate_between() {
+fn forward_curve_rate_between_and_index_tenor() {
     let t_3m = 91.0 / 360.0;
     let t_6m = 183.0 / 360.0;
+    let p_3m = 1.0 / (1.0 + 0.04 * t_3m);
+    let p_6m = p_3m / (1.0 + 0.045 * (t_6m - t_3m));
     let options = js_sys::JSON::parse(
         &serde_json::json!({
             "id": "USD-SOFR-3M",
-            "tenor": 0.25,
             "baseDate": "2025-01-01",
-            "knots": [0.0, 0.04, t_3m, 0.045],
+            "knots": [t_3m, p_3m, t_6m, p_6m],
             "dayCount": "act_360",
-            "interp": "linear",
-            "extrapolation": "flat_forward",
-            "projectionGrid": [0.0, t_3m, t_6m],
-            "resetLag": 3
+            "interp": "log_linear",
+            "extrapolation": "extend",
+            "indexTenor": "3M"
         })
         .to_string(),
     )
     .expect("valid options");
     let curve = JsForwardCurve::new(options).expect("forward curve");
+    let rate = |t1: f64, t2: f64| {
+        curve.rate_between(JsValue::from(t1), JsValue::from(t2), JsValue::from(t2 - t1))
+    };
 
-    assert!(
-        (curve
-            .rate_between(JsValue::from(0.0), JsValue::from(t_3m))
-            .expect("first period")
-            - 0.04)
-            .abs()
-            < 1e-14
-    );
-    assert!(
-        (curve
-            .rate_between(JsValue::from(t_3m), JsValue::from(t_6m))
-            .expect("second period")
-            - 0.045)
-            .abs()
-            < 1e-14
-    );
-    assert!(
-        curve
-            .rate_between(JsValue::from(t_3m), JsValue::from(t_3m))
-            .is_err()
-    );
-    assert!(
-        curve
-            .rate_between(JsValue::from(t_6m), JsValue::from(t_3m))
-            .is_err()
-    );
+    assert!((rate(0.0, t_3m).expect("first period") - 0.04).abs() < 1e-14);
+    assert!((rate(t_3m, t_6m).expect("second period") - 0.045).abs() < 1e-14);
+    assert!(rate(t_3m, t_3m).is_err());
+    assert!(rate(t_6m, t_3m).is_err());
 
-    let grid = Float64Array::new(&curve.projection_grid());
-    assert_eq!(grid.length(), 3);
-    assert!((grid.get_index(1) - t_3m).abs() < 1e-14);
-    assert_eq!(curve.reset_lag(), 3);
+    assert_eq!(curve.knots().len(), 3);
+    assert_eq!(curve.factors()[0], 1.0);
+    assert_eq!(curve.index_tenor().as_deref(), Some("3M"));
 }
 
 /// `DiscountCurve` options object built from JSON text.
@@ -95,19 +76,16 @@ fn discount_options(options: serde_json::Value) -> JsValue {
 }
 
 #[wasm_bindgen_test]
-fn discount_curve_negative_rate_validation_mode_is_explicit() {
+fn discount_curve_negative_rate_and_strict_options_are_explicit() {
     let chf = serde_json::json!({
         "id": "CHF-OIS",
         "baseDate": "2025-01-01",
         "knots": [0.0, 1.0, 1.0, 1.002],
+        "interp": "linear",
+        "extrapolation": "extend",
+        "dayCount": "act_365f",
     });
-    assert!(JsDiscountCurve::new(discount_options(chf.clone())).is_err());
-
-    let mut friendly = chf.clone();
-    friendly["validationMode"] = "negative_rate_friendly".into();
-    friendly["forwardFloor"] = (-0.01).into();
-    let curve = JsDiscountCurve::new(discount_options(friendly.clone()))
-        .expect("negative-rate-friendly curve");
+    let curve = JsDiscountCurve::new(discount_options(chf.clone())).expect("negative-rate curve");
     assert!(
         curve
             .forward(JsValue::from(0.0), JsValue::from(1.0))
@@ -115,15 +93,17 @@ fn discount_curve_negative_rate_validation_mode_is_explicit() {
             < 0.0
     );
 
-    // A non-finite floor cannot reach Rust through JSON; a floor without the
-    // negative-rate preset is rejected by `ValidationMode::from_preset`.
+    let mut legacy_mode = chf.clone();
+    legacy_mode["validationMode"] = "negative_rate_friendly".into();
+    assert!(JsDiscountCurve::new(discount_options(legacy_mode)).is_err());
+
     let mut stray_floor = chf.clone();
     stray_floor["forwardFloor"] = (-0.01).into();
     assert!(JsDiscountCurve::new(discount_options(stray_floor)).is_err());
 
-    let mut unknown_key = friendly;
-    unknown_key["forward_floor"] = (-0.01).into();
-    assert!(JsDiscountCurve::new(discount_options(unknown_key)).is_err());
+    let mut missing_dc = chf;
+    missing_dc.as_object_mut().unwrap().remove("dayCount");
+    assert!(JsDiscountCurve::new(discount_options(missing_dc)).is_err());
 }
 
 #[wasm_bindgen_test]
@@ -167,21 +147,37 @@ fn fx_matrix_policy_can_be_reused() {
 
 #[wasm_bindgen_test]
 fn fx_delta_vol_surface_basic_accessors_and_implied_vol() {
+    let ref_date = create_date(JsValue::from(2025), JsValue::from(1), JsValue::from(15)).unwrap();
+    let clock = JsVolatilityClock::new(
+        JsValue::from(ref_date),
+        JsValue::from(JsDayCount::act365f()),
+        None,
+    )
+    .unwrap();
+    let opts = js_sys::Object::new();
+    js_sys::Reflect::set(&opts, &"expiryClock".into(), &JsValue::from(clock)).unwrap();
     let surface = JsFxDeltaVolSurface::new(
         JsValue::from("EURUSD-DELTA-VOL"),
+        JsValue::from("EUR/USD"),
         JsValue::from([0.25, 0.5, 1.0].to_vec()),
         JsValue::from([0.08, 0.085, 0.09].to_vec()),
         JsValue::from([0.01, 0.012, 0.015].to_vec()),
         JsValue::from([0.005, 0.006, 0.007].to_vec()),
-        None,
-        None,
+        Some(opts.into()),
     )
     .unwrap();
 
     assert_eq!(surface.id(), "EURUSD-DELTA-VOL");
+    assert_eq!(surface.pair(), "EUR/USD");
+    assert_eq!(surface.delta_convention().unwrap(), "forward_unadjusted");
+    assert_eq!(surface.atm_convention().unwrap(), "delta_neutral_straddle");
+    assert_eq!(surface.butterfly_convention().unwrap(), "smile");
+    assert_eq!(surface.quote_type(), "black_lognormal");
+    assert_eq!(surface.expiry_clock().unwrap().reference_date(), ref_date);
     assert_eq!(surface.expiries().as_ref(), [0.25, 0.5, 1.0]);
 
     let pillar = get_fx_delta_pillar_vols(&surface, JsValue::from(0)).unwrap();
+    assert_eq!(pillar.len(), 3);
     assert!((pillar[0] - 0.08).abs() < 1e-12);
 
     // ATM-DNS strike at expiry 1.0 should recover the 0.09 ATM vol.
@@ -200,14 +196,16 @@ fn fx_delta_vol_surface_basic_accessors_and_implied_vol() {
 
 #[wasm_bindgen_test]
 fn fx_delta_vol_surface_rejects_mixed_10d_arguments() {
+    let opts = js_sys::Object::new();
+    js_sys::Reflect::set(&opts, &"rr10d".into(), &JsValue::from(vec![0.018, 0.020])).unwrap();
     match JsFxDeltaVolSurface::new(
         JsValue::from("BAD"),
+        JsValue::from("EUR/USD"),
         JsValue::from([0.25, 0.5].to_vec()),
         JsValue::from([0.08, 0.085].to_vec()),
         JsValue::from([0.01, 0.012].to_vec()),
         JsValue::from([0.005, 0.006].to_vec()),
-        Some(JsValue::from(vec![0.018, 0.020])),
-        None,
+        Some(opts.into()),
     ) {
         Ok(_) => panic!("mixed rr10d/bf10d must error"),
         Err(err) => {
@@ -385,13 +383,21 @@ fn discount_curve_new_and_accessors() {
         "id": "USD-OIS",
         "baseDate": "2024-01-15",
         "knots": [0.5, 0.99, 1.0, 0.98, 2.0, 0.96],
+        "interp": "monotone_convex",
+        "extrapolation": "extend",
+        "dayCount": "act_365f",
     })))
     .expect("discount curve");
     assert_eq!(curve.id(), "USD-OIS");
     assert_eq!(curve.base_date(), "2024-01-15");
     assert!((curve.df(JsValue::from(0.5)).unwrap() - 0.99).abs() < 1e-6);
     assert!((curve.df(JsValue::from(1.0)).unwrap() - 0.98).abs() < 1e-6);
-    assert!(curve.zero_rate(JsValue::from(1.0), None).unwrap() > 0.0);
+    assert!(
+        curve
+            .zero_rate(JsValue::from(1.0), JsValue::from("continuous"))
+            .unwrap()
+            > 0.0
+    );
     let f = curve
         .forward(JsValue::from(0.5), JsValue::from(1.0))
         .expect("forward rate");
@@ -404,6 +410,7 @@ fn discount_curve_flat_uses_continuous_compounding() {
         JsValue::from("USD-OIS"),
         JsValue::from("2024-01-15"),
         JsValue::from(0.04),
+        JsValue::from("act_365f"),
     )
     .expect("flat discount curve");
 

@@ -15,7 +15,7 @@ use finstack_quant_core::{
     currency::Currency,
     dates::Date,
     market_data::context::MarketContext,
-    market_data::term_structures::{HazardCurve, ParInterp, Seniority},
+    market_data::term_structures::{HazardCurve, Seniority},
     math::interp::InterpStyle,
     money::Money,
     types::{CurveId, InstrumentId},
@@ -100,7 +100,6 @@ pub fn calibrated_hazard_curve_from_spec(
         notional: 1.0,
         method: CalibrationMethod::Bootstrap,
 
-        par_interp: ParInterp::Linear,
         doc_clause: spec.doc_clause.map(|clause| clause.as_str().to_string()),
         cds_valuation_convention: spec.cds_valuation_convention,
     });

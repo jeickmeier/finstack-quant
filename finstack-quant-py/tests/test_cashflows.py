@@ -74,10 +74,7 @@ def _market_json() -> str:
                 "day_count": "act_365f",
                 "knot_points": [[0.0, 1.0], [1.0, 0.95], [5.0, 0.80]],
                 "interp_style": "linear",
-                "extrapolation": "flat_forward",
-                "min_forward_rate": None,
-                "allow_non_monotonic": False,
-                "min_forward_tenor": 1e-6,
+                "extrapolation": "extend",
             }
         ],
         "fx": None,
@@ -140,12 +137,11 @@ def _floating_market_json() -> str:
         "type": "forward",
         "id": "USD-SOFR-3M",
         "base": "2025-01-15",
-        "reset_lag": 0,
         "day_count": "act_360",
-        "tenor": 0.25,
-        "knot_points": [[0.0, 0.03], [1.0, 0.04], [5.0, 0.05]],
-        "interp_style": "linear",
-        "extrapolation": "flat_forward",
+        "index_tenor": {"count": 3, "unit": "months"},
+        "knot_points": [[0.0, 1.0], [1.0, math.exp(-0.035)], [5.0, math.exp(-0.215)]],
+        "interp_style": "log_linear",
+        "extrapolation": "extend",
     })
     return json.dumps(market)
 
@@ -454,7 +450,11 @@ def test_typed_accrual_reference_metadata_roundtrips() -> None:
         "2025-01-15",
         "2025-10-15",
         DayCount.ACT_ACT_ISMA,
-        DayCountContext(coupon_period=("2025-01-15", "2025-07-15"), end_is_termination_date=True),
+        DayCountContext(
+            coupon_period=("2025-01-15", "2025-07-15"),
+            frequency="6M",
+            end_is_termination_date=True,
+        ),
     )
     flow = CashFlow("2025-10-15", Money(75_000, "USD"), CFKind.STUB, 0.0).with_accrual(metadata)
     restored = CashFlow.from_json(flow.to_json()).accrual
@@ -476,7 +476,7 @@ def test_build_cashflow_schedule_and_json_accept_as_of_cutoff() -> None:
         build_cashflow_schedule_json(spec_json, market_without_fixing.to_json(), "2025-02-01")
 
     market = MarketContext.from_json(_floating_market_json())
-    market.insert_series(ScalarTimeSeries("FIXING:USD-SOFR-3M", [(datetime.date(2025, 1, 15), 0.06)]))
+    market.insert_series(ScalarTimeSeries("FIXING:USD-SOFR-3M", [(datetime.date(2025, 1, 15), 0.06)], "step", "error"))
     typed = build_cashflow_schedule(spec, market, as_of=datetime.date(2025, 2, 1))
     via_json = json.loads(build_cashflow_schedule_json(spec_json, market.to_json(), "2025-02-01"))
     assert json.loads(typed.to_json()) == via_json

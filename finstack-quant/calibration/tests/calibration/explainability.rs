@@ -33,6 +33,8 @@ fn base_discount_curve(base_date: finstack_quant_core::dates::Date) -> DiscountC
             (2.0, 0.9100),
         ])
         .interp(InterpStyle::MonotoneConvex)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -79,12 +81,13 @@ fn explanation_not_computed_by_default() {
                 curve_id: CurveId::from("USD-SOFR-3M"),
                 currency: Currency::USD,
                 base_date,
-                tenor_years: 0.25,
+                index_tenor: Some(finstack_quant_core::dates::Tenor::quarterly()),
                 discount_curve_id: CurveId::from("USD-OIS"),
                 method: CalibrationMethod::GlobalSolve {
                     use_analytical_jacobian: false,
                 },
                 interpolation: Default::default(),
+                extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
                 conventions: Default::default(),
             }),
         }],
@@ -136,12 +139,13 @@ fn explanation_is_present_when_enabled() {
                 curve_id: CurveId::from("USD-SOFR-3M"),
                 currency: Currency::USD,
                 base_date,
-                tenor_years: 0.25,
+                index_tenor: Some(finstack_quant_core::dates::Tenor::quarterly()),
                 discount_curve_id: CurveId::from("USD-OIS"),
                 method: CalibrationMethod::GlobalSolve {
                     use_analytical_jacobian: false,
                 },
                 interpolation: Default::default(),
+                extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
                 conventions: Default::default(),
             }),
         }],

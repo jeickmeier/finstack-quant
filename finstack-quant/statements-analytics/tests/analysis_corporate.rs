@@ -147,6 +147,9 @@ fn test_cs_cashflows_populated_on_statement_result() {
     let disc_curve = DiscountCurve::builder("USD-OIS")
         .base_date(issue)
         .knots([(0.0, 1.0), (5.0, 0.9)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve should build");
     let market_ctx = MarketContext::new().insert(disc_curve);
@@ -729,6 +732,9 @@ fn usd_discount_curve_does_not_mix_discounting_bases() {
     let usd_discount = DiscountCurve::builder("USD-DISCOUNT")
         .base_date(base_date)
         .knots([(0.0, 1.0), (5.0, 0.8)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
     let market = MarketContext::new().insert(usd_discount);
@@ -841,6 +847,9 @@ fn evaluate_dcf_uses_curve_for_cs_interest() {
     let disc_curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.8)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
     let market = MarketContext::new().insert(disc_curve);

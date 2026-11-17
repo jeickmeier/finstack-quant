@@ -161,32 +161,32 @@ pub(crate) fn validate_output(values: &[Option<f64>]) -> Result<()> {
 }
 
 /// Scale before centering so moments do not depend on the input's units.
-pub(crate) fn scaled_centered(values: &[f64]) -> (f64, Vec<f64>) {
+pub(crate) fn scaled_centered(values: &[f64]) -> Result<(f64, Vec<f64>)> {
     let scale = values.iter().copied().map(f64::abs).fold(0.0, f64::max);
     if scale <= 0.0 {
-        return (0.0, vec![0.0; values.len()]);
+        return Ok((0.0, vec![0.0; values.len()]));
     }
     let mut centered: Vec<_> = values.iter().map(|value| value / scale).collect();
-    let center = finstack_quant_core::math::summation::kahan_sum(centered.iter().copied())
+    let center = finstack_quant_core::math::summation::kahan_sum(centered.iter().copied())?
         / values.len() as f64;
     for value in &mut centered {
         *value -= center;
     }
-    (scale, centered)
+    Ok((scale, centered))
 }
 
-pub(crate) fn mean(values: &[f64]) -> Option<f64> {
+pub(crate) fn mean(values: &[f64]) -> Result<Option<f64>> {
     if values.is_empty() {
-        return None;
+        return Ok(None);
     }
     let scale = values.iter().copied().map(f64::abs).fold(0.0, f64::max);
     if scale <= 0.0 {
-        return Some(0.0);
+        return Ok(Some(0.0));
     }
     let normalized =
-        finstack_quant_core::math::summation::kahan_sum(values.iter().map(|value| value / scale))
+        finstack_quant_core::math::summation::kahan_sum(values.iter().map(|value| value / scale))?
             / values.len() as f64;
-    Some(normalized.clamp(-1.0, 1.0) * scale)
+    Ok(Some(normalized.clamp(-1.0, 1.0) * scale))
 }
 
 /// Return the Type-7 continuous quantile of an ascending, total-ordered slice.
@@ -206,25 +206,26 @@ pub(crate) fn quantile_cont(sorted: &[f64], probability: f64) -> Option<f64> {
     Some((1.0 - weight) * lower + weight * upper)
 }
 
-pub(crate) fn sample_std(values: &[f64]) -> Option<f64> {
+pub(crate) fn sample_std(values: &[f64]) -> Result<Option<f64>> {
     if values.len() < 2 {
-        return None;
+        return Ok(None);
     }
-    Some(std(values, values.len() - 1))
+    Ok(Some(std(values, values.len() - 1)?))
 }
 
-pub(crate) fn population_std(values: &[f64]) -> Option<f64> {
+pub(crate) fn population_std(values: &[f64]) -> Result<Option<f64>> {
     if values.is_empty() {
-        return None;
+        return Ok(None);
     }
-    Some(std(values, values.len()))
+    Ok(Some(std(values, values.len())?))
 }
 
-fn std(values: &[f64], denominator: usize) -> f64 {
-    let (scale, centered) = scaled_centered(values);
-    let sum_sq =
-        finstack_quant_core::math::summation::kahan_sum(centered.iter().map(|value| value * value));
-    (sum_sq / denominator as f64).sqrt() * scale
+fn std(values: &[f64], denominator: usize) -> Result<f64> {
+    let (scale, centered) = scaled_centered(values)?;
+    let sum_sq = finstack_quant_core::math::summation::kahan_sum(
+        centered.iter().map(|value| value * value),
+    )?;
+    Ok((sum_sq / denominator as f64).sqrt() * scale)
 }
 
 #[cfg(test)]

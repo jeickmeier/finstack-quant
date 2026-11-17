@@ -263,7 +263,6 @@ fn test_ytm_current_period_coupon_uses_fixing() {
     use finstack_quant_cashflows::builder::FloatingRateSpec;
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
-    use finstack_quant_core::math::interp::InterpStyle;
     use rust_decimal::Decimal;
 
     let issue = date!(2024 - 01 - 01);
@@ -317,13 +316,7 @@ fn test_ytm_current_period_coupon_uses_fixing() {
 
     let market_with_fixing = |rate: f64| {
         let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
-        let fwd_curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-            .base_date(issue)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.05), (5.0, 0.05)])
-            .interp(InterpStyle::Linear)
-            .build()
-            .unwrap();
+        let fwd_curve = ForwardCurve::flat("USD-SOFR-3M", issue, 0.05, DayCount::Act360).unwrap();
         let fixings = ScalarTimeSeries::new(
             "FIXING:USD-SOFR-3M",
             vec![
@@ -335,6 +328,8 @@ fn test_ytm_current_period_coupon_uses_fixing() {
                 (date!(2025 - 04 - 01), rate),
             ],
             None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .unwrap();
         MarketContext::new()

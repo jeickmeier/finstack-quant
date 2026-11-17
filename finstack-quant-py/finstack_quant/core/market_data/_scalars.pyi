@@ -18,11 +18,11 @@ class ScalarTimeSeries:
     Examples
     --------
     >>> from finstack_quant.core.market_data import ScalarTimeSeries
-    >>> series = ScalarTimeSeries("SOFR", [("2025-01-01", 0.04), ("2025-01-03", 0.05)], interpolation="linear")
-    >>> round(series.value_on("2025-01-02"), 4)
+    >>> series = ScalarTimeSeries("SOFR", [("2025-01-01", 0.04), ("2025-01-03", 0.05)], "linear", "flat")
+    >>> round(series.get_value("2025-01-02"), 4)
     0.045
-    >>> (series.first_date, len(series))
-    (datetime.date(2025, 1, 1), 2)
+    >>> (series.first_date, series.extrapolation, len(series))
+    (datetime.date(2025, 1, 1), 'flat', 2)
 
     """
 
@@ -30,35 +30,42 @@ class ScalarTimeSeries:
         self,
         id: str,
         observations: Sequence[tuple[DateLike, Union[float, int, Decimal]]],
+        interpolation: str,
+        extrapolation: str,
         currency: Optional[Union[Currency, str]] = None,
-        interpolation: Optional[str] = None,
     ) -> None:
         """
-        Construct a scalar time series from dated observations.
+        Construct a scalar time series from strictly ascending dated observations.
 
         Parameters
         ----------
         id : str
-            Series identifier.
+            Non-empty trimmed series identifier.
         observations : Sequence[tuple[datetime.date or str, float, int or Decimal]]
-            Dated values; a ``Decimal`` converts to ``float``. Dates must be unique; any order is accepted.
+            Chronologically strictly ascending ``(date, value)`` pairs; a
+            ``Decimal`` converts to ``float``. Empty and single-point series
+            are accepted; unsorted or duplicate dates raise ``ValueError``.
+        interpolation : str
+            Required in-range fill policy: ``"step"`` or ``"linear"``.
+        extrapolation : str
+            Required right-tail policy after the latest observation:
+            ``"flat"`` (hold last value) or ``"error"`` (raise ``KeyError``).
         currency : Currency or str, optional
             Currency tag for monetary series; ``None`` for unitless values.
-        interpolation : str, optional
-            ``"step"`` (default, last observation carried forward) or ``"linear"``.
 
         Raises
         ------
         ValueError
-            If ``observations`` is empty or has duplicate dates, a value is
-            non-finite, or ``interpolation`` is not a recognised label.
+            If ``id`` is blank/untrimmed, dates are unsorted or duplicated, a
+            value is non-finite, or ``interpolation``/``extrapolation`` is not
+            a recognised label.
         TypeError
             If a value is not a float, int or ``Decimal``.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import ScalarTimeSeries
-        >>> str(ScalarTimeSeries("PX", [("2025-01-01", 100.0)], currency="USD").currency)
+        >>> str(ScalarTimeSeries("PX", [("2025-01-01", 100.0)], "step", "error", currency="USD").currency)
         'USD'
 
         """
@@ -86,8 +93,8 @@ class ScalarTimeSeries:
         Examples
         --------
         >>> from finstack_quant.core.market_data import ScalarTimeSeries
-        >>> series = ScalarTimeSeries("SOFR", [("2025-01-01", 0.03)])
-        >>> ScalarTimeSeries.from_json(series.to_json()).value_on("2025-01-01")
+        >>> series = ScalarTimeSeries("SOFR", [("2025-01-01", 0.03)], "step", "flat")
+        >>> ScalarTimeSeries.from_json(series.to_json()).get_value("2025-01-01")
         0.03
 
         """
@@ -109,28 +116,33 @@ class ScalarTimeSeries:
         """
         ...
 
-    def value_on(self, date: DateLike) -> float:
+    def get_value(self, date: DateLike) -> float:
         """
-        Value on a date under the series interpolation policy.
+        Value on a date under the series interpolation and extrapolation policies.
 
         Parameters
         ----------
         date : datetime.date or str
-            Lookup date; must lie within the observation range.
+            Lookup date; empty series, dates before the first stored
+            observation, and dates after the last observation under
+            ``"error"`` extrapolation raise ``KeyError``.
 
         Returns
         -------
         float
-            Interpolated (or stepped) value.
+            Interpolated (or stepped/carried) value.
 
         Raises
         ------
+        KeyError
+            If the series is empty, ``date`` precedes the first observation,
+            or ``date`` exceeds the last observation when ``extrapolation == "error"``.
         ValueError
-            If ``date`` is outside the observed range.
+            If ``date`` cannot be parsed as a valid date.
         """
         ...
 
-    def value_on_exact(self, date: DateLike) -> float:
+    def get_value_exact(self, date: DateLike) -> float:
         """
         Value on an exact observation date (no interpolation).
 
@@ -208,7 +220,23 @@ class ScalarTimeSeries:
         Returns
         -------
         str
-            Either ``"step"`` (hold the last observation, the default) or ``"linear"`` (interpolate between neighbouring dates).
+            Either ``"step"`` (hold the last observation) or ``"linear"`` (interpolate between neighbouring dates).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def extrapolation(self) -> str:
+        """
+        How queries strictly after the latest observation are handled.
+
+        Returns
+        -------
+        str
+            Either ``"flat"`` (hold the last observation) or ``"error"`` (reject queries past ``last_date``).
 
         Notes
         -----
@@ -240,7 +268,7 @@ class ScalarTimeSeries:
         Returns
         -------
         Optional[datetime.date]
-            The first observation date in the series; queries before it fall under the extrapolation policy.
+            The first observation date in the series, or ``None`` when the series is empty; queries before it fail.
 
         Notes
         -----
@@ -256,7 +284,7 @@ class ScalarTimeSeries:
         Returns
         -------
         Optional[datetime.date]
-            The last observation date in the series; queries after it fall under the extrapolation policy.
+            The last observation date in the series, or ``None`` when the series is empty; queries after it follow :attr:`extrapolation`.
 
         Notes
         -----
@@ -269,135 +297,276 @@ class ScalarTimeSeries:
     def __repr__(self) -> str: ...
     def _repr_html_(self) -> Optional[str]: ...
 
-class InflationIndex:
-    """
-    Inflation index observations with Rust-owned interpolation, lag and seasonality.
+class InflationObservation:
+    """Monthly CPI fixing record; snapshot construction validates its financial invariants.
 
     Examples
     --------
-    >>> from finstack_quant.core.market_data import InflationIndex
-    >>> index = InflationIndex("US-CPI", [("2025-01-01", 300.0), ("2025-02-01", 301.5)], "USD")
-    >>> (index.value_on("2025-01-15"), index.lag, index.seasonality)
-    (300.0, 'none', None)
-    >>> released = index.with_publication_dates([("2025-01-01", "2025-02-12")])
-    >>> released.get_publication_date("2025-01-31").isoformat()
-    '2025-02-12'
-    >>> len(released.get_publication_dates())
-    1
+    >>> from finstack_quant.core.market_data import InflationObservation
+    >>> observation = InflationObservation("2025-01-01", 300.0, "2025-02-12")
+    >>> observation.value
+    300.0
+    """
+
+    def __init__(self, reference_month: DateLike, value: Union[float, int, Decimal], available_on: DateLike) -> None:
+        """Construct a fixing record without applying lag or interpolation.
+
+        Parameters
+        ----------
+        reference_month : datetime.date or str
+            First calendar day of the CPI reference month.
+        value : float, int or Decimal
+            Published CPI index level; Decimal converts to float.
+        available_on : datetime.date or str
+            Inclusive availability date for the selected observation version.
+
+        Raises
+        ------
+        TypeError
+            If dates are unsupported or value is bool or not numeric.
+        ValueError
+            If a date is malformed or a Decimal is non-finite. InflationIndex
+            validates positivity, canonical month keys and cutoff constraints.
+        """
+        ...
+
+    @property
+    def reference_month(self) -> datetime.date:
+        """Reference month key.
+
+        Returns
+        -------
+        datetime.date
+            Stored monthly key, without adjustment.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def value(self) -> float:
+        """Published CPI level.
+
+        Returns
+        -------
+        float
+            Absolute index points, not a growth rate.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def available_on(self) -> datetime.date:
+        """Observation-version availability cutoff.
+
+        Returns
+        -------
+        datetime.date
+            Inclusive date the fixing became available.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+class InflationExpectedRelease:
+    """Expected monthly release assumption, distinct from observed availability.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import InflationExpectedRelease
+    >>> release = InflationExpectedRelease("2025-01-01", "2025-02-12", "2025-01-01")
+    >>> release.expected_release
+    datetime.date(2025, 2, 12)
+    """
+
+    def __init__(self, reference_month: DateLike, expected_release: DateLike, known_on: DateLike) -> None:
+        """Construct schedule metadata; attaching it to a snapshot validates the dates.
+
+        Parameters
+        ----------
+        reference_month : datetime.date or str
+            First calendar day of the reference month.
+        expected_release : datetime.date or str
+            Scheduled release date, no earlier than the reference month.
+        known_on : datetime.date or str
+            Inclusive date this release assumption was known.
+
+        Raises
+        ------
+        ValueError
+            If a date is malformed.
+        TypeError
+            If an argument is not a supported date-like value.
+        """
+        ...
+
+    @property
+    def reference_month(self) -> datetime.date:
+        """Reference month of the scheduled print.
+
+        Returns
+        -------
+        datetime.date
+            Stored reference-month key.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def expected_release(self) -> datetime.date:
+        """Scheduled date of the monthly release.
+
+        Returns
+        -------
+        datetime.date
+            Expected release date, not proof of fixing availability.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+    @property
+    def known_on(self) -> datetime.date:
+        """Date this release assumption entered the information set.
+
+        Returns
+        -------
+        datetime.date
+            Inclusive knowledge date for the schedule fact.
+
+        Notes
+        -----
+        This accessor does not raise.
+        """
+        ...
+
+class InflationIndex:
+    """
+    Immutable monthly CPI fixing snapshot with an explicit knowledge cutoff.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.market_data import InflationIndex, InflationObservation
+    >>> index = InflationIndex("US-CPI", [InflationObservation("2025-01-01", 300.0, "2025-02-12")], "USD", "2025-03-01")
+    >>> index.qualified_monthly_observation(2025, 1, "2025-02-12")
+    300.0
 
     """
 
     def __init__(
         self,
         id: str,
-        observations: Sequence[tuple[DateLike, Union[float, int, Decimal]]],
+        observations: Sequence[InflationObservation],
         currency: Union[Currency, str],
-        interpolation: Optional[str] = None,
-        lag: Optional[Union[str, int]] = None,
-        seasonality: Optional[Sequence[float]] = None,
+        knowledge_date: DateLike,
     ) -> None:
         """
-        Construct an inflation index from dated observations.
+        Construct a snapshot from strictly ordered canonical monthly records.
 
         Parameters
         ----------
         id : str
             Index identifier (e.g. ``"US-CPI-U"``).
-        observations : Sequence[tuple[datetime.date or str, float, int or Decimal]]
-            Dated index levels; a ``Decimal`` converts to ``float``.
+        observations : Sequence[InflationObservation]
+            Strictly ascending unique first-of-month records with finite positive
+            levels and ``reference_month <= available_on <= knowledge_date``.
+            Empty histories are valid. No carry, interpolation or lag is applied.
         currency : Currency or str
             Currency of the index.
-        interpolation : str, optional
-            ``"step"`` (default) or ``"linear"``.
-        lag : str or int, optional
-            Contractual observation lag applied before lookups: ``"none"`` (default),
-            market strings such as ``"3M"`` or ``"90D"``, or an integer number
-            of months.
-        seasonality : Sequence[float], optional
-            Twelve multiplicative factors, January through December.
+        knowledge_date : datetime.date or str
+            Inclusive end-of-day snapshot cutoff.
 
         Raises
         ------
         TypeError
-            If an observation value or ``lag`` is ``bool`` or an unsupported type.
+            If observations are not InflationObservation records or inputs have unsupported types.
         ValueError
-            If ``observations`` is empty or has duplicate dates, a label is
-            unknown, a value is non-finite, or ``seasonality`` does not have
-            exactly 12 entries.
+            If the identifier is blank, months are not canonical/strictly ordered,
+            levels are not finite positive values, availability violates the
+            cutoff, or a date/currency is invalid.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import InflationIndex
-        >>> InflationIndex("US-CPI", [("2025-01-01", 300.0)], "USD", lag="3M").lag
-        '3M'
+        >>> InflationIndex("US-CPI", [], "USD", "2025-03-01").date_range() is None
+        True
 
         """
         ...
 
-    def with_publication_dates(self, dates: Sequence[tuple[DateLike, DateLike]]) -> InflationIndex:
+    def with_expected_releases(self, expected_releases: Sequence[InflationExpectedRelease]) -> InflationIndex:
         """
-        Return a new index with an explicit monthly publication schedule.
+        Return a new snapshot with a replacement expected-release schedule.
 
         Parameters
         ----------
-        dates : Sequence[tuple[datetime.date or str, datetime.date or str]]
-            First-of-month reference dates paired with inclusive publication
-            dates. Replaces any prior schedule independently of observation lag.
-            This declares monthly reference observations for valuation even
-            with no lag or a day lag; observation label days are not fixing dates.
+        expected_releases : Sequence[InflationExpectedRelease]
+            Strictly ascending unique first-of-month schedule facts, with
+            ``expected_release >= reference_month`` and ``known_on <= knowledge_date``.
+            An empty sequence removes the schedule; facts do not assert availability.
 
         Returns
         -------
         InflationIndex
-            New index retaining the observations and other conventions.
+            New snapshot retaining observations and knowledge cutoff.
 
         Raises
         ------
         ValueError
-            If a date is malformed, a reference key is not month start, a month
-            is duplicated, or publication precedes its reference month.
+            If months are noncanonical or not strictly ordered, release precedes
+            the reference month, or a fact was known after the snapshot cutoff.
         TypeError
-            If an entry is not a pair of supported date-like values.
+            If an entry is not an InflationExpectedRelease record.
         """
         ...
 
-    def get_publication_date(self, reference_date: DateLike) -> Optional[datetime.date]:
+    def get_expected_release(self, reference_month: DateLike) -> Optional[InflationExpectedRelease]:
         """
-        Look up the configured availability date of a reference month.
+        Look up the schedule assumption for an exact canonical reference month.
 
         Parameters
         ----------
-        reference_date : datetime.date or str
-            Any day in the reference month; its day component is ignored.
+        reference_month : datetime.date or str
+            First calendar day of the requested month; other days are rejected.
 
         Returns
         -------
-        datetime.date or None
-            Inclusive availability date, or ``None`` when unspecified. Missing
-            metadata does not authorize forecasting missing historical fixings.
+        InflationExpectedRelease or None
+            Stored schedule fact, or ``None`` when unspecified.
 
         Raises
         ------
         ValueError
-            If the reference date is malformed.
+            If the reference date is malformed or not the first day of a month.
         TypeError
             If the reference date is not date-like or an ISO date string.
         """
         ...
 
-    def get_publication_dates(self) -> list[tuple[datetime.date, datetime.date]]:
+    def get_expected_releases(self) -> list[InflationExpectedRelease]:
         """
-        Return the configured publication schedule in reference-month order.
+        Return the configured expected releases in reference-month order.
 
         Returns
         -------
-        list[tuple[datetime.date, datetime.date]]
-            First-of-month reference dates and inclusive publication dates.
+        list[InflationExpectedRelease]
+            Stored schedule facts, empty when no schedule is configured.
 
-        Raises
-        ------
-        ValueError
-            If an internal date cannot be converted to a Python date.
+        Notes
+        -----
+        This accessor does not raise.
         """
         ...
 
@@ -414,8 +583,7 @@ class InflationIndex:
         Returns
         -------
         InflationIndex
-            The reconstructed inflation index, with its lag, interpolation and
-            seasonality settings restored.
+            The validated snapshot, including observations, knowledge cutoff and schedule facts.
 
         Raises
         ------
@@ -425,7 +593,7 @@ class InflationIndex:
         Examples
         --------
         >>> from finstack_quant.core.market_data import InflationIndex
-        >>> index = InflationIndex("US-CPI", [("2025-01-01", 300.0)], "USD")
+        >>> index = InflationIndex("US-CPI", [], "USD", "2025-03-01")
         >>> InflationIndex.from_json(index.to_json()).id
         'US-CPI'
 
@@ -448,92 +616,69 @@ class InflationIndex:
         """
         ...
 
-    def value_on(self, date: DateLike) -> float:
+    def get_observation(self, reference_month: DateLike) -> InflationObservation:
         """
-        Index level on a date with lag, interpolation and seasonality applied.
+        Return the exact stored record for a canonical reference month.
 
         Parameters
         ----------
-        date : datetime.date or str
-            Contract date (the lag is applied by Rust).
+        reference_month : datetime.date or str
+            First calendar day of the requested month; no interpolation or carry.
 
         Returns
         -------
-        float
-            Index level.
-
-        Raises
-        ------
-        ValueError
-            If the lag-adjusted date is outside the observation range.
-        """
-        ...
-
-    def ratio(self, base_date: DateLike, settle_date: DateLike) -> float:
-        """
-        Indexation ratio ``value_on(settle_date) / value_on(base_date)``.
-
-        Parameters
-        ----------
-        base_date : datetime.date or str
-            Reference date of the base index level.
-        settle_date : datetime.date or str
-            Date of the uplifted level.
-
-        Returns
-        -------
-        float
-            Indexation ratio.
-
-        Raises
-        ------
-        ValueError
-            If either lag-adjusted date is outside the observation range.
-        """
-        ...
-
-    def ref_cpi_months_lag(self, date: DateLike, lag_months: int) -> float:
-        """
-        Reference CPI for a date under an explicit month lag (bond-style lookup).
-
-        Parameters
-        ----------
-        date : datetime.date or str
-            Contract date.
-        lag_months : int
-            Calendar months to look back (``3`` for TIPS/gilts). Observations
-            must be unique within each reference month; missing months are not
-            interpolated. The first of the contract month needs only the first
-            lagged observation.
-
-        Returns
-        -------
-        float
-            Reference index level.
+        InflationObservation
+            Stored monthly fixing and its availability date.
 
         Raises
         ------
         KeyError
-            If a required monthly CPI observation is missing.
-        TypeError
-            If ``date`` is not date-like or ``lag_months`` is not an ``int`` (or is ``bool``).
+            If the month has no stored observation.
         ValueError
-            If the contract date cannot be parsed or a required month has multiple observations.
+            If the date is malformed or is not first-of-month.
         """
         ...
 
-    def date_range(self) -> tuple[datetime.date, datetime.date]:
+    def qualified_monthly_observation(self, year: int, month: int, knowledge_date: DateLike) -> float:
+        """
+        Resolve an exact monthly fixing eligible on a query knowledge date.
+
+        Parameters
+        ----------
+        year : int
+            Calendar year of the reference month.
+        month : int
+            Calendar month number, 1 through 12.
+        knowledge_date : datetime.date or str
+            Inclusive query cutoff, no later than the snapshot knowledge date.
+
+        Returns
+        -------
+        float
+            Published positive CPI index level.
+
+        Raises
+        ------
+        KeyError
+            If the monthly observation is absent.
+        ValueError
+            If a date is invalid, the query cutoff exceeds the snapshot cutoff,
+            or the observation was unavailable on the query date.
+        """
+        ...
+
+    def date_range(self) -> Optional[tuple[datetime.date, datetime.date]]:
         """
         ``(first_date, last_date)`` of the stored observations.
 
         Returns
         -------
-        tuple[datetime.date, datetime.date]
+        tuple[datetime.date, datetime.date] or None
+            First and last reference months, or ``None`` for empty snapshots.
 
-        Raises
-        ------
-        ValueError
-            If the index has no observations.
+        Notes
+        -----
+        This accessor does not raise.
         """
         ...
 
@@ -544,8 +689,8 @@ class InflationIndex:
         Returns
         -------
         pd.DataFrame
-            Column ``value`` on a ``DatetimeIndex``; only stored observations
-            appear (nothing is interpolated).
+            Columns ``value`` and ``available_on`` on a reference-month
+            ``DatetimeIndex``; only stored observations appear.
 
         Raises
         ------
@@ -587,14 +732,14 @@ class InflationIndex:
         ...
 
     @property
-    def interpolation(self) -> str:
+    def knowledge_date(self) -> datetime.date:
         """
-        How index values between publication dates are produced.
+        Inclusive knowledge cutoff of the stored snapshot.
 
         Returns
         -------
-        str
-            Either ``"step"`` (hold the last print, the usual convention for monthly CPI) or ``"linear"`` (daily interpolation between prints).
+        datetime.date
+            Latest query knowledge date authorized by this snapshot.
 
         Notes
         -----
@@ -603,46 +748,14 @@ class InflationIndex:
         ...
 
     @property
-    def lag(self) -> str:
-        """
-        Delay between the reference period and its published print.
-
-        Returns
-        -------
-        str
-            Lag label: ``"none"``, ``"<n>M"`` for whole months (``"3M"`` is the standard linker lag) or ``"<n>D"`` for calendar days.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def seasonality(self) -> Optional[list[float]]:
-        """
-        Multiplicative seasonal adjustment applied to the index.
-
-        Returns
-        -------
-        Optional[list[float]]
-            Twelve factors starting with January, applied multiplicatively to the interpolated index, or ``None`` when no seasonality is modelled.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def observations(self) -> list[tuple[datetime.date, float]]:
+    def observations(self) -> list[InflationObservation]:
         """
         The stored observation history.
 
         Returns
         -------
-        list[tuple[datetime.date, float]]
-            ``(date, value)`` pairs in ascending date order, with one entry per observation date.
+        list[InflationObservation]
+            Monthly records in strictly ascending reference-month order.
 
         Notes
         -----
@@ -651,6 +764,8 @@ class InflationIndex:
         ...
 
     def __len__(self) -> int: ...
-    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct the immutable snapshot through its validated canonical JSON when unpickling."""
+        ...
     def __repr__(self) -> str: ...
     def _repr_html_(self) -> Optional[str]: ...

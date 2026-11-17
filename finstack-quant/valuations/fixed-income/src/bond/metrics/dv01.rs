@@ -2,7 +2,7 @@
 //!
 use crate::bond::Bond;
 use crate::bond::metrics::effective::{option_risk_bond_and_base_price, option_risk_curve_id};
-use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::pricing_overrides::BondRiskBasis;
 use finstack_quant_valuations_core::metrics::sensitivities::cs01::sensitivity_central_diff;
@@ -107,14 +107,13 @@ fn curve_bump_dv01(
         return Ok(0.0);
     }
 
-    let market_up = context.curves.bump([MarketBump::Curve {
-        id: curve_id.clone(),
-        spec: BumpSpec::parallel_bp(bump_bp),
-    }])?;
-    let market_down = context.curves.bump([MarketBump::Curve {
-        id: curve_id.clone(),
-        spec: BumpSpec::parallel_bp(-bump_bp),
-    }])?;
+    let target = context.curves.curve_target(curve_id)?;
+    let market_up = context
+        .curves
+        .bump([target.clone().into_bump(BumpSpec::parallel_bp(bump_bp))])?;
+    let market_down = context
+        .curves
+        .bump([target.into_bump(BumpSpec::parallel_bp(-bump_bp))])?;
 
     let pv_up = context.reprice_instrument_raw(bond, &market_up, context.as_of)?;
     let pv_down = context.reprice_instrument_raw(bond, &market_down, context.as_of)?;
@@ -220,6 +219,9 @@ mod tests {
             DiscountCurve::builder(curve_id.clone())
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (5.0, 0.82), (10.0, 0.67)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("valid discount curve"),
         );

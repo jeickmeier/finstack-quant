@@ -50,11 +50,26 @@ fn with_heston_scalars(
     v0: f64,
 ) -> MarketContext {
     market
-        .insert_price("HESTON_KAPPA", MarketScalar::Unitless(kappa))
-        .insert_price("HESTON_THETA", MarketScalar::Unitless(theta))
-        .insert_price("HESTON_SIGMA_V", MarketScalar::Unitless(sigma_v))
-        .insert_price("HESTON_RHO", MarketScalar::Unitless(rho))
-        .insert_price("HESTON_V0", MarketScalar::Unitless(v0))
+        .insert_price(
+            "HESTON_KAPPA",
+            MarketScalar::unitless(kappa).expect("valid scalar"),
+        )
+        .insert_price(
+            "HESTON_THETA",
+            MarketScalar::unitless(theta).expect("valid scalar"),
+        )
+        .insert_price(
+            "HESTON_SIGMA_V",
+            MarketScalar::unitless(sigma_v).expect("valid scalar"),
+        )
+        .insert_price(
+            "HESTON_RHO",
+            MarketScalar::unitless(rho).expect("valid scalar"),
+        )
+        .insert_price(
+            "HESTON_V0",
+            MarketScalar::unitless(v0).expect("valid scalar"),
+        )
 }
 
 /// Price an ATM-ish call through `model`, returning the PV in account currency.
@@ -353,12 +368,30 @@ fn with_rough_heston_scalars(
     v0: f64,
 ) -> MarketContext {
     market
-        .insert_price("ROUGH_HESTON_HURST", MarketScalar::Unitless(hurst))
-        .insert_price("ROUGH_HESTON_KAPPA", MarketScalar::Unitless(kappa))
-        .insert_price("ROUGH_HESTON_THETA", MarketScalar::Unitless(theta))
-        .insert_price("ROUGH_HESTON_SIGMA_V", MarketScalar::Unitless(sigma_v))
-        .insert_price("ROUGH_HESTON_RHO", MarketScalar::Unitless(rho))
-        .insert_price("ROUGH_HESTON_V0", MarketScalar::Unitless(v0))
+        .insert_price(
+            "ROUGH_HESTON_HURST",
+            MarketScalar::unitless(hurst).expect("valid scalar"),
+        )
+        .insert_price(
+            "ROUGH_HESTON_KAPPA",
+            MarketScalar::unitless(kappa).expect("valid scalar"),
+        )
+        .insert_price(
+            "ROUGH_HESTON_THETA",
+            MarketScalar::unitless(theta).expect("valid scalar"),
+        )
+        .insert_price(
+            "ROUGH_HESTON_SIGMA_V",
+            MarketScalar::unitless(sigma_v).expect("valid scalar"),
+        )
+        .insert_price(
+            "ROUGH_HESTON_RHO",
+            MarketScalar::unitless(rho).expect("valid scalar"),
+        )
+        .insert_price(
+            "ROUGH_HESTON_V0",
+            MarketScalar::unitless(v0).expect("valid scalar"),
+        )
 }
 
 /// PRICER-LAYER collapse test: with vol-of-vol `σ_v → 0` and `v0 = θ = σ²`,

@@ -291,6 +291,7 @@ mod tests {
                 .base_date(base)
                 .knots([(100.0, 7.0), (101.0, tail_hazard)])
                 .recovery_rate(0.4)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .expect("curve");
             assert!(hazard.sp_on_date(as_of).expect("survival") < 1e-12);

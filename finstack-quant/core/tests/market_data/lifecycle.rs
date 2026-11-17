@@ -67,7 +67,9 @@ fn signed_price_shocks_preserve_zero_identity_and_native_units() {
 }
 
 #[test]
-fn price_and_cpi_rolls_preserve_the_new_origin_and_remaining_segment() {
+fn price_and_cpi_condition_keeps_original_clocks_and_levels() {
+    use finstack_quant_core::market_data::context::MarketContext;
+
     let price = PriceCurve::builder("PRICE")
         .base_date(base())
         .day_count(DayCount::Act365F)
@@ -77,17 +79,24 @@ fn price_and_cpi_rolls_preserve_the_new_origin_and_remaining_segment() {
     let cpi = InflationCurve::builder("CPI")
         .base_date(base())
         .day_count(DayCount::Act365F)
-        .base_cpi(300.0)
         .knots([(0.0, 300.0), (1.0, 306.0), (2.0, 312.0)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .build()
         .unwrap();
+    let context = MarketContext::new()
+        .insert(price.clone())
+        .insert(cpi.clone());
     for days in [0, 183, 365, 548] {
-        let dt = f64::from(days) / 365.0;
-        let rolled_price = price.roll_forward(i64::from(days)).unwrap();
-        let rolled_cpi = cpi.roll_forward(i64::from(days)).unwrap();
-        for t in [0.0, 1e-8, 0.1, 0.25] {
-            assert!((rolled_price.price(t) - price.price(t + dt)).abs() < 1e-10);
-            assert!((rolled_cpi.cpi(t) - cpi.cpi(t + dt)).abs() < 1e-10);
+        let horizon = base() + time::Duration::days(i64::from(days));
+        let conditioned = context.condition(horizon).unwrap();
+        let kept_price = conditioned.get_price_curve("PRICE").unwrap();
+        let kept_cpi = conditioned.get_inflation_curve("CPI").unwrap();
+        assert_eq!(kept_price.base_date(), price.base_date());
+        assert_eq!(kept_cpi.base_date(), cpi.base_date());
+        for t in [0.0, 1e-8, 0.1, 0.25, 1.5] {
+            assert!((kept_price.price(t) - price.price(t)).abs() < 1e-12);
+            assert!((kept_cpi.cpi(t).unwrap() - cpi.cpi(t).unwrap()).abs() < 1e-12);
         }
     }
 }
@@ -173,19 +182,23 @@ fn derived_fx_shocks_preserve_dates_policies_and_reciprocals() {
 fn backward_roll_is_rejected_across_context_and_curves() {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{
-        BasisSpreadCurve, DiscountCurve, ForwardCurve, HazardCurve,
+        DiscountCurve, ForwardCurve, HazardCurve,
     };
 
     let discount = DiscountCurve::builder("DISCOUNT")
         .base_date(base())
         .day_count(DayCount::Act360)
         .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.9)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
-    let forward = ForwardCurve::builder("FORWARD", 0.25)
+    let forward = ForwardCurve::builder("FORWARD")
         .base_date(base())
         .day_count(DayCount::Act365F)
-        .knots([(0.0, 0.03), (1.0, 0.04), (2.0, 0.05)])
+        .knots([(0.0, 1.0), (1.0, 0.96), (2.0, 0.91)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("forward curve");
     let hazard = HazardCurve::builder("HAZARD")
@@ -197,8 +210,10 @@ fn backward_roll_is_rejected_across_context_and_curves() {
         .expect("hazard curve");
     let inflation = InflationCurve::builder("INFLATION")
         .base_date(base())
-        .base_cpi(300.0)
+        .day_count(DayCount::Act365F)
         .knots([(0.0, 300.0), (1.0, 306.0), (2.0, 312.0)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .build()
         .expect("inflation curve");
     let price = PriceCurve::builder("PRICE")
@@ -206,54 +221,57 @@ fn backward_roll_is_rejected_across_context_and_curves() {
         .knots([(0.0, 100.0), (1.0, 110.0), (2.0, 120.0)])
         .build()
         .expect("price curve");
-    let basis = BasisSpreadCurve::builder("BASIS")
-        .base_date(base())
-        .knots([(0.0, 0.001), (1.0, 0.002), (2.0, 0.003)])
-        .build()
-        .expect("basis curve");
 
-    assert!(discount.roll_forward(-30).is_err());
-    assert!(forward.roll_forward(-30).is_err());
-    assert!(hazard.roll_forward(-30).is_err());
-    assert!(inflation.roll_forward(-30).is_err());
-    assert!(price.roll_forward(-30).is_err());
-    assert!(basis.roll_forward(-30).is_err());
+    let back_date = base() - time::Duration::days(30);
+    assert!(discount.condition(back_date).is_err());
+    assert!(forward.condition(back_date).is_err());
+    assert!(hazard.condition(back_date).is_err());
 
     let context = MarketContext::new()
         .insert(discount)
         .insert(forward)
         .insert(hazard)
         .insert(inflation)
-        .insert(price)
-        .insert(basis);
-    assert!(context.roll_forward(-30).is_err());
+        .insert(price);
+    assert!(context.condition(back_date).is_err());
 }
 
 #[test]
 fn cpi_validation_survives_serialization() {
-    let builder = |base_cpi| {
+    let builder = |origin_cpi| {
         InflationCurve::builder("CPI")
             .base_date(base())
-            .base_cpi(base_cpi)
-            .knots([(0.0, 300.0), (1.0, 306.0)])
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, origin_cpi), (1.0, 306.0)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
     };
-    for invalid in [f64::NAN, f64::INFINITY, 0.0, -300.0, 301.0] {
+    for invalid in [f64::NAN, f64::INFINITY, 0.0, -300.0] {
         assert!(builder(invalid).build().is_err());
     }
     let curve = builder(300.0).build().unwrap();
-    for invalid in [0.0, -300.0, 301.0] {
+    for invalid in [0.0, -300.0] {
         let mut state = serde_json::to_value(&curve).unwrap();
-        state["base_cpi"] = serde_json::json!(invalid);
+        state["knot_points"][0][1] = serde_json::json!(invalid);
         assert!(serde_json::from_value::<InflationCurve>(state).is_err());
     }
+    let mut nonzero_origin = serde_json::to_value(&curve).unwrap();
+    nonzero_origin["knot_points"][0][0] = serde_json::json!(0.1);
+    assert!(serde_json::from_value::<InflationCurve>(nonzero_origin).is_err());
     assert!((curve.inflation_rate(0.0, 1.0).unwrap() - 0.02).abs() < 1e-12);
 }
 
 #[test]
 fn volatility_mutations_reject_invalid_values_without_changing_the_source() {
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
+    };
     let mut surface = VolSurface::builder("VOL")
         .expiries(&[1.0, 2.0])
-        .strikes(&[90.0, 100.0])
+        .secondary_values(&[90.0, 100.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[0.2, 0.3])
         .row(&[0.25, 0.35])
         .build()

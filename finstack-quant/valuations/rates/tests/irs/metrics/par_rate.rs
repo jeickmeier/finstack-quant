@@ -24,15 +24,12 @@ fn build_flat_curves(rate: f64, base_date: Date) -> MarketContext {
             (5.0, (-rate * 5.0).exp()),
             (10.0, (-rate * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let fwd_curve = ForwardCurve::builder("USD_LIBOR_3M", 0.25)
-        .base_date(base_date)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, rate), (10.0, rate)])
-        .build()
-        .unwrap();
+    let fwd_curve = ForwardCurve::flat("USD_LIBOR_3M", base_date, rate, DayCount::Act360).unwrap();
 
     MarketContext::new().insert(disc_curve).insert(fwd_curve)
 }

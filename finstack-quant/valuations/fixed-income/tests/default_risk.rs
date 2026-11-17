@@ -38,7 +38,7 @@ fn hazard_curve(recovery: f64) -> HazardCurve {
         .base_date(AS_OF)
         .day_count(DayCount::Act365F)
         .recovery_rate(recovery)
-        .knots([(0.0, HAZARD), (10.0, HAZARD)])
+        .knots([(10.0, HAZARD)])
         .build()
         .expect("hazard curve")
 }
@@ -49,6 +49,7 @@ fn market_at(recovery: f64) -> MarketContext {
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (10.0, (-RATE * 10.0).exp())])
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
     MarketContext::new()

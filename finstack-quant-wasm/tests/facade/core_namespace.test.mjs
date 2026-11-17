@@ -154,10 +154,10 @@ test('core Cholesky solve rejects non-finite inputs and overflowing solutions', 
 });
 
 test('core correlation documents canonical missing-data and constant-series behavior', () => {
-  assert.equal(core.correlation([], []), 0);
-  assert.equal(core.correlation([1], [2]), 0);
-  assert.equal(core.correlation([1, 1], [2, 3]), 0);
-  assert.ok(Number.isNaN(core.correlation([1, 2], [3])));
+  assert.equal(core.correlation([], []), undefined);
+  assert.equal(core.correlation([1], [2]), undefined);
+  assert.equal(core.correlation([1, 1], [2, 3]), undefined);
+  assert.throws(() => core.correlation([1, 2], [3]), /dimensions do not match/);
 });
 
 test('core ACT/ACT ICMA short-month rolls require a reference period', () => {
@@ -185,14 +185,16 @@ test('wasm-bindgen handles expose free and conditional Symbol.dispose', () => {
   usd.free();
 });
 
-test('DiscountCurve uses canonical forward and explicit negative-rate validation', () => {
-  const options = { id: 'CHF-OIS', baseDate: '2025-01-01', knots: [0, 1, 1, 1.002] };
-  assert.throws(() => new core.DiscountCurve(options), /non-increasing/);
-  const curve = new core.DiscountCurve({
-    ...options,
-    validationMode: 'negative_rate_friendly',
-    forwardFloor: -0.01,
-  });
+test('DiscountCurve uses canonical forward and accepts negative-rate curves directly', () => {
+  const options = {
+    id: 'CHF-OIS',
+    baseDate: '2025-01-01',
+    knots: [0, 1, 1, 1.002],
+    interp: 'linear',
+    extrapolation: 'extend',
+    dayCount: 'act_365f',
+  };
+  const curve = new core.DiscountCurve(options);
   try {
     assert.ok(curve.forward(0, 1) < 0);
     assert.equal(curve.forwardRate, undefined);
@@ -206,6 +208,9 @@ test('DiscountCurve accepts typed-array options and rejects unknown fields', () 
     id: 'USD-OIS',
     baseDate: '2025-01-01',
     knots: new Float64Array([0, 1, 1, 0.99]),
+    interp: 'monotone_convex',
+    extrapolation: 'extend',
+    dayCount: 'act_365f',
   };
   const curve = new core.DiscountCurve(options);
   try {
@@ -219,59 +224,98 @@ test('DiscountCurve accepts typed-array options and rejects unknown fields', () 
   );
 });
 
-test('DiscountCurve options are strict and defaults come from the Rust builder', () => {
+test('DiscountCurve options are strict and require explicit interp, extrapolation, and dayCount', () => {
   const knots = new Float64Array([0, 1, 1, 0.98, 5, 0.88]);
-  const curve = new core.DiscountCurve({ id: 'USD-OIS', baseDate: '2025-01-01', knots });
+  const curve = new core.DiscountCurve({
+    id: 'USD-OIS',
+    baseDate: '2025-01-01',
+    knots,
+    interp: 'monotone_convex',
+    extrapolation: 'extend',
+    dayCount: 'act_365f',
+  });
   const explicit = new core.DiscountCurve(
     JSON.stringify({
       id: 'USD-OIS',
       baseDate: '2025-01-01',
       knots: [...knots],
       interp: 'monotone_convex',
-      extrapolation: 'flat_forward',
+      extrapolation: 'extend',
       dayCount: 'act_365f',
-      validationMode: 'market_standard',
     })
   );
   assert.equal(curve.df(2.5), explicit.df(2.5));
-  // A floor without `negative_rate_friendly` is rejected by
-  // `ValidationMode::from_preset`, whether the preset is explicit or omitted.
   assert.throws(
-    () => new core.DiscountCurve({ id: 'X', baseDate: '2025-01-01', knots, forwardFloor: -0.01 }),
-    /forward_floor is only valid/
+    () =>
+      new core.DiscountCurve({
+        id: 'X',
+        baseDate: '2025-01-01',
+        knots,
+        interp: 'monotone_convex',
+        extrapolation: 'extend',
+      }),
+    /missing field `dayCount`/
   );
+  for (const legacy of [{ validationMode: 'negative_rate_friendly' }, { forwardFloor: -0.01 }]) {
+    assert.throws(
+      () =>
+        new core.DiscountCurve({
+          id: 'X',
+          baseDate: '2025-01-01',
+          knots,
+          interp: 'monotone_convex',
+          extrapolation: 'extend',
+          dayCount: 'act_365f',
+          ...legacy,
+        }),
+      (error) => error.kind === 'validation' && /unknown field/.test(error.message)
+    );
+  }
   assert.throws(
-    () => new core.DiscountCurve({ id: 'X', baseDate: '2025-01-01', knots, dayCountt: 'act_360' }),
+    () =>
+      new core.DiscountCurve({
+        id: 'X',
+        baseDate: '2025-01-01',
+        knots,
+        interp: 'monotone_convex',
+        extrapolation: 'extend',
+        dayCountt: 'act_360',
+      }),
     (error) => error.kind === 'validation' && /unknown field `dayCountt`/.test(error.message)
   );
   assert.throws(() => new core.DiscountCurve('X', '2025-01-01', knots), /options/);
 });
 
-test('ForwardCurve options expose resetLag', () => {
+test('ForwardCurve options expose indexTenor', () => {
   const curve = new core.ForwardCurve({
     id: 'USD-SOFR',
-    tenor: 0.25,
     baseDate: '2025-01-01',
-    knots: [0, 0.04, 1, 0.045],
+    knots: [0, 1, 1, Math.exp(-0.045)],
     dayCount: 'act_360',
-    interp: 'linear',
-    extrapolation: 'flat_forward',
-    resetLag: 3,
+    interp: 'log_linear',
+    extrapolation: 'extend',
+    indexTenor: '3M',
   });
-  assert.equal(curve.resetLag, 3);
+  try {
+    assert.equal(curve.indexTenor, '3M');
+  } finally {
+    curve.free();
+  }
 });
 
 test('ForwardCurve options accept typed arrays', () => {
   const options = {
     id: 'USD-SOFR',
-    tenor: 0.25,
     baseDate: '2025-01-01',
-    knots: new Float64Array([0, 0.04, 1, 0.045]),
+    knots: new Float64Array([1, Math.exp(-0.045)]),
     dayCount: 'act_360',
+    interp: 'log_linear',
+    extrapolation: 'extend',
   };
   const curve = new core.ForwardCurve(options);
   try {
-    assert.equal(curve.rate(1), 0.045);
+    assert.deepEqual([...curve.knots], [0, 1]);
+    assert.ok(Math.abs(curve.df(1) - Math.exp(-0.045)) < 1e-15);
   } finally {
     curve.free();
   }
@@ -318,24 +362,53 @@ test('core VolCube takes SABR node objects only', () => {
 test('core.FxDeltaVolSurface constructs from 25-delta quotes', () => {
   const surface = new core.FxDeltaVolSurface(
     'EURUSD-VOL',
+    'EUR/USD',
     [0.25, 0.5, 1.0],
     [0.1, 0.11, 0.12],
     [-0.01, -0.012, -0.015],
     [0.002, 0.0025, 0.003]
   );
   assert.equal(surface.id, 'EURUSD-VOL');
+  assert.equal(surface.pair, 'EUR/USD');
   assert.equal(surface.expiries.length, 3);
 });
 
-test('core FX delta surface absent wings use omitted arguments, not empty arrays', () => {
-  const surface = new core.FxDeltaVolSurface('EURUSD', [1], [0.1], [0], [0], undefined, undefined);
+test('core FX delta surface validates options, currency pair, and absent wings', () => {
+  const surface = new core.FxDeltaVolSurface(
+    'EURUSD',
+    [new core.Currency('EUR'), new core.Currency('USD')],
+    [1],
+    [0.1],
+    [0],
+    [0],
+    null
+  );
   try {
+    assert.equal(surface.pair, 'EUR/USD');
     assert.equal(surface.expiries.length, 1);
   } finally {
     surface.free();
   }
-  assert.throws(() => new core.FxDeltaVolSurface('EURUSD', [1], [0.1], [0], [0], [], []));
-  assert.throws(() => new core.FxDeltaVolSurface('EURUSD', [1], [0.1], [0], [0], [0], undefined));
+  assert.throws(
+    () =>
+      new core.FxDeltaVolSurface('EURUSD', 'EUR/USD', [1], [0.1], [0], [0], {
+        rr10d: [],
+        bf10d: [],
+      })
+  );
+  assert.throws(
+    () =>
+      new core.FxDeltaVolSurface('EURUSD', 'EUR/USD', [1], [0.1], [0], [0], {
+        rr10d: [0],
+      })
+  );
+  assert.throws(
+    () =>
+      new core.FxDeltaVolSurface('EURUSD', 'EUR/USD', [1], [0.1], [0], [0], {
+        unknownKey: true,
+      })
+  );
+  assert.throws(() => new core.FxDeltaVolSurface('EURUSD', 'EUR/EUR', [1], [0.1], [0], [0]));
 });
 
 test('core FX pair convention keeps the supplied order and explicit pip size', () => {

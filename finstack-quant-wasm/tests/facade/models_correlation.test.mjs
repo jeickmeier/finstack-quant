@@ -42,9 +42,13 @@ test('overflowing square dimensions produce ordinary errors instead of WASM trap
   }
 });
 
-test('integer dimensions and canonical zero-size and zero-iteration behavior remain valid', () => {
+test('integer dimensions and canonical zero-size behavior remain valid, and zero maxIter fails validation', () => {
   assert.equal(correlation.validateCorrelationMatrix([1], 1), undefined);
-  assert.deepEqual(Array.from(correlation.nearestCorrelation([1], 1, 0)), [1]);
+  assert.deepEqual(Array.from(correlation.nearestCorrelation([1], 1, 1)), [1]);
+  assert.throws(
+    () => correlation.nearestCorrelation([1], 1, 0),
+    (error) => error instanceof Error && error.kind === 'validation'
+  );
   assert.equal(correlation.validateCorrelationMatrix([], 0), undefined);
   assert.deepEqual(Array.from(correlation.nearestCorrelation([], 0)), []);
 });

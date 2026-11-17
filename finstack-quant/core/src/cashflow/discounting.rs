@@ -35,6 +35,9 @@
 //! let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
 //! let curve = DiscountCurve::builder("USD-OIS")
 //!     .base_date(base_date)
+//!     .day_count(finstack_quant_core::dates::DayCount::Act365F)
+//!     .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+//!     .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
 //!     .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.78)])
 //!     .build()?;
 //! let flows = vec![(
@@ -181,6 +184,8 @@ pub fn flat_discount_factor(rate: f64, years: f64) -> crate::Result<f64> {
 ///     .base_date(base)
 ///     .day_count(DayCount::Act360)
 ///     .knots([(0.0, 1.0), (1.0, 0.95)])
+///     .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+///     .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
 ///     .build()?;
 /// let today = (base, Money::from((7_i64, Currency::USD)));
 /// let later = (
@@ -272,6 +277,9 @@ pub fn npv<D: Discounting + ?Sized>(
 /// let curve = DiscountCurve::builder("USD-OIS")
 ///     .base_date(base)
 ///     .knots([(0.0, 1.0), (1.0, 0.95)])
+///     .day_count(finstack_quant_core::dates::DayCount::Act365F)
+///     .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+///     .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
 ///     .build()?;
 /// assert_eq!(npv_amounts(&curve, base, &[], false)?, 0.0);
 /// assert_eq!(npv_amounts(&curve, base, &[(base, 5.0)], true)?, 5.0);
@@ -310,9 +318,9 @@ pub fn npv_amounts<D: Discounting + ?Sized>(
                 product
             }
         };
-        total.checked_add(present)?;
+        total.add(present)?;
     }
-    let result = total.checked_total()?;
+    let result = total.get_total()?;
     Ok(if result == 0.0 { 0.0 } else { result })
 }
 
@@ -354,18 +362,14 @@ fn flat_curve(
     continuous_rate: f64,
     day_count: DayCount,
 ) -> crate::market_data::term_structures::DiscountCurve {
-    use crate::market_data::term_structures::{DiscountCurve, ValidationMode};
+    use crate::market_data::term_structures::DiscountCurve;
     use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 
     DiscountCurve::builder(id)
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, (-continuous_rate).exp())])
         .interp(InterpStyle::LogLinear)
-        .extrapolation(ExtrapolationPolicy::FlatForward)
-        .validation(ValidationMode::Raw {
-            allow_non_monotonic: continuous_rate < 0.0,
-            forward_floor: None,
-        })
+        .extrapolation(ExtrapolationPolicy::Extend)
         .day_count(day_count)
         .build()
         .expect("valid flat curve")
@@ -394,6 +398,8 @@ mod hardening_tests {
             .base_date(curve_base)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.88)])
+            .interp(crate::math::interp::InterpStyle::LogLinear)
+            .extrapolation(crate::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
 
@@ -498,8 +504,13 @@ mod tests {
         fn base_date(&self) -> Date {
             Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date")
         }
-        fn df(&self, _t: f64) -> f64 {
-            1.0
+
+        fn df(&self, _t: f64) -> crate::Result<f64> {
+            Ok(1.0)
+        }
+
+        fn instantaneous_forward(&self, _t: f64) -> crate::Result<f64> {
+            Ok(0.0)
         }
     }
 
@@ -519,12 +530,17 @@ mod tests {
         fn base_date(&self) -> Date {
             Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date")
         }
-        fn df(&self, t: f64) -> f64 {
+
+        fn df(&self, t: f64) -> crate::Result<f64> {
             if t.abs() < f64::EPSILON {
-                1.0
+                Ok(1.0)
             } else {
-                f64::NAN
+                Ok(f64::NAN)
             }
+        }
+
+        fn instantaneous_forward(&self, _t: f64) -> crate::Result<f64> {
+            Ok(f64::NAN)
         }
     }
 
@@ -536,8 +552,13 @@ mod tests {
         fn base_date(&self) -> Date {
             Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date")
         }
-        fn df(&self, t: f64) -> f64 {
-            if t.abs() < f64::EPSILON { 0.0 } else { 1.0 }
+
+        fn df(&self, t: f64) -> crate::Result<f64> {
+            Ok(if t.abs() < f64::EPSILON { 0.0 } else { 1.0 })
+        }
+
+        fn instantaneous_forward(&self, _t: f64) -> crate::Result<f64> {
+            Ok(0.0)
         }
     }
 
@@ -603,6 +624,8 @@ mod tests {
         let err = crate::market_data::term_structures::DiscountCurve::builder("BRL-FLAT")
             .base_date(base)
             .day_count(DayCount::Bus252)
+            .interp(crate::math::interp::InterpStyle::LogLinear)
+            .extrapolation(crate::math::interp::ExtrapolationPolicy::Extend)
             .knots([(0.0, 1.0), (1.0, 0.9)])
             .build()
             .expect_err("Bus/252 time axis needs a calendar");
@@ -611,7 +634,7 @@ mod tests {
 
     #[test]
     fn npv_counts_business_days_on_the_curve_calendar() {
-        use crate::market_data::term_structures::{DiscountCurve, ValidationMode};
+        use crate::market_data::term_structures::DiscountCurve;
         use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 
         let base = create_date(2025, Month::January, 6).expect("Valid test date");
@@ -622,11 +645,7 @@ mod tests {
             .calendar_id("target2")
             .knots([(0.0, 1.0), (1.0, (-0.10_f64).exp())])
             .interp(InterpStyle::LogLinear)
-            .extrapolation(ExtrapolationPolicy::FlatForward)
-            .validation(ValidationMode::Raw {
-                allow_non_monotonic: false,
-                forward_floor: None,
-            })
+            .extrapolation(ExtrapolationPolicy::Extend)
             .build()
             .expect("calendar-backed Bus/252 curve");
         let flows = vec![(pay, Money::from((100_i64, Currency::USD)))];
@@ -789,11 +808,17 @@ mod record_016_tests {
         fn id(&self) -> &CurveId {
             &self.id
         }
+
         fn base_date(&self) -> Date {
             self.base
         }
-        fn df(&self, _t: f64) -> f64 {
-            f64::NAN
+
+        fn df(&self, _t: f64) -> crate::Result<f64> {
+            Ok(f64::NAN)
+        }
+
+        fn instantaneous_forward(&self, _t: f64) -> crate::Result<f64> {
+            Ok(f64::NAN)
         }
     }
 
@@ -811,6 +836,9 @@ mod record_016_tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(day(2025, Month::January, 1))
             .knots([(0.0, 1.0), (1.0, 0.95)])
+            .day_count(crate::dates::DayCount::Act365F)
+            .interp(crate::math::interp::InterpStyle::LogLinear)
+            .extrapolation(crate::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let flows = [(as_of, usd(7)), (day(2026, Month::January, 2), usd(100))];
@@ -911,6 +939,9 @@ mod record_016_tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, 0.5)])
+            .day_count(crate::dates::DayCount::Act365F)
+            .interp(crate::math::interp::InterpStyle::LogLinear)
+            .extrapolation(crate::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let tiny = [(day(2026, Month::January, 1), 5e-324)];

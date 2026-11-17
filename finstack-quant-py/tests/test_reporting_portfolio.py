@@ -100,7 +100,12 @@ def test_portfolio_tearsheet_real_portfolio() -> None:
     mc = MarketContext()
     mc.insert(
         DiscountCurve(
-            "USD-OIS", date(2025, 1, 15), [(0.0, 1.0), (0.25, 0.9875), (1.0, 0.95), (5.0, 0.75)], day_count="act_365f"
+            "USD-OIS",
+            date(2025, 1, 15),
+            [(0.0, 1.0), (0.25, 0.9875), (1.0, 0.95), (5.0, 0.75)],
+            day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
         )
     )
     spec = {

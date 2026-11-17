@@ -7,8 +7,9 @@ use crate::api::engine::calibrate_from_json;
 use crate::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::dates::{DateExt, Tenor, adjust, calendar_by_id_strict};
 use finstack_quant_core::market_data::term_structures::{
-    RateCalibrationMethod, RateCalibrationPillar, ValidationMode,
+    RateCalibrationMethod, RateCalibrationPillar,
 };
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::{Instrument, PayReceive};
 use finstack_quant_valuations_core::market::conventions::ConventionRegistry;
@@ -144,7 +145,8 @@ fn single_ois_quote_replay_composes_and_preserves_zero_shock_identity()
     let restored = bump(Arc::clone(&plus_one), -1.0)?;
 
     assert!(
-        (source.get_discount("USD-OIS")?.df(5.0) - plus_one.get_discount("USD-OIS")?.df(5.0)).abs()
+        (source.get_discount("USD-OIS")?.df(5.0)? - plus_one.get_discount("USD-OIS")?.df(5.0)?)
+            .abs()
             > 1e-6,
         "fixture must have a material response to the first quote shock"
     );
@@ -162,8 +164,8 @@ fn single_ois_quote_replay_composes_and_preserves_zero_shock_identity()
                 &source,
             ),
         ] {
-            let actual_df = actual.get_discount("USD-OIS")?.df(time);
-            let expected_df = expected.get_discount("USD-OIS")?.df(time);
+            let actual_df = actual.get_discount("USD-OIS")?.df(time)?;
+            let expected_df = expected.get_discount("USD-OIS")?.df(time)?;
             assert!(
                 (actual_df - expected_df).abs() <= 1e-10,
                 "{label} at t={time}: actual={actual_df:.15}, expected={expected_df:.15}"
@@ -206,14 +208,14 @@ fn linked_rate_quote_replay_composes_both_curve_recipes()
                 &source,
             ),
         ] {
-            let actual_df = actual.get_discount("USD-OIS")?.df(time);
-            let expected_df = expected.get_discount("USD-OIS")?.df(time);
+            let actual_df = actual.get_discount("USD-OIS")?.df(time)?;
+            let expected_df = expected.get_discount("USD-OIS")?.df(time)?;
             assert!(
                 (actual_df - expected_df).abs() <= 1e-10,
                 "{label}, discount at t={time}: actual={actual_df:.15}, expected={expected_df:.15}"
             );
-            let actual_forward = actual.get_forward("USD-SOFR-3M")?.rate(time);
-            let expected_forward = expected.get_forward("USD-SOFR-3M")?.rate(time);
+            let actual_forward = actual.get_forward("USD-SOFR-3M")?.df(time)?;
+            let expected_forward = expected.get_forward("USD-SOFR-3M")?.df(time)?;
             assert!(
                 (actual_forward - expected_forward).abs() <= 1e-9,
                 "{label}, forward at t={time}: actual={actual_forward:.15}, \
@@ -226,7 +228,6 @@ fn linked_rate_quote_replay_composes_both_curve_recipes()
 
 fn discount_floor_fixture(
     rate: f64,
-    forward_floor: Option<f64>,
 ) -> std::result::Result<(DiscountCurve, RateCalibrationRecipe), Box<dyn std::error::Error>> {
     let mut quotes = Vec::new();
     for tenor in ["1Y", "2Y"] {
@@ -249,12 +250,10 @@ fn discount_floor_fixture(
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(Date::from_calendar_date(2025, time::Month::January, 2)?)
         .day_count(DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .knots([(0.0, 1.0), (1.0, (-rate).exp()), (2.0, (-2.0 * rate).exp())])
         .rate_calibration(recipe.clone())
-        .validation(ValidationMode::Raw {
-            allow_non_monotonic: true,
-            forward_floor,
-        })
         .build()?;
     Ok((curve, recipe))
 }
@@ -262,7 +261,7 @@ fn discount_floor_fixture(
 #[test]
 fn discount_replay_preserves_absent_forward_floor_in_negative_rate_market()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let (source, recipe) = discount_floor_fixture(-0.015, None)?;
+    let (source, recipe) = discount_floor_fixture(-0.015)?;
     let replay = bump_discount_curve_from_rate_calibration(
         &source,
         &recipe,
@@ -270,12 +269,10 @@ fn discount_replay_preserves_absent_forward_floor_in_negative_rate_market()
         &QuoteBump::ParallelBp(0.0),
     )?;
 
-    assert!(replay.allows_non_monotonic());
-    assert_eq!(replay.min_forward_rate(), None);
-    assert!(replay.df(2.0) > 1.0);
+    assert!(replay.df(2.0)? > 1.0);
     for time in [0.0, 0.25, 0.5, 1.0, 1.5, 2.0] {
         assert!(
-            (replay.df(time) - source.df(time)).abs() < 1e-14,
+            (replay.df(time)? - source.df(time)?).abs() < 1e-14,
             "zero replay changed the negative-rate curve at t={time}"
         );
     }
@@ -283,9 +280,9 @@ fn discount_replay_preserves_absent_forward_floor_in_negative_rate_market()
 }
 
 #[test]
-fn discount_replay_preserves_and_enforces_positive_forward_floor()
+fn discount_replay_supports_negative_shifted_positive_curve()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let (source, recipe) = discount_floor_fixture(0.03, Some(0.01))?;
+    let (source, recipe) = discount_floor_fixture(0.03)?;
     let replay = bump_discount_curve_from_rate_calibration(
         &source,
         &recipe,
@@ -293,29 +290,19 @@ fn discount_replay_preserves_and_enforces_positive_forward_floor()
         &QuoteBump::ParallelBp(0.0),
     )?;
 
-    assert!(replay.allows_non_monotonic());
-    assert_eq!(replay.min_forward_rate(), Some(0.01));
     for time in [0.0, 0.25, 0.5, 1.0, 1.5, 2.0] {
         assert!(
-            (replay.df(time) - source.df(time)).abs() < 1e-14,
+            (replay.df(time)? - source.df(time)?).abs() < 1e-14,
             "zero replay changed the positive-rate curve at t={time}"
         );
     }
 
-    let error = bump_discount_curve_from_rate_calibration(
+    let down = bump_discount_curve_from_rate_calibration(
         &source,
         &recipe,
         &MarketContext::new(),
-        &QuoteBump::ParallelBp(-300.0),
-    )
-    .expect_err("the delivered curve must reject forwards below its native 1% floor");
-    assert!(
-        matches!(
-            &error,
-            finstack_quant_core::Error::Validation(message)
-                if message.contains("below minimum 1.0000%")
-        ),
-        "expected native curve floor validation, received: {error}"
-    );
+        &QuoteBump::ParallelBp(-400.0),
+    )?;
+    assert!(down.df(2.0)? > 1.0);
     Ok(())
 }

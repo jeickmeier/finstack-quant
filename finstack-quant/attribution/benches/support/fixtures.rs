@@ -50,6 +50,8 @@ pub fn build_flat_curve(curve_id: &str, as_of: Date, rate: f64) -> DiscountCurve
         .base_date(as_of)
         .knots(knots)
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -123,25 +125,31 @@ pub fn rich_markets(shift_bp: f64) -> BondMarkets {
     let lean = BondMarkets::new(shift_bp);
     let hazard_t0 = HazardCurve::builder("ACME-HAZ")
         .base_date(lean.as_of_t0)
-        .knots([(0.0, 0.0050), (1.0, 0.0055), (5.0, 0.0060)])
+        .knots([(1.0, 0.0055), (5.0, 0.0060)])
         .recovery_rate(0.40)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
     let hazard_t1 = HazardCurve::builder("ACME-HAZ")
         .base_date(lean.as_of_t1)
-        .knots([(0.0, 0.0055), (1.0, 0.0060), (5.0, 0.0068)])
+        .knots([(1.0, 0.0060), (5.0, 0.0068)])
         .recovery_rate(0.40)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
     let cpi_t0 = InflationCurve::builder("USD-CPI")
         .base_date(lean.as_of_t0)
-        .base_cpi(100.0)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .knots([(0.0, 100.0), (1.0, 102.0), (5.0, 110.0)])
         .build()
         .unwrap();
     let cpi_t1 = InflationCurve::builder("USD-CPI")
         .base_date(lean.as_of_t1)
-        .base_cpi(100.2)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .knots([(0.0, 100.2), (1.0, 102.4), (5.0, 111.0)])
         .build()
         .unwrap();
@@ -156,7 +164,7 @@ pub fn rich_markets(shift_bp: f64) -> BondMarkets {
             .insert_fx(fx_t0)
             .insert_price(
                 "AAPL-SPOT",
-                MarketScalar::Price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
+                MarketScalar::price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
             ),
         market_t1: lean
             .market_t1
@@ -165,7 +173,7 @@ pub fn rich_markets(shift_bp: f64) -> BondMarkets {
             .insert_fx(fx_t1)
             .insert_price(
                 "AAPL-SPOT",
-                MarketScalar::Price(Money::new(185.0, Currency::USD).expect("valid money fixture")),
+                MarketScalar::price(Money::new(185.0, Currency::USD).expect("valid money fixture")),
             ),
         as_of_t0: lean.as_of_t0,
         as_of_t1: lean.as_of_t1,
@@ -237,11 +245,11 @@ pub fn equity_markets() -> BondMarkets {
     BondMarkets {
         market_t0: MarketContext::new().insert(disc_t0).insert_price(
             "AAPL-SPOT",
-            MarketScalar::Price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
         ),
         market_t1: MarketContext::new().insert(disc_t1).insert_price(
             "AAPL-SPOT",
-            MarketScalar::Price(Money::new(185.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(185.0, Currency::USD).expect("valid money fixture")),
         ),
         as_of_t0,
         as_of_t1,

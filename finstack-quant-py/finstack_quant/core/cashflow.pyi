@@ -234,9 +234,15 @@ class CashFlowAccrual:
 
         Raises
         ------
+        KeyError
+            If ``day_count`` is ``DayCount.BUS_252`` and ``context.calendar_id``
+            names an unknown holiday calendar.
         ValueError
             If a supplied date cannot be parsed, ``start`` is not before
-            ``end``, or ``projected_index_rate`` is not finite.
+            ``end``, ``projected_index_rate`` is not finite, or ``context``
+            fails ``day_count`` validation (missing ``BUS_252`` calendar,
+            missing or non-overlapping ``ACT/ACT ICMA`` coupon period, or
+            out-of-bounds ``ACT/365L`` period).
         """
         ...
 

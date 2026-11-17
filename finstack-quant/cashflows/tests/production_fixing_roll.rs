@@ -39,9 +39,10 @@ fn production_roll_keeps_existing_fixing_values_and_series_metadata() {
             "FIXING:USD-SOFR",
             vec![(date!(2025 - 01 - 03), 0.07)],
             Some(Currency::USD),
+            SeriesInterpolation::Linear,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
-        .unwrap()
-        .with_interpolation(SeriesInterpolation::Linear),
+        .unwrap(),
     );
     let projected = schedule(&[Some(0.03), None, Some(f64::NAN)]);
     let rolled = materialize_fixings(
@@ -52,7 +53,7 @@ fn production_roll_keeps_existing_fixing_values_and_series_metadata() {
     )
     .unwrap();
     let series = rolled.get_series("FIXING:USD-SOFR").unwrap();
-    assert_eq!(series.value_on_exact(date!(2025 - 01 - 03)).unwrap(), 0.07);
+    assert_eq!(series.get_value_exact(date!(2025 - 01 - 03)).unwrap(), 0.07);
     assert_eq!(series.currency(), Some(Currency::USD));
     assert_eq!(series.interpolation(), SeriesInterpolation::Linear);
     assert_eq!(
@@ -161,7 +162,7 @@ fn production_roll_includes_origin_and_horizon_only_when_advancing() {
         advancing
             .get_series("FIXING:USD-SOFR")
             .unwrap()
-            .value_on_exact(date!(2025 - 01 - 03))
+            .get_value_exact(date!(2025 - 01 - 03))
             .unwrap(),
         0.03
     );

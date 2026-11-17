@@ -1,27 +1,126 @@
 //! Tests for all curve type variants (Forecast, Hazard, Inflation).
 
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_core::market_data::term_structures::ForwardCurve;
-use finstack_quant_core::market_data::term_structures::HazardCurve;
-use finstack_quant_core::market_data::term_structures::InflationCurve;
+use finstack_quant_core::market_data::term_structures::{
+    DiscountCurve, ForwardCurve, HazardCurve, InflationCurve, Seniority,
+};
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_scenarios::{
     CurveKind, ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec, TenorMatchMode,
 };
 use finstack_quant_statements::types::FinancialModelSpec;
 use time::Month;
 
+fn calibrate_test_hazard(
+    base_date: Date,
+    discount: &DiscountCurve,
+    curve_id: &str,
+    recovery_rate: f64,
+    spreads: &[(&str, f64)],
+) -> HazardCurve {
+    use finstack_quant_calibration::api::{
+        engine,
+        market_datum::MarketDatum,
+        prior_market::PriorMarketObject,
+        schema::{
+            CalibrationEnvelope, CalibrationPlan, CalibrationSchema, CalibrationStep,
+            HazardCurveParams, StepParams,
+        },
+    };
+    use finstack_quant_calibration::quotes::{CdsQuote, MarketQuote, Pillar, QuoteId};
+    use finstack_quant_calibration::{CalibrationConfig, CalibrationMethod};
+    use finstack_quant_core::types::CurveId;
+    use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+
+    let mut quotes = Vec::with_capacity(spreads.len());
+    let mut quote_ids = Vec::with_capacity(spreads.len());
+    for (tenor_str, spread_bp) in spreads {
+        let id = QuoteId::new(format!("{curve_id}-{tenor_str}"));
+        quote_ids.push(id.clone());
+        let pillar_date = Tenor::parse(tenor_str)
+            .expect("valid tenor")
+            .add_to_date(
+                base_date,
+                None,
+                finstack_quant_core::dates::BusinessDayConvention::Unadjusted,
+            )
+            .expect("valid pillar date");
+        quotes.push(MarketDatum::from(MarketQuote::Cds(
+            CdsQuote::CdsParSpread {
+                id,
+                entity: curve_id.to_string(),
+                pillar: Pillar::Date(pillar_date),
+                spread_bp: *spread_bp,
+                recovery_rate,
+                convention: CdsConventionKey {
+                    currency: Currency::USD,
+                    doc_clause: CdsDocClause::IsdaNa,
+                },
+            },
+        )));
+    }
+    let mut quote_sets = finstack_quant_core::FxHashMap::default();
+    quote_sets.insert("credit".to_string(), quote_ids);
+    let envelope = CalibrationEnvelope {
+        schema_url: None,
+        schema: CalibrationSchema::CURRENT,
+        plan: CalibrationPlan {
+            id: format!("{curve_id}-cal"),
+            description: None,
+            quote_sets: quote_sets.into_iter().collect(),
+            steps: vec![CalibrationStep {
+                id: curve_id.to_string(),
+                quote_set: "credit".to_string(),
+                params: StepParams::Hazard(HazardCurveParams {
+                    curve_id: CurveId::new(curve_id),
+                    entity: curve_id.to_string(),
+                    seniority: Seniority::Senior,
+                    currency: Currency::USD,
+                    base_date,
+                    discount_curve_id: discount.id().clone(),
+                    recovery_rate,
+                    notional: 1.0,
+                    method: CalibrationMethod::Bootstrap,
+                    doc_clause: None,
+                    cds_valuation_convention: None,
+                }),
+            }],
+            settings: CalibrationConfig::default(),
+        },
+        market_data: quotes,
+        prior_market: vec![PriorMarketObject::DiscountCurve(discount.clone())],
+    };
+    let calibrated = engine::calibrate(&envelope).expect("hazard calibration");
+    MarketContext::try_from(calibrated.result.final_market)
+        .expect("calibrated market")
+        .get_hazard(curve_id)
+        .expect("calibrated hazard")
+        .as_ref()
+        .clone()
+}
+
+/// 3M projection curve with 5.5% and 6.0% continuously compounded zero rates
+/// at 1Y and 5Y.
+fn sample_forward_curve(base_date: Date) -> ForwardCurve {
+    ForwardCurve::from_zero_rates(
+        "USD_LIBOR_3M",
+        base_date,
+        &[(1.0, 0.055), (5.0, 0.06)],
+        finstack_quant_core::math::Compounding::Continuous,
+        DayCount::Act365F,
+        InterpStyle::LogLinear,
+        ExtrapolationPolicy::Extend,
+    )
+    .unwrap()
+}
+
 #[test]
 fn test_forecast_curve_parallel_shock() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
-    // Create forward curve (3M = 0.25 years)
-    let curve = ForwardCurve::builder("USD_LIBOR_3M", 0.25)
-        .base_date(base_date)
-        .knots(vec![(0.0, 0.05), (1.0, 0.055), (5.0, 0.06)])
-        .build()
-        .unwrap();
+    let curve = sample_forward_curve(base_date);
 
     let mut market = MarketContext::new().insert(curve);
     let mut model = FinancialModelSpec::new(
@@ -45,7 +144,6 @@ fn test_forecast_curve_parallel_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -61,10 +159,14 @@ fn test_forecast_curve_parallel_shock() {
     let report = engine.apply(&scenario, &mut ctx).unwrap();
     assert_eq!(report.operations_applied, 1);
 
-    // Verify curve was bumped
+    // A parallel forward shock moves the continuously compounded projection
+    // zero rate by the requested amount.
     let bumped_curve = market.get_forward("USD_LIBOR_3M").unwrap();
-    let forwards = bumped_curve.forwards();
-    assert!(forwards[0] > 0.05, "Forward rate should be bumped");
+    let zero_1y = -bumped_curve.df(1.0).unwrap().ln();
+    assert!(
+        (zero_1y - 0.0575).abs() < 1e-12,
+        "projection zero rate should be bumped +25bp, got {zero_1y}"
+    );
 }
 
 #[test]
@@ -73,18 +175,21 @@ fn test_par_cds_parallel_shock() {
 
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
+        .day_count(DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .knots(vec![(0.0, 1.0), (1.0, 0.98), (5.0, 0.90)])
         .build()
         .unwrap();
 
-    // Create hazard curve
-    let curve = HazardCurve::builder("CORP_BBB")
-        .base_date(base_date)
-        .recovery_rate(0.4)
-        .knots(vec![(0.0, 0.0), (1.0, 0.02), (5.0, 0.025)])
-        .par_spreads(vec![(1.0, 120.0), (5.0, 150.0)])
-        .build()
-        .unwrap();
+    // Create calibrated hazard curve
+    let curve = calibrate_test_hazard(
+        base_date,
+        &discount,
+        "CORP_BBB",
+        0.4,
+        &[("1Y", 120.0), ("5Y", 150.0)],
+    );
 
     let mut market = MarketContext::new().insert(discount).insert(curve);
     let mut model = FinancialModelSpec::new(
@@ -108,7 +213,6 @@ fn test_par_cds_parallel_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: finstack_quant_scenarios::HazardBumpMode::FirstOrderShift,
     };
 
     let engine = ScenarioEngine::new();
@@ -136,7 +240,9 @@ fn test_inflation_curve_parallel_shock() {
     // Create inflation curve
     let curve = InflationCurve::builder("US_CPI")
         .base_date(base_date)
-        .base_cpi(300.0)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .knots(vec![
             (0.0, 300.0),
             (1.0, 306.0), // ~2% inflation
@@ -149,6 +255,9 @@ fn test_inflation_curve_parallel_shock() {
     let ois = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
         .knots(vec![(0.0, 1.0), (1.0, 0.98)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -174,7 +283,6 @@ fn test_inflation_curve_parallel_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -200,11 +308,7 @@ fn test_inflation_curve_parallel_shock() {
 fn test_forecast_curve_node_shock() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
-    let curve = ForwardCurve::builder("USD_LIBOR_3M", 0.25)
-        .base_date(base_date)
-        .knots(vec![(0.0, 0.05), (1.0, 0.055), (5.0, 0.06)])
-        .build()
-        .unwrap();
+    let curve = sample_forward_curve(base_date);
 
     let mut market = MarketContext::new().insert(curve);
     let mut model = FinancialModelSpec::new(
@@ -229,7 +333,6 @@ fn test_forecast_curve_node_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -253,17 +356,21 @@ fn test_par_cds_node_shock() {
     // Keep the discount curve present so the market matches a normal credit setup.
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
+        .day_count(DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .knots(vec![(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.60)])
         .build()
         .unwrap();
 
-    let curve = HazardCurve::builder("CORP_BBB")
-        .base_date(base_date)
-        .recovery_rate(0.4)
-        .knots(vec![(0.0, 0.0), (1.0, 0.02), (5.0, 0.025)])
-        .par_spreads(vec![(1.0, 120.0), (5.0, 150.0)])
-        .build()
-        .unwrap();
+    let curve = calibrate_test_hazard(
+        base_date,
+        &discount,
+        "CORP_BBB",
+        0.4,
+        &[("1Y", 120.0), ("5Y", 150.0)],
+    );
+    let orig_5y = curve.hazard_rate(5.0).unwrap();
 
     let mut market = MarketContext::new().insert(discount).insert(curve);
     let mut model = FinancialModelSpec::new(
@@ -288,7 +395,6 @@ fn test_par_cds_node_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: finstack_quant_scenarios::HazardBumpMode::FirstOrderShift,
     };
 
     let engine = ScenarioEngine::new();
@@ -301,22 +407,15 @@ fn test_par_cds_node_shock() {
         as_of: base_date,
     };
 
-    // First-order mode applies the direct core hazard-intensity operation.
     let report = engine.apply(&scenario, &mut ctx).unwrap();
     assert_eq!(report.operations_applied, 1);
 
     // Check bumped value
     let bumped = market.get_hazard("CORP_BBB").unwrap();
-    // Delta spread = 25bp, R=0.4 => Delta Lambda approx 25bp / 0.6 = 41.67bp
-    // Original 5Y lambda = 0.025. New approx 0.025 + 0.004167 = 0.029167
-
-    // We can just verify it changed in the right direction
-    // The exact 5Y node is targeted directly.
-    let val_5y = bumped.hazard_rate(5.0);
+    let val_5y = bumped.hazard_rate(5.0).unwrap();
     assert!(
-        val_5y > 0.025,
-        "Hazard rate should increase from Par CDS spread bump: got {}",
-        val_5y
+        val_5y > orig_5y,
+        "Hazard rate should increase from Par CDS spread bump: {val_5y} vs {orig_5y}"
     );
 }
 
@@ -326,7 +425,9 @@ fn test_inflation_curve_node_shock() {
 
     let curve = InflationCurve::builder("US_CPI")
         .base_date(base_date)
-        .base_cpi(300.0)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .knots(vec![(0.0, 300.0), (1.0, 306.0), (5.0, 330.0)])
         .build()
         .unwrap();
@@ -335,6 +436,9 @@ fn test_inflation_curve_node_shock() {
     let ois = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
         .knots(vec![(0.0, 1.0), (1.0, 0.98)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -361,7 +465,6 @@ fn test_inflation_curve_node_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -385,6 +488,9 @@ fn test_discount_curve_id_preservation() {
     let curve = DiscountCurve::builder("USD_SOFR")
         .base_date(base_date)
         .knots(vec![(0.0, 1.0), (1.0, 0.98), (5.0, 0.90)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -410,7 +516,6 @@ fn test_discount_curve_id_preservation() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -438,34 +543,37 @@ fn test_all_curve_types_in_one_scenario() {
     let disc = DiscountCurve::builder("USD_SOFR")
         .base_date(base_date)
         .knots(vec![(0.0, 1.0), (1.0, 0.98)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let fwd = ForwardCurve::builder("USD_LIBOR_3M", 0.25)
+    let fwd = sample_forward_curve(base_date);
+
+    let ois = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
-        .knots(vec![(0.0, 0.05), (1.0, 0.055)])
+        .day_count(DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
+        .knots(vec![(0.0, 1.0), (1.0, 0.98)])
         .build()
         .unwrap();
 
-    let hazard = HazardCurve::builder("CORP_BBB")
-        .base_date(base_date)
-        .recovery_rate(0.4)
-        .knots(vec![(0.0, 0.0), (1.0, 0.02), (5.0, 0.025)])
-        .par_spreads(vec![(1.0, 120.0), (5.0, 150.0)])
-        .build()
-        .unwrap();
+    let hazard = calibrate_test_hazard(
+        base_date,
+        &ois,
+        "CORP_BBB",
+        0.4,
+        &[("1Y", 120.0), ("5Y", 150.0)],
+    );
 
     let inflation = InflationCurve::builder("US_CPI")
         .base_date(base_date)
-        .base_cpi(300.0)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .knots(vec![(0.0, 300.0), (1.0, 306.0)])
-        .build()
-        .unwrap();
-
-    // Add fallback discount curve for inflation
-    let ois = DiscountCurve::builder("USD-OIS")
-        .base_date(base_date)
-        .knots(vec![(0.0, 1.0), (1.0, 0.98)])
         .build()
         .unwrap();
 
@@ -517,7 +625,6 @@ fn test_all_curve_types_in_one_scenario() {
         ],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: finstack_quant_scenarios::HazardBumpMode::FirstOrderShift,
     };
 
     let engine = ScenarioEngine::new();

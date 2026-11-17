@@ -94,20 +94,26 @@ fn stochastic_test_market(as_of: Date) -> MarketContext {
             (2.0, (-0.06_f64).exp()),
         ])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("test discount curve");
-    let term_forward = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let term_forward = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(as_of)
-        .knots([(0.0, 0.04), (2.0, 0.04)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .index_tenor(Tenor::quarterly())
+        .knots([(0.0, 1.0), (1.0, (-0.04_f64).exp())])
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("term forward curve");
-    let overnight_forward = ForwardCurve::builder("USD-SOFR", 1.0 / 360.0)
-        .base_date(as_of)
-        .knots([(0.0, 0.04), (2.0, 0.04)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .expect("overnight forward curve");
+    let overnight_forward = ForwardCurve::flat(
+        "USD-SOFR",
+        as_of,
+        0.04,
+        finstack_quant_core::dates::DayCount::Act365F,
+    )
+    .expect("overnight forward curve");
     MarketContext::new()
         .insert(discount)
         .insert(term_forward)
@@ -191,14 +197,10 @@ fn overnight_replay_preserves_index_rates_across_curve_clocks() {
     let tree = stochastic_test_tree(31);
     let bond = overnight_pik_test_bond(as_of, maturity);
     for (day_count, curve_rate) in [
-        (DayCount::Act360, 0.04),
-        (DayCount::Act365F, 0.04 * 365.0 / 360.0),
+        (DayCount::Act360, 360.0 * (1.0_f64 + 0.04 / 360.0).ln()),
+        (DayCount::Act365F, 365.0 * (1.0_f64 + 0.04 / 360.0).ln()),
     ] {
-        let forward = ForwardCurve::builder("USD-SOFR", 1.0 / 360.0)
-            .base_date(as_of)
-            .day_count(day_count)
-            .knots([(0.0, curve_rate), (2.0, curve_rate)])
-            .build()
+        let forward = ForwardCurve::flat("USD-SOFR", as_of, curve_rate, day_count)
             .expect("equivalent forward curve");
         let market = stochastic_test_market(as_of).insert(forward);
         let template =
@@ -422,6 +424,8 @@ fn past_overnight_payment_retains_only_fully_determined_pending_pik() {
             "FIXING:USD-SOFR",
             fixings,
             None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .expect("published business-day fixings"),
     );
@@ -1170,12 +1174,16 @@ fn term_reset_base_forward_uses_discount_curve_date_axis() {
             (3.0, (-0.17_f64).exp()),
         ])
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("shifted-base test discount curve");
-    let term_forward = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let term_forward = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(as_of)
-        .knots([(0.0, 0.04), (2.0, 0.04)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .index_tenor(Tenor::quarterly())
+        .knots([(0.0, 1.0), (1.0, (-0.04_f64).exp())])
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("term forward curve");
     let market = MarketContext::new()
@@ -1192,15 +1200,23 @@ fn term_reset_base_forward_uses_discount_curve_date_axis() {
     let FloatingRateModel::Term(ObservedRateSource::Conditional(rate)) = &coupon.rate_model else {
         panic!("future reset should carry a conditional rate");
     };
-    let tenor_years = market
-        .get_forward("USD-SOFR-3M")
-        .expect("3M term forward")
-        .tenor();
+    let fwd = market.get_forward("USD-SOFR-3M").expect("3M term forward");
+    let reset_date = template.step_dates[coupon.reset_step].expect("reset grid date");
+    let tenor_years = fwd
+        .index_tenor()
+        .expect("3M curve has index_tenor")
+        .to_years_with_context(
+            reset_date,
+            None,
+            finstack_quant_core::dates::BusinessDayConvention::Unadjusted,
+            fwd.day_count(),
+            fwd.day_count_context(),
+        )
+        .expect("tenor years");
     let observation_end_step = nearest_step(
         &template.times,
         template.times[coupon.reset_step] + tenor_years,
     );
-    let reset_date = template.step_dates[coupon.reset_step].expect("reset grid date");
     let observation_end_date =
         template.step_dates[observation_end_step].expect("observation-end grid date");
     let expected_df = discount
@@ -1213,8 +1229,10 @@ fn term_reset_base_forward_uses_discount_curve_date_axis() {
         rate.base_discount_forward
     );
 
-    let old_time_axis_df = discount.df(template.times[observation_end_step])
-        / discount.df(template.times[coupon.reset_step]);
+    let old_time_axis_df = discount
+        .df(template.times[observation_end_step])
+        .expect("df")
+        / discount.df(template.times[coupon.reset_step]).expect("df");
     let old_time_axis_forward = (1.0 / old_time_axis_df - 1.0) / rate.accrual;
     assert!(
         (rate.base_discount_forward - old_time_axis_forward).abs() > 0.02,
@@ -1239,11 +1257,20 @@ fn lagged_term_reset_uses_curve_tenor_and_captures_post_pik_start_balance() {
         .find(|(_, coupon)| coupon.accrual_start_step > 0)
         .expect("future term coupon");
     assert!(coupon.reset_step < coupon.accrual_start_step);
-    let tenor_years = market
-        .get_forward("USD-SOFR-3M")
-        .expect("3M term forward")
-        .tenor();
-    assert!((tenor_years - 0.25).abs() < 1.0e-12);
+    let fwd = market.get_forward("USD-SOFR-3M").expect("3M term forward");
+    let index_tenor = fwd.index_tenor().expect("3M curve has index_tenor");
+    assert_eq!(index_tenor, Tenor::quarterly());
+    let reset_date = template.step_dates[coupon.reset_step].expect("reset grid date");
+    let tenor_years = index_tenor
+        .to_years_with_context(
+            reset_date,
+            None,
+            finstack_quant_core::dates::BusinessDayConvention::Unadjusted,
+            fwd.day_count(),
+            fwd.day_count_context(),
+        )
+        .expect("tenor years");
+    assert!((tenor_years - 0.25).abs() < 0.01);
     let times = tree.time_grid().expect("tree times");
     let observation_end = nearest_step(times, times[coupon.reset_step] + tenor_years);
     assert!(

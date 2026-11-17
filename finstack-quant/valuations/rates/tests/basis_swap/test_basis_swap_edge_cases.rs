@@ -30,18 +30,76 @@ fn market() -> MarketContext {
         .base_date(d(2025, 1, 2))
         .knots(vec![(0.0, 1.0), (0.5, 0.99), (1.0, 0.98), (5.0, 0.90)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let f3m = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let f3m = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(d(2025, 1, 2))
-        .knots(vec![(0.0, 0.02), (0.5, 0.021), (1.0, 0.022), (5.0, 0.025)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.997487536532938),
+            (0.25, 0.994950292856076),
+            (0.375, 0.992388490374784),
+            (0.5, 0.98980235222721),
+            (0.625, 0.98719210325196),
+            (0.75, 0.984557969955606),
+            (0.875, 0.981900180480004),
+            (1.0, 0.97921896456946),
+            (1.25, 0.973825219539481),
+            (1.5, 0.968415788843127),
+            (1.75, 0.962991265325316),
+            (2.0, 0.957552240640482),
+            (2.25, 0.95209930514862),
+            (2.5, 0.946633047812227),
+            (2.75, 0.941154056094142),
+            (3.0, 0.935662915856331),
+            (3.25, 0.930160211259623),
+            (3.5, 0.924646524664431),
+            (3.75, 0.91912243653247),
+            (4.0, 0.913588525329506),
+            (4.25, 0.90804536742914),
+            (4.5, 0.90249353701767),
+            (4.75, 0.896933606000028),
+            (5.0, 0.891366143906831),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let f1m = ForwardCurve::builder("USD-SOFR-1M", 1.0 / 12.0)
+    let f1m = ForwardCurve::builder("USD-SOFR-1M")
         .base_date(d(2025, 1, 2))
-        .knots(vec![(0.0, 0.019), (0.5, 0.020), (1.0, 0.021), (5.0, 0.024)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.9976122302682),
+            (0.25, 0.995199061524078),
+            (0.375, 0.992760705844714),
+            (0.5, 0.990297377149241),
+            (0.625, 0.987809291167626),
+            (0.75, 0.985296665409241),
+            (0.875, 0.982759719131244),
+            (1.0, 0.980198673306755),
+            (1.25, 0.975043262181957),
+            (1.5, 0.969869502539092),
+            (1.75, 0.964677975480559),
+            (2.0, 0.959469261503619),
+            (2.25, 0.954243940395089),
+            (2.5, 0.949002591126764),
+            (2.75, 0.943745791751597),
+            (3.0, 0.938474119300664),
+            (3.25, 0.933188149680935),
+            (3.5, 0.927888457573875),
+            (3.75, 0.922575616334903),
+            (4.0, 0.917250197893724),
+            (4.25, 0.911912772655572),
+            (4.5, 0.906563909403366),
+            (4.75, 0.901204175200823),
+            (5.0, 0.895834135296528),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     MarketContext::new().insert(disc).insert(f3m).insert(f1m)
@@ -105,10 +163,24 @@ fn adjusted_payment_dates_control_simple_leg_pv_and_settlement() {
     let end = d(2025, 8, 31); // Sunday; September 1 is US Labor Day.
     let ctx = market()
         .insert_series(
-            ScalarTimeSeries::new("FIXING:USD-SOFR-3M", vec![(start, 0.04)], None).unwrap(),
+            ScalarTimeSeries::new(
+                "FIXING:USD-SOFR-3M",
+                vec![(start, 0.04)],
+                None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .unwrap(),
         )
         .insert_series(
-            ScalarTimeSeries::new("FIXING:USD-SOFR-1M", vec![(start, 0.03)], None).unwrap(),
+            ScalarTimeSeries::new(
+                "FIXING:USD-SOFR-1M",
+                vec![(start, 0.03)],
+                None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .unwrap(),
         );
     let discount = ctx.get_discount("USD-OIS").unwrap();
     let notional = 10_000_000.0;
@@ -324,26 +396,24 @@ fn flat_curves_zero_rates() {
         .base_date(d(2025, 1, 2))
         .knots(vec![(0.0, 1.0), (1.0, 1.0), (2.0, 1.0)])
         .interp(InterpStyle::LogLinear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        )
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let f3m = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(d(2025, 1, 2))
-        .knots(vec![(0.0, 1e-6), (1.0, 1e-6), (2.0, 1e-6)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap();
-    let f1m = ForwardCurve::builder("USD-SOFR-1M", 1.0 / 12.0)
-        .base_date(d(2025, 1, 2))
-        .knots(vec![(0.0, 1e-6), (1.0, 1e-6), (2.0, 1e-6)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap();
+    let f3m = ForwardCurve::flat(
+        "USD-SOFR-3M",
+        d(2025, 1, 2),
+        1e-6,
+        finstack_quant_core::dates::DayCount::Act365F,
+    )
+    .unwrap();
+    let f1m = ForwardCurve::flat(
+        "USD-SOFR-1M",
+        d(2025, 1, 2),
+        1e-6,
+        finstack_quant_core::dates::DayCount::Act365F,
+    )
+    .unwrap();
 
     let ctx = MarketContext::new().insert(disc).insert(f3m).insert(f1m);
 
@@ -365,24 +435,60 @@ fn negative_rates() {
         .base_date(d(2025, 1, 2))
         .knots(vec![(0.0, 1.0), (1.0, 1.005), (2.0, 1.01)])
         .interp(InterpStyle::LogLinear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        )
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let f3m = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let f3m = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(d(2025, 1, 2))
-        .knots(vec![(0.0, 1e-6), (1.0, 2e-6), (2.0, 3e-6)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.999999867187509),
+            (0.25, 0.99999971875004),
+            (0.375, 0.999999554687599),
+            (0.5, 0.999999375000195),
+            (0.625, 0.999999179687836),
+            (0.75, 0.999998968750532),
+            (0.875, 0.999998742188291),
+            (1.0, 0.999998500001125),
+            (1.125, 0.999998242189045),
+            (1.25, 0.999997968752063),
+            (1.375, 0.999997679690192),
+            (1.5, 0.999997375003445),
+            (1.625, 0.999997054691837),
+            (1.75, 0.999996718755383),
+            (1.875, 0.999996367194099),
+            (2.0, 0.999996000008),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let f1m = ForwardCurve::builder("USD-SOFR-1M", 1.0 / 12.0)
+    let f1m = ForwardCurve::builder("USD-SOFR-1M")
         .base_date(d(2025, 1, 2))
-        .knots(vec![(0.0, 1e-6), (1.0, 2e-6), (2.0, 3e-6)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.999999867187509),
+            (0.25, 0.99999971875004),
+            (0.375, 0.999999554687599),
+            (0.5, 0.999999375000195),
+            (0.625, 0.999999179687836),
+            (0.75, 0.999998968750532),
+            (0.875, 0.999998742188291),
+            (1.0, 0.999998500001125),
+            (1.125, 0.999998242189045),
+            (1.25, 0.999997968752063),
+            (1.375, 0.999997679690192),
+            (1.5, 0.999997375003445),
+            (1.625, 0.999997054691837),
+            (1.75, 0.999996718755383),
+            (1.875, 0.999996367194099),
+            (2.0, 0.999996000008),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -513,18 +619,60 @@ fn steep_curve() {
         .base_date(d(2025, 1, 2))
         .knots(vec![(0.0, 1.0), (0.5, 0.95), (1.0, 0.85), (2.0, 0.70)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let f3m = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let f3m = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(d(2025, 1, 2))
-        .knots(vec![(0.0, 0.01), (0.5, 0.05), (1.0, 0.10), (2.0, 0.15)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.998126756714382),
+            (0.25, 0.995012479192682),
+            (0.375, 0.990668808304661),
+            (0.5, 0.985111939603063),
+            (0.625, 0.978209665521516),
+            (0.75, 0.969839194590702),
+            (0.875, 0.960039115536311),
+            (1.0, 0.948854321055801),
+            (1.125, 0.936701492882787),
+            (1.25, 0.923982173754537),
+            (1.375, 0.91072378725585),
+            (1.5, 0.896954628127771),
+            (1.625, 0.882703762036534),
+            (1.75, 0.868000923831803),
+            (1.875, 0.852876414789924),
+            (2.0, 0.837360999335754),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let f1m = ForwardCurve::builder("USD-SOFR-1M", 1.0 / 12.0)
+    let f1m = ForwardCurve::builder("USD-SOFR-1M")
         .base_date(d(2025, 1, 2))
-        .knots(vec![(0.0, 0.01), (0.5, 0.04), (1.0, 0.09), (2.0, 0.14)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.998282726204918),
+            (0.25, 0.995634556371046),
+            (0.375, 0.992062916318795),
+            (0.5, 0.987577800493881),
+            (0.625, 0.981884838409545),
+            (0.75, 0.974700533783853),
+            (0.875, 0.966058149897594),
+            (1.0, 0.9559974818331),
+            (1.125, 0.944933593864856),
+            (1.25, 0.933268348983563),
+            (1.375, 0.92102727833037),
+            (1.5, 0.908236928451824),
+            (1.625, 0.894924765620324),
+            (1.75, 0.881119077880176),
+            (1.875, 0.866848875306405),
+            (2.0, 0.852143788966211),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -556,18 +704,76 @@ fn seasoned_swap_requires_fixings() {
         .base_date(d(2025, 2, 15))
         .knots(vec![(0.0, 1.0), (0.5, 0.99), (1.0, 0.98), (5.0, 0.90)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let f3m = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let f3m = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(d(2025, 2, 15))
-        .knots(vec![(0.0, 0.02), (0.5, 0.021), (1.0, 0.022), (5.0, 0.025)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.997487536532938),
+            (0.25, 0.994950292856076),
+            (0.375, 0.992388490374784),
+            (0.5, 0.98980235222721),
+            (0.625, 0.98719210325196),
+            (0.75, 0.984557969955606),
+            (0.875, 0.981900180480004),
+            (1.0, 0.97921896456946),
+            (1.25, 0.973825219539481),
+            (1.5, 0.968415788843127),
+            (1.75, 0.962991265325316),
+            (2.0, 0.957552240640482),
+            (2.25, 0.95209930514862),
+            (2.5, 0.946633047812227),
+            (2.75, 0.941154056094142),
+            (3.0, 0.935662915856331),
+            (3.25, 0.930160211259623),
+            (3.5, 0.924646524664431),
+            (3.75, 0.91912243653247),
+            (4.0, 0.913588525329506),
+            (4.25, 0.90804536742914),
+            (4.5, 0.90249353701767),
+            (4.75, 0.896933606000028),
+            (5.0, 0.891366143906831),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let f1m = ForwardCurve::builder("USD-SOFR-1M", 1.0 / 12.0)
+    let f1m = ForwardCurve::builder("USD-SOFR-1M")
         .base_date(d(2025, 2, 15))
-        .knots(vec![(0.0, 0.019), (0.5, 0.020), (1.0, 0.021), (5.0, 0.024)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.9976122302682),
+            (0.25, 0.995199061524078),
+            (0.375, 0.992760705844714),
+            (0.5, 0.990297377149241),
+            (0.625, 0.987809291167626),
+            (0.75, 0.985296665409241),
+            (0.875, 0.982759719131244),
+            (1.0, 0.980198673306755),
+            (1.25, 0.975043262181957),
+            (1.5, 0.969869502539092),
+            (1.75, 0.964677975480559),
+            (2.0, 0.959469261503619),
+            (2.25, 0.954243940395089),
+            (2.5, 0.949002591126764),
+            (2.75, 0.943745791751597),
+            (3.0, 0.938474119300664),
+            (3.25, 0.933188149680935),
+            (3.5, 0.927888457573875),
+            (3.75, 0.922575616334903),
+            (4.0, 0.917250197893724),
+            (4.25, 0.911912772655572),
+            (4.5, 0.906563909403366),
+            (4.75, 0.901204175200823),
+            (5.0, 0.895834135296528),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -600,18 +806,60 @@ fn seasoned_swap_with_fixings_succeeds() {
         .base_date(d(2025, 1, 2))
         .knots(vec![(0.0, 1.0), (0.5, 0.99), (1.0, 0.98), (2.0, 0.96)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let f3m = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let f3m = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(d(2025, 1, 2))
-        .knots(vec![(0.0, 0.02), (0.5, 0.021), (1.0, 0.022), (2.0, 0.023)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.997487536532938),
+            (0.25, 0.994950292856076),
+            (0.375, 0.992388490374784),
+            (0.5, 0.98980235222721),
+            (0.625, 0.98719210325196),
+            (0.75, 0.984557969955606),
+            (0.875, 0.981900180480004),
+            (1.0, 0.97921896456946),
+            (1.125, 0.976522182587467),
+            (1.25, 0.973817611559672),
+            (1.375, 0.971105357458722),
+            (1.5, 0.96838552632258),
+            (1.625, 0.965658224247723),
+            (1.75, 0.962923557382358),
+            (1.875, 0.96018163191965),
+            (2.0, 0.957432554090967),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let f1m = ForwardCurve::builder("USD-SOFR-1M", 1.0 / 12.0)
+    let f1m = ForwardCurve::builder("USD-SOFR-1M")
         .base_date(d(2025, 1, 2))
-        .knots(vec![(0.0, 0.019), (0.5, 0.020), (1.0, 0.021), (2.0, 0.022)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.9976122302682),
+            (0.25, 0.995199061524078),
+            (0.375, 0.992760705844714),
+            (0.5, 0.990297377149241),
+            (0.625, 0.987809291167626),
+            (0.75, 0.985296665409241),
+            (0.875, 0.982759719131244),
+            (1.0, 0.980198673306755),
+            (1.125, 0.97762138823012),
+            (1.25, 0.975035644686228),
+            (1.375, 0.972441545744155),
+            (1.5, 0.969839194590702),
+            (1.625, 0.96722869452364),
+            (1.75, 0.964610148944963),
+            (1.875, 0.961983661354156),
+            (2.0, 0.959349335341472),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -619,12 +867,16 @@ fn seasoned_swap_with_fixings_succeeds() {
         "FIXING:USD-SOFR-3M",
         vec![(d(2024, 7, 2), 0.0195), (d(2024, 10, 2), 0.0198)],
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .expect("fixings series");
     let fix_1m = finstack_quant_core::market_data::scalars::ScalarTimeSeries::new(
         "FIXING:USD-SOFR-1M",
         vec![(d(2024, 7, 2), 0.0185), (d(2024, 10, 2), 0.0188)],
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .expect("fixings series");
 

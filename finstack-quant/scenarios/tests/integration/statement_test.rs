@@ -1,10 +1,11 @@
 //! Integration tests for statement shock functionality.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, build_periods};
+use finstack_quant_core::dates::{Date, DayCount, Tenor, build_periods};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::math::Compounding;
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_scenarios::{
     ExecutionContext, OperationSpec, RateBindingSpec, ScenarioEngine, ScenarioSpec, Warning,
 };
@@ -68,7 +69,6 @@ fn test_statement_forecast_percent() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     // Apply scenario
@@ -141,7 +141,6 @@ fn test_statement_forecast_assign() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     // Apply scenario
@@ -216,7 +215,6 @@ fn forecast_assignment_preserves_currency_and_actual_values() {
             }],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         };
         let mut ctx = ExecutionContext {
             market: &mut market,
@@ -257,18 +255,32 @@ fn invalid_rate_conversion_reports_failure_without_mutating_forecasts() {
         .periods;
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
 
-    // The negative case has a non-positive accumulation factor. The positive
-    // case has a valid quarterly factor but overflows the annual output rate.
-    for (simple_rate, compounding) in [
-        (-5.0, Compounding::Continuous),
-        (1e100, Compounding::Periodic(std::num::NonZeroU32::MIN)),
+    // The first curve has a valid quarterly growth factor that overflows the
+    // annual output rate. The second lacks the index tenor that defines the
+    // projected forward period.
+    let overflowing = ForwardCurve::builder("FWD")
+        .base_date(as_of)
+        .day_count(DayCount::Act365F)
+        .index_tenor(Tenor::quarterly())
+        .knots([
+            (0.0, 1.0),
+            (1.0, 300.0_f64.exp()),
+            (2.0, (-500.0_f64).exp()),
+        ])
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
+        .build()
+        .expect("finite forward curve");
+    let untenored =
+        ForwardCurve::flat("FWD", as_of, 0.04, DayCount::Act365F).expect("flat forward curve");
+    for (forward, compounding, reason_fragment) in [
+        (
+            overflowing,
+            Compounding::Periodic(std::num::NonZeroU32::MIN),
+            "overflowed",
+        ),
+        (untenored, Compounding::Continuous, "index_tenor"),
     ] {
-        let forward = ForwardCurve::builder("FWD", 0.25)
-            .base_date(as_of)
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, simple_rate), (2.0, simple_rate)])
-            .build()
-            .expect("finite forward curve");
         let mut market = MarketContext::new().insert(forward);
         let initial_values = IndexMap::from([
             (periods[0].id, AmountOrScalar::Scalar(0.02)),
@@ -300,7 +312,6 @@ fn invalid_rate_conversion_reports_failure_without_mutating_forecasts() {
             }],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         };
         let mut ctx = ExecutionContext {
             market: &mut market,
@@ -314,11 +325,15 @@ fn invalid_rate_conversion_reports_failure_without_mutating_forecasts() {
             .apply(&scenario, &mut ctx)
             .expect("binding failure is reported as a warning");
         assert_eq!(report.operations_applied, 0);
-        assert!(matches!(
-            report.warnings.as_slice(),
-            [Warning::RateBindingFailed { node_id, curve_id, .. }]
-                if node_id == "Rate" && curve_id == "FWD"
-        ));
+        assert!(
+            matches!(
+                report.warnings.as_slice(),
+                [Warning::RateBindingFailed { node_id, curve_id, reason }]
+                    if node_id == "Rate" && curve_id == "FWD" && reason.contains(reason_fragment)
+            ),
+            "{:?}",
+            report.warnings
+        );
         assert_eq!(
             model.get_node("Rate").expect("rate node").values.as_ref(),
             Some(&initial_values)
@@ -345,12 +360,8 @@ fn rate_binding_rejects_monetary_nodes_without_mutating_values() {
     ]);
 
     for validated in [false, true] {
-        let forward = ForwardCurve::builder("FWD", 0.25)
-            .base_date(as_of)
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, 0.04), (2.0, 0.04)])
-            .build()
-            .expect("forward curve");
+        let forward =
+            ForwardCurve::flat("FWD", as_of, 0.04, DayCount::Act365F).expect("forward curve");
         let mut market = MarketContext::new().insert(forward);
         let mut model = FinancialModelSpec::new(
             "expenses",

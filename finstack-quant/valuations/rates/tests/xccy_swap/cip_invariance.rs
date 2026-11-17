@@ -47,18 +47,19 @@ fn build_discount(id: &str, base: Date, zero: f64) -> DiscountCurve {
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (t, df_end)])
         .interp(InterpStyle::Linear)
-        .extrapolation(ExtrapolationPolicy::FlatZero)
+        .extrapolation(ExtrapolationPolicy::Flat)
         .build()
         .expect("build discount curve")
 }
 
 fn build_forward(id: &str, base: Date, zero: f64) -> ForwardCurve {
-    ForwardCurve::builder(CurveId::new(id), 0.25)
-        .base_date(base)
-        .knots(vec![(0.0, zero), (TENOR_YEARS, zero)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .expect("build forward curve")
+    ForwardCurve::flat(
+        CurveId::new(id),
+        base,
+        zero,
+        finstack_quant_core::dates::DayCount::Act365F,
+    )
+    .expect("build forward curve")
 }
 
 /// Build an FxMatrix with EUR/USD spot = SPOT_USD_PER_EUR (1.10).
@@ -163,7 +164,7 @@ fn cip_invariance_holds_when_as_of_after_curve_base_date() {
             (TENOR_YEARS + 0.25, (-USD_ZERO * (TENOR_YEARS + 0.25)).exp()),
         ])
         .interp(InterpStyle::Linear)
-        .extrapolation(ExtrapolationPolicy::FlatZero)
+        .extrapolation(ExtrapolationPolicy::Flat)
         .build()
         .expect("USD disc");
     let eur_disc = DiscountCurve::builder(CurveId::new("EUR-OIS"))
@@ -174,7 +175,7 @@ fn cip_invariance_holds_when_as_of_after_curve_base_date() {
             (TENOR_YEARS + 0.25, (-EUR_ZERO * (TENOR_YEARS + 0.25)).exp()),
         ])
         .interp(InterpStyle::Linear)
-        .extrapolation(ExtrapolationPolicy::FlatZero)
+        .extrapolation(ExtrapolationPolicy::Flat)
         .build()
         .expect("EUR disc");
     let usd_fwd = build_forward("USD-SOFR-3M", curve_base, USD_ZERO);
@@ -338,18 +339,32 @@ fn mtm_reset_cashflow_schedule_npv_matches_base_value() {
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     let ctx = build_market_context()
         .insert_series(
-            ScalarTimeSeries::new("FIXING:EUR-EURIBOR-3M", vec![(base_date(), EUR_ZERO)], None)
-                .expect("EUR fixing"),
+            ScalarTimeSeries::new(
+                "FIXING:EUR-EURIBOR-3M",
+                vec![(base_date(), EUR_ZERO)],
+                None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .expect("EUR fixing"),
         )
         .insert_series(
-            ScalarTimeSeries::new("FIXING:USD-SOFR-3M", vec![(base_date(), USD_ZERO)], None)
-                .expect("USD fixing"),
+            ScalarTimeSeries::new(
+                "FIXING:USD-SOFR-3M",
+                vec![(base_date(), USD_ZERO)],
+                None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .expect("USD fixing"),
         )
         .insert_series(
             ScalarTimeSeries::new(
                 "FIXING:FX-EUR-USD",
                 vec![(base_date(), SPOT_USD_PER_EUR)],
                 None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
             )
             .expect("FX fixing"),
         );
@@ -438,18 +453,32 @@ fn seasoned_mtm_schedule_uses_resetting_leg_fixing() {
     let reset_date = base_date();
     let context = build_market_context()
         .insert_series(
-            ScalarTimeSeries::new("FIXING:EUR-EURIBOR-3M", vec![(reset_date, 0.08)], None)
-                .expect("EUR fixing"),
+            ScalarTimeSeries::new(
+                "FIXING:EUR-EURIBOR-3M",
+                vec![(reset_date, 0.08)],
+                None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .expect("EUR fixing"),
         )
         .insert_series(
-            ScalarTimeSeries::new("FIXING:USD-SOFR-3M", vec![(reset_date, 0.02)], None)
-                .expect("USD fixing"),
+            ScalarTimeSeries::new(
+                "FIXING:USD-SOFR-3M",
+                vec![(reset_date, 0.02)],
+                None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .expect("USD fixing"),
         )
         .insert_series(
             ScalarTimeSeries::new(
                 "FIXING:FX-EUR-USD",
                 vec![(reset_date, SPOT_USD_PER_EUR)],
                 None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
             )
             .expect("FX reset fixing"),
         );
@@ -494,14 +523,22 @@ fn seasoned_mtm_schedule_requires_constant_leg_fixing() {
     let reset_date = base_date();
     let context = build_market_context()
         .insert_series(
-            ScalarTimeSeries::new("FIXING:EUR-EURIBOR-3M", vec![(reset_date, 0.08)], None)
-                .expect("EUR fixing"),
+            ScalarTimeSeries::new(
+                "FIXING:EUR-EURIBOR-3M",
+                vec![(reset_date, 0.08)],
+                None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .expect("EUR fixing"),
         )
         .insert_series(
             ScalarTimeSeries::new(
                 "FIXING:FX-EUR-USD",
                 vec![(reset_date, SPOT_USD_PER_EUR)],
                 None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
             )
             .expect("FX reset fixing"),
         );
@@ -548,6 +585,19 @@ fn mtm_constant_leg_spread_changes_pv_and_schedule_rate() {
         "positive spread on the received constant leg must increase PV"
     );
 
+    let zero_schedule = zero_spread
+        .cashflow_schedule(&context, as_of)
+        .expect("MtM zero-spread schedule");
+    let base_rate = zero_schedule
+        .get_flows()
+        .iter()
+        .find(|flow| {
+            flow.get_kind() == finstack_quant_core::cashflow::CFKind::Floating
+                && flow.get_amount().currency() == Currency::EUR
+        })
+        .expect("EUR base coupon")
+        .get_rate()
+        .expect("zero coupon rate");
     let schedule = positive_spread
         .cashflow_schedule(&context, as_of)
         .expect("MtM schedule");
@@ -560,7 +610,7 @@ fn mtm_constant_leg_spread_changes_pv_and_schedule_rate() {
         })
         .expect("EUR constant coupon");
     assert!(
-        (constant_coupon.get_rate().expect("coupon rate") - (EUR_ZERO + 0.0025)).abs() < 1e-12,
+        (constant_coupon.get_rate().expect("coupon rate") - (base_rate + 0.0025)).abs() < 1e-12,
         "constant-leg all-in rate must include its contractual spread"
     );
 }

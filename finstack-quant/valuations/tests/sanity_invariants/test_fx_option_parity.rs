@@ -11,7 +11,9 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
@@ -79,6 +81,8 @@ fn create_market(as_of: Date) -> MarketContext {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, (-R_D).exp())])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("domestic curve should build");
 
@@ -86,6 +90,8 @@ fn create_market(as_of: Date) -> MarketContext {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, (-R_F).exp())])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("foreign curve should build");
 
@@ -93,8 +99,11 @@ fn create_market(as_of: Date) -> MarketContext {
     let strikes = [0.9, 1.0, 1.1, 1.2, 1.3];
 
     let vol_surface = VolSurface::builder("EURUSD-VOL")
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&expiries)
-        .strikes(&strikes)
+        .secondary_values(&strikes)
         .row(&[VOL, VOL, VOL, VOL, VOL])
         .row(&[VOL, VOL, VOL, VOL, VOL])
         .row(&[VOL, VOL, VOL, VOL, VOL])

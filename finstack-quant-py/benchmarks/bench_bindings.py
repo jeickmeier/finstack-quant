@@ -599,30 +599,36 @@ class TestCoreBenchmarks:
         )
 
     def test_forward_curve_rate(self, benchmark) -> None:
+        zero_rates = [(1.0, 0.05), (5.0, 0.055), (10.0, 0.06)]
         curve = ForwardCurve(
             "USD-SOFR-3M",
-            0.25,
             date(2024, 1, 1),
-            [(0.0, 0.05), (1.0, 0.052), (5.0, 0.055), (10.0, 0.06)],
-            interp="linear",
+            [(t, math.exp(-r * t)) for t, r in zero_rates],
+            interp="log_linear",
+            extrapolation="extend",
+            day_count="act_360",
+            index_tenor="3M",
         )
-        assert curve.interp_style == "linear"
+        assert curve.interp_style == "log_linear"
+        # Log-linear on [1, 5]: ln P falls by (0.275 - 0.05) / 4 per year.
+        expected = math.expm1(0.25 * (0.275 - 0.05) / 4.0) / 0.25
         _ccm_bench(
             benchmark,
-            lambda: curve.rate(2.5),
-            _ccm._scalar(0.052 + (2.5 - 1.0) / (5.0 - 1.0) * (0.055 - 0.052)),
+            lambda: curve.rate_between(2.5, 2.75, 0.25),
+            _ccm._scalar(expected),
             parameters={
                 "id": "USD-SOFR-3M",
                 "base_date": "2024-01-01",
-                "tenor_years": 0.25,
-                "knots": [(0.0, 0.05), (1.0, 0.052), (5.0, 0.055), (10.0, 0.06)],
-                "interp": "linear",
+                "zero_rates": zero_rates,
+                "interp": "log_linear",
                 "day_count": curve.day_count,
-                "reset_lag": curve.reset_lag,
-                "time_years": 2.5,
+                "index_tenor": "3M",
+                "t1": 2.5,
+                "t2": 2.75,
+                "accrual_year_fraction": 0.25,
                 "rate_units": "decimal",
             },
-            boundary="Forward-curve construction is outside timing; one numeric-time rate lookup and result conversion are timed.",
+            boundary="Forward-curve construction is outside timing; one numeric-time rate_between lookup and result conversion are timed.",
         )
 
     def test_fx_matrix_rate(self, benchmark) -> None:

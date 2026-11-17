@@ -15,9 +15,12 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationLag, MarketScalar, ScalarTimeSeries, SeriesInterpolation,
+    InflationExpectedRelease, InflationIndex, InflationLag, InflationObservation, MarketScalar,
+    ScalarTimeSeries, SeriesInterpolation,
 };
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::{
     BaseCorrelationCurve, CreditIndexData, DiscountCurve, ForwardCurve, HazardCurve, InflationCurve,
 };
@@ -160,20 +163,26 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
             (10.0, 0.60 - rate_shift),
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let usd_fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(base)
-        .knots([
+    let usd_fwd = ForwardCurve::from_zero_rates(
+        "USD-SOFR-3M",
+        base,
+        &[
             (0.0, 0.04 + rate_shift),
             (1.0, 0.042 + rate_shift),
             (5.0, 0.045 + rate_shift),
             (10.0, 0.05 + rate_shift),
-        ])
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap();
+        ],
+        finstack_quant_core::math::Compounding::Continuous,
+        finstack_quant_core::dates::DayCount::Act360,
+        InterpStyle::LogLinear,
+        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+    )
+    .unwrap();
 
     let eur_disc = DiscountCurve::builder("EUR-OIS")
         .base_date(base)
@@ -184,6 +193,8 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
             (10.0, 0.65 - rate_shift),
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -196,6 +207,8 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
             (10.0, 0.59 - rate_shift),
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -208,6 +221,8 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
             (10.0, 0.90 - rate_shift),
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -215,8 +230,8 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
     let hazard = HazardCurve::builder("CORP-HAZARD")
         .base_date(base)
         .knots(hazard_knots)
-        .par_spreads([(1.0, 100.0), (5.0, 200.0), (10.0, 250.0)])
         .recovery_rate(0.40)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
 
@@ -233,8 +248,8 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
     let hazard_for_index = HazardCurve::builder("CORP-HAZARD")
         .base_date(base)
         .knots(hazard_knots)
-        .par_spreads([(1.0, 100.0), (5.0, 200.0), (10.0, 250.0)])
         .recovery_rate(0.40)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
     let base_corr_for_index = BaseCorrelationCurve::builder("CDX-CORR")
@@ -251,7 +266,8 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
 
     let inflation = InflationCurve::builder("USD-CPI")
         .base_date(base)
-        .base_cpi(100.0)
+        .day_count(DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .knots([(0.0, 100.0), (1.0, 102.0), (5.0, 110.0), (10.0, 122.0)])
         .interp(InterpStyle::Linear)
         .build()
@@ -261,25 +277,51 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
     let cpi_history = InflationIndex::new(
         "USD-CPI",
         (-3..=0)
-            .map(|months| (base.add_months(months).expect("valid date shift"), 100.0))
+            .map(|months| InflationObservation {
+                reference_month: base
+                    .replace_day(1)
+                    .unwrap()
+                    .add_months(months)
+                    .expect("valid date shift"),
+                value: 100.0,
+                available_on: base,
+            })
             .collect(),
         Currency::USD,
+        base,
     )
     .unwrap()
-    .with_lag(InflationLag::None)
-    .with_interpolation(SeriesInterpolation::Linear);
+    .with_expected_releases(
+        (1..=360)
+            .map(|months| {
+                let reference_month = base.replace_day(1).unwrap().add_months(months).unwrap();
+                InflationExpectedRelease {
+                    reference_month,
+                    expected_release: reference_month,
+                    known_on: base,
+                }
+            })
+            .collect(),
+    )
+    .unwrap();
 
     let base_corr = BaseCorrelationCurve::builder("CDX-CORR")
         .knots(corr_knots)
         .build()
         .unwrap();
 
+    let vol_opts = VolGridOpts {
+        secondary_axis: VolSurfaceAxis::Strike,
+        quote_type: VolQuoteType::BlackLognormal,
+        interpolation_mode: VolInterpolationMode::Vol,
+    };
+
     let equity_vol = VolSurface::from_grid(
         "EQUITY-VOL",
         &[0.25, 0.5, 1.0, 2.0],
         &[100.0, 120.0, 140.0, 160.0, 180.0],
         &[0.25; 20],
-        Default::default(),
+        vol_opts.clone(),
         None,
     )
     .unwrap();
@@ -289,7 +331,7 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         &[0.25, 0.5, 1.0, 2.0, 5.0],
         &[0.02, 0.03, 0.04, 0.05, 0.06],
         &[0.20; 25],
-        Default::default(),
+        vol_opts.clone(),
         None,
     )
     .unwrap();
@@ -299,7 +341,7 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         &[0.25, 0.5, 1.0, 2.0],
         &[1.05, 1.10, 1.15, 1.20, 1.25],
         &[0.10; 20],
-        Default::default(),
+        vol_opts.clone(),
         None,
     )
     .unwrap();
@@ -312,7 +354,7 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         &[0.25, 1.0, 2.0, 5.0, 10.0],
         &[0.5, 1.0, 1.5],
         &[0.02; 15],
-        Default::default(),
+        vol_opts.clone(),
         None,
     )
     .unwrap();
@@ -322,7 +364,7 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         &[0.25, 0.5, 1.0, 2.0],
         &[0.005, 0.01, 0.015, 0.02, 0.03],
         &[0.30; 20],
-        Default::default(),
+        vol_opts,
         None,
     )
     .unwrap();
@@ -348,10 +390,18 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
             })
             .collect(),
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .unwrap();
-    let sofr_fixings =
-        ScalarTimeSeries::new("FIXING:USD-SOFR-3M", vec![(base, 0.04 + rate_shift)], None).unwrap();
+    let sofr_fixings = ScalarTimeSeries::new(
+        "FIXING:USD-SOFR-3M",
+        vec![(base, 0.04 + rate_shift)],
+        None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+    )
+    .unwrap();
 
     let usd_alias = DiscountCurve::builder("USD")
         .base_date(base)
@@ -362,6 +412,8 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
             (10.0, 0.60 - rate_shift),
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -374,6 +426,8 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
             (10.0, 0.65 - rate_shift),
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -386,6 +440,8 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
             (10.0, 0.59 - rate_shift),
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -398,6 +454,8 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
             (10.0, 0.90 - rate_shift),
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -423,30 +481,45 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         .insert_fx(fx)
         .insert_series(aapl_history)
         .insert_series(sofr_fixings)
-        .insert_price("EQUITY-SPOT", MarketScalar::Unitless(150.0))
-        .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(0.02))
+        .insert_price(
+            "EQUITY-SPOT",
+            MarketScalar::unitless(150.0).expect("valid scalar"),
+        )
+        .insert_price(
+            "EQUITY-DIVYIELD",
+            MarketScalar::unitless(0.02).expect("valid scalar"),
+        )
         .insert_price(
             "AAPL",
-            MarketScalar::Price(Money::new(150.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(150.0, Currency::USD).expect("valid money fixture")),
         )
-        .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
-        .insert_price("AAPL_IMPL_VOL", MarketScalar::Unitless(0.25))
-        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02))
+        .insert_price(
+            "AAPL-VOL",
+            MarketScalar::unitless(0.25).expect("valid scalar"),
+        )
+        .insert_price(
+            "AAPL_IMPL_VOL",
+            MarketScalar::unitless(0.25).expect("valid scalar"),
+        )
+        .insert_price(
+            "AAPL-DIVYIELD",
+            MarketScalar::unitless(0.02).expect("valid scalar"),
+        )
         .insert_price(
             "BOND_0_PRICE",
-            MarketScalar::Price(
+            MarketScalar::price(
                 Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             ),
         )
         .insert_price(
             "BOND_1_PRICE",
-            MarketScalar::Price(
+            MarketScalar::price(
                 Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             ),
         )
         .insert_price(
             "BOND_2_PRICE",
-            MarketScalar::Price(
+            MarketScalar::price(
                 Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
             ),
         )
@@ -1023,7 +1096,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             .base_cpi(100.0)
             .base_date(base)
             .indexation_method(IndexationMethod::Tips)
-            .lag(finstack_quant_core::market_data::scalars::InflationLag::Months(3))
+            .lag(finstack_quant_core::market_data::scalars::InflationLag::months(3))
             .deflation_protection(DeflationProtection::MaturityOnly)
             .business_day_convention(BusinessDayConvention::Following)
             .stub(StubKind::None)
@@ -1057,7 +1130,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             .maturity(maturity_5y())
             .fixed_rate(rust_decimal::Decimal::try_from(0.02).expect("valid literal"))
             .inflation_index_id("USD-CPI".into())
-            .lag(InflationLag::Months(3))
+            .lag(InflationLag::months(3))
             .interpolation(SeriesInterpolation::Step)
             .discount_curve_id("USD-OIS".into())
             .day_count(DayCount::Act365F)

@@ -17,20 +17,24 @@ fn count_pmf(probabilities: &[f64]) -> Vec<f64> {
 fn assert_moments(probabilities: &[f64], pmf: &[f64]) {
     assert_eq!(pmf.len(), probabilities.len() + 1);
     assert!(pmf.iter().all(|p| p.is_finite() && *p >= 0.0));
-    assert!((neumaier_sum(pmf.iter().copied()) - 1.0).abs() <= 1e-10);
+    assert!((neumaier_sum(pmf.iter().copied()).expect("finite pmf") - 1.0).abs() <= 1e-10);
     if probabilities.is_empty() {
         assert_eq!(pmf, [1.0]);
         return;
     }
     let n = probabilities.len() as f64;
-    let mean = neumaier_sum(probabilities.iter().copied()) / n;
-    let variance = neumaier_sum(probabilities.iter().map(|p| p * (1.0 - p))) / (n * n);
-    let actual_mean = neumaier_sum(pmf.iter().enumerate().map(|(k, p)| p * k as f64 / n));
+    let mean = neumaier_sum(probabilities.iter().copied()).expect("finite probabilities") / n;
+    let variance = neumaier_sum(probabilities.iter().map(|p| p * (1.0 - p)))
+        .expect("finite variances")
+        / (n * n);
+    let actual_mean = neumaier_sum(pmf.iter().enumerate().map(|(k, p)| p * k as f64 / n))
+        .expect("finite pmf mean");
     let actual_variance = neumaier_sum(
         pmf.iter()
             .enumerate()
             .map(|(k, p)| p * (k as f64 / n - mean).powi(2)),
-    );
+    )
+    .expect("finite pmf variance");
     assert!((actual_mean - mean).abs() <= 1e-10);
     assert!((actual_variance - variance).abs() <= 1e-10);
 }
@@ -136,7 +140,8 @@ fn default_count_matches_two_independent_binomial_cohorts() {
         let expected = neumaier_sum((0..=60).filter_map(|a| {
             let b = k.checked_sub(a)?;
             (b <= 65).then(|| cohort_mass(60, a, 0.03) * cohort_mass(65, b, 0.72))
-        }));
+        }))
+        .expect("finite subset sum");
         assert!((actual - expected).abs() < 1e-12);
     }
 }
@@ -168,14 +173,18 @@ fn count_caps_match_contractual_subsets_at_kinks_and_recovery_endpoints() {
                         }
                     }
                     mass * amount.min(cap)
-                }));
-                let actual = count_capped_expectation(&pmf, weight, exposure, cap);
+                }))
+                .expect("finite subset expectation");
+                let actual = count_capped_expectation(&pmf, weight, exposure, cap)
+                    .expect("finite capped expectation");
                 assert!((actual - expected).abs() < 1e-13);
             }
         }
     }
-    let expected = weight * 0.6 * neumaier_sum(probabilities.iter().copied());
-    let actual = count_capped_expectation(&pmf, weight, 0.6, 2.0);
+    let expected =
+        weight * 0.6 * neumaier_sum(probabilities.iter().copied()).expect("finite probs");
+    let actual =
+        count_capped_expectation(&pmf, weight, 0.6, 2.0).expect("finite capped expectation");
     assert!((actual - expected).abs() < 1e-14);
     assert!((actual - expected * (0.1 / weight)).abs() > 1e-11);
 }
@@ -214,6 +223,7 @@ fn index(pds: &[f64], weights: &[f64], recoveries: &[f64]) -> Result<CreditIndex
                 .base_date(date!(2025 - 01 - 01))
                 .recovery_rate(0.4)
                 .knots([(1.0, -(-pd).ln_1p())])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()?;
             Ok((format!("NAME-{i:05}"), Arc::new(curve)))
         })
@@ -277,7 +287,7 @@ fn count_pricing_preserves_explicit_common_weight_and_zero_weight_exclusion() {
 fn count_route_leaves_true_sub_tolerance_pd_dispersion_homogeneous() {
     let data = index(&[0.1, 0.1 + 5e-10], &[0.5; 2], &[0.4; 2]).expect("pool");
     let pricer = CdsTranchePricer::new();
-    let probability = 1.0 - data.index_credit_curve().sp(1.0);
+    let probability = 1.0 - data.index_credit_curve().sp(1.0).expect("sp");
     for exposure in [PoolExposure::Loss, PoolExposure::Recovery] {
         let expected = pricer
             .homogeneous_capped_expectation(1.0, 2, probability, 0.4, 0.25, exposure)

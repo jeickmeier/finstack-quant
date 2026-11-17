@@ -64,7 +64,7 @@ class PriceCurve:
             An explicit spot is inserted at zero if that knot is absent and
             must match any supplied zero-time knot.
         extrapolation : str, optional
-            Extrapolation policy; default ``"flat_zero"``.
+            Extrapolation policy; default ``"flat"``.
         interp : str, optional
             Interpolation style; default ``"linear"``.
         day_count : DayCount | str, optional
@@ -307,7 +307,7 @@ class PriceCurve:
         Returns
         -------
         str
-            Policy label such as ``"flat_zero"`` or ``"flat_forward"``, governing queries outside the knot range.
+            Policy label such as ``"flat"`` or ``"extend"``, governing queries outside the knot range.
 
         Notes
         -----

@@ -107,14 +107,22 @@ pub fn create_market_context_with_params(spot: f64, vol: f64, div_yield: f64) ->
         .base_date(base_date)
         .knots([(0.0, 1.0), (1.0, 0.9741), (10.0, 0.741)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     MarketContext::new()
         .insert(discount_curve)
-        .insert_price("AAPL", MarketScalar::Unitless(spot))
-        .insert_price("AAPL-VOL", MarketScalar::Unitless(vol))
-        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(div_yield))
+        .insert_price("AAPL", MarketScalar::unitless(spot).expect("valid scalar"))
+        .insert_price(
+            "AAPL-VOL",
+            MarketScalar::unitless(vol).expect("valid scalar"),
+        )
+        .insert_price(
+            "AAPL-DIVYIELD",
+            MarketScalar::unitless(div_yield).expect("valid scalar"),
+        )
 }
 
 /// Create market context with specific risk-free rate
@@ -126,19 +134,24 @@ pub fn create_market_context_with_rate(rate: f64) -> MarketContext {
         .base_date(base_date)
         .knots([(0.0, 1.0), (1.0, (-rate).exp()), (10.0, df_10y)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     MarketContext::new()
         .insert(discount_curve)
-        .insert_price("AAPL", MarketScalar::Unitless(market_params::SPOT_PRICE))
+        .insert_price(
+            "AAPL",
+            MarketScalar::unitless(market_params::SPOT_PRICE).expect("valid scalar"),
+        )
         .insert_price(
             "AAPL-VOL",
-            MarketScalar::Unitless(market_params::VOL_STANDARD),
+            MarketScalar::unitless(market_params::VOL_STANDARD).expect("valid scalar"),
         )
         .insert_price(
             "AAPL-DIVYIELD",
-            MarketScalar::Unitless(market_params::DIV_YIELD),
+            MarketScalar::unitless(market_params::DIV_YIELD).expect("valid scalar"),
         )
 }
 
@@ -496,29 +509,40 @@ pub fn create_market_context_with_credit(credit_spread_bp: f64) -> MarketContext
         .base_date(base_date)
         // The mid pillar lies on the linear-DF segment, so the curve is
         // unchanged; three pillars let the market roll one day for theta.
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots([
             (0.0, 1.0),
             (5.0, 0.5 * (1.0 + (-rf_rate * 10.0).exp())),
             (10.0, (-rf_rate * 10.0).exp()),
         ])
         .interp(InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let credit_curve =
-        HazardCurve::flat("USD-CREDIT", base_date, credit_spread_bp / 10_000.0, 0.0).unwrap();
+    let credit_curve = HazardCurve::flat(
+        "USD-CREDIT",
+        base_date,
+        credit_spread_bp / 10_000.0,
+        0.0,
+        finstack_quant_core::dates::DayCount::Act365F,
+    )
+    .unwrap();
 
     MarketContext::new()
         .insert(rf_curve)
         .insert(credit_curve)
-        .insert_price("AAPL", MarketScalar::Unitless(market_params::SPOT_PRICE))
+        .insert_price(
+            "AAPL",
+            MarketScalar::unitless(market_params::SPOT_PRICE).expect("valid scalar"),
+        )
         .insert_price(
             "AAPL-VOL",
-            MarketScalar::Unitless(market_params::VOL_STANDARD),
+            MarketScalar::unitless(market_params::VOL_STANDARD).expect("valid scalar"),
         )
         .insert_price(
             "AAPL-DIVYIELD",
-            MarketScalar::Unitless(market_params::DIV_YIELD),
+            MarketScalar::unitless(market_params::DIV_YIELD).expect("valid scalar"),
         )
 }
 

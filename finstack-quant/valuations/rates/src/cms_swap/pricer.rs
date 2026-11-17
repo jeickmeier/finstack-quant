@@ -392,8 +392,9 @@ pub(super) fn cms_coupon_rate(
     if fixing_date < as_of {
         let observed = crate::cms_common::historical_cms_fixing(
             market,
+            inst.cms_fixing_index_id.as_ref(),
             &inst.forward_curve_id,
-            inst.cms_tenor.to_years_approx(),
+            inst.index_id.as_ref(),
             fixing_date,
         )?;
         return apply_cms_cap_floor(
@@ -627,6 +628,7 @@ mod tests {
             notional: Money::from((100_000_000_i64, Currency::USD)),
             day_count: DayCount::Act360,
             index_id: IndexId::new("USD-SOFR-OIS"),
+            cms_fixing_index_id: None,
             side: PayReceive::Pay,
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-FUND".into(),
@@ -644,11 +646,23 @@ mod tests {
             .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
             .insert(
                 finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
-                    "USD-FUND", 0.25,
+                    "USD-FUND",
                 )
                 .base_date(as_of)
                 .day_count(DayCount::Act365F)
-                .knots([(0.0, 0.06), (0.25, 0.08), (1.0, 0.12)])
+                .knots([
+                    (0.0, 1.0),
+                    (0.125, 0.991907918597632),
+                    (0.25, 0.982652235665073),
+                    (0.375, 0.972469402541589),
+                    (0.5, 0.961590430718416),
+                    (0.625, 0.950041130558528),
+                    (0.75, 0.937848678391265),
+                    (0.875, 0.925041510124189),
+                    (1.0, 0.911649210964462),
+                ])
+                .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("sloped forward curve"),
             );
@@ -699,6 +713,7 @@ mod tests {
             notional: Money::from((100_000_000_i64, Currency::USD)),
             day_count: DayCount::Act360,
             index_id: IndexId::new("USD-SOFR-OIS"),
+            cms_fixing_index_id: None,
             side: PayReceive::Pay,
             discount_curve_id: "USD-OIS".into(),
             forward_curve_id: "USD-FUND".into(),
@@ -814,13 +829,18 @@ mod tests {
 
     /// Build a market with a flat vol surface for the embedded-option tests.
     fn cms_market_with_vol(as_of: Date, vol: f64) -> MarketContext {
-        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::market_data::surfaces::{
+            VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+        };
 
         let strikes = vec![0.005, 0.02, 0.03, 0.04, 0.06, 0.10];
         let expiries = vec![0.25, 1.0, 5.0, 10.0];
         let mut builder = VolSurface::builder(CurveId::new("USD-CMS10Y-VOL"))
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&expiries)
-            .strikes(&strikes);
+            .secondary_values(&strikes);
         for _ in 0..expiries.len() {
             builder = builder.row(&vec![vol; strikes.len()]);
         }
@@ -833,13 +853,18 @@ mod tests {
     /// Black quotes do not define a normal-volatility model at negative rates.
     #[test]
     fn embedded_black_option_rejects_negative_rates() {
-        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::market_data::surfaces::{
+            VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+        };
 
         let strikes = vec![0.005, 0.02, 0.04, 0.10];
         let expiries = vec![0.25, 1.0, 5.0];
         let mut builder = VolSurface::builder(CurveId::new("V"))
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&expiries)
-            .strikes(&strikes);
+            .secondary_values(&strikes);
         for _ in 0..expiries.len() {
             builder = builder.row(&vec![0.4; strikes.len()]);
         }
@@ -993,6 +1018,7 @@ mod tests {
             .accrual_fractions(vec![0.25])
             .day_count(DayCount::Act365F)
             .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
+            .cms_fixing_index_id_opt(Some(IndexId::new("USD-CMS-10Y")))
             .funding_leg(FundingLeg::Fixed {
                 rate: Decimal::ZERO,
                 periods: vec![funding_period(fixing, pay, 0.25)],
@@ -1010,8 +1036,10 @@ mod tests {
     /// hard error, never a silent fallback to live-curve projection.
     #[test]
     fn seasoned_cms_coupon_uses_recorded_fixing() {
-        use finstack_quant_core::market_data::fixings::cms_fixing_series_id;
-        use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+        use finstack_quant_core::market_data::fixings::fixing_series_id;
+        use finstack_quant_core::market_data::scalars::{
+            ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+        };
 
         let fixing = date(2024, 12, 1);
         let as_of = date(2025, 1, 1);
@@ -1024,7 +1052,7 @@ mod tests {
             .pv_cms_leg(&swap, &market, as_of, 1.0)
             .expect_err("missing CMS fixing series must be a hard error");
         assert!(
-            err.to_string().contains("FIXING:CMS-10Y:USD-LIBOR-3M"),
+            err.to_string().contains("FIXING:USD-CMS-10Y"),
             "error must name the missing series: {err}"
         );
 
@@ -1032,9 +1060,11 @@ mod tests {
         // coupon off the observed rate.
         let observed = 0.0412;
         let series = ScalarTimeSeries::new(
-            cms_fixing_series_id("USD-LIBOR-3M", 10.0),
+            fixing_series_id("USD-CMS-10Y"),
             vec![(fixing, observed)],
             None,
+            SeriesInterpolation::Step,
+            SeriesExtrapolation::Error,
         )
         .expect("fixing series");
         let market = market.insert_series(series);
@@ -1124,17 +1154,18 @@ mod tests {
              unfloored={pv_unfloored}"
         );
         // The gap must exceed pure intrinsic — time value must be present.
-        // Intrinsic ≈ (floor - forward) * accrual * N * df.
-        // We conservatively require the gap > 0.5 * intrinsic_approx to ensure
-        // the embedded floorlet option value (not just clamp) is being captured.
-        // On 1M notional with 25% vol and 1Y to fixing this should be ~100+ USD.
-        let intrinsic_approx = (0.04_f64 - 0.03_f64) * 0.25 * 1_000_000.0 * 0.97; // rough df
+        // Compute intrinsic against the actual discount factor and unfloored PV.
+        let df = market
+            .get_discount("USD-OIS")
+            .expect("disc")
+            .df_between_dates(as_of, date(2026, 4, 1))
+            .expect("df");
+        let intrinsic_gap = (0.04_f64 * 0.25 * 1_000_000.0 * df - pv_unfloored).max(0.0);
         let gap = pv_floored - pv_unfloored;
         assert!(
-            gap > intrinsic_approx,
+            gap > intrinsic_gap + 50.0,
             "floored-vs-unfloored gap ({gap:.2}) must exceed pure intrinsic \
-             ({intrinsic_approx:.2}); time value must be present (embedded \
-             floorlet, not clamp)"
+             ({intrinsic_gap:.2}) by time value (embedded floorlet, not clamp)"
         );
     }
 
@@ -1159,6 +1190,7 @@ mod tests {
             .accrual_fractions(vec![0.25])
             .day_count(DayCount::Act365F)
             .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
+            .cms_fixing_index_id_opt(Some(IndexId::new("USD-CMS-10Y")))
             .funding_leg(FundingLeg::Fixed {
                 rate: Decimal::ZERO,
                 periods: vec![funding_period(fixing, payment, 0.25)],
@@ -1256,15 +1288,19 @@ mod tests {
     /// recorded fixing (no convexity on a known rate).
     #[test]
     fn replication_matches_hagan_exactly_for_seasoned_fixing() {
-        use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+        use finstack_quant_core::market_data::scalars::{
+            ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+        };
 
         let as_of = date(2025, 6, 1);
         // Fixed 2025-01-01, pays 2025-07-01: fixed-but-unpaid at as_of.
         let swap = single_fixing_cms_swap(10, date(2025, 1, 1), date(2025, 7, 1));
         let fixing_series = ScalarTimeSeries::new(
-            finstack_quant_core::market_data::fixings::cms_fixing_series_id("USD-LIBOR-3M", 10.0),
+            finstack_quant_core::market_data::fixings::fixing_series_id("USD-CMS-10Y"),
             vec![(date(2025, 1, 1), 0.045)],
             None,
+            SeriesInterpolation::Step,
+            SeriesExtrapolation::Error,
         )
         .expect("fixing series");
         let market = cms_market_with_vol(as_of, 0.30).insert_series(fixing_series);
@@ -1311,14 +1347,18 @@ mod tests {
         use crate::cms_option::{
             CmsOption, pricer::CmsOptionPricer, replication_pricer::CmsReplicationPricer,
         };
-        use finstack_quant_core::market_data::surfaces::{VolSurface, VolSurfaceAxis};
+        use finstack_quant_core::market_data::surfaces::{
+            VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+        };
         let as_of = date(2025, 1, 1);
         let swap = single_fixing_cms_swap(10, date(2026, 1, 1), date(2026, 4, 1));
         let surface = |id| {
             VolSurface::builder(id)
-                .expiries(&[1.0, 5.0])
-                .strikes(&[2.0, 10.0])
                 .secondary_axis(VolSurfaceAxis::Tenor)
+                .quote_type(VolQuoteType::BlackLognormal)
+                .interpolation_mode(VolInterpolationMode::Vol)
+                .expiries(&[1.0, 5.0])
+                .secondary_values(&[2.0, 10.0])
                 .row(&[0.1, 0.4])
                 .row(&[0.1, 0.4])
                 .build()

@@ -387,9 +387,9 @@ impl AccrualIndex {
             find_active_periods_and_elapsed(&self.period_inputs[first..upper], as_of, &self.cfg)?;
         let mut accrued = finstack_quant_core::math::summation::NeumaierAccumulator::default();
         for (inputs, elapsed_yf) in active {
-            accrued.add(accrue_in_period(inputs, elapsed_yf, &self.cfg.method)?);
+            accrued.add(accrue_in_period(inputs, elapsed_yf, &self.cfg.method)?)?;
         }
-        let total = accrued.total();
+        let total = accrued.get_total()?;
         if !total.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "accrual: non-finite total accrued interest {total}"
@@ -511,10 +511,11 @@ fn build_coupon_periods(
         };
         let accrual = cf.get_accrual().as_ref();
         let true_period = accrual.map(|accrual| (accrual.get_start(), accrual.get_end()));
-        let calendar_id = accrual.and_then(|accrual| accrual.get_context().calendar_id.clone());
-        let coupon_period = accrual.and_then(|accrual| accrual.get_context().coupon_period);
+        let calendar_id =
+            accrual.and_then(|accrual| accrual.get_context().get_calendar_id().map(str::to_owned));
+        let coupon_period = accrual.and_then(|accrual| accrual.get_context().get_coupon_period());
         let end_is_termination_date =
-            accrual.and_then(|accrual| accrual.get_context().end_is_termination_date);
+            accrual.and_then(|accrual| accrual.get_context().get_end_is_termination_date());
         let flow_day_count = accrual.map(|accrual| accrual.get_day_count());
 
         // `AccrualIndex::build` validated the schedule: factors are finite
@@ -880,10 +881,14 @@ mod tests {
                 end,
                 DayCount::Act360,
                 None,
-                finstack_quant_core::dates::DayCountContextState {
-                    end_is_termination_date: Some(true),
-                    ..Default::default()
-                },
+                finstack_quant_core::dates::DayCountContextState::try_new(
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(true),
+                )
+                .expect("valid context"),
             )
             .expect("valid accrual"),
         )
@@ -969,13 +974,14 @@ mod tests {
                     end,
                     DayCount::Act365F,
                     None,
-                    finstack_quant_core::dates::DayCountContextState {
-                        calendar_id: None,
-                        coupon_period: Some(reference),
-                        end_is_termination_date: Some(false),
-                        frequency: None,
-                        bus_basis: None,
-                    },
+                    finstack_quant_core::dates::DayCountContextState::try_new(
+                        None,
+                        None,
+                        None,
+                        Some(reference),
+                        Some(false),
+                    )
+                    .expect("valid context"),
                 )
                 .expect("valid accrual"),
             )
@@ -1081,11 +1087,14 @@ mod tests {
                 let mut expected =
                     finstack_quant_core::math::summation::NeumaierAccumulator::default();
                 for (inputs, elapsed) in full {
-                    expected.add(accrue_in_period(inputs, elapsed, &cfg.method).unwrap());
+                    expected
+                        .add(accrue_in_period(inputs, elapsed, &cfg.method).unwrap())
+                        .unwrap();
                 }
                 assert_eq!(
                     index.accrued_at(as_of).unwrap(),
-                    Money::from_model_value(expected.total(), index.get_currency()).unwrap()
+                    Money::from_model_value(expected.get_total().unwrap(), index.get_currency())
+                        .unwrap()
                 );
             }
         }
@@ -1196,13 +1205,14 @@ mod tests {
                     end,
                     DayCount::Thirty360,
                     None,
-                    finstack_quant_core::dates::DayCountContextState {
-                        calendar_id: None,
-                        coupon_period: None,
-                        end_is_termination_date: Some(false),
-                        frequency: None,
-                        bus_basis: None,
-                    },
+                    finstack_quant_core::dates::DayCountContextState::try_new(
+                        None,
+                        None,
+                        None,
+                        None,
+                        Some(false),
+                    )
+                    .expect("valid context"),
                 )
                 .expect("valid accrual"),
             )
@@ -1222,13 +1232,14 @@ mod tests {
                     end,
                     DayCount::Act365F,
                     None,
-                    finstack_quant_core::dates::DayCountContextState {
-                        calendar_id: None,
-                        coupon_period: None,
-                        end_is_termination_date: Some(false),
-                        frequency: None,
-                        bus_basis: None,
-                    },
+                    finstack_quant_core::dates::DayCountContextState::try_new(
+                        None,
+                        None,
+                        None,
+                        None,
+                        Some(false),
+                    )
+                    .expect("valid context"),
                 )
                 .expect("valid accrual"),
             )
@@ -1268,13 +1279,14 @@ mod tests {
                         payment,
                         DayCount::Act360,
                         None,
-                        finstack_quant_core::dates::DayCountContextState {
-                            calendar_id: None,
-                            coupon_period: Some((start, payment)),
-                            end_is_termination_date: Some(false),
-                            frequency: None,
-                            bus_basis: None,
-                        },
+                        finstack_quant_core::dates::DayCountContextState::try_new(
+                            None,
+                            None,
+                            None,
+                            Some((start, payment)),
+                            Some(false),
+                        )
+                        .expect("valid context"),
                     )
                     .expect("valid accrual"),
                 )
@@ -1432,13 +1444,14 @@ mod tests {
                         payment,
                         DayCount::ActActIsma,
                         None,
-                        finstack_quant_core::dates::DayCountContextState {
-                            calendar_id: None,
-                            coupon_period: Some((issue, payment)),
-                            end_is_termination_date: Some(false),
-                            frequency: None,
-                            bus_basis: None,
-                        },
+                        finstack_quant_core::dates::DayCountContextState::try_new(
+                            None,
+                            Some(Tenor::semi_annual()),
+                            None,
+                            Some((issue, payment)),
+                            Some(false),
+                        )
+                        .expect("valid context"),
                     )
                     .expect("valid accrual"),
                 )
@@ -1730,9 +1743,8 @@ mod tests {
             .accrued_at(make_date(2025, 6, 30))
             .expect_err("finite individual accruals must not produce a non-finite total");
         assert!(
-            error
-                .to_string()
-                .contains("non-finite total accrued interest")
+            error.to_string().contains("compensated sum overflowed"),
+            "unexpected error: {error}"
         );
     }
 

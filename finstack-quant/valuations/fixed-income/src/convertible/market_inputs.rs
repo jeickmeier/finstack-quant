@@ -2,7 +2,6 @@
 //!
 use super::ConvertibleBond;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::{Error, Result};
 
 /// Resolve the continuous dividend yield (decimal) from `div_yield_id`.
@@ -13,13 +12,12 @@ pub(super) fn resolve_dividend_yield(ctx: &MarketContext, bond: &ConvertibleBond
     let Some(div_yield_id) = &bond.div_yield_id else {
         return Ok(0.0);
     };
-    match ctx.get_price(div_yield_id)? {
-        MarketScalar::Unitless(value) => Ok(*value),
-        MarketScalar::Price(_) => Err(Error::Validation(format!(
+    ctx.get_price(div_yield_id)?.get_unitless().ok_or_else(|| {
+        Error::Validation(format!(
             "ConvertibleBond '{}' div_yield_id '{}' must be a unitless scalar",
             bond.id, div_yield_id
-        ))),
-    }
+        ))
+    })
 }
 
 #[cfg(test)]
@@ -32,7 +30,8 @@ mod tests {
         // A `{spot_id}-DIVYIELD` scalar is never picked up implicitly.
         let market = MarketContext::new().insert_price(
             "TECH-DIVYIELD",
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(0.03),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(0.03)
+                .expect("valid scalar"),
         );
         bond.div_yield_id = None;
         assert_eq!(resolve_dividend_yield(&market, &bond).expect("zero"), 0.0);

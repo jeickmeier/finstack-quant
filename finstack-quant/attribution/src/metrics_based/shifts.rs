@@ -1,12 +1,34 @@
-use finstack_quant_core::FxHashMap;
+use finstack_quant_calibration::quotes::CdsQuote;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::diff::{
-    TenorSamplingMethod, measure_discount_curve_shift, measure_inflation_index_shift,
+    HazardDiffQuery, HazardDiffScale, RateDiffScale, ZeroRateDiffParams,
+    measure_hazard_intensity_diff, measure_price_scalar_diff, measure_unitless_scalar_diff,
+    zero_rate_difference,
 };
+use finstack_quant_core::market_data::term_structures::HazardCurve;
+use finstack_quant_core::math::stats;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_core::{Error, Result};
+
+#[inline]
+fn exact_f64_eq(a: f64, b: f64) -> bool {
+    a.to_bits() == b.to_bits() || ((a.to_bits() << 1) == 0 && (b.to_bits() << 1) == 0)
+}
+use finstack_quant_core::{Error, FxHashMap, Result};
 use finstack_quant_valuations::metrics::{MetricId, parse_key_rate_label};
 use finstack_quant_valuations::recalibration::RecalibrationProvider;
+
+/// Diagnostic tenor grid (in years) shared by aggregate rolling-horizon attribution shift helpers.
+pub(crate) const DIAGNOSTIC_RATE_TENORS_YEARS: [f64; 9] =
+    [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 30.0];
+
+/// Explicit rate-curve family preventing silent discount/forward registry fallback.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum RateCurveFamily {
+    /// Discount-factor curve measured via continuously compounded zero rates.
+    Discount,
+    /// Projection-factor curve measured via continuously compounded zero rates.
+    Forward,
+}
 
 /// Extract every supplied key-rate coordinate for the declared curves.
 ///
@@ -90,7 +112,6 @@ pub(crate) fn extract_credit_keyrates(
     market_t1: &MarketContext,
     provider: &dyn RecalibrationProvider,
 ) -> Result<FxHashMap<CurveId, Vec<CreditKeyRateBucket>>> {
-    use finstack_quant_calibration::quotes::CdsQuote;
     let mut result = FxHashMap::default();
     for curve_id in curve_ids {
         let prefix = format!("bucketed_cs01::{curve_id}::");
@@ -203,13 +224,12 @@ pub(crate) fn extract_credit_keyrates(
                 .get(curve_id)
                 .ok_or_else(|| Error::Internal("missing credit coordinates".into()))?;
             let tenors: Vec<_> = coordinates.iter().map(|(tenor, _)| *tenor).collect();
-            let moves =
-                finstack_quant_core::market_data::diff::measure_per_tenor_credit_curve_shift(
-                    curve_id.as_str(),
-                    market_t0,
-                    market_t1,
-                    &tenors,
-                )?;
+            let moves = measure_per_tenor_credit_curve_shift_bp(
+                curve_id.as_str(),
+                market_t0,
+                market_t1,
+                &tenors,
+            )?;
             coordinates
                 .iter()
                 .zip(moves)
@@ -227,81 +247,198 @@ pub(crate) fn extract_credit_keyrates(
     Ok(result)
 }
 
-/// Measure the per-tenor discount-curve zero-rate shift (in basis points) at
-/// the supplied tenors.
-///
-/// Unlike [`measure_discount_curve_shift`], which averages the shift over a
-/// fixed tenor grid (and so mis-attributes a non-parallel move), this returns
-/// the shift at each requested tenor so the caller can pair it with the
-/// per-tenor (key-rate) DV01.
-fn measure_per_tenor_discount_shift(
-    curve_id: &str,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-    tenors: &[f64],
-) -> Option<Vec<f64>> {
-    let curve_t0 = market_t0.get_discount(curve_id).ok()?;
-    let curve_t1 = market_t1.get_discount(curve_id).ok()?;
-    Some(
-        tenors
-            .iter()
-            .map(|&t| {
-                (curve_t1.zero_rate(t, finstack_quant_core::math::Compounding::Continuous)
-                    - curve_t0.zero_rate(t, finstack_quant_core::math::Compounding::Continuous))
-                    * 10_000.0
-            })
-            .collect(),
-    )
-}
-
-/// Per-tenor rate shift (bp) for a rates curve that may be a discount curve
-/// (zero rates) **or** a forward/projection curve (forward rates).
-///
-/// the rates ladder must consume forward-curve DV01 too —
-/// `BucketedDv01` emits per-tenor series for projection curves, and a basis
-/// move (discount and forward moving differently) is mis-attributed when only
-/// discount curves are measured.
-pub(super) fn measure_per_tenor_rate_shift(
-    curve_id: &str,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-    tenors: &[f64],
-) -> Option<Vec<f64>> {
-    if let Some(shifts) = measure_per_tenor_discount_shift(curve_id, market_t0, market_t1, tenors) {
-        return Some(shifts);
-    }
-    let curve_t0 = market_t0.get_forward(curve_id).ok()?;
-    let curve_t1 = market_t1.get_forward(curve_id).ok()?;
-    Some(
-        tenors
-            .iter()
-            .map(|&t| (curve_t1.rate(t) - curve_t0.rate(t)) * 10_000.0)
-            .collect(),
-    )
-}
-
-/// Mean over the standard tenor grid (`t > 0`) of the per-tenor move
-/// `r1 − r0` in basis points, taking `|Δ|` when `absolute`. Tenors where
-/// either side is non-finite are skipped; `None` when no tenor contributed.
+/// Pair direct-intensity hazard sensitivity buckets (`bucketed_hazard01`) with native
+/// [`measure_hazard_intensity_diff`] shifts in intensity basis points.
 ///
 /// # Arguments
 ///
-/// * `sample` - Returns `(r0, r1)` — the T₀ and T₁ rate at a tenor in years.
-/// * `absolute` - `true` for the L1 mean used by the twist guards, `false`
-///   for the signed mean.
-fn mean_tenor_shift_bp(sample: impl Fn(f64) -> (f64, f64), absolute: bool) -> Option<f64> {
-    use finstack_quant_core::market_data::diff::STANDARD_TENORS;
-    let tenors = STANDARD_TENORS.iter().copied().filter(|&t| t > 0.0);
-    average_over(tenors, |t| {
-        let (r0, r1) = sample(t);
-        let delta_bp = (r1 - r0) * 10_000.0;
-        (r0.is_finite() && r1.is_finite()).then_some(if absolute {
-            delta_bp.abs()
-        } else {
-            delta_bp
-        })
+/// * `measures` - Opening sensitivity map containing optional `bucketed_hazard01::<curve>::<tenor>` entries.
+/// * `curve_ids` - Complete declared credit curve set.
+/// * `market_t0` - Earlier market snapshot.
+/// * `market_t1` - Later market snapshot.
+pub(crate) fn extract_hazard_intensity_keyrates(
+    measures: &indexmap::IndexMap<MetricId, f64>,
+    curve_ids: &[CurveId],
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Result<FxHashMap<CurveId, Vec<CreditKeyRateBucket>>> {
+    let per_curve = extract_keyrate_per_curve(measures, curve_ids, "bucketed_hazard01")?;
+    let mut result = FxHashMap::default();
+    for (curve_id, coordinates) in per_curve {
+        let tenors: Vec<f64> = coordinates.iter().map(|(tenor, _)| *tenor).collect();
+        let diff = measure_hazard_intensity_diff(
+            &HazardDiffQuery::new(curve_id.as_str(), &tenors, HazardDiffScale::IntensityBp),
+            market_t0,
+            market_t1,
+        )?;
+        let buckets = coordinates
+            .into_iter()
+            .zip(diff.into_rows())
+            .map(|((tenor_years, sensitivity), row)| CreditKeyRateBucket {
+                tenor_years,
+                sensitivity,
+                move_bp: row.diff,
+                quote_index: None,
+            })
+            .collect();
+        result.insert(curve_id, buckets);
+    }
+    Ok(result)
+}
+
+/// Measure aggregate native hazard intensity shift (intensity bp) strictly over [`MarketContext::get_hazard`].
+///
+/// # Arguments
+///
+/// * `curve_id` - Hazard curve identifier in both snapshots.
+/// * `market_t0` - Earlier market snapshot.
+/// * `market_t1` - Later market snapshot.
+pub(crate) fn measure_hazard_intensity_shift_bp(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Result<f64> {
+    let h0 = market_t0.get_hazard(curve_id)?;
+    let times: Vec<f64> = h0.knot_points().map(|(t, _)| t).collect();
+    let diff = measure_hazard_intensity_diff(
+        &HazardDiffQuery::new(curve_id, &times, HazardDiffScale::IntensityBp),
+        market_t0,
+        market_t1,
+    )?;
+    let shifts: Vec<f64> = diff.into_rows().into_iter().map(|row| row.diff).collect();
+    stats::mean(&shifts)?.ok_or_else(|| {
+        Error::Validation("hazard intensity shift produced an empty mean".to_string())
     })
-    .0
+}
+
+/// Measure the per-tenor discount-curve zero-rate shift (in basis points) at
+/// the supplied tenors strictly from [`MarketContext::get_discount`].
+///
+/// # Arguments
+///
+/// * `curve_id` - Discount curve identifier in both market snapshots.
+/// * `market_t0` - Earlier market snapshot.
+/// * `market_t1` - Later market snapshot.
+/// * `tenors` - Non-empty slice of strictly positive tenor coordinates in years.
+pub(crate) fn measure_discount_curve_tenor_shifts_bp(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    tenors: &[f64],
+) -> Result<Vec<f64>> {
+    if tenors.is_empty() {
+        return Err(Error::Validation(
+            "discount curve tenor shift measurement requires at least one tenor".to_string(),
+        ));
+    }
+    let curve_t0 = market_t0.get_discount(curve_id)?;
+    let curve_t1 = market_t1.get_discount(curve_id)?;
+    factor_zero_rate_shifts_bp(tenors, |t| curve_t0.df(t), |t| curve_t1.df(t))
+}
+
+/// Continuously compounded zero-rate shift (bp) between two factor curves at each tenor.
+fn factor_zero_rate_shifts_bp(
+    tenors: &[f64],
+    df_t0: impl Fn(f64) -> Result<f64>,
+    df_t1: impl Fn(f64) -> Result<f64>,
+) -> Result<Vec<f64>> {
+    tenors
+        .iter()
+        .map(|&t| {
+            zero_rate_difference(ZeroRateDiffParams {
+                d0_anchor: 1.0,
+                d0_maturity: df_t0(t)?,
+                d1_anchor: 1.0,
+                d1_maturity: df_t1(t)?,
+                alpha: t,
+                scale: RateDiffScale::BasisPoints,
+            })
+        })
+        .collect()
+}
+
+/// Measure the signed mean discount-curve zero-rate shift (in bp) over [`DIAGNOSTIC_RATE_TENORS_YEARS`].
+///
+/// # Arguments
+///
+/// * `curve_id` - Discount curve identifier in both market snapshots.
+/// * `market_t0` - Earlier market snapshot.
+/// * `market_t1` - Later market snapshot.
+pub(crate) fn measure_discount_curve_shift_bp(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Result<f64> {
+    let shifts = measure_discount_curve_tenor_shifts_bp(
+        curve_id,
+        market_t0,
+        market_t1,
+        &DIAGNOSTIC_RATE_TENORS_YEARS,
+    )?;
+    stats::mean(&shifts)?
+        .ok_or_else(|| Error::Validation("discount curve shift produced an empty mean".to_string()))
+}
+
+/// Measure the per-tenor projection-factor zero-rate shift (in basis points)
+/// strictly from [`MarketContext::get_forward`].
+///
+/// Uses the continuously compounded zero rate of the projection factor, the
+/// same coordinate that forward-curve key-rate bumps shock.
+///
+/// # Arguments
+///
+/// * `curve_id` - Forward curve identifier in both market snapshots.
+/// * `market_t0` - Earlier market snapshot.
+/// * `market_t1` - Later market snapshot.
+/// * `tenors` - Non-empty slice of strictly positive tenor coordinates in years.
+pub(crate) fn measure_forward_curve_tenor_shifts_bp(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    tenors: &[f64],
+) -> Result<Vec<f64>> {
+    if tenors.is_empty() {
+        return Err(Error::Validation(
+            "forward curve tenor shift measurement requires at least one tenor".to_string(),
+        ));
+    }
+    let curve_t0 = market_t0.get_forward(curve_id)?;
+    let curve_t1 = market_t1.get_forward(curve_id)?;
+    factor_zero_rate_shifts_bp(tenors, |t| curve_t0.df(t), |t| curve_t1.df(t))
+}
+
+/// Signed mean projection-factor zero-rate shift (bp) over [`DIAGNOSTIC_RATE_TENORS_YEARS`].
+fn measure_forward_curve_shift_bp(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Result<f64> {
+    let shifts = measure_forward_curve_tenor_shifts_bp(
+        curve_id,
+        market_t0,
+        market_t1,
+        &DIAGNOSTIC_RATE_TENORS_YEARS,
+    )?;
+    stats::mean(&shifts)?
+        .ok_or_else(|| Error::Validation("forward curve shift produced an empty mean".to_string()))
+}
+
+/// Per-tenor rate shift (bp) dispatched strictly on the declared [`RateCurveFamily`].
+pub(super) fn measure_per_tenor_rate_shift(
+    curve_id: &str,
+    family: RateCurveFamily,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    tenors: &[f64],
+) -> Result<Vec<f64>> {
+    match family {
+        RateCurveFamily::Discount => {
+            measure_discount_curve_tenor_shifts_bp(curve_id, market_t0, market_t1, tenors)
+        }
+        RateCurveFamily::Forward => {
+            measure_forward_curve_tenor_shifts_bp(curve_id, market_t0, market_t1, tenors)
+        }
+    }
 }
 
 /// Arithmetic mean of `shift(item)` over the items where it is `Some`.
@@ -316,105 +453,262 @@ pub(super) fn average_over<T>(
     items: impl IntoIterator<Item = T>,
     mut shift: impl FnMut(T) -> Option<f64>,
 ) -> (Option<f64>, usize) {
-    let mut total = 0.0;
-    let mut count = 0usize;
-    for item in items {
-        if let Some(value) = shift(item) {
-            total += value;
-            count += 1;
-        }
-    }
-    (
-        if count > 0 {
-            Some(total / count as f64)
-        } else {
-            None
-        },
-        count,
-    )
+    let values: Vec<f64> = items.into_iter().filter_map(&mut shift).collect();
+    let count = values.len();
+    let mean = stats::mean(&values).ok().flatten();
+    (mean, count)
 }
 
-/// Signed mean forward-rate shift (bp) over the standard tenor grid —
-/// forward-curve counterpart of `measure_discount_curve_shift`.
-fn measure_forward_curve_shift_bp(
-    curve_id: &str,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-) -> Option<f64> {
-    let curve_t0 = market_t0.get_forward(curve_id).ok()?;
-    let curve_t1 = market_t1.get_forward(curve_id).ok()?;
-    mean_tenor_shift_bp(|t| (curve_t0.rate(t), curve_t1.rate(t)), false)
+fn l1_mean(shifts: &[f64]) -> f64 {
+    let abs_vals: Vec<f64> = shifts
+        .iter()
+        .copied()
+        .filter(|v| v.is_finite())
+        .map(f64::abs)
+        .collect();
+    stats::mean(&abs_vals).ok().flatten().unwrap_or(0.0)
 }
 
-/// Signed mean rate shift (bp) for a curve that may be a discount or a
-/// forward/projection curve.
+/// Signed mean rate shift (bp) dispatched strictly on the declared [`RateCurveFamily`].
 pub(super) fn measure_rate_curve_shift_bp(
     curve_id: &str,
+    family: RateCurveFamily,
     market_t0: &MarketContext,
     market_t1: &MarketContext,
-) -> Option<f64> {
-    measure_discount_curve_shift(
-        curve_id,
-        market_t0,
-        market_t1,
-        TenorSamplingMethod::Standard,
-    )
-    .ok()
-    .or_else(|| measure_forward_curve_shift_bp(curve_id, market_t0, market_t1))
+) -> Result<f64> {
+    match family {
+        RateCurveFamily::Discount => {
+            measure_discount_curve_shift_bp(curve_id, market_t0, market_t1)
+        }
+        RateCurveFamily::Forward => measure_forward_curve_shift_bp(curve_id, market_t0, market_t1),
+    }
 }
 
-/// Mean of the per-tenor *absolute* discount-curve zero-rate shift (bp) on
-/// the standard tenor grid.
+/// L1-mean rate shift (bp) dispatched strictly on [`RateCurveFamily`] for twist diagnostics.
 ///
-/// Where [`measure_discount_curve_shift`] returns the signed mean (which
-/// collapses toward zero for a twist), this returns the L1 mean so a
-/// non-parallel move still registers a large magnitude. Used by the
-/// rates-convexity block to detect "the average is small but the curve
-/// genuinely moved".
-///
-/// Returns `0.0` if either side's curve is missing.
-fn discount_curve_abs_shift_bp(
+/// Returns `0.0` if either side's curve is missing or invalid.
+pub(super) fn rate_curve_abs_shift_bp(
     curve_id: &str,
+    family: RateCurveFamily,
     market_t0: &MarketContext,
     market_t1: &MarketContext,
 ) -> f64 {
-    let (Ok(c0), Ok(c1)) = (
-        market_t0.get_discount(curve_id),
-        market_t1.get_discount(curve_id),
-    ) else {
-        return 0.0;
-    };
-    mean_tenor_shift_bp(
-        |t| {
-            (
-                c0.zero_rate(t, finstack_quant_core::math::Compounding::Continuous),
-                c1.zero_rate(t, finstack_quant_core::math::Compounding::Continuous),
-            )
-        },
-        true,
-    )
+    match family {
+        RateCurveFamily::Discount => measure_discount_curve_tenor_shifts_bp(
+            curve_id,
+            market_t0,
+            market_t1,
+            &DIAGNOSTIC_RATE_TENORS_YEARS,
+        ),
+        RateCurveFamily::Forward => measure_forward_curve_tenor_shifts_bp(
+            curve_id,
+            market_t0,
+            market_t1,
+            &DIAGNOSTIC_RATE_TENORS_YEARS,
+        ),
+    }
+    .map(|shifts| l1_mean(&shifts))
     .unwrap_or(0.0)
 }
 
-/// L1-mean rate shift (bp) for a curve that may be a discount or a
-/// forward/projection curve. Forward-aware counterpart of
-/// [`discount_curve_abs_shift_bp`] for the twist-guard block.
-pub(super) fn rate_curve_abs_shift_bp(
+/// Extract matched quote-space delta tuples `(pillar_time, delta_bp)` from two calibrated hazard recipes.
+fn extract_matched_quote_deltas(
+    curve_id: &str,
+    h0: &HazardCurve,
+    h1: &HazardCurve,
+) -> Result<Vec<(f64, f64)>> {
+    let (Some(recipe0), Some(recipe1)) = (h0.hazard_calibration(), h1.hazard_calibration()) else {
+        return Err(Error::Validation(format!(
+            "credit par-spread diff for '{curve_id}' requires matched hazard calibration recipes on both snapshots"
+        )));
+    };
+    let inputs0 = recipe0.spread_risk_inputs();
+    let inputs1 = recipe1.spread_risk_inputs();
+    if inputs0.is_empty() || inputs0.len() != inputs1.len() {
+        return Err(Error::Validation(format!(
+            "credit par-spread diff for '{curve_id}' requires aligned non-empty spread_risk_inputs across both snapshots"
+        )));
+    }
+    let parsed1 = inputs1
+        .iter()
+        .map(|item| {
+            serde_json::from_value::<CdsQuote>(item.quote.clone())
+                .map(|q| (item.pillar_date, q))
+                .map_err(|error| {
+                    Error::Validation(format!(
+                        "invalid closing spread-risk quote on '{curve_id}': {error}"
+                    ))
+                })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    let mut deltas = Vec::with_capacity(inputs0.len());
+    for item0 in inputs0 {
+        let q0: CdsQuote = serde_json::from_value(item0.quote.clone()).map_err(|error| {
+            Error::Validation(format!(
+                "invalid opening spread-risk quote on '{curve_id}': {error}"
+            ))
+        })?;
+        let mut matches = parsed1.iter().filter(|(date1, q1)| {
+            *date1 == item0.pillar_date && q1.id().as_str() == q0.id().as_str()
+        });
+        let Some((_, q1)) = matches.next() else {
+            return Err(Error::Validation(format!(
+                "credit par-spread diff for '{curve_id}' missing matching closing quote '{}' at {}",
+                q0.id(),
+                item0.pillar_date
+            )));
+        };
+        if matches.next().is_some() {
+            return Err(Error::Validation(format!(
+                "credit par-spread diff for '{curve_id}' found ambiguous closing quote '{}'",
+                q0.id()
+            )));
+        }
+        let delta_bp = q1.coupon_bp() - q0.coupon_bp();
+        if !delta_bp.is_finite() {
+            return Err(Error::Validation(format!(
+                "calibrated CDS spread delta overflowed for '{curve_id}'"
+            )));
+        }
+        deltas.push((item0.pillar_time, delta_bp));
+    }
+    Ok(deltas)
+}
+
+/// Evaluate calibrated CDS par-spread shifts in bp at exact recipe `tenors`.
+fn measure_matched_quote_tenor_shifts_bp(
+    h0: &HazardCurve,
+    h1: &HazardCurve,
+    curve_id: &str,
+    tenors: &[f64],
+) -> Result<Vec<f64>> {
+    if tenors.is_empty() {
+        return Err(Error::Validation(
+            "hazard curve tenor shift measurement requires at least one tenor".to_string(),
+        ));
+    }
+    let deltas = extract_matched_quote_deltas(curve_id, h0, h1)?;
+    let mut shifts = Vec::with_capacity(tenors.len());
+    for &t in tenors {
+        if !t.is_finite() || t <= 0.0 {
+            return Err(Error::Validation(format!(
+                "credit curve tenor must be finite and strictly positive, got {t}"
+            )));
+        }
+        let mut matching = deltas
+            .iter()
+            .filter(|&&(pillar_t, _)| exact_f64_eq(pillar_t, t));
+        let Some(&(_, delta_bp)) = matching.next() else {
+            return Err(Error::Validation(format!(
+                "credit par-spread diff for '{curve_id}' has no calibrated quote at tenor {t}"
+            )));
+        };
+        if matching.next().is_some() {
+            return Err(Error::Validation(format!(
+                "credit par-spread diff for '{curve_id}' found multiple quotes at tenor {t}; use typed replay bucket labels"
+            )));
+        }
+        shifts.push(delta_bp);
+    }
+    Ok(shifts)
+}
+
+/// Measure aggregate hazard par-spread move (bp) from matched calibration spread-risk inputs.
+fn measure_hazard_par_spread_mean_bp(
+    curve_id: &str,
+    h0: &HazardCurve,
+    h1: &HazardCurve,
+) -> Result<f64> {
+    let quote_deltas: Vec<f64> = extract_matched_quote_deltas(curve_id, h0, h1)?
+        .into_iter()
+        .map(|(_, delta_bp)| delta_bp)
+        .collect();
+    stats::mean(&quote_deltas)?
+        .ok_or_else(|| Error::Validation("credit spread delta mean was empty".to_string()))
+}
+
+fn dispatch_credit_family<T>(
     curve_id: &str,
     market_t0: &MarketContext,
     market_t1: &MarketContext,
-) -> f64 {
-    let v = discount_curve_abs_shift_bp(curve_id, market_t0, market_t1);
-    if v > 0.0 {
-        return v;
+    on_hazard: impl FnOnce(&HazardCurve, &HazardCurve) -> Result<T>,
+    on_discount: impl FnOnce() -> Result<T>,
+) -> Result<T> {
+    match market_t0.get_hazard(curve_id) {
+        Ok(h0) => {
+            let h1 = market_t1.get_hazard(curve_id)?;
+            on_hazard(&h0, &h1)
+        }
+        Err(err) => {
+            if market_t0.get_discount(curve_id).is_ok() {
+                on_discount()
+            } else {
+                Err(err)
+            }
+        }
     }
-    let (Ok(c0), Ok(c1)) = (
-        market_t0.get_forward(curve_id),
-        market_t1.get_forward(curve_id),
-    ) else {
-        return 0.0;
-    };
-    mean_tenor_shift_bp(|t| (c0.rate(t), c1.rate(t)), true).unwrap_or(0.0)
+}
+
+/// Measure per-tenor credit-curve shifts (bp) enforcing matching curve families across snapshots.
+///
+/// # Arguments
+///
+/// * `curve_id` - Credit curve identifier present as the same family (`HazardCurve` or risky `DiscountCurve`) in both snapshots.
+/// * `market_t0` - Earlier market snapshot.
+/// * `market_t1` - Later market snapshot.
+/// * `tenors` - Non-empty slice of positive tenor coordinates in years.
+pub(crate) fn measure_per_tenor_credit_curve_shift_bp(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    tenors: &[f64],
+) -> Result<Vec<f64>> {
+    dispatch_credit_family(
+        curve_id,
+        market_t0,
+        market_t1,
+        |h0, h1| measure_matched_quote_tenor_shifts_bp(h0, h1, curve_id, tenors),
+        || measure_discount_curve_tenor_shifts_bp(curve_id, market_t0, market_t1, tenors),
+    )
+}
+
+/// Measure aggregate credit-curve shift (bp) enforcing matching curve families across snapshots.
+///
+/// # Arguments
+///
+/// * `curve_id` - Credit curve identifier present as the same family (`HazardCurve` or risky `DiscountCurve`) in both snapshots.
+/// * `market_t0` - Earlier market snapshot.
+/// * `market_t1` - Later market snapshot.
+pub(crate) fn measure_credit_curve_shift_bp(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Result<f64> {
+    dispatch_credit_family(
+        curve_id,
+        market_t0,
+        market_t1,
+        |h0, h1| measure_hazard_par_spread_mean_bp(curve_id, h0, h1),
+        || measure_discount_curve_shift_bp(curve_id, market_t0, market_t1),
+    )
+}
+
+/// Measure aggregate par CDS spread shift (bp) strictly over [`MarketContext::get_hazard`].
+///
+/// # Arguments
+///
+/// * `curve_id` - Hazard curve identifier in both snapshots.
+/// * `market_t0` - Earlier market snapshot.
+/// * `market_t1` - Later market snapshot.
+pub(crate) fn measure_par_spread_shift_bp(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Result<f64> {
+    let h0 = market_t0.get_hazard(curve_id)?;
+    let h1 = market_t1.get_hazard(curve_id)?;
+    measure_hazard_par_spread_mean_bp(curve_id, &h0, &h1)
 }
 
 /// Threshold below which a signed mean shift is considered twist-dominated
@@ -423,81 +717,152 @@ pub(super) fn rate_curve_abs_shift_bp(
 /// fall back to per-tenor convexity.
 const TWIST_FRACTION_THRESHOLD: f64 = 1e-2;
 
-/// Mean of the per-tenor *absolute* credit-curve shift (bp) on the standard
-/// tenor grid. Counterpart of [`discount_curve_abs_shift_bp`] for credit.
+/// Mean of the per-tenor *absolute* credit-curve shift (bp) on [`DIAGNOSTIC_RATE_TENORS_YEARS`].
 ///
-/// For a hazard curve this is the L1 mean of the par CDS spread move; for a
-/// discount-style credit curve it is the L1 mean of the zero-rate move. Either way it pairs with the signed
-/// mean that the per-method credit attribution consumes.
-///
-/// Returns `0.0` if either side's curve is missing.
+/// Returns `0.0` if either side's curve is missing or incomparable.
 pub(super) fn credit_curve_abs_shift_bp(
     curve_id: &str,
     market_t0: &MarketContext,
     market_t1: &MarketContext,
 ) -> f64 {
-    use finstack_quant_core::market_data::diff::STANDARD_TENORS;
-    let tenors: Vec<f64> = STANDARD_TENORS
-        .iter()
-        .copied()
-        .filter(|t| *t > 0.0)
-        .collect();
-    let Ok(shifts) = finstack_quant_core::market_data::diff::measure_per_tenor_credit_curve_shift(
-        curve_id, market_t0, market_t1, &tenors,
-    ) else {
-        return 0.0;
-    };
-    let (total_abs, count) = shifts
-        .iter()
-        .filter(|v| v.is_finite())
-        .fold((0.0, 0usize), |(acc, n), v| (acc + v.abs(), n + 1));
-    if count == 0 {
-        0.0
-    } else {
-        total_abs / count as f64
-    }
+    measure_per_tenor_credit_curve_shift_bp(
+        curve_id,
+        market_t0,
+        market_t1,
+        &DIAGNOSTIC_RATE_TENORS_YEARS,
+    )
+    .map(|shifts| l1_mean(&shifts))
+    .unwrap_or(0.0)
 }
 
-/// Mean of the per-tenor *absolute* inflation-curve shift (bp) on the standard
-/// tenor grid. Counterpart of [`discount_curve_abs_shift_bp`] for inflation.
+/// Measure per-tenor annual inflation-curve rate shifts (in bp) strictly from [`MarketContext::get_inflation_curve`].
 ///
-/// Returns `0.0` if either side's curve is missing.
-pub(super) fn inflation_source_abs_shift_bp(
+/// Never falls back to [`InflationIndex`](finstack_quant_core::market_data::scalars::InflationIndex).
+fn measure_inflation_curve_tenor_shifts_bp(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    tenors: &[f64],
+) -> Result<Vec<f64>> {
+    if tenors.is_empty() {
+        return Err(Error::Validation(
+            "inflation curve shift measurement requires at least one tenor".to_string(),
+        ));
+    }
+    let c0 = market_t0.get_inflation_curve(curve_id)?;
+    let c1 = market_t1.get_inflation_curve(curve_id)?;
+    let mut shifts = Vec::with_capacity(tenors.len());
+    for &t in tenors {
+        let i0_a = c0.base_cpi();
+        let i0_m = c0.cpi(t)?;
+        let i1_a = c1.base_cpi();
+        let i1_m = c1.cpi(t)?;
+        let delta_r = -zero_rate_difference(ZeroRateDiffParams {
+            d0_anchor: i0_a,
+            d0_maturity: i0_m,
+            d1_anchor: i1_a,
+            d1_maturity: i1_m,
+            alpha: t,
+            scale: RateDiffScale::Decimal,
+        })?;
+        let r0 = (i0_m / i0_a).ln() / t;
+        if !r0.is_finite() {
+            return Err(Error::Validation(format!(
+                "baseline annual CPI log-growth overflowed at tenor {t} for '{curve_id}'"
+            )));
+        }
+        let diff_bp = if delta_r <= 0.0 && 0.0 <= delta_r {
+            0.0
+        } else {
+            r0.exp() * delta_r.exp_m1() * 10_000.0
+        };
+        if !diff_bp.is_finite() {
+            return Err(Error::Validation(format!(
+                "inflation curve shift overflowed at tenor {t} for '{curve_id}'"
+            )));
+        }
+        shifts.push(diff_bp);
+    }
+    Ok(shifts)
+}
+
+/// Measure signed mean annual inflation-curve rate shift (bp) strictly over [`MarketContext::get_inflation_curve`].
+///
+/// # Arguments
+///
+/// * `curve_id` - Inflation curve identifier in both market snapshots.
+/// * `market_t0` - Earlier market snapshot.
+/// * `market_t1` - Later market snapshot.
+pub(crate) fn measure_inflation_curve_shift_bp(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Result<f64> {
+    let shifts = measure_inflation_curve_tenor_shifts_bp(
+        curve_id,
+        market_t0,
+        market_t1,
+        &DIAGNOSTIC_RATE_TENORS_YEARS,
+    )?;
+    stats::mean(&shifts)?.ok_or_else(|| {
+        Error::Validation("inflation curve shift produced an empty mean".to_string())
+    })
+}
+
+/// Mean of the per-tenor *absolute* inflation-curve shift (bp) on [`DIAGNOSTIC_RATE_TENORS_YEARS`].
+///
+/// Returns `0.0` if either side's curve is missing or invalid.
+pub(super) fn inflation_curve_abs_shift_bp(
     curve_id: &str,
     market_t0: &MarketContext,
     market_t1: &MarketContext,
 ) -> f64 {
-    let index_abs = measure_inflation_index_shift(curve_id, market_t0, market_t1)
-        .map(f64::abs)
-        .unwrap_or(0.0);
-    let (Ok(c0), Ok(c1)) = (
-        market_t0.get_inflation_curve(curve_id),
-        market_t1.get_inflation_curve(curve_id),
-    ) else {
-        return index_abs;
-    };
-    // Inflation rate at tenor t from the cpi ratio (mirrors the
-    // measure_inflation_curve_shift formula in core::market_data::diff).
-    let rate =
-        |c: &finstack_quant_core::market_data::term_structures::InflationCurve, t: f64| -> f64 {
-            let ratio = c.cpi(t) / c.base_cpi();
-            ratio.powf(1.0 / t) - 1.0
-        };
-    mean_tenor_shift_bp(|t| (rate(&c0, t), rate(&c1, t)), true).unwrap_or(0.0)
+    measure_inflation_curve_tenor_shifts_bp(
+        curve_id,
+        market_t0,
+        market_t1,
+        &DIAGNOSTIC_RATE_TENORS_YEARS,
+    )
+    .map(|shifts| l1_mean(&shifts))
+    .unwrap_or(0.0)
+}
+
+/// Measure exact native scalar difference `x1 - x0` in currency/unitless units.
+///
+/// Dispatches strictly within matching scalar kinds: `Price` entries subtract via
+/// [`measure_price_scalar_diff`] (exact `Decimal` subtraction before `.amount()`) and
+/// `Unitless` entries subtract via [`measure_unitless_scalar_diff`].
+///
+/// # Arguments
+///
+/// * `id` - Market scalar identifier in both market snapshots.
+/// * `market_t0` - Earlier market snapshot.
+/// * `market_t1` - Later market snapshot.
+pub(crate) fn measure_scalar_native_amount_diff(
+    id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Result<f64> {
+    let s0 = market_t0.get_price(id)?;
+    if s0.get_price().is_some() {
+        Ok(measure_price_scalar_diff(id, id, market_t0, market_t1)?.amount())
+    } else {
+        measure_unitless_scalar_diff(id, id, market_t0, market_t1)
+    }
 }
 
 /// Push the twist diagnostic for `factor_label` when `signed_avg_bp` is small
-/// against the L1 mean of `abs_shift_bp` over `curve_ids` (curves with no
+/// against the L1 mean of `abs_shift_bp` over `items` (items with no
 /// measurable move are skipped).
-pub(super) fn note_twist<'c>(
+pub(super) fn note_twist<I>(
     notes: &mut Vec<String>,
     factor_label: &str,
     signed_avg_bp: f64,
-    curve_ids: impl IntoIterator<Item = &'c CurveId>,
-    abs_shift_bp: impl Fn(&str) -> f64,
+    items: impl IntoIterator<Item = I>,
+    abs_shift_bp: impl Fn(I) -> f64,
 ) {
-    let (Some(l1_avg), _) = average_over(curve_ids, |curve_id| {
-        let shift = abs_shift_bp(curve_id.as_str());
+    let (Some(l1_avg), _) = average_over(items, |item| {
+        let shift = abs_shift_bp(item);
         (shift > 0.0).then_some(shift)
     }) else {
         return;

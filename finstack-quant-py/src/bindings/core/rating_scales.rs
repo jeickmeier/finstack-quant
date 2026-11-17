@@ -177,7 +177,7 @@ impl PyScorecardScale {
         description: Option<String>,
     ) -> PyResult<Self> {
         let levels: Vec<RatingLevel> = ratings.iter().map(|r| r.inner.clone()).collect();
-        ScorecardScale::try_new(scale_name, description, levels)
+        ScorecardScale::try_new(scale_name, levels, description)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }
@@ -354,6 +354,8 @@ impl PyRatingScaleEntry {
             .unwrap_or(false)
     }
 }
+
+wire_methods!(PyRatingScaleEntry, RatingScaleEntry, "RatingScaleEntry");
 
 /// Caller-supplied registry of scorecard rating scales.
 ///

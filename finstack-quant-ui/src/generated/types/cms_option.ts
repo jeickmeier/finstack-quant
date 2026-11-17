@@ -2,6 +2,10 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
+ * Opaque string identifier.
+ */
+export type Id = string;
+/**
  * Day count convention for the option accrual
  */
 export type DayCount =
@@ -20,19 +24,15 @@ export type DayCount =
   | "act_act_afb"
   | "bus_252";
 /**
- * Discount curve ID for present value calculations
+ * Opaque string identifier.
  */
-export type Id = string;
+export type Id1 = string;
 /**
  * ISO 8601 calendar date string.
  */
 export type Date = string;
 /**
- * Forward/projection curve ID for CMS rate projection
- */
-export type Id1 = string;
-/**
- * Unique instrument identifier
+ * Opaque string identifier.
  */
 export type Id2 = string;
 /**
@@ -359,15 +359,20 @@ export interface D_95A946Bb2F055985D90A {
    */
   accrual_fractions: number[];
   attributes?: Attributes;
+  /**
+   * Explicit CMS benchmark fixing identifier used for historical fixings
+   * (`FIXING:<cms_fixing_index_id>`), distinct from `forward_curve_id` and `index_id`.
+   */
+  cms_fixing_index_id?: Id | null;
   cms_tenor: Tenor;
   day_count: DayCount;
-  discount_curve_id: Id;
+  discount_curve_id: Id1;
   /**
    * Observation/fixing dates for CMS rate
    */
   fixing_dates: Date[];
-  forward_curve_id: Id1;
-  id: Id2;
+  forward_curve_id: Id2;
+  id: Id3;
   /**
    * Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).
    *
@@ -375,7 +380,7 @@ export interface D_95A946Bb2F055985D90A {
    * `swap_fixed_day_count`, and `swap_float_day_count`. Individual fields still
    * override the convention when explicitly set. Required for USD CMS.
    */
-  index_id?: Id3 | null;
+  index_id?: Id | null;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   metric_pricing_overrides?: MetricPricingOverrides;
   notional: Money;

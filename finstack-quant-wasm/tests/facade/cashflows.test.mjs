@@ -401,17 +401,15 @@ test('cashflows nonbinding overnight period cap preserves changing-balance inter
         type: 'forward',
         id: 'RFR',
         base: '2025-01-06',
-        reset_lag: 0,
         day_count: 'act_360',
-        tenor: 1 / 360,
+        // 10% simple overnight rate for the first day, zero afterwards.
         knot_points: [
-          [0, 0.2],
-          [1 / 360, 0],
-          [1, 0],
+          [0, 1],
+          [1 / 360, 1 / (1 + 0.1 / 360)],
+          [1, 1 / (1 + 0.1 / 360)],
         ],
-        projection_grid: null,
-        interp_style: 'linear',
-        extrapolation: 'flat_forward',
+        interp_style: 'log_linear',
+        extrapolation: 'extend',
         rate_calibration: null,
         fx_policy: null,
       },
@@ -706,7 +704,9 @@ test('buildCashflowSchedule and buildCashflowScheduleJson accept asOf cutoff ove
       /fixing|FIXING/
     );
 
-    market.insertSeries(new core.ScalarTimeSeries('FIXING:USD-SOFR-3M', [['2025-01-15', 0.06]]));
+    market.insertSeries(
+      new core.ScalarTimeSeries('FIXING:USD-SOFR-3M', [['2025-01-15', 0.06]], 'step', 'error')
+    );
     const schedule = cashflows.buildCashflowSchedule(floatingSpec, market, '2025-02-01');
     try {
       const viaJson = JSON.parse(

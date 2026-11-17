@@ -622,11 +622,13 @@ fn get_cube_expiry_slice_vol_clamped(slice: &PyVolCubeExpirySlice, tenor: f64, s
 
 #[doc = pydoc!("finstack_quant.models.volatility", "get_fx_delta_pillar_vols")]
 #[pyfunction]
-fn get_fx_delta_pillar_vols(
+fn get_fx_delta_pillar_vols<'py>(
+    py: Python<'py>,
     surface: &PyFxDeltaVolSurface,
     expiry_index: usize,
-) -> PyResult<(f64, f64, f64)> {
-    vol::get_fx_delta_pillar_vols(&surface.inner, expiry_index).map_err(core_to_py)
+) -> PyResult<Bound<'py, pyo3::types::PyTuple>> {
+    let vols = vol::get_fx_delta_pillar_vols(&surface.inner, expiry_index).map_err(core_to_py)?;
+    pyo3::types::PyTuple::new(py, vols)
 }
 
 #[doc = pydoc!("finstack_quant.models.volatility", "get_fx_delta_vol")]
@@ -644,25 +646,35 @@ fn get_fx_delta_vol(
 #[pyfunction]
 fn materialize_fx_delta_surface(
     surface: &PyFxDeltaVolSurface,
-    spot: f64,
-    domestic_rate: f64,
-    foreign_rate: f64,
+    delivery_forwards: Vec<f64>,
 ) -> PyResult<PyVolSurface> {
-    vol::materialize_fx_delta_surface(&surface.inner, spot, domestic_rate, foreign_rate)
+    vol::materialize_fx_delta_surface(&surface.inner, &delivery_forwards)
         .map(|surface| PyVolSurface::from_inner(Arc::new(surface)))
         .map_err(core_to_py)
 }
 
 #[doc = pydoc!("finstack_quant.models.volatility", "delta_to_strike")]
 #[pyfunction]
-fn delta_to_strike(delta: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
-    vol::delta_to_strike(delta, forward, vol, expiry)
+fn delta_to_strike(
+    is_call: bool,
+    delta_abs: f64,
+    forward: f64,
+    vol: f64,
+    expiry: f64,
+) -> PyResult<f64> {
+    vol::delta_to_strike(is_call, delta_abs, forward, vol, expiry).map_err(core_to_py)
 }
 
 #[doc = pydoc!("finstack_quant.models.volatility", "strike_to_delta")]
 #[pyfunction]
-fn strike_to_delta(strike: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
-    vol::strike_to_delta(strike, forward, vol, expiry)
+fn strike_to_delta(
+    is_call: bool,
+    strike: f64,
+    forward: f64,
+    vol: f64,
+    expiry: f64,
+) -> PyResult<f64> {
+    vol::strike_to_delta(is_call, strike, forward, vol, expiry).map_err(core_to_py)
 }
 
 fn grid_to_dataframe<'py>(

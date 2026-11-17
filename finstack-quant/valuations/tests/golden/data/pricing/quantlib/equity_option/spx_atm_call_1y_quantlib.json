@@ -38,10 +38,9 @@
       "credit_indices": [],
       "curves": [
         {
-          "allow_non_monotonic": false,
           "base": "2026-04-30",
           "day_count": "act_365f",
-          "extrapolation": "flat_forward",
+          "extrapolation": "extend",
           "id": "USD-OIS",
           "interp_style": "log_linear",
           "knot_points": [
@@ -54,8 +53,6 @@
               0.30119421191220214
             ]
           ],
-          "min_forward_rate": null,
-          "min_forward_tenor": 1e-06,
           "rate_calibration": null,
           "type": "discount"
         }
@@ -89,7 +86,7 @@
           "interpolation_mode": "vol",
           "quote_type": "black_lognormal",
           "secondary_axis": "strike",
-          "strikes": [
+          "secondary_values": [
             0.5,
             1.0,
             2.0

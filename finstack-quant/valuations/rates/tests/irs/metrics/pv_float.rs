@@ -22,6 +22,8 @@ fn build_curves(disc_rate: f64, fwd_rate: f64, base_date: Date) -> MarketContext
             (5.0, (-disc_rate * 5.0).exp()),
             (10.0, (-disc_rate * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -35,15 +37,13 @@ fn build_curves(disc_rate: f64, fwd_rate: f64, base_date: Date) -> MarketContext
             (5.0, (-disc_rate * 5.0).exp()),
             (10.0, (-disc_rate * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let fwd_curve = ForwardCurve::builder("USD_LIBOR_3M", 0.25)
-        .base_date(base_date)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, fwd_rate), (10.0, fwd_rate)])
-        .build()
-        .unwrap();
+    let fwd_curve =
+        ForwardCurve::flat("USD_LIBOR_3M", base_date, fwd_rate, DayCount::Act360).unwrap();
 
     MarketContext::new()
         .insert(disc_curve_ois)
@@ -103,7 +103,9 @@ fn test_pv_float_positive() {
     let end = date!(2029 - 01 - 01);
 
     let swap = create_swap(as_of, end, dec!(0.05));
-    let market = build_curves(0.05, 0.05, as_of);
+    // Convert 5% quarterly simple rate to equivalent continuous rate for ForwardCurve::flat.
+    let fwd_cont = 4.0 * (1.0_f64 + 0.05 * 0.25).ln();
+    let market = build_curves(0.05, fwd_cont, as_of);
 
     let result = swap
         .price_with_metrics(
@@ -209,7 +211,9 @@ fn test_pv_float_equals_fixed_at_par() {
     let end = date!(2029 - 01 - 01);
 
     let swap = create_swap(as_of, end, dec!(0.05));
-    let market = build_curves(0.05, 0.05, as_of);
+    // Convert 5% quarterly simple rate to equivalent continuous rate for ForwardCurve::flat.
+    let fwd_cont = 4.0 * (1.0_f64 + 0.05 * 0.25).ln();
+    let market = build_curves(0.05, fwd_cont, as_of);
 
     let result = swap
         .price_with_metrics(
@@ -238,7 +242,9 @@ fn test_swap_npv_matches_leg_pvs() {
     let end = date!(2029 - 01 - 01);
 
     let swap = create_swap(as_of, end, dec!(0.05));
-    let market = build_curves(0.05, 0.05, as_of);
+    // Convert 5% quarterly simple rate to equivalent continuous rate for ForwardCurve::flat.
+    let fwd_cont = 4.0 * (1.0_f64 + 0.05 * 0.25).ln();
+    let market = build_curves(0.05, fwd_cont, as_of);
 
     // Base NPV from the instrument pricer
     let npv = swap.value(&market, as_of).unwrap().amount();

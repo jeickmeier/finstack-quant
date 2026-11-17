@@ -427,6 +427,8 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, 0.97), (3.0, 0.88), (7.0, 0.70)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         (as_of, option, MarketContext::new().insert(discount))

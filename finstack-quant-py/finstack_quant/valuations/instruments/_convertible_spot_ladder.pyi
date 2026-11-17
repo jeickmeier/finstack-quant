@@ -553,8 +553,8 @@ def convertible_spot_ladder(
     >>> as_of = datetime.date(2025, 1, 15)
     >>> market = (
     ...     MarketContext()
-    ...     .insert(DiscountCurve.flat("USD-IG", as_of, 0.04))
-    ...     .insert(HazardCurve("USD-CREDIT-BBB", as_of, [(1.0, 0.025)], recovery_rate=0.0))
+    ...     .insert(DiscountCurve.flat("USD-IG", as_of, 0.04, "act_365f"))
+    ...     .insert(HazardCurve("USD-CREDIT-BBB", as_of, [(1.0, 0.025)], recovery_rate=0.0, day_count="act_365f"))
     ...     .insert_price("TECH", 100.0, "USD")
     ...     .insert_price("TECH-VOL", 0.30)
     ... )

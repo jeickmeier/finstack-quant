@@ -1,727 +1,431 @@
-//! FX delta-based volatility surface builder.
+//! FX delta-quoted volatility smile conversion and evaluation.
 //!
-//! FX options markets quote volatility in delta space rather than strike space.
-//! The standard market quotes are:
+//! Market FX volatility surfaces quote implied volatility in delta space using:
+//! - `ATM` (at-the-money delta-neutral straddle volatility)
+//! - `25D` (and optionally `10D`) risk reversal (`RR = sigma_call - sigma_put`)
+//! - `25D` (and optionally `10D`) smile butterfly (`BF = 0.5 * (sigma_call + sigma_put) - sigma_ATM`)
 //!
-//! - **ATM DNS** (delta-neutral straddle): The at-the-money volatility where
-//!   the delta of a straddle is zero.
-//! - **25-delta risk reversal (RR)**: The difference between 25-delta call vol
-//!   and 25-delta put vol, capturing the skew.
-//! - **25-delta butterfly (BF)**: The average of 25-delta call and put vols
-//!   minus the ATM vol, capturing the smile curvature.
-//!
-//! This module converts those quotes to a standard strike-based [`VolSurface`]
-//! using the Garman-Kohlhagen framework for FX options.
-//!
-//! # Delta Convention: Premium-Unadjusted Forward Delta
-//!
-//! All delta-to-strike conversions here use the **premium-unadjusted forward
-//! delta**:
-//!
-//! ```text
-//! Delta_fwd_call = N(d1)
-//! ```
-//!
-//! where `d1 = [ln(F/K) + 0.5 * sigma^2 * T] / (sigma * sqrt(T))` and
-//! `F = S * exp((r_d - r_f) * T)` is the forward rate. The spot delta
-//! `exp(-r_f * T) * N(d1)` and premium-adjusted deltas are **not** used.
-//! This matches interbank convention for long-dated G10 pairs; markets that
-//! quote premium-adjusted spot delta (notably EM pairs such as USD/TRY,
-//! USD/BRL, and short-dated G10 spot-delta quotes) will see strike placement
-//! biased relative to their convention — convert quotes to forward delta
-//! before using this builder.
-//!
-//! Inverting the forward delta gives the strike:
-//!
-//! ```text
-//! K(Delta) = F * exp(-N_inv(Delta) * sigma * sqrt(T) + 0.5 * sigma^2 * T)
-//! ```
-//!
-//! For the ATM DNS (delta-neutral straddle) strike:
-//!
-//! ```text
-//! K_ATM = F * exp(0.5 * sigma^2 * T)
-//! ```
-//!
-//! # Quote and Interpolation Conventions
-//!
-//! - **Butterfly quotes are treated as smile (broker) strangles**:
-//!   `sigma_wing = ATM + BF ± 0.5 * RR` exactly. No market-strangle
-//!   (single-vol strangle) consistency solve is performed; if your BF quotes
-//!   are market strangles the wings will be slightly misplaced for skewed
-//!   smiles.
-//! - **Expiry interpolation is linear in vol** on the resulting
-//!   [`VolSurface`] grid, not linear in total variance, so calendar
-//!   interpolation between pillars is only approximate.
-//! - **Per-expiry smiles**:
-//!   Each expiry's smile is built independently from its own
-//!   3/5 pillar strikes (via the crate-internal `fx_smile_pillars` helper),
-//!   derived from *that expiry's* forward and vol scale.
-//!   The rectangular [`VolSurface`] materialization samples each expiry's own
-//!   smile on the union of all pillar strikes; because every expiry's knots
-//!   are grid points, queries at pillar expiries reproduce the per-expiry
-//!   smile exactly (piecewise-linear interpolation is invariant under grid
-//!   refinement). Beyond an expiry's own quoted wings the smile is flat.
-//!   Models-layer evaluators can instead work directly from the delta-space
-//!   artifact when smile-faithful off-pillar evaluation is required.
-//!
-//! # References
-//!
-//! - Wystup, U. (2006). *FX Options and Structured Products*. Wiley.
-//!   Chapter 1 (FX volatility surface conventions). `docs/REFERENCES.md#wystup-fx-options`
-//! - Clark, I. J. (2011). *Foreign Exchange Option Pricing: A Practitioner's Guide*.
-//!   Wiley. Chapters 3-4 (Delta conventions and smile construction). `docs/REFERENCES.md#clark-fx-options`
-//! - Garman, M. B., & Kohlhagen, S. W. (1983). "Foreign Currency Option Values."
-//!   `docs/REFERENCES.md#garman-kohlhagen-1983`
+//! Given these quotes and a forward FX rate `F`, this module delegates wing
+//! recovery, delta-to-strike inversion, and smile monotonicity checks to the
+//! checked kernels in [`finstack_quant_core::market_data::surfaces`], interpolates
+//! quote-space curves linearly in expiry, and interpolates linearly in strike across
+//! the recovered pillar smile with flat extrapolation beyond the extreme wings.
 
-use finstack_quant_core::{InputError, types::CurveId};
-
-use finstack_quant_core::Result;
-use finstack_quant_core::market_data::surfaces::{FxDeltaVolSurface, VolSurface};
-use finstack_quant_core::math::interp::{
-    ExtrapolationPolicy, Interpolator, LinearStrategy, ValidationPolicy,
+use finstack_quant_core::market_data::surfaces::{
+    DEFAULT_FX_DELTA_REL_TOL, FxDeltaVolSurface, VolGridOpts, VolInterpolationMode, VolQuoteType,
+    VolSurface, VolSurfaceAxis, checked_ln_ratio, fx_option_delta_to_strike,
+    fx_smile_pillars_checked, interpolate_fx_wing_vols, recover_fx_wing_vols,
 };
+use finstack_quant_core::math::special_functions::norm_cdf;
+use finstack_quant_core::{InputError, Result};
 
-/// Builder that converts FX delta-quoted vols to a standard strike-based [`VolSurface`].
+type SmileQuoteRow = (f64, (f64, f64), Option<(f64, f64)>);
+
+fn recover_row(surface: &FxDeltaVolSurface, index: usize) -> Result<SmileQuoteRow> {
+    let atm = surface.atm_vols()[index];
+    let wings_25d = recover_fx_wing_vols(atm, surface.rr_25d()[index], surface.bf_25d()[index])?;
+    let wings_10d = match (surface.rr_10d(), surface.bf_10d()) {
+        (Some(rr10), Some(bf10)) => Some(recover_fx_wing_vols(atm, rr10[index], bf10[index])?),
+        _ => None,
+    };
+    Ok((atm, wings_25d, wings_10d))
+}
+
+fn interpolate_row(
+    surface: &FxDeltaVolSurface,
+    i0: usize,
+    i1: usize,
+    expiry: f64,
+) -> Result<SmileQuoteRow> {
+    if i0 == i1 {
+        return recover_row(surface, i0);
+    }
+    let expiries = surface.expiries();
+    let t0 = expiries[i0];
+    let t1 = expiries[i1];
+    if expiry.total_cmp(&t0).is_eq() {
+        return recover_row(surface, i0);
+    }
+    if expiry.total_cmp(&t1).is_eq() {
+        return recover_row(surface, i1);
+    }
+    let dt = t1 - t0;
+    if !dt.is_finite() || dt <= 0.0 {
+        return Err(crate::invalid_input(
+            "FX delta volatility surface expiries must be strictly increasing across brackets",
+        ));
+    }
+    // Form both weights directly from the endpoints to avoid `1 - u` rounding cancellation.
+    let w0 = (t1 - expiry) / dt;
+    let w1 = (expiry - t0) / dt;
+    let atm0 = surface.atm_vols()[i0];
+    let atm1 = surface.atm_vols()[i1];
+    let (atm, sp25, sc25) = interpolate_fx_wing_vols(
+        w0,
+        (atm0, surface.rr_25d()[i0], surface.bf_25d()[i0]),
+        w1,
+        (atm1, surface.rr_25d()[i1], surface.bf_25d()[i1]),
+    )?;
+    let wings_10d = match (surface.rr_10d(), surface.bf_10d()) {
+        (Some(rr10), Some(bf10)) => {
+            let (_, sp10, sc10) = interpolate_fx_wing_vols(
+                w0,
+                (atm0, rr10[i0], bf10[i0]),
+                w1,
+                (atm1, rr10[i1], bf10[i1]),
+            )?;
+            Some((sp10, sc10))
+        }
+        _ => None,
+    };
+    Ok((atm, (sp25, sc25), wings_10d))
+}
+
+/// Convert an unsigned Garman-Kohlhagen forward delta into a domestic-per-foreign FX strike.
 ///
-/// FX markets quote volatility in delta space (ATM DNS, 25-delta RR, 25-delta BF),
-/// not strike space. This builder converts those quotes to strikes and
-/// builds a standard [`VolSurface`] for the pricing engine.
+/// Uses the premium-unadjusted forward delta convention:
+/// - For calls (`is_call = true`), `Delta_call = N(d1) = delta_abs`.
+/// - For puts (`is_call = false`), `|Delta_put| = N(-d1) = delta_abs`.
 ///
-/// # Quote Conventions
+/// # Arguments
 ///
-/// From the market quotes, individual wing volatilities are recovered as:
+/// * `is_call` - Selects call delta (`true`) or put delta magnitude (`false`).
+/// * `delta_abs` - Unsigned forward delta magnitude strictly inside `(0, 1)` (for example `0.25` for a 25-delta call or 25-delta put).
+/// * `forward` - Strictly positive finite FX forward rate (domestic per unit foreign).
+/// * `vol` - Strictly positive finite Black implied volatility as an annualized decimal (for example `0.10` for 10%).
+/// * `expiry` - Strictly positive finite time to expiry in years.
 ///
-/// ```text
-/// sigma_25d_call = ATM + BF + 0.5 * RR
-/// sigma_25d_put  = ATM + BF - 0.5 * RR
-/// ```
+/// # Returns
+///
+/// Returns the strictly positive strike `K` satisfying the forward delta convention within [`DEFAULT_FX_DELTA_REL_TOL`].
+///
+/// # Errors
+///
+/// Returns an error if any numerical input is non-finite or outside its positive/`(0, 1)` domain,
+/// or if extreme `vol * sqrt(expiry)` / tail inputs cause the inverted strike to overflow,
+/// underflow to zero, or lose delta-roundtrip accuracy beyond [`DEFAULT_FX_DELTA_REL_TOL`].
 ///
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_models::volatility::FxVolSurfaceBuilder;
+/// use finstack_quant_models::volatility::{delta_to_strike, strike_to_delta};
 ///
-/// let surface = FxVolSurfaceBuilder::new("EURUSD-VOL")
-///     .spot(1.10)
-///     .domestic_rate(0.05)
-///     .foreign_rate(0.04)
-///     .expiries(&[0.25, 0.5, 1.0])
-///     .atm_vols(&[0.08, 0.085, 0.09])
-///     .rr_25d(&[0.01, 0.012, 0.015])
-///     .bf_25d(&[0.005, 0.006, 0.007])
-///     .build()
-///     .expect("FX delta vol surface should build");
-///
-/// assert_eq!(surface.grid_shape().0, 3);
-/// assert!(surface.vols().iter().all(|vol| *vol > 0.0));
+/// # fn main() -> finstack_quant_core::Result<()> {
+/// let strike = delta_to_strike(true, 0.25, 1.10, 0.12, 1.0)?;
+/// let delta = strike_to_delta(true, strike, 1.10, 0.12, 1.0)?;
+/// assert!((delta - 0.25).abs() < 1e-6);
+/// # Ok(())
+/// # }
 /// ```
-pub struct FxVolSurfaceBuilder {
-    id: CurveId,
-    spot: f64,
-    domestic_rate: f64,
-    foreign_rate: f64,
-    expiries: Vec<f64>,
-    atm_vols: Vec<f64>,
-    rr_25d: Option<Vec<f64>>,
-    bf_25d: Option<Vec<f64>>,
-    rr_10d: Option<Vec<f64>>,
-    bf_10d: Option<Vec<f64>>,
-}
-
-impl FxVolSurfaceBuilder {
-    /// Create a new builder with the given surface identifier.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Unique identifier for the resulting [`VolSurface`]
-    pub fn new(id: impl Into<CurveId>) -> Self {
-        Self {
-            id: id.into(),
-            spot: 0.0,
-            domestic_rate: 0.0,
-            foreign_rate: 0.0,
-            expiries: Vec::new(),
-            atm_vols: Vec::new(),
-            rr_25d: None,
-            bf_25d: None,
-            rr_10d: None,
-            bf_10d: None,
-        }
-    }
-
-    /// Set the FX spot rate (e.g., 1.10 for EUR/USD).
-    ///
-    /// # Arguments
-    ///
-    /// * `spot` - Positive finite FX spot in domestic-currency units per one foreign unit; copied into the builder and validated by build.
-    pub fn spot(mut self, spot: f64) -> Self {
-        self.spot = spot;
-        self
-    }
-
-    /// Set the domestic (numerator currency) continuously compounded interest rate.
-    ///
-    /// # Arguments
-    ///
-    /// * `rate` - Finite continuously compounded annual domestic interest rate as a decimal, for example 0.05 for 5 percent; negative rates are allowed.
-    pub fn domestic_rate(mut self, rate: f64) -> Self {
-        self.domestic_rate = rate;
-        self
-    }
-
-    /// Set the foreign (denominator currency) continuously compounded interest rate.
-    ///
-    /// # Arguments
-    ///
-    /// * `rate` - Finite continuously compounded annual foreign interest rate as a decimal; used with the domestic rate to compute forwards.
-    pub fn foreign_rate(mut self, rate: f64) -> Self {
-        self.foreign_rate = rate;
-        self
-    }
-
-    /// Set the expiry times in years.
-    ///
-    /// Must be strictly increasing and match the length of `atm_vols`.
-    ///
-    /// # Arguments
-    ///
-    /// * `expiries` - Nonempty, strictly increasing positive finite year fractions; copied into the builder and matched one-for-one to every quote array.
-    pub fn expiries(mut self, expiries: &[f64]) -> Self {
-        self.expiries = expiries.to_vec();
-        self
-    }
-
-    /// Set the ATM delta-neutral straddle volatilities per expiry.
-    ///
-    /// Must have the same length as `expiries`.
-    ///
-    /// # Arguments
-    ///
-    /// * `vols` - Positive finite annualized Black volatilities as decimals, one per expiry, under the premium-unadjusted forward-delta ATM DNS convention.
-    pub fn atm_vols(mut self, vols: &[f64]) -> Self {
-        self.atm_vols = vols.to_vec();
-        self
-    }
-
-    /// Set the 25-delta risk reversal quotes per expiry.
-    ///
-    /// `RR = sigma_25d_call - sigma_25d_put`
-    ///
-    /// Must have the same length as `expiries`. If not provided, only ATM
-    /// strikes are generated (single-strike surface).
-    ///
-    /// # Arguments
-    ///
-    /// * `rr` - Finite call-minus-put 25-delta volatility differences as decimals, one per expiry; supply bf_25d together with these quotes.
-    pub fn rr_25d(mut self, rr: &[f64]) -> Self {
-        self.rr_25d = Some(rr.to_vec());
-        self
-    }
-
-    /// Set the 25-delta butterfly quotes per expiry.
-    ///
-    /// `BF = 0.5 * (sigma_25d_call + sigma_25d_put) - sigma_ATM`
-    ///
-    /// Must have the same length as `expiries`. If not provided, only ATM
-    /// strikes are generated (single-strike surface).
-    ///
-    /// # Arguments
-    ///
-    /// * `bf` - Finite 25-delta smile-strangle butterfly quotes as decimal volatility, one per expiry; paired with rr_25d. These are not market-strangle quotes.
-    pub fn bf_25d(mut self, bf: &[f64]) -> Self {
-        self.bf_25d = Some(bf.to_vec());
-        self
-    }
-
-    /// Set the 10-delta risk reversal quotes per expiry.
-    ///
-    /// # Arguments
-    ///
-    /// * `rr` - Finite call-minus-put 10-delta volatility differences as decimals, one per expiry; paired with bf_10d to add outer wings to the 25-delta smile.
-    pub fn rr_10d(mut self, rr: &[f64]) -> Self {
-        self.rr_10d = Some(rr.to_vec());
-        self
-    }
-
-    /// Set the 10-delta butterfly quotes per expiry.
-    ///
-    /// # Arguments
-    ///
-    /// * `bf` - Finite 10-delta smile-strangle butterfly quotes as decimal volatility, one per expiry; paired with rr_10d to add outer wings.
-    pub fn bf_10d(mut self, bf: &[f64]) -> Self {
-        self.bf_10d = Some(bf.to_vec());
-        self
-    }
-
-    /// Build the strike-based [`VolSurface`] from the delta-space quotes.
-    ///
-    /// # Conversion Steps
-    ///
-    /// 1. Recover individual wing vols from RR/BF quotes
-    /// 2. Compute the forward rate `F = S * exp((r_d - r_f) * T)` per expiry
-    /// 3. Convert delta to strike using Garman-Kohlhagen inversion
-    /// 4. Assemble the strike-vol grid into a standard [`VolSurface`]
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the spot is non-positive or non-finite; expiries or
-    /// ATM vols are empty; array lengths disagree; any expiry is non-positive
-    /// or non-finite; expiries are not strictly increasing; any ATM vol is
-    /// non-positive or non-finite; RR/BF quotes are unpaired or non-finite; or
-    /// a recovered wing volatility is non-positive.
-    pub fn build(self) -> Result<VolSurface> {
-        if !self.spot.is_finite() || self.spot <= 0.0 {
-            return Err(InputError::NonPositiveValue.into());
-        }
-        if !self.domestic_rate.is_finite() || !self.foreign_rate.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(
-                "domestic and foreign rates must be finite".to_string(),
-            ));
-        }
-        if self.expiries.is_empty() || self.atm_vols.is_empty() {
-            return Err(InputError::TooFewPoints.into());
-        }
-        if self.expiries.len() != self.atm_vols.len() {
-            return Err(InputError::DimensionMismatch.into());
-        }
-
-        for &t in &self.expiries {
-            if !t.is_finite() || t <= 0.0 {
-                return Err(InputError::NonPositiveValue.into());
-            }
-        }
-        for w in self.expiries.windows(2) {
-            if w[1] <= w[0] {
-                return Err(InputError::NonMonotonicKnots.into());
-            }
-        }
-
-        for &v in &self.atm_vols {
-            if !v.is_finite() || v <= 0.0 {
-                return Err(InputError::NonPositiveValue.into());
-            }
-        }
-
-        if self.rr_25d.is_some() != self.bf_25d.is_some()
-            || self.rr_10d.is_some() != self.bf_10d.is_some()
-        {
-            return Err(finstack_quant_core::Error::Validation(
-                "risk reversal and butterfly quotes must be supplied together for each delta"
-                    .to_string(),
-            ));
-        }
-        let has_wings = self.rr_25d.is_some();
-
-        if let Some(ref rr) = self.rr_25d {
-            if rr.len() != self.expiries.len() {
-                return Err(InputError::DimensionMismatch.into());
-            }
-            for &v in rr {
-                if !v.is_finite() {
-                    return Err(finstack_quant_core::Error::Validation(
-                        "25-delta risk reversal quotes must be finite".to_string(),
-                    ));
-                }
-            }
-        }
-        if let Some(ref bf) = self.bf_25d {
-            if bf.len() != self.expiries.len() {
-                return Err(InputError::DimensionMismatch.into());
-            }
-            for &v in bf {
-                if !v.is_finite() {
-                    return Err(finstack_quant_core::Error::Validation(
-                        "25-delta butterfly quotes must be finite".to_string(),
-                    ));
-                }
-            }
-        }
-        if let Some(ref rr) = self.rr_10d {
-            if rr.len() != self.expiries.len() {
-                return Err(InputError::DimensionMismatch.into());
-            }
-            for &v in rr {
-                if !v.is_finite() {
-                    return Err(finstack_quant_core::Error::Validation(
-                        "10-delta risk reversal quotes must be finite".to_string(),
-                    ));
-                }
-            }
-        }
-        if let Some(ref bf) = self.bf_10d {
-            if bf.len() != self.expiries.len() {
-                return Err(InputError::DimensionMismatch.into());
-            }
-            for &v in bf {
-                if !v.is_finite() {
-                    return Err(finstack_quant_core::Error::Validation(
-                        "10-delta butterfly quotes must be finite".to_string(),
-                    ));
-                }
-            }
-        }
-
-        let n_expiries = self.expiries.len();
-        let has_10d_wings = self.rr_10d.is_some() && self.bf_10d.is_some();
-
-        if has_wings {
-            let (Some(rr), Some(bf)) = (self.rr_25d.as_ref(), self.bf_25d.as_ref()) else {
-                return Err(finstack_quant_core::Error::Validation(
-                    "25-delta wings require both risk reversal and butterfly quotes".to_string(),
-                ));
-            };
-            let wings_10d = match (self.rr_10d.as_ref(), self.bf_10d.as_ref()) {
-                (Some(rr10), Some(bf10)) => Some((rr10, bf10)),
-                _ => None,
-            };
-
-            let mut all_strikes: Vec<f64> =
-                Vec::with_capacity(if has_10d_wings { 5 } else { 3 } * n_expiries);
-            let mut per_expiry_smiles: Vec<(Vec<f64>, Vec<f64>)> = Vec::with_capacity(n_expiries);
-
-            for i in 0..n_expiries {
-                let t = self.expiries[i];
-                let fwd = fx_forward(self.spot, self.domestic_rate, self.foreign_rate, t);
-                let (known_strikes, known_vols) = fx_smile_pillars(
-                    fwd,
-                    t,
-                    self.atm_vols[i],
-                    rr[i],
-                    bf[i],
-                    wings_10d.map(|(rr10, bf10)| (rr10[i], bf10[i])),
-                )?;
-                all_strikes.extend(known_strikes.iter().copied());
-                per_expiry_smiles.push((known_strikes, known_vols));
-            }
-
-            // Strike axis: union of all expiries' pillar strikes (sorted,
-            // deduplicated). Every expiry's own knots are grid points, so
-            // sampling the per-expiry smiles on this axis is lossless at the
-            // pillar expiries: piecewise-linear interpolation is invariant
-            // under grid refinement.
-            all_strikes.sort_by(|a, b| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal));
-            all_strikes.dedup_by(|a, b| (*a - *b).abs() < 1e-10);
-
-            let strikes = &all_strikes;
-
-            let mut builder = VolSurface::builder(self.id)
-                .expiries(&self.expiries)
-                .strikes(strikes);
-
-            // Each row samples that expiry's OWN smile only: linear within
-            // its own 3/5 pillars, flat beyond its own quoted wings. Strikes
-            // contributed by other expiries never alter the smile shape.
-            for (known_strikes, known_vols) in per_expiry_smiles {
-                let smile = Interpolator::<LinearStrategy>::new(
-                    known_strikes.into_boxed_slice(),
-                    known_vols.into_boxed_slice(),
-                    ExtrapolationPolicy::FlatZero,
-                    ValidationPolicy::AllowNegative,
-                )?;
-                let row: Vec<f64> = strikes.iter().map(|&k| smile.interp(k)).collect();
-                builder = builder.row(&row);
-            }
-
-            builder.build()
-        } else {
-            let mut all_strikes: Vec<f64> = Vec::with_capacity(n_expiries);
-
-            for i in 0..n_expiries {
-                let t = self.expiries[i];
-                let atm = self.atm_vols[i];
-                let fwd = fx_forward(self.spot, self.domestic_rate, self.foreign_rate, t);
-                let k_atm = fx_atm_dns_strike(fwd, atm, t);
-                all_strikes.push(k_atm);
-            }
-
-            all_strikes.sort_by(|a, b| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal));
-            all_strikes.dedup_by(|a, b| (*a - *b).abs() < 1e-10);
-
-            let n_strikes = all_strikes.len();
-
-            let mut builder = VolSurface::builder(self.id)
-                .expiries(&self.expiries)
-                .strikes(&all_strikes);
-
-            for &atm in &self.atm_vols {
-                builder = builder.row(&vec![atm; n_strikes]);
-            }
-
-            builder.build()
-        }
-    }
-}
-
-/// Recover 25d/10d wing vols from ATM/RR/BF quotes, treating BF as a
-/// **smile (broker) strangle**: `sigma_wing = ATM + BF ± RR/2` exactly.
-/// No market-strangle consistency solve is performed.
-#[inline]
-fn recover_fx_wing_vols(atm: f64, rr: f64, bf: f64) -> (f64, f64) {
-    let sigma_call = atm + bf + 0.5 * rr;
-    let sigma_put = atm + bf - 0.5 * rr;
-    (sigma_put, sigma_call)
-}
-
-/// Garman-Kohlhagen FX forward `F = S * exp((r_d - r_f) * T)` with
-/// continuously compounded rates.
-#[inline]
-fn fx_forward(spot: f64, domestic_rate: f64, foreign_rate: f64, expiry: f64) -> f64 {
-    spot * ((domestic_rate - foreign_rate) * expiry).exp()
-}
-
-/// Delta-neutral-straddle ATM strike `K = F * exp(sigma^2 T / 2)` under the
-/// premium-unadjusted **forward delta** convention.
-#[inline]
-fn fx_atm_dns_strike(forward: f64, vol: f64, expiry: f64) -> f64 {
-    forward * (0.5 * vol * vol * expiry).exp()
-}
-
-/// Strikes for put/call at absolute delta `delta_abs` using the
-/// premium-unadjusted **forward delta** convention (`Delta_call = N(d1)`),
-/// i.e. `K = F * exp(∓ N⁻¹(Δ) σ √T + σ² T / 2)`. Spot-delta and
-/// premium-adjusted conventions are intentionally not supported here.
-#[inline]
-fn fx_put_call_delta_strikes(
-    forward: f64,
-    sigma_put: f64,
-    sigma_call: f64,
-    expiry: f64,
+pub fn delta_to_strike(
+    is_call: bool,
     delta_abs: f64,
-) -> (f64, f64) {
-    (
-        delta_to_strike(1.0 - delta_abs, forward, sigma_put, expiry),
-        delta_to_strike(delta_abs, forward, sigma_call, expiry),
-    )
-}
-
-/// Per-expiry FX smile pillars: the (strikes, vols) of one expiry's own
-/// 3-point (25Δ put, ATM DNS, 25Δ call) or 5-point (plus 10Δ wings) smile.
-///
-/// Both direct FX smile evaluation and [`FxVolSurfaceBuilder`] use this
-/// canonical per-expiry representation when evaluating or materializing a
-/// rectangular data artifact. Each expiry's strikes are derived from *that
-/// expiry's* forward and vol scale; no strikes from other expiries are involved.
-///
-/// `wings_10d` carries `(rr_10d, bf_10d)` when 10-delta quotes are available.
-///
-/// # Errors
-///
-/// Returns [`InputError::NegativeValue`](finstack_quant_core::InputError) if any
-/// recovered wing vol is non-positive.
-fn fx_smile_pillars(
     forward: f64,
+    vol: f64,
     expiry: f64,
-    atm: f64,
-    rr_25d: f64,
-    bf_25d: f64,
-    wings_10d: Option<(f64, f64)>,
-) -> Result<(Vec<f64>, Vec<f64>)> {
-    let (sigma_put, sigma_call) = recover_fx_wing_vols(atm, rr_25d, bf_25d);
-    if sigma_call <= 0.0 || sigma_put <= 0.0 {
-        return Err(finstack_quant_core::InputError::NegativeValue.into());
-    }
-
-    let k_atm = fx_atm_dns_strike(forward, atm, expiry);
-    let (k_put, k_call) = fx_put_call_delta_strikes(forward, sigma_put, sigma_call, expiry, 0.25);
-
-    if let Some((rr_10d, bf_10d)) = wings_10d {
-        let (sigma_put_10d, sigma_call_10d) = recover_fx_wing_vols(atm, rr_10d, bf_10d);
-        if sigma_call_10d <= 0.0 || sigma_put_10d <= 0.0 {
-            return Err(finstack_quant_core::InputError::NegativeValue.into());
-        }
-        let (k_put_10d, k_call_10d) =
-            fx_put_call_delta_strikes(forward, sigma_put_10d, sigma_call_10d, expiry, 0.10);
-        Ok((
-            vec![k_put_10d, k_put, k_atm, k_call, k_call_10d],
-            vec![sigma_put_10d, sigma_put, atm, sigma_call, sigma_call_10d],
-        ))
-    } else {
-        Ok((vec![k_put, k_atm, k_call], vec![sigma_put, atm, sigma_call]))
-    }
-}
-
-/// Convert premium-unadjusted forward delta to strike.
-///
-/// # Arguments
-///
-/// * `delta` - Absolute call delta on the open unit interval.
-/// * `forward` - Positive FX forward in domestic-currency units per foreign unit.
-/// * `vol` - Annualized Black volatility as a decimal.
-/// * `expiry` - Time to expiry in years.
-pub fn delta_to_strike(delta: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
-    let z = finstack_quant_core::math::special_functions::standard_normal_inv_cdf(delta);
-    forward * (-z * vol * expiry.sqrt() + 0.5 * vol * vol * expiry).exp()
-}
-
-/// Convert strike to premium-unadjusted forward call delta.
-///
-/// # Arguments
-///
-/// * `strike` - Positive strike in domestic-currency units per foreign unit.
-/// * `forward` - Positive FX forward in the same units as `strike`.
-/// * `vol` - Annualized Black volatility as a decimal.
-/// * `expiry` - Time to expiry in years.
-pub fn strike_to_delta(strike: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
-    finstack_quant_core::math::special_functions::norm_cdf(
-        crate::closed_form::d1_d2_black76(forward, strike, vol, expiry).0,
+) -> Result<f64> {
+    fx_option_delta_to_strike(
+        is_call,
+        delta_abs,
+        forward,
+        vol,
+        expiry,
+        DEFAULT_FX_DELTA_REL_TOL,
     )
 }
 
-/// Evaluate an FX delta-quoted volatility artifact.
+/// Compute unsigned Garman-Kohlhagen forward delta magnitude from an FX strike.
+///
+/// Uses the premium-unadjusted forward delta convention:
+/// - For calls (`is_call = true`), returns `N(d1)`.
+/// - For puts (`is_call = false`), returns `|Delta_put| = N(-d1)`.
 ///
 /// # Arguments
 ///
-/// * `surface` - Structurally validated ATM, risk-reversal, and butterfly quotes.
-/// * `expiry` - Positive option expiry in years; wings are flat outside the axis.
-/// * `strike` - Positive strike in domestic-currency units per foreign unit.
-/// * `forward` - Positive FX forward in the same units as `strike`.
+/// * `is_call` - Selects call delta (`true`) or unsigned put delta magnitude (`false`).
+/// * `strike` - Strictly positive finite option strike in domestic-per-foreign units.
+/// * `forward` - Strictly positive finite FX forward rate in the same units as `strike`.
+/// * `vol` - Strictly positive finite annualized decimal Black volatility.
+/// * `expiry` - Strictly positive finite time to expiry in years.
+///
+/// # Returns
+///
+/// Returns the unsigned forward delta in `[0, 1]`.
 ///
 /// # Errors
 ///
-/// Returns an input error for non-positive or non-finite coordinates, or for
-/// quotes that imply a non-positive wing volatility.
+/// Returns [`InputError::NonPositiveValue`] when any input is non-finite or non-positive, or a
+/// validation error when `vol * sqrt(expiry)` underflows to zero or overflows `f64`.
+pub fn strike_to_delta(
+    is_call: bool,
+    strike: f64,
+    forward: f64,
+    vol: f64,
+    expiry: f64,
+) -> Result<f64> {
+    if !strike.is_finite()
+        || strike <= 0.0
+        || !forward.is_finite()
+        || forward <= 0.0
+        || !vol.is_finite()
+        || vol <= 0.0
+        || !expiry.is_finite()
+        || expiry <= 0.0
+    {
+        return Err(InputError::NonPositiveValue.into());
+    }
+    let vol_sqrt_t = vol * expiry.sqrt();
+    if !vol_sqrt_t.is_finite() || vol_sqrt_t <= 0.0 {
+        return Err(crate::invalid_input(
+            "FX volatility * sqrt(expiry) must be positive and finite",
+        ));
+    }
+    let ln_fk = checked_ln_ratio(forward, strike);
+    let d1 = ln_fk / vol_sqrt_t + 0.5 * vol_sqrt_t;
+    if !d1.is_finite() {
+        return Err(crate::invalid_input(
+            "FX Black d1 overflowed finite f64 range",
+        ));
+    }
+    let signed_d1 = if is_call { d1 } else { -d1 };
+    Ok(norm_cdf(signed_d1))
+}
+
+/// Evaluate an [`FxDeltaVolSurface`] at `(expiry, strike)` given an explicit FX `forward`.
+///
+/// Enforces strict expiry bounds `[expiries.first(), expiries.last()]`. At an exact stored expiry
+/// knot, only that row's ATM/RR/BF quotes are recovered; between expiries, ATM, risk-reversal,
+/// and butterfly quotes are interpolated linearly in expiry before recovering wing volatilities and
+/// mapping delta pillars to strikes at `(expiry, forward)`. Strike interpolation is linear between
+/// pillar strikes with flat clamping outside the extreme wings.
+///
+/// # Arguments
+///
+/// * `surface` - Validated FX delta volatility surface supplying ATM, RR, and BF term structures.
+/// * `expiry` - Strictly positive finite query expiry in years; must fall within the surface's stored `[T_min, T_max]` expiry span.
+/// * `strike` - Strictly positive finite query strike in domestic-per-foreign units.
+/// * `forward` - Strictly positive finite FX forward rate at `expiry` in the same units as `strike`.
+///
+/// # Returns
+///
+/// Returns the annualized decimal Black volatility implied at `(expiry, strike)`.
+///
+/// # Errors
+///
+/// Returns an error if `expiry`, `strike`, or `forward` is non-positive or non-finite, if
+/// `expiry` lies outside `[T_min, T_max]`, if recovered wing volatilities are non-positive, or if
+/// inverted pillar strikes are non-monotone or violate [`DEFAULT_FX_DELTA_REL_TOL`].
 pub fn get_fx_delta_vol(
     surface: &FxDeltaVolSurface,
     expiry: f64,
     strike: f64,
     forward: f64,
 ) -> Result<f64> {
-    if expiry <= 0.0
-        || !expiry.is_finite()
-        || strike <= 0.0
+    if !expiry.is_finite()
+        || expiry <= 0.0
         || !strike.is_finite()
-        || forward <= 0.0
+        || strike <= 0.0
         || !forward.is_finite()
+        || forward <= 0.0
     {
         return Err(InputError::NonPositiveValue.into());
     }
-    let atm = linear_clamped(surface.expiries(), surface.atm_vols(), expiry);
-    let rr25 = linear_clamped(surface.expiries(), surface.rr_25d(), expiry);
-    let bf25 = linear_clamped(surface.expiries(), surface.bf_25d(), expiry);
-    let wings_10d = surface.rr_10d().zip(surface.bf_10d()).map(|(rr, bf)| {
-        (
-            linear_clamped(surface.expiries(), rr, expiry),
-            linear_clamped(surface.expiries(), bf, expiry),
-        )
-    });
-    let (strikes, vols) = fx_smile_pillars(forward, expiry, atm, rr25, bf25, wings_10d)?;
-    Ok(linear_clamped(&strikes, &vols, strike))
+    let (i0, i1, _) = super::source::segment(surface.expiries(), expiry)?;
+    let (atm, wings_25d, wings_10d) = interpolate_row(surface, i0, i1, expiry)?;
+    let (strikes, vols) = fx_smile_pillars_checked(
+        forward,
+        expiry,
+        atm,
+        wings_25d,
+        wings_10d,
+        DEFAULT_FX_DELTA_REL_TOL,
+    )?;
+    Ok(super::source::linear_clamped(&strikes, &vols, strike))
 }
 
-/// Return ATM, 25-delta put, and 25-delta call volatilities at a stored expiry.
+/// Recover the pillar volatilities stored at `expiry_index` on `surface`.
 ///
 /// # Arguments
 ///
-/// * `surface` - Structurally validated FX delta-volatility quotes.
-/// * `expiry_index` - Zero-based index into the stored expiry axis.
+/// * `surface` - Validated FX delta volatility surface.
+/// * `expiry_index` - Zero-based index into `surface.expiries()`.
+///
+/// # Returns
+///
+/// Returns `[atm, sigma_put_25d, sigma_call_25d]` for 3-point surfaces, or
+/// `[atm, sigma_put_25d, sigma_call_25d, sigma_put_10d, sigma_call_10d]` when 10-delta quotes are present.
 ///
 /// # Errors
 ///
-/// Returns an input error when `expiry_index` is outside the stored axis.
+/// Returns a validation error when `expiry_index` is out of range for the FX delta surface or when
+/// the stored quotes fail wing recovery.
 pub fn get_fx_delta_pillar_vols(
     surface: &FxDeltaVolSurface,
     expiry_index: usize,
-) -> Result<(f64, f64, f64)> {
-    let atm = *surface.atm_vols().get(expiry_index).ok_or_else(|| {
-        finstack_quant_core::Error::Validation(format!(
-            "expiry index {expiry_index} is out of range for the FX delta surface"
-        ))
-    })?;
-    let rr = surface.rr_25d()[expiry_index];
-    let bf = surface.bf_25d()[expiry_index];
-    let (put, call) = recover_fx_wing_vols(atm, rr, bf);
-    Ok((atm, put, call))
+) -> Result<Vec<f64>> {
+    let expiries = surface.expiries();
+    if expiry_index >= expiries.len() {
+        return Err(crate::invalid_input(format!(
+            "expiry_index {expiry_index} out of range for the FX delta surface '{}' (len={})",
+            surface.id().as_str(),
+            expiries.len()
+        )));
+    }
+    let (atm, (sp25, sc25), wings_10d) = recover_row(surface, expiry_index)?;
+    let mut out = Vec::with_capacity(if wings_10d.is_some() { 5 } else { 3 });
+    out.push(atm);
+    out.push(sp25);
+    out.push(sc25);
+    if let Some((sp10, sc10)) = wings_10d {
+        out.push(sp10);
+        out.push(sc10);
+    }
+    Ok(out)
 }
 
-/// Materialize an FX delta-quoted artifact on a rectangular strike grid.
+/// Materialize an [`FxDeltaVolSurface`] onto a strike-by-expiry [`VolSurface`] grid.
+///
+/// Converts each expiry slice's delta pillars into strikes using its explicit delivery forward
+/// `delivery_forwards[i]`, takes the exact IEEE-754 union (`f64::total_cmp` + exact dedup without
+/// tolerance coalescing) as the strike axis, and samples every expiry row linearly with flat wing
+/// clamping using [`VolInterpolationMode::Vol`].
 ///
 /// # Arguments
 ///
-/// * `surface` - Structurally validated FX delta-volatility quotes.
-/// * `spot` - Positive FX spot in domestic-currency units per foreign unit.
-/// * `domestic_rate` - Continuously compounded domestic rate as an annual decimal.
-/// * `foreign_rate` - Continuously compounded foreign rate as an annual decimal.
+/// * `surface` - Validated FX delta volatility surface to materialize.
+/// * `delivery_forwards` - Positive finite outright FX forward rates (`quote` per `base`), one per expiry in `surface.expiries()`.
+///
+/// # Returns
+///
+/// Returns a strike-indexed [`VolSurface`] storing `VolQuoteType::BlackLognormal` and
+/// `VolInterpolationMode::Vol`.
 ///
 /// # Errors
 ///
-/// Returns an input or structural-validation error when the market inputs or
-/// recovered volatility grid are invalid.
+/// Returns [`InputError::DimensionMismatch`] when `delivery_forwards.len() != surface.expiries().len()`,
+/// [`InputError::NonPositiveValue`] when any delivery forward is non-positive or non-finite, or an
+/// error if any expiry row produces invalid wings, non-monotone pillar strikes, or invalid
+/// delta-to-strike accuracy.
 pub fn materialize_fx_delta_surface(
     surface: &FxDeltaVolSurface,
-    spot: f64,
-    domestic_rate: f64,
-    foreign_rate: f64,
+    delivery_forwards: &[f64],
 ) -> Result<VolSurface> {
-    let mut builder = FxVolSurfaceBuilder::new(surface.id().clone())
-        .spot(spot)
-        .domestic_rate(domestic_rate)
-        .foreign_rate(foreign_rate)
-        .expiries(surface.expiries())
-        .atm_vols(surface.atm_vols())
-        .rr_25d(surface.rr_25d())
-        .bf_25d(surface.bf_25d());
-    if let Some(rr) = surface.rr_10d() {
-        builder = builder.rr_10d(rr);
+    let expiries = surface.expiries();
+    if delivery_forwards.len() != expiries.len() {
+        return Err(InputError::DimensionMismatch.into());
     }
-    if let Some(bf) = surface.bf_10d() {
-        builder = builder.bf_10d(bf);
+    if delivery_forwards
+        .iter()
+        .any(|&fwd| !fwd.is_finite() || fwd <= 0.0)
+    {
+        return Err(InputError::NonPositiveValue.into());
     }
-    builder.build()
-}
 
-use super::source::linear_clamped;
+    let mut row_smiles = Vec::with_capacity(expiries.len());
+    let mut all_strikes = Vec::new();
+    for (idx, (&expiry, &forward)) in expiries.iter().zip(delivery_forwards.iter()).enumerate() {
+        let (atm, wings_25d, wings_10d) = recover_row(surface, idx)?;
+        let (strikes, vols) = fx_smile_pillars_checked(
+            forward,
+            expiry,
+            atm,
+            wings_25d,
+            wings_10d,
+            DEFAULT_FX_DELTA_REL_TOL,
+        )?;
+        all_strikes.extend_from_slice(&strikes);
+        row_smiles.push((strikes, vols));
+    }
+
+    all_strikes.sort_by(f64::total_cmp);
+    all_strikes.dedup_by(|a, b| a.total_cmp(b).is_eq());
+
+    let mut flat_vols = Vec::with_capacity(expiries.len() * all_strikes.len());
+    for (row_strikes, row_vols) in &row_smiles {
+        for &strike in &all_strikes {
+            flat_vols.push(super::source::linear_clamped(row_strikes, row_vols, strike));
+        }
+    }
+
+    let out = VolSurface::from_grid(
+        surface.id().as_str(),
+        expiries,
+        &all_strikes,
+        &flat_vols,
+        VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
+            interpolation_mode: VolInterpolationMode::Vol,
+        },
+        None,
+    )?;
+    Ok(match surface.expiry_clock() {
+        Some(clock) => out.with_expiry_clock(clock.clone()),
+        None => out,
+    })
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::market_data::surfaces::{
+        FxAtmConvention, FxButterflyConvention, FxDeltaConvention,
+    };
+    use finstack_quant_core::money::fx::CurrencyPair;
 
-    #[test]
-    fn build_uses_five_point_smile_when_10d_quotes_are_available() {
-        let surface = FxVolSurfaceBuilder::new("EURUSD-VOL")
-            .spot(1.10)
-            .domestic_rate(0.05)
-            .foreign_rate(0.04)
-            .expiries(&[0.5, 1.0])
-            .atm_vols(&[0.08, 0.09])
-            .rr_25d(&[0.01, 0.012])
-            .bf_25d(&[0.005, 0.006])
-            .rr_10d(&[0.015, 0.018])
-            .bf_10d(&[0.008, 0.009])
-            .build()
-            .expect("surface should build with 10d and 25d wings");
-
-        assert!(
-            surface.strikes().len() >= 5,
-            "10d wings should add extra smile points"
-        );
+    fn sample_surface() -> FxDeltaVolSurface {
+        FxDeltaVolSurface::builder(
+            "EURUSD-VOL",
+            CurrencyPair::try_new(Currency::EUR, Currency::USD).unwrap(),
+        )
+        .delta_convention(FxDeltaConvention::ForwardUnadjusted)
+        .atm_convention(FxAtmConvention::DeltaNeutralStraddle)
+        .butterfly_convention(FxButterflyConvention::Smile)
+        .expiries(&[0.5, 1.0])
+        .atm_vols(&[0.10, 0.11])
+        .rr_25d(&[0.01, 0.015])
+        .bf_25d(&[0.002, 0.003])
+        .build()
+        .unwrap()
     }
 
     #[test]
-    fn builder_rejects_unpaired_rr_and_bf_quotes() {
-        let base = || {
-            FxVolSurfaceBuilder::new("EURUSD-VOL")
-                .spot(1.10)
-                .expiries(&[1.0])
-                .atm_vols(&[0.09])
-        };
-        assert!(base().rr_25d(&[0.01]).build().is_err());
-        assert!(base().bf_25d(&[0.005]).build().is_err());
-        assert!(
-            base()
-                .rr_25d(&[0.01])
-                .bf_25d(&[0.005])
-                .rr_10d(&[0.02])
-                .build()
-                .is_err()
-        );
-        assert!(
-            base()
-                .rr_25d(&[0.01])
-                .bf_25d(&[0.005])
-                .bf_10d(&[0.01])
-                .build()
-                .is_err()
-        );
+    fn materialize_builds_vol_surface_for_valid_quotes() {
+        use finstack_quant_core::dates::{DayCount, DayCountContextState, VolatilityClock};
+        use time::macros::date;
+
+        let clock = VolatilityClock::try_new(
+            date!(2025 - 01 - 01),
+            DayCount::Act365F,
+            DayCountContextState::default(),
+        )
+        .unwrap();
+        let surface = FxDeltaVolSurface::builder(
+            "EURUSD-VOL",
+            CurrencyPair::try_new(Currency::EUR, Currency::USD).unwrap(),
+        )
+        .delta_convention(FxDeltaConvention::ForwardUnadjusted)
+        .atm_convention(FxAtmConvention::DeltaNeutralStraddle)
+        .butterfly_convention(FxButterflyConvention::Smile)
+        .expiry_clock(clock.clone())
+        .expiries(&[0.5, 1.0])
+        .atm_vols(&[0.10, 0.11])
+        .rr_25d(&[0.01, 0.015])
+        .bf_25d(&[0.002, 0.003])
+        .build()
+        .unwrap();
+        let materialized = materialize_fx_delta_surface(&surface, &[1.10, 1.12]).unwrap();
+        assert_eq!(materialized.expiries(), &[0.5, 1.0]);
+        assert_eq!(materialized.interpolation_mode(), VolInterpolationMode::Vol);
+        assert!(materialized.secondary_values().len() >= 3);
+        assert_eq!(materialized.expiry_clock(), Some(&clock));
+    }
+
+    #[test]
+    fn materialize_rejects_mismatched_or_non_positive_forwards() {
+        let surface = sample_surface();
+        assert!(materialize_fx_delta_surface(&surface, &[1.10]).is_err());
+        assert!(materialize_fx_delta_surface(&surface, &[1.10, 0.0]).is_err());
     }
 }

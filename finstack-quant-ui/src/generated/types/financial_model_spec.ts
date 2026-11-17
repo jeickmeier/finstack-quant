@@ -15897,7 +15897,7 @@ export interface D_7D9F94Bbd332B01035F6 {
   available_cash_node: string;
   /**
    * Excess Cash Flow (ECF) sweep specification.
-   * A positive sweep percentage requires the `Sweep` payment priority.
+   * This specification and the `Sweep` payment priority must be supplied together.
    */
   ecf_sweep?: D_7A9D5Ee9143003A0618A | null;
   /**
@@ -15921,7 +15921,8 @@ export interface D_7D9F94Bbd332B01035F6 {
    */
   pik_toggle?: D_321Bf35B4A9Ae99F3Cf3 | null;
   /**
-   * Priority order of payments (default: Fees > Interest > Amortization > Sweep > Equity)
+   * Priority order of payments (default: Fees > Interest > Amortization > Equity).
+   * Include each prepayment priority explicitly alongside its sizing configuration.
    */
   priority_of_payments?: D_75Eaaaa2F753Dbeee283[];
   /**

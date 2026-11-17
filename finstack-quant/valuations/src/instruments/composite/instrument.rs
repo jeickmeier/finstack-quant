@@ -500,7 +500,7 @@ impl CompositeInstrument {
                 Ok(converted * resolved.quantity)
             })
             .collect::<Result<Vec<_>>>()?;
-        Ok(neumaier_sum(values))
+        neumaier_sum(values)
     }
 }
 

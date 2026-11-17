@@ -33,11 +33,14 @@ def kahan_sum(values: Sequence[float] | npt.NDArray[np.float64]) -> float:
     Returns
     -------
     float
-        Compensated sum.
+        Compensated sum (``0.0`` for an empty sequence).
 
-    Notes
-    -----
-    This method does not raise; it returns the compensated sum of ``values``.
+    Raises
+    ------
+    ValueError
+        If any element of *values* is ``nan`` or infinite.
+    RuntimeError
+        If running accumulation overflows to a non-finite value.
 
     Examples
     --------
@@ -62,11 +65,14 @@ def neumaier_sum(values: Sequence[float] | npt.NDArray[np.float64]) -> float:
     Returns
     -------
     float
-        Compensated sum.
+        Compensated sum (``0.0`` for an empty sequence).
 
-    Notes
-    -----
-    This method does not raise; it returns the compensated sum of ``values``.
+    Raises
+    ------
+    ValueError
+        If any element of *values* is ``nan`` or infinite.
+    RuntimeError
+        If running accumulation overflows to a non-finite value.
 
     Examples
     --------

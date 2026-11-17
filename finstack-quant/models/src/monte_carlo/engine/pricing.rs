@@ -522,7 +522,7 @@ impl McEngine {
                 .collect();
             let mut combined = OnlineCovariance::new();
             for result in chunk_results {
-                combined.merge(&result?);
+                combined.merge(&result?)?;
             }
             return Ok(combined);
         }
@@ -542,7 +542,7 @@ impl McEngine {
                 &mut scratch,
                 &control_value,
             )?;
-            combined.merge(&moments);
+            combined.merge(&moments)?;
         }
         Ok(combined)
     }
@@ -692,7 +692,7 @@ impl McEngine {
             for path in collected_paths {
                 dataset.add_path(path);
             }
-            estimate = apply_captured_path_statistics(estimate, &dataset.paths);
+            estimate = apply_captured_path_statistics(estimate, &dataset.paths)?;
             Some(dataset)
         } else {
             None
@@ -901,7 +901,7 @@ impl McEngine {
                     control_value,
                 )?,
             };
-            moments.update(target, control);
+            moments.update(target, control)?;
         }
         Ok(moments)
     }
@@ -954,11 +954,13 @@ impl McEngine {
                     captured.as_deref_mut(),
                 )?,
             };
-            stats.update(discounted_value);
+            stats.update(discounted_value)?;
 
             if let Some(target) = self.config.target_ci_half_width
-                && stats.count() >= AUTO_STOP_MIN_SAMPLES
-                && stats.ci_half_width() < target
+                && stats.get_count() >= AUTO_STOP_MIN_SAMPLES
+                && stats
+                    .get_ci_half_width(0.05)?
+                    .is_some_and(|half_width| half_width < target)
             {
                 return Ok((stats, true));
             }
@@ -967,14 +969,14 @@ impl McEngine {
     }
 
     /// Wrap merged run statistics in an [`Estimate`].
-    fn run_estimate(&self, combined: &OnlineStats) -> Estimate {
-        let num_paths = combined.count();
+    fn run_estimate(&self, combined: &OnlineStats) -> Result<Estimate> {
+        let num_paths = combined.get_count();
         let num_simulated_paths = if self.config.antithetic {
             num_paths.saturating_mul(2)
         } else {
             num_paths
         };
-        Estimate::from_stats(combined).with_num_simulated_paths(num_simulated_paths)
+        Ok(Estimate::from_stats(combined)?.with_num_simulated_paths(num_simulated_paths))
     }
 
     /// Serial pricing implementation with optional path capture.
@@ -1043,13 +1045,13 @@ impl McEngine {
                 &mut scratch,
                 capture.then_some(&mut captured_paths),
             )?;
-            combined.merge(&stats);
+            combined.merge(&stats)?;
             if auto_stopped {
                 break;
             }
         }
 
-        Ok((self.run_estimate(&combined), captured_paths))
+        Ok((self.run_estimate(&combined)?, captured_paths))
     }
 
     /// Parallel pricing implementation with optional path capture.
@@ -1105,11 +1107,11 @@ impl McEngine {
         let mut captured_paths = Vec::new();
         for chunk_result in chunk_results {
             let (chunk_stat, chunk_paths) = chunk_result?;
-            combined.merge(&chunk_stat);
+            combined.merge(&chunk_stat)?;
             captured_paths.extend(chunk_paths);
         }
 
-        Ok((self.run_estimate(&combined), captured_paths))
+        Ok((self.run_estimate(&combined)?, captured_paths))
     }
 }
 

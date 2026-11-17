@@ -513,8 +513,8 @@ pub fn cell_returns_from_curves(
 
         let start_t = mid;
         let end_t = mid - horizon_years;
-        let df_start = start.df(start_t);
-        let df_end = end.df(end_t);
+        let df_start = start.df(start_t)?;
+        let df_end = end.df(end_t)?;
         if !df_start.is_finite() || df_start <= 0.0 {
             return Err(Error::invalid_input(format!(
                 "start curve '{}' produced a non-positive/non-finite discount factor \
@@ -931,10 +931,10 @@ pub fn excess_returns(
         let cell = find_cell(p.duration, table, &p.id)?;
         let excess = p.total_return - cell.base_return;
 
-        weight_sum.add(p.weight);
-        total_return_sum.add(p.weight * p.total_return);
-        base_return_sum.add(p.weight * cell.base_return);
-        excess_return_sum.add(p.weight * excess);
+        weight_sum.add(p.weight)?;
+        total_return_sum.add(p.weight * p.total_return)?;
+        base_return_sum.add(p.weight * cell.base_return)?;
+        excess_return_sum.add(p.weight * excess)?;
 
         position_results.push(PositionExcess {
             id: p.id.clone(),
@@ -944,15 +944,15 @@ pub fn excess_returns(
         });
     }
 
-    let total_weight = weight_sum.total();
+    let total_weight = weight_sum.get_total()?;
     check_weights_sum("position", total_weight)?;
 
     Ok(ExcessReturnResult {
         base_label: table.base_label.clone(),
         positions: position_results,
-        portfolio_total_return: total_return_sum.total(),
-        portfolio_base_return: base_return_sum.total(),
-        portfolio_excess_return: excess_return_sum.total(),
+        portfolio_total_return: total_return_sum.get_total()?,
+        portfolio_base_return: base_return_sum.get_total()?,
+        portfolio_excess_return: excess_return_sum.get_total()?,
     })
 }
 
@@ -971,6 +971,9 @@ mod tests {
         DiscountCurve::builder(id)
             .base_date(date!(2024 - 01 - 01))
             .knots(knots.iter().copied())
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve")
     }

@@ -13,12 +13,15 @@ it directly; it is only ever imported.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 import datetime
 import json
+import math
 from pathlib import Path
 
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
+from finstack_quant.core.market_data import ForwardCurve
 from finstack_quant.core.money import Money
 from finstack_quant.valuations.instruments import (
     AssetPool,
@@ -52,6 +55,30 @@ _STRUCTURED_CREDIT_FIXTURE = (
     / "json_examples"
     / "structured_credit.json"
 )
+
+
+def projection_curve(
+    curve_id: str,
+    base_date: datetime.date | str,
+    zero_rates: Sequence[tuple[float, float]],
+    *,
+    day_count: str = "act_360",
+    index_tenor: str = "3M",
+) -> ForwardCurve:
+    """Log-linear projection curve from continuously-compounded zero-rate pillars.
+
+    A ``t = 0`` pillar is dropped (the curve prepends ``(0, 1)``); one pillar
+    gives a flat curve.
+    """
+    return ForwardCurve(
+        curve_id,
+        base_date,
+        [(t, math.exp(-r * t)) for t, r in zero_rates if t > 0.0],
+        interp="log_linear",
+        extrapolation="extend",
+        day_count=day_count,
+        index_tenor=index_tenor,
+    )
 
 
 def canonical_structured_credit_json(*, calendar_id: str = "nyse") -> str:

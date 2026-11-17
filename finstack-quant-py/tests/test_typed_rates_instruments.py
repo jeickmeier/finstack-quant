@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import math
 
 import pytest
 
@@ -57,21 +58,18 @@ def _market_json() -> str:
                 "day_count": "act_360",
                 "knot_points": [[0.0, 1.0], [5.0, 0.90], [10.0, 0.80]],
                 "interp_style": "monotone_convex",
-                "extrapolation": "flat_forward",
-                "min_forward_rate": None,
-                "allow_non_monotonic": False,
-                "min_forward_tenor": 1e-6,
+                "extrapolation": "extend",
             },
             {
                 "type": "forward",
                 "id": "USD-SOFR-3M",
                 "base": "2024-01-01",
-                "reset_lag": 2,
                 "day_count": "act_360",
-                "tenor": 0.25,
-                "knot_points": [[0.0, 0.04], [10.0, 0.045]],
-                "interp_style": "linear",
-                "extrapolation": "flat_forward",
+                "index_tenor": {"count": 3, "unit": "months"},
+                # Forward rate rising linearly from 4% to 4.5% over 10y.
+                "knot_points": [[float(t), math.exp(-(0.04 * t + 0.00025 * t * t))] for t in range(11)],
+                "interp_style": "log_linear",
+                "extrapolation": "extend",
             },
         ],
         "fx": None,

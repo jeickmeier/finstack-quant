@@ -820,6 +820,8 @@ mod tests {
             .base_date(as_of)
             .knots([(0.0, 1.0), (3.0, 0.857)])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("flat discount curve for smoke test");
         let market = MarketContext::new().insert(disc);
@@ -863,17 +865,20 @@ mod tests {
             .base_date(as_of)
             .knots([(0.0, 1.0), (6.0, 0.741)])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("flat discount curve for FRN smoke test");
 
         // Build a flat 4.5% forward curve named "USD-SOFR-3M" (the bond's forward_curve_id).
         // Tenor 0.25 = quarterly (3M SOFR), matching the FloatingRateSpec in example_floating.
-        let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-            .base_date(as_of - time::Duration::days(10))
-            .knots([(0.0, 0.045), (6.0, 0.045)])
-            .interp(InterpStyle::Linear)
-            .build()
-            .expect("flat forward curve for FRN smoke test");
+        let fwd = ForwardCurve::flat(
+            "USD-SOFR-3M",
+            as_of - time::Duration::days(10),
+            0.045,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("flat forward curve for FRN smoke test");
 
         // MarketContext must carry BOTH the discount curve and the forward curve so that
         // Bond::full_cashflow_schedule can project the floating coupons.
@@ -926,6 +931,8 @@ mod tests {
             .base_date(as_of)
             .knots([(0.0_f64, 1.0_f64), (6.0_f64, df6)])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("flat discount curve");
         MarketContext::new().insert(disc)
@@ -1172,15 +1179,18 @@ mod tests {
                 .base_date(as_of)
                 .knots([(0.0_f64, 1.0_f64), (6.0_f64, 0.741_f64)])
                 .interp(InterpStyle::Linear)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("flat discount curve for FRN test");
 
-            let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-                .base_date(as_of - time::Duration::days(10))
-                .knots([(0.0_f64, fwd_rate), (6.0_f64, fwd_rate)])
-                .interp(InterpStyle::Linear)
-                .build()
-                .expect("flat forward curve for FRN test");
+            let fwd = ForwardCurve::flat(
+                "USD-SOFR-3M",
+                as_of - time::Duration::days(10),
+                fwd_rate,
+                finstack_quant_core::dates::DayCount::Act365F,
+            )
+            .expect("flat forward curve for FRN test");
 
             let market = MarketContext::new().insert(disc).insert(fwd);
 

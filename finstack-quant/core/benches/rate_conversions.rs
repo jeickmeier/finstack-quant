@@ -47,7 +47,9 @@ fn reference_rate(from: Compounding, rate: f64, years: f64, to: Compounding) -> 
 }
 
 fn checked_conversion(from: Compounding, rate: f64, years: f64, to: Compounding) -> f64 {
-    let actual = from.convert_rate(rate, years, &to);
+    let actual = from
+        .convert_rate(rate, years, &to)
+        .expect("valid bench conversion");
     assert_rate(actual, reference_rate(from, rate, years, to));
     actual
 }
@@ -71,7 +73,7 @@ fn bench_simple_to_periodic(c: &mut Criterion) {
                     black_box(yf),
                     &Compounding::SEMI_ANNUAL,
                 );
-                black_box(result);
+                let _ = black_box(result);
             })
         });
     }
@@ -95,7 +97,7 @@ fn bench_periodic_to_continuous(c: &mut Criterion) {
             b.iter(|| {
                 let result =
                     conv.convert_rate(black_box(0.05), black_box(1.0), &Compounding::Continuous);
-                black_box(result);
+                let _ = black_box(result);
             })
         });
     }
@@ -119,7 +121,7 @@ fn bench_continuous_to_periodic(c: &mut Criterion) {
             b.iter(|| {
                 let result =
                     Compounding::Continuous.convert_rate(black_box(0.05), black_box(1.0), &conv);
-                black_box(result);
+                let _ = black_box(result);
             })
         });
     }
@@ -141,7 +143,7 @@ fn bench_simple_continuous_direct(c: &mut Criterion) {
                     black_box(yf),
                     &Compounding::Continuous,
                 );
-                black_box(result);
+                let _ = black_box(result);
             })
         });
 
@@ -153,7 +155,7 @@ fn bench_simple_continuous_direct(c: &mut Criterion) {
                     black_box(yf),
                     &Compounding::Simple,
                 );
-                black_box(result);
+                let _ = black_box(result);
             })
         });
     }
@@ -177,16 +179,16 @@ fn bench_round_trip_conversions(c: &mut Criterion) {
             0.05,
         );
         b.iter(|| {
-            let continuous = Compounding::SEMI_ANNUAL.convert_rate(
-                black_box(0.05),
-                black_box(1.0),
-                &Compounding::Continuous,
-            );
-            let back = Compounding::Continuous.convert_rate(
-                black_box(continuous),
-                black_box(1.0),
-                &Compounding::SEMI_ANNUAL,
-            );
+            let continuous = Compounding::SEMI_ANNUAL
+                .convert_rate(black_box(0.05), black_box(1.0), &Compounding::Continuous)
+                .expect("valid bench conversion");
+            let back = Compounding::Continuous
+                .convert_rate(
+                    black_box(continuous),
+                    black_box(1.0),
+                    &Compounding::SEMI_ANNUAL,
+                )
+                .expect("valid bench conversion");
             black_box(back);
         })
     });
@@ -198,16 +200,12 @@ fn bench_round_trip_conversions(c: &mut Criterion) {
             0.05,
         );
         b.iter(|| {
-            let periodic = Compounding::Simple.convert_rate(
-                black_box(0.05),
-                black_box(1.0),
-                &Compounding::SEMI_ANNUAL,
-            );
-            let back = Compounding::SEMI_ANNUAL.convert_rate(
-                black_box(periodic),
-                black_box(1.0),
-                &Compounding::Simple,
-            );
+            let periodic = Compounding::Simple
+                .convert_rate(black_box(0.05), black_box(1.0), &Compounding::SEMI_ANNUAL)
+                .expect("valid bench conversion");
+            let back = Compounding::SEMI_ANNUAL
+                .convert_rate(black_box(periodic), black_box(1.0), &Compounding::Simple)
+                .expect("valid bench conversion");
             black_box(back);
         })
     });
@@ -225,16 +223,12 @@ fn bench_round_trip_conversions(c: &mut Criterion) {
             0.05,
         );
         b.iter(|| {
-            let continuous = Compounding::Simple.convert_rate(
-                black_box(0.05),
-                black_box(1.0),
-                &Compounding::Continuous,
-            );
-            let back = Compounding::Continuous.convert_rate(
-                black_box(continuous),
-                black_box(1.0),
-                &Compounding::Simple,
-            );
+            let continuous = Compounding::Simple
+                .convert_rate(black_box(0.05), black_box(1.0), &Compounding::Continuous)
+                .expect("valid bench conversion");
+            let back = Compounding::Continuous
+                .convert_rate(black_box(continuous), black_box(1.0), &Compounding::Simple)
+                .expect("valid bench conversion");
             black_box(back);
         })
     });
@@ -255,7 +249,9 @@ fn bench_batch_conversions(c: &mut Criterion) {
                 let results: Vec<_> = rates
                     .iter()
                     .map(|&rate| {
-                        Compounding::SEMI_ANNUAL.convert_rate(rate, 1.0, &Compounding::Continuous)
+                        Compounding::SEMI_ANNUAL
+                            .convert_rate(rate, 1.0, &Compounding::Continuous)
+                            .expect("valid bench conversion")
                     })
                     .collect();
                 assert_eq!(rates.len(), size);
@@ -297,7 +293,9 @@ fn bench_batch_conversions(c: &mut Criterion) {
                 let results: Vec<_> = rates
                     .iter()
                     .map(|&rate| {
-                        Compounding::Simple.convert_rate(rate, 1.0, &Compounding::SEMI_ANNUAL)
+                        Compounding::Simple
+                            .convert_rate(rate, 1.0, &Compounding::SEMI_ANNUAL)
+                            .expect("valid bench conversion")
                     })
                     .collect();
                 assert_eq!(rates.len(), size);
@@ -343,7 +341,7 @@ fn bench_market_scenarios(c: &mut Criterion) {
                 black_box(1.0),
                 &Compounding::Continuous,
             );
-            black_box(continuous);
+            let _ = black_box(continuous);
         })
     });
 
@@ -356,7 +354,7 @@ fn bench_market_scenarios(c: &mut Criterion) {
                 black_box(0.25),
                 &Compounding::SEMI_ANNUAL,
             );
-            black_box(swap);
+            let _ = black_box(swap);
         })
     });
 
@@ -374,7 +372,7 @@ fn bench_market_scenarios(c: &mut Criterion) {
                 black_box(1.0),
                 &Compounding::Continuous,
             );
-            black_box(continuous);
+            let _ = black_box(continuous);
         })
     });
 
@@ -387,7 +385,7 @@ fn bench_market_scenarios(c: &mut Criterion) {
                 black_box(1.0),
                 &Compounding::QUARTERLY,
             );
-            black_box(futures);
+            let _ = black_box(futures);
         })
     });
 
@@ -411,7 +409,7 @@ fn bench_negative_rates(c: &mut Criterion) {
                 black_box(1.0),
                 &Compounding::Continuous,
             );
-            black_box(continuous);
+            let _ = black_box(continuous);
         })
     });
 
@@ -432,16 +430,16 @@ fn bench_negative_rates(c: &mut Criterion) {
             -0.005,
         );
         b.iter(|| {
-            let continuous = Compounding::SEMI_ANNUAL.convert_rate(
-                black_box(-0.005),
-                black_box(1.0),
-                &Compounding::Continuous,
-            );
-            let back = Compounding::Continuous.convert_rate(
-                black_box(continuous),
-                black_box(1.0),
-                &Compounding::SEMI_ANNUAL,
-            );
+            let continuous = Compounding::SEMI_ANNUAL
+                .convert_rate(black_box(-0.005), black_box(1.0), &Compounding::Continuous)
+                .expect("valid bench conversion");
+            let back = Compounding::Continuous
+                .convert_rate(
+                    black_box(continuous),
+                    black_box(1.0),
+                    &Compounding::SEMI_ANNUAL,
+                )
+                .expect("valid bench conversion");
             black_box(back);
         })
     });

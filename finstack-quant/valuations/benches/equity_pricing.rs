@@ -18,7 +18,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::{
     DiscountCurve, ForwardCurve, PriceCurve, PriceCurveKind,
 };
@@ -74,22 +76,83 @@ fn create_equity_market() -> MarketContext {
             (10.0, 0.800),
         ])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let fwd = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(base)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots([
-            (0.0, 0.02),
-            (0.25, 0.021),
-            (0.5, 0.022),
-            (1.0, 0.023),
-            (2.0, 0.024),
-            (5.0, 0.025),
-            (7.0, 0.026),
-            (10.0, 0.027),
+            (0.0, 1.0),
+            (0.125, 0.997471950911942),
+            (0.25, 0.994888110405994),
+            (0.375, 0.992248945555301),
+            (0.5, 0.989554932567899),
+            (0.625, 0.98682197561651),
+            (0.75, 0.984065814019865),
+            (0.875, 0.981286684604636),
+            (1.0, 0.978484825682528),
+            (1.125, 0.975668099393593),
+            (1.25, 0.972844280694656),
+            (1.375, 0.970013478228807),
+            (1.5, 0.967175800650738),
+            (1.625, 0.964331356619928),
+            (1.75, 0.961480254793845),
+            (1.875, 0.958622603821178),
+            (2.0, 0.955758512335073),
+            (2.1875, 0.951461686598083),
+            (2.375, 0.947173078450782),
+            (2.5625, 0.942892751140432),
+            (2.75, 0.938620767338384),
+            (2.9375, 0.934357189139748),
+            (3.125, 0.9301020780631),
+            (3.3125, 0.925855495050225),
+            (3.5, 0.921617500465892),
+            (3.6875, 0.917388154097666),
+            (3.875, 0.913167515155755),
+            (4.0625, 0.908955642272887),
+            (4.25, 0.904752593504231),
+            (4.4375, 0.900558426327339),
+            (4.625, 0.896373197642133),
+            (4.8125, 0.892196963770921),
+            (5.0, 0.888029780458446),
+            (5.125, 0.885255560927911),
+            (5.25, 0.882483113678219),
+            (5.375, 0.879712476410418),
+            (5.5, 0.876943686664984),
+            (5.625, 0.87417678182115),
+            (5.75, 0.871411799096252),
+            (5.875, 0.868648775545072),
+            (6.0, 0.865887748059205),
+            (6.125, 0.863128753366417),
+            (6.25, 0.860371828030025),
+            (6.375, 0.857617008448277),
+            (6.5, 0.854864330853747),
+            (6.625, 0.852113831312733),
+            (6.75, 0.849365545724664),
+            (6.875, 0.84661950982152),
+            (7.0, 0.843875759167255),
+            (7.1875, 0.839766955659775),
+            (7.375, 0.835668364736334),
+            (7.5625, 0.831580032378845),
+            (7.75, 0.827502003984762),
+            (7.9375, 0.823434324367821),
+            (8.125, 0.819377037758803),
+            (8.3125, 0.815330187806336),
+            (8.5, 0.811293817577717),
+            (8.6875, 0.807267969559776),
+            (8.875, 0.803252685659755),
+            (9.0625, 0.799248007206233),
+            (9.25, 0.795253974950065),
+            (9.4375, 0.79127062906536),
+            (9.625, 0.787298009150485),
+            (9.8125, 0.783336154229096),
+            (10.0, 0.779385102751198),
         ])
-        .interp(InterpStyle::Linear)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -98,7 +161,11 @@ fn create_equity_market() -> MarketContext {
         &[0.25, 0.5, 1.0, 2.0, 3.0, 5.0],
         &[4500.0, 4800.0, 5000.0, 5200.0, 5500.0],
         &[0.28; 30],
-        Default::default(),
+        VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
+            interpolation_mode: VolInterpolationMode::Vol,
+        },
         None,
     )
     .unwrap();
@@ -119,7 +186,11 @@ fn create_equity_market() -> MarketContext {
         &[0.25, 0.5, 1.0],
         &[15.0, 18.0, 21.0, 24.0, 27.0],
         &[0.80; 15],
-        Default::default(),
+        VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
+            interpolation_mode: VolInterpolationMode::Vol,
+        },
         None,
     )
     .unwrap();
@@ -132,12 +203,21 @@ fn create_equity_market() -> MarketContext {
         .insert_surface(vix_volvol)
         .insert_price(
             "SPX",
-            MarketScalar::Price(Money::new(5000.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(5000.0, Currency::USD).expect("valid money fixture")),
         )
-        .insert_price("SPX-SPOT", MarketScalar::Unitless(5000.0))
+        .insert_price(
+            "SPX-SPOT",
+            MarketScalar::unitless(5000.0).expect("valid scalar"),
+        )
         // TRS tests use `SPX-DIV-YIELD`; variance forward variance uses `SPX-DIVYIELD`.
-        .insert_price("SPX-DIV-YIELD", MarketScalar::Unitless(0.015))
-        .insert_price("SPX-DIVYIELD", MarketScalar::Unitless(0.015))
+        .insert_price(
+            "SPX-DIV-YIELD",
+            MarketScalar::unitless(0.015).expect("valid scalar"),
+        )
+        .insert_price(
+            "SPX-DIVYIELD",
+            MarketScalar::unitless(0.015).expect("valid scalar"),
+        )
 }
 
 fn sample_equity() -> Equity {

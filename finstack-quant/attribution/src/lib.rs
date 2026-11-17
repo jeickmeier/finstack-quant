@@ -94,11 +94,11 @@
 //! );
 //! let market_t0 = MarketContext::new().insert_price(
 //!     "AAPL-SPOT",
-//!     MarketScalar::Price(Money::from((180_i64, Currency::USD))),
+//!     MarketScalar::price(Money::from((180_i64, Currency::USD))),
 //! );
 //! let market_t1 = MarketContext::new().insert_price(
 //!     "AAPL-SPOT",
-//!     MarketScalar::Price(Money::from((185_i64, Currency::USD))),
+//!     MarketScalar::price(Money::from((185_i64, Currency::USD))),
 //! );
 //!
 //! let config = FinstackConfig::default();

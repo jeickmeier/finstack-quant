@@ -11,12 +11,12 @@
       "clean_price_pct": 98.5,
       "dirty_price_currency": 985116.758242,
       "discount_margin": null,
-      "i_spread": 0.00833586693883,
+      "i_spread": 0.00833586693907,
       "japanese_simple_yield": 0.0446692167841,
-      "moosmuller_ytm": 0.0443737390981,
+      "moosmuller_ytm": 0.0443737390984,
       "oas": 0.00816585226782,
-      "ytm": 0.0443512769572,
-      "ytw": 0.0443512769572,
+      "ytm": 0.0443512769575,
+      "ytw": 0.0443512769575,
       "z_spread": 0.00832977967677
     }
   ],

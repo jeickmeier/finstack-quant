@@ -2177,6 +2177,23 @@ reductions and exact-zero tolerance and share behavior. Production arithmetic,
 report and host qualification remain pending.
 [ATTRIBUTION-013](attribution/13-target-currency-and-scaling.md#accepted-decision-for-checked-reporting-fx-sizing-aggregation-and-residual-qualification).
 
+The accepted single-period return contribution package has independent
+checks of small and signed denominators, supplied weights, cancellation,
+groups and specific return. Production arithmetic, wire and host
+qualification remain pending.
+[ATTRIBUTION-014](attribution/14-return-contribution-weights.md#accepted-decision-for-checked-single-period-return-contributions).
+
+The accepted detail and reporting package has independent checks of delimiter
+collisions, duplicate keys, partition closure, signed Waterfall cash and Decimal
+precision. Production projection, schema and host qualification remain pending.
+[ATTRIBUTION-015](attribution/15-detail-and-reporting-contracts.md#accepted-decision-for-checked-detail-identities-report-projections-and-schemas).
+
+The accepted grouped benchmark-relative package has independent checks of
+one-sided groups, exact weights, active groups with zero net weight, centered
+closure and a small active difference with equal projected side totals.
+Production arithmetic, wire and host qualification remain pending.
+[ATTRIBUTION-016](attribution/16-benchmark-relative-return.md#accepted-decision-for-checked-grouped-benchmark-relative-returns).
+
 Selected tests and references were inspected; this does not claim review of
 every test body. Numerical suites, simulation experiments and vendor comparisons
 were not executed for these documentation audits. Independent semantic reviews

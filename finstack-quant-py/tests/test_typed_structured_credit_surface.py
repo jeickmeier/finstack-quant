@@ -83,7 +83,7 @@ def _loans() -> list[PoolAsset]:
 
 
 def _market() -> MarketContext:
-    return MarketContext().insert(DiscountCurve.flat("USD-OIS", CLOSE, 0.04))
+    return MarketContext().insert(DiscountCurve.flat("USD-OIS", CLOSE, 0.04, "act_365f"))
 
 
 def _clo() -> StructuredCredit:

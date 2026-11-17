@@ -106,7 +106,7 @@ def _pool_report_case(pool: ins.AssetPool, close: datetime.date) -> dict[str, An
 def _bond_workout_ladder_case() -> dict[str, Any]:
     """Ladders of a callable at a premium, and of one with a call on the quote date."""
     as_of = datetime.date(2025, 1, 15)
-    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04, "act_365f"))
     spec = json.loads(ins.Bond.example_callable().to_json())
     spec["instrument"]["spec"]["instrument_pricing_overrides"] = {"market_quotes": {"quoted_clean_price_pct": 108.0}}
     callable_json = json.dumps(spec)
@@ -128,9 +128,9 @@ def _compute_quotes_case() -> dict[str, Any]:
     as_of = datetime.date(2024, 1, 15)
     market = (
         MarketContext()
-        .insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
-        .insert(DiscountCurve.flat("USD-TREASURY", as_of, 0.04))
-        .insert(ForwardCurve.flat("USD-SOFR-3M", 0.25, datetime.date(2024, 1, 2), 0.03))
+        .insert(DiscountCurve.flat("USD-OIS", as_of, 0.04, "act_365f"))
+        .insert(DiscountCurve.flat("USD-TREASURY", as_of, 0.04, "act_365f"))
+        .insert(ForwardCurve.flat("USD-SOFR-3M", datetime.date(2024, 1, 2), 0.03, "act_360"))
     )
     callable_spec = json.loads(ins.Bond.example_callable().to_json())
     callable_spec["instrument"]["spec"]["instrument_pricing_overrides"] = {
@@ -168,8 +168,8 @@ def _g_spread_case() -> dict[str, Any]:
     discount_curve_id = spec["instrument"]["spec"]["discount_curve_id"]
     market = (
         MarketContext()
-        .insert(DiscountCurve.flat(discount_curve_id, as_of, 0.04))
-        .insert(DiscountCurve.flat("USD-GOVT", as_of, 0.035))
+        .insert(DiscountCurve.flat(discount_curve_id, as_of, 0.04, "act_365f"))
+        .insert(DiscountCurve.flat("USD-GOVT", as_of, 0.035, "act_365f"))
     )
 
     def naming(curve_id: str) -> ins.Bond:
@@ -200,11 +200,11 @@ def _default_risk_case() -> dict[str, Any]:
     }
     specs = {name: json.loads(example.to_json()) for name, example in examples.items()}
     specs["RevolvingCredit"]["instrument"]["spec"]["rate"] = {"fixed": {"rate": 0.05}}
-    market = MarketContext().insert(HazardCurve.flat("HY-CREDIT", as_of, 0.02, 0.4))
+    market = MarketContext().insert(HazardCurve.flat("HY-CREDIT", as_of, 0.02, 0.4, "act_365f"))
     for spec in specs.values():
         spec["instrument"]["spec"]["credit_curve_id"] = "HY-CREDIT"
         curve_id = spec["instrument"]["spec"]["discount_curve_id"]
-        market = market.insert(DiscountCurve.flat(curve_id, as_of, 0.04))
+        market = market.insert(DiscountCurve.flat(curve_id, as_of, 0.04, "act_365f"))
     cases = {}
     for name, spec in specs.items():
         instrument = getattr(ins, name).from_json(json.dumps(spec))
@@ -226,8 +226,8 @@ def _convertible_spot_ladder_case() -> dict[str, Any]:
     as_of = datetime.date(2025, 1, 15)
     market = (
         MarketContext()
-        .insert(DiscountCurve.flat("USD-IG", as_of, 0.04))
-        .insert(HazardCurve("USD-CREDIT-BBB", as_of, [(1.0, 0.025)], recovery_rate=0.0))
+        .insert(DiscountCurve.flat("USD-IG", as_of, 0.04, "act_365f"))
+        .insert(HazardCurve("USD-CREDIT-BBB", as_of, [(1.0, 0.025)], recovery_rate=0.0, day_count="act_365f"))
         .insert_price("TECH", 100.0, "USD")
         .insert_price("TECH-VOL", 0.30)
     )
@@ -373,8 +373,18 @@ def build_cases() -> dict[str, Any]:
     convertible_market = cef_cases._equity_market()
     convertible_market.insert_price("TECH", 45.0, currency="USD")
     convertible_market.insert(cef_cases._discount("USD-IG", 0.04))
-    convertible_market.insert(VolSurface("TECH-VOL", [0.25, 1.0, 5.0], [20.0, 40.0, 60.0], [[0.3, 0.3, 0.3]] * 3))
-    convertible_market.insert(HazardCurve.flat("USD-CREDIT-BBB", cef_cases.BASE, 0.02, 0.4))
+    convertible_market.insert(
+        VolSurface(
+            "TECH-VOL",
+            [0.25, 1.0, 5.0],
+            [20.0, 40.0, 60.0],
+            [[0.3, 0.3, 0.3]] * 3,
+            secondary_axis="strike",
+            quote_type="black_lognormal",
+            interpolation_mode="vol",
+        )
+    )
+    convertible_market.insert(HazardCurve.flat("USD-CREDIT-BBB", cef_cases.BASE, 0.02, 0.4, "act_365f"))
     cases["convertible"] = {
         "market": convertible_market.to_json(),
         "parity": convertible.parity(convertible_market),

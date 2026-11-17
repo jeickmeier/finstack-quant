@@ -42,6 +42,8 @@ fn create_market(base_date: Date, correlations: [f64; 2]) -> MarketContext {
             (5.0, 0.82),
             (10.0, 0.68),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
     let hazard = Arc::new(
@@ -49,7 +51,7 @@ fn create_market(base_date: Date, correlations: [f64; 2]) -> MarketContext {
             .base_date(base_date)
             .day_count(DayCount::Act365F)
             .recovery_rate(0.40)
-            .knots([(0.0, 0.0010), (5.0, 0.0012), (10.0, 0.0015)])
+            .knots([(5.0, 0.0012), (10.0, 0.0015)])
             .build()
             .expect("hazard curve"),
     );

@@ -24,15 +24,11 @@ class ScenarioSpec:
         Composition priority; lower values execute first.
     resolution_mode : {"most_specific_wins", "cumulative"}
         Hierarchy conflict policy.
-    hazard_bump_mode : {"solve_to_par", "first_order_shift"}
-        ParCDS delivery. ``solve_to_par`` re-bootstraps hazard from shocked
-        par spreads; ``first_order_shift`` applies ``delta_hazard = delta_spread / (1 - recovery)``
-        and reports an approximation warning.
 
     Raises
     ------
     ValueError
-        If the resolution mode, hazard bump mode, or resulting scenario is invalid.
+        If the resolution mode or resulting scenario is invalid.
 
     Examples
     --------
@@ -53,7 +49,6 @@ class ScenarioSpec:
         description: str | None = None,
         priority: int = 0,
         resolution_mode: Literal["most_specific_wins", "cumulative"] = "most_specific_wins",
-        hazard_bump_mode: Literal["solve_to_par", "first_order_shift"] = "solve_to_par",
     ) -> None: ...
     @staticmethod
     def from_json(json: str) -> ScenarioSpec:
@@ -256,23 +251,6 @@ class ScenarioSpec:
         -------
         {"most_specific_wins", "cumulative"}
             Policy used when targeted operations overlap.
-
-        Raises
-        ------
-        None
-            This property does not raise.
-        """
-        ...
-    @property
-    def hazard_bump_mode(self) -> Literal["solve_to_par", "first_order_shift"]:
-        """Return the canonical ParCDS hazard delivery mode.
-
-        Returns
-        -------
-        {"solve_to_par", "first_order_shift"}
-            ``solve_to_par`` re-bootstraps hazard from shocked par spreads;
-            ``first_order_shift`` applies ``delta_hazard = delta_spread / (1 - recovery)``
-            and reports an approximation warning.
 
         Raises
         ------

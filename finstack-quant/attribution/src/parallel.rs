@@ -480,7 +480,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
         if !snapshot.has_data(spec.flags) {
             return Ok(eval(snapshot, None, None));
         }
-        let market_with_t0 = MarketSnapshot::restore_market(market_t1, &snapshot, spec.flags);
+        let market_with_t0 = MarketSnapshot::restore_market(market_t1, &snapshot, spec.flags)?;
         let reprice = instrument.value(&market_with_t0, as_of_t1)?;
         // FX-exposure (pricing-impact) P&L: both values are in the instrument's
         // native currency, so the conversions are same-currency identities.
@@ -569,7 +569,7 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
             instrument
         };
         let combined = MarketSnapshot::extract_with_dependencies(market_t0, flags, &dependencies);
-        let market_combined = MarketSnapshot::restore_market(market_t1, &combined, flags);
+        let market_combined = MarketSnapshot::restore_market(market_t1, &combined, flags)?;
         let val_both = priced.value(&market_combined, as_of_t1)?;
         let pnl = cross_interaction_pnl(val_t1, *val_a, *val_b, val_both)?;
         Ok::<_, finstack_quant_core::Error>((format!("{}×{}", a.label, b.label), pnl))
@@ -612,8 +612,11 @@ pub(crate) fn attribute_pnl_parallel(request: &AttributionRequest<'_>) -> Result
         )?
     {
         // T1 market with T0 hazard for the issuer's curves.
-        let market_t0_credit =
-            MarketSnapshot::restore_market(market_t1, &credit_snapshot, MarketRestoreFlags::HAZARD);
+        let market_t0_credit = MarketSnapshot::restore_market(
+            market_t1,
+            &credit_snapshot,
+            MarketRestoreFlags::HAZARD,
+        )?;
 
         // Base value for the cascade: exactly the reference point
         // `credit_curves_pnl` is measured against. Reuse the credit
@@ -763,8 +766,8 @@ mod tests {
         fn base_value(&self, market: &MarketContext, _as_of: Date) -> Result<Money> {
             let rate = market
                 .get_discount("USD-OIS")?
-                .zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous);
-            let hazard = market.get_hazard("ACME-HAZ")?.hazard_rate(1.0);
+                .zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous)?;
+            let hazard = market.get_hazard("ACME-HAZ")?.hazard_rate(1.0)?;
             Ok(
                 Money::new(1_000_000.0 * rate * hazard, Currency::USD)
                     .expect("valid money fixture"),
@@ -837,6 +840,8 @@ mod tests {
             .base_date(as_of_t0)
             .knots(vec![(0.0, 1.0), (1.0, 0.98)])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("DiscountCurve builder should succeed with valid test data");
 
@@ -844,6 +849,8 @@ mod tests {
             .base_date(as_of_t1)
             .knots(vec![(0.0, 1.0), (1.0, 0.97)]) // Rates increased (curve lower)
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("DiscountCurve builder should succeed with valid test data");
 
@@ -855,7 +862,8 @@ mod tests {
         assert_eq!(rates_snapshot.discount_curves.len(), 1);
 
         let restored =
-            MarketSnapshot::restore_market(&market_t1, &rates_snapshot, MarketRestoreFlags::RATES);
+            MarketSnapshot::restore_market(&market_t1, &rates_snapshot, MarketRestoreFlags::RATES)
+                .expect("restore_market should succeed");
         assert!(restored.get_discount("USD-OIS").is_ok());
     }
 
@@ -873,6 +881,8 @@ mod tests {
                     .base_date(as_of_t0)
                     .knots(vec![(0.0, 1.0), (1.0, 0.99)])
                     .interp(InterpStyle::Linear)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount curve should build"),
             )
@@ -881,6 +891,7 @@ mod tests {
                     .base_date(as_of_t0)
                     .knots(vec![(1.0, 0.01)])
                     .recovery_rate(0.40)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
                     .build()
                     .expect("hazard curve should build"),
             );
@@ -891,6 +902,8 @@ mod tests {
                     .base_date(as_of_t1)
                     .knots(vec![(0.0, 1.0), (1.0, 0.98)])
                     .interp(InterpStyle::Linear)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount curve should build"),
             )
@@ -899,6 +912,7 @@ mod tests {
                     .base_date(as_of_t1)
                     .knots(vec![(1.0, 0.02)])
                     .recovery_rate(0.40)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
                     .build()
                     .expect("hazard curve should build"),
             );

@@ -357,7 +357,7 @@ fn test_bloomberg_usd_ois_calibration_accuracy() {
             use_analytical_jacobian: true,
         },
         interpolation: InterpStyle::LogLinear,
-        extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::FlatForward,
+        extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
         pricing_discount_id: None,
         pricing_forward_id: None,
         conventions: finstack_quant_calibration::RatesStepConventions {
@@ -493,7 +493,7 @@ fn test_interpolation_method_comparison() {
         base_date,
         method: CalibrationMethod::Bootstrap,
         interpolation: InterpStyle::MonotoneConvex,
-        extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::FlatForward,
+        extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
         pricing_discount_id: None,
         pricing_forward_id: None,
         conventions: Default::default(),
@@ -513,7 +513,7 @@ fn test_interpolation_method_comparison() {
         base_date,
         method: CalibrationMethod::Bootstrap,
         interpolation: InterpStyle::LogLinear,
-        extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::FlatForward,
+        extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
         pricing_discount_id: None,
         pricing_forward_id: None,
         conventions: Default::default(),
@@ -532,8 +532,8 @@ fn test_interpolation_method_comparison() {
 
     let test_points = [0.025, 0.089, 0.506, 1.013, 2.011, 5.014, 10.014];
     for yf in test_points {
-        let mc_df = mc_curve.df(yf);
-        let ll_df = ll_curve.df(yf);
+        let mc_df = mc_curve.df(yf).expect("valid");
+        let ll_df = ll_curve.df(yf).expect("valid");
         assert!(
             (mc_df - ll_df).abs() < 1e-3,
             "MC vs LL DF mismatch at t={:.3}: mc_df={:.6}, ll_df={:.6}",

@@ -132,7 +132,7 @@ impl TryFrom<ScorecardScaleWire> for ScorecardScale {
     type Error = Error;
 
     fn try_from(wire: ScorecardScaleWire) -> Result<Self> {
-        Self::try_new(wire.scale_name, wire.description, wire.ratings)
+        Self::try_new(wire.scale_name, wire.ratings, wire.description)
     }
 }
 
@@ -148,9 +148,9 @@ impl ScorecardScale {
     ///
     /// * `scale_name` - Scale name; outer whitespace is trimmed and the
     ///   trimmed name must be nonblank. Also labels validation messages.
-    /// * `description` - Optional human-readable description.
     /// * `ratings` - Bands ordered best to worst; scores and minima strictly
     ///   descend, labels are unique after outer trim and ASCII case folding.
+    /// * `description` - Optional human-readable description.
     ///
     /// # Errors
     ///
@@ -159,8 +159,8 @@ impl ScorecardScale {
     /// worst minimum is not `0`, or a representative falls outside its band.
     pub fn try_new(
         scale_name: impl Into<String>,
-        description: Option<String>,
         ratings: Vec<RatingLevel>,
+        description: Option<String>,
     ) -> Result<Self> {
         let scale = Self {
             scale_name: scale_name.into().trim().to_string(),
@@ -623,12 +623,12 @@ mod tests {
     fn scale() -> ScorecardScale {
         ScorecardScale::try_new(
             "Internal",
-            Some("Test policy".to_string()),
             vec![
                 level("A", 90.0, 80.0),
                 level("B", 70.0, 50.0),
                 level("C", 20.0, 0.0),
             ],
+            Some("Test policy".to_string()),
         )
         .expect("valid scale")
     }
@@ -657,27 +657,27 @@ mod tests {
 
     #[test]
     fn scale_requires_order_coverage_and_representative_membership() {
-        assert!(ScorecardScale::try_new("empty", None, Vec::new()).is_err());
-        assert!(ScorecardScale::try_new(" ", None, vec![level("A", 50.0, 0.0)]).is_err());
-        let gap = ScorecardScale::try_new("gap", None, vec![level("A", 90.0, 80.0)]);
+        assert!(ScorecardScale::try_new("empty", Vec::new(), None).is_err());
+        assert!(ScorecardScale::try_new(" ", vec![level("A", 50.0, 0.0)], None).is_err());
+        let gap = ScorecardScale::try_new("gap", vec![level("A", 90.0, 80.0)], None);
         assert!(gap.is_err(), "worst minimum above 0 leaves a gap");
         let shuffled = ScorecardScale::try_new(
             "shuffled",
-            None,
             vec![level("B", 70.0, 0.0), level("A", 90.0, 80.0)],
+            None,
         );
         assert!(shuffled.is_err());
         let collide = ScorecardScale::try_new(
             "collide",
-            None,
             vec![level("Aa", 90.0, 80.0), level(" AA ", 70.0, 0.0)],
+            None,
         );
         assert!(collide.is_err());
         // Representative 95 is not below the preceding minimum 95.
         let outside = ScorecardScale::try_new(
             "outside",
-            None,
             vec![level("AAA", 100.0, 95.0), level("AA+", 95.0, 0.0)],
+            None,
         );
         assert!(outside.is_err());
     }

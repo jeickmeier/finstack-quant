@@ -4,7 +4,9 @@ use crate::builder::CashFlowSchedule;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings::FIXING_PREFIX;
-use finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};
+use finstack_quant_core::market_data::scalars::{
+    ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+};
 use finstack_quant_core::{Error, Result};
 use std::collections::BTreeMap;
 
@@ -69,8 +71,15 @@ pub fn materialize_fixings<'a>(
             if fixing.date < old_date || fixing.date > new_date {
                 continue;
             }
-            if !fixing.series_id.starts_with(FIXING_PREFIX)
-                || fixing.series_id.len() == FIXING_PREFIX.len()
+            let Some(raw_suffix) = fixing.series_id.strip_prefix(FIXING_PREFIX) else {
+                return Err(Error::Validation(format!(
+                    "invalid projected fixing series '{}'",
+                    fixing.series_id
+                )));
+            };
+            if raw_suffix.trim().is_empty()
+                || raw_suffix.trim() != raw_suffix
+                || raw_suffix.starts_with(FIXING_PREFIX)
             {
                 return Err(Error::Validation(format!(
                     "invalid projected fixing series '{}'",
@@ -80,7 +89,7 @@ pub fn materialize_fixings<'a>(
             if market
                 .get_series(&fixing.series_id)
                 .ok()
-                .is_some_and(|series| series.value_on_exact(fixing.date).is_ok())
+                .is_some_and(|series| series.get_value_exact(fixing.date).is_ok())
             {
                 continue;
             }
@@ -123,14 +132,17 @@ pub fn materialize_fixings<'a>(
             observations.entry(date).or_insert(value);
         }
         let currency = existing.and_then(ScalarTimeSeries::currency);
-        let interpolation = existing.map_or(
-            SeriesInterpolation::default(),
-            ScalarTimeSeries::interpolation,
-        );
-        replacements.push(
-            ScalarTimeSeries::new(id, observations.into_iter().collect(), currency)?
-                .with_interpolation(interpolation),
-        );
+        let interpolation =
+            existing.map_or(SeriesInterpolation::Step, ScalarTimeSeries::interpolation);
+        let extrapolation =
+            existing.map_or(SeriesExtrapolation::Error, ScalarTimeSeries::extrapolation);
+        replacements.push(ScalarTimeSeries::new(
+            id,
+            observations.into_iter().collect(),
+            currency,
+            interpolation,
+            extrapolation,
+        )?);
     }
     let mut projected = market.clone();
     for series in replacements {

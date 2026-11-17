@@ -34,6 +34,8 @@ fn test_discount_curve_df_monotonic_after_parallel_shock() {
             (5.0, 0.85),
             (10.0, 0.70),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -52,7 +54,6 @@ fn test_discount_curve_df_monotonic_after_parallel_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let mut model = FinancialModelSpec::new(
@@ -109,6 +110,8 @@ fn test_discount_curve_df_monotonic_after_node_shock() {
             (5.0, 0.85),
             (10.0, 0.70),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -128,7 +131,6 @@ fn test_discount_curve_df_monotonic_after_node_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let mut model = FinancialModelSpec::new(
@@ -168,23 +170,51 @@ fn test_discount_curve_df_monotonic_after_node_shock() {
     }
 }
 
-#[test]
-fn test_forward_curve_rates_finite_after_parallel_shock() {
-    let mut market = MarketContext::new();
-    let as_of = date!(2025 - 01 - 01);
-
-    // Build a sample forward curve (3M = 0.25 years)
-    let curve = ForwardCurve::builder("USD_LIBOR_3M", 0.25)
-        .base_date(as_of)
-        .knots(vec![
+/// Projection-factor curve with 5.0%-5.5% continuously compounded zero rates.
+fn sample_forward_curve(as_of: time::Date) -> ForwardCurve {
+    ForwardCurve::from_zero_rates(
+        "USD_LIBOR_3M",
+        as_of,
+        &[
             (0.25, 0.05),
             (0.5, 0.051),
             (1.0, 0.052),
             (2.0, 0.053),
             (5.0, 0.055),
-        ])
-        .build()
-        .unwrap();
+        ],
+        finstack_quant_core::math::Compounding::Continuous,
+        finstack_quant_core::dates::DayCount::Act365F,
+        finstack_quant_core::math::interp::InterpStyle::LogLinear,
+        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+    )
+    .unwrap()
+}
+
+/// Assert finite positive factors and finite non-negative simple forwards
+/// between consecutive knots.
+fn assert_period_forwards_finite_non_negative(curve: &ForwardCurve, label: &str) {
+    for (i, &factor) in curve.factors().iter().enumerate() {
+        assert!(
+            factor.is_finite() && factor > 0.0,
+            "Projection factor at index {i} is invalid after {label}: {factor}"
+        );
+    }
+    for window in curve.knots().windows(2) {
+        let (t1, t2) = (window[0], window[1]);
+        let fwd = curve.rate_between(t1, t2, t2 - t1).unwrap();
+        assert!(
+            fwd.is_finite() && fwd >= 0.0,
+            "Forward rate over [{t1}, {t2}] is invalid after {label}: {fwd}"
+        );
+    }
+}
+
+#[test]
+fn test_forward_curve_rates_finite_after_parallel_shock() {
+    let mut market = MarketContext::new();
+    let as_of = date!(2025 - 01 - 01);
+
+    let curve = sample_forward_curve(as_of);
 
     market = market.insert(curve);
 
@@ -201,7 +231,6 @@ fn test_forward_curve_rates_finite_after_parallel_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let mut model = FinancialModelSpec::new(
@@ -224,24 +253,8 @@ fn test_forward_curve_rates_finite_after_parallel_shock() {
 
     engine.apply(&scenario, &mut ctx).unwrap();
 
-    // Check that all forwards are finite and non-negative
     let curve = market.get_forward("USD_LIBOR_3M").unwrap();
-    let forwards = curve.forwards();
-
-    for (i, &fwd) in forwards.iter().enumerate() {
-        assert!(
-            fwd.is_finite(),
-            "Forward rate at index {} is not finite: {}",
-            i,
-            fwd
-        );
-        assert!(
-            fwd >= 0.0,
-            "Forward rate at index {} is negative: {}",
-            i,
-            fwd
-        );
-    }
+    assert_period_forwards_finite_non_negative(&curve, "parallel shock");
 }
 
 #[test]
@@ -249,18 +262,7 @@ fn test_forward_curve_rates_finite_after_node_shock() {
     let mut market = MarketContext::new();
     let as_of = date!(2025 - 01 - 01);
 
-    // Build a sample forward curve (3M = 0.25 years)
-    let curve = ForwardCurve::builder("USD_LIBOR_3M", 0.25)
-        .base_date(as_of)
-        .knots(vec![
-            (0.25, 0.05),
-            (0.5, 0.051),
-            (1.0, 0.052),
-            (2.0, 0.053),
-            (5.0, 0.055),
-        ])
-        .build()
-        .unwrap();
+    let curve = sample_forward_curve(as_of);
 
     market = market.insert(curve);
 
@@ -278,7 +280,6 @@ fn test_forward_curve_rates_finite_after_node_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let mut model = FinancialModelSpec::new(
@@ -301,24 +302,8 @@ fn test_forward_curve_rates_finite_after_node_shock() {
 
     engine.apply(&scenario, &mut ctx).unwrap();
 
-    // Check that all forwards are finite and non-negative
     let curve = market.get_forward("USD_LIBOR_3M").unwrap();
-    let forwards = curve.forwards();
-
-    for (i, &fwd) in forwards.iter().enumerate() {
-        assert!(
-            fwd.is_finite(),
-            "Forward rate at index {} is not finite after node shock: {}",
-            i,
-            fwd
-        );
-        assert!(
-            fwd >= 0.0,
-            "Forward rate at index {} is negative after node shock: {}",
-            i,
-            fwd
-        );
-    }
+    assert_period_forwards_finite_non_negative(&curve, "node shock");
 }
 
 #[test]
@@ -350,7 +335,6 @@ fn test_base_correlation_bounds_after_parallel_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let mut model = FinancialModelSpec::new(
@@ -405,7 +389,6 @@ fn parallel_base_correlation_clamp_warning_names_the_parallel_op() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
     let mut ctx = ExecutionContext {
         market: &mut market,
@@ -464,7 +447,6 @@ fn test_base_correlation_bounds_after_bucket_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let mut model = FinancialModelSpec::new(
@@ -509,7 +491,10 @@ fn test_vol_surface_non_negative_after_parallel_shock() {
     // Build a sample vol surface
     let surface = finstack_quant_core::market_data::surfaces::VolSurface::builder("SPX_VOL")
         .expiries(&[0.25, 0.5, 1.0, 2.0])
-        .strikes(&[90.0, 95.0, 100.0, 105.0, 110.0])
+        .secondary_values(&[90.0, 95.0, 100.0, 105.0, 110.0])
+        .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+        .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
+        .interpolation_mode(finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol)
         .row(&[0.25, 0.22, 0.20, 0.22, 0.25])
         .row(&[0.24, 0.21, 0.19, 0.21, 0.24])
         .row(&[0.23, 0.20, 0.18, 0.20, 0.23])
@@ -530,7 +515,6 @@ fn test_vol_surface_non_negative_after_parallel_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let mut model = FinancialModelSpec::new(
@@ -557,7 +541,7 @@ fn test_vol_surface_non_negative_after_parallel_shock() {
     // Check that all vol values are non-negative
     let surface = market.get_surface("SPX_VOL").unwrap();
     let expiries = surface.expiries().to_vec();
-    let strikes = surface.strikes().to_vec();
+    let strikes = surface.secondary_values().to_vec();
 
     for &expiry in &expiries {
         for &strike in &strikes {
@@ -576,12 +560,38 @@ fn test_vol_surface_non_negative_after_parallel_shock() {
 
 #[test]
 fn test_vol_surface_non_negative_after_bucket_shock() {
+    let as_of = date!(2025 - 01 - 01);
+    let clock = finstack_quant_core::dates::VolatilityClock::try_new(
+        as_of,
+        finstack_quant_core::dates::DayCount::Act365F,
+        finstack_quant_core::dates::DayCountContextState::default(),
+    )
+    .expect("valid clock");
+    let expiries: Vec<f64> = ["3M", "6M", "1Y", "2Y"]
+        .iter()
+        .map(|s| {
+            let d = finstack_quant_core::dates::Tenor::parse(s)
+                .unwrap()
+                .add_to_date(
+                    as_of,
+                    None,
+                    finstack_quant_core::dates::BusinessDayConvention::Unadjusted,
+                )
+                .unwrap();
+            clock.expiry_time(d).unwrap()
+        })
+        .collect();
+
     let mut market = MarketContext::new();
 
     // Build a sample vol surface
     let surface = finstack_quant_core::market_data::surfaces::VolSurface::builder("SPX_VOL")
-        .expiries(&[0.25, 0.5, 1.0, 2.0])
-        .strikes(&[90.0, 95.0, 100.0, 105.0, 110.0])
+        .expiries(&expiries)
+        .secondary_values(&[90.0, 95.0, 100.0, 105.0, 110.0])
+        .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+        .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
+        .interpolation_mode(finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol)
+        .expiry_clock(clock)
         .row(&[0.25, 0.22, 0.20, 0.22, 0.25])
         .row(&[0.24, 0.21, 0.19, 0.21, 0.24])
         .row(&[0.23, 0.20, 0.18, 0.20, 0.23])
@@ -604,7 +614,6 @@ fn test_vol_surface_non_negative_after_bucket_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let mut model = FinancialModelSpec::new(
@@ -616,7 +625,6 @@ fn test_vol_surface_non_negative_after_bucket_shock() {
         .expect("valid period plan"),
     );
     let engine = ScenarioEngine::new();
-    let as_of = date!(2025 - 01 - 01);
     let mut ctx = ExecutionContext {
         market: &mut market,
         model: Some(&mut model),
@@ -631,7 +639,7 @@ fn test_vol_surface_non_negative_after_bucket_shock() {
     // Check that all vol values are non-negative
     let surface = market.get_surface("SPX_VOL").unwrap();
     let expiries = surface.expiries().to_vec();
-    let strikes = surface.strikes().to_vec();
+    let strikes = surface.secondary_values().to_vec();
 
     for &expiry in &expiries {
         for &strike in &strikes {

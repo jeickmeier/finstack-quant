@@ -54,10 +54,10 @@ impl MetricCalculator for MacaulayDurationCalculator {
                 crate::bond::pricing::quote_conversions::YieldCompounding::Street,
                 bond.cashflow_spec.frequency(),
             )?;
-            weighted_time.add(t * amount.amount() * df);
+            weighted_time.add(t * amount.amount() * df)?;
         }
 
-        Ok(weighted_time.total() / price)
+        Ok(weighted_time.get_total()? / price)
     }
 }
 
@@ -92,6 +92,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.8)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new().insert(curve);

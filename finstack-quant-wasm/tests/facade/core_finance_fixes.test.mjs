@@ -8,15 +8,21 @@ await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
 });
 
-test('monotone-convex interpolation preserves a flat zero-forward strip', () => {
+test('monotone-convex interpolation uses uncollared Hagan-West on a flat first strip', () => {
   const curve = new core.DiscountCurve({
     id: 'USD-OIS',
     baseDate: '2025-01-01',
     knots: [0, 1, 1, 1, 2, Math.exp(-0.005), 3, Math.exp(-0.035)],
+    interp: 'monotone_convex',
+    extrapolation: 'extend',
+    dayCount: 'act_365f',
   });
   try {
+    assert.equal(curve.df(0), 1);
+    assert.equal(curve.df(1), 1);
     for (const t of [0.1, 1 / 3, 0.5, 0.9]) {
-      assert.ok(Math.abs(curve.df(t) - 1) < 1e-14);
+      const expected = Math.exp(0.00125 * t * (1 - t) * (1 + t));
+      assert.ok(Math.abs(curve.df(t) - expected) < 1e-14);
     }
   } finally {
     curve.free();

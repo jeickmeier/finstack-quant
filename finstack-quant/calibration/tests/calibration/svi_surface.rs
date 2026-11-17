@@ -75,6 +75,9 @@ fn nonflat_discount_curve(base_date: Date) -> DiscountCurve {
     DiscountCurve::builder(DISCOUNT_ID)
         .base_date(base_date)
         .knots(knots)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("non-flat discount curve")
 }
@@ -316,6 +319,9 @@ fn calibrated_surfaces_preserve_total_variance_between_published_expiries() {
     let discount = DiscountCurve::builder(DISCOUNT_ID)
         .base_date(base_date)
         .knots([(0.0, 1.0), (5.0, 1.0)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("zero-rate discount curve");
     let source_market = MarketContext::new().insert(discount);
@@ -410,7 +416,7 @@ fn surface_acceptance_policy_preserves_fit_and_execution_controls() {
     let base_date = Date::from_calendar_date(2025, Month::January, 3).expect("base date");
     let strikes = vec![70.0, 80.0, 90.0, 100.0, 110.0, 120.0, 140.0];
     let discount = nonflat_discount_curve(base_date);
-    let quote_forward = SPOT / discount.df(1.0);
+    let quote_forward = SPOT / discount.df(1.0).expect("valid");
     let truth = finstack_quant_models::volatility::sabr::SabrParameters::new(0.2, 1.0, 1.0, -0.3)
         .expect("SABR truth");
     let source_market = MarketContext::new().insert(discount);
@@ -571,6 +577,9 @@ fn svi_density_scan_obeys_global_arbitrage_and_report_policy() {
     let discount = DiscountCurve::builder(DISCOUNT_ID)
         .base_date(base_date)
         .knots([(0.0, 1.0), (5.0, 1.0)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount");
     let (prior_market, mut market_data) =

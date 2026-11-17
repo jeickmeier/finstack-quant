@@ -39,6 +39,8 @@ fn flat_discount_curve(as_of: Date, rate: f64) -> DiscountCurve {
         .base_date(as_of)
         .knots(knots)
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve should build")
 }
@@ -50,13 +52,13 @@ fn flat_hazard_curve(as_of: Date, hazard_rate: f64) -> HazardCurve {
     HazardCurve::builder("CDS-CREDIT")
         .base_date(as_of)
         .knots(vec![
-            (0.0, hazard_rate),
             (1.0, hazard_rate),
             (3.0, hazard_rate),
             (5.0, hazard_rate),
             (10.0, hazard_rate),
         ])
         .recovery_rate(0.40)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("hazard curve should build")
 }

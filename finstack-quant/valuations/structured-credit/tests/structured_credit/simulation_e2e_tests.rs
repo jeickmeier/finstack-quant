@@ -45,13 +45,18 @@ fn flat_market() -> MarketContext {
         .base_date(as_of())
         .knots(vec![(0.0, 1.0), (10.0, 0.60)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let forward = ForwardCurve::builder("SOFR-3M", 0.25)
+    let forward = ForwardCurve::builder("SOFR-3M")
         .base_date(as_of())
-        .knots(vec![(0.0, 0.05), (10.0, 0.05)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .index_tenor(finstack_quant_core::dates::Tenor::quarterly())
+        .knots([(0.0, 1.0), (1.0, (-0.05_f64).exp())])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 

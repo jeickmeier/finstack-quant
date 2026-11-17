@@ -178,26 +178,13 @@ impl ParametricCurveTarget {
         )?;
         let prepared_quotes = prepared.quotes;
 
-        let initial_params =
-            schema_params
-                .initial_params
-                .clone()
-                .unwrap_or(match schema_params.model {
-                    NsVariant::Ns => NelsonSiegelModel::Ns {
-                        beta0: 0.03,
-                        beta1: -0.02,
-                        beta2: 0.01,
-                        tau: 1.5,
-                    },
-                    NsVariant::Nss => NelsonSiegelModel::Nss {
-                        beta0: 0.03,
-                        beta1: -0.02,
-                        beta2: 0.01,
-                        beta3: 0.01,
-                        tau1: 1.5,
-                        tau2: 5.0,
-                    },
-                });
+        let initial_params = schema_params.initial_params.clone().map_or_else(
+            || match schema_params.model {
+                NsVariant::Ns => NelsonSiegelModel::ns(0.03, -0.02, 0.01, 1.5),
+                NsVariant::Nss => NelsonSiegelModel::nss(0.03, -0.02, 0.01, 0.01, 1.5, 5.0),
+            },
+            Ok,
+        )?;
 
         let config = global_config.clone();
         let target = Self::new(
@@ -253,6 +240,7 @@ impl GlobalSolveTarget for ParametricCurveTarget {
         let model = NelsonSiegelModel::from_params_vec(self.params.variant, &p)?;
         ParametricCurve::builder(self.params.curve_id.clone())
             .base_date(self.params.base_date)
+            .day_count(DayCount::Act365F)
             .model(model)
             .build()
     }
@@ -270,8 +258,8 @@ impl GlobalSolveTarget for ParametricCurveTarget {
         let knots: Vec<(f64, f64)> = self
             .sample_times
             .iter()
-            .map(|&t| (t, curve.df(t)))
-            .collect();
+            .map(|&t| Ok((t, curve.df(t)?)))
+            .collect::<Result<Vec<_>>>()?;
         let disc_curve = finstack_quant_core::market_data::term_structures::DiscountCurve::builder(
             self.params.curve_id.clone(),
         )
@@ -281,12 +269,7 @@ impl GlobalSolveTarget for ParametricCurveTarget {
         // Interpolation is never used by these date-based calibration quotes:
         // every economically queried date is an exact analytical knot.
         .interp(InterpStyle::LogLinear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        )
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()?;
 
         self.scratch.with_curve(&disc_curve, |ctx| {

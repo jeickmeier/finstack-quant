@@ -1,8 +1,8 @@
 use super::context::MetricsContext;
+use super::shifts::measure_scalar_native_amount_diff;
 use super::{push_first_order_step, push_second_order_step};
 use crate::helpers::FactorWorking;
 use crate::{MoveUnit, PnlAttribution};
-use finstack_quant_core::market_data::diff::measure_scalar_absolute_shift;
 use finstack_quant_valuations::metrics::MetricId;
 
 pub(super) fn apply_spot(
@@ -31,7 +31,7 @@ pub(super) fn apply_spot(
         );
 
         let primary_shift = market_scalar_ids.first().and_then(|spot_id| {
-            measure_scalar_absolute_shift(spot_id, inputs.market_t0, inputs.market_t1).ok()
+            measure_scalar_native_amount_diff(spot_id, inputs.market_t0, inputs.market_t1).ok()
         });
 
         if let Some(spot_shift) = primary_shift {
@@ -70,6 +70,15 @@ pub(super) fn apply_spot(
                 attribution,
                 non_finite_detected,
             );
+            if market_scalar_ids.len() > 1 {
+                attribution.meta.notes.push(format!(
+                    "Spot Delta/Gamma attribution pairs aggregate sensitivity with the primary \
+                     scalar '{}' only; the instrument declares {} scalars, so differential \
+                     moves across scalars are approximated",
+                    market_scalar_ids[0].as_str(),
+                    market_scalar_ids.len()
+                ));
+            }
         } else {
             *non_finite_detected = true;
             attribution.meta.notes.push(

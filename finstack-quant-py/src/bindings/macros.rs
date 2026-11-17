@@ -91,12 +91,23 @@ macro_rules! wire_methods {
         });
         $crate::bindings::macros::wire_methods!(@reduce $py_type);
     };
+    ($py_type:ident, $rust_type:ty, $name:literal, module = $module:literal, arc) => {
+        $crate::bindings::macros::wire_methods!(@documented_json $py_type, $rust_type, $name, [*], |inner| {
+            ::std::sync::Arc::new(inner)
+        },
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".to_json")),
+            $crate::bindings::pydoc::pydoc!($module, concat!($name, ".from_json")));
+        $crate::bindings::macros::wire_methods!(@reduce $py_type, $crate::bindings::pydoc::pydoc!($module, concat!($name, ".__reduce__")));
+        $crate::bindings::macros::wire_methods!(@wire_eq $py_type);
+    };
     ($py_type:ident, $rust_type:ty, $name:literal, arc) => {
         $crate::bindings::macros::wire_methods!(@json $py_type, $rust_type, $name, [*], |inner| {
             ::std::sync::Arc::new(inner)
         });
         $crate::bindings::macros::wire_methods!(@reduce $py_type);
-
+        $crate::bindings::macros::wire_methods!(@wire_eq $py_type);
+    };
+    (@wire_eq $py_type:ident) => {
         #[::pyo3::pymethods]
         impl $py_type {
             /// Structural equality via the canonical JSON wire form.

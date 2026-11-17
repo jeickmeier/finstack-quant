@@ -658,6 +658,7 @@ fn envelope_for_priced(
                 Money::from_model_value(native_pv, ccy)?,
                 row_reporting_currency,
                 as_of_date,
+                finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
             )?
             .amount
             .amount();
@@ -762,7 +763,7 @@ fn envelope_for_priced(
         ))
     })?;
 
-    let total_pv = sum_pvs(rows.iter().map(|row| row.pv));
+    let total_pv = sum_pvs(rows.iter().map(|row| row.pv))?;
 
     // Compare against the same selected registry result that supplied the
     // effective date. Per-flow and model PVs use different compensated sums,
@@ -829,15 +830,15 @@ fn accrual_start_balances(
     )
 }
 
-fn sum_pvs<I>(pvs: I) -> f64
+fn sum_pvs<I>(pvs: I) -> finstack_quant_core::Result<f64>
 where
     I: IntoIterator<Item = f64>,
 {
     let mut acc = NeumaierAccumulator::new();
     for pv in pvs {
-        acc.add(pv);
+        acc.add(pv)?;
     }
-    acc.total()
+    acc.get_total()
 }
 
 #[cfg(test)]
@@ -915,7 +916,7 @@ mod tests {
 
     #[test]
     fn total_pv_uses_compensated_summation_for_mixed_sign_flows() {
-        let total = sum_pvs([1.0e16, 1.0, -1.0e16]);
+        let total = sum_pvs([1.0e16, 1.0, -1.0e16]).expect("finite pvs");
 
         assert_eq!(total, 1.0);
     }

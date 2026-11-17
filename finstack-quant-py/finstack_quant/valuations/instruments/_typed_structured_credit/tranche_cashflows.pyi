@@ -57,7 +57,7 @@ class TrancheCashflows:
     ...         calendar_id="nyse",
     ...     ),
     ... )
-    >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
+    >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03, "act_365f"))
     >>> flows = deal.tranche_cashflows("A", market, as_of)
     >>> flows.tranche_id, list(flows.to_dataframe().columns)
     ('A', ['date', 'cashflow', 'interest', 'principal', 'pik', 'deferred', 'writedown'])

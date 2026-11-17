@@ -11,22 +11,14 @@ use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_equity::spot::Equity;
 
 fn build_flat_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve {
-    let mut builder = DiscountCurve::builder(curve_id)
+    DiscountCurve::builder(curve_id)
         .base_date(base_date)
         .day_count(DayCount::Act365F)
-        .knots([(0.0, 1.0), (0.5, (-rate * 0.5).exp()), (1.0, (-rate).exp())]);
-
-    // For zero or negative rates, the curve may be flat or increasing
-    if rate.abs() < 1e-10 || rate < 0.0 {
-        builder = builder.validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        );
-    }
-
-    builder.build().expect("Failed to build discount curve")
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+        .knots([(0.0, 1.0), (0.5, (-rate * 0.5).exp()), (1.0, (-rate).exp())])
+        .build()
+        .expect("Failed to build discount curve")
 }
 
 #[test]
@@ -143,7 +135,7 @@ fn test_equity_price_per_share_from_spot_id() {
 
     let market = MarketContext::new().insert_price(
         "AAPL",
-        MarketScalar::Price(Money::new(200.0, Currency::USD).expect("valid money fixture")),
+        MarketScalar::price(Money::new(200.0, Currency::USD).expect("valid money fixture")),
     );
 
     let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
@@ -156,7 +148,8 @@ fn test_equity_price_per_share_unitless() {
     let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_spot_id("AAPL");
 
     // Unitless scalar is treated as amount in equity currency
-    let market = MarketContext::new().insert_price("AAPL", MarketScalar::Unitless(210.0));
+    let market = MarketContext::new()
+        .insert_price("AAPL", MarketScalar::unitless(210.0).expect("valid scalar"));
 
     let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
     let price = equity.price_per_share(&market, as_of).unwrap();
@@ -178,7 +171,10 @@ fn test_equity_dividend_yield_ignores_ticker_suffix() {
     let equity = Equity::new("AAPL", "AAPL", Currency::USD);
 
     // No `div_yield_id` means a zero yield; `{ticker}-DIVYIELD` is not read.
-    let market = MarketContext::new().insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
+    let market = MarketContext::new().insert_price(
+        "AAPL-DIVYIELD",
+        MarketScalar::unitless(0.02).expect("valid scalar"),
+    );
 
     let div_yield = equity.dividend_yield(&market).unwrap();
     assert_eq!(div_yield, 0.0);
@@ -188,7 +184,10 @@ fn test_equity_dividend_yield_ignores_ticker_suffix() {
 fn test_equity_dividend_yield_from_custom_id() {
     let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_div_yield_id("MY_DIV_YIELD");
 
-    let market = MarketContext::new().insert_price("MY_DIV_YIELD", MarketScalar::Unitless(0.035));
+    let market = MarketContext::new().insert_price(
+        "MY_DIV_YIELD",
+        MarketScalar::unitless(0.035).expect("valid scalar"),
+    );
 
     let div_yield = equity.dividend_yield(&market).unwrap();
     assert_eq!(div_yield, 0.035);
@@ -263,7 +262,7 @@ fn test_equity_price_resolution_priority() {
 
     let market = MarketContext::new().insert_price(
         "AAPL",
-        MarketScalar::Price(Money::new(200.0, Currency::USD).expect("valid money fixture")),
+        MarketScalar::price(Money::new(200.0, Currency::USD).expect("valid money fixture")),
     );
 
     let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
@@ -281,11 +280,11 @@ fn test_equity_custom_price_id_priority() {
     let market = MarketContext::new()
         .insert_price(
             "CUSTOM_PRICE",
-            MarketScalar::Price(Money::new(150.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(150.0, Currency::USD).expect("valid money fixture")),
         )
         .insert_price(
             "AAPL",
-            MarketScalar::Price(Money::new(200.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(200.0, Currency::USD).expect("valid money fixture")),
         );
 
     let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
@@ -305,7 +304,7 @@ fn test_equity_fx_conversion() {
 
     let market = MarketContext::new().insert(eur_curve).insert_price(
         "SAP",
-        MarketScalar::Price(Money::new(100.0, Currency::EUR).expect("valid money fixture")),
+        MarketScalar::price(Money::new(100.0, Currency::EUR).expect("valid money fixture")),
     );
 
     let price = equity.price_per_share(&market, base_date).unwrap();

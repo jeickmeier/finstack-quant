@@ -56,7 +56,6 @@ pub(crate) fn split_market_context_state(
             CurveState::Hazard(c) => PriorMarketObject::HazardCurve(c),
             CurveState::Inflation(c) => PriorMarketObject::InflationCurve(c),
             CurveState::BaseCorrelation(c) => PriorMarketObject::BaseCorrelationCurve(c),
-            CurveState::BasisSpread(c) => PriorMarketObject::BasisSpreadCurve(c),
             CurveState::Parametric(c) => PriorMarketObject::ParametricCurve(c),
             CurveState::Price(c) if c.kind() == finstack_quant_core::market_data::term_structures::PriceCurveKind::VolIndex => {
                 PriorMarketObject::VolatilityIndexCurve(c)

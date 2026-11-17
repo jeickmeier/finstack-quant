@@ -7,8 +7,8 @@ use crate::Result;
 use crate::types::CurveId;
 
 use super::super::term_structures::{
-    BaseCorrelationCurve, BasisSpreadCurve, DiscountCurve, ForwardCurve, HazardBumpTarget,
-    HazardCurve, InflationCurve, ParametricCurve, PriceCurve,
+    BaseCorrelationCurve, DiscountCurve, ForwardCurve, HazardCurve, InflationCurve,
+    ParametricCurve, PriceCurve,
 };
 use crate::market_data::bumps::BumpSpec;
 
@@ -25,7 +25,6 @@ macro_rules! for_each_context_curve {
                 type_name: "BaseCorrelation"
             },
             Price => { accessor: price, ty: PriceCurve, type_name: "Price" },
-            BasisSpread => { accessor: basis_spread, ty: BasisSpreadCurve, type_name: "BasisSpread" },
             Parametric => { accessor: parametric, ty: ParametricCurve, type_name: "Parametric" }
         }
     };
@@ -140,24 +139,39 @@ impl_curve_storage_from!(
     Hazard => HazardCurve,
     Inflation => InflationCurve,
     BaseCorrelation => BaseCorrelationCurve,
-    BasisSpread => BasisSpreadCurve,
     Parametric => ParametricCurve,
     // Every PriceCurve uses the single Price variant; its kind lives on the curve.
     Price => PriceCurve,
 );
 
 impl CurveStorage {
-    /// Roll this curve storage forward by the provided number of days.
-    pub(crate) fn roll_forward_storage(&self, days: i64) -> Result<Self> {
+    /// Condition this curve storage to `reference_date`.
+    pub(crate) fn condition_storage(&self, reference_date: crate::dates::Date) -> Result<Self> {
+        let day_count_ctx = crate::dates::DayCountContext::default();
         match self {
-            Self::Discount(curve) => Ok(Self::Discount(Arc::new(curve.roll_forward(days)?))),
-            Self::Forward(curve) => Ok(Self::Forward(Arc::new(curve.roll_forward(days)?))),
-            Self::Hazard(curve) => Ok(Self::Hazard(Arc::new(curve.roll_forward(days)?))),
-            Self::Inflation(curve) => Ok(Self::Inflation(Arc::new(curve.roll_forward(days)?))),
+            Self::Discount(curve) => Ok(Self::Discount(Arc::new(curve.condition(reference_date)?))),
+            Self::Forward(curve) => Ok(Self::Forward(Arc::new(curve.condition(reference_date)?))),
+            Self::Hazard(curve) => Ok(Self::Hazard(Arc::new(curve.condition(reference_date)?))),
+            Self::Parametric(curve) => {
+                Ok(Self::Parametric(Arc::new(curve.condition(reference_date)?)))
+            }
+            Self::Inflation(curve) => {
+                let _ = curve.day_count().signed_year_fraction(
+                    curve.base_date(),
+                    reference_date,
+                    curve.day_count_context(),
+                )?;
+                Ok(Self::Inflation(Arc::clone(curve)))
+            }
+            Self::Price(curve) => {
+                let _ = curve.day_count().signed_year_fraction(
+                    curve.base_date(),
+                    reference_date,
+                    day_count_ctx,
+                )?;
+                Ok(Self::Price(Arc::clone(curve)))
+            }
             Self::BaseCorrelation(curve) => Ok(Self::BaseCorrelation(Arc::clone(curve))),
-            Self::Price(curve) => Ok(Self::Price(Arc::new(curve.roll_forward(days)?))),
-            Self::BasisSpread(curve) => Ok(Self::BasisSpread(Arc::new(curve.roll_forward(days)?))),
-            Self::Parametric(curve) => Ok(Self::Parametric(Arc::new(curve.roll_forward(days)?))),
         }
     }
 
@@ -205,7 +219,7 @@ impl CurveStorage {
                 Ok(())
             }
             Self::Hazard(arc) => {
-                Arc::make_mut(arc).bump_in_place(&spec, HazardBumpTarget::ParSpread)?;
+                Arc::make_mut(arc).bump_in_place(&spec)?;
                 Ok(())
             }
             Self::Inflation(original) => {
@@ -234,10 +248,6 @@ impl CurveStorage {
                 *self = Self::Price(Arc::new(curve));
                 Ok(())
             }
-            Self::BasisSpread(_) => Err(crate::InputError::UnsupportedBump {
-                reason: "BasisSpreadCurve does not support bumping".to_string(),
-            }
-            .into()),
             Self::Parametric(arc) => {
                 Arc::make_mut(arc).bump_in_place(&spec)?;
                 Ok(())
@@ -264,13 +274,13 @@ mod tests {
 
     #[test]
     fn forward_bump_preserves_interp_and_extrapolation() {
-        let curve = ForwardCurve::builder("FWD", 0.25)
+        let curve = ForwardCurve::builder("FWD")
             .base_date(test_date())
-            .reset_lag(0)
             .day_count(DayCount::Act365F)
+            .index_tenor(crate::dates::Tenor::quarterly())
             .interp(InterpStyle::LogLinear)
-            .extrapolation(ExtrapolationPolicy::FlatZero)
-            .knots([(0.5, 0.02), (1.0, 0.025), (2.0, 0.03)])
+            .extrapolation(ExtrapolationPolicy::Flat)
+            .knots([(0.5, 0.99), (1.0, 0.975), (2.0, 0.94)])
             .build()
             .expect("curve builds");
         let original = json(&curve);
@@ -281,20 +291,19 @@ mod tests {
         let bumped_curve = storage.forward().expect("forward curve");
         let bumped_json = json(bumped_curve.as_ref());
         assert_eq!(bumped_curve.interp_style(), InterpStyle::LogLinear);
-        assert_eq!(bumped_json["reset_lag"], original["reset_lag"]);
+        assert_eq!(bumped_json["index_tenor"], original["index_tenor"]);
         assert_eq!(bumped_json["day_count"], original["day_count"]);
         assert_eq!(bumped_json["interp_style"], original["interp_style"]);
         assert_eq!(bumped_json["extrapolation"], original["extrapolation"]);
     }
 
     #[test]
-    fn inflation_bump_preserves_lag_day_count_and_interp() {
+    fn inflation_bump_preserves_day_count_interp_and_extrapolation() {
         let curve = InflationCurve::builder("CPI")
             .base_date(test_date())
-            .base_cpi(300.0)
             .day_count(DayCount::Act360)
-            .indexation_lag_months(2)
             .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Extend)
             .knots([(0.0, 300.0), (5.0, 325.0), (10.0, 350.0)])
             .build()
             .expect("curve builds");
@@ -306,14 +315,9 @@ mod tests {
         let bumped_curve = storage.inflation().expect("inflation curve");
         let bumped_json = json(bumped_curve.as_ref());
         assert_eq!(bumped_curve.day_count(), DayCount::Act360);
-        assert_eq!(bumped_curve.indexation_lag_months(), 2);
         assert_eq!(bumped_curve.interp_style(), InterpStyle::LogLinear);
         assert_eq!(bumped_json["base_date"], original["base_date"]);
         assert_eq!(bumped_json["day_count"], original["day_count"]);
-        assert_eq!(
-            bumped_json["indexation_lag_months"],
-            original["indexation_lag_months"]
-        );
         assert_eq!(bumped_json["interp_style"], original["interp_style"]);
         assert_eq!(bumped_json["extrapolation"], original["extrapolation"]);
     }
@@ -322,10 +326,9 @@ mod tests {
     fn inflation_triangular_key_rate_bump_weights_neighboring_knots() {
         let curve = InflationCurve::builder("CPI")
             .base_date(test_date())
-            .base_cpi(300.0)
             .day_count(DayCount::Act360)
-            .indexation_lag_months(3)
             .interp(InterpStyle::Linear)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .knots([
                 (0.0, 300.0),
                 (2.5, 306.0),
@@ -370,19 +373,13 @@ mod tests {
     }
 
     #[test]
-    fn discount_bump_preserves_numerical_controls_and_relaxes_rate_policy() {
+    fn discount_bump_preserves_interpolator_and_clock() {
         let curve = DiscountCurve::builder("DISC")
             .base_date(test_date())
             .day_count(DayCount::Act365F)
             .interp(InterpStyle::Linear)
-            .extrapolation(ExtrapolationPolicy::FlatForward)
+            .extrapolation(ExtrapolationPolicy::Extend)
             .knots([(0.5, 1.0), (1.0, 1.001), (2.0, 1.002)])
-            .validation(
-                crate::market_data::term_structures::ValidationMode::NegativeRateFriendly {
-                    forward_floor: -0.05,
-                },
-            )
-            .min_forward_tenor(1e-8)
             .build()
             .expect("curve builds");
         let original = json(&curve);
@@ -393,12 +390,8 @@ mod tests {
         let bumped_curve = storage.discount().expect("discount curve");
         let bumped_json = json(bumped_curve.as_ref());
         assert_eq!(bumped_curve.interp_style(), InterpStyle::Linear);
-        assert_eq!(bumped_json["allow_non_monotonic"], true);
-        assert!(bumped_json["min_forward_rate"].is_null());
-        assert_eq!(
-            bumped_json["min_forward_tenor"],
-            original["min_forward_tenor"]
-        );
+        assert_eq!(bumped_json["extrapolation"], original["extrapolation"]);
+        assert_eq!(bumped_json["day_count"], original["day_count"]);
     }
 }
 

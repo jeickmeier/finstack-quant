@@ -14,7 +14,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
@@ -55,12 +57,17 @@ fn create_market(as_of: Date) -> MarketContext {
             (1.0_f64, (-RATE).exp()),
             (2.0_f64, (-RATE * 2.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve should build");
 
     let vol_surface = VolSurface::builder("SPOT_VOL")
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[0.5, 1.0, 2.0])
-        .strikes(&[80.0, 100.0, 120.0])
+        .secondary_values(&[80.0, 100.0, 120.0])
         .row(&[VOL, VOL, VOL])
         .row(&[VOL, VOL, VOL])
         .row(&[VOL, VOL, VOL])
@@ -70,8 +77,11 @@ fn create_market(as_of: Date) -> MarketContext {
     MarketContext::new()
         .insert(disc_curve)
         .insert_surface(vol_surface)
-        .insert_price("SPOT", MarketScalar::Unitless(SPOT))
-        .insert_price("SPOT_DIV", MarketScalar::Unitless(DIV_YIELD))
+        .insert_price("SPOT", MarketScalar::unitless(SPOT).expect("valid scalar"))
+        .insert_price(
+            "SPOT_DIV",
+            MarketScalar::unitless(DIV_YIELD).expect("valid scalar"),
+        )
 }
 
 fn create_option(expiry: Date, option_type: OptionType) -> EquityOption {

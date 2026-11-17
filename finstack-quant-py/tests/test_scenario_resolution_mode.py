@@ -36,40 +36,9 @@ def test_scenario_spec_runtime_doc_describes_resolution_contract() -> None:
     assert "ValueError" in doc
 
 
-def test_scenario_spec_exposes_hazard_bump_mode() -> None:
-    defaulted = ScenarioSpec("default-hazard", [])
-    first_order = ScenarioSpec(
-        "first-order-hazard",
-        [],
-        hazard_bump_mode="first_order_shift",
-    )
-    composed = compose_scenarios([
-        first_order,
-        ScenarioSpec(
-            "also-first-order",
-            [],
-            hazard_bump_mode="first_order_shift",
-        ),
-    ])
-
-    assert defaulted.hazard_bump_mode == "solve_to_par"
-    assert first_order.hazard_bump_mode == "first_order_shift"
-    assert composed.hazard_bump_mode == "first_order_shift"
-
-
-def test_compose_scenarios_rejects_mixed_hazard_bump_modes() -> None:
-    first_order = ScenarioSpec(
-        "first-order-hazard",
-        [],
-        hazard_bump_mode="first_order_shift",
-    )
-    solve_to_par = ScenarioSpec("solve-to-par-hazard", [])
-
-    with pytest.raises(
-        ValueError,
-        match=r"first-order-hazard.*first_order_shift.*solve-to-par-hazard.*solve_to_par",
-    ):
-        compose_scenarios([first_order, solve_to_par])
+def test_scenario_spec_rejects_retired_hazard_bump_mode() -> None:
+    with pytest.raises(ValueError, match=r"unknown field.*hazard_bump_mode"):
+        ScenarioSpec.from_json('{"id":"legacy","operations":[],"hazard_bump_mode":"first_order_shift"}')
 
 
 def test_scenario_spec_exposes_resolution_mode() -> None:

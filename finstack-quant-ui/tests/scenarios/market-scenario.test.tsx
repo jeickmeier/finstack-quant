@@ -60,8 +60,6 @@ it.each(cases)(
 );
 it("leaves every omitted option to Rust and sends the instrument only when the spec needs it", async () => {
   const [shift, roll] = cases;
-  const shiftSpec = JSON.parse(shift!.scenarioJson);
-  expect(shiftSpec).not.toHaveProperty("hazard_bump_mode");
   expect(native.scenarioSpecRequiresInstruments(shift!.scenarioJson)).toBe(
     false,
   );
@@ -97,14 +95,23 @@ it("returns the native errors for a blank size and an unsupported hazard bump", 
     }),
   );
   expect(blank.ok).toBe(false);
-  const hz = cases.find((entry) => entry.name === "hz-par-cds-25bp")!;
-  const { hazard_bump_mode: _mode, ...solveToParSpec } = hz.spec;
-  const solveToPar = unwrap(
-    await harness.proxy.validateScenarioSpec(JSON.stringify(solveToParSpec)),
+  // The bond market's HZ curve is hand-built, so a par-CDS shock has no recipe to refit.
+  const parCds = unwrap(
+    await harness.proxy.validateScenarioSpec(
+      JSON.stringify({
+        id: "hz-par-cds-25bp",
+        operations: [
+          {
+            kind: "curve_parallel_bp",
+            curve_kind: "par_cds",
+            curve_id: "HZ",
+            bp: 25,
+          },
+        ],
+      }),
+    ),
   );
-  const failed = await harness.proxy.applyMarketScenario(
-    application(solveToPar),
-  );
+  const failed = await harness.proxy.applyMarketScenario(application(parCds));
   expect(failed.ok).toBe(false);
   if (!failed.ok)
     expect(failed.error.message).toContain("no lossless calibration recipe");

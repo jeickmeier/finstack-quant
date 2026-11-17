@@ -13,6 +13,9 @@ fn m1_hull_white_node_bond_uses_centered_state() {
     use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
     let curve = DiscountCurve::builder("HW")
         .base_date(Date::from_calendar_date(2025, time::Month::January, 1).expect("date"))
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .knots([(0.0, 1.0), (1.0, 0.98), (3.0, 0.85), (10.0, 0.55)])
         .build()
         .expect("curve");
@@ -52,6 +55,7 @@ fn m1_scheduled_hw_bond_matches_integrated_ou_moments() {
         "HW",
         Date::from_calendar_date(2025, time::Month::January, 1).expect("date"),
         0.03,
+        finstack_quant_core::dates::DayCount::Act365F,
     )
     .expect("curve");
     let t = 2.0_f64;
@@ -95,10 +99,13 @@ fn m1_scheduled_hw_bond_matches_integrated_ou_moments() {
 
 #[test]
 fn b2_black_lookup_rejects_normal_surface() {
+    use finstack_quant_core::market_data::surfaces::{VolInterpolationMode, VolSurfaceAxis};
     let surface = VolSurface::builder("NORMAL")
+        .secondary_axis(VolSurfaceAxis::Strike)
         .quote_type(VolQuoteType::Normal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[1.0])
-        .strikes(&[0.01])
+        .secondary_values(&[0.01])
         .row(&[0.008])
         .build()
         .expect("surface");
@@ -263,6 +270,9 @@ fn m1_hw_bond_option_converges_to_independent_affine_price() {
     let strike: f64 = 0.83;
     let curve = DiscountCurve::builder("HW-OPTION")
         .base_date(Date::from_calendar_date(2025, time::Month::January, 1).expect("date"))
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .knots([(0.0, 1.0), (10.0, (-rate * 10.0).exp())])
         .build()
         .expect("curve");

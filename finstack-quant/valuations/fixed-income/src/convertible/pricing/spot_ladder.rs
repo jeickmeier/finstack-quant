@@ -376,14 +376,20 @@ mod tests {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(AS_OF)
                     .knots(knots)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("curve"),
             )
             .insert_price(
                 "STOCK",
-                MarketScalar::Price(Money::new(100.0, Currency::USD).expect("spot")),
+                MarketScalar::price(Money::new(100.0, Currency::USD).expect("spot")),
             )
-            .insert_price("STOCK-VOL", MarketScalar::Unitless(VOL))
+            .insert_price(
+                "STOCK-VOL",
+                MarketScalar::unitless(VOL).expect("valid scalar"),
+            )
     }
 
     /// Hand-checked by the closed form above at r 4%, vol 30%, T 5 and K 100:
@@ -468,7 +474,7 @@ mod tests {
         let (bond, market) = (bond(), market());
         let moved = market.clone().insert_price(
             "STOCK",
-            MarketScalar::Price(Money::new(300.0, Currency::USD).expect("spot")),
+            MarketScalar::price(Money::new(300.0, Currency::USD).expect("spot")),
         );
         assert_eq!(
             price_bond_floor(&bond, &market, AS_OF).expect("floor"),

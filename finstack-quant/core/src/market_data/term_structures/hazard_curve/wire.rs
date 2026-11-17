@@ -1,44 +1,41 @@
-//! Validated serialization adapters.
+//! Validated serialization adapters for [`HazardCurve`].
 
 use super::*;
 
-/// Raw serializable state of a HazardCurve
+/// Raw serializable state of a [`HazardCurve`].
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub(super) struct RawHazardCurve {
-    /// Curve identifier
+    /// Curve identifier.
     pub id: String,
-    /// Base date
+    /// Base date.
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub base: Date,
-    /// Time/value pairs used to construct the curve
-    pub knot_points: Vec<(f64, f64)>,
-    /// Recovery rate
-    pub recovery_rate: f64,
-    /// Optional issuer
-    pub issuer: Option<String>,
-    /// Seniority
-    pub seniority: Option<Seniority>,
-    /// Currency
-    pub currency: Option<Currency>,
-    /// Day count convention
+    /// Day count convention.
     pub day_count: DayCount,
-    /// Par spread points for reporting
-    pub par_points: Vec<(f64, f64)>,
-    /// Par interpolation method
-    #[serde(default)]
-    pub par_interp: ParInterp,
+    /// Registered holiday calendar id of the business-day time axis.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calendar_id: Option<String>,
+    /// Recovery rate in `[0, 1]`.
+    pub recovery_rate: f64,
+    /// Strictly positive ending `(time_years, hazard_rate)` pillars.
+    pub knot_points: Vec<(f64, f64)>,
+    /// Optional issuer.
+    pub issuer: Option<String>,
+    /// Seniority.
+    pub seniority: Option<Seniority>,
+    /// Currency.
+    pub currency: Option<Currency>,
     /// Exact calibration replay inputs.
     #[serde(default)]
     pub hazard_calibration: Option<crate::market_data::term_structures::HazardCalibrationRecipe>,
     /// Opaque FX policy stamp; see [`crate::market_data::term_structures::DiscountCurve::fx_policy`].
     #[serde(default)]
     pub fx_policy: Option<String>,
-    /// Hazard-rate cap the curve was built with, when it differs from the
-    /// default of 10; absent for curves built with the default.
+    /// Source coordinate anchor for conditioned curves.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_hazard_rate: Option<f64>,
+    pub source: Option<HazardConditionSource>,
 }
 
 impl From<HazardCurve> for RawHazardCurve {
@@ -49,29 +46,20 @@ impl From<HazardCurve> for RawHazardCurve {
             .zip(curve.lambdas.iter())
             .map(|(&t, &lambda)| (t, lambda))
             .collect();
-        let par_points: Vec<(f64, f64)> = curve
-            .par_tenors
-            .iter()
-            .zip(curve.par_spreads_bp.iter())
-            .map(|(&t, &spread)| (t, spread))
-            .collect();
 
         RawHazardCurve {
             id: curve.id.to_string(),
             base: curve.base,
-            knot_points,
+            day_count: curve.day_count,
+            calendar_id: curve.calendar.map(|cal| cal.id),
             recovery_rate: curve.recovery_rate,
+            knot_points,
             issuer: curve.issuer,
             seniority: curve.seniority,
             currency: curve.currency,
-            day_count: curve.day_count,
-            par_points,
-            par_interp: curve.par_interp,
-
             hazard_calibration: curve.hazard_calibration,
             fx_policy: curve.fx_policy,
-            max_hazard_rate: (curve.max_hazard_rate != DEFAULT_MAX_HAZARD_RATE)
-                .then_some(curve.max_hazard_rate),
+            source: curve.source,
         }
     }
 }
@@ -80,19 +68,18 @@ impl TryFrom<RawHazardCurve> for HazardCurve {
     type Error = crate::Error;
 
     fn try_from(state: RawHazardCurve) -> crate::Result<Self> {
-        HazardCurve::builder(state.id)
+        let mut builder = HazardCurve::builder(state.id)
             .base_date(state.base)
-            .recovery_rate(state.recovery_rate)
             .day_count(state.day_count)
+            .calendar_id_opt(state.calendar_id)
+            .recovery_rate(state.recovery_rate)
             .knots(state.knot_points)
-            .par_spreads(state.par_points)
-            .par_interp(state.par_interp)
             .hazard_calibration_opt(state.hazard_calibration)
-            .max_hazard_rate(state.max_hazard_rate.unwrap_or(DEFAULT_MAX_HAZARD_RATE))
             .issuer_opt(state.issuer)
             .seniority_opt(state.seniority)
             .currency_opt(state.currency)
-            .fx_policy_opt(state.fx_policy)
-            .build()
+            .fx_policy_opt(state.fx_policy);
+        builder.source = state.source;
+        builder.build()
     }
 }

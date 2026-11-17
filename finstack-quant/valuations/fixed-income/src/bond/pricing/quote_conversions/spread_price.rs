@@ -367,9 +367,9 @@ impl BondZSpreadPricingKernel {
         let mut pv = finstack_quant_core::math::summation::NeumaierAccumulator::new();
         for (t, df_base, amount) in &self.cached_flows {
             let df_z = z_spread_discount_factor(*df_base, *t, z, self.compounding)?;
-            pv.add(*amount * df_z);
+            pv.add(*amount * df_z)?;
         }
-        Ok(pv.total())
+        pv.get_total()
     }
 }
 
@@ -399,8 +399,12 @@ pub(crate) fn solve_kernel_spread(
     tolerance: f64,
 ) -> finstack_quant_core::Result<f64> {
     let bracket = maturity_scaled_bracket(bond, bracket_from, base_bracket_bp, max_bracket_bp)?;
-    BrentSolver::new()
-        .with_tolerance(tolerance)
-        .with_initial_bracket_size(Some(bracket))
-        .solve_fallible(|z| Ok(kernel.price(z)? - target), 0.0)
+    BrentSolver::new(tolerance, 100)?.solve(
+        |z| Ok(kernel.price(z)? - target),
+        0.0,
+        -10.0,
+        100.0,
+        bracket,
+        25,
+    )
 }

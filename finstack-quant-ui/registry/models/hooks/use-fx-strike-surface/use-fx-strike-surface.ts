@@ -9,7 +9,7 @@ export type {
   FxStrikeSurfaceRequest,
   FxStrikeSurface,
 } from "@/workers/finstack-contract";
-/** Snapshot every quote array, the spot and both rates; null means no materialization request. */
+/** Snapshot every quote array and the delivery forwards; null means no materialization request. */
 export function fxStrikeSurfaceOptions(
   client: FinstackClient | null,
   session: number,
@@ -20,7 +20,7 @@ export function fxStrikeSurfaceOptions(
     session,
     "materializeFxSurface",
     request,
-    "FX strike-grid materialization requires a ready worker, a spot and both rates",
+    "FX strike-grid materialization requires a ready worker and qualified delivery forwards for every expiry",
   );
 }
 /** Native strike-space surface materialized from FX delta quotes; errors are unchanged. */

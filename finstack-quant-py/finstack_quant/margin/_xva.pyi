@@ -1745,7 +1745,7 @@ def compute_mva(
     >>> result = compute_mva(
     ...     profile,
     ...     [(0.0, 50.0)],
-    ...     DiscountCurve.flat("USD-OIS", date(2025, 1, 1), 0.0),
+    ...     DiscountCurve.flat("USD-OIS", date(2025, 1, 1), 0.0, "act_365f"),
     ... )
     >>> round(result.mva, 2)
     10000.0
@@ -1813,8 +1813,10 @@ def compute_bilateral_xva(
     ...     dt.date(2025, 1, 1),
     ...     [(0.5 * i, 1.0) for i in range(9)],
     ...     interp="log_linear",
+    ...     extrapolation="extend",
+    ...     day_count="act_365f",
     ... )
-    >>> hz = HazardCurve("CPTY", dt.date(2025, 1, 1), [(0.0, 0.02), (30.0, 0.02)], recovery_rate=0.40)
+    >>> hz = HazardCurve("CPTY", dt.date(2025, 1, 1), [(30.0, 0.02)], recovery_rate=0.40, day_count="act_365f")
     >>> result = compute_bilateral_xva(profile, hz, hz, df, 0.40, 0.40)
     >>> result.total_xva == result.cva - result.dva
     True

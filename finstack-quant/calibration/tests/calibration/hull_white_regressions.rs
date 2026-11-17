@@ -6,7 +6,6 @@ use finstack_quant_core::{
     currency::Currency,
     dates::{Date, DayCount},
     market_data::{
-        scalars::MarketScalar,
         surfaces::VolQuoteType,
         term_structures::{DiscountCurve, ForwardCurve},
     },
@@ -74,6 +73,7 @@ fn discount(dc: DayCount, shift_years: u32) -> DiscountCurve {
         .day_count(dc)
         .knots(knots)
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount")
 }
@@ -86,24 +86,15 @@ fn projection(dc: DayCount, shift_years: u32) -> ForwardCurve {
     } else {
         1.0
     };
-    let tenor = 0.25 * scale;
-    let rate = ((0.04_f64 * 0.25).exp() - 1.0) / tenor;
-    ForwardCurve::builder("F", tenor)
-        .base_date(base)
-        .day_count(dc)
-        .knots([(0.0, rate), (12.0 * scale, rate)])
-        .build()
-        .expect("projection")
+    ForwardCurve::flat("F", base, 0.04 / scale, dc).expect("projection")
 }
 
 fn fitted_sigma(envelope: &CalibrationEnvelope) -> f64 {
     let result = engine::calibrate(envelope).expect("calibration");
     assert!(result.result.report.success);
-    let MarketScalar::Unitless(sigma) = result.result.final_market.prices["D_CAPFLOOR_HW1F_SIGMA"]
-    else {
-        unreachable!("sigma is unitless");
-    };
-    sigma
+    result.result.final_market.prices["D_CAPFLOOR_HW1F_SIGMA"]
+        .get_unitless()
+        .expect("sigma is unitless")
 }
 
 #[test]
@@ -158,6 +149,8 @@ fn cap_floor_plan_rejects_conflicting_quotes_in_any_order() {
                     .base_date(Date::from_ordinal_date(2025, 1).expect("base date"))
                     .knots([(0.0, 1.0), (10.0, (-0.3_f64).exp())])
                     .interp(InterpStyle::LogLinear)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("flat curve"),
             )],

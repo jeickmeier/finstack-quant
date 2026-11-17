@@ -583,6 +583,7 @@ impl FactorModel {
                 )
             } else {
                 stressed = stressed.bump(mapping_to_market_bumps(
+                    &stressed,
                     &factor.market_mapping,
                     shift,
                     factor.factor_type.bump_units(),
@@ -1620,6 +1621,8 @@ pub(super) mod tests {
                 (5.0, (-0.25_f64).exp()),
                 (10.0, (-0.50_f64).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         use finstack_quant_calibration::api::{
@@ -1669,9 +1672,6 @@ pub(super) mod tests {
                         recovery_rate: 0.4,
                         notional: 1.0,
                         method: Default::default(),
-
-                        par_interp:
-                            finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                         doc_clause: Some("cr14".into()),
                         cds_valuation_convention: None,
                     }),
@@ -1695,8 +1695,23 @@ pub(super) mod tests {
         let market = credit_market(as_of, id.clone()).insert_fx(FxMatrix::new(fx, None));
         let bumped = bump_credit_spreads(&market, &id, 1.0).unwrap();
         let base = market.get_hazard(id.as_str()).unwrap();
-        assert!(bumped.hazard_calibration().is_some());
-        for ((_, old), (_, new)) in base.par_spread_points().zip(bumped.par_spread_points()) {
+        let base_recipe = base.hazard_calibration().unwrap();
+        let bumped_recipe = bumped.hazard_calibration().unwrap();
+        for (old_input, new_input) in base_recipe
+            .spread_risk_inputs()
+            .iter()
+            .zip(bumped_recipe.spread_risk_inputs().iter())
+        {
+            let old = old_input
+                .quote
+                .get("spread_bp")
+                .and_then(|v| v.as_f64())
+                .unwrap();
+            let new = new_input
+                .quote
+                .get("spread_bp")
+                .and_then(|v| v.as_f64())
+                .unwrap();
             assert!(
                 (new - old - 1.0).abs() < 1e-8,
                 "factor shock must move CDS spreads by one bp"
@@ -1715,6 +1730,7 @@ pub(super) mod tests {
             .base_date(as_of)
             .knots([(1.0, 0.01), (5.0, 0.01)])
             .recovery_rate(0.4)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .unwrap();
         let error =
@@ -2450,18 +2466,27 @@ pub(super) mod tests {
         let full_matrix = engine
             .compute_sensitivities(&positions, &factors, &market, as_of, Currency::USD)
             .expect("full matrix");
-        for (factor_idx, curve_id) in [(1, "INDEX-HZ"), (2, "INDEX-BC")] {
+        for (factor_idx, bump_fn) in [
+            (
+                1,
+                (|spec| MarketBump::HazardCurve {
+                    id: "INDEX-HZ".into(),
+                    spec,
+                }) as fn(BumpSpec) -> MarketBump,
+            ),
+            (
+                2,
+                (|spec| MarketBump::BaseCorrelation {
+                    id: "INDEX-BC".into(),
+                    spec,
+                }) as fn(BumpSpec) -> MarketBump,
+            ),
+        ] {
             let up = market
-                .bump(vec![MarketBump::Curve {
-                    id: curve_id.into(),
-                    spec: BumpSpec::parallel_bp(1.0),
-                }])
+                .bump(vec![bump_fn(BumpSpec::parallel_bp(1.0))])
                 .expect("up market");
             let down = market
-                .bump(vec![MarketBump::Curve {
-                    id: curve_id.into(),
-                    spec: BumpSpec::parallel_bp(-1.0),
-                }])
+                .bump(vec![bump_fn(BumpSpec::parallel_bp(-1.0))])
                 .expect("down market");
             let manual = (tranche.value_raw(&up, as_of).expect("up PV")
                 - tranche.value_raw(&down, as_of).expect("down PV"))

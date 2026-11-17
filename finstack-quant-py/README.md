@@ -157,7 +157,7 @@ bond = Bond.fixed(
     StubKind.NONE,
     "USD-OIS",
 )
-market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
+market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04, "act_365f"))
 
 result = price_instrument(bond, market, as_of, metrics=["dv01"])
 print(result.instrument_id, round(result.price, 2), result.currency)  # B 1017.07 USD

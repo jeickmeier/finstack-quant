@@ -181,10 +181,7 @@ class TestDateArguments:
                     "day_count": "act_360",
                     "knot_points": [[0.0, 1.0], [5.0, 0.90], [10.0, 0.80]],
                     "interp_style": "monotone_convex",
-                    "extrapolation": "flat_forward",
-                    "min_forward_rate": None,
-                    "allow_non_monotonic": False,
-                    "min_forward_tenor": 1e-6,
+                    "extrapolation": "extend",
                 }
             ],
             "fx": None,

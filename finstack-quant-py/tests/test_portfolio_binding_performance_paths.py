@@ -61,6 +61,8 @@ def _market() -> MarketContext:
             date.fromisoformat(AS_OF),
             [(0.0, 1.0), (0.5, 0.98), (1.0, 0.95)],
             day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
         )
     )
     return market

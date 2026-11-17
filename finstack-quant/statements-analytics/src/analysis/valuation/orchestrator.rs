@@ -645,15 +645,12 @@ mod tests {
                 (5.0, (-rate * 5.0).exp()),
                 (10.0, (-rate * 10.0).exp()),
                 (30.0, (-rate * 30.0).exp()),
-            ]);
+            ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend);
 
         if rate.abs() < 1e-10 || rate < 0.0 {
-            builder = builder.interp(InterpStyle::Linear).validation(
-                finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                    allow_non_monotonic: true,
-                    forward_floor: None,
-                },
-            );
+            builder = builder.interp(InterpStyle::Linear);
         }
 
         builder.build().expect("valid flat discount curve")

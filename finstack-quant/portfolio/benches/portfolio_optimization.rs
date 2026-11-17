@@ -30,12 +30,8 @@ fn opt_market(as_of: Date) -> MarketContext {
         .base_date(as_of)
         .knots(vec![(0.0, 1.0), (1.0, 0.99), (3.0, 0.96), (5.0, 0.93)])
         .interp(InterpStyle::Linear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        )
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("bench: discount curve");
     MarketContext::new().insert(curve)

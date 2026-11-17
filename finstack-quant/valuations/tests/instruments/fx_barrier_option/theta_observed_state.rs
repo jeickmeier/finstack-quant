@@ -77,9 +77,10 @@ fn one_day_reprice(
     market: &MarketContext,
     as_of: Date,
 ) -> f64 {
-    let rolled_market = market.roll_forward(1).expect("roll market");
+    let rolled_date = as_of + time::Duration::days(1);
+    let rolled_market = market.condition(rolled_date).expect("condition market");
     let rolled = rolled_instrument
-        .value(&rolled_market, as_of + time::Duration::days(1))
+        .value(&rolled_market, rolled_date)
         .expect("rolled reprice")
         .amount();
     rolled - instrument.value(market, as_of).expect("base PV").amount()
@@ -102,8 +103,8 @@ fn fx_barrier_golden_theta_rolls_observed_state_with_spot_held() {
         "golden spot sits below the up barrier"
     );
 
-    let rolled_market = market.roll_forward(1).expect("roll market");
     let rolled_date = as_of + time::Duration::days(1);
+    let rolled_market = market.condition(rolled_date).expect("condition market");
     assert!(
         option.value(&rolled_market, rolled_date).is_err(),
         "ordinary seasoned pricing still requires observed_barrier_breached"
@@ -161,11 +162,10 @@ fn fx_touch_theta_rolls_observed_state_with_spot_held() {
         (spot, BarrierDirection::Down, true, "down one-touch at spot"),
     ] {
         let option = touch(as_of, barrier, direction);
-        let rolled_market = market.roll_forward(1).expect("roll market");
+        let rolled_date = as_of + time::Duration::days(1);
+        let rolled_market = market.condition(rolled_date).expect("condition market");
         assert!(
-            option
-                .value(&rolled_market, as_of + time::Duration::days(1))
-                .is_err(),
+            option.value(&rolled_market, rolled_date).is_err(),
             "{label}: ordinary seasoned pricing still requires observed_barrier_breached"
         );
         let mut observed = option.clone();

@@ -17,7 +17,9 @@ use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_m
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;
@@ -54,15 +56,18 @@ fn create_market(as_of: Date) -> MarketContext {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots(knots)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let fwd = ForwardCurve::builder(CurveId::new("USD-LIBOR-3M"), 0.25)
-        .base_date(as_of)
-        .day_count(DayCount::Act365F)
-        .knots(vec![(0.0, 0.035), (30.0, 0.035)])
-        .build()
-        .unwrap();
+    let fwd = ForwardCurve::flat(
+        CurveId::new("USD-LIBOR-3M"),
+        as_of,
+        0.035,
+        DayCount::Act365F,
+    )
+    .unwrap();
 
     // Cover the first near-dated CMS fixing as well as the later quarterly
     // fixings without relying on expiry extrapolation.
@@ -78,8 +83,11 @@ fn create_market(as_of: Date) -> MarketContext {
     let flat_row = vec![0.20_f64; strikes.len()];
 
     let mut vol_builder = VolSurface::builder(CurveId::new("USD-CMS10Y-VOL"))
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&expiries)
-        .strikes(&strikes);
+        .secondary_values(&strikes);
     for _ in 0..expiries.len() {
         vol_builder = vol_builder.row(&flat_row);
     }
@@ -121,6 +129,7 @@ fn make_cms_option(as_of: Date, n_periods: usize, cms_tenor: Tenor) -> CmsOption
         // Match the existing legacy 3M forward curve and semiannual 30/360
         // reference-swap conventions explicitly.
         index_id: Some(IndexId::new("USD-LIBOR-3M")),
+        cms_fixing_index_id: None,
         swap_fixed_frequency: Some(Tenor::semi_annual()),
         swap_float_frequency: Some(Tenor::quarterly()),
         swap_fixed_day_count: Some(DayCount::Thirty360),
@@ -229,6 +238,7 @@ fn bench_cms_swap_period_count(c: &mut Criterion) {
                 notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 day_count: DayCount::Act360,
                 index_id: IndexId::new("USD-SOFR-OIS"),
+                cms_fixing_index_id: None,
                 side: PayReceive::Receive,
                 discount_curve_id: "USD-OIS".into(),
                 forward_curve_id: "USD-LIBOR-3M".into(),

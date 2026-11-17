@@ -95,7 +95,7 @@
             "base_date": "2026-04-30",
             "method": "bootstrap",
             "interpolation": "log_linear",
-            "extrapolation": "flat_forward",
+            "extrapolation": "extend",
             "pricing_discount_id": null,
             "pricing_forward_id": null,
             "conventions": {

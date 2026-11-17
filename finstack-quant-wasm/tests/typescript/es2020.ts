@@ -31,28 +31,36 @@ const discountFromArray = new core.DiscountCurve({
   id: 'USD-OIS',
   baseDate: '2025-01-01',
   knots: numberValues,
+  interp: 'monotone_convex',
+  extrapolation: 'extend',
+  dayCount: 'act_365f',
 });
 const discountFromTyped = new core.DiscountCurve({
   id: 'USD-OIS-TYPED',
   baseDate: '2025-01-01',
   knots: typedValues,
-  validationMode: 'negative_rate_friendly',
-  forwardFloor: -0.01,
+  interp: 'linear',
+  extrapolation: 'extend',
+  dayCount: 'act_365f',
 });
 
 const forwardFromArray = new core.ForwardCurve({
   id: 'USD-SOFR-3M',
-  tenor: 0.25,
   baseDate: '2025-01-01',
-  knots: [0, 0.04, 1, 0.045],
-  projectionGrid: [0, 0.25, 1],
+  knots: numberValues,
+  interp: 'log_linear',
+  extrapolation: 'extend',
+  dayCount: 'act_360',
+  indexTenor: '3M',
 });
 const forwardFromTyped = new core.ForwardCurve({
   id: 'USD-SOFR-3M-TYPED',
-  tenor: 0.25,
   baseDate: '2025-01-01',
-  knots: new Float64Array([0, 0.04, 1, 0.045]),
-  projectionGrid: new Float64Array([0, 0.25, 1]),
+  knots: typedValues,
+  interp: 'log_linear',
+  extrapolation: 'extend',
+  dayCount: 'act_360',
+  indexTenor: '3M',
 });
 
 const cubeFromArrays = new core.VolCube(
@@ -70,28 +78,40 @@ const cubeFromTyped = new core.VolCube(
   new Float64Array([0.04])
 );
 
+const clock = new core.VolatilityClock(19723, 'act_365f');
 const fxVolFromArrays = new core.FxDeltaVolSurface(
   'EURUSD',
+  'EUR/USD',
   [0.25, 1],
   [0.08, 0.09],
   [0.01, 0.012],
   [0.005, 0.006],
-  [0.02, 0.022],
-  [0.008, 0.009]
+  {
+    rr10d: [0.02, 0.022],
+    bf10d: [0.008, 0.009],
+    expiryClock: clock,
+  }
 );
 const fxVolFromTyped = new core.FxDeltaVolSurface(
   'EURUSD-TYPED',
+  ['EUR', 'USD'],
   new Float64Array([0.25, 1]),
   new Float64Array([0.08, 0.09]),
   new Float64Array([0.01, 0.012]),
   new Float64Array([0.005, 0.006]),
-  new Float64Array([0.02, 0.022]),
-  new Float64Array([0.008, 0.009])
+  {
+    rr10d: new Float64Array([0.02, 0.022]),
+    bf10d: new Float64Array([0.008, 0.009]),
+  }
 );
 
-const projectionGrid: Float64Array | undefined = forwardFromTyped.projectionGrid;
+const forwardFactors: Float64Array = forwardFromTyped.factors;
 const expiries: Float64Array = fxVolFromTyped.expiries;
 const pillarVols: Float64Array = models.volatility.getFxDeltaPillarVols(fxVolFromArrays, 0);
+const fxStrike: number = models.volatility.deltaToStrike(true, 0.25, 1.1, 0.12, 1);
+const fxDelta: number = models.volatility.strikeToDelta(true, 1.12, 1.1, 0.12, 1);
+const fxStrikeSurface: InstanceType<typeof core.VolSurface> =
+  models.volatility.materializeFxDeltaSurface(fxVolFromArrays, [1.105, 1.11]);
 const factorReturns = analytics.constrainedLeastSquares([1], 1, [0.01], [1]);
 const factorAttribution: FactorBrinsonResult = portfolio.factorBrinsonAttribution(
   '{}',
@@ -105,14 +125,18 @@ const owned: WasmOwned[] = [
   forwardFromTyped,
   cubeFromArrays,
   cubeFromTyped,
+  clock,
   fxVolFromArrays,
   fxVolFromTyped,
+  fxStrikeSurface,
 ];
 owned.forEach((value) => value.free());
 
-void projectionGrid;
+void forwardFactors;
 void expiries;
 void pillarVols;
+void fxStrike;
+void fxDelta;
 void factorAttribution;
 void materializationParseNanos;
 void materializationTimingAvailable;
@@ -243,5 +267,11 @@ declare const typedMoney: InstanceType<typeof core.Money>;
 typedMarket
   .insertPrice('SPOT-DECIMAL', '9007199254740993.25', 'USD')
   .insertPrice('SPOT-MONEY', typedMoney);
-const cpiNumericLag = new core.InflationIndex('US-CPI', [['2025-01-01', 300]], 'USD', 'step', 3);
-cpiNumericLag.free();
+const cpiSnapshot = new core.InflationIndex(
+  'US-CPI',
+  [{ reference_month: '2025-01-01', value: 300, available_on: '2025-02-12' }],
+  'USD',
+  '2025-03-01'
+);
+cpiSnapshot.getObservation('2025-01-01').value satisfies number;
+cpiSnapshot.free();

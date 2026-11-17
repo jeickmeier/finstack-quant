@@ -16,7 +16,6 @@ import pytest
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import (
     DiscountCurve,
-    ForwardCurve,
     HazardCurve,
     MarketContext,
     ScalarTimeSeries,
@@ -29,6 +28,7 @@ from finstack_quant.valuations.instruments import (
     instrument_cashflows,
     price_instrument,
 )
+from tests.tests_typed_helpers import projection_curve
 
 AS_OF = datetime.date(2024, 1, 15)
 MATURITY = datetime.date(2027, 1, 15)
@@ -37,14 +37,18 @@ HAZARD_ID = "BORROWER-HZ"
 
 def market() -> MarketContext:
     """Flat 3% OIS discounting, a flat 4% SOFR-3M index with its fixings and a rising hazard curve."""
-    fixings = [(AS_OF - datetime.timedelta(days=days), 0.04) for days in range(25)]
+    fixings = [(AS_OF - datetime.timedelta(days=days), 0.04) for days in range(24, -1, -1)]
     ctx = (
         MarketContext()
-        .insert(DiscountCurve.flat("USD-OIS", AS_OF, 0.03))
-        .insert(ForwardCurve("USD-SOFR-3M", 0.25, AS_OF, [(0.0, 0.04), (10.0, 0.04)], day_count="act_360"))
-        .insert(HazardCurve(HAZARD_ID, AS_OF, [(1.0, 0.04), (3.0, 0.10), (5.0, 0.14)], recovery_rate=0.4))
+        .insert(DiscountCurve.flat("USD-OIS", AS_OF, 0.03, "act_365f"))
+        .insert(projection_curve("USD-SOFR-3M", AS_OF, [(10.0, 0.04)]))
+        .insert(
+            HazardCurve(
+                HAZARD_ID, AS_OF, [(1.0, 0.04), (3.0, 0.10), (5.0, 0.14)], recovery_rate=0.4, day_count="act_365f"
+            )
+        )
     )
-    ctx.insert_series(ScalarTimeSeries("FIXING:USD-SOFR-3M", fixings))
+    ctx.insert_series(ScalarTimeSeries("FIXING:USD-SOFR-3M", fixings, "step", "error"))
     return ctx
 
 

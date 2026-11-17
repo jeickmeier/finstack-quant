@@ -383,6 +383,32 @@ impl Money {
         ))
     }
 
+    /// Construct from exact decimal text using the configured ingest rounding policy.
+    ///
+    /// Parses `amount` with [`Self::from_decimal_str`] without rounding through
+    /// `f64`, then applies `cfg`'s ingest rounding via
+    /// [`Self::from_decimal_with_config`].
+    ///
+    /// # Arguments
+    ///
+    /// * `amount` - Exact decimal amount text in major currency units, in fixed-point or scientific notation.
+    /// * `currency` - ISO-4217 currency whose ingest override, if any, selects the scale.
+    /// * `cfg` - Configuration supplying the optional currency scale override and the rounding mode it requires.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when `amount` cannot be represented
+    /// exactly as a `Decimal` or when `currency` has an ingest scale
+    /// override and `cfg` selects no rounding mode.
+    pub fn from_decimal_str_with_config(
+        amount: &str,
+        currency: Currency,
+        cfg: &FinstackConfig,
+    ) -> Result<Self, Error> {
+        let exact = crate::decimal::parse_decimal(amount)?;
+        Self::from_decimal_with_config(exact, currency, cfg)
+    }
+
     /// Construct from an exact Decimal using the configured ingest rounding policy.
     ///
     /// Without an ingest scale override for `currency` the amount is kept
@@ -479,12 +505,13 @@ impl Money {
 
     /// Amount accessor (by value).
     ///
-    /// This converts the internal [`Decimal`](rust_decimal::Decimal) representation to `f64` for
-    /// ergonomic display and binding use. Values outside the finite `f64`
-    /// range should avoid this lossy view and keep values on Decimal-backed APIs.
+    /// This converts the internal [`Decimal`](rust_decimal::Decimal)
+    /// representation to binary64 using exact decimal-to-binary single rounding
+    /// (ties to even). Values needing full fixed-point precision should keep
+    /// using [`Self::amount_decimal`].
     #[inline]
     pub fn amount(&self) -> f64 {
-        self.amount.as_f64()
+        decimal_to_f64_nearest(self.amount)
     }
 
     /// Lossless amount accessor as the internal [`rust_decimal::Decimal`].
@@ -831,7 +858,42 @@ impl Money {
         if self.amount.is_zero() {
             return Ok(0.0);
         }
-        Ok(decimal_to_f64_nearest(self.amount)? / decimal_to_f64_nearest(rhs.amount)?)
+        Ok(decimal_to_f64_nearest(self.amount) / decimal_to_f64_nearest(rhs.amount))
+    }
+
+    /// Return the exact fractional change `(self - baseline) / baseline` in the same currency.
+    ///
+    /// Evaluates `(self - baseline)` in `Decimal` via `checked_sub` when representable and
+    /// converts the numerator and denominator cleanly to `f64`, falling back to `f64`
+    /// difference only when opposite-signed extreme `Decimal` values exceed `Decimal::MAX`.
+    /// Rejects zero baselines even when `self` is also zero.
+    ///
+    /// # Arguments
+    /// - `baseline` - Non-zero baseline money amount in the same currency as `self`.
+    ///
+    /// # Errors
+    /// Returns [`Error::CurrencyMismatch`](crate::Error::CurrencyMismatch) if currencies
+    /// differ, or [`Error::Validation`](crate::Error::Validation) if `baseline` is zero or
+    /// the resulting ratio is non-finite or underflows to zero for distinct amounts.
+    pub fn proportional_change(self, baseline: Self) -> Result<f64, Error> {
+        ensure_same_currency(&self, &baseline)?;
+        if baseline.amount.is_zero() {
+            return Err(Error::Validation("division by zero".into()));
+        }
+        if self.amount == baseline.amount {
+            return Ok(0.0);
+        }
+        let denom = decimal_to_f64_nearest(baseline.amount);
+        let ratio = match self.amount.checked_sub(baseline.amount) {
+            Some(delta) => decimal_to_f64_nearest(delta) / denom,
+            None => (decimal_to_f64_nearest(self.amount) - denom) / denom,
+        };
+        if !ratio.is_finite() || ratio == 0.0 {
+            return Err(Error::Validation(
+                "proportional change ratio overflowed or underflowed f64".into(),
+            ));
+        }
+        Ok(if ratio == 0.0 { 0.0 } else { ratio })
     }
 
     /// Return the absolute amount in the same currency without rounding.
@@ -917,7 +979,7 @@ impl Money {
             return Err(InputError::InvalidFxRate {
                 from: self.currency,
                 to,
-                rate: decimal_to_f64_nearest(rate)?,
+                rate: decimal_to_f64_nearest(rate),
             }
             .into());
         }
@@ -1630,6 +1692,40 @@ mod tests {
     }
 
     #[test]
+    fn proportional_change_preserves_decimal_difference_and_rejects_zero_baseline() {
+        assert!(
+            Money::zero(Currency::USD)
+                .proportional_change(Money::zero(Currency::USD))
+                .is_err()
+        );
+        assert!(
+            usd("1")
+                .proportional_change(Money::zero(Currency::USD))
+                .is_err()
+        );
+        assert!(
+            usd("1")
+                .proportional_change(Money::from((1_i64, Currency::EUR)))
+                .is_err()
+        );
+        let big_base = usd("10000000000000000000");
+        let big_next = usd("10000000000000000001");
+        let frac = big_next
+            .proportional_change(big_base)
+            .expect("exact small delta");
+        assert!((frac - 1e-19).abs() < 1e-32);
+        assert_eq!(usd("50").proportional_change(usd("50")).expect("same"), 0.0);
+
+        let half = rust_decimal::Decimal::from(2_i32);
+        let pos_extreme = Money::from_decimal(rust_decimal::Decimal::MAX / half, Currency::USD);
+        let neg_extreme = Money::from_decimal(-rust_decimal::Decimal::MAX / half, Currency::USD);
+        let opp = pos_extreme
+            .proportional_change(neg_extreme)
+            .expect("opposite-sign extreme");
+        assert!((opp - (-2.0)).abs() < 1e-12);
+    }
+
+    #[test]
     fn convert_at_rate_is_exact_and_validates_before_shortcuts() {
         let eur = Money::from_decimal_str("-100.000000000000000001", Currency::EUR).expect("eur");
         let rate = rust_decimal::Decimal::new(10825, 4);
@@ -1674,5 +1770,39 @@ mod tests {
             zero.convert_at_rate_f64(Currency::USD, f64::INFINITY)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn from_decimal_str_with_config_and_amount_nearest_even() {
+        let mut cfg = FinstackConfig::default();
+        let kept = Money::from_decimal_str_with_config("1.245", Currency::USD, &cfg)
+            .expect("exact without override");
+        assert_eq!(kept.amount_decimal().to_string(), "1.245");
+
+        cfg.rounding
+            .ingest_scale
+            .set_scale(Currency::USD, 2)
+            .expect("valid scale");
+        assert!(Money::from_decimal_str_with_config("1.245", Currency::USD, &cfg).is_err());
+
+        cfg.rounding.mode = Some(RoundingMode::Bankers);
+        let rounded = Money::from_decimal_str_with_config("1.245", Currency::USD, &cfg)
+            .expect("rounded with mode");
+        assert_eq!(rounded.amount_decimal().to_string(), "1.24");
+
+        // Reject malformed decimal text even when config is provided.
+        assert!(Money::from_decimal_str_with_config("NaN", Currency::USD, &cfg).is_err());
+
+        // Money::amount() delegates to decimal_to_f64_nearest (single rounding).
+        let edge = Money::from_decimal_str("9007199254740993", Currency::USD).expect("2^53+1");
+        assert_eq!(edge.amount(), 9_007_199_254_740_992.0);
+        let huge = Money::from_decimal_str("12345678901234567890123456789", Currency::USD)
+            .expect("large exact");
+        let expected: f64 = huge
+            .amount_decimal()
+            .to_string()
+            .parse()
+            .expect("f64 nearest");
+        assert_eq!(huge.amount().to_bits(), expected.to_bits());
     }
 }

@@ -81,7 +81,7 @@ pub(crate) fn solve_ytm_timed(
         if years > 0.0 && fv > 0.0 && target > 0.0 {
             let ratio = fv / target;
             let ytm = match spec.compounding {
-                YieldCompounding::Rate(rate_comp) => rate_comp.rate_from_df(target / fv, years),
+                YieldCompounding::Rate(rate_comp) => rate_comp.rate_from_df(target / fv, years)?,
                 YieldCompounding::Moosmuller => (ratio - 1.0) / years,
                 YieldCompounding::Street => {
                     let m = spec.frequency.payments_per_year()?.max(1.0);
@@ -100,13 +100,14 @@ pub(crate) fn solve_ytm_timed(
     // (e.g. a non-positive compounding base `1 + y/m <= 0` in the
     // deep-negative-yield regime) aborts the solve and is reported as-is,
     // so no fake root is found around it.
-    BrentSolver::new()
-        .with_tolerance(YTM_TOLERANCE)
-        .with_max_iterations(YTM_MAX_ITERATIONS)
-        .solve_fallible(
-            |y| Ok(price_from_ytm_timed(cashflows, spec.frequency, y, spec.compounding)? - target),
-            initial_guess,
-        )
+    BrentSolver::new(YTM_TOLERANCE, YTM_MAX_ITERATIONS)?.solve(
+        |y| Ok(price_from_ytm_timed(cashflows, spec.frequency, y, spec.compounding)? - target),
+        initial_guess,
+        -10.0,
+        100.0,
+        0.05,
+        25,
+    )
 }
 
 /// Current yield plus half the annualised pull-to-par, clamped to
@@ -213,15 +214,20 @@ mod tests {
                 DiscountCurve::builder("ACT365L-DISC")
                     .base_date(issue)
                     .knots([(0.0, 1.0), (3.0, 0.88)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount curve"),
             )
             .insert(
-                ForwardCurve::builder("ACT365L-FWD", 0.5)
-                    .base_date(issue)
-                    .knots([(0.0, 0.04), (3.0, 0.04)])
-                    .build()
-                    .expect("forward curve"),
+                ForwardCurve::flat(
+                    "ACT365L-FWD",
+                    issue,
+                    0.04,
+                    finstack_quant_core::dates::DayCount::Act365F,
+                )
+                .expect("forward curve"),
             );
         for (maturity, convention, lag, final_time, final_payment) in [
             (

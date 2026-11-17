@@ -4,7 +4,9 @@ use crate::metrics::common::builders::test_option;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::{FxMatrix, FxQuery, SimpleFxProvider};
@@ -154,6 +156,8 @@ fn build_fx_market(
             (1.0, (-r_domestic).exp()),
             (5.0, (-r_domestic * 5.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("usd curve should build");
     let eur_curve = DiscountCurve::builder("EUR-OIS")
@@ -165,11 +169,16 @@ fn build_fx_market(
             (1.0, (-r_foreign).exp()),
             (5.0, (-r_foreign * 5.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("eur curve should build");
     let vol_surface = VolSurface::builder("EURUSD-VOL")
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[0.25, 0.5, 1.0, 2.0, 5.0])
-        .strikes(&[0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4])
+        .secondary_values(&[0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4])
         .row(&[vol; 7])
         .row(&[vol; 7])
         .row(&[vol; 7])

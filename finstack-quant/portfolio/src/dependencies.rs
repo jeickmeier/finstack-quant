@@ -456,12 +456,16 @@ pub(crate) mod tests {
         let discount = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.8), (10.0, 0.6)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount");
         let hazard = HazardCurve::builder("INDEX-HZ")
             .base_date(as_of)
             .recovery_rate(0.4)
             .knots([(1.0, 0.01), (3.0, 0.015), (5.0, 0.02), (10.0, 0.025)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard");
         let correlation = BaseCorrelationCurve::builder("INDEX-BC")
@@ -513,6 +517,7 @@ pub(crate) mod tests {
             .base_date(as_of)
             .recovery_rate(0.4)
             .knots([(1.0, 0.01), (5.0, 0.02)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("issuer");
         let index = market

@@ -22,6 +22,8 @@ fn build_discount_curve(id: &str, as_of: Date, rate: f64) -> DiscountCurve {
             (5.0f64, (-rate * 5.0).exp()),
             (10.0f64, (-rate * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve should build")
 }
@@ -31,7 +33,7 @@ fn build_hazard_curve(id: &str, as_of: Date, hazard_rate: f64) -> HazardCurve {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .recovery_rate(0.4)
-        .knots([(0.0f64, hazard_rate), (5.0f64, hazard_rate)])
+        .knots([(1.0f64, hazard_rate), (5.0f64, hazard_rate)])
         .build()
         .expect("hazard curve should build")
 }

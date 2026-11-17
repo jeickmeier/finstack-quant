@@ -15,9 +15,6 @@ use finstack_quant_valuations_core::instruments::{FixedLegSpec, FloatLegSpec, Pa
 use finstack_quant_valuations_rates::irs::InterestRateSwap;
 use time::Month;
 
-// Overnight compounded fixtures need a positive projection-curve tenor.
-const OVERNIGHT_FORWARD_TENOR: f64 = 1.0 / 360.0;
-
 #[test]
 fn test_compounding_lookback_sensitivity() {
     let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
@@ -31,15 +28,28 @@ fn test_compounding_lookback_sensitivity() {
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, 0.951229)]) // exp(-0.05 * 1)
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     // Increasing forward curve: starts at 5%, ends at 10%
-    let fwd = ForwardCurve::builder("FWD", OVERNIGHT_FORWARD_TENOR)
+    let fwd = ForwardCurve::builder("FWD")
         .base_date(base)
         .day_count(DayCount::Act360)
-        .knots([(0.0, 0.05), (1.0, 0.10)])
-        .interp(InterpStyle::Linear)
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.993381375224844),
+            (0.25, 0.986035915092277),
+            (0.375, 0.977980424496391),
+            (0.5, 0.969233234476344),
+            (0.625, 0.95981413273481),
+            (0.75, 0.949744289089124),
+            (0.875, 0.939046176248012),
+            (1.0, 0.927743486328553),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -57,7 +67,16 @@ fn test_compounding_lookback_sensitivity() {
             obs.push((d, 0.05));
             d = d.add_business_days(1, cal).unwrap();
         }
-        ctx.insert_series(ScalarTimeSeries::new("FIXING:FWD", obs, None).unwrap())
+        ctx.insert_series(
+            ScalarTimeSeries::new(
+                "FIXING:FWD",
+                obs,
+                None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .unwrap(),
+        )
     } else {
         ctx
     };
@@ -124,13 +143,26 @@ fn test_rate_cutoff_uses_business_day_lockout_over_weekend() {
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, 0.95)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let fwd = ForwardCurve::builder("FWD", OVERNIGHT_FORWARD_TENOR)
+    let fwd = ForwardCurve::builder("FWD")
         .base_date(base)
         .day_count(DayCount::Act360)
-        .knots([(0.0, 0.02), (1.0, 0.20)])
-        .interp(InterpStyle::Linear)
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.996101369470118),
+            (0.25, 0.989431245931904),
+            (0.375, 0.980045529228744),
+            (0.5, 0.968022449831306),
+            (0.625, 0.953461483136346),
+            (0.75, 0.936481979195658),
+            (0.875, 0.917221534272911),
+            (1.0, 0.895834135296528),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let ctx = MarketContext::new().insert(disc).insert(fwd);
@@ -189,18 +221,20 @@ fn test_payment_delay_sensitivity() {
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, 0.95)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     // Flat forward curve based at the swap start (2024-01-01): seasoned resets
     // strictly before the curve base now error under the default fallback.
-    let fwd = ForwardCurve::builder("FWD", OVERNIGHT_FORWARD_TENOR)
-        .base_date(Date::from_calendar_date(2024, Month::January, 1).unwrap())
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.05), (2.0, 0.05)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap();
+    let fwd = ForwardCurve::flat(
+        "FWD",
+        Date::from_calendar_date(2024, Month::January, 1).unwrap(),
+        0.05,
+        DayCount::Act360,
+    )
+    .unwrap();
 
     // Provide fixings for seasoned swap - example() creates a swap starting 2024-01-01
     // but we're pricing on 2025-01-01, so past resets need fixings
@@ -216,6 +250,8 @@ fn test_payment_delay_sensitivity() {
             })
             .collect(),
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .expect("fixings series");
 
@@ -256,16 +292,12 @@ fn test_seasoned_compounded_swap_requires_fixings() {
         .base_date(as_of)
         .knots([(0.0, 1.0), (1.0, 0.95)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let fwd = ForwardCurve::builder("FWD", OVERNIGHT_FORWARD_TENOR)
-        .base_date(as_of)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.05), (1.0, 0.05)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap();
+    let fwd = ForwardCurve::flat("FWD", as_of, 0.05, DayCount::Act360).unwrap();
 
     let ctx = MarketContext::new().insert(disc).insert(fwd);
 
@@ -326,16 +358,12 @@ fn test_seasoned_compounded_swap_with_fixings_prices() {
         .base_date(as_of)
         .knots([(0.0, 1.0), (1.0, 0.95)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let fwd = ForwardCurve::builder("FWD", OVERNIGHT_FORWARD_TENOR)
-        .base_date(as_of)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.05), (1.0, 0.05)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap();
+    let fwd = ForwardCurve::flat("FWD", as_of, 0.05, DayCount::Act360).unwrap();
 
     // Build minimal business-day fixings from start up to (but not including) as_of.
     let mut obs: Vec<(Date, f64)> = Vec::new();
@@ -344,7 +372,14 @@ fn test_seasoned_compounded_swap_with_fixings_prices() {
         obs.push((d, 0.05));
         d = d.add_business_days(1, cal).unwrap();
     }
-    let fixings = ScalarTimeSeries::new("FIXING:FWD", obs, None).unwrap();
+    let fixings = ScalarTimeSeries::new(
+        "FIXING:FWD",
+        obs,
+        None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+    )
+    .unwrap();
 
     let ctx = MarketContext::new()
         .insert(disc)
@@ -407,23 +442,14 @@ fn test_compounded_swap_with_spread_near_zero_rates() {
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, 0.999)])
         .interp(InterpStyle::LogLinear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        ) // Allow for very flat curves
+        // Allow for very flat curves
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     // Near-zero forward curve
-    let fwd = ForwardCurve::builder("FWD", OVERNIGHT_FORWARD_TENOR)
-        .base_date(base)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.001), (1.0, 0.001)]) // 0.1% flat
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap();
+    let fwd = ForwardCurve::flat("FWD", base, 0.001, DayCount::Act360).unwrap();
 
     let ctx = MarketContext::new().insert(disc).insert(fwd);
 
@@ -498,23 +524,14 @@ fn test_compounded_swap_with_spread_negative_rates() {
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, 1.005)]) // exp(-(-0.005)*1) ≈ 1.005
         .interp(InterpStyle::LogLinear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        ) // Negative rates cause DF > 1
+        // Negative rates cause DF > 1
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     // Negative forward curve
-    let fwd = ForwardCurve::builder("FWD", OVERNIGHT_FORWARD_TENOR)
-        .base_date(base)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, -0.005), (1.0, -0.005)]) // -0.5% flat
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap();
+    let fwd = ForwardCurve::flat("FWD", base, -0.005, DayCount::Act360).unwrap();
 
     let ctx = MarketContext::new().insert(disc).insert(fwd);
 
@@ -592,16 +609,12 @@ fn test_observation_shift_before_curve_base_date() {
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, 0.95)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let fwd = ForwardCurve::builder("FWD", OVERNIGHT_FORWARD_TENOR)
-        .base_date(base)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.05), (1.0, 0.05)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap();
+    let fwd = ForwardCurve::flat("FWD", base, 0.05, DayCount::Act360).unwrap();
 
     // Build fixings from swap start up to curve base date
     let mut obs: Vec<(Date, f64)> = Vec::new();
@@ -610,7 +623,14 @@ fn test_observation_shift_before_curve_base_date() {
         obs.push((d, 0.05));
         d = d.add_business_days(1, cal).unwrap();
     }
-    let fixings = ScalarTimeSeries::new("FIXING:FWD", obs, None).unwrap();
+    let fixings = ScalarTimeSeries::new(
+        "FIXING:FWD",
+        obs,
+        None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+    )
+    .unwrap();
 
     let ctx = MarketContext::new()
         .insert(disc)

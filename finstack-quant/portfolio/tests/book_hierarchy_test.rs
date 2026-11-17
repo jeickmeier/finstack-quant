@@ -41,12 +41,8 @@ fn build_test_market() -> MarketContext {
         .base_date(date!(2024 - 01 - 01))
         .knots(vec![(0.0, 1.0), (1.0, 1.0), (5.0, 1.0)])
         .interp(InterpStyle::Linear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        )
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("USD curve should build");
 

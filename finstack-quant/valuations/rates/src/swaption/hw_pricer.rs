@@ -264,6 +264,7 @@ mod tests {
                     .day_count(day_count)
                     .knots(knots)
                     .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("curve");
                 let market = MarketContext::new().insert(curve);
@@ -395,8 +396,14 @@ mod tests {
             10.0,
         ));
         let market = market
-            .insert_price(&kappa_key, MarketScalar::Unitless(0.05))
-            .insert_price(&sigma_key, MarketScalar::Unitless(0.01));
+            .insert_price(
+                &kappa_key,
+                MarketScalar::unitless(0.05).expect("valid scalar"),
+            )
+            .insert_price(
+                &sigma_key,
+                MarketScalar::unitless(0.01).expect("valid scalar"),
+            );
         (as_of, swaption, market)
     }
 
@@ -417,8 +424,14 @@ mod tests {
         let (kappa_key, sigma_key) = hw1f_scalar_keys(swaption.get_discount_curve_id().as_str());
         // Fitted sigma deliberately far from the baseline 0.01.
         let calibrated_market = baseline_market
-            .insert_price(&kappa_key, MarketScalar::Unitless(0.10))
-            .insert_price(&sigma_key, MarketScalar::Unitless(0.025));
+            .insert_price(
+                &kappa_key,
+                MarketScalar::unitless(0.10).expect("valid scalar"),
+            )
+            .insert_price(
+                &sigma_key,
+                MarketScalar::unitless(0.025).expect("valid scalar"),
+            );
 
         let calibrated_pv = SwaptionHullWhitePricer::default()
             .price_internal(&swaption, &calibrated_market, as_of)
@@ -446,9 +459,12 @@ mod tests {
         // must consume only the pre-fitted scalar pair already in the market.
         let surface = VolSurface::builder(swaption.vol_surface_id.clone())
             .expiries(&[0.5, 1.0, 2.0])
-            .strikes(&[1.0, 2.0, 5.0])
+            .secondary_values(&[1.0, 2.0, 5.0])
             .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Tenor)
             .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             // Declining expiry vol keeps κ inside the calibration bounds.
             .row(&[0.028, 0.026, 0.024])
             .row(&[0.024, 0.022, 0.020])
@@ -457,7 +473,7 @@ mod tests {
             .expect("swaption surface");
         let market = market.insert_surface(surface);
         let shocked_market = market
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::VolSurface {
                 id: CurveId::from(swaption.vol_surface_id.as_str()),
                 spec: BumpSpec {
                     mode: BumpMode::Multiplicative,
@@ -496,8 +512,14 @@ mod tests {
         let (as_of, mut swaption, market) = example_single_curve();
         let (kappa_key, sigma_key) = hw1f_scalar_keys(swaption.get_discount_curve_id().as_str());
         let market = market
-            .insert_price(&kappa_key, MarketScalar::Unitless(0.10))
-            .insert_price(&sigma_key, MarketScalar::Unitless(0.025));
+            .insert_price(
+                &kappa_key,
+                MarketScalar::unitless(0.10).expect("valid scalar"),
+            )
+            .insert_price(
+                &sigma_key,
+                MarketScalar::unitless(0.025).expect("valid scalar"),
+            );
 
         // PV with market scalars only.
         let market_pv = SwaptionHullWhitePricer::default()
@@ -620,7 +642,7 @@ mod tests {
         let registry = crate::RATES.pricers();
         let price = |bp: f64| {
             let shifted = market
-                .bump([MarketBump::Curve {
+                .bump([MarketBump::DiscountCurve {
                     id: (swaption.get_discount_curve_id()).clone(),
                     spec: BumpSpec::parallel_bp(bp),
                 }])

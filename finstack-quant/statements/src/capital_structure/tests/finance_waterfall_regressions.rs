@@ -90,6 +90,20 @@ fn sweep(percentage: f64, target: Option<&str>) -> EcfSweepSpec {
     }
 }
 
+fn waterfall_with_sweep(percentage: f64) -> WaterfallSpec {
+    WaterfallSpec {
+        priority_of_payments: vec![
+            PaymentPriority::Fees,
+            PaymentPriority::Interest,
+            PaymentPriority::Amortization,
+            PaymentPriority::Sweep,
+            PaymentPriority::Equity,
+        ],
+        ecf_sweep: Some(sweep(percentage, None)),
+        ..Default::default()
+    }
+}
+
 fn payment_classes() -> Vec<PaymentClassSpec> {
     vec![
         PaymentClassSpec {
@@ -199,10 +213,7 @@ fn ecf_deducts_cash_interest_fees_and_scheduled_arrears_actually_paid() {
             amount: usd(20),
         }],
     );
-    let spec = WaterfallSpec {
-        ecf_sweep: Some(sweep(0.5, None)),
-        ..Default::default()
-    };
+    let spec = waterfall_with_sweep(0.5);
     let result = execute_waterfall(
         &context(&[("cash", 300.0), ("ebitda", 300.0)]),
         &spec,
@@ -254,10 +265,7 @@ fn ecf_does_not_reserve_cash_for_a_later_interest_priority() {
 fn full_principal_repayment_preserves_earned_unpaid_interest() {
     let (mut state, mut flows) = loans(&["loan"], 1_000);
     flows.get_mut("loan").expect("loan").accrued_interest = usd(25);
-    let spec = WaterfallSpec {
-        ecf_sweep: Some(sweep(1.0, None)),
-        ..Default::default()
-    };
+    let spec = waterfall_with_sweep(1.0);
     let result = execute_waterfall(
         &context(&[("cash", 1_000.0), ("ebitda", 1_000.0)]),
         &spec,
@@ -542,10 +550,7 @@ fn advance_principal_cannot_be_repaid_again_before_its_economic_date() {
         state
             .set_period_principal_flows("loan", &middle_period, Vec::new())
             .expect("economic date still in the future");
-        let spec = WaterfallSpec {
-            ecf_sweep: Some(sweep(1.0, None)),
-            ..Default::default()
-        };
+        let spec = waterfall_with_sweep(1.0);
         let middle = execute_waterfall(
             &context_for(middle_period.id, &[("cash", 100.0), ("ebitda", 100.0)]),
             &spec,
@@ -643,10 +648,7 @@ fn residual_rebuild_reserves_due_principal_ahead_of_future_installments() {
                 }],
             )
             .expect("advance is economically later than the other installment");
-        let mut spec = WaterfallSpec {
-            ecf_sweep: Some(sweep(1.0, None)),
-            ..Default::default()
-        };
+        let mut spec = waterfall_with_sweep(1.0);
         if sweep_first {
             spec.priority_of_payments = vec![
                 PaymentPriority::Fees,

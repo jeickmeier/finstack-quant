@@ -36,8 +36,8 @@ def test_ois_theta_observes_the_same_day_sofr_fixing_at_the_as_of_forward() -> N
     instrument, market = _golden()
     # Single-curve OIS: the overnight forward for [2026-05-04, 2026-05-05] on ACT/360.
     forward = (1.0 / market.get_discount("USD-SOFR").df_between_dates(AS_OF, ROLLED) - 1.0) * 360.0
-    fixing = ScalarTimeSeries("FIXING:USD-SOFR", [(AS_OF, forward)])
-    rolled_pv = float(price_instrument(instrument, market.insert_series(fixing).roll_forward(1), ROLLED).price)
+    fixing = ScalarTimeSeries("FIXING:USD-SOFR", [(AS_OF, forward)], "step", "error")
+    rolled_pv = float(price_instrument(instrument, market.insert_series(fixing).condition(ROLLED), ROLLED).price)
     base_pv = float(price_instrument(instrument, market, AS_OF).price)
 
     assert _theta(instrument, market) == pytest.approx(rolled_pv - base_pv, rel=1e-9, abs=1e-6)
@@ -47,4 +47,4 @@ def test_rolled_pricing_still_requires_the_fixing() -> None:
     """Only theta observes the crossed fixing; ordinary pricing still raises ValueError."""
     instrument, market = _golden()
     with pytest.raises(ValueError, match="FIXING:USD-SOFR"):
-        price_instrument(instrument, market.roll_forward(1), ROLLED)
+        price_instrument(instrument, market.condition(ROLLED), ROLLED)

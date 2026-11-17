@@ -88,6 +88,9 @@ fn create_market_single_curve() -> MarketContext {
             (5.0, 0.88),
             (10.0, 0.70),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -121,13 +124,13 @@ fn create_market_constituents(num_names: usize) -> MarketContext {
         let hazard = HazardCurve::builder(format!("HAZARD-{:03}", i + 1))
             .base_date(base)
             .knots([
-                (0.0, 0.0),
                 (1.0, 0.02 * scale),
                 (3.0, 0.025 * scale),
                 (5.0, 0.03 * scale),
                 (10.0, 0.035 * scale),
             ])
             .recovery_rate(0.40)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .unwrap();
         market = market.insert(hazard);

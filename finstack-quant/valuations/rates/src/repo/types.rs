@@ -143,25 +143,14 @@ impl CollateralSpec {
     /// Calculate the market value of this collateral.
     pub fn market_value(&self, market: &MarketContext) -> Result<Money> {
         let price_scalar = market.get_price(&self.market_value_id)?;
-        let unit_value = match price_scalar {
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => money.amount(),
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
-        };
+        let money = price_scalar.get_price().ok_or_else(|| {
+            Error::Validation(
+                "repo collateral price must carry a currency; unitless prices are rejected"
+                    .to_string(),
+            )
+        })?;
 
-        // Derive currency from price scalar; error on unitless to enforce currency safety
-        let currency = match price_scalar {
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => {
-                money.currency()
-            }
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(_) => {
-                return Err(Error::Validation(
-                    "repo collateral price must carry a currency; unitless prices are rejected"
-                        .to_string(),
-                ));
-            }
-        };
-
-        Money::from_model_value(unit_value * self.quantity, currency)
+        Money::from_model_value(money.amount() * self.quantity, money.currency())
     }
 }
 
@@ -810,7 +799,8 @@ mod tests {
         .expect("test repo construction");
         let ctx = MarketContext::new().insert_price(
             "BOND_PX",
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(1.0),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(1.0)
+                .expect("valid scalar"),
         );
         // Should error due to currency safety enforcement
         assert!(repo.collateral.market_value(&ctx).is_err());
@@ -1086,6 +1076,9 @@ mod tests {
                 (1.0, (-flat_rate).exp()),
                 (5.0, (-flat_rate * 5.0).exp()),
             ])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("DiscountCurve builder should succeed");
         let ctx = MarketContext::new().insert(disc_curve);

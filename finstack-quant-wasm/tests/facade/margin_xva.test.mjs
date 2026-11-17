@@ -44,6 +44,8 @@ const flatDiscount = () =>
     baseDate: '2025-01-01',
     knots: [0.0, 1.0, 1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 4.0, 1.0],
     interp: 'log_linear',
+    extrapolation: 'extend',
+    dayCount: 'act_365f',
   });
 
 const hazardOptions = (knots, recoveryRate, id = 'HZ') => ({
@@ -51,10 +53,11 @@ const hazardOptions = (knots, recoveryRate, id = 'HZ') => ({
   baseDate: '2025-01-01',
   knots,
   recoveryRate,
+  dayCount: 'act_365f',
 });
 
 const flatHazard = (lambda) =>
-  new core.HazardCurve(hazardOptions([0.0, lambda, 30.0, lambda], 0.4));
+  new core.HazardCurve(hazardOptions([1.0, lambda, 30.0, lambda], 0.4));
 
 const exposureJson = JSON.stringify({
   times: [1.0, 2.0],
@@ -81,12 +84,18 @@ test('core namespace exports HazardCurve as a live constructor', () => {
 test('HazardCurve rejects missing recovery', () => {
   // `recoveryRate` is a required option key: serde rejects its absence.
   assert.throws(
-    () => new core.HazardCurve({ id: 'HZ', baseDate: '2025-01-01', knots: [0.0, 0.02] }),
+    () =>
+      new core.HazardCurve({
+        id: 'HZ',
+        baseDate: '2025-01-01',
+        knots: [1.0, 0.02],
+        dayCount: 'act_365f',
+      }),
     (error) => error.kind === 'validation' && /missing field `recoveryRate`/.test(error.message)
   );
   // NaN has no JSON form, so the options walker rejects it before Rust runs.
   assert.throws(
-    () => new core.HazardCurve(hazardOptions([0.0, 0.02, 30.0, 0.02], Number.NaN)),
+    () => new core.HazardCurve(hazardOptions([1.0, 0.02, 30.0, 0.02], Number.NaN)),
     (error) => error instanceof TypeError && error.kind === 'invalid_type'
   );
 });
@@ -99,9 +108,9 @@ test('HazardCurve recovery validation is the Rust builder check, in its order', 
       error.message ===
         'Validation error: Invalid recovery_rate: must be finite and in [0, 1], got 1.5'
   );
-  // Knots are validated before recovery, exactly as in Python.
+  // Knots are validated against non-negative intensity when recovery is valid, as in Python.
   assert.throws(
-    () => new core.HazardCurve(hazardOptions([1.0, -0.02], 1.5)),
+    () => new core.HazardCurve(hazardOptions([1.0, -0.02], 0.4)),
     (error) => error.kind === 'validation' && error.message === 'Values must be non-negative'
   );
 });
@@ -109,7 +118,7 @@ test('HazardCurve recovery validation is the Rust builder check, in its order', 
 test('HazardCurve recovery boundaries round-trip', () => {
   for (const recovery of [0.0, 1.0]) {
     const hz = new core.HazardCurve(
-      hazardOptions([0.0, 0.02, 30.0, 0.02], recovery, `HZ-${recovery}`)
+      hazardOptions([1.0, 0.02, 30.0, 0.02], recovery, `HZ-${recovery}`)
     );
     assert.equal(hz.recoveryRate, recovery);
   }
@@ -311,8 +320,6 @@ test('a Merton-calibrated hazard curve feeds computeBilateralXva through HazardC
 test('HazardCurve JSON round trip and members pass through Rust', () => {
   const hz = new core.HazardCurve({
     ...hazardOptions([1.0, 0.02, 5.0, 0.03], 0.4),
-    parSpreads: [1.0, 120.0, 5.0, 180.0],
-    parInterp: 'log_linear',
     issuer: 'ACME',
     seniority: 'senior',
     currency: 'USD',
@@ -320,13 +327,11 @@ test('HazardCurve JSON round trip and members pass through Rust', () => {
   const back = core.HazardCurve.fromJson(hz.toJson());
   assert.equal(back.toJson(), hz.toJson());
   assert.deepEqual([...hz.knotPoints], [1.0, 0.02, 5.0, 0.03]);
-  assert.deepEqual([...hz.parSpreadPoints], [1.0, 120.0, 5.0, 180.0]);
   assert.equal(hz.dayCount, 'act_365f');
+  assert.equal(hz.calendarId, undefined);
   assert.equal(hz.issuer, 'ACME');
   assert.equal(hz.seniority, 'senior');
   assert.equal(hz.currency.toString(), 'USD');
-  assert.equal(hz.parInterp, 'log_linear');
-  assert.equal(hz.cdsQuoteBp(3.0), hz.cdsQuoteBp(3.0, 'log_linear'));
   assert.ok(Math.abs(hz.defaultProb(1.0, 5.0) - (hz.sp(1.0) - hz.sp(5.0))) < 1e-15);
   assert.throws(
     () => hz.defaultProb(5.0, 1.0),
@@ -337,9 +342,15 @@ test('HazardCurve JSON round trip and members pass through Rust', () => {
   assert.equal(hz.withRecoveryRate(0.25).recoveryRate, 0.25);
   assert.equal(new core.HazardCurve(hazardOptions([1.0, 0.02], 0.4)).currency, undefined);
 
-  const flat = core.HazardCurve.flat('F', '2025-01-01', 0.02, 0.4);
+  const flat = core.HazardCurve.flat('F', '2025-01-01', 0.02, 0.4, 'act_365f');
   assert.ok(Math.abs(flat.sp(5.0) - Math.exp(-0.1)) < 1e-12);
-  const pillars = core.HazardCurve.fromSurvivalProbs('S', '2025-01-01', [1.0, 0.98, 5.0, 0.9], 0.4);
+  const pillars = core.HazardCurve.fromSurvivalProbs(
+    'S',
+    '2025-01-01',
+    [1.0, 0.98, 5.0, 0.9],
+    0.4,
+    'act_365f'
+  );
   assert.ok(Math.abs(pillars.sp(5.0) - 0.9) < 1e-12);
   assert.throws(
     () => new core.HazardCurve({ ...hazardOptions([1.0, 0.02], 0.4), extra: 1 }),

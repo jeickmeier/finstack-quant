@@ -75,7 +75,7 @@ fn exact_curve_key(market: &MarketContext, curve_id: &CurveId) -> Option<MarketF
         CurveStorage::BaseCorrelation(_) => {
             return Some(MarketFactorKey::BaseCorrelation(curve_id.clone()));
         }
-        CurveStorage::Price(_) | CurveStorage::BasisSpread(_) | CurveStorage::Parametric(_) => {
+        CurveStorage::Price(_) | CurveStorage::Parametric(_) => {
             return None;
         }
     };
@@ -261,6 +261,9 @@ mod tests {
         let discount = DiscountCurve::builder(curve_id.clone())
             .base_date(date!(2025 - 01 - 01))
             .knots([(0.0, 1.0), (1.0, 0.96)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let market = MarketContext::new().insert(discount);

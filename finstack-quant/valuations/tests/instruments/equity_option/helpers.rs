@@ -4,7 +4,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
@@ -34,20 +36,15 @@ pub fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> 
             (2.0, (-rate * 2.0).exp()),
             (5.0, (-rate * 5.0).exp()),
             (10.0, (-rate * 10.0).exp()),
-        ]);
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend);
 
     // For zero or negative rates, the curve may be flat or increasing
     // which requires allow_non_monotonic() and a simpler interpolation style
     // (MonotoneConvex enforces non-increasing DFs).
     if rate.abs() < 1e-10 || rate < 0.0 {
-        builder = builder
-            .validation(
-                finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                    allow_non_monotonic: true,
-                    forward_floor: None,
-                },
-            )
-            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear);
+        builder = builder.interp(finstack_quant_core::math::interp::InterpStyle::LogLinear);
     }
 
     builder.build().unwrap()
@@ -56,8 +53,11 @@ pub fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> 
 /// Build a flat volatility surface (same vol for all strikes/expiries)
 pub fn build_flat_vol_surface(vol: f64, _base_date: Date, vol_surface_id: &str) -> VolSurface {
     VolSurface::builder(vol_surface_id)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[0.25, 0.5, 1.0, 2.0, 5.0])
-        .strikes(&[50.0, 80.0, 100.0, 120.0, 150.0])
+        .secondary_values(&[50.0, 80.0, 100.0, 120.0, 150.0])
         .row(&[vol, vol, vol, vol, vol])
         .row(&[vol, vol, vol, vol, vol])
         .row(&[vol, vol, vol, vol, vol])
@@ -73,8 +73,11 @@ pub fn build_smile_vol_surface(_base_date: Date, vol_surface_id: &str) -> VolSur
     let strikes = [70.0, 90.0, 100.0, 110.0, 130.0];
 
     VolSurface::builder(vol_surface_id)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&expiries)
-        .strikes(&strikes)
+        .secondary_values(&strikes)
         .row(&[0.35, 0.28, 0.25, 0.28, 0.35]) // 3M
         .row(&[0.34, 0.27, 0.25, 0.27, 0.34]) // 6M
         .row(&[0.33, 0.26, 0.24, 0.26, 0.33]) // 1Y
@@ -153,9 +156,12 @@ pub fn build_standard_market(
         .insert_surface(vol_surface)
         .insert_price(
             SPOT_ID,
-            MarketScalar::Price(Money::new(spot, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(spot, Currency::USD).expect("valid money fixture")),
         )
-        .insert_price(DIV_ID, MarketScalar::Unitless(div_yield))
+        .insert_price(
+            DIV_ID,
+            MarketScalar::unitless(div_yield).expect("valid scalar"),
+        )
 }
 
 /// Create a market context with vol smile
@@ -168,9 +174,12 @@ pub fn build_smile_market(as_of: Date, spot: f64, rate: f64, div_yield: f64) -> 
         .insert_surface(vol_surface)
         .insert_price(
             SPOT_ID,
-            MarketScalar::Price(Money::new(spot, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(spot, Currency::USD).expect("valid money fixture")),
         )
-        .insert_price(DIV_ID, MarketScalar::Unitless(div_yield))
+        .insert_price(
+            DIV_ID,
+            MarketScalar::unitless(div_yield).expect("valid scalar"),
+        )
 }
 
 #[cfg(test)]

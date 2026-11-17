@@ -178,15 +178,10 @@ pub fn xirr(flows: &[(Date, f64)]) -> crate::Result<f64> {
         let mut sum = NeumaierAccumulator::new();
         let mut end = start;
         while end < dated.len() && dated[end].0 == date {
-            sum.add(dated[end].1);
+            sum.add(dated[end].1)?;
             end += 1;
         }
-        let net = sum.total();
-        if !net.is_finite() {
-            return Err(crate::Error::Validation(
-                "XIRR net amount for a date must be finite".into(),
-            ));
-        }
+        let net = sum.get_total()?;
         if net != 0.0 {
             nets.push((date, net));
         }
@@ -258,9 +253,7 @@ fn solve(stream: &[(f64, f64)]) -> crate::Result<f64> {
         ));
     }
 
-    let candidate = BrentSolver::new()
-        .with_tolerance(LOG_RATE_TOLERANCE)
-        .with_max_iterations(MAX_ITERATIONS)
+    let candidate = BrentSolver::new(LOG_RATE_TOLERANCE, MAX_ITERATIONS)?
         .solve_in_bracket(rho, lower, upper)?;
     accept(&terms, candidate, (lower, min_rate), (upper, max_rate))
 }
@@ -320,11 +313,11 @@ fn scaled_residual(terms: &[(f64, f64, f64)], log_growth: f64) -> crate::Result<
     let mut gross = NeumaierAccumulator::new();
     for &(time, log_amount, sign) in terms {
         let scaled = (log_amount - time * log_growth - max_log).exp();
-        net.add(sign * scaled);
-        gross.add(scaled);
+        net.add(sign * scaled)?;
+        gross.add(scaled)?;
     }
-    let (net, gross) = (net.total(), gross.total());
-    if !(gross.is_finite() && gross > 0.0) {
+    let (net, gross) = (net.get_total()?, gross.get_total()?);
+    if gross <= 0.0 {
         return Err(invalid());
     }
     let residual = net / gross;

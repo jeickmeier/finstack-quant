@@ -20,7 +20,7 @@ from finstack_quant import statements
 from finstack_quant.attribution import attribute_pnl, attribute_pnl_many
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, StubKind, Tenor
-from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext
+from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.core.types import Bps, Rate
 from finstack_quant.portfolio import CandidatePosition, Portfolio
@@ -49,6 +49,7 @@ from finstack_quant.valuations.instruments import (
     price_instrument,
     tranche_metrics,
 )
+from tests.tests_typed_helpers import projection_curve
 
 AS_OF = datetime.date(2024, 1, 15)
 
@@ -75,16 +76,17 @@ EXAMPLE_TYPES = [
 def _market(as_of: datetime.date = AS_OF, df_5y: float = 0.82) -> MarketContext:
     return (
         MarketContext()
-        .insert(DiscountCurve("USD-OIS", as_of, [(0.0, 1.0), (1.0, 0.96), (5.0, df_5y), (10.0, 0.67)]))
         .insert(
-            ForwardCurve(
-                "USD-SOFR-3M",
-                0.25,
+            DiscountCurve(
+                "USD-OIS",
                 as_of,
-                [(0.0, 0.04), (5.0, 0.042), (10.0, 0.045)],
-                day_count="act_360",
+                [(0.0, 1.0), (1.0, 0.96), (5.0, df_5y), (10.0, 0.67)],
+                interp="monotone_convex",
+                extrapolation="extend",
+                day_count="act_365f",
             )
         )
+        .insert(projection_curve("USD-SOFR-3M", as_of, [(0.0, 0.04), (5.0, 0.042), (10.0, 0.045)]))
     )
 
 

@@ -110,12 +110,7 @@ mod tests {
             spread_compounding: OvernightSpreadCompounding::Exclude,
         });
         let market = MarketContext::new().insert(
-            ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 360.0)
-                .base_date(as_of)
-                .day_count(DayCount::Act360)
-                .knots([(0.0, 0.05), (1.0, 0.05)])
-                .build()
-                .expect("forward"),
+            ForwardCurve::flat("USD-SOFR-OIS", as_of, 0.05, DayCount::Act360).expect("forward"),
         );
 
         let next = next_option_theta_expiry(&option, &market, as_of)

@@ -1,4 +1,6 @@
-use finstack_quant_core::market_data::surfaces::{VolGridOpts, VolQuoteType, VolSurface};
+use finstack_quant_core::market_data::surfaces::{
+    VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 
 /// Copy of `surface` under a different quote convention.
 ///
@@ -27,7 +29,7 @@ pub fn relabel_quote_type(
     VolSurface::from_grid(
         surface.id().as_str(),
         surface.expiries(),
-        surface.strikes(),
+        surface.secondary_values(),
         surface.vols(),
         VolGridOpts {
             secondary_axis: surface.secondary_axis(),
@@ -67,9 +69,11 @@ pub fn flat_vol_surface_with_quote_type(
     quote_type: VolQuoteType,
 ) -> VolSurface {
     let mut builder = VolSurface::builder(id)
+        .secondary_axis(VolSurfaceAxis::Strike)
         .quote_type(quote_type)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(expiries)
-        .strikes(strikes);
+        .secondary_values(strikes);
     for _ in expiries {
         builder = builder.row(&vec![vol; strikes.len()]);
     }

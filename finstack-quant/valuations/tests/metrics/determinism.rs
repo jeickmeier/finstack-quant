@@ -25,7 +25,9 @@ mod tests {
     #[allow(unused_imports)]
     use finstack_quant_core::market_data::scalars::MarketScalar;
     #[allow(unused_imports)]
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     #[allow(unused_imports)]
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     #[allow(unused_imports)]
@@ -64,12 +66,17 @@ mod tests {
                 (1.0f64, (-rate).exp()),
                 (2.0f64, (-rate * 2.0f64).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
         let vol_surface = VolSurface::builder("SPOT_VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.5, 1.0, 2.0])
-            .strikes(&[80.0, 100.0, 120.0])
+            .secondary_values(&[80.0, 100.0, 120.0])
             .row(&[vol, vol, vol])
             .row(&[vol, vol, vol])
             .row(&[vol, vol, vol])
@@ -79,7 +86,7 @@ mod tests {
         MarketContext::new()
             .insert(disc_curve)
             .insert_surface(vol_surface)
-            .insert_price("SPOT", MarketScalar::Unitless(spot))
+            .insert_price("SPOT", MarketScalar::unitless(spot).expect("valid scalar"))
     }
 
     /// Run a metric calculation multiple times and verify all results are identical

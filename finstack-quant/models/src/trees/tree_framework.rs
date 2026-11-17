@@ -89,7 +89,7 @@ impl TreeDiscounting for Compounding {
         match (self, self.periods_per_year().map(f64::from)) {
             (_, Some(n)) if 1.0 + rate / n < FLOOR => FLOOR.powf(-n * dt),
             (Compounding::Simple, None) if 1.0 + rate * dt < FLOOR => 1.0 / FLOOR,
-            _ => self.df_from_rate(rate, dt),
+            _ => self.df_from_rate(rate, dt).unwrap_or(0.0),
         }
     }
 
@@ -102,7 +102,7 @@ impl TreeDiscounting for Compounding {
             );
             return 0.0;
         }
-        self.rate_from_df(df, dt)
+        self.rate_from_df(df, dt).unwrap_or(0.0)
     }
 
     #[inline]

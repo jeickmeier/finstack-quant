@@ -61,9 +61,6 @@ use crate::metrics::sensitivities::cs01::{GenericBucketedCs01, GenericParallelCs
 use crate::metrics::sensitivities::cs01::{
     sensitivity_central_diff, validate_buckets_strictly_increasing,
 };
-use crate::metrics::sensitivities::cs01_direct_hazard::{
-    DirectHazardBucketedCs01, DirectHazardParallelCs01,
-};
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 
 /// Cashflow inputs an instrument exposes for z-spread CS01.
@@ -144,9 +141,9 @@ fn price_at_spread(
     let mut pv = NeumaierAccumulator::new();
     for (t, df_base, amt) in cached {
         let df_z = z_spread_discount_factor(*df_base, *t, z, compounding)?;
-        pv.add(amt * df_z);
+        pv.add(amt * df_z)?;
     }
-    Ok(pv.total())
+    pv.get_total()
 }
 
 /// Central PV difference for one bucket, visiting only its assigned flows.
@@ -162,9 +159,9 @@ fn bucket_pv_difference(
         let (t, df_base, amt) = cached[i];
         let up = z_spread_discount_factor(df_base, t, base_z + dz, compounding)?;
         let down = z_spread_discount_factor(df_base, t, base_z - dz, compounding)?;
-        pv.add(amt * (up - down));
+        pv.add(amt * (up - down))?;
     }
-    Ok(pv.total())
+    pv.get_total()
 }
 
 /// Solve the anchor spread `z*` so that `PV_z(z*)` matches `target` (a quoted
@@ -179,18 +176,9 @@ fn solve_anchor_spread(
             "z-spread anchor target must be finite".into(),
         ));
     }
-    let objective = |z: f64| -> f64 {
-        match price_at_spread(cached, z, compounding) {
-            Ok(pv) => pv - target,
-            // Diverge positively for spreads below the compounding floor so
-            // Brent does not manufacture a spurious bracket.
-            Err(_) => 1e12,
-        }
-    };
-    let solver = BrentSolver::new()
-        .with_tolerance(1e-10)
-        .with_initial_bracket_size(Some(0.05)); // ±500 bp
-    let spread = solver.solve(objective, 0.0)?;
+    let objective = |z: f64| price_at_spread(cached, z, compounding).map(|pv| pv - target);
+    let solver = BrentSolver::new(1e-10, 100)?;
+    let spread = solver.solve(objective, 0.0, -0.99, 5.0, 0.05, 10)?;
     let pv = price_at_spread(cached, spread, compounding)?;
     if !pv.is_finite() || (pv - target).abs() > target.abs().max(1.0) * 1e-8 {
         return Err(finstack_quant_core::Error::Validation(
@@ -260,21 +248,6 @@ fn assign_buckets(cached: &[CachedFlow], buckets: &[f64]) -> Vec<Vec<usize>> {
     groups
 }
 
-/// Whether the instrument's hazard curve carries a lossless calibration
-/// recipe. Quote-space CS01 needs one; a curve built directly from hazard
-/// rates falls back to a direct hazard-rate bump.
-fn hazard_is_replayable<I: Instrument>(
-    instrument: &I,
-    context: &MetricContext,
-) -> finstack_quant_core::Result<bool> {
-    let Some((hazard_id, _)) = super::cs01::resolve_optional_cs01_curves(instrument, true, "CS01")?
-    else {
-        return Ok(false);
-    };
-    let hazard = context.curves.get_hazard(hazard_id.as_str())?;
-    Ok(hazard.hazard_calibration().is_some())
-}
-
 /// Resolve whether the instrument declares a credit (hazard) curve.
 fn has_credit_curve<I: Instrument>(instrument: &I) -> finstack_quant_core::Result<bool> {
     Ok(!instrument
@@ -330,11 +303,7 @@ where
         })?;
 
         if self.delegate_to_hazard_when_credit_curve && has_credit_curve(instrument)? {
-            return if hazard_is_replayable(instrument, context)? {
-                GenericParallelCs01.calculate(context)
-            } else {
-                DirectHazardParallelCs01::<I>::default().calculate(context)
-            };
+            return GenericParallelCs01.calculate(context);
         }
 
         let curves = Arc::clone(&context.curves);
@@ -414,11 +383,7 @@ where
         })?;
 
         if self.delegate_to_hazard_when_credit_curve && has_credit_curve(instrument)? {
-            return if hazard_is_replayable(instrument, context)? {
-                GenericBucketedCs01.calculate(context)
-            } else {
-                DirectHazardBucketedCs01::<I>::default().calculate(context)
-            };
+            return GenericBucketedCs01.calculate(context);
         }
 
         let curves = Arc::clone(&context.curves);
@@ -465,11 +430,11 @@ where
                 sensitivity_central_diff(difference, 0.0, bump_bp)
             };
             series.push((label, cs01));
-            total.add(cs01);
+            total.add(cs01)?;
         }
 
         context.store_bucketed_series(series_id, series);
-        Ok(total.total())
+        total.get_total()
     }
 }
 

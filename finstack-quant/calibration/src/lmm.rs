@@ -337,7 +337,9 @@ mod tests {
     use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Tenor;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_models::rates::hw1f::Hw1fMcConfig;
@@ -398,6 +400,9 @@ mod tests {
                 (6.0, (-0.03_f64 * 6.0).exp()),
                 (12.0, (-0.03_f64 * 12.0).exp()),
             ])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve")
     }
@@ -405,7 +410,10 @@ mod tests {
     fn test_surface() -> VolSurface {
         VolSurface::builder("USD-SWPNVOL")
             .expiries(&[0.5, 12.0])
-            .strikes(&[0.001, 0.20])
+            .secondary_values(&[0.001, 0.20])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[SURFACE_VOL, SURFACE_VOL])
             .row(&[SURFACE_VOL, SURFACE_VOL])
             .build()
@@ -495,11 +503,15 @@ mod tests {
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (20.0, (-rate * 20.0).exp())])
             .interp(InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("low-rate curve");
         let surface = VolSurface::builder("USD-SWPNVOL")
             .expiries(&[0.5, 12.0])
-            .strikes(&[0.001, 0.20])
+            .secondary_values(&[0.001, 0.20])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.50, 0.50])
             .row(&[0.50, 0.50])
             .build()

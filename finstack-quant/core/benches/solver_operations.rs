@@ -169,8 +169,13 @@ fn checked_lm(system: &DenseSystem, solution: &LmSolution, expected: LmTerminati
     assert!(solution.params.iter().all(|value| value.is_finite()));
     assert_eq!(solution.stats.termination_reason, expected);
     assert!(solution.stats.final_residual_norm.is_finite());
-    assert!(solution.stats.final_step_norm.is_finite());
-    assert!(solution.stats.lambda_final.is_finite() && solution.stats.lambda_final > 0.0);
+    assert!(solution.stats.last_step_norm.is_some_and(f64::is_finite));
+    assert!(
+        solution
+            .stats
+            .last_lambda
+            .is_some_and(|lambda| lambda.is_finite() && lambda > 0.0)
+    );
     assert!(solution.stats.iterations > 0);
     assert!(solution.stats.jacobian_evals > 0);
     assert!(
@@ -214,12 +219,14 @@ fn benchmark_brent(c: &mut Criterion) {
     let mut group = c.benchmark_group("solver_comparison");
     group.bench_function("brent", |b| {
         let f = |x: f64| x * x - 2.0;
-        let solver = BrentSolver::new();
-        let checked = solver.solve(f, 1.0).expect("Brent preflight converges");
+        let solver = BrentSolver::new(1e-12, 100).expect("valid Brent solver");
+        let checked = solver
+            .solve(|x| Ok(f(x)), 1.0, -1e6, 1e6, 0.01, 20)
+            .expect("Brent preflight converges");
         check_root(checked, 2.0_f64.sqrt(), f(checked), 2.0);
         b.iter(|| {
             let root = solver
-                .solve(black_box(&f), black_box(1.0))
+                .solve(|x| Ok(f(x)), black_box(1.0), -1e6, 1e6, 0.01, 20)
                 .expect("Brent converges");
             assert!(root.is_finite());
             black_box(root)
@@ -271,13 +278,15 @@ fn benchmark_lm_global_sizes(c: &mut Criterion) {
     group.bench_function(BenchmarkId::new("nonlinear_full_rank", "100x50"), |b| {
         let (system, expected) = DenseSystem::full_rank(50, 100);
         let initial = vec![0.01; system.n_params];
-        let solver = LevenbergMarquardtSolver::new()
-            .with_tolerance(LM_TOLERANCE)
-            .with_max_iterations(200);
+        let solver =
+            LevenbergMarquardtSolver::new(LM_TOLERANCE, 1e-12, 200).expect("valid LM solver");
         let solve = || {
             solver
-                .solve_system(
-                    |p, r| system.residuals(p, r),
+                .solve_least_squares(
+                    |p, r| {
+                        system.residuals(p, r);
+                        Ok(())
+                    },
                     black_box(&initial),
                     system.n_residuals,
                 )
@@ -311,13 +320,15 @@ fn benchmark_lm_global_sizes(c: &mut Criterion) {
             // one-trial nonconvergence control, not a claimed dense successful fit.
             let system = DenseSystem::rank_one(50, 100);
             let initial = vec![0.01; system.n_params];
-            let solver = LevenbergMarquardtSolver::new()
-                .with_tolerance(LM_TOLERANCE)
-                .with_max_iterations(1);
+            let solver =
+                LevenbergMarquardtSolver::new(LM_TOLERANCE, 1e-12, 1).expect("valid LM solver");
             let solve = || {
                 solver
                     .solve_least_squares(
-                        |p, r| system.residuals(p, r),
+                        |p, r| {
+                            system.residuals(p, r);
+                            Ok(())
+                        },
                         black_box(&initial),
                         system.n_residuals,
                     )

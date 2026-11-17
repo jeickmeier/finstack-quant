@@ -142,11 +142,17 @@ mod rho_tests {
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (5.0, (-0.04_f64 * 5.0).exp())])
             .interp(InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let surface = VolSurface::builder("SPX-VOL")
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&[80.0, 100.0, 120.0, 140.0])
+            .secondary_values(&[80.0, 100.0, 120.0, 140.0])
+            .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+            .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             .row(&[0.20, 0.20, 0.20, 0.20])
             .row(&[0.20, 0.20, 0.20, 0.20])
             .row(&[0.20, 0.20, 0.20, 0.20])
@@ -156,8 +162,14 @@ mod rho_tests {
         MarketContext::new()
             .insert(curve)
             .insert_surface(surface)
-            .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0))
-            .insert_price("SPX-DIV", MarketScalar::Unitless(0.01))
+            .insert_price(
+                "SPX-SPOT",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "SPX-DIV",
+                MarketScalar::unitless(0.01).expect("valid scalar"),
+            )
     }
 
     /// A cliquet whose resets are all observed but that settles later.

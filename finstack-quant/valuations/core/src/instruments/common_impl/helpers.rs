@@ -10,7 +10,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::{
     context::MarketContext,
-    scalars::{InflationIndex, MarketScalar, SeriesInterpolation},
+    scalars::{InflationExpectedRelease, InflationObservation, MarketScalar, SeriesInterpolation},
 };
 use finstack_quant_core::money::Money;
 use indexmap::IndexMap;
@@ -21,14 +21,21 @@ pub fn scalar_price_amount(
     scalar: &MarketScalar,
     expected_currency: Currency,
 ) -> finstack_quant_core::Result<f64> {
-    match scalar {
-        MarketScalar::Unitless(value) => Ok(*value),
-        MarketScalar::Price(price) if price.currency() == expected_currency => Ok(price.amount()),
-        MarketScalar::Price(price) => Err(finstack_quant_core::Error::CurrencyMismatch {
+    if let Some(value) = scalar.get_unitless() {
+        return Ok(value);
+    }
+    if let Some(price) = scalar.get_price() {
+        if price.currency() == expected_currency {
+            return Ok(price.amount());
+        }
+        return Err(finstack_quant_core::Error::CurrencyMismatch {
             expected: expected_currency,
             actual: price.currency(),
-        }),
+        });
     }
+    Err(finstack_quant_core::Error::Validation(
+        "Unsupported market scalar variant".into(),
+    ))
 }
 
 /// Publish a Monte Carlo estimate's standard error, 95% confidence bounds and
@@ -265,13 +272,19 @@ pub fn resolve_optional_dividend_yield(
         ))
     })?;
 
-    match scalar {
-        MarketScalar::Unitless(v) => Ok(*v),
-        MarketScalar::Price(m) => Err(finstack_quant_core::Error::Validation(format!(
+    if let Some(v) = scalar.get_unitless() {
+        Ok(v)
+    } else if let Some(m) = scalar.get_price() {
+        Err(finstack_quant_core::Error::Validation(format!(
             "Dividend yield '{}' should be a unitless scalar, got Price({})",
             div_id,
             m.currency()
-        ))),
+        )))
+    } else {
+        Err(finstack_quant_core::Error::Validation(format!(
+            "Dividend yield '{}' should be a unitless scalar",
+            div_id
+        )))
     }
 }
 
@@ -314,7 +327,7 @@ pub fn build_gbm_drift_schedule(
         as_of,
         DayCountContext::default(),
     )?;
-    let as_of_df = disc_curve.df(as_of_curve_time);
+    let as_of_df = disc_curve.df(as_of_curve_time)?;
     if !as_of_df.is_finite() || as_of_df <= 0.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
             "GBM drift schedule: invalid discount factor at as_of {as_of}: {as_of_df}"
@@ -324,7 +337,7 @@ pub fn build_gbm_drift_schedule(
     // rate equals r·t exactly — this keeps the simulated terminal forward
     // consistent with the date-based discount factor used to discount the
     // payoff. The curve supplies only the *shape* of the term structure.
-    let terminal_rate_cum = -(disc_curve.df(as_of_curve_time + t) / as_of_df).ln();
+    let terminal_rate_cum = -(disc_curve.df(as_of_curve_time + t)? / as_of_df).ln();
     let scale = if terminal_rate_cum.abs() > 1e-12 {
         (r * t) / terminal_rate_cum
     } else {
@@ -336,7 +349,7 @@ pub fn build_gbm_drift_schedule(
     for k in 0..=knots {
         let tk = t * (k as f64) / (knots as f64);
         let rate_cum = if tk > 0.0 {
-            -(disc_curve.df(as_of_curve_time + tk) / as_of_df).ln() * scale
+            -(disc_curve.df(as_of_curve_time + tk)? / as_of_df).ln() * scale
         } else {
             0.0
         };
@@ -440,10 +453,11 @@ pub fn get_unitless_scalar_strict(
     model: &str,
 ) -> finstack_quant_core::Result<f64> {
     match market.get_price(key) {
-        Ok(MarketScalar::Unitless(v)) => Ok(*v),
-        Ok(other) => Err(finstack_quant_core::Error::Validation(format!(
-            "{model} parameter '{key}' must be a unitless market scalar, got {other:?}"
-        ))),
+        Ok(scalar) => scalar.get_unitless().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "{model} parameter '{key}' must be a unitless market scalar, got {scalar:?}"
+            ))
+        }),
         Err(_) => Err(finstack_quant_core::Error::from(
             finstack_quant_core::InputError::NotFound {
                 id: format!("{key} (required by {model})"),
@@ -1017,7 +1031,7 @@ mod tests {
     fn configured_dividend_yield_must_be_unitless() {
         let market = MarketContext::new().insert_price(
             "DIV",
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(Money::from((
+            finstack_quant_core::market_data::scalars::MarketScalar::price(Money::from((
                 1_i64,
                 Currency::USD,
             ))),
@@ -1042,6 +1056,8 @@ mod tests {
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (1.0, 0.95)])
                 .interp(InterpStyle::Linear)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()?,
         );
 
@@ -1086,6 +1102,8 @@ mod tests {
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (1.0, 0.95)])
                 .interp(InterpStyle::Linear)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()?,
         );
 
@@ -1163,99 +1181,42 @@ use finstack_quant_core::market_data::scalars::InflationLag;
 ///
 /// Returns a validation error when the lag underflows the supported calendar
 /// or the lag convention is unsupported.
+///
+/// # Arguments
+///
+/// * `date` - Contractual date before applying the observation shift.
+/// * `lag` - Explicit contractual calendar-month or calendar-day shift.
 pub fn apply_inflation_lag(date: Date, lag: InflationLag) -> finstack_quant_core::Result<Date> {
     match lag {
         InflationLag::None => Ok(date),
-        InflationLag::Months(m) => date.add_months(-i32::from(m)),
-        InflationLag::Days(d) => date.add_days(-i64::from(d)),
+        InflationLag::Months(m) => date.add_months(-i32::from(m.get())),
+        InflationLag::Days(d) => date.add_days(-i64::from(d.get())),
         _ => Err(finstack_quant_core::Error::Validation(
             "unsupported inflation lag convention".into(),
         )),
     }
 }
 
-/// Resolve the effective lag for an inflation instrument.
-///
-/// Priority: (1) the contract's explicit `lag`, (2) index lag from market context,
-/// (3) the projection curve's `indexation_lag_months`, (4)
-/// `InflationLag::None`.
-///
-/// A market that carries only a projection curve still carries that curve's
-/// indexation lag, and a bootstrapped inflation curve is anchored at its base
-/// date minus that lag. Ignoring it would read the curve on an unlagged time
-/// axis while the curve itself is built on a lagged one, silently
-/// over-projecting the reference index at both ends of a swap.
-pub fn resolve_inflation_lag(
-    contract_lag: Option<InflationLag>,
-    index_id: &str,
-    curves: &MarketContext,
-) -> InflationLag {
-    if let Some(lag) = contract_lag {
-        return lag;
-    }
-    if let Ok(index) = curves.get_inflation_index(index_id) {
-        return index.lag();
-    }
-    let Ok(curve) = curves.get_inflation_curve(index_id) else {
-        return InflationLag::None;
-    };
-    match u8::try_from(curve.indexation_lag_months()) {
-        Ok(0) | Err(_) => InflationLag::None,
-        Ok(months) => InflationLag::Months(months),
-    }
+/// Selected observation or release assumption admitting a monthly CPI contribution.
+#[derive(Debug, Clone, Copy)]
+pub enum InflationReferenceSource {
+    /// Exact published fixing in the selected snapshot.
+    Observed(InflationObservation),
+    /// Projection admitted by an outstanding release assumption known at the cutoff.
+    Projected(InflationExpectedRelease),
 }
 
-/// Resolve a realized CPI/RPI value from a supplied index history.
-///
-/// Historical observations are contractual fixings: once the effective fixing
-/// date is on or before `as_of`, missing coverage must be surfaced rather than
-/// silently replaced with a curve projection or an indefinitely stale value.
-/// Step interpolation may carry the published level through the remainder of
-/// its calendar month; linear interpolation requires a published right anchor.
-///
-/// The index is cloned with the instrument's effective lag so a contract-level
-/// lag override is honored without mutating shared market data.
-fn realized_inflation_index_value(
-    index: &InflationIndex,
-    unlagged_date: Date,
-    effective_date: Date,
-    effective_lag: InflationLag,
-) -> finstack_quant_core::Result<f64> {
-    if matches!(effective_lag, InflationLag::Months(_)) {
-        return index
-            .clone()
-            .with_lag(effective_lag)
-            .value_on(unlagged_date);
-    }
-    let (first, last) = index.date_range()?;
-    let is_covered = if effective_date < first {
-        false
-    } else {
-        match index.interpolation() {
-            SeriesInterpolation::Step => {
-                (effective_date.year(), effective_date.month()) <= (last.year(), last.month())
-            }
-            SeriesInterpolation::Linear => effective_date <= last,
-        }
-    };
-
-    if !is_covered {
-        return Err(finstack_quant_core::InputError::NotFound {
-            id: format!(
-                "inflation index '{}' fixing coverage for {} (available {} through {})",
-                index.id(),
-                effective_date,
-                first,
-                last
-            ),
-        }
-        .into());
-    }
-
-    index
-        .clone()
-        .with_lag(effective_lag)
-        .value_on(unlagged_date)
+/// A monthly contribution to a contractual reference CPI.
+#[derive(Debug, Clone, Copy)]
+pub struct InflationReferenceAnchor {
+    /// Canonical first day of the contributing reference month.
+    pub reference_month: Date,
+    /// Positive convex interpolation weight; contributing weights sum to one.
+    pub weight: f64,
+    /// Positive finite observed or projected index level.
+    pub value: f64,
+    /// Actual availability or expected-release facts admitting this contribution.
+    pub source: InflationReferenceSource,
 }
 
 /// Resolved reference CPI together with the information needed to distinguish
@@ -1265,27 +1226,33 @@ pub struct InflationReferenceValue {
     pub value: f64,
     /// Whether every required anchor has an available historical fixing.
     pub is_known: bool,
-    /// Date when all outstanding monthly anchors become available. `None` on
-    /// an unknown reference means its publication schedule is unspecified.
+    /// Latest expected release among outstanding anchors, or `None` when all
+    /// anchors are observed. This is a schedule assumption, not actual availability.
     pub publication_date: Option<Date>,
+    /// Exact index identifier shared by observations and projection.
+    pub index_id: String,
+    /// Inclusive knowledge cutoff of the immutable fixing snapshot.
+    pub knowledge_date: Date,
+    /// Required monthly contributions, without unused zero-weight anchors.
+    pub anchors: Vec<InflationReferenceAnchor>,
 }
 
 /// Resolve a contractual reference CPI, applying month lag and daily weight
 /// once, together with the availability of every interpolation anchor.
 ///
-/// Explicit monthly publication dates control availability independently of the
-/// observation lag. Without one, past reference anchors remain strictly required
-/// history; a stale feed cannot silently extend the forecast window. Known
-/// anchors read the inflation index history; unknown anchors are projected from
-/// the inflation curve with the same id.
+/// Exact observations in the selected knowledge snapshot take priority over
+/// release assumptions. A missing observation projects only when a matching
+/// expected release is strictly after the cutoff. Missing or overdue release
+/// facts error; valuation-date changes never publish a fixing.
 ///
 /// # Arguments
 ///
 /// * `market` - Market context holding the inflation index history and, for
-///   anchors not yet published by `as_of`, the inflation curve named `index_id`.
+///   unpublished anchors, the unlagged inflation curve named `index_id`.
 /// * `index_id` - Identifier shared by the inflation index and inflation curve.
 /// * `date` - Contractual reference date before the observation lag is applied.
-/// * `as_of` - Valuation date deciding which anchors are published fixings.
+/// * `knowledge_date` - Inclusive information cutoff; must match the supplied
+///   index snapshot. This is independent of the product's valuation date.
 /// * `lag` - Observation lag: month lags keep the contractual month's daily
 ///   weight, day lags shift the reference date itself.
 /// * `interpolation` - `Step` uses the first-of-month anchor only; `Linear`
@@ -1293,359 +1260,339 @@ pub struct InflationReferenceValue {
 ///
 /// # Errors
 ///
-/// Returns an error when a required historical fixing or projection curve is
-/// missing, or when the lag moves the date out of range.
+/// Returns an error for a mismatched snapshot cutoff, missing/overdue fixing
+/// facts, missing projection coverage, invalid levels, or calendar overflow.
 pub fn resolve_reference_inflation(
     market: &MarketContext,
     index_id: &str,
     date: Date,
-    as_of: Date,
+    knowledge_date: Date,
     lag: InflationLag,
     interpolation: SeriesInterpolation,
 ) -> finstack_quant_core::Result<InflationReferenceValue> {
-    let index = market.get_inflation_index(index_id).ok();
-    // An explicit monthly publication schedule also establishes reference-month
-    // identity for zero/day-lag contracts. Publication is independent of the
-    // contractual date shift; it must not disappear when that shift is not Months.
-    let monthly = matches!(lag, InflationLag::Months(_))
-        || index
-            .as_ref()
-            .is_some_and(|index| !index.get_publication_dates().is_empty());
-    let cpi_on = |reference_date: Date| -> finstack_quant_core::Result<InflationReferenceValue> {
-        let publication_date = index
-            .as_ref()
-            .and_then(|index| index.get_publication_date(reference_date));
-        let is_known = publication_date.unwrap_or(reference_date) <= as_of;
-        let value = if is_known {
-            let index = market.get_inflation_index(index_id)?;
-            if monthly {
-                index.ref_cpi_months_lag(reference_date, 0)?
-            } else {
-                realized_inflation_index_value(
-                    index.as_ref(),
-                    reference_date,
-                    reference_date,
-                    InflationLag::None,
-                )?
+    let index = market.get_inflation_index(index_id)?;
+    if index.knowledge_date() != knowledge_date {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "inflation index '{index_id}' snapshot cutoff {} does not match requested knowledge date {knowledge_date}",
+            index.knowledge_date()
+        )));
+    }
+    let (weight_date, months) = match lag {
+        InflationLag::Months(months) => (date, months.get()),
+        _ => (apply_inflation_lag(date, lag)?, 0),
+    };
+    let first = weight_date
+        .replace_day(1)
+        .map_err(|_| finstack_quant_core::InputError::InvalidDateRange)?
+        .add_months(-i32::from(months))?;
+    let weight = match interpolation {
+        SeriesInterpolation::Step => 0.0,
+        SeriesInterpolation::Linear => {
+            f64::from(weight_date.day() - 1)
+                / f64::from(weight_date.month().length(weight_date.year()))
+        }
+    };
+    let resolve = |reference_month,
+                   weight|
+     -> finstack_quant_core::Result<InflationReferenceAnchor> {
+        let (value, source) = match index.get_observation(reference_month) {
+            Ok(observation) => (
+                observation.value,
+                InflationReferenceSource::Observed(observation),
+            ),
+            Err(finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
+                ..
+            })) => {
+                let release = index.get_expected_release(reference_month)?.ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "inflation index '{index_id}' has no observation or expected release for {reference_month}"
+                    ))
+                })?;
+                if release.expected_release <= knowledge_date {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "inflation index '{index_id}' fixing for {reference_month} is overdue on {knowledge_date}"
+                    )));
+                }
+                (
+                    market
+                        .get_inflation_curve(index_id)?
+                        .cpi_on_date(reference_month)?,
+                    InflationReferenceSource::Projected(release),
+                )
             }
-        } else {
-            market
-                .get_inflation_curve(index_id)?
-                .cpi_on_date(reference_date)?
+            Err(error) => return Err(error),
         };
-        Ok(InflationReferenceValue {
+        Ok(InflationReferenceAnchor {
+            reference_month,
+            weight,
             value,
-            is_known,
-            publication_date: if is_known { None } else { publication_date },
+            source,
         })
     };
-    if monthly {
-        // Month lags retain the contractual month's daily weight; day lags
-        // move the reference date itself before applying monthly interpolation.
-        let (weight_date, months) = match lag {
-            InflationLag::Months(months) => (date, months),
-            _ => (apply_inflation_lag(date, lag)?, 0),
-        };
-        let first = weight_date
-            .replace_day(1)
-            .map_err(|_| finstack_quant_core::InputError::InvalidDateRange)?;
-        let anchor0 = first.add_months(-i32::from(months))?;
-        let cpi0 = cpi_on(anchor0)?;
-        if interpolation == SeriesInterpolation::Step || weight_date.day() == 1 {
-            return Ok(cpi0);
-        }
-        let cpi1 = cpi_on(anchor0.add_months(1)?)?;
-        let weight = f64::from(weight_date.day() - 1)
-            / f64::from(weight_date.month().length(weight_date.year()));
-        let publication_date = match (cpi0.is_known, cpi1.is_known) {
-            (true, true) => None,
-            (true, false) => cpi1.publication_date,
-            (false, true) => cpi0.publication_date,
-            (false, false) => cpi0
-                .publication_date
-                .zip(cpi1.publication_date)
-                .map(|(first, second)| first.max(second)),
-        };
-        Ok(InflationReferenceValue {
-            value: cpi0.value + weight * (cpi1.value - cpi0.value),
-            is_known: cpi0.is_known && cpi1.is_known,
-            publication_date,
-        })
+    let mut anchors = vec![resolve(first, 1.0 - weight)?];
+    let value = if weight == 0.0 {
+        anchors[0].value
     } else {
-        cpi_on(apply_inflation_lag(date, lag)?)
+        anchors.push(resolve(first.add_months(1)?, weight)?);
+        let left = anchors[0].value;
+        let right = anchors[1].value;
+        if left <= right {
+            left + weight * (right - left)
+        } else {
+            right + (1.0 - weight) * (left - right)
+        }
+    };
+    if !value.is_finite() || value <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "inflation index '{index_id}' reference CPI is not finite and positive"
+        )));
     }
+    let publication_date = anchors
+        .iter()
+        .filter_map(|anchor| match anchor.source {
+            InflationReferenceSource::Observed(_) => None,
+            InflationReferenceSource::Projected(release) => Some(release.expected_release),
+        })
+        .max();
+    Ok(InflationReferenceValue {
+        value,
+        is_known: publication_date.is_none(),
+        publication_date,
+        index_id: index_id.to_owned(),
+        knowledge_date,
+        anchors,
+    })
 }
 
 #[cfg(test)]
 mod realized_inflation_index_tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::DayCount;
+    use finstack_quant_core::market_data::scalars::InflationIndex;
+    use finstack_quant_core::market_data::term_structures::InflationCurve;
+    use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
     use time::macros::date;
 
-    #[test]
-    fn publication_policy_is_independent_of_zero_or_day_observation_lag() {
-        use finstack_quant_core::market_data::term_structures::InflationCurve;
-
-        let january = date!(2026 - 01 - 01);
-        let february = date!(2026 - 02 - 01);
-        let index = InflationIndex::new(
-            "CPI",
-            vec![(january, 306.0), (february, 900.0)],
-            Currency::USD,
+    fn market(
+        cutoff: Date,
+        observations: Vec<InflationObservation>,
+        releases: Vec<InflationExpectedRelease>,
+    ) -> MarketContext {
+        let index = InflationIndex::new("CPI", observations, Currency::USD, cutoff)
+            .unwrap()
+            .with_expected_releases(releases)
+            .unwrap();
+        MarketContext::new().insert_inflation_index(index).insert(
+            InflationCurve::builder("CPI")
+                .base_date(date!(2024 - 01 - 01))
+                .day_count(DayCount::Act365F)
+                .interp(InterpStyle::Linear)
+                .extrapolation(ExtrapolationPolicy::Flat)
+                .knots([(0.0, 306.0), (5.0, 306.0)])
+                .build()
+                .unwrap(),
         )
-        .expect("index")
-        .with_interpolation(SeriesInterpolation::Linear)
-        .with_publication_dates(vec![
-            (january, date!(2026 - 02 - 13)),
-            (february, date!(2026 - 03 - 13)),
-        ])
-        .expect("publication schedule");
-        let market = MarketContext::new()
-            .insert(
-                InflationCurve::builder("CPI")
-                    .base_date(date!(2025 - 12 - 01))
-                    .base_cpi(310.0)
-                    .knots([(0.0, 310.0), (2.0, 310.0)])
-                    .build()
-                    .expect("curve"),
-            )
-            .insert_inflation_index(index);
-        for (lag, exact_date, interpolation_date) in [
-            (InflationLag::None, january, date!(2026 - 01 - 16)),
-            (
-                InflationLag::Days(10),
-                date!(2026 - 01 - 11),
-                date!(2026 - 01 - 26),
-            ),
-        ] {
-            let unpublished = resolve_reference_inflation(
-                &market,
-                "CPI",
-                exact_date,
-                date!(2026 - 01 - 20),
-                lag,
-                SeriesInterpolation::Step,
-            )
-            .expect("unpublished January projects for either lag");
-            // The default log-linear curve performs a log/exp round trip,
-            // even for constant CPI. Allow only its floating-point rounding.
-            assert!((unpublished.value - 310.0).abs() <= 2.0 * f64::EPSILON * 310.0);
-            assert!(!unpublished.is_known);
-            assert_eq!(unpublished.publication_date, Some(date!(2026 - 02 - 13)));
+    }
 
-            let mixed = resolve_reference_inflation(
+    #[test]
+    fn observations_win_and_outstanding_releases_admit_projection() {
+        let cutoff = date!(2024 - 02 - 20);
+        let january = date!(2024 - 01 - 01);
+        let february = date!(2024 - 02 - 01);
+        let market = market(
+            cutoff,
+            vec![InflationObservation {
+                reference_month: january,
+                value: 300.0,
+                available_on: date!(2024 - 02 - 12),
+            }],
+            vec![
+                InflationExpectedRelease {
+                    reference_month: january,
+                    expected_release: date!(2024 - 02 - 24),
+                    known_on: january,
+                },
+                InflationExpectedRelease {
+                    reference_month: february,
+                    expected_release: date!(2024 - 03 - 12),
+                    known_on: january,
+                },
+            ],
+        );
+        let result = resolve_reference_inflation(
+            &market,
+            "CPI",
+            date!(2024 - 04 - 15),
+            cutoff,
+            InflationLag::months(3),
+            SeriesInterpolation::Linear,
+        )
+        .unwrap();
+        assert!((result.value - 302.8).abs() < 1e-12);
+        assert!(!result.is_known);
+        assert_eq!(result.publication_date, Some(date!(2024 - 03 - 12)));
+        assert_eq!(result.knowledge_date, cutoff);
+        assert_eq!(result.anchors.len(), 2);
+        assert!(matches!(
+            result.anchors[0].source,
+            InflationReferenceSource::Observed(_)
+        ));
+        assert!(matches!(
+            result.anchors[1].source,
+            InflationReferenceSource::Projected(_)
+        ));
+        assert_eq!(result.anchors[1].reference_month, february);
+        assert!((result.anchors[1].weight - 14.0 / 30.0).abs() < 1e-15);
+        assert!(
+            resolve_reference_inflation(
                 &market,
                 "CPI",
-                interpolation_date,
-                date!(2026 - 02 - 14),
-                lag,
+                date!(2024 - 04 - 15),
+                date!(2024 - 03 - 12),
+                InflationLag::months(3),
                 SeriesInterpolation::Linear,
             )
-            .expect("published January with projected February");
-            assert!((mixed.value - (306.0 + (310.0 - 306.0) * 15.0 / 31.0)).abs() < 1e-12);
-            assert!(!mixed.is_known);
-            assert_eq!(mixed.publication_date, Some(date!(2026 - 03 - 13)));
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn missing_or_overdue_release_facts_never_project() {
+        let cutoff = date!(2024 - 03 - 12);
+        for releases in [
+            vec![],
+            vec![InflationExpectedRelease {
+                reference_month: date!(2024 - 02 - 01),
+                expected_release: cutoff,
+                known_on: date!(2024 - 01 - 01),
+            }],
+        ] {
+            let market = market(cutoff, vec![], releases);
+            assert!(
+                resolve_reference_inflation(
+                    &market,
+                    "CPI",
+                    date!(2024 - 02 - 01),
+                    cutoff,
+                    InflationLag::None,
+                    SeriesInterpolation::Step,
+                )
+                .is_err()
+            );
         }
     }
 
     #[test]
-    fn no_publication_metadata_preserves_daily_calendar_interpolation() {
-        let index = InflationIndex::new(
-            "DAILY",
-            vec![
-                (date!(2026 - 01 - 10), 300.0),
-                (date!(2026 - 01 - 20), 302.0),
-            ],
-            Currency::USD,
-        )
-        .expect("daily index")
-        .with_interpolation(SeriesInterpolation::Linear);
-        let market = MarketContext::new().insert_inflation_index(index);
+    fn monthly_geometry_and_unused_anchors_do_not_depend_on_metadata() {
+        let cutoff = date!(2024 - 03 - 01);
+        let january = date!(2024 - 01 - 01);
+        let observations = vec![InflationObservation {
+            reference_month: january,
+            value: 300.0,
+            available_on: date!(2024 - 02 - 12),
+        }];
+        let market = market(cutoff, observations, vec![]);
         for (lag, contract_date) in [
-            (InflationLag::None, date!(2026 - 01 - 15)),
-            (InflationLag::Days(10), date!(2026 - 01 - 25)),
+            (InflationLag::None, january),
+            (InflationLag::months(0), january),
+            (InflationLag::days(0), january),
+            (InflationLag::days(10), date!(2024 - 01 - 11)),
+            (InflationLag::months(3), date!(2024 - 04 - 01)),
         ] {
             let result = resolve_reference_inflation(
                 &market,
-                "DAILY",
+                "CPI",
                 contract_date,
-                date!(2026 - 01 - 21),
+                cutoff,
                 lag,
                 SeriesInterpolation::Linear,
             )
-            .expect("existing daily interpolation");
-            assert_eq!(result.value, 301.0);
+            .unwrap();
+            assert_eq!(result.value, 300.0);
+            assert!(result.is_known);
+            assert_eq!(result.anchors.len(), 1);
+        }
+        let step = resolve_reference_inflation(
+            &market,
+            "CPI",
+            date!(2024 - 01 - 15),
+            cutoff,
+            InflationLag::None,
+            SeriesInterpolation::Step,
+        )
+        .unwrap();
+        assert_eq!(step.value, 300.0);
+        assert!(
+            resolve_reference_inflation(
+                &market,
+                "CPI",
+                date!(2024 - 01 - 15),
+                cutoff,
+                InflationLag::None,
+                SeriesInterpolation::Linear,
+            )
+            .is_err()
+        );
+        assert!(
+            resolve_reference_inflation(
+                &market,
+                "CPI",
+                date!(2023 - 12 - 15),
+                cutoff,
+                InflationLag::None,
+                SeriesInterpolation::Step,
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn month_lag_uses_contract_month_weight_and_preserves_extreme_levels() {
+        let cutoff = date!(2024 - 03 - 01);
+        for (left, right, expected) in [
+            (285.0, 314.0, 313.0),
+            (f64::from_bits(1), f64::from_bits(1), f64::from_bits(1)),
+            (f64::MAX, f64::MAX, f64::MAX),
+        ] {
+            let market = market(
+                cutoff,
+                vec![
+                    InflationObservation {
+                        reference_month: date!(2023 - 11 - 01),
+                        value: left,
+                        available_on: date!(2023 - 12 - 12),
+                    },
+                    InflationObservation {
+                        reference_month: date!(2023 - 12 - 01),
+                        value: right,
+                        available_on: date!(2024 - 01 - 12),
+                    },
+                ],
+                vec![],
+            );
+            let result = resolve_reference_inflation(
+                &market,
+                "CPI",
+                date!(2024 - 02 - 29),
+                cutoff,
+                InflationLag::months(3),
+                SeriesInterpolation::Linear,
+            )
+            .unwrap();
+            assert_eq!(result.value, expected);
             assert!(result.is_known);
         }
     }
 
     #[test]
-    fn monthly_reference_uses_release_dates_without_hiding_stale_history() {
-        use finstack_quant_core::market_data::term_structures::InflationCurve;
-
-        let december = date!(2025 - 12 - 01);
-        let january = date!(2026 - 01 - 01);
-        let release = date!(2026 - 02 - 13);
-        let index = InflationIndex::new(
-            "US-CPI",
-            vec![(december, 305.0), (january, 306.0)],
-            Currency::USD,
-        )
-        .expect("index")
-        .with_publication_dates(vec![(december, date!(2026 - 01 - 13)), (january, release)])
-        .expect("publication dates");
-        // A deliberately different projection makes source selection visible.
-        let curve = InflationCurve::builder("US-CPI")
-            .base_date(december)
-            .base_cpi(310.0)
-            .knots([(0.0, 310.0), (2.0, 310.0)])
-            .build()
-            .expect("curve");
-        let market = MarketContext::new()
-            .insert(curve)
-            .insert_inflation_index(index.clone());
-        let mixed = resolve_reference_inflation(
-            &market,
-            "US-CPI",
-            date!(2026 - 03 - 16),
-            date!(2026 - 01 - 20),
-            InflationLag::Months(3),
-            SeriesInterpolation::Linear,
-        )
-        .expect("one observed and one unpublished anchor");
-        assert!((mixed.value - (305.0 + 5.0 * 15.0 / 31.0)).abs() < 1e-12);
-        assert!(!mixed.is_known);
-        assert_eq!(mixed.publication_date, Some(release));
-
-        for as_of in [release, date!(2026 - 02 - 14)] {
-            let fixed = resolve_reference_inflation(
-                &market,
-                "US-CPI",
-                date!(2026 - 04 - 01),
-                as_of,
-                InflationLag::Months(3),
-                SeriesInterpolation::Step,
-            )
-            .expect("published anchor");
-            assert_eq!(fixed.value, 306.0);
-            assert!(fixed.is_known);
-        }
-
-        let stale = InflationIndex::new("US-CPI", vec![(december, 305.0)], Currency::USD)
-            .expect("stale history")
-            .with_publication_dates(index.get_publication_dates())
-            .expect("release dates");
-        let stale_market = market.clone().insert_inflation_index(stale);
-        assert!(
-            resolve_reference_inflation(
-                &stale_market,
-                "US-CPI",
-                date!(2026 - 04 - 01),
-                release,
-                InflationLag::Months(3),
-                SeriesInterpolation::Step,
-            )
-            .is_err()
-        );
-
-        let no_metadata = InflationIndex::new("US-CPI", vec![(december, 305.0)], Currency::USD)
-            .expect("history with no publication policy");
-        let no_metadata_market = market.insert_inflation_index(no_metadata);
-        assert!(
-            resolve_reference_inflation(
-                &no_metadata_market,
-                "US-CPI",
-                date!(2026 - 04 - 01),
-                date!(2026 - 01 - 20),
-                InflationLag::Months(3),
-                SeriesInterpolation::Step,
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
     fn date_offset_rejects_inflation_lag_underflow() {
-        for lag in [InflationLag::Months(1), InflationLag::Days(1)] {
+        for lag in [InflationLag::months(1), InflationLag::days(1)] {
             assert!(apply_inflation_lag(Date::MIN, lag).is_err());
         }
         assert_eq!(
             apply_inflation_lag(Date::MIN, InflationLag::None).expect("no date shift"),
             Date::MIN
-        );
-    }
-
-    fn step_index() -> InflationIndex {
-        InflationIndex::new(
-            "US-CPI",
-            vec![
-                (date!(2025 - 01 - 01), 300.0),
-                (date!(2025 - 02 - 01), 301.0),
-            ],
-            Currency::USD,
-        )
-        .expect("valid index")
-        .with_lag(InflationLag::Months(3))
-    }
-
-    #[test]
-    fn rejects_historical_dates_outside_published_coverage() {
-        let index = step_index();
-        for effective_date in [date!(2024 - 12 - 15), date!(2025 - 03 - 01)] {
-            let result = realized_inflation_index_value(
-                &index,
-                effective_date,
-                effective_date,
-                InflationLag::None,
-            );
-            assert!(result.is_err(), "{effective_date} must require a fixing");
-        }
-    }
-
-    #[test]
-    fn step_interpolation_carries_only_within_last_published_month() {
-        let index = step_index();
-        let value = realized_inflation_index_value(
-            &index,
-            date!(2025 - 02 - 20),
-            date!(2025 - 02 - 20),
-            InflationLag::None,
-        )
-        .expect("same-month step fixing is covered");
-        assert_eq!(value, 301.0);
-    }
-
-    #[test]
-    fn contract_lag_replaces_index_default_lag() {
-        let index = step_index();
-        let value = realized_inflation_index_value(
-            &index,
-            date!(2025 - 02 - 15),
-            date!(2025 - 02 - 15),
-            InflationLag::None,
-        )
-        .expect("explicit no-lag override should use February fixing");
-        assert_eq!(value, 301.0);
-    }
-
-    #[test]
-    fn linear_interpolation_requires_a_published_right_anchor() {
-        let index = InflationIndex::new(
-            "US-CPI",
-            vec![(date!(2025 - 01 - 01), 300.0)],
-            Currency::USD,
-        )
-        .expect("valid index")
-        .with_interpolation(SeriesInterpolation::Linear);
-        let result = realized_inflation_index_value(
-            &index,
-            date!(2025 - 01 - 15),
-            date!(2025 - 01 - 15),
-            InflationLag::None,
-        );
-        assert!(
-            result.is_err(),
-            "linear interpolation needs the next anchor"
         );
     }
 }

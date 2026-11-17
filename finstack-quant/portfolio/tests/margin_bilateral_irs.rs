@@ -9,6 +9,7 @@
 
 use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_margin::types::{CsaSpec, OtcMarginSpec};
@@ -53,14 +54,14 @@ fn bilateral_irs_portfolio_margin_reports_finite_im_and_positive_zero_vm() {
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (10.0, (-0.04_f64 * 10.0).exp())])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("USD-OIS curve builds"),
         )
         .insert(
-            ForwardCurve::builder("USD-SOFR-3M", 0.25)
-                .base_date(as_of)
-                .knots([(0.0, 0.04), (10.0, 0.04)])
-                .build()
+            ForwardCurve::flat("USD-SOFR-3M", as_of, 0.04, DayCount::Act360)
                 .expect("USD-SOFR-3M curve builds"),
         );
 

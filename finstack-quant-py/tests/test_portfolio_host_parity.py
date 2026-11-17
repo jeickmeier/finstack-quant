@@ -74,7 +74,16 @@ def _position(index: int) -> dict[str, Any]:
 
 def _market_json(as_of: str, rate: float) -> dict[str, Any]:
     knots = [(year, math.exp(-rate * year)) for year in (0.0, 0.5, 1.0, 2.0)]
-    market = MarketContext().insert(DiscountCurve("USD-OIS", date.fromisoformat(as_of), knots))
+    market = MarketContext().insert(
+        DiscountCurve(
+            "USD-OIS",
+            date.fromisoformat(as_of),
+            knots,
+            interp="monotone_convex",
+            extrapolation="extend",
+            day_count="act_365f",
+        )
+    )
     return json.loads(market.to_json())
 
 

@@ -20,6 +20,9 @@ fn create_curve(base_date: Date) -> MarketContext {
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
         .knots([(0.0, 1.0), (5.0, 0.80)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     MarketContext::new().insert(curve)
@@ -133,14 +136,12 @@ fn test_accrued_frn_uses_forward_rate() {
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(issue)
         .knots([(0.0, 1.0), (1.0, 0.99)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(issue)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.05), (10.0, 0.05)]) // 5% flat
-        .build()
-        .unwrap();
+    let fwd = ForwardCurve::flat("USD-SOFR-3M", issue, 0.05, DayCount::Act360).unwrap();
     let market = MarketContext::new().insert(disc).insert(fwd);
 
     // Floating-rate bond with SOFR 3M (using new CashflowSpec)
@@ -197,6 +198,9 @@ fn test_clean_dirty_ex_coupon_parity() {
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(issue)
         .knots([(0.0, 1.0), (5.0, 0.9)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let market = MarketContext::new().insert(curve);

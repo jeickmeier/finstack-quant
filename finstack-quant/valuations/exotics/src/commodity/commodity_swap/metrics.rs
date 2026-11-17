@@ -15,7 +15,6 @@ use finstack_quant_core::market_data::bumps::BumpMode;
 use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::bumps::BumpType;
 use finstack_quant_core::market_data::bumps::BumpUnits;
-use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::metrics::MetricCalculator;
@@ -56,14 +55,14 @@ impl MetricCalculator for DeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let swap: &CommoditySwap = context.instrument_as()?;
         let curve_id = CurveId::new(swap.forward_curve_id.as_str());
-        let bump = |value| MarketBump::Curve {
-            id: curve_id.clone(),
-            spec: BumpSpec {
+        let target = context.curves.curve_target(&curve_id)?;
+        let bump = |value| {
+            target.clone().into_bump(BumpSpec {
                 bump_type: BumpType::Parallel,
                 mode: BumpMode::Additive,
                 units: BumpUnits::Fraction,
                 value,
-            },
+            })
         };
         let up = context.curves.bump([bump(1.0)])?;
         let down = context.curves.bump([bump(-1.0)])?;

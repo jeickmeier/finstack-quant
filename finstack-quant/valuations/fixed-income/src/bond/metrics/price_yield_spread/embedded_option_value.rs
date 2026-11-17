@@ -154,6 +154,8 @@ mod tests {
             .base_date(base_date)
             .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.85), (10.0, 0.70)])
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("Valid curve");
         MarketContext::new().insert(discount_curve)
@@ -540,7 +542,8 @@ mod tests {
             HazardCurve::builder("USD-CREDIT")
                 .base_date(as_of)
                 .recovery_rate(0.4)
-                .knots([(0.0, 0.02), (5.0, 0.02)])
+                .knots([(5.0, 0.02)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .expect("valid hazard curve"),
         );

@@ -29,7 +29,7 @@ bachelier_price_with_annuity}`.
 |------|----------|
 | [`mod.rs`](mod.rs) | Facade: flat re-exports of the private children below, plus the public submodules |
 | [`source.rs`](source.rs) | `VolSource` plus surface and cube evaluation/materialization (private, re-exported flat) |
-| [`fx.rs`](fx.rs) | FX delta quotes: `FxVolSurfaceBuilder`, `get_fx_delta_vol`, delta/strike conversion (private, re-exported flat) |
+| [`fx.rs`](fx.rs) | FX delta quotes: `get_fx_delta_vol`, `materialize_fx_delta_surface`, checked delta/strike conversion (private, re-exported flat) |
 | [`implied.rs`](implied.rs) | `implied_vol_black`, `implied_vol_bachelier` (private, re-exported flat) |
 | [`convert.rs`](convert.rs) | `VolatilityConvention` and `convert_atm_volatility` (private, re-exported flat) |
 | [`dupire.rs`](dupire.rs) | Crate-private Dupire kernel shared by `local_vol` and the arbitrage density check |

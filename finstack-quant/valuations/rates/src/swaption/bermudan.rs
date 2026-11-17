@@ -977,8 +977,15 @@ mod lsmc_diagnostics_tests {
         model.hw1f_mean_reversion = Some(0.03);
         model.hw1f_sigma = Some(0.012);
         model.mc_paths = Some(64);
-        let market = MarketContext::new()
-            .insert(DiscountCurve::flat("USD-OIS", as_of, 0.03).expect("discount curve"));
+        let market = MarketContext::new().insert(
+            DiscountCurve::flat(
+                "USD-OIS",
+                as_of,
+                0.03,
+                finstack_quant_core::dates::DayCount::Act365F,
+            )
+            .expect("discount curve"),
+        );
 
         for mc_base_steps in [None, Some(64)] {
             for antithetic in [false, true] {

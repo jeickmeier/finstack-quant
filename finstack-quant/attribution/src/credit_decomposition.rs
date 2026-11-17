@@ -56,7 +56,7 @@ pub(crate) fn credit_factor_detail(
 
     let credit_snapshot = MarketSnapshot::extract(market_t0, MarketRestoreFlags::HAZARD);
     let cs01_base_market =
-        MarketSnapshot::restore_market(market_t1, &credit_snapshot, MarketRestoreFlags::HAZARD);
+        MarketSnapshot::restore_market(market_t1, &credit_snapshot, MarketRestoreFlags::HAZARD)?;
     let cs01_bump_bp = 1.0_f64;
     let disc = cascade.discount_curve_id.as_ref();
     let recalibration_provider = CachedRecalibrationProvider::default();
@@ -381,9 +381,7 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, create_date};
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::market_data::term_structures::{
-        DiscountCurve, HazardCurve, ValidationMode,
-    };
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Attributes;
@@ -496,9 +494,8 @@ mod tests {
             .base_date(base)
             .knots([(0.0, 1.0), (10.0, (-r * 10.0).exp())])
             .interp(InterpStyle::LogLinear)
-            .validation(ValidationMode::NegativeRateFriendly {
-                forward_floor: -0.10,
-            })
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap()
     }
@@ -508,6 +505,7 @@ mod tests {
             .base_date(base)
             .recovery_rate(recovery)
             .knots([(1.0, rate), (10.0, rate)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .unwrap()
     }

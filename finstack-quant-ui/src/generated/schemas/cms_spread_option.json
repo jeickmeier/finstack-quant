@@ -14,6 +14,7 @@
           "forward_curve_id": "USD-SOFR-3M",
           "id": "CMS-SPREAD-10Y2Y",
           "index_id": "USD-SOFR-OIS",
+          "long_cms_fixing_index_id": "USD-SOFR-CMS-10Y",
           "long_cms_tenor": {
             "count": 10,
             "unit": "years"
@@ -25,6 +26,7 @@
           },
           "option_type": "call",
           "payment_date": "2027-03-31",
+          "short_cms_fixing_index_id": "USD-SOFR-CMS-2Y",
           "short_cms_tenor": {
             "count": 2,
             "unit": "years"
@@ -3813,6 +3815,17 @@
           "$ref": "#/$defs/d_c08279a20372931820e0",
           "description": "Instrument-owned pricing inputs."
         },
+        "long_cms_fixing_index_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Explicit CMS benchmark fixing identifier for the long-tenor leg\n(`FIXING:<long_cms_fixing_index_id>`), distinct from `forward_curve_id`,\n`index_id`, and `short_cms_fixing_index_id`."
+        },
         "long_cms_tenor": {
           "$ref": "#/$defs/d_47e5e74524615b78a19f",
           "description": "Long CMS tenor (e.g., 10Y)."
@@ -3840,6 +3853,17 @@
         "scenario_pricing_overrides": {
           "$ref": "#/$defs/d_f80c8a31d359e1cb5dd4",
           "description": "Scenario-only pricing adjustments."
+        },
+        "short_cms_fixing_index_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Explicit CMS benchmark fixing identifier for the short-tenor leg\n(`FIXING:<short_cms_fixing_index_id>`), distinct from `forward_curve_id`,\n`index_id`, and `long_cms_fixing_index_id`."
         },
         "short_cms_tenor": {
           "$ref": "#/$defs/d_47e5e74524615b78a19f",

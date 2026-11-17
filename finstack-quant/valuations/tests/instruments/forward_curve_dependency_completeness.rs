@@ -25,19 +25,24 @@ fn build_discount_curve(id: &str, rate: f64) -> DiscountCurve {
             (5.0f64, (-rate * 5.0).exp()),
             (10.0f64, (-rate * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("Discount curve construction should succeed")
 }
 
-fn build_forward_curve(id: &str, tenor_years: f64, rate: f64) -> ForwardCurve {
+fn build_forward_curve(id: &str, _tenor_years: f64, rate: f64) -> ForwardCurve {
     let as_of = date!(2025 - 01 - 01);
-    ForwardCurve::builder(id, tenor_years)
-        .base_date(as_of)
-        .day_count(DayCount::Act365F)
-        .reset_lag(2)
-        .knots([(0.0, rate), (1.0, rate + 0.0025), (5.0, rate + 0.0050)])
-        .build()
-        .expect("Forward curve construction should succeed")
+    ForwardCurve::from_zero_rates(
+        id,
+        as_of,
+        &[(0.0, rate), (1.0, rate + 0.0025), (5.0, rate + 0.0050)],
+        finstack_quant_core::math::Compounding::Continuous,
+        DayCount::Act365F,
+        finstack_quant_core::math::interp::InterpStyle::LogLinear,
+        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+    )
+    .expect("Forward curve construction should succeed")
 }
 
 fn build_minimal_market(discount_ids: &[&str], forward_ids: &[&str]) -> MarketContext {

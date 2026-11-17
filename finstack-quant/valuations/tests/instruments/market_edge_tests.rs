@@ -37,6 +37,8 @@ mod cds_market_edge {
                 (5.0, (-rate * 5.0).exp()),
                 (10.0, (-rate * 10.0).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap()
     }
@@ -50,12 +52,8 @@ mod cds_market_edge {
         HazardCurve::builder(id)
             .base_date(base_date)
             .recovery_rate(recovery)
-            .knots([
-                (0.0, hazard_rate),
-                (1.0, hazard_rate),
-                (5.0, hazard_rate),
-                (10.0, hazard_rate),
-            ])
+            .knots([(1.0, hazard_rate), (5.0, hazard_rate), (10.0, hazard_rate)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .unwrap()
     }
@@ -303,6 +301,8 @@ mod bond_market_edge {
                 (10.0, (-rate * 10.0).exp()),
                 (30.0, (-rate * 30.0).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap()
     }

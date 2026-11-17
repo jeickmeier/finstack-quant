@@ -179,10 +179,20 @@ pub(crate) fn compute_pnl(
     as_of_t1: Date,
 ) -> Result<Money> {
     let val_t0_converted = market_t1
-        .convert_money(val_t0, target_currency, as_of_t1)?
+        .convert_money(
+            val_t0,
+            target_currency,
+            as_of_t1,
+            FxConversionPolicy::CashflowDate,
+        )?
         .amount;
     let val_t1_converted = market_t1
-        .convert_money(val_t1, target_currency, as_of_t1)?
+        .convert_money(
+            val_t1,
+            target_currency,
+            as_of_t1,
+            FxConversionPolicy::CashflowDate,
+        )?
         .amount;
 
     val_t1_converted.checked_sub(val_t0_converted)
@@ -222,10 +232,20 @@ pub(crate) fn compute_pnl_with_fx(
     as_of_t1: Date,
 ) -> Result<Money> {
     let val_t0_converted = market_fx_t0
-        .convert_money(val_t0, target_currency, as_of_t0)?
+        .convert_money(
+            val_t0,
+            target_currency,
+            as_of_t0,
+            FxConversionPolicy::CashflowDate,
+        )?
         .amount;
     let val_t1_converted = market_fx_t1
-        .convert_money(val_t1, target_currency, as_of_t1)?
+        .convert_money(
+            val_t1,
+            target_currency,
+            as_of_t1,
+            FxConversionPolicy::CashflowDate,
+        )?
         .amount;
 
     val_t1_converted.checked_sub(val_t0_converted)
@@ -531,6 +551,7 @@ fn build_flat_ytm_market(
         .day_count(original.day_count())
         .knots(knots)
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()?;
     Ok(market.clone().insert(flat_curve))
 }
@@ -951,6 +972,8 @@ mod tests {
                 .base_date(date!(2025 - 01 - 15))
                 .knots([(0.0, 1.0), (100.0, (-0.05_f64 * 100.0).exp())])
                 .interp(InterpStyle::LogLinear)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve")
         };
@@ -1196,6 +1219,8 @@ mod tests {
             .base_date(as_of)
             .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("base curve");
         let market = MarketContext::new().insert(base_curve);
@@ -1205,10 +1230,10 @@ mod tests {
 
         let expected_1y = (1.0_f64 + 0.05 / 2.0).powi(-2);
         assert!(
-            (curve.df(1.0) - expected_1y).abs() < 1e-12,
+            (curve.df(1.0).expect("df") - expected_1y).abs() < 1e-12,
             "DF(1y) at 5% street (semi-annual) YTM must be (1.025)^-2 = \
              {expected_1y}, got {} (continuous exp(-0.05) = {})",
-            curve.df(1.0),
+            curve.df(1.0).expect("df"),
             (-0.05_f64).exp()
         );
 
@@ -1217,10 +1242,10 @@ mod tests {
         // 0..=200 half-year grid for a 10y bond.
         let expected_100y = (1.0_f64 + 0.05 / 2.0).powi(-200);
         assert!(
-            ((curve.df(100.0) - expected_100y) / expected_100y).abs() < 1e-9,
+            ((curve.df(100.0).expect("df") - expected_100y) / expected_100y).abs() < 1e-9,
             "DF(100y) must be on the semi-annual flat curve, expected \
              {expected_100y}, got {}",
-            curve.df(100.0)
+            curve.df(100.0).expect("df")
         );
         assert!(
             curve.knots().len() < 50,
@@ -1249,8 +1274,10 @@ mod tests {
         .expect("bund construction");
         let base_curve = DiscountCurve::builder("EUR-OIS")
             .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
             .interp(InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("base curve");
         let market = MarketContext::new().insert(base_curve);
@@ -1261,10 +1288,10 @@ mod tests {
         let expected_1y = 1.0_f64 / 1.05;
         let street2_1y = (1.0_f64 + 0.05 / 2.0).powi(-2);
         assert!(
-            (curve.df(1.0) - expected_1y).abs() < 1e-12,
+            (curve.df(1.0).expect("df") - expected_1y).abs() < 1e-12,
             "DF(1y) at 5% annual Street YTM must be 1/1.05 = {expected_1y}, \
              got {} (hardcoded Street-2 would be {street2_1y})",
-            curve.df(1.0)
+            curve.df(1.0).expect("df")
         );
     }
 
@@ -1291,12 +1318,16 @@ mod tests {
             .base_date(as_of_t0)
             .knots([(0.0, 1.0), (10.0, (-0.05_f64 * 10.0).exp())])
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("ois");
         let repo = DiscountCurve::builder("USD-REPO")
             .base_date(as_of_t0)
             .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("repo");
         let market = MarketContext::new().insert(ois).insert(repo);

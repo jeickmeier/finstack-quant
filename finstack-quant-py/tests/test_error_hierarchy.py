@@ -130,6 +130,8 @@ def _usd_market() -> MarketContext:
             date.fromisoformat(AS_OF),
             [(0.0, 1.0), (0.5, 0.98), (1.0, 0.95)],
             day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
         )
     )
     return market
@@ -258,15 +260,17 @@ class TestRealFailuresRaiseTheMappedClass:
         assert isinstance(excinfo.value, ContractValidationError)
         assert isinstance(excinfo.value, FinstackError)
 
-    def test_non_positive_definite_matrix_raises_cholesky_error(self) -> None:
-        """``cholesky_decomposition`` maps a factorisation failure to ``CholeskyError``."""
-        with pytest.raises(linalg.CholeskyError, match=r"(?i)positive semi-definite"):
+    def test_non_positive_definite_matrix_raises_runtime_error(self) -> None:
+        """``cholesky_decomposition`` maps a non-SPD factorisation failure to ``RuntimeError``."""
+        with pytest.raises(RuntimeError, match=r"(?i)positive semi-definite") as excinfo:
             linalg.cholesky_decomposition([[1.0, 2.0], [2.0, 1.0]])
+        assert not isinstance(excinfo.value, linalg.CholeskyError)
+        assert not isinstance(excinfo.value, ValueError)
 
-    def test_cholesky_failure_is_still_caught_by_value_error(self) -> None:
-        """``CholeskyError`` sits under ``ValueError`` but outside ``FinstackError``."""
-        with pytest.raises(ValueError, match=r"(?i)positive semi-definite") as excinfo:
-            linalg.cholesky_decomposition([[1.0, 2.0], [2.0, 1.0]])
+    def test_cholesky_validation_failure_is_still_caught_by_value_error(self) -> None:
+        """``CholeskyError`` on asymmetric input sits under ``ValueError`` and ``FinstackError``."""
+        with pytest.raises(ValueError, match=r"(?i)symmetric") as excinfo:
+            linalg.cholesky_decomposition([[1.0, 0.5], [0.4, 1.0]])
         assert isinstance(excinfo.value, linalg.CholeskyError)
         assert isinstance(excinfo.value, FinstackError)
 

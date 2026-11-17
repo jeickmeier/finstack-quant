@@ -15,6 +15,7 @@ Examples
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any, Literal
 import pandas as pd
 from finstack_quant.core.market_data import FxDeltaVolSurface, VolCube, VolCubeExpirySlice, VolSurface
@@ -1375,7 +1376,19 @@ def get_surface_vol(surface: VolSurface, expiry: float, strike: float) -> float:
     --------
     >>> from finstack_quant.core.market_data import VolSurface
     >>> from finstack_quant.models.volatility import get_surface_vol
-    >>> get_surface_vol(VolSurface("V", [1.0], [100.0], [0.2]), 1.0, 100.0)
+    >>> get_surface_vol(
+    ...     VolSurface(
+    ...         "V",
+    ...         [1.0],
+    ...         [100.0],
+    ...         [0.2],
+    ...         secondary_axis="strike",
+    ...         quote_type="black_lognormal",
+    ...         interpolation_mode="vol",
+    ...     ),
+    ...     1.0,
+    ...     100.0,
+    ... )
     0.2
     """
     ...
@@ -1403,7 +1416,19 @@ def get_surface_vol_clamped(surface: VolSurface, expiry: float, strike: float) -
     --------
     >>> from finstack_quant.core.market_data import VolSurface
     >>> from finstack_quant.models.volatility import get_surface_vol_clamped
-    >>> get_surface_vol_clamped(VolSurface("V", [1.0], [100.0], [0.2]), 2.0, 120.0)
+    >>> get_surface_vol_clamped(
+    ...     VolSurface(
+    ...         "V",
+    ...         [1.0],
+    ...         [100.0],
+    ...         [0.2],
+    ...         secondary_axis="strike",
+    ...         quote_type="black_lognormal",
+    ...         interpolation_mode="vol",
+    ...     ),
+    ...     2.0,
+    ...     120.0,
+    ... )
     0.2
     """
     ...
@@ -1615,7 +1640,7 @@ def get_cube_expiry_slice_vol(slice: VolCubeExpirySlice, tenor: float, strike: f
     --------
     >>> from finstack_quant.core.market_data import VolCubeExpirySlice
     >>> from finstack_quant.models.volatility import get_cube_expiry_slice_vol
-    >>> grid = VolCubeExpirySlice("S", 1.0, [5.0], [0.03], [0.2])
+    >>> grid = VolCubeExpirySlice("S", 1.0, [5.0], [0.03], [0.2], quote_type="black_lognormal")
     >>> get_cube_expiry_slice_vol(grid, 5.0, 0.03)
     0.2
     """
@@ -1646,7 +1671,7 @@ def get_cube_expiry_slice_vol_clamped(slice: VolCubeExpirySlice, tenor: float, s
     --------
     >>> from finstack_quant.core.market_data import VolCubeExpirySlice
     >>> from finstack_quant.models.volatility import get_cube_expiry_slice_vol_clamped
-    >>> grid = VolCubeExpirySlice("S", 1.0, [5.0], [0.03], [0.2])
+    >>> grid = VolCubeExpirySlice("S", 1.0, [5.0], [0.03], [0.2], quote_type="black_lognormal")
     >>> get_cube_expiry_slice_vol_clamped(grid, 5.0, 0.03)
     0.2
     """
@@ -1664,13 +1689,16 @@ def get_fx_delta_pillar_vols(surface: FxDeltaVolSurface, expiry_index: int) -> t
 
     Returns
     -------
-    tuple[float, float, float]
-        ATM, put, and call annualized decimal volatilities.
+    tuple[float, float, float] | tuple[float, float, float, float, float]
+        Pillar annualized decimal volatilities at ``expiry_index`` ordered as
+        ``(atm, put_25d, call_25d)`` when only 25-delta quotes exist, or
+        ``(atm, put_25d, call_25d, put_10d, call_10d)`` when 10-delta quotes are
+        present.
 
     Raises
     ------
     ValueError
-        If the index is outside the surface.
+        If ``expiry_index`` is outside the surface.
 
     Examples
     --------
@@ -1678,7 +1706,7 @@ def get_fx_delta_pillar_vols(surface: FxDeltaVolSurface, expiry_index: int) -> t
     >>> from finstack_quant.models.volatility import get_fx_delta_pillar_vols
     >>> tuple(
     ...     round(value, 6)
-    ...     for value in get_fx_delta_pillar_vols(FxDeltaVolSurface("FX", [1.0], [0.12], [0.01], [0.002]), 0)
+    ...     for value in get_fx_delta_pillar_vols(FxDeltaVolSurface("FX", "EUR/USD", [1.0], [0.12], [0.01], [0.002]), 0)
     ... )
     (0.12, 0.117, 0.127)
     """
@@ -1712,7 +1740,7 @@ def get_fx_delta_vol(surface: FxDeltaVolSurface, expiry: float, strike: float, f
     --------
     >>> from finstack_quant.core.market_data import FxDeltaVolSurface
     >>> from finstack_quant.models.volatility import get_fx_delta_vol
-    >>> s = FxDeltaVolSurface("FX", [1.0], [0.12], [0.01], [0.002])
+    >>> s = FxDeltaVolSurface("FX", "EUR/USD", [1.0], [0.12], [0.01], [0.002])
     >>> get_fx_delta_vol(s, 1.0, 1.1, 1.1) > 0
     True
     """
@@ -1720,9 +1748,7 @@ def get_fx_delta_vol(surface: FxDeltaVolSurface, expiry: float, strike: float, f
 
 def materialize_fx_delta_surface(
     surface: FxDeltaVolSurface,
-    spot: float,
-    domestic_rate: float,
-    foreign_rate: float,
+    delivery_forwards: Sequence[float],
 ) -> VolSurface:
     """Materialize FX delta quotes as a strike-axis surface.
 
@@ -1730,12 +1756,9 @@ def materialize_fx_delta_surface(
     ----------
     surface : FxDeltaVolSurface
         Source FX delta quote artifact.
-    spot : float
-        Positive spot FX rate.
-    domestic_rate : float
-        Continuously compounded domestic decimal rate.
-    foreign_rate : float
-        Continuously compounded foreign decimal rate.
+    delivery_forwards : Sequence[float]
+        Positive delivery FX forward rates matching ``surface.expiries`` in
+        ``surface.pair`` quote-per-base units (one forward per expiry slice).
 
     Returns
     -------
@@ -1745,25 +1768,34 @@ def materialize_fx_delta_surface(
     Raises
     ------
     ValueError
-        If market inputs or smile nodes are invalid.
+        If ``delivery_forwards`` length does not match ``surface.expiries``, any
+        forward is non-positive/non-finite, or smile nodes are invalid.
 
     Examples
     --------
     >>> from finstack_quant.core.market_data import FxDeltaVolSurface
     >>> from finstack_quant.models.volatility import materialize_fx_delta_surface
-    >>> s = FxDeltaVolSurface("FX", [1.0], [0.12], [0.01], [0.002])
-    >>> materialize_fx_delta_surface(s, 1.1, 0.03, 0.02).grid_shape
+    >>> s = FxDeltaVolSurface("FX", "EUR/USD", [1.0], [0.12], [0.01], [0.002])
+    >>> materialize_fx_delta_surface(s, [1.1]).grid_shape
     (1, 3)
     """
     ...
 
-def delta_to_strike(delta: float, forward: float, vol: float, expiry: float) -> float:
-    """Convert premium-unadjusted forward call delta to strike.
+def delta_to_strike(
+    is_call: bool,
+    delta_abs: float,
+    forward: float,
+    vol: float,
+    expiry: float,
+) -> float:
+    """Convert premium-unadjusted forward delta magnitude to strike.
 
     Parameters
     ----------
-    delta : float
-        Forward call delta in the open interval from zero to one.
+    is_call : bool
+        ``True`` for a call delta, ``False`` for a put delta magnitude.
+    delta_abs : float
+        Forward delta magnitude in the open interval ``(0, 1)``.
     forward : float
         Positive forward in strike units.
     vol : float
@@ -1776,21 +1808,33 @@ def delta_to_strike(delta: float, forward: float, vol: float, expiry: float) -> 
     float
         Strike in forward units.
 
-    This function does not raise; IEEE non-finite results propagate for invalid inputs.
+    Raises
+    ------
+    ValueError
+        If ``delta_abs`` is outside ``(0, 1)`` or ``forward``, ``vol``, or
+        ``expiry`` is non-positive/non-finite.
 
     Examples
     --------
     >>> from finstack_quant.models.volatility import delta_to_strike
-    >>> round(delta_to_strike(0.25, 1.1, 0.12, 1.0), 6)
+    >>> round(delta_to_strike(True, 0.25, 1.1, 0.12, 1.0), 6)
     1.201354
     """
     ...
 
-def strike_to_delta(strike: float, forward: float, vol: float, expiry: float) -> float:
-    """Convert strike to premium-unadjusted forward call delta.
+def strike_to_delta(
+    is_call: bool,
+    strike: float,
+    forward: float,
+    vol: float,
+    expiry: float,
+) -> float:
+    """Convert strike to premium-unadjusted forward delta magnitude.
 
     Parameters
     ----------
+    is_call : bool
+        ``True`` for a call delta, ``False`` for a put delta magnitude.
     strike : float
         Positive strike in forward units.
     forward : float
@@ -1803,14 +1847,18 @@ def strike_to_delta(strike: float, forward: float, vol: float, expiry: float) ->
     Returns
     -------
     float
-        Forward call delta as a decimal probability.
+        Forward call delta or put delta magnitude in ``(0, 1)``.
 
-    This function does not raise; IEEE non-finite results propagate for invalid inputs.
+    Raises
+    ------
+    ValueError
+        If ``strike``, ``forward``, ``vol``, or ``expiry`` is
+        non-positive/non-finite.
 
     Examples
     --------
     >>> from finstack_quant.models.volatility import strike_to_delta
-    >>> round(strike_to_delta(1.1, 1.1, 0.12, 1.0), 6)
+    >>> round(strike_to_delta(True, 1.1, 1.1, 0.12, 1.0), 6)
     0.523922
     """
     ...
@@ -1889,7 +1937,15 @@ class LocalVolSurface:
     --------
     >>> from finstack_quant.core.market_data import VolSurface
     >>> from finstack_quant.models.volatility import LocalVolSurface
-    >>> implied = VolSurface("FLAT", [0.5, 1.0], [90.0, 100.0, 110.0], [[0.2] * 3] * 2)
+    >>> implied = VolSurface(
+    ...     "FLAT",
+    ...     [0.5, 1.0],
+    ...     [90.0, 100.0, 110.0],
+    ...     [[0.2] * 3] * 2,
+    ...     secondary_axis="strike",
+    ...     quote_type="black_lognormal",
+    ...     interpolation_mode="vol",
+    ... )
     >>> local = LocalVolSurface.from_implied_vol(implied, [100.0, 100.0])
     >>> local.grid_shape
     (2, 3)
@@ -1976,7 +2032,15 @@ class LocalVolSurface:
         --------
         >>> from finstack_quant.core.market_data import VolSurface
         >>> from finstack_quant.models.volatility import LocalVolSurface
-        >>> implied = VolSurface("FLAT", [0.5, 1.0], [90.0, 100.0, 110.0], [[0.2] * 3] * 2)
+        >>> implied = VolSurface(
+        ...     "FLAT",
+        ...     [0.5, 1.0],
+        ...     [90.0, 100.0, 110.0],
+        ...     [[0.2] * 3] * 2,
+        ...     secondary_axis="strike",
+        ...     quote_type="black_lognormal",
+        ...     interpolation_mode="vol",
+        ... )
         >>> local = LocalVolSurface.from_implied_vol(implied, [100.0, 101.0])
         >>> [round(vol, 10) for vol in local.local_vols]
         [0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
@@ -2023,7 +2087,15 @@ class LocalVolSurface:
         --------
         >>> from finstack_quant.core.market_data import VolSurface
         >>> from finstack_quant.models.volatility import LocalVolSurface
-        >>> implied = VolSurface("FLAT", [0.5, 1.0], [90.0, 100.0, 110.0], [[0.2] * 3] * 2)
+        >>> implied = VolSurface(
+        ...     "FLAT",
+        ...     [0.5, 1.0],
+        ...     [90.0, 100.0, 110.0],
+        ...     [[0.2] * 3] * 2,
+        ...     secondary_axis="strike",
+        ...     quote_type="black_lognormal",
+        ...     interpolation_mode="vol",
+        ... )
         >>> local = LocalVolSurface.from_implied_vol_smoothed(implied, [100.0, 101.0], 5.0)
         >>> round(local.value(1.0, 100.0), 10)
         0.2

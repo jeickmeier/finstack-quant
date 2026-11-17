@@ -498,55 +498,79 @@ pub(crate) fn period_stats_inner(
     let mut raw_losses = NeumaierAccumulator::new();
     let gain_scale = stats.best.max(0.0);
     let loss_scale = (-stats.worst).max(0.0);
+    let mut raw_total_ok = true;
+    let mut raw_gains_ok = true;
+    let mut raw_losses_ok = true;
     let mut win_streak = 0;
     let mut loss_streak = 0;
     for &value in &returns {
-        raw_total.add(value);
+        raw_total_ok &= raw_total.add(value).is_ok();
         if scale > 0.0 {
-            total_sum.add(value / scale);
+            total_sum.add(value / scale)?;
         }
         if value > 0.0 {
             stats.wins += 1;
             win_streak += 1;
             loss_streak = 0;
             stats.consecutive_wins = stats.consecutive_wins.max(win_streak);
-            gains.add(value / gain_scale);
-            raw_gains.add(value);
+            gains.add(value / gain_scale)?;
+            raw_gains_ok &= raw_gains.add(value).is_ok();
         } else if value < 0.0 {
             stats.losses += 1;
             loss_streak += 1;
             win_streak = 0;
             stats.consecutive_losses = stats.consecutive_losses.max(loss_streak);
-            losses.add(-value / loss_scale);
-            raw_losses.add(-value);
+            losses.add(-value / loss_scale)?;
+            raw_losses_ok &= raw_losses.add(-value).is_ok();
         } else {
             win_streak = 0;
             loss_streak = 0;
         }
     }
-    let net = raw_total.total();
-    stats.avg_return = if net.is_finite() {
+    let net = if raw_total_ok {
+        raw_total.get_total().ok().filter(|v| v.is_finite())
+    } else {
+        None
+    };
+    let scaled_total = total_sum.get_total()?;
+    stats.avg_return = if let Some(net) = net {
         net / stats.n_obs as f64
     } else {
-        scale * (total_sum.total() / stats.n_obs as f64)
+        scale * (scaled_total / stats.n_obs as f64)
     };
     if stats.avg_return == 0.0
-        && (net.is_finite() && net != 0.0 || !net.is_finite() && total_sum.total() != 0.0)
+        && (net.is_some_and(|v| v != 0.0) || (net.is_none() && scaled_total != 0.0))
     {
         return Err(finstack_quant_core::Error::Internal(
             "mean bucket return underflowed".into(),
         ));
     }
     stats.win_rate = stats.wins as f64 / stats.n_obs as f64;
+    let raw_gain_sum = if raw_gains_ok {
+        raw_gains.get_total().ok().filter(|v| v.is_finite())
+    } else {
+        None
+    };
+    let scaled_gains = gains.get_total()?;
     if stats.wins > 0 {
-        stats.avg_win = if raw_gains.total().is_finite() {
-            raw_gains.total() / stats.wins as f64
+        stats.avg_win = if let Some(gain_sum) = raw_gain_sum {
+            gain_sum / stats.wins as f64
         } else {
-            gain_scale * (gains.total() / stats.wins as f64)
+            gain_scale * (scaled_gains / stats.wins as f64)
         };
     }
+    let raw_loss_sum = if raw_losses_ok {
+        raw_losses.get_total().ok().filter(|v| v.is_finite())
+    } else {
+        None
+    };
+    let scaled_losses = losses.get_total()?;
     if stats.losses > 0 {
-        stats.avg_loss = -raw_losses.total() / stats.losses as f64;
+        stats.avg_loss = if let Some(loss_sum) = raw_loss_sum {
+            -loss_sum / stats.losses as f64
+        } else {
+            -loss_scale * (scaled_losses / stats.losses as f64)
+        };
     }
     if (stats.wins > 0 && stats.avg_win == 0.0) || (stats.losses > 0 && stats.avg_loss == 0.0) {
         return Err(finstack_quant_core::Error::Internal(
@@ -554,20 +578,21 @@ pub(crate) fn period_stats_inner(
         ));
     }
     if stats.wins > 0 && stats.losses > 0 {
-        let raw_gain_sum = raw_gains.total();
-        let raw_loss_sum = raw_losses.total();
-        let direct_pf = raw_gain_sum / raw_loss_sum;
+        let direct_pf = match (raw_gain_sum, raw_loss_sum) {
+            (Some(g), Some(l)) => g / l,
+            _ => f64::NAN,
+        };
         stats.profit_factor = if direct_pf.is_finite() && direct_pf > 0.0 {
             direct_pf
         } else {
             // Scale only when raw gross sums or intermediate quotients exceed
             // binary64 range; ordinary direct division preserves adjacent ratios.
-            let direct = (gain_scale / loss_scale) * (gains.total() / losses.total());
+            let direct = (gain_scale / loss_scale) * (scaled_gains / scaled_losses);
             if direct.is_finite() && direct > 0.0 {
                 direct
             } else {
                 checked_positive_exp(
-                    gain_scale.ln() - loss_scale.ln() + gains.total().ln() - losses.total().ln(),
+                    gain_scale.ln() - loss_scale.ln() + scaled_gains.ln() - scaled_losses.ln(),
                     "profit factor",
                 )?
             }
@@ -590,15 +615,13 @@ pub(crate) fn period_stats_inner(
         let p = stats.wins as f64 / (stats.wins + stats.losses) as f64;
         // K = p * (G-D)/G. A compensated direct net retains a tiny signed
         // Kelly estimate when gains and losses nearly cancel.
-        stats.kelly_risk_fraction = if net.is_finite() && raw_gain_sum.is_finite() {
-            p * (net / raw_gain_sum)
-        } else {
-            p * ((total_sum.total() / gains.total()) * (scale / gain_scale))
+        stats.kelly_risk_fraction = match (net, raw_gain_sum) {
+            (Some(net), Some(gain_sum)) => p * (net / gain_sum),
+            _ => p * ((scaled_total / scaled_gains) * (scale / gain_scale)),
         };
         if !stats.kelly_risk_fraction.is_finite()
             || (stats.kelly_risk_fraction == 0.0
-                && ((net.is_finite() && net != 0.0)
-                    || (!net.is_finite() && total_sum.total() != 0.0)))
+                && (net.is_some_and(|v| v != 0.0) || (net.is_none() && scaled_total != 0.0)))
         {
             return Err(finstack_quant_core::Error::Internal(
                 "Kelly risk fraction is not representable".into(),

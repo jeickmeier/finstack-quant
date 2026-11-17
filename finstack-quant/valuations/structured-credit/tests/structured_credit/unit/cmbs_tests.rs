@@ -46,6 +46,9 @@ fn market() -> MarketContext {
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(close())
         .knots(knots)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
     MarketContext::new().insert(curve)
@@ -624,11 +627,13 @@ fn dscr_uses_the_live_floating_coupon_and_the_amortization_schedule() {
     floating.asset_type = AssetType::CommercialMortgage { ltv: None };
     floating.io_months = Some(close().months_until(maturity()).expect("forward range"));
     floating.noi = Some(usd(8_000_000.0));
-    let sofr = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let sofr = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(close())
         .day_count(DayCount::Act360)
-        .reset_lag(2)
-        .knots([(0.0, 0.043), (10.0, 0.043)])
+        .index_tenor(finstack_quant_core::dates::Tenor::quarterly())
+        .knots([(0.0, 1.0), (10.0, (-0.43_f64).exp())])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("forward curve");
     let market = MarketContext::new().insert(sofr);
@@ -779,6 +784,9 @@ fn flat_curve(rate: f64) -> DiscountCurve {
     DiscountCurve::builder("USD-YM")
         .base_date(close())
         .knots((0..=10).map(|i| (f64::from(i), (-rate * f64::from(i)).exp())))
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve")
 }

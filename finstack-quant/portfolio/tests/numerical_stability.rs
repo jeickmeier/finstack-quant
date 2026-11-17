@@ -253,7 +253,7 @@ fn test_neumaier_sum_accuracy() {
         .map(|i| if i % 2 == 0 { 1e12 } else { -1e12 })
         .collect();
 
-    let neumaier_result = neumaier_sum(values.iter().copied());
+    let neumaier_result = neumaier_sum(values.iter().copied()).expect("finite sum");
     let naive_result: f64 = values.iter().sum();
 
     // True sum of alternating ±1e12 (500 each) is exactly 0.0

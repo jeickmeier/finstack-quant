@@ -330,22 +330,25 @@ impl CompiledCashFlowPlan {
     }
 }
 
-/// Reject term-index tenors that disagree with the resolved forward curve's tenor by > 10%.
+/// Reject term-index tenors that disagree with the resolved forward curve's metadata tenor by > 10%.
 pub(crate) fn validate_index_tenor_match(
     index_tenor: Option<finstack_quant_core::dates::Tenor>,
     curve: &ForwardCurve,
     forward_curve_id: &str,
 ) -> finstack_quant_core::Result<()> {
-    let Some(spec_tenor) = index_tenor else {
+    let (Some(spec_tenor), Some(curve_tenor)) = (index_tenor, curve.index_tenor()) else {
         return Ok(());
     };
+    if spec_tenor == curve_tenor {
+        return Ok(());
+    }
     let spec_years = spec_tenor.to_years_approx();
-    let curve_years = curve.tenor();
+    let curve_years = curve_tenor.to_years_approx();
     if curve_years > 0.0 && spec_years > 0.0 && (spec_years - curve_years).abs() / curve_years > 0.1
     {
         return Err(finstack_quant_core::Error::Validation(format!(
             "floating leg index_tenor {spec_tenor:?} ({spec_years:.6}y) disagrees with resolved \
-             forward curve '{forward_curve_id}' tenor ({curve_years:.6}y)"
+             forward curve '{forward_curve_id}' tenor {curve_tenor:?} ({curve_years:.6}y)"
         )));
     }
     Ok(())

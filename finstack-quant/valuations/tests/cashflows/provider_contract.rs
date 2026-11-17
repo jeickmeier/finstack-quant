@@ -178,13 +178,35 @@ fn minimal_market() -> MarketContext {
         .base_date(base)
         .knots([(0.0, 1.0), (10.0, 0.75)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("valid discount curve");
 
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let fwd = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(base)
-        .knots([(0.0, 0.04), (10.0, 0.05)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (0.625, 0.975119440412489),
+            (1.25, 0.950486566729423),
+            (1.875, 0.926114119711543),
+            (2.5, 0.902014214657405),
+            (3.125, 0.878198338758511),
+            (3.75, 0.854677349733179),
+            (4.375, 0.831461475709036),
+            (5.0, 0.808560316321452),
+            (5.625, 0.785982844992816),
+            (6.25, 0.763737412355305),
+            (6.875, 0.741831750777771),
+            (7.5, 0.72027297995544),
+            (8.125, 0.699067613519461),
+            (8.75, 0.678221566621784),
+            (9.375, 0.657740164449519),
+            (10.0, 0.637628151621773),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("valid forward curve");
 

@@ -2,6 +2,7 @@
   "id": "bse",
   "name": "Bombay Stock Exchange (BSE) Holiday Calendar",
   "ignore_weekends": false,
+  "supported_years": { "from_year": 2024, "to_year": 2026 },
   "comment": "BSE cash-segment holidays match NSE. Both IDs exist so desks can look up either name. Recurring Gregorian/statutory rules apply every year. Moving festivals use published circular dates (exact_date) for 2024-2026 only. Years outside that verified window have only the statutory/Gregorian rules. Full-day model: Diwali Laxmi Pujan regular sessions are holidays; Muhurat is not modeled.",
   "rules": [
     { "type": "fixed", "name": "Republic Day", "month": "january", "day": 26, "observed": "none" },

@@ -120,7 +120,7 @@ fn min_relevant_surface_vol(
     let Some(strike) = reference_strike else {
         return min_grid_vol(surface);
     };
-    let strikes = surface.strikes();
+    let strikes = surface.secondary_values();
     if strikes.is_empty() {
         return None;
     }
@@ -327,7 +327,7 @@ fn apply_dependency_surface_bumps_in_place(
                         .iter()
                         .filter(|dep| dep.vol_surface_id == *vol_surface_id)
                         .collect();
-                    let strikes = surface.strikes();
+                    let strikes = surface.secondary_values();
                     if !matching.is_empty()
                         && !strikes.is_empty()
                         && matching.iter().all(|dep| dep.reference_strike.is_some())
@@ -1017,10 +1017,7 @@ mod tests {
 
         fn raw_pv(&self, market: &MarketContext) -> finstack_quant_core::Result<f64> {
             let spot_scalar = market.get_price(self.spot_id.as_str())?;
-            let spot = match spot_scalar {
-                MarketScalar::Price(m) => m.amount(),
-                MarketScalar::Unitless(v) => *v,
-            };
+            let spot = crate::metrics::finite_difference::scalar_numeric_value(spot_scalar);
             Ok(spot * 0.00003)
         }
     }
@@ -1097,10 +1094,7 @@ mod tests {
                 return Ok(Money::from((0_i64, Currency::USD)));
             }
             let spot_scalar = market.get_price(self.spot_id.as_str())?;
-            let spot = match spot_scalar {
-                MarketScalar::Price(m) => m.amount(),
-                MarketScalar::Unitless(v) => *v,
-            };
+            let spot = crate::metrics::finite_difference::scalar_numeric_value(spot_scalar);
             // Simple analytic PV = S^2 (currency USD)
             Ok(Money::new(spot * spot, Currency::USD).expect("valid money fixture"))
         }
@@ -1259,7 +1253,7 @@ mod tests {
     fn market_with_spot(spot_id: &str, price: f64) -> MarketContext {
         MarketContext::new().insert_price(
             spot_id,
-            MarketScalar::Price(Money::new(price, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(price, Currency::USD).expect("valid money fixture")),
         )
     }
 
@@ -1582,17 +1576,16 @@ mod tests {
                 let expiry = surface.expiries().first().copied().ok_or_else(|| {
                     finstack_quant_core::Error::Validation("empty expiries".into())
                 })?;
-                let strike = surface.strikes().first().copied().ok_or_else(|| {
+                let strike = surface.secondary_values().first().copied().ok_or_else(|| {
                     finstack_quant_core::Error::Validation("empty strikes".into())
                 })?;
                 value += slope
                     * finstack_quant_models::volatility::get_surface_vol(&surface, expiry, strike)?;
             }
             if self.multiply_by_spot {
-                let spot = match market.get_price(self.spot_id.as_str())? {
-                    MarketScalar::Price(money) => money.amount(),
-                    MarketScalar::Unitless(value) => *value,
-                };
+                let spot = crate::metrics::finite_difference::scalar_numeric_value(
+                    market.get_price(self.spot_id.as_str())?,
+                );
                 value *= spot;
             }
             Ok(value)
@@ -1716,7 +1709,12 @@ mod tests {
     ) -> finstack_quant_core::market_data::surfaces::VolSurface {
         finstack_quant_core::market_data::surfaces::VolSurface::builder(id)
             .expiries(&[0.5, 1.0])
-            .strikes(&[90.0, 100.0, 110.0])
+            .secondary_values(&[90.0, 100.0, 110.0])
+            .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+            .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             .row(&[vol, vol, vol])
             .row(&[vol, vol, vol])
             .build()
@@ -1777,7 +1775,12 @@ mod tests {
         // Surface: ATM (strike=100) has σ=0.20; wings (90, 110) have σ=0.005.
         let surface = finstack_quant_core::market_data::surfaces::VolSurface::builder("SMILE")
             .expiries(&[0.5, 1.0])
-            .strikes(&[90.0, 100.0, 110.0])
+            .secondary_values(&[90.0, 100.0, 110.0])
+            .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+            .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             .row(&[0.005, 0.20, 0.005])
             .row(&[0.005, 0.20, 0.005])
             .build()
@@ -1798,7 +1801,12 @@ mod tests {
         // Same smile surface: ATM high-vol, wings low-vol.
         let surface = finstack_quant_core::market_data::surfaces::VolSurface::builder("SMILE2")
             .expiries(&[0.5, 1.0])
-            .strikes(&[90.0, 100.0, 110.0])
+            .secondary_values(&[90.0, 100.0, 110.0])
+            .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+            .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             .row(&[0.005, 0.20, 0.005])
             .row(&[0.005, 0.20, 0.005])
             .build()

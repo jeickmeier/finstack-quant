@@ -72,9 +72,11 @@ fn market() -> MarketContext {
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, 0.97), (40.0, 0.3)])
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
-    let hazard = HazardCurve::flat("ACME-HAZARD", base, 0.02, 0.4).expect("hazard curve");
+    let hazard =
+        HazardCurve::flat("ACME-HAZARD", base, 0.02, 0.4, DayCount::Act365F).expect("hazard curve");
     MarketContext::new().insert(discount).insert(hazard)
 }
 

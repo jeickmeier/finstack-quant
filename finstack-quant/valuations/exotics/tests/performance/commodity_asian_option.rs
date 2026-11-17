@@ -108,6 +108,8 @@ fn market(case: &Case) -> MarketContext {
             (10.0, 0.60),
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("benchmark discount curve");
     let mut market = MarketContext::new().insert(discount);
@@ -199,24 +201,28 @@ fn reference_moments(
 ) -> Moments {
     let n = option.fixing_dates.len() as f64;
     let m = forwards.len() as f64;
-    let historical_log = neumaier_sum(option.past_fixings.iter().map(|(_, value)| value.ln()));
-    let log_sum = neumaier_sum(forwards.iter().map(|(_, forward)| forward.ln()));
-    let sum_t = neumaier_sum(forwards.iter().map(|(time, _)| *time));
+    let historical_log =
+        neumaier_sum(option.past_fixings.iter().map(|(_, value)| value.ln())).expect("finite sum");
+    let log_sum =
+        neumaier_sum(forwards.iter().map(|(_, forward)| forward.ln())).expect("finite sum");
+    let sum_t = neumaier_sum(forwards.iter().map(|(time, _)| *time)).expect("finite sum");
     let mut second_moment = NeumaierAccumulator::new();
     let mut min_times = NeumaierAccumulator::new();
     for &(ti, fi) in forwards {
         for &(tj, fj) in forwards {
             let minimum = ti.min(tj);
             let product = fi * fj * (sigma * sigma * minimum).exp();
-            second_moment.add(product);
-            min_times.add(minimum);
+            second_moment.add(product).expect("finite product");
+            min_times.add(minimum).expect("finite time");
         }
     }
-    let variance = sigma * sigma * min_times.total() / (n * n);
+    let variance = sigma * sigma * min_times.get_total().expect("finite total") / (n * n);
     let mu = (historical_log + log_sum - 0.5 * sigma * sigma * sum_t) / n;
     Moments {
-        arithmetic_m1: neumaier_sum(forwards.iter().map(|(_, forward)| *forward)) / m,
-        arithmetic_m2: second_moment.total() / (m * m),
+        arithmetic_m1: neumaier_sum(forwards.iter().map(|(_, forward)| *forward))
+            .expect("finite sum")
+            / m,
+        arithmetic_m2: second_moment.get_total().expect("finite total") / (m * m),
         geometric_log_variance: variance,
         geometric_forward: (mu + 0.5 * variance).exp(),
     }
@@ -247,9 +253,11 @@ fn reference_values(
 ) -> (f64, f64, f64) {
     let n = option.fixing_dates.len() as f64;
     let m = forwards.len() as f64;
-    let historical_sum = neumaier_sum(option.past_fixings.iter().map(|(_, value)| *value));
-    let arithmetic_average =
-        (historical_sum + neumaier_sum(forwards.iter().map(|(_, value)| *value))) / n;
+    let historical_sum =
+        neumaier_sum(option.past_fixings.iter().map(|(_, value)| *value)).expect("finite sum");
+    let arithmetic_average = (historical_sum
+        + neumaier_sum(forwards.iter().map(|(_, value)| *value)).expect("finite sum"))
+        / n;
     let (call, put, parity) = match option.averaging_method {
         AveragingMethod::Arithmetic => {
             let effective_strike = (n * option.strike - historical_sum) / m;
@@ -346,7 +354,7 @@ fn run_case(case: &Case) -> (Value, bool) {
         .expect("date-based discount factor");
     let reference = reference_moments(&option, &forwards, case.volatility);
     let (arithmetic_m1, arithmetic_variance) =
-        super::arithmetic_moments(&forwards, case.volatility);
+        super::arithmetic_moments(&forwards, case.volatility).expect("finite arithmetic moments");
     let arithmetic_m2 = arithmetic_m1 * arithmetic_m1 + arithmetic_variance;
     let (_, historical_log, _) = option.accumulated_state(as_of);
     let geometric = super::geometric_moments(
@@ -354,7 +362,8 @@ fn run_case(case: &Case) -> (Value, bool) {
         case.volatility,
         historical_log,
         option.fixing_dates.len(),
-    );
+    )
+    .expect("finite geometric moments");
     let production = Moments {
         arithmetic_m1,
         arithmetic_m2,
@@ -500,8 +509,8 @@ fn run_case(case: &Case) -> (Value, bool) {
         },
         "companion_put_instrument": &put_option,
         "projection": { "future_time_forward_pairs": &forwards, "discount_factor": df,
-            "historical_sum": neumaier_sum(option.past_fixings.iter().map(|(_, value)| *value)),
-            "historical_log_sum": neumaier_sum(option.past_fixings.iter().map(|(_, value)| value.ln())) },
+            "historical_sum": neumaier_sum(option.past_fixings.iter().map(|(_, value)| *value)).expect("finite sum"),
+            "historical_log_sum": neumaier_sum(option.past_fixings.iter().map(|(_, value)| value.ln())).expect("finite sum") },
         "moments": { "compensated_quadratic_reference": reference, "production": production,
             "production_arithmetic_variance": arithmetic_variance },
         "output": { "value": call.amount(), "currency": call.currency(), "production_call": call.amount(),
@@ -601,7 +610,8 @@ fn check_moment_edge(
         let reference = reference_moments(&option, forwards, sigma);
         match method {
             AveragingMethod::Arithmetic => {
-                let (m1, variance) = super::arithmetic_moments(forwards, sigma);
+                let (m1, variance) =
+                    super::arithmetic_moments(forwards, sigma).expect("finite arithmetic moments");
                 let m2 = m1 * m1 + variance;
                 let scale2 = reference
                     .arithmetic_m2
@@ -632,7 +642,8 @@ fn check_moment_edge(
                     sigma,
                     historical_log,
                     option.fixing_dates.len(),
-                );
+                )
+                .expect("finite geometric moments");
                 let variance_scale = reference
                     .geometric_log_variance
                     .abs()
@@ -669,7 +680,8 @@ fn check_moment_edge(
                     kind,
                     historical_sum,
                     option.fixing_dates.len(),
-                ),
+                )
+                .expect("finite arithmetic price"),
                 AveragingMethod::Geometric => super::price_geometric_commodity(
                     forwards,
                     strike,
@@ -678,7 +690,8 @@ fn check_moment_edge(
                     kind,
                     historical_log,
                     option.fixing_dates.len(),
-                ),
+                )
+                .expect("finite geometric price"),
             };
             let value = option.quantity * per_unit;
             assert!(
@@ -784,6 +797,9 @@ fn adjacent_forward_option_market(volatility: f64) -> (CommodityAsianOption, Mar
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots([(0.0, 1.0), (3.0, 1.0)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("unit discount curve");
     let market = MarketContext::new()
@@ -850,7 +866,8 @@ struct TinyAtmReference {
 /// close to one half and retains the positive tiny-volatility expectation.
 fn tiny_atm_reference(forwards: &[(f64, f64)], sigma: f64) -> TinyAtmReference {
     let count = forwards.len() as f64;
-    let mean = neumaier_sum(forwards.iter().map(|(_, forward)| *forward)) / count;
+    let mean =
+        neumaier_sum(forwards.iter().map(|(_, forward)| *forward)).expect("finite sum") / count;
     assert_eq!(
         mean, 1.0,
         "adjacent-forward fixture must remain exactly ATM"
@@ -858,10 +875,12 @@ fn tiny_atm_reference(forwards: &[(f64, f64)], sigma: f64) -> TinyAtmReference {
     let mut covariance = NeumaierAccumulator::new();
     for &(ti, fi) in forwards {
         for &(tj, fj) in forwards {
-            covariance.add(fi * fj * (sigma * sigma * ti.min(tj)).exp_m1());
+            covariance
+                .add(fi * fj * (sigma * sigma * ti.min(tj)).exp_m1())
+                .expect("finite covariance term");
         }
     }
-    let variance = covariance.total() / (count * count);
+    let variance = covariance.get_total().expect("finite covariance total") / (count * count);
     assert!(variance.is_finite() && variance > 0.0);
     let log_variance = (variance / mean.powi(2)).ln_1p();
     assert!(log_variance.is_finite() && log_variance > 0.0);
@@ -932,9 +951,11 @@ fn tiny_positive_volatility_adjacent_forwards_retains_time_value() {
                 0.0,
                 forwards.len(),
             )
+            .expect("finite arithmetic price")
     };
     let reference = tiny_atm_reference(&forwards, sigma);
-    let (mean, variance) = super::arithmetic_moments(&forwards, sigma);
+    let (mean, variance) =
+        super::arithmetic_moments(&forwards, sigma).expect("finite arithmetic moments");
     assert!(mean.is_finite() && mean > 0.0);
     assert_eq!(mean, 1.0);
     assert!(variance.is_finite() && variance > 0.0);
@@ -1038,7 +1059,7 @@ fn nonpositive_effective_strike() {
     let forwards = [(0.5, 80.0)];
     let history = [120.0, 120.0];
     let total_count = history.len() + forwards.len();
-    let historical_sum = neumaier_sum(history);
+    let historical_sum = neumaier_sum(history).expect("finite sum");
     let df = 0.96;
     let quantity = 1000.0;
     let average = (historical_sum + 80.0) / total_count as f64;
@@ -1053,7 +1074,8 @@ fn nonpositive_effective_strike() {
                 OptionType::Call,
                 historical_sum,
                 total_count,
-            );
+            )
+            .expect("finite call price");
         let put = quantity
             * super::price_arithmetic_tw_commodity(
                 &forwards,
@@ -1063,7 +1085,8 @@ fn nonpositive_effective_strike() {
                 OptionType::Put,
                 historical_sum,
                 total_count,
-            );
+            )
+            .expect("finite put price");
         let currency_scale = quantity * df * 120.0;
         assert_edge_bound(
             "nonpositive effective strike call",
@@ -1094,6 +1117,9 @@ fn fully_observed_before_payment() {
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots([(0.0, 1.0), (1.0, (-0.05_f64).exp())])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("fully observed discount curve");
     let df = discount
@@ -1105,9 +1131,13 @@ fn fully_observed_before_payment() {
     let market = MarketContext::new().insert(discount);
     for method in [AveragingMethod::Arithmetic, AveragingMethod::Geometric] {
         let average = match method {
-            AveragingMethod::Arithmetic => neumaier_sum([70.0, 80.0, 90.0]) / 3.0,
+            AveragingMethod::Arithmetic => {
+                neumaier_sum([70.0, 80.0, 90.0]).expect("finite sum") / 3.0
+            }
             AveragingMethod::Geometric => {
-                (neumaier_sum([70.0_f64.ln(), 80.0_f64.ln(), 90.0_f64.ln()]) / 3.0).exp()
+                (neumaier_sum([70.0_f64.ln(), 80.0_f64.ln(), 90.0_f64.ln()]).expect("finite sum")
+                    / 3.0)
+                    .exp()
             }
         };
         for strike in [75.0, 85.0] {

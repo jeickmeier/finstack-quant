@@ -222,12 +222,12 @@
         }
       },
       "total_base_currency": {
-        "amount": "3000227.8208109112",
+        "amount": "3000227.8208109117",
         "currency": "USD"
       },
       "by_entity": {
         "FUND": {
-          "amount": "3000227.8208109112",
+          "amount": "3000227.8208109117",
           "currency": "USD"
         }
       },
@@ -668,8 +668,8 @@
     }
   ],
   "expected": {
-    "valuation_position_value_base": 2000151.8805406075,
-    "valuation_entity_value": 3000227.8208109112,
+    "valuation_position_value_base": 2000151.8805406077,
+    "valuation_entity_value": 3000227.8208109117,
     "metrics_total_dv01": -148.77842076454544,
     "metrics_position_dv01": -99.1856138430303
   }

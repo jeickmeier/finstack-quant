@@ -546,7 +546,7 @@ def bond_workout_ladder(bond: Bond, market: MarketContext | str, as_of: datetime
     ... }
     >>> bond = Bond.from_json(json.dumps(spec))
     >>> as_of = datetime.date(2025, 1, 15)
-    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
+    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04, "act_365f"))
     >>> ladder = bond_workout_ladder(bond, market, as_of)
     >>> [row.kind for row in ladder.rows][-1]
     'maturity'

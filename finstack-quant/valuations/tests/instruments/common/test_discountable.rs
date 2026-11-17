@@ -27,8 +27,12 @@ impl Discounting for FlatCurve {
         dates::TODAY
     }
 
-    fn df(&self, t: f64) -> f64 {
-        (-self.rate * t).exp()
+    fn df(&self, t: f64) -> finstack_quant_core::Result<f64> {
+        Ok((-self.rate * t).exp())
+    }
+
+    fn instantaneous_forward(&self, _t: f64) -> finstack_quant_core::Result<f64> {
+        Ok(self.rate)
     }
 }
 

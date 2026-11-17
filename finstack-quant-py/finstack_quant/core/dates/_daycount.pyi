@@ -430,3 +430,191 @@ class DayCountContext:
         ...
 
     def __repr__(self) -> str: ...
+
+class VolatilityClock:
+    """
+    Calendar and day-count clock mapping option expiry dates to year fractions.
+
+    Encapsulates an evaluation ``reference_date``, a :class:`DayCount`
+    convention, and an optional :class:`DayCountContext` so surfaces (such as
+    FX delta volatility surfaces) resolve date-based expiries consistently with
+    calibration and pricing.
+
+    Examples
+    --------
+    >>> import datetime
+    >>> from finstack_quant.core.dates import DayCount, DayCountContext, VolatilityClock
+    >>> clock = VolatilityClock(
+    ...     datetime.date(2025, 1, 15),
+    ...     DayCount.ACT_365F,
+    ...     DayCountContext(),
+    ... )
+    >>> clock.reference_date
+    datetime.date(2025, 1, 15)
+    >>> round(clock.expiry_time(datetime.date(2026, 1, 15)), 6)
+    1.0
+    """
+
+    def __init__(
+        self,
+        reference_date: datetime.date,
+        day_count: DayCount | str,
+        context: DayCountContext | None = None,
+    ) -> None:
+        """
+        Construct a volatility expiry clock.
+
+        Parameters
+        ----------
+        reference_date : datetime.date
+            Valuation / reference date where expiry time equals ``0.0``.
+        day_count : DayCount | str
+            Day-count convention (or its string label) used to convert dates
+            into year fractions.
+        context : DayCountContext | None, optional
+            Day-count calculation context (calendars, frequency, bus basis).
+            Defaults to an empty context when ``None``.
+
+        Raises
+        ------
+        ValueError
+            If ``day_count`` or its required context inputs (for example a
+            calendar for ``BUS_252``) are invalid.
+        TypeError
+            If ``reference_date`` or ``day_count`` has an incompatible type.
+        """
+        ...
+
+    @property
+    def reference_date(self) -> datetime.date:
+        """
+        Reference date where option time-to-expiry is ``0.0``.
+
+        Returns
+        -------
+        datetime.date
+            Valuation / reference date of the clock.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def day_count(self) -> DayCount:
+        """
+        Day-count convention used to measure expiry times.
+
+        Returns
+        -------
+        DayCount
+            Configured day-count convention.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def context(self) -> DayCountContext:
+        """
+        Day-count context attached to the clock.
+
+        Returns
+        -------
+        DayCountContext
+            Configured day-count context.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def expiry_time(self, expiry_date: datetime.date) -> float:
+        """
+        Compute year fraction from ``reference_date`` to ``expiry_date``.
+
+        Parameters
+        ----------
+        expiry_date : datetime.date
+            Option expiry date on or after ``reference_date``.
+
+        Returns
+        -------
+        float
+            Non-negative year fraction computed under the clock's day-count
+            convention and context.
+
+        Raises
+        ------
+        ValueError
+            If ``expiry_date < reference_date`` or the day-count calculation
+            fails validation.
+        KeyError
+            If ``context.calendar_id`` is set to an unknown calendar identifier.
+        TypeError
+            If ``expiry_date`` cannot be converted to a date.
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize this clock to a canonical JSON string.
+
+        Returns
+        -------
+        str
+            JSON string representing the clock state.
+
+        Raises
+        ------
+        ValueError
+            If the clock cannot be serialized.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> VolatilityClock:
+        """
+        Deserialize a :class:`VolatilityClock` from JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON payload previously produced by :meth:`to_json`.
+
+        Returns
+        -------
+        VolatilityClock
+            Validated volatility clock instance.
+
+        Raises
+        ------
+        ValueError
+            If the JSON payload is malformed or fails clock validation.
+
+        Examples
+        --------
+        >>> import datetime
+        >>> from finstack_quant.core.dates import DayCount, VolatilityClock
+        >>> clock = VolatilityClock(datetime.date(2025, 1, 15), DayCount.ACT_365F)
+        >>> VolatilityClock.from_json(clock.to_json()).reference_date
+        datetime.date(2025, 1, 15)
+        """
+        ...
+
+    def __reduce__(self) -> tuple[object, tuple[str]]:
+        """
+        Return pickle reconstruction tuple via :meth:`from_json`.
+
+        Returns
+        -------
+        tuple[object, tuple[str]]
+            Pickling constructor callable and single JSON argument tuple.
+        """
+        ...
+
+    def __repr__(self) -> str: ...

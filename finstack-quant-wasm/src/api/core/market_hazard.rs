@@ -1,12 +1,10 @@
 //! WASM binding for `finstack_quant_core::market_data::term_structures::HazardCurve`.
 
-use crate::utils::input::{
-    from_js_json, js_f64, js_f64_seq, js_opt_string, js_string, js_string_seq,
-};
+use crate::utils::input::{from_js_json, js_f64, js_f64_seq, js_string, js_string_seq};
 use std::sync::Arc;
 
 use crate::api::core::currency::JsCurrency;
-use crate::utils::wire::{js_date, label, parse_label};
+use crate::utils::wire::{js_date, parse_label};
 use crate::utils::{date_to_iso, parse_iso_date, parse_iso_dates, to_js_err};
 use finstack_quant_core::currency::Currency as RustCurrency;
 use finstack_quant_core::dates::DayCount;
@@ -18,9 +16,9 @@ use crate::api::core::curve_args::{TimePoint, flat_pairs, flatten_pairs, js_time
 
 /// Credit hazard-rate curve for default-probability modelling.
 ///
-/// Built from `(time, hazard_rate)` pillars where `time` is a year fraction
-/// from `baseDate` and `hazard_rate` is the instantaneous default intensity
-/// `λ(t)`. Survival is `S(t) = exp(-∫₀ᵗ λ(u) du)`.
+/// Built from `(time, hazard_rate)` pillars where `time` is a strictly positive
+/// ending year fraction from `baseDate` and `hazard_rate` is the instantaneous
+/// default intensity `λ(t)`. Survival is `S(t) = exp(-∫₀ᵗ λ(u) du)`.
 ///
 /// @example
 /// ```javascript
@@ -30,8 +28,9 @@ use crate::api::core::curve_args::{TimePoint, flat_pairs, flatten_pairs, js_time
 /// const hz = new core.HazardCurve({
 ///   id: "ACME-HZD",
 ///   baseDate: "2025-01-02",
-///   knots: [0.0, 0.02, 30.0, 0.02],
+///   knots: [1.0, 0.02, 30.0, 0.02],
 ///   recoveryRate: 0.4,
+///   dayCount: "act_365f",
 /// });
 /// hz.sp(5.0);          // survival probability at 5y
 /// hz.hazardRate(5.0);  // instantaneous hazard rate at 5y
@@ -50,20 +49,15 @@ struct HazardCurveOptions {
     base_date: String,
     knots: Vec<f64>,
     recovery_rate: f64,
+    day_count: String,
     #[serde(default)]
-    day_count: Option<String>,
-    #[serde(default)]
-    par_spreads: Option<Vec<f64>>,
-    #[serde(default)]
-    par_interp: Option<String>,
+    calendar_id: Option<String>,
     #[serde(default)]
     issuer: Option<String>,
     #[serde(default)]
     seniority: Option<String>,
     #[serde(default)]
     currency: Option<String>,
-    #[serde(default)]
-    max_hazard_rate: Option<f64>,
 }
 
 impl JsHazardCurve {
@@ -74,19 +68,13 @@ impl JsHazardCurve {
     }
 
     fn build(options: HazardCurveOptions) -> Result<JsHazardCurve, JsValue> {
+        let day_count = options.day_count.parse::<DayCount>().map_err(to_js_err)?;
         let mut builder = RustHazardCurve::builder(options.id)
             .base_date(parse_iso_date(&options.base_date)?)
+            .day_count(day_count)
+            .calendar_id_opt(options.calendar_id)
             .knots(flat_pairs(&options.knots, "knots")?)
             .recovery_rate(options.recovery_rate);
-        if let Some(day_count) = options.day_count.as_deref() {
-            builder = builder.day_count(day_count.parse::<DayCount>().map_err(to_js_err)?);
-        }
-        if let Some(par_spreads) = options.par_spreads.as_deref() {
-            builder = builder.par_spreads(flat_pairs(par_spreads, "parSpreads")?);
-        }
-        if let Some(par_interp) = options.par_interp.as_deref() {
-            builder = builder.par_interp(parse_label(par_interp)?);
-        }
         if let Some(issuer) = options.issuer {
             builder = builder.issuer(issuer);
         }
@@ -95,9 +83,6 @@ impl JsHazardCurve {
         }
         if let Some(currency) = options.currency.as_deref() {
             builder = builder.currency(currency.parse::<RustCurrency>().map_err(to_js_err)?);
-        }
-        if let Some(max_hazard_rate) = options.max_hazard_rate {
-            builder = builder.max_hazard_rate(max_hazard_rate);
         }
         builder.build().map(Self::from_inner).map_err(to_js_err)
     }
@@ -113,24 +98,22 @@ impl JsHazardCurve {
     ///   (curve identifier, the `MarketContext` lookup key); `baseDate`
     ///   (ISO-8601 `"YYYY-MM-DD"`; knot times are year fractions from it under
     ///   `dayCount`); `knots` (flat `[t0, lambda0, t1, lambda1, …]` array or
-    ///   typed array, `t` in years, `lambda` a non-negative annual default
-    ///   intensity as a decimal); `recoveryRate` (required recovery on default,
-    ///   decimal in `[0, 1]`); and the optional `dayCount` (default
-    ///   `"act_365f"`), `parSpreads` (flat `[t0, bp0, …]` par CDS quotes in
-    ///   basis points, kept for reporting), `parInterp` (`"linear"` default or
-    ///   `"log_linear"`), `issuer`, `seniority` (`"senior_secured"`,
-    ///   `"senior"`, `"subordinated"`, `"junior"`), `currency` (ISO-4217 code of
-    ///   the protection leg) and `maxHazardRate` (sanity ceiling on any knot,
-    ///   default `10.0`). Omitted options use the Rust builder defaults.
-    ///   Unknown keys are rejected.
+    ///   typed array, strictly positive increasing ending times `t > 0` in
+    ///   years, `lambda` a finite non-negative annual default intensity as a
+    ///   decimal); `recoveryRate` (required recovery on default, decimal in
+    ///   `[0, 1]`); `dayCount` (explicit day-count convention label, e.g.
+    ///   `"act_365f"` or `"bus_252"`); and optional `calendarId` (required with
+    ///   `"bus_252"`), `issuer`, `seniority` (`"senior_secured"`, `"senior"`,
+    ///   `"subordinated"`, `"junior"`), and `currency` (ISO-4217 code of the
+    ///   protection leg). Unknown keys are rejected.
     ///
     /// @returns The constructed `HazardCurve`.
     /// @throws `TypeError` (kind `invalid_type`) if `options` is not a JSON
     /// string or plain object, or holds a non-finite number; `FinstackError`
-    /// (kind `validation`) for an unknown, missing or mistyped key, an
-    /// odd-length `knots`/`parSpreads`, a malformed date, an unknown label, a
-    /// knot the curve builder rejects, or `recoveryRate` outside `[0, 1]`.
-    /// @param options - HazardCurveOptions object (or its JSON text) with: `id` (curve identifier, the `MarketContext` lookup key); `baseDate` (ISO-8601 `"YYYY-MM-DD"`; knot times are year fractions from it under `dayCount`); `knots` (flat `[t0, lambda0, t1, lambda1, …]` array or typed array, `t` in years, `lambda` a non-negative annual default intensity as a decimal); `recoveryRate` (required recovery on default, decimal in `[0, 1]`); and the optional `dayCount` (default `"act_365f"`), `parSpreads` (flat `[t0, bp0, …]` par CDS quotes in basis points, kept for reporting), `parInterp` (`"linear"` default or `"log_linear"`), `issuer`, `seniority` (`"senior_secured"`, `"senior"`, `"subordinated"`, `"junior"`), `currency` (ISO-4217 code of the protection leg) and `maxHazardRate` (sanity ceiling on any knot, default `10.0`). Omitted options use the Rust builder defaults. Unknown keys are rejected.
+    /// (kind `validation`) for an unknown, missing, or mistyped key, an
+    /// odd-length `knots`, non-positive/non-increasing knot times, a malformed
+    /// date, an unknown label, or `recoveryRate` outside `[0, 1]`.
+    /// @param options - HazardCurveOptions object (or its JSON text) with `id`, `baseDate`, `knots`, `recoveryRate`, `dayCount`, and optional `calendarId`, `issuer`, `seniority`, and `currency`. Unknown keys are rejected.
     #[wasm_bindgen(constructor)]
     pub fn new(
         #[wasm_bindgen(unchecked_param_type = "HazardCurveOptions | string")] options: JsValue,
@@ -146,14 +129,17 @@ impl JsHazardCurve {
     /// * `base_date` - ISO-8601 valuation date anchoring `t = 0`.
     /// * `hazard_rate` - Constant annual default intensity as a decimal (`0.02` is 2%).
     /// * `recovery_rate` - Recovery on default as a decimal fraction in `[0, 1]`.
+    /// * `day_count` - Explicit curve day-count convention label (for example `"act_365f"`).
     ///
     /// @returns Curve with `sp(t) === Math.exp(-hazardRate * t)`.
-    /// @throws If `baseDate` is not an ISO date, `hazardRate` is non-finite or
-    /// negative, or `recoveryRate` is outside `[0, 1]`.
+    /// @throws If `baseDate` is not an ISO date, `dayCount` is unknown or
+    /// unsupported, `hazardRate` is non-finite or negative, or `recoveryRate`
+    /// is outside `[0, 1]`.
     /// @param id - Curve identifier stored on the curve.
     /// @param baseDate - ISO-8601 valuation date anchoring `t = 0`.
     /// @param hazardRate - Constant annual default intensity as a decimal (`0.02` is 2%).
     /// @param recoveryRate - Recovery on default as a decimal fraction in `[0, 1]`.
+    /// @param dayCount - Explicit curve day-count convention label.
     #[wasm_bindgen(js_name = flat)]
     pub fn flat(
         #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
@@ -162,12 +148,16 @@ impl JsHazardCurve {
         hazard_rate: JsValue,
         #[wasm_bindgen(js_name = "recoveryRate", unchecked_param_type = "number")]
         recovery_rate: JsValue,
+        #[wasm_bindgen(js_name = "dayCount", unchecked_param_type = "string")] day_count: JsValue,
     ) -> Result<JsHazardCurve, JsValue> {
         let id = js_string(&id, "id")?;
         let base_date = js_date(&base_date, "baseDate")?;
         let hazard_rate = js_f64(&hazard_rate, "hazardRate")?;
         let recovery_rate = js_f64(&recovery_rate, "recoveryRate")?;
-        RustHazardCurve::flat(id, base_date, hazard_rate, recovery_rate)
+        let day_count = js_string(&day_count, "dayCount")?
+            .parse::<DayCount>()
+            .map_err(to_js_err)?;
+        RustHazardCurve::flat(id, base_date, hazard_rate, recovery_rate, day_count)
             .map(Self::from_inner)
             .map_err(to_js_err)
     }
@@ -180,17 +170,21 @@ impl JsHazardCurve {
     /// * `id` - Curve identifier stored on the curve.
     /// * `base_date` - ISO-8601 valuation date anchoring `t = 0`.
     /// * `points` - Flat `[t0, s0, t1, s1, …]` array: times in years and
-    ///   survival probabilities in `(0, 1]`, non-increasing in time; a `t = 0`
-    ///   pillar must be `1.0`.
+    ///   survival probabilities in `(0, 1]`, non-increasing in time; an
+    ///   optional `t = 0` pillar must be `1.0`, and at least one `t > 0`
+    ///   pillar is required.
     /// * `recovery_rate` - Recovery on default as a decimal fraction in `[0, 1]`.
+    /// * `day_count` - Explicit curve day-count convention label.
     ///
     /// @returns Piecewise-constant hazard curve reproducing every pillar.
-    /// @throws If `points` is empty or odd-length, a probability is outside
-    /// `(0, 1]` or increases with time, or `recoveryRate` is outside `[0, 1]`.
+    /// @throws If `points` is empty or odd-length, `dayCount` is unknown or
+    /// unsupported, a probability is outside `(0, 1]` or increases with time,
+    /// or `recoveryRate` is outside `[0, 1]`.
     /// @param id - Curve identifier stored on the curve.
     /// @param baseDate - ISO-8601 valuation date anchoring `t = 0`.
-    /// @param points - Flat `[t0, s0, t1, s1, …]` array: times in years and survival probabilities in `(0, 1]`, non-increasing in time; a `t = 0` pillar must be `1.0`.
+    /// @param points - Flat `[t0, s0, t1, s1, …]` array: times in years and survival probabilities in `(0, 1]`, non-increasing in time.
     /// @param recoveryRate - Recovery on default as a decimal fraction in `[0, 1]`.
+    /// @param dayCount - Explicit curve day-count convention label.
     #[wasm_bindgen(js_name = fromSurvivalProbs)]
     pub fn from_survival_probs(
         #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
@@ -198,12 +192,16 @@ impl JsHazardCurve {
         #[wasm_bindgen(unchecked_param_type = "NumericArray")] points: JsValue,
         #[wasm_bindgen(js_name = "recoveryRate", unchecked_param_type = "number")]
         recovery_rate: JsValue,
+        #[wasm_bindgen(js_name = "dayCount", unchecked_param_type = "string")] day_count: JsValue,
     ) -> Result<JsHazardCurve, JsValue> {
         let id = js_string(&id, "id")?;
         let base_date = js_date(&base_date, "baseDate")?;
         let points = flat_pairs(&js_f64_seq(&points, "points")?, "points")?;
         let recovery_rate = js_f64(&recovery_rate, "recoveryRate")?;
-        RustHazardCurve::from_survival_probs(id, base_date, &points, recovery_rate)
+        let day_count = js_string(&day_count, "dayCount")?
+            .parse::<DayCount>()
+            .map_err(to_js_err)?;
+        RustHazardCurve::from_survival_probs(id, base_date, &points, recovery_rate, day_count)
             .map(Self::from_inner)
             .map_err(to_js_err)
     }
@@ -254,7 +252,7 @@ impl JsHazardCurve {
         #[wasm_bindgen(unchecked_param_type = "number | string")] t: JsValue,
     ) -> Result<f64, JsValue> {
         match js_time_point(&t, "t")? {
-            TimePoint::Years(t) => Ok(self.inner.sp(t)),
+            TimePoint::Years(t) => self.inner.sp(t).map_err(to_js_err),
             TimePoint::Date(d) => self.inner.sp_on_date(d).map_err(to_js_err),
         }
     }
@@ -263,13 +261,13 @@ impl JsHazardCurve {
     ///
     /// # Arguments
     ///
-    /// * `t` - Time from the curve base date in years (`number`) or an ISO-8601
-    ///   target date (`"YYYY-MM-DD"`, converted with the curve day count).
+    /// * `t` - Non-negative time from the curve base date in years (`number`)
+    ///   or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
     ///
     /// @returns The annualized default intensity at `t`, expressed as a decimal rate.
     /// @throws `TypeError` if `t` is neither a number nor a string;
-    /// `FinstackError` (kind `validation`) for a malformed date or a year
-    /// fraction that cannot be computed.
+    /// `FinstackError` (kind `validation`) for a malformed date, negative time,
+    /// or a year fraction that cannot be computed.
     /// @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
     #[wasm_bindgen(js_name = hazardRate)]
     pub fn hazard_rate(
@@ -277,7 +275,7 @@ impl JsHazardCurve {
         #[wasm_bindgen(unchecked_param_type = "number | string")] t: JsValue,
     ) -> Result<f64, JsValue> {
         match js_time_point(&t, "t")? {
-            TimePoint::Years(t) => Ok(self.inner.hazard_rate(t)),
+            TimePoint::Years(t) => self.inner.hazard_rate(t).map_err(to_js_err),
             TimePoint::Date(d) => self.inner.hazard_rate_on_date(d).map_err(to_js_err),
         }
     }
@@ -355,34 +353,6 @@ impl JsHazardCurve {
             .map_err(to_js_err)
     }
 
-    /// Interpolated par CDS spread in basis points at year fraction `t`.
-    ///
-    /// Uses the stored `parSpreads` quotes; with fewer than two quotes it
-    /// falls back to a hazard-based approximation.
-    ///
-    /// # Arguments
-    ///
-    /// * `t` - Year fraction from `baseDate`.
-    /// * `method` - `"linear"` or `"log_linear"`; omitted uses the curve's `parInterp`.
-    ///
-    /// @returns Par spread in basis points.
-    /// @throws If `method` is not a recognised label.
-    /// @param t - Year fraction from `baseDate`.
-    /// @param method - `"linear"` or `"log_linear"`; omitted uses the curve's `parInterp`.
-    #[wasm_bindgen(js_name = cdsQuoteBp)]
-    pub fn cds_quote_bp(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
-        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] method: Option<JsValue>,
-    ) -> Result<f64, JsValue> {
-        let t = js_f64(&t, "t")?;
-        let method = match js_opt_string(method.as_ref(), "method")? {
-            Some(label) => parse_label(&label)?,
-            None => self.inner.par_interp(),
-        };
-        Ok(self.inner.cds_quote_bp(t, method))
-    }
-
     /// Copy of this curve with a different recovery rate (survival unchanged).
     ///
     /// # Arguments
@@ -429,16 +399,17 @@ impl JsHazardCurve {
         flatten_pairs(self.inner.knot_points())
     }
 
-    /// Par CDS quotes as a flat `[t0, bp0, …]` array in basis points (may be empty).
-    #[wasm_bindgen(getter, js_name = parSpreadPoints)]
-    pub fn par_spread_points(&self) -> Box<[f64]> {
-        flatten_pairs(self.inner.par_spread_points())
-    }
-
     /// Day-count convention label (e.g. `"act_365f"`).
     #[wasm_bindgen(getter, js_name = dayCount)]
     pub fn day_count(&self) -> String {
         self.inner.day_count().to_string()
+    }
+
+    /// Registered holiday calendar of the curve's time axis (for example
+    /// `"brbd"` on a `"bus_252"` curve), or `undefined` when none is set.
+    #[wasm_bindgen(getter, js_name = calendarId)]
+    pub fn calendar_id(&self) -> Option<String> {
+        self.inner.calendar_id().map(str::to_owned)
     }
 
     /// Currency of the protection leg, or `undefined`.
@@ -458,12 +429,6 @@ impl JsHazardCurve {
     #[wasm_bindgen(getter, js_name = seniority)]
     pub fn seniority(&self) -> Option<String> {
         self.inner.seniority().map(|s| s.to_string())
-    }
-
-    /// Par-spread readout interpolation label (`"linear"` or `"log_linear"`).
-    #[wasm_bindgen(getter, js_name = parInterp)]
-    pub fn par_interp(&self) -> Result<String, JsValue> {
-        label(&self.inner.par_interp())
     }
 
     /// Calibration recipe stamped on this curve by the calibration engine.
@@ -494,13 +459,11 @@ mod tests {
             base_date: "2025-01-02".into(),
             knots: vec![1.0, 0.02, 5.0, 0.03],
             recovery_rate: 0.4,
-            day_count: None,
-            par_spreads: Some(vec![1.0, 120.0, 5.0, 180.0]),
-            par_interp: Some("log_linear".into()),
+            day_count: "act_365f".into(),
+            calendar_id: None,
             issuer: Some("ACME".into()),
             seniority: Some("senior".into()),
             currency: Some("USD".into()),
-            max_hazard_rate: None,
         }
     }
 
@@ -508,15 +471,14 @@ mod tests {
     fn hazard_curve_options_reach_the_rust_builder() {
         let curve = JsHazardCurve::build(hazard_options()).expect("hazard curve");
         assert_eq!(&*curve.knot_points(), &[1.0, 0.02, 5.0, 0.03]);
-        assert_eq!(&*curve.par_spread_points(), &[1.0, 120.0, 5.0, 180.0]);
         assert_eq!(curve.day_count(), "act_365f");
+        assert_eq!(curve.calendar_id(), None);
         assert_eq!(curve.issuer().as_deref(), Some("ACME"));
         assert_eq!(curve.seniority().as_deref(), Some("senior"));
         assert_eq!(
             curve.currency().map(|c| c.inner.to_string()).as_deref(),
             Some("USD")
         );
-        assert_eq!(curve.par_interp().expect("label"), "log_linear");
     }
 
     #[test]
@@ -525,6 +487,6 @@ mod tests {
         let json = curve.to_json().expect("json");
         let back: RustHazardCurve = serde_json::from_str(&json).expect("parse");
         assert_eq!(serde_json::to_string(&back).expect("json"), json);
-        assert!((back.sp(3.0) - curve.inner.sp(3.0)).abs() < 1e-15);
+        assert!((back.sp(3.0).expect("sp") - curve.inner.sp(3.0).expect("sp")).abs() < 1e-15);
     }
 }

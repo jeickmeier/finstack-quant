@@ -38,7 +38,6 @@ fn test_time_roll_1_day() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -91,7 +90,6 @@ fn test_time_roll_negative_period_is_rejected() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -140,7 +138,6 @@ fn test_time_roll_1_month() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -187,7 +184,6 @@ fn test_time_roll_1_year() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -216,6 +212,9 @@ fn test_time_roll_with_bond_carry() {
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
         .knots(vec![(0.0, 1.0), (1.0, 0.98), (5.0, 0.90)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -286,7 +285,6 @@ fn test_time_roll_with_bond_carry() {
             }],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         };
         let engine = ScenarioEngine::new();
         let mut ctx = ExecutionContext {

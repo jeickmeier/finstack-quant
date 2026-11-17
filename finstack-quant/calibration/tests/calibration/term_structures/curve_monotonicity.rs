@@ -50,6 +50,9 @@ proptest! {
         let curve = DiscountCurve::builder("PROP-TEST")
             .base_date(base_date)
             .knots(knots.clone())
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build();
 
         prop_assert!(curve.is_ok(), "Valid monotonic curve should build: {:?}", curve.err());
@@ -61,8 +64,8 @@ proptest! {
             let (t1, _df1) = knots[i];
             let (t2, _df2) = knots[i + 1];
 
-            let evaluated_df1 = curve.df(t1);
-            let evaluated_df2 = curve.df(t2);
+            let evaluated_df1 = curve.df(t1).expect("valid");
+            let evaluated_df2 = curve.df(t2).expect("valid");
 
             prop_assert!(
                 evaluated_df2 < evaluated_df1,
@@ -108,13 +111,16 @@ proptest! {
         let curve = DiscountCurve::builder("ZERO-PROP")
             .base_date(base_date)
             .knots(knots.clone())
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
         // Property: For normal (decreasing DF) curves, zero rates are typically positive
         for (t, _df) in &knots {
             if *t > 0.0 {
-                let zero = curve.zero_rate(*t, finstack_quant_core::math::Compounding::Continuous);
+                let zero = curve.zero_rate(*t, finstack_quant_core::math::Compounding::Continuous).expect("valid");
 
                 // Zero rates should be in reasonable range for normal curves
                 // Widened to accommodate wider DF ranges: -25% to +50%
@@ -151,6 +157,9 @@ fn test_negative_rate_curve_via_zero_rates() {
     let curve = DiscountCurve::builder("NEAR-ZERO")
         .base_date(base_date)
         .knots(knots)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build();
 
     assert!(
@@ -162,7 +171,9 @@ fn test_negative_rate_curve_via_zero_rates() {
     let curve = curve.unwrap();
 
     // Verify zero rates are very small
-    let z1 = curve.zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous);
+    let z1 = curve
+        .zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous)
+        .expect("valid");
     assert!(
         z1.abs() < 0.01,
         "Zero rate should be < 1% for near-zero curve: {:.4}",
@@ -186,6 +197,9 @@ fn test_flat_near_zero_rate_curve() {
     let curve = DiscountCurve::builder("FLAT-ZERO")
         .base_date(base_date)
         .knots(knots)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build();
 
     assert!(curve.is_ok(), "Near-zero flat curve should build");
@@ -193,7 +207,9 @@ fn test_flat_near_zero_rate_curve() {
     let curve = curve.unwrap();
 
     // Verify zero rates are small but positive
-    let z5 = curve.zero_rate(5.0, finstack_quant_core::math::Compounding::Continuous);
+    let z5 = curve
+        .zero_rate(5.0, finstack_quant_core::math::Compounding::Continuous)
+        .expect("valid");
     assert!(
         z5.abs() < 0.001,
         "Zero rate should be < 10bp for near-zero curve"
@@ -216,6 +232,9 @@ fn test_steep_high_rate_curve() {
     let curve = DiscountCurve::builder("HIGH-RATE")
         .base_date(base_date)
         .knots(knots)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build();
 
     assert!(curve.is_ok(), "High rate curve should build");
@@ -223,12 +242,23 @@ fn test_steep_high_rate_curve() {
     let curve = curve.unwrap();
 
     // Verify DFs are monotonically decreasing
-    assert!(curve.df(1.0) < curve.df(0.0), "DF should decrease");
-    assert!(curve.df(5.0) < curve.df(1.0), "DF should decrease");
-    assert!(curve.df(10.0) < curve.df(5.0), "DF should decrease");
+    assert!(
+        curve.df(1.0).expect("valid") < curve.df(0.0).expect("valid"),
+        "DF should decrease"
+    );
+    assert!(
+        curve.df(5.0).expect("valid") < curve.df(1.0).expect("valid"),
+        "DF should decrease"
+    );
+    assert!(
+        curve.df(10.0).expect("valid") < curve.df(5.0).expect("valid"),
+        "DF should decrease"
+    );
 
     // Verify zero rates are high
-    let z10 = curve.zero_rate(10.0, finstack_quant_core::math::Compounding::Continuous);
+    let z10 = curve
+        .zero_rate(10.0, finstack_quant_core::math::Compounding::Continuous)
+        .expect("valid");
     assert!(z10 > 0.10, "Zero rate should be > 10% for high rate curve");
 }
 
@@ -250,6 +280,9 @@ fn test_inverted_curve_shape() {
     let curve = DiscountCurve::builder("INVERTED")
         .base_date(base_date)
         .knots(knots)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build();
 
     assert!(curve.is_ok(), "Inverted curve should build");
@@ -257,8 +290,12 @@ fn test_inverted_curve_shape() {
     let curve = curve.unwrap();
 
     // Verify zero rates are higher at short end
-    let z1 = curve.zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous);
-    let z10 = curve.zero_rate(10.0, finstack_quant_core::math::Compounding::Continuous);
+    let z1 = curve
+        .zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous)
+        .expect("valid");
+    let z10 = curve
+        .zero_rate(10.0, finstack_quant_core::math::Compounding::Continuous)
+        .expect("valid");
     // Note: With these DFs, z1 ≈ 8% and z10 ≈ 7%
     // The relationship depends on interpolation
     assert!(z1 > 0.07, "Short-end zero rate should be high");

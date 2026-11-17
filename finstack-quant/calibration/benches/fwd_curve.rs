@@ -24,6 +24,9 @@ fn bench_forward_curve(c: &mut Criterion) {
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let ctx = MarketContext::new().insert(disc);
@@ -48,12 +51,13 @@ fn bench_forward_curve(c: &mut Criterion) {
         curve_id: "USD-SOFR-3M-FWD".into(),
         currency: Currency::USD,
         base_date,
-        tenor_years: 0.25,
+        index_tenor: Some(finstack_quant_core::dates::Tenor::quarterly()),
         discount_curve_id: "USD-OIS".into(),
         method: CalibrationMethod::GlobalSolve {
             use_analytical_jacobian: false,
         },
         interpolation: Default::default(),
+        extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
         conventions: Default::default(),
     };
     let step = StepParams::Forward(params);

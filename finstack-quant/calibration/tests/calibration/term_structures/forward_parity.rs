@@ -25,18 +25,14 @@ fn create_discount_curve_for_parity(base_date: Date, rate: f64, curve_id: &str) 
             (0.5, (-rate * 0.5).exp()),
             (1.0, (-rate).exp()),
             (2.0, (-rate * 2.0).exp()),
-        ]);
+        ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend);
 
     // Allow non-monotonic for zero/negative rates
     if rate.abs() < 1e-10 || rate < 0.0 {
-        builder = builder
-            .validation(
-                finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                    allow_non_monotonic: true,
-                    forward_floor: None,
-                },
-            )
-            .interp(InterpStyle::Linear);
+        builder = builder.interp(InterpStyle::Linear);
     }
 
     builder.build().unwrap()
@@ -55,8 +51,8 @@ proptest! {
 
         let curve = create_discount_curve_for_parity(base_date, rate, "TEST-DISC");
 
-        let df_t1 = curve.df(t1);
-        let df_t2 = curve.df(t2);
+        let df_t1 = curve.df(t1).expect("valid");
+        let df_t2 = curve.df(t2).expect("valid");
 
         // Property: DF(t2) < DF(t1) for t2 > t1 (strictly decreasing)
         prop_assert!(
@@ -81,8 +77,8 @@ proptest! {
 
         let curve = create_discount_curve_for_parity(base_date, rate, "ZERO-CURVE");
 
-        let df = curve.df(time);
-        let zero = curve.zero_rate(time, finstack_quant_core::math::Compounding::Continuous);
+        let df = curve.df(time).expect("valid");
+        let zero = curve.zero_rate(time, finstack_quant_core::math::Compounding::Continuous).expect("valid");
 
         // Property: DF = exp(-z·t), so z = -ln(DF)/t
         let zero_from_df = -df.ln() / time;
@@ -111,8 +107,8 @@ proptest! {
         let base_date = Date::from_calendar_date(2025, Month::January, 15).unwrap();
         let curve = create_discount_curve_for_parity(base_date, rate, "FWD-PARITY");
 
-        let z1 = curve.zero_rate(t1, finstack_quant_core::math::Compounding::Continuous);
-        let z2 = curve.zero_rate(t2, finstack_quant_core::math::Compounding::Continuous);
+        let z1 = curve.zero_rate(t1, finstack_quant_core::math::Compounding::Continuous).expect("valid");
+        let z2 = curve.zero_rate(t2, finstack_quant_core::math::Compounding::Continuous).expect("valid");
         let tau = t2 - t1;
 
         // Continuous compounding: f = (z2·t2 - z1·t1) / τ
@@ -141,8 +137,8 @@ proptest! {
         let base_date = Date::from_calendar_date(2025, Month::January, 15).unwrap();
         let curve = create_discount_curve_for_parity(base_date, rate, "FWD-PARITY-ZERO");
 
-        let df = curve.df(t2);
-        let zero = curve.zero_rate(t2, finstack_quant_core::math::Compounding::Continuous);
+        let df = curve.df(t2).expect("valid");
+        let zero = curve.zero_rate(t2, finstack_quant_core::math::Compounding::Continuous).expect("valid");
         let zero_from_df = -df.ln() / t2;
         let zero_diff = (zero - zero_from_df).abs();
         prop_assert!(
@@ -151,8 +147,8 @@ proptest! {
             t2, zero, zero_from_df
         );
 
-        let z1 = curve.zero_rate(t1, finstack_quant_core::math::Compounding::Continuous);
-        let z2 = curve.zero_rate(t2, finstack_quant_core::math::Compounding::Continuous);
+        let z1 = curve.zero_rate(t1, finstack_quant_core::math::Compounding::Continuous).expect("valid");
+        let z2 = curve.zero_rate(t2, finstack_quant_core::math::Compounding::Continuous).expect("valid");
         let tau = t2 - t1;
         let fwd_from_zero = (z2 * t2 - z1 * t1) / tau;
         let fwd_from_curve = curve.forward(t1, t2).expect("forward should succeed");

@@ -227,12 +227,12 @@ impl PortfolioLossResult {
         } else {
             let mut sum = NeumaierAccumulator::new();
             for &loss in &sorted[tail_start..] {
-                sum.add(loss / scale);
+                sum.add(loss / scale)?;
             }
             if fraction > 0.0 {
-                sum.add(fraction * (sorted[tail_start - 1] / scale));
+                sum.add(fraction * (sorted[tail_start - 1] / scale))?;
             }
-            (sum.total() / tail_mass).min(1.0) * scale
+            (sum.get_total()? / tail_mass).min(1.0) * scale
         };
         if !var.is_finite() || !expected_loss.is_finite() || !expected_shortfall.is_finite() {
             return Err(invalid_input("portfolio loss statistics must be finite"));
@@ -534,9 +534,9 @@ impl ValidatedSimulation {
             let systematic = if rho > 0.0 {
                 let mut dot = NeumaierAccumulator::new();
                 for (loading, factor) in exposure.factor_loadings.iter().zip(factors.iter()) {
-                    dot.add(loading * factor);
+                    dot.add(loading * factor)?;
                 }
-                dot.total() / rho.sqrt()
+                dot.get_total()? / rho.sqrt()
             } else {
                 0.0
             };
@@ -638,9 +638,19 @@ fn validate_exposures(exposures: &[CreditExposure]) -> Result<Vec<f64>> {
         }
         let mut squared_norm_sum = NeumaierAccumulator::new();
         for loading in &exposure.factor_loadings {
-            squared_norm_sum.add(loading * loading);
+            squared_norm_sum.add(loading * loading).map_err(|_| {
+                invalid_input(format!(
+                    "credit exposure '{}' squared factor-loading norm must be finite",
+                    exposure.id
+                ))
+            })?;
         }
-        let squared_norm = squared_norm_sum.total();
+        let squared_norm = squared_norm_sum.get_total().map_err(|_| {
+            invalid_input(format!(
+                "credit exposure '{}' squared factor-loading norm must be finite",
+                exposure.id
+            ))
+        })?;
         let tolerance = FACTOR_NORM_REL_TOLERANCE * squared_norm.abs().max(1.0);
         if !squared_norm.is_finite() || squared_norm > 1.0 + tolerance {
             return Err(invalid_input(format!(
@@ -671,9 +681,9 @@ fn scaled_mean(values: &[f64], statistic: &str) -> Result<f64> {
 
     let mut scaled_total = NeumaierAccumulator::new();
     for value in values {
-        scaled_total.add(*value / scale);
+        scaled_total.add(*value / scale)?;
     }
-    let mean = scale * (scaled_total.total() / values.len() as f64);
+    let mean = scale * (scaled_total.get_total()? / values.len() as f64);
     if mean.is_finite() {
         Ok(mean)
     } else {

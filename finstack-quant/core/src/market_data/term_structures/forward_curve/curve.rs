@@ -1,467 +1,293 @@
-//! Curve evaluation and accessors.
+//! Forward-curve construction, positive-factor evaluation, and interval rate queries.
 
-use super::*;
+use super::super::DiscountCurve;
+use super::super::common::factor::{
+    dated_points_to_factors, df_between_admitted_factors,
+    instantaneous_forward as factor_instantaneous_forward, simple_rate_from_factors,
+    zero_rate_points_to_factors,
+};
+use super::super::common::{signed_curve_year_fraction, validate_curve_clock};
+use super::{ForwardCurve, ForwardCurveBuilder};
+use crate::dates::{Date, DayCount, Tenor};
+use crate::math::Compounding;
+use crate::math::interp::{ExtrapolationPolicy, InterpStyle, exact_f64_eq};
+use crate::types::CurveId;
 
 impl ForwardCurve {
-    /// Start building a forward curve for `id` with tenor `tenor_years`.
-    ///
-    /// **Defaults:** The builder infers day-count and reset-lag conventions from
-    /// the curve ID when possible, then uses Linear interpolation with
-    /// [`ExtrapolationPolicy::FlatZero`] extrapolation. A forward curve stores
-    /// rates, so `FlatZero` holds the first and last forward rate constant
-    /// outside the pillars: the market-standard flat-forward extrapolation of
-    /// a projection curve. [`ExtrapolationPolicy::FlatForward`] would instead
-    /// extend the boundary rate slope, so tail forwards keep trending.
-    ///
-    /// **Build-vs-query basis trap:** the inferred day-count converts dated
-    /// pillars to year fractions at build time and query dates back at lookup
-    /// time. Because inference is substring-based, renaming the curve ID can
-    /// silently change the basis (Act/360 vs Act/365F shifts every pillar time
-    /// by ~1.4%) and the reset lag. Set [`ForwardCurveBuilder::day_count`] and
-    /// [`ForwardCurveBuilder::reset_lag`] explicitly when conventions matter;
-    /// each day-count inference is logged at `debug` level.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Market-data identifier; its text supplies inferred index conventions unless the builder overrides them.
-    /// * `tenor_years` - Positive index accrual tenor in years, such as `0.25` for three months; validated at build time.
+    /// Create a builder for a [`ForwardCurve`] with explicit required choices.
     #[must_use]
-    pub fn builder(id: impl Into<CurveId>, tenor_years: f64) -> ForwardCurveBuilder {
-        let id: CurveId = id.into();
-        let (day_count, reset_lag) = infer_forward_curve_defaults(id.as_str());
+    pub fn builder(id: impl Into<CurveId>) -> ForwardCurveBuilder {
         ForwardCurveBuilder {
-            id,
+            id: id.into(),
             base: None,
-            reset_lag,
-            day_count,
-            tenor: tenor_years,
+            day_count: None,
+            calendar_id: None,
+            index_tenor: None,
             points: Vec::new(),
-            projection_grid: None,
-            style: InterpStyle::Linear,
-            extrapolation: ExtrapolationPolicy::FlatZero,
+            style: None,
+            extrapolation: None,
             rate_calibration: None,
             fx_policy: None,
             transform: None,
         }
     }
 
-    /// Construct a flat forward curve quoting `rate` at every maturity.
+    /// Construct a flat continuously-compounded projection factor curve.
     ///
-    /// The curve stores two knots, `(0, rate)` and `(1, rate)`, with linear
-    /// interpolation and flat-forward extrapolation, so `rate(t) == rate` for
-    /// every non-negative `t`. Day count and reset lag follow the same curve-ID
-    /// inference as [`ForwardCurve::builder`].
+    /// Uses a two-knot log-linear representation `(0, 1)` and
+    /// `(1, exp(-continuous_rate))` with [`ExtrapolationPolicy::Extend`] on the
+    /// supplied `day_count`, preserving `P_x(t) = exp(-continuous_rate * t)`
+    /// across all representable times.
     ///
     /// # Arguments
     ///
     /// * `id` - Unique curve identifier (for example `"USD-SOFR-3M"`).
-    /// * `tenor_years` - Index tenor in years (`0.25` for a 3-month index);
-    ///   must be finite and strictly positive.
     /// * `base_date` - Valuation date anchoring `t = 0`.
-    /// * `rate` - Simple forward rate as a decimal fraction (`0.04` is 4%);
-    ///   must be finite.
+    /// * `continuous_rate` - Continuously-compounded source rate as a decimal
+    ///   fraction (`0.04` is 4%, `-0.005` is -50 bps).
+    /// * `day_count` - Explicit supported curve day-count convention (cannot be
+    ///   `ActActIsma`, `Act365L`, `ThirtyE360Isda`, or calendarless `Bus252`).
     ///
     /// # Errors
     ///
-    /// Returns a validation error when `rate` is non-finite or `tenor_years`
-    /// is non-finite or non-positive, or when the builder rejects the curve.
+    /// Returns an error when `continuous_rate` is non-finite, its 1-year factor
+    /// overflows or underflows to zero, or `day_count` is unsupported.
     pub fn flat(
         id: impl Into<CurveId>,
-        tenor_years: f64,
         base_date: Date,
-        rate: f64,
+        continuous_rate: f64,
+        day_count: DayCount,
     ) -> crate::Result<Self> {
-        if !rate.is_finite() {
-            return Err(crate::Error::Validation(format!(
-                "ForwardCurve::flat rate must be finite, got {rate}"
-            )));
-        }
-        if !tenor_years.is_finite() || tenor_years <= 0.0 {
-            return Err(crate::Error::Validation(format!(
-                "ForwardCurve::flat tenor must be finite and positive, got {tenor_years}"
-            )));
-        }
-        Self::builder(id, tenor_years)
+        let one_year_factor = Compounding::Continuous.df_from_rate(continuous_rate, 1.0)?;
+
+        Self::builder(id)
             .base_date(base_date)
-            .knots([(0.0, rate), (1.0, rate)])
+            .day_count(day_count)
+            .knots([(0.0, 1.0), (1.0, one_year_factor)])
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Extend)
             .build()
     }
 
-    /// Construct a forward curve implied by zero-rate pillars under `compounding`.
+    /// Construct a forward curve from strictly ordered zero-rate pillars.
     ///
-    /// Each `(time_years, zero_rate)` pillar is converted to a discount factor
-    /// `DF(t)` under `compounding` (with a `(0, 1)` anchor added if absent), and
-    /// simple forward rates `F(t, t + tenor_years) = (DF(t) / DF(t + tenor_years) - 1) / tenor_years`
-    /// are derived at each pillar time. Negative zero rates are supported
-    /// whenever `compounding` produces strictly positive discount factors (for
-    /// example, `1 + r * t > 0` under simple compounding or `1 + r / m > 0`
-    /// under periodic compounding). Day count and reset lag follow the same
-    /// curve-ID inference as [`ForwardCurve::builder`].
+    /// Converts each `(t, r)` pillar into a positive projection factor under
+    /// `compounding`, validating strict ascending order without sorting or
+    /// merging and prepending `(0, 1)` when missing.
     ///
     /// # Arguments
     ///
     /// * `id` - Unique curve identifier (for example `"EUR-EURIBOR-3M"`).
-    /// * `tenor_years` - Positive index accrual tenor in years (`0.25` for 3M).
     /// * `base_date` - Valuation date anchoring `t = 0`.
-    /// * `points` - `(time_years, zero_rate)` pillars with rates as decimal
-    ///   fractions (`0.04` is 4% and `-0.005` is -50 bps); times must be finite,
-    ///   non-negative, and distinct.
-    /// * `compounding` - Compounding convention under which `zero_rate` is quoted.
+    /// * `points` - Strictly ascending `(time_years, zero_rate)` pillars with
+    ///   finite `time_years >= 0` and decimal zero rates (`0.04` is 4%).
+    /// * `compounding` - Explicit compounding convention of the input rates.
+    /// * `day_count` - Explicit supported curve day-count convention.
+    /// * `style` - Explicit interpolation strategy.
+    /// * `extrapolation` - Explicit out-of-range tail policy.
     ///
     /// # Errors
     ///
-    /// Returns an error when `points` is empty, `tenor_years` is non-finite or
-    /// non-positive, any pillar time is negative or non-finite, any zero rate is
-    /// non-finite or outside `compounding`'s positive-DF domain, or the derived
-    /// forward curve fails validation.
+    /// Returns an error when `points` is empty, unsorted or contains duplicate
+    /// times, a rate is outside `compounding`'s valid domain, `day_count` is
+    /// invalid, or interpolation setup fails.
     pub fn from_zero_rates(
         id: impl Into<CurveId>,
-        tenor_years: f64,
         base_date: Date,
         points: &[(f64, f64)],
-        compounding: crate::math::Compounding,
+        compounding: Compounding,
+        day_count: DayCount,
+        style: InterpStyle,
+        extrapolation: ExtrapolationPolicy,
     ) -> crate::Result<Self> {
-        if !tenor_years.is_finite() || tenor_years <= 0.0 {
-            return Err(crate::Error::Validation(format!(
-                "ForwardCurve::from_zero_rates tenor must be finite and positive, got {tenor_years}"
-            )));
-        }
-        if points.is_empty() {
-            return Err(crate::InputError::TooFewPoints.into());
-        }
-        let id: CurveId = id.into();
-        let (day_count, reset_lag) = infer_forward_curve_defaults(id.as_str());
-
-        let mut df_knots = Vec::with_capacity(points.len() + 1);
-        let mut has_negative_rate = false;
-        for &(t, r) in points {
-            if !t.is_finite() || t < 0.0 || !r.is_finite() {
-                return Err(crate::Error::Validation(format!(
-                    "ForwardCurve::from_zero_rates requires finite non-negative times and finite rates, got (t={t}, r={r})"
-                )));
-            }
-            let df = compounding.df_from_rate(r, t);
-            if !df.is_finite() || df <= 0.0 {
-                return Err(crate::Error::Validation(format!(
-                    "ForwardCurve::from_zero_rates pillar (t={t}, r={r}) under {compounding:?} produced invalid discount factor {df}"
-                )));
-            }
-            if r < 0.0 || df > 1.0 {
-                has_negative_rate = true;
-            }
-            df_knots.push((t, df));
-        }
-        if !df_knots.iter().any(|&(t, _)| t == 0.0) {
-            df_knots.push((0.0, 1.0));
-        }
-
-        let mut disc_builder =
-            crate::market_data::term_structures::DiscountCurve::builder(id.clone())
-                .base_date(base_date)
-                .day_count(day_count)
-                .knots(df_knots);
-        if has_negative_rate {
-            disc_builder =
-                disc_builder.validation(crate::market_data::term_structures::ValidationMode::Raw {
-                    allow_non_monotonic: true,
-                    forward_floor: None,
-                });
-        }
-        let disc = disc_builder.build()?;
-        let mut forward_rates = Vec::with_capacity(disc.knots().len());
-        for &t in disc.knots() {
-            let df_start = disc.df(t);
-            let df_end = disc.df(t + tenor_years);
-            if !df_start.is_finite() || !df_end.is_finite() || df_start <= 0.0 || df_end <= 0.0 {
-                return Err(crate::Error::Validation(format!(
-                    "ForwardCurve::from_zero_rates cannot derive forward at t={t}: DF(t)={df_start}, DF(t+tenor)={df_end}"
-                )));
-            }
-            let forward_rate = (df_start / df_end - 1.0) / tenor_years;
-            if !forward_rate.is_finite() {
-                return Err(crate::Error::Validation(format!(
-                    "ForwardCurve::from_zero_rates derived non-finite forward rate at t={t}"
-                )));
-            }
-            forward_rates.push((t, forward_rate));
-        }
-
-        Self::builder(id, tenor_years)
+        let knots = zero_rate_points_to_factors("ForwardCurve", points, compounding)?;
+        Self::builder(id)
             .base_date(base_date)
             .day_count(day_count)
-            .reset_lag(reset_lag)
-            .knots(forward_rates)
+            .knots(knots)
+            .interp(style)
+            .extrapolation(extrapolation)
             .build()
     }
 
-    /// Curve-basis forward rate starting on `date` for the curve's tenor.
-    ///
-    /// Converts `date` to curve time with [`ForwardCurve::curve_time`] (dates
-    /// on or before the base date map to `0.0`, so they return the spot-start
-    /// forward) and evaluates [`ForwardCurve::rate`]. The returned rate is
-    /// annualized on this curve's day-count basis; a contractual index with a
-    /// different accrual basis requires conversion before calculating a coupon.
+    /// Construct a forward curve from strictly ordered dated factor pillars.
     ///
     /// # Arguments
     ///
-    /// * `date` - Calendar date at which the forward rate is observed; dates
-    ///   on or before the curve base date read the rate at curve time zero.
+    /// * `id` - Unique curve identifier.
+    /// * `base_date` - Valuation date anchoring `t = 0`.
+    /// * `points` - Strictly ascending `(date, factor)` pillars with
+    ///   `date >= base_date` and finite strictly positive projection factors.
+    /// * `day_count` - Explicit supported curve day-count convention.
+    /// * `style` - Explicit interpolation strategy.
+    /// * `extrapolation` - Explicit out-of-range tail policy.
     ///
     /// # Errors
     ///
-    /// Propagates a failure while computing the curve day-count fraction from
-    /// the base date to `date`.
-    pub fn rate_on_date(&self, date: Date) -> crate::Result<f64> {
-        Ok(self.rate(self.curve_time(date)?))
+    /// Returns an error when `points` is empty, any date precedes `base_date`,
+    /// mapped pillar times are not strictly increasing, `day_count` is invalid
+    /// or requires an absent calendar, or any factor is non-positive.
+    pub fn from_dates(
+        id: impl Into<CurveId>,
+        base_date: Date,
+        points: &[(Date, f64)],
+        day_count: DayCount,
+        style: InterpStyle,
+        extrapolation: ExtrapolationPolicy,
+    ) -> crate::Result<Self> {
+        let id: CurveId = id.into();
+        let calendar = validate_curve_clock("ForwardCurve", id.as_str(), day_count, None)?;
+        let knots = dated_points_to_factors(
+            "ForwardCurve",
+            base_date,
+            points,
+            day_count,
+            calendar.as_ref(),
+        )?;
+        Self::builder(id)
+            .base_date(base_date)
+            .day_count(day_count)
+            .knots(knots)
+            .interp(style)
+            .extrapolation(extrapolation)
+            .build()
     }
 
-    /// Curve time of a calendar date: year fraction from the curve base date on
-    /// the curve's own day count, with dates on or before the base date mapping
-    /// to zero.
+    /// Promote a complete [`DiscountCurve`] evaluator directly into a
+    /// projection [`ForwardCurve`] without resampling or refitting pillars.
     ///
-    /// Forward-curve lookups must use the curve's own time basis, not the
-    /// instrument's accrual day count; this is the date-to-time mapping every
-    /// date-based lookup below shares.
+    /// Preserves the complete source interpolator, day-count clock, holiday
+    /// calendar, tail policy, FX policy stamp, and any retained conditioning or
+    /// continuous shock transform while resetting `rate_calibration` to `None`.
     ///
     /// # Arguments
     ///
-    /// * `date` - Reset, payment or observation date; dates on or before the
-    ///   curve base date map to `0.0`.
-    ///
-    /// # Errors
-    ///
-    /// Propagates a failure while computing the curve day-count fraction.
-    #[inline]
-    pub fn curve_time(&self, date: Date) -> crate::Result<f64> {
-        if date <= self.base {
-            return Ok(0.0);
-        }
-        self.day_count.signed_year_fraction(
-            self.base,
-            date,
-            crate::dates::DayCountContext::default(),
-        )
-    }
-
-    /// Discount-factor-implied simple term forward over a date interval,
-    /// annualized on the contractual index accrual fraction.
-    ///
-    /// Dates map to projection discount factors on the curve's own day count
-    /// and base date; the resulting growth is divided by
-    /// `accrual_year_fraction`, which may use a different day count, so the
-    /// curve clock cannot change the economics of a quoted rate.
-    ///
-    /// # Arguments
-    ///
-    /// * `start` - Period start date, on or after the curve base date; an
-    ///   earlier start is historical or straddles the projection boundary and
-    ///   must be served from an observed fixing instead.
-    /// * `end` - Exclusive period end date after `start`.
-    /// * `accrual_year_fraction` - Finite, strictly positive year fraction for
-    ///   `[start, end]` under the contractual index day count (for example
-    ///   `90.0 / 360.0` for a 90-calendar-day ACT/360 fixing).
-    ///
-    /// # Errors
-    ///
-    /// Returns `Error::Validation` when `end <= start`, when `start` is before
-    /// the curve base date, when `accrual_year_fraction` is non-finite or
-    /// non-positive, or when the implied rate is not finite; propagates
-    /// day-count failures.
-    pub fn rate_between_dates(
-        &self,
-        start: Date,
-        end: Date,
-        accrual_year_fraction: f64,
-    ) -> crate::Result<f64> {
-        if end <= start {
-            return Err(crate::Error::Validation(format!(
-                "term forward period requires end > start; got start={start}, end={end}"
-            )));
-        }
-        if start < self.base {
-            return Err(crate::Error::Validation(format!(
-                "term forward period starts before the '{}' curve base date {}; \
-                 use the historical fixing for reset date {} instead of projection",
-                self.id, self.base, start
-            )));
-        }
-        if !accrual_year_fraction.is_finite() || accrual_year_fraction <= 0.0 {
-            return Err(crate::Error::Validation(format!(
-                "term forward requires a finite positive contractual accrual fraction; got {accrual_year_fraction}"
-            )));
-        }
-        let t_start = self.curve_time(start)?;
-        let t_end = self.curve_time(end)?;
-        let rate = self.rate_between(t_start, t_end)? * ((t_end - t_start) / accrual_year_fraction);
-        if !rate.is_finite() {
-            return Err(crate::Error::Validation(format!(
-                "term forward for '{}' over {start} -> {end} is not finite on accrual {accrual_year_fraction}",
-                self.id
-            )));
-        }
-        Ok(rate)
-    }
-
-    /// Simpson-rule integral average of the curve over a date interval.
-    ///
-    /// Only appropriate for averaging overnight observation sub-windows; an
-    /// arbitrary term projection interval uses [`Self::rate_between_dates`].
-    ///
-    /// # Arguments
-    ///
-    /// * `start` - Beginning date of the overnight observation sub-window.
-    /// * `end` - End date of the sub-window, on or after `start`.
-    ///
-    /// # Errors
-    ///
-    /// Propagates a failure while mapping either date to curve time.
-    pub fn rate_period_between_dates(&self, start: Date, end: Date) -> crate::Result<f64> {
-        let t_start = self.curve_time(start)?;
-        let t_end = self.curve_time(end)?;
-        self.rate_period(t_start, t_end)
-    }
-
-    /// Curve-basis forward rate starting at time `t` for the curve's tenor.
-    ///
-    /// The raw rate is annualized on [`Self::day_count`], the same clock used by
-    /// projection discount-factor chaining. Coupon projection must convert its
-    /// accrual growth to the contractual index basis when that basis differs.
-    ///
-    /// # Arguments
-    ///
-    /// * `t` - Year-fraction time from the curve or surface base date to the query point
-    #[inline]
+    /// * `id` - Identifier for the resulting forward projection curve.
+    /// * `discount` - Source [`DiscountCurve`] whose positive-factor evaluator
+    ///   is cloned losslessly.
+    /// * `index_tenor` - Optional index accrual tenor metadata associated with
+    ///   the projection role.
     #[must_use]
-    pub fn rate(&self, t: f64) -> f64 {
-        self.transform.as_ref().map_or_else(
-            || self.interp.interp(t),
-            |transform| transform.rate(&self.interp, t),
-        )
-    }
-
-    /// Simple forward rate implied by projection discount factors between `t1` and `t2`.
-    ///
-    /// This is the period rate coherent with [`Self::df`]:
-    ///
-    /// ```text
-    /// rate = (df(t1) / df(t2) - 1) / (t2 - t1)
-    /// ```
-    ///
-    /// Use this for an arbitrary term period. For an index fixing at a reset
-    /// date, use [`Self::rate`]. [`Self::rate_period`] instead returns the
-    /// Simpson-rule integral average used by overnight compounding sub-windows.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when either time is non-finite, `t2 <= t1`, or an
-    /// implied projection discount factor cannot be calculated.
-    ///
-    /// # Arguments
-    ///
-    /// * `t1` - Start year-fraction of the forward or rate interval being queried
-    /// * `t2` - End year-fraction of the forward or rate interval being queried
-    #[must_use = "computed forward rate should not be discarded"]
-    pub fn rate_between(&self, t1: f64, t2: f64) -> crate::Result<f64> {
-        if !(t1.is_finite() && t2.is_finite()) {
-            return Err(crate::Error::Validation(
-                "rate_between interval endpoints must be finite".to_string(),
-            ));
+    pub fn from_discount_curve(
+        id: impl Into<CurveId>,
+        discount: &DiscountCurve,
+        index_tenor: Option<Tenor>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            base: discount.base,
+            day_count: discount.day_count,
+            calendar: discount.calendar.clone(),
+            index_tenor,
+            knots: discount.knots.clone(),
+            factors: discount.dfs.clone(),
+            interp: discount.interp.clone(),
+            transform: discount
+                .transform_snapshot()
+                .map(super::evaluation::CurveTransform::from_snapshot),
+            rate_calibration: None,
+            fx_policy: discount.fx_policy.clone(),
         }
-        if t2 <= t1 {
-            return Err(crate::Error::Validation(format!(
-                "ForwardCurve::rate_between requires t2 > t1; got t1={t1}, t2={t2}"
-            )));
-        }
-
-        let log_growth = self.projection_log_df(t1)? - self.projection_log_df(t2)?;
-        let rate = log_growth.exp_m1() / (t2 - t1);
-        if !rate.is_finite() {
-            return Err(crate::Error::Validation(format!(
-                "Invalid implied forward rate for {} over [{t1}, {t2}]: {rate}",
-                self.id.as_str()
-            )));
-        }
-        Ok(rate)
     }
 
-    /// Reset lag in business days from fixing to spot.
-    #[inline]
-    pub fn reset_lag(&self) -> i32 {
-        self.reset_lag
-    }
-
-    /// Day-count convention used for this index.
-    #[inline]
-    pub fn day_count(&self) -> DayCount {
-        self.day_count
-    }
-
-    /// Index tenor in **years** (e.g. 0.25 = 3M).
-    #[inline]
-    pub fn tenor(&self) -> f64 {
-        self.tenor
-    }
-
-    /// Raw knot times used to bootstrap the curve.
-    #[inline]
-    pub fn knots(&self) -> &[f64] {
-        &self.knots
-    }
-
-    /// Raw simple forward rates at each knot.
-    #[inline]
-    pub fn forwards(&self) -> &[f64] {
-        &self.forwards
-    }
-
-    /// Contractual reset/end-date boundaries used for projection DFs, when present.
-    ///
-    /// This grid is independent of interpolation knots. `None` means the curve
-    /// uses fixed numeric-tenor stepping from zero.
-    #[inline]
-    pub fn projection_grid(&self) -> Option<&[f64]> {
-        self.projection_grid.as_deref()
-    }
-
-    /// Curve identifier.
+    /// Unique identifier of the curve.
     #[inline]
     pub fn id(&self) -> &CurveId {
         &self.id
     }
-    /// Valuation **base date**.
+
+    /// Valuation **base date** anchoring `t = 0`.
     #[inline]
     pub fn base_date(&self) -> Date {
         self.base
     }
 
-    /// Interpolation style used by this curve.
+    /// Original untransformed anchor date for conditioned curves, or `base_date()` otherwise.
+    #[inline]
+    #[must_use]
+    pub fn source_base_date(&self) -> Date {
+        self.transform
+            .as_ref()
+            .map_or(self.base, |transform| transform.source_base_date())
+    }
+
+    /// Day-count basis used for projection factor time mapping.
+    #[inline]
+    pub fn day_count(&self) -> DayCount {
+        self.day_count
+    }
+
+    /// Canonical id of the curve's time-axis holiday calendar, if any.
+    #[must_use]
+    pub fn calendar_id(&self) -> Option<&str> {
+        self.calendar.as_ref().map(|calendar| calendar.id.as_str())
+    }
+
+    /// Day-count context of the curve's time axis: its holiday calendar, if any.
+    #[must_use]
+    pub fn day_count_context(&self) -> crate::dates::DayCountContext<'static> {
+        crate::dates::DayCountContext {
+            calendar: self.calendar.as_ref().map(|calendar| calendar.calendar),
+            ..crate::dates::DayCountContext::default()
+        }
+    }
+
+    /// Optional contractual index accrual tenor metadata associated with this curve.
+    #[inline]
+    pub fn index_tenor(&self) -> Option<Tenor> {
+        self.index_tenor
+    }
+
+    /// Knot times in **years** from [`base_date`](Self::base_date).
+    #[inline]
+    pub fn knots(&self) -> &[f64] {
+        &self.knots
+    }
+
+    /// Normalized positive projection factors at each knot.
+    #[inline]
+    pub fn factors(&self) -> &[f64] {
+        &self.factors
+    }
+
+    /// Paired `(time, factor)` pillars stored on this curve.
+    #[must_use]
+    pub fn knot_points(&self) -> Vec<(f64, f64)> {
+        self.knots
+            .iter()
+            .copied()
+            .zip(self.factors.iter().copied())
+            .collect()
+    }
+
+    /// Interpolation style configured for this curve.
     #[inline]
     pub fn interp_style(&self) -> InterpStyle {
         self.interp.style()
     }
 
-    /// Extrapolation policy used by this curve.
+    /// Extrapolation policy configured for out-of-bounds queries.
     #[inline]
     pub fn extrapolation(&self) -> ExtrapolationPolicy {
         self.interp.extrapolation()
     }
 
-    /// Exact typed conventions and quotes used to calibrate this curve.
+    /// Exact typed recipe used to bootstrap this curve, when available.
     #[inline]
+    #[must_use]
     pub fn rate_calibration(
         &self,
     ) -> Option<&crate::market_data::term_structures::RateCalibrationRecipe> {
         self.rate_calibration.as_ref()
     }
 
-    /// Opaque FX policy stamp set by the curve constructor; see
-    /// [`crate::market_data::term_structures::DiscountCurve::fx_policy`] for the contract.
+    /// Opaque FX policy stamp set by calibration, if any.
     #[inline]
     pub fn fx_policy(&self) -> Option<&str> {
         self.fx_policy.as_deref()
     }
 
-    /// Number of knot points in the curve.
+    /// Number of visible knot points stored on this curve.
     #[inline]
     #[must_use]
     pub fn len(&self) -> usize {
@@ -475,203 +301,212 @@ impl ForwardCurve {
         self.knots.is_empty()
     }
 
-    /// Integral average rate over `[t1, t2]`.
+    /// Projection factor `P_x(t)` at time `t` in years from [`base_date`](Self::base_date).
     ///
-    /// This average remains annualized on the curve's day-count basis. Multiply
-    /// by `t2 - t1` and divide by the contractual observation accrual fraction
-    /// before using it as an overnight rate on a different index basis.
-    ///
-    /// This is appropriate for averaging short overnight observation
-    /// sub-windows, not for deriving the simple term forward over an arbitrary
-    /// projection interval. Use [`Self::rate_between`] for the latter.
-    /// The source interpolation uses fixed-segment Simpson integration;
-    /// accumulated continuous rate shocks are integrated analytically so a
-    /// narrow key-rate bucket cannot disappear between quadrature samples.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error if either endpoint, the interval length or
-    /// the resulting average is non-finite, or if `t2 < t1`. Equal endpoints
-    /// and intervals no longer than `1e-12` years return the point rate at `t1`.
-    /// Negative finite times retain the curve's existing extrapolation policy.
+    /// Supports negative finite query coordinates `t < 0` according to the
+    /// configured [`ExtrapolationPolicy`] (`Flat`, `Extend`, or `Error`).
     ///
     /// # Arguments
     ///
-    /// * `t1` - Finite start year fraction from the curve base date, on its day-count basis.
-    /// * `t2` - Finite end year fraction on the same basis; must be at least `t1`.
+    /// * `t` - Finite curve time coordinate in years.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `t` is non-finite, out of bounds under
+    /// [`ExtrapolationPolicy::Error`], or evaluates to a non-finite or
+    /// non-positive value.
+    #[must_use = "computed projection factor should not be discarded"]
     #[inline]
-    pub fn rate_period(&self, t1: f64, t2: f64) -> crate::Result<f64> {
-        if !t1.is_finite() || !t2.is_finite() || t2 < t1 {
+    pub fn df(&self, t: f64) -> crate::Result<f64> {
+        if !t.is_finite() {
             return Err(crate::Error::Validation(format!(
-                "ForwardCurve::rate_period requires finite t1 <= t2 (got t1={t1}, t2={t2})"
+                "ForwardCurve::df requires finite time t, got {t}"
             )));
         }
-        let dt = t2 - t1;
-        if !dt.is_finite() {
-            return Err(crate::Error::Validation(
-                "ForwardCurve::rate_period interval length must be finite".to_string(),
-            ));
+        if let Some(transform) = &self.transform {
+            return transform.df(&self.interp, t);
         }
-        let average = if dt <= 1e-12 {
-            self.rate(t1)
-        } else {
-            let n = if dt > 20.0 {
-                32
-            } else if dt > 5.0 {
-                16
-            } else {
-                8
-            };
-            if let Some(transform) = &self.transform {
-                let source = simpson_rule(
-                    |time| self.interp.interp(time + transform.offset),
-                    t1,
-                    t2,
-                    n,
-                )?;
-                (transform.scale * source
-                    + transform
-                        .adjustment
-                        .integral(t1 + transform.offset, t2 + transform.offset))
-                    / dt
-            } else {
-                simpson_rule(|t| self.rate(t), t1, t2, n)? / dt
-            }
-        };
-        if !average.is_finite() {
-            return Err(crate::Error::Validation(
-                "ForwardCurve::rate_period average must be finite".to_string(),
-            ));
+        let val = self.interp.interp(t)?;
+        if !val.is_finite() || val <= 0.0 {
+            return Err(crate::InputError::NonPositiveValue.into());
         }
-        Ok(average)
+        Ok(val)
     }
 
-    /// Logarithm of the implied projection discount factor from zero to `t`.
-    fn projection_log_df(&self, t: f64) -> crate::Result<f64> {
-        if !t.is_finite() {
-            return Err(crate::Error::Validation(
-                "projection time must be finite".to_string(),
-            ));
+    /// Projection factor on a specific date using the curve's signed clock.
+    ///
+    /// Conditioned curves map `date` on [`source_base_date`](Self::source_base_date)
+    /// using [`day_count`](Self::day_count) and [`day_count_context`](Self::day_count_context).
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Target calendar date for the projection factor query.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if day-count calculation fails or the factor at the
+    /// mapped coordinate cannot be admitted under the curve's tail policy.
+    #[inline]
+    #[must_use = "computed projection factor should not be discarded"]
+    pub fn df_on_date(&self, date: Date) -> crate::Result<f64> {
+        if let Some(transform) = &self.transform {
+            let source_t = signed_curve_year_fraction(
+                transform.source_base_date(),
+                date,
+                self.day_count,
+                self.calendar.as_ref(),
+            )?;
+            return transform.df_at_source_time(&self.interp, source_t);
         }
-        if t < 0.0 {
+        let t =
+            signed_curve_year_fraction(self.base, date, self.day_count, self.calendar.as_ref())?;
+        self.df(t)
+    }
+
+    /// Relative projection factor `P_x(to) / P_x(from)` between two calendar dates.
+    ///
+    /// Admits both endpoint factors before evaluating the quotient.
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - Start calendar date.
+    /// * `to` - End calendar date.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if either endpoint factor cannot be admitted or the
+    /// relative factor overflows or underflows to zero.
+    #[inline]
+    #[must_use = "computed relative projection factor should not be discarded"]
+    pub fn df_between_dates(&self, from: Date, to: Date) -> crate::Result<f64> {
+        let p_from = self.df_on_date(from)?;
+        let p_to = self.df_on_date(to)?;
+        df_between_admitted_factors(p_from, p_to, from, to)
+    }
+
+    /// Simple forward rate over curve-time interval `[t1, t2]` annualized on
+    /// explicit contractual accrual year fraction `accrual_year_fraction`.
+    ///
+    /// Evaluates `(exp(ln(P_x(t1) / P_x(t2))) - 1) / accrual_year_fraction`
+    /// using stable positive-factor log-ratio arithmetic after admitting both
+    /// endpoint factors.
+    ///
+    /// # Arguments
+    ///
+    /// * `t1` - Finite start year fraction from [`base_date`](Self::base_date).
+    /// * `t2` - Finite end year fraction strictly greater than `t1`.
+    /// * `accrual_year_fraction` - Explicit strictly positive finite accrual
+    ///   year fraction of the index interval (must not depend on the curve
+    ///   clock when the index convention differs).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `t1` or `t2` is non-finite, `t2 <= t1`,
+    /// `accrual_year_fraction` is non-finite or `<= 0`, either endpoint factor
+    /// fails admission, or the rate overflows, underflows non-equal factors to
+    /// zero, or hits the non-positive simple gross domain.
+    #[must_use = "computed forward rate should not be discarded"]
+    pub fn rate_between(&self, t1: f64, t2: f64, accrual_year_fraction: f64) -> crate::Result<f64> {
+        if !t1.is_finite() || !t2.is_finite() || t2 <= t1 {
             return Err(crate::Error::Validation(format!(
-                "ForwardCurve df(t) requires t >= 0; got t={t}"
+                "ForwardCurve::rate_between requires finite t1 < t2, got [{t1}, {t2}]"
             )));
         }
-        if t == 0.0 {
+        let p1 = self.df(t1)?;
+        let p2 = self.df(t2)?;
+        simple_rate_from_factors(p1, p2, accrual_year_fraction, "ForwardCurve::rate_between")
+    }
+
+    /// Simple forward rate over date interval `[start, end]` annualized on
+    /// explicit contractual accrual year fraction `accrual_year_fraction`.
+    ///
+    /// Both dates are mapped on the curve's signed clock from
+    /// [`source_base_date`](Self::source_base_date) without clamping pre-base
+    /// resets to zero (allowing spot-based curves to project pre-spot resets
+    /// under their tail policy). Both endpoint factors are admitted before any
+    /// equal-coordinate shortcut; distinct dates that map to the same curve
+    /// coordinate (such as Mar 30 to Mar 31 under `30/360`) return `0.0` once
+    /// factor admission succeeds.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - Period start date (`start < end`).
+    /// * `end` - Exclusive period end date strictly after `start`.
+    /// * `accrual_year_fraction` - Explicit strictly positive finite year
+    ///   fraction for `[start, end]` under the contractual index convention.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `end <= start`, mapped coordinates reverse order,
+    /// `accrual_year_fraction` is non-finite or `<= 0`, either endpoint factor
+    /// cannot be admitted under the curve's clock/tail policy, or simple-rate
+    /// computation overflows, underflows to zero, or hits the non-positive
+    /// gross domain.
+    #[must_use = "computed forward rate should not be discarded"]
+    pub fn rate_between_dates(
+        &self,
+        start: Date,
+        end: Date,
+        accrual_year_fraction: f64,
+    ) -> crate::Result<f64> {
+        if end <= start {
+            return Err(crate::Error::Validation(format!(
+                "ForwardCurve::rate_between_dates requires end > start; got start={start}, end={end}"
+            )));
+        }
+        if !accrual_year_fraction.is_finite() || accrual_year_fraction <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "ForwardCurve::rate_between_dates requires finite positive accrual_year_fraction, got {accrual_year_fraction}"
+            )));
+        }
+        let anchor_base = self.source_base_date();
+        let t_start =
+            signed_curve_year_fraction(anchor_base, start, self.day_count, self.calendar.as_ref())?;
+        let t_end =
+            signed_curve_year_fraction(anchor_base, end, self.day_count, self.calendar.as_ref())?;
+        if !t_start.is_finite() || !t_end.is_finite() || t_end < t_start {
+            return Err(crate::Error::Validation(format!(
+                "ForwardCurve::rate_between_dates requires finite non-decreasing mapped coordinates for [{start}, {end}], got [{t_start}, {t_end}]"
+            )));
+        }
+        let (p1, p2) = if let Some(transform) = &self.transform {
+            (
+                transform.df_at_source_time(&self.interp, t_start)?,
+                transform.df_at_source_time(&self.interp, t_end)?,
+            )
+        } else {
+            (self.df(t_start)?, self.df(t_end)?)
+        };
+        if exact_f64_eq(t_start, t_end) {
             return Ok(0.0);
         }
-
-        let tau = self.tenor;
-
-        let mut log_df = 0.0_f64;
-        let mut cur = 0.0_f64;
-        let advance = |start: f64, end: f64, log_df: &mut f64| -> crate::Result<()> {
-            let dt = end - start;
-            if dt <= 0.0 {
-                return Ok(());
-            }
-            let forward = self.rate(start);
-            let accrual = forward * dt;
-            let denom = 1.0 + accrual;
-            if !denom.is_finite() || denom <= 0.0 {
-                return Err(crate::Error::Validation(format!(
-                    "Invalid implied projection DF step for {}: t={start:.6} -> {end:.6}, forward={forward:.6}, denom={denom:.6}",
-                    self.id.as_str(),
-                )));
-            }
-            *log_df -= accrual.ln_1p();
-            Ok(())
-        };
-
-        if let Some(grid) = &self.projection_grid {
-            for &boundary in grid.iter().skip(1) {
-                if cur >= t {
-                    break;
-                }
-                let nxt = boundary.min(t);
-                advance(cur, nxt, &mut log_df)?;
-                cur = nxt;
-            }
-        }
-
-        while cur < t {
-            let nxt = (cur + tau).min(t);
-            if nxt <= cur {
-                return Err(crate::Error::Validation(format!(
-                    "ForwardCurve projection step made no progress at t={cur} toward {t}"
-                )));
-            }
-            advance(cur, nxt, &mut log_df)?;
-            cur = nxt;
-        }
-        Ok(log_df)
+        simple_rate_from_factors(
+            p1,
+            p2,
+            accrual_year_fraction,
+            "ForwardCurve::rate_between_dates",
+        )
     }
 
-    /// Implied **projection discount factor** from `0` to `t` (years).
+    /// Analytic instantaneous projection forward `-P_x'(t) / P_x(t)` at time `t`.
     ///
-    /// This is a convenience for Bloomberg-style curve inspection where a projection curve
-    /// is displayed with both forward rates and an implied discount factor curve.
-    ///
-    /// With an explicit [`Self::projection_grid`], projection discount factors
-    /// chain the contractual reset/end intervals independently of interpolation
-    /// knots:
-    ///
-    /// ```text
-    /// DF(0) = 1
-    /// DF(reset_end) = DF(reset_start) / (1 + F(reset_start) * dt)
-    /// ```
-    ///
-    /// This preserves fixed-tenor quote meaning when calendar adjustment makes
-    /// a contractual period differ from the numeric tenor (for example, a 3M
-    /// Act/360 period spanning 91 or 92 days). Without an explicit grid, the
-    /// fixed numeric-tenor stepping from zero is used.
-    ///
-    /// Notes
-    /// -----
-    /// - This is **not** a discount curve used for PV discounting; it is an *implied projection DF*.
-    /// - Explicit contractual intervals come from `projection_grid`.
-    /// - Curves without a grid, and times beyond an explicit grid, step by `tenor_years`.
-    /// - This is a simple-rate chaining helper, not an overnight compounded-in-arrears engine.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when `t` is non-finite or negative, a projection step
-    /// cannot produce a finite positive discount factor, or the final
-    /// exponentiation is non-finite or non-positive.
+    /// Uses the derivative of the curve's actual evaluator with one-sided
+    /// limits at interpolation knots and continuous-shock breakpoints.
     ///
     /// # Arguments
     ///
-    /// * `t` - Year-fraction time from the curve or surface base date to the query point
-    #[must_use = "computed discount factor should not be discarded"]
-    pub fn df(&self, t: f64) -> crate::Result<f64> {
-        let df = self.projection_log_df(t)?.exp();
-        if !df.is_finite() || df <= 0.0 {
-            return Err(crate::Error::Validation(format!(
-                "Invalid implied projection DF for {} at t={t}: {df}",
-                self.id.as_str()
-            )));
-        }
-        Ok(df)
-    }
-
-    /// Implied projection discount factor on a calendar date using the curve's day-count.
-    ///
-    /// # Arguments
-    ///
-    /// * `date` - Target calendar date converted to a year fraction from [`base_date`](Self::base_date) using [`day_count`](Self::day_count).
+    /// * `t` - Finite curve time coordinate in years.
     ///
     /// # Errors
     ///
-    /// Returns an error if year fraction or discount factor calculation fails.
+    /// Returns an error if `t` is non-finite, factor admission at `t` fails, or
+    /// the derivative quotient overflows.
     #[inline]
-    #[must_use = "computed discount factor should not be discarded"]
-    pub fn df_on_date(&self, date: Date) -> crate::Result<f64> {
-        let t = self.day_count.signed_year_fraction(
-            self.base,
-            date,
-            crate::dates::DayCountContext::default(),
-        )?;
-        self.df(t)
+    #[must_use = "computed instantaneous forward rate should not be discarded"]
+    pub fn instantaneous_forward(&self, t: f64) -> crate::Result<f64> {
+        if let Some(transform) = &self.transform {
+            return transform.instantaneous_forward(&self.interp, t);
+        }
+        factor_instantaneous_forward(&self.interp, None, t, "ForwardCurve")
     }
 }

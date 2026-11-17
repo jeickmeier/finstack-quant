@@ -128,8 +128,10 @@ mod date_extensions;
 pub use date_extensions::DateExt;
 
 mod daycount;
+mod volatility_clock;
 
 pub use daycount::{DayCount, DayCountContext, DayCountContextState};
+pub use volatility_clock::VolatilityClock;
 
 pub use calendar::business_days::canonical_calendar_id;
 pub use calendar::business_days::{

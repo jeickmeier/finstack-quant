@@ -13,7 +13,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor, calendar_by_id_strict,
 };
-use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
@@ -48,7 +48,14 @@ fn sofr_fixings(from: Date, through: Date) -> ScalarTimeSeries {
         .into_iter()
         .map(|day| (day, SOFR))
         .collect();
-    ScalarTimeSeries::new("FIXING:USD-SOFR", observations, None).expect("fixings")
+    ScalarTimeSeries::new(
+        "FIXING:USD-SOFR",
+        observations,
+        None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+    )
+    .expect("fixings")
 }
 
 /// Receive-fixed 1Y SOFR OIS swap valued inside its first accrual period.
@@ -97,13 +104,27 @@ fn sofr_market(as_of: Date, fixings_from: Date) -> MarketContext {
         .base_date(as_of)
         .knots([(0.0, 1.0), (5.0, (-SOFR * 5.0).exp())])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount");
-    let forward = ForwardCurve::builder("USD-SOFR", 1.0 / 360.0)
+    // Chain USNY business-day simple SOFR factors so each overnight reset (including
+    // weekends and holidays) projects exact simple `SOFR` on `DayCount::Act360`.
+    let bds = usny_business_days(as_of, as_of.add_months(13).expect("horizon end"));
+    let mut knots = vec![(0.0, 1.0)];
+    let mut factor = 1.0;
+    for pair in bds.windows(2) {
+        let accrual = (pair[1] - pair[0]).whole_days() as f64 / 360.0;
+        factor /= 1.0 + SOFR * accrual;
+        let t = (pair[1] - as_of).whole_days() as f64 / 360.0;
+        knots.push((t, factor));
+    }
+    let forward = ForwardCurve::builder("USD-SOFR")
         .base_date(as_of)
         .day_count(DayCount::Act360)
-        .knots([(0.0, SOFR), (5.0, SOFR)])
-        .interp(InterpStyle::Linear)
+        .knots(knots)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("forward");
     let history_end = as_of.previous_day().expect("previous day");
@@ -128,11 +149,10 @@ fn ois_swap_theta_observes_crossed_sofr_fixings_at_the_as_of_forward() {
     for (period, rolled) in [("1D", date!(2025 - 02 - 04)), ("1M", date!(2025 - 03 - 03))] {
         let mut swap = seasoned_ois_swap(start);
         swap.metric_pricing_overrides.theta_period = Some(Tenor::parse(period).expect("tenor"));
-        let days = (rolled - as_of).whole_days();
 
         // Ordinary pricing still requires every past fixing.
         assert!(
-            swap.value(&market.roll_forward(days).expect("roll"), rolled)
+            swap.value(&market.condition(rolled).expect("condition"), rolled)
                 .is_err(),
             "{period}: the roll must cross an unpublished SOFR fixing"
         );
@@ -140,8 +160,8 @@ fn ois_swap_theta_observes_crossed_sofr_fixings_at_the_as_of_forward() {
         let injected = market
             .clone()
             .insert_series(sofr_fixings(start, rolled))
-            .roll_forward(days)
-            .expect("roll");
+            .condition(rolled)
+            .expect("condition");
         let expected = swap.value(&injected, rolled).expect("rolled PV").amount()
             - swap.value(&market, as_of).expect("base PV").amount();
         let actual = theta(&swap, &market, as_of);
@@ -271,12 +291,16 @@ fn ois_swap_iterative_breakeven_observes_crossed_sofr_fixings_at_the_as_of_forwa
         .cloned()
         .collect();
     let injected = market.insert_series(sofr_fixings(start, rolled));
-    let bumped = injected
-        .bump(rate_curves.into_iter().map(|id| MarketBump::Curve {
-            id,
-            spec: BumpSpec::parallel_bp(breakeven),
-        }))
-        .expect("bump");
+    let bumps: Vec<_> = rate_curves
+        .into_iter()
+        .map(|id| {
+            injected
+                .curve_target(&id)
+                .expect("curve target")
+                .into_bump(BumpSpec::parallel_bp(breakeven))
+        })
+        .collect();
+    let bumped = injected.bump(bumps).expect("bump");
     let residual = carry + swap.value(&bumped, rolled).expect("bumped PV").amount()
         - swap.value(&injected, rolled).expect("base PV").amount();
     assert!(

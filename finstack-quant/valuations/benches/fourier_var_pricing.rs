@@ -38,6 +38,8 @@ fn make_var_market() -> MarketContext {
             (10.0, 0.730),
         ])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     MarketContext::new().insert(disc)

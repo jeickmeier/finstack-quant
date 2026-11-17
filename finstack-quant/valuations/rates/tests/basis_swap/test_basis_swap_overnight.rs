@@ -22,20 +22,24 @@ fn market() -> MarketContext {
         .base_date(d(2025, 1, 2))
         .knots(vec![(0.0, 1.0), (1.0, 0.96), (2.0, 0.92)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let ois = ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 365.0)
-        .base_date(d(2025, 1, 2))
-        .knots(vec![(0.0, 0.04), (2.0, 0.04)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap();
-    let term = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(d(2025, 1, 2))
-        .knots(vec![(0.0, 0.041), (2.0, 0.041)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap();
+    let ois = ForwardCurve::flat(
+        "USD-SOFR-OIS",
+        d(2025, 1, 2),
+        0.04,
+        finstack_quant_core::dates::DayCount::Act365F,
+    )
+    .unwrap();
+    let term = ForwardCurve::flat(
+        "USD-SOFR-3M",
+        d(2025, 1, 2),
+        0.041,
+        finstack_quant_core::dates::DayCount::Act365F,
+    )
+    .unwrap();
     MarketContext::new().insert(disc).insert(ois).insert(term)
 }
 

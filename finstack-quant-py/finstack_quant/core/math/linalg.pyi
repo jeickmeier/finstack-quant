@@ -37,16 +37,18 @@ __all__ = [
 
 class CholeskyError(FinstackError):
     """
-    Cholesky decomposition failure.
+    Cholesky and symmetric-eigen input validation failure.
 
-    Raised when the input matrix is not positive-definite, is numerically
-    singular, or contains non-finite entries. Inherits from ``ValueError``.
+    Raised when the input matrix is asymmetric, has mismatched dimensions, or
+    contains non-finite entries. Inherits from ``FinstackError`` and
+    ``ValueError``. Factorization failures on symmetric matrices (not
+    positive-definite or numerically singular) raise ``RuntimeError``.
 
     Examples
     --------
     >>> from finstack_quant.core.math import linalg
-    >>> str(linalg.CholeskyError("matrix is not positive definite"))
-    'matrix is not positive definite'
+    >>> str(linalg.CholeskyError("matrix is not symmetric"))
+    'matrix is not symmetric'
 
     """
 
@@ -122,9 +124,10 @@ def cholesky_decomposition(
     Raises
     ------
     CholeskyError
-        If the matrix is not symmetric, not positive-definite, is numerically
-        singular, or contains non-finite entries. This exception is a
-        ``ValueError`` subclass.
+        If the matrix is not symmetric, has mismatched dimensions, or contains
+        non-finite entries. This exception is a ``ValueError`` subclass.
+    RuntimeError
+        If a symmetric matrix is not positive-definite or is numerically singular.
     TypeError
         If ``matrix`` is not a numeric sequence/array or contains ``bool`` values.
     ValueError

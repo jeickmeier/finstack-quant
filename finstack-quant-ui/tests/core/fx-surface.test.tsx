@@ -125,30 +125,26 @@ it("selects an evaluated sample by its FX surface, expiry and strike key", async
   );
   cache.clear();
 });
-it("materializes the strike grid natively only from an explicit spot and both rates", async () => {
+it("materializes the strike grid natively only from explicit delivery forwards for every expiry", async () => {
   const cache = new QueryClient();
   const calls = () =>
     transport.call.mock.calls.filter(
       ([method]) => method === "materializeFxSurface",
     );
-  const view = (initial: {
-    initialSpot?: number;
-    initialDomesticRate?: number;
-    initialForeignRate?: number;
-  }) => (
+  const view = (initial: { initialDeliveryForwards?: readonly number[] }) => (
     <QueryClientProvider client={cache}>
       <FxSurfaceChart surface={fxQuotes} colorDomain={[0, 0.3]} {...initial} />
     </QueryClientProvider>
   );
-  const unseeded = render(view({ initialSpot: 1.1 }));
-  expect(screen.getByText(/Enter a spot and both/)).toBeTruthy();
+  const unseeded = render(view({ initialDeliveryForwards: [1.105] }));
+  expect(
+    screen.getByText(/Enter a delivery forward for every expiry/),
+  ).toBeTruthy();
   expect(calls()).toHaveLength(0);
   unseeded.unmount();
   render(
     view({
-      initialSpot: 1.1,
-      initialDomesticRate: 0.04,
-      initialForeignRate: 0.03,
+      initialDeliveryForwards: [1.105, 1.11],
     }),
   );
   const grid = await screen.findByRole("region", {
@@ -157,9 +153,7 @@ it("materializes the strike grid natively only from an explicit spot and both ra
   expect(calls()).toHaveLength(1);
   expect(calls()[0]![1]).toEqual({
     surface: fxQuotes,
-    spot: 1.1,
-    domesticRate: 0.04,
-    foreignRate: 0.03,
+    deliveryForwards: [1.105, 1.11],
   });
   const native = unwrap(
     await worker.proxy.materializeFxSurface(calls()[0]![1]),
@@ -171,20 +165,20 @@ it("materializes the strike grid natively only from an explicit spot and both ra
     .map((cells) => Number(cells[2]!.textContent));
   expect(values).toEqual(native.vols_row_major);
   expect(within(grid).getByText(/no local interpolation/)).toBeTruthy();
-  fireEvent.change(
-    screen.getByLabelText("Spot (domestic per unit of foreign)"),
-    { target: { value: "-1" } },
-  );
+  fireEvent.change(screen.getByLabelText("Delivery forward (0.5y)"), {
+    target: { value: "-1" },
+  });
   await waitFor(() =>
     expect(screen.getByRole("alert").textContent).toBe(
       "Values must be positive",
     ),
   );
-  fireEvent.change(
-    screen.getByLabelText("Domestic rate (continuously compounded decimal)"),
-    { target: { value: "" } },
-  );
-  expect(screen.getByText(/Enter a spot and both/)).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Delivery forward (1y)"), {
+    target: { value: "" },
+  });
+  expect(
+    screen.getByText(/Enter a delivery forward for every expiry/),
+  ).toBeTruthy();
   expect(calls()).toHaveLength(2);
   cache.clear();
 });

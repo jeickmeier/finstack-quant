@@ -20,7 +20,7 @@ use time::macros::date;
 
 /// Helper to build a flat discount curve for property tests.
 fn build_test_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve {
-    let mut builder = DiscountCurve::builder(curve_id)
+    let builder = DiscountCurve::builder(curve_id)
         .base_date(base_date)
         .day_count(DayCount::Act360)
         .knots([
@@ -33,30 +33,15 @@ fn build_test_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> Disc
         // For property tests we prefer robustness over strict Hagan–West
         // monotone-convex behaviour; linear interpolation is sufficient and
         // handles flat/zero-rate curves gracefully.
-        .interp(InterpStyle::Linear);
-
-    // For zero or negative rates, allow non-monotonic DFs
-    if rate.abs() < 1e-10 || rate < 0.0 {
-        builder = builder.validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        );
-    }
+        .interp(InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend);
 
     builder.build().unwrap()
 }
 
 /// Helper to build a flat forward curve for property tests.
 fn build_test_forward_curve(rate: f64, base_date: Date, curve_id: &str) -> ForwardCurve {
-    ForwardCurve::builder(curve_id, 0.25)
-        .base_date(base_date)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, rate), (10.0, rate), (30.0, rate)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap()
+    ForwardCurve::flat(curve_id, base_date, rate, DayCount::Act360).unwrap()
 }
 
 proptest! {
@@ -304,14 +289,10 @@ proptest! {
                 (30.0, (-curve_rate * 30.0).exp()),
             ])
             .interp(InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build();
 
-        let fwd_res = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-            .base_date(base_date)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, curve_rate), (10.0, curve_rate), (30.0, curve_rate)])
-            .interp(InterpStyle::Linear)
-            .build();
+        let fwd_res = ForwardCurve::flat("USD-SOFR-3M", base_date, curve_rate, DayCount::Act360);
 
         prop_assume!(disc_res.is_ok() && fwd_res.is_ok());
         let disc = disc_res.unwrap();

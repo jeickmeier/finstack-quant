@@ -46,10 +46,7 @@
           ]
         ],
         "interp_style": "log_linear",
-        "extrapolation": "flat_forward",
-        "min_forward_rate": null,
-        "allow_non_monotonic": false,
-        "min_forward_tenor": 1e-06,
+        "extrapolation": "extend",
         "rate_calibration": null,
         "fx_policy": null
       },
@@ -57,9 +54,7 @@
         "type": "inflation",
         "id": "US-CPI",
         "base_date": "2024-10-15",
-        "base_cpi": 300,
         "day_count": "act_365f",
-        "indexation_lag_months": 3,
         "knot_points": [
           [
             0,
@@ -75,14 +70,33 @@
           ]
         ],
         "interp_style": "linear",
-        "extrapolation": "flat_zero"
+        "extrapolation": "flat"
       }
     ],
     "fx": null,
     "surfaces": [],
     "prices": {},
     "series": [],
-    "inflation_indices": [],
+    "inflation_indices": [
+      {
+        "id": "US-CPI",
+        "currency": "USD",
+        "knowledge_date": "2025-01-15",
+        "observations": [],
+        "expected_releases": [
+          {
+            "reference_month": "2029-10-01",
+            "expected_release": "2029-11-15",
+            "known_on": "2025-01-15"
+          },
+          {
+            "reference_month": "2029-11-01",
+            "expected_release": "2029-12-15",
+            "known_on": "2025-01-15"
+          }
+        ]
+      }
+    ],
     "dividends": [],
     "credit_indices": [],
     "fx_delta_vol_surfaces": [],

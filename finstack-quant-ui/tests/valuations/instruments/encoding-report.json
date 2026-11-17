@@ -6057,6 +6057,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/CmsSwap/properties/cms_fixing_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/CmsSwap/properties/index_id",
             "keyword": "anyOf"
           },
@@ -6074,6 +6078,10 @@
           },
           {
             "pointer": "#/$defs/CmsSwap/properties/swap_float_frequency",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CmsOption/properties/cms_fixing_index_id",
             "keyword": "anyOf"
           },
           {
@@ -6382,6 +6390,14 @@
           },
           {
             "pointer": "#/$defs/CmsSpreadOption/properties/index_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CmsSpreadOption/properties/long_cms_fixing_index_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CmsSpreadOption/properties/short_cms_fixing_index_id",
             "keyword": "anyOf"
           },
           {
@@ -12036,6 +12052,10 @@
         ],
         "nullable-union": [
           {
+            "pointer": "#/$defs/d_95a946bb2f055985d90a/properties/cms_fixing_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_95a946bb2f055985d90a/properties/index_id",
             "keyword": "anyOf"
           },
@@ -12470,6 +12490,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/d_ff58eb1d8c0cb6416b15/properties/long_cms_fixing_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/d_00292b2cd9779815232f/properties/bond_risk_basis",
             "keyword": "anyOf"
           },
@@ -12491,6 +12515,10 @@
           },
           {
             "pointer": "#/$defs/d_e49387f97c0f9d510642/properties/reporting_currency",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/d_ff58eb1d8c0cb6416b15/properties/short_cms_fixing_index_id",
             "keyword": "anyOf"
           },
           {
@@ -12854,6 +12882,10 @@
           "#/$defs/d_572ad1befb7d94914652/properties/mc_seed_scenario"
         ],
         "nullable-union": [
+          {
+            "pointer": "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_fixing_index_id",
+            "keyword": "anyOf"
+          },
           {
             "pointer": "#/$defs/d_3dbd4a1aab74e98eef06/properties/index_id",
             "keyword": "anyOf"
@@ -17818,6 +17850,10 @@
             "keyword": "anyOf"
           },
           {
+            "pointer": "#/$defs/CmsSwap/properties/cms_fixing_index_id",
+            "keyword": "anyOf"
+          },
+          {
             "pointer": "#/$defs/CmsSwap/properties/index_id",
             "keyword": "anyOf"
           },
@@ -17835,6 +17871,10 @@
           },
           {
             "pointer": "#/$defs/CmsSwap/properties/swap_float_frequency",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CmsOption/properties/cms_fixing_index_id",
             "keyword": "anyOf"
           },
           {
@@ -18143,6 +18183,14 @@
           },
           {
             "pointer": "#/$defs/CmsSpreadOption/properties/index_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CmsSpreadOption/properties/long_cms_fixing_index_id",
+            "keyword": "anyOf"
+          },
+          {
+            "pointer": "#/$defs/CmsSpreadOption/properties/short_cms_fixing_index_id",
             "keyword": "anyOf"
           },
           {

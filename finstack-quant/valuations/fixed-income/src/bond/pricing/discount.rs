@@ -92,13 +92,13 @@ pub(crate) fn price_with_oas(
         // the quote compounding.
         let curve_df = discount.df_between_dates(as_of, date)?;
         let oas_shift = if time > 0.0 && curve_df > 0.0 {
-            compounding.continuous_spread_shift(-curve_df.ln() / time, oas_quote_decimal)
+            compounding.continuous_spread_shift(-curve_df.ln() / time, oas_quote_decimal)?
         } else {
-            compounding.continuous_spread_shift(0.0, oas_quote_decimal)
+            compounding.continuous_spread_shift(0.0, oas_quote_decimal)?
         };
-        pv.add(amount.amount() * curve_df * (-oas_shift * time).exp());
+        pv.add(amount.amount() * curve_df * (-oas_shift * time).exp())?;
     }
-    Ok(pv.total())
+    pv.get_total()
 }
 
 #[cfg(test)]

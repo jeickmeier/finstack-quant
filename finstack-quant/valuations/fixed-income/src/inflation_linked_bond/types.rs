@@ -78,16 +78,16 @@ impl IndexationMethod {
     /// # Production Recommendation
     ///
     /// When pricing UK Index-Linked Gilts, verify the bond's issue date:
-    /// - Build legacy gilts with `lag = InflationLag::Months(8)` and modern
-    ///   gilts with `lag = InflationLag::Months(3)` via
+    /// - Build legacy gilts with `lag = InflationLag::months(8)` and modern
+    ///   gilts with `lag = InflationLag::months(3)` via
     ///   [`InflationLinkedBond::builder`]
     pub fn standard_lag(&self) -> InflationLag {
         match self {
-            IndexationMethod::Uk => InflationLag::Months(8), // Legacy UK Gilts (pre-Sep 2005)
+            IndexationMethod::Uk => InflationLag::months(8), // Legacy UK Gilts (pre-Sep 2005)
             IndexationMethod::Canadian
             | IndexationMethod::Tips
             | IndexationMethod::French
-            | IndexationMethod::Japanese => InflationLag::Months(3),
+            | IndexationMethod::Japanese => InflationLag::months(3),
         }
     }
 }
@@ -304,7 +304,7 @@ impl InflationLinkedBond {
             )));
         }
         if matches!(self.indexation_method, IndexationMethod::Uk)
-            && !matches!(self.lag, InflationLag::Months(3) | InflationLag::Months(8))
+            && !matches!(self.lag, InflationLag::Months(months) if matches!(months.get(), 3 | 8))
         {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "{context} UK linkers require a 3-month modern or 8-month legacy lag"
@@ -464,14 +464,13 @@ impl InflationLinkedBond {
                     period.accrual_end,
                     self.day_count,
                     None,
-                    finstack_quant_core::dates::DayCountContextState {
-                        calendar_id: None,
+                    finstack_quant_core::dates::DayCountContextState::try_new(
+                        None,
+                        (self.day_count == DayCount::ActActIsma).then_some(self.frequency),
+                        None,
                         coupon_period,
-                        end_is_termination_date: Some(period.accrual_end == self.maturity),
-                        frequency: (self.day_count == DayCount::ActActIsma)
-                            .then_some(self.frequency),
-                        bus_basis: None,
-                    },
+                        Some(period.accrual_end == self.maturity),
+                    )?,
                 )?)
                 .build()?,
             );
@@ -557,7 +556,7 @@ impl InflationLinkedBond {
                 let (start, end) = flow
                     .get_accrual()
                     .as_ref()
-                    .and_then(|accrual| accrual.get_context().coupon_period)
+                    .and_then(|accrual| accrual.get_context().get_coupon_period())
                     .ok_or_else(|| {
                         finstack_quant_core::Error::Validation(
                             "ACT/365L real yield requires full contractual coupon metadata".into(),
@@ -710,7 +709,7 @@ impl InflationLinkedBond {
             real_yield_street,
             t,
             &Compounding::Periodic(std::num::NonZeroU32::MIN),
-        );
+        )?;
 
         // Both yields are now effective-annual. Apply the exact Fisher identity.
         // Guard against division by zero for extreme negative real yields.
@@ -958,8 +957,12 @@ mod tests {
     use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::market_data::scalars::{InflationIndex, SeriesInterpolation};
+    use finstack_quant_core::market_data::scalars::{
+        InflationExpectedRelease, InflationIndex, InflationObservation,
+    };
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
+    use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
+    use finstack_quant_valuations_test_support::inflation::simple_index;
     use time::Month;
 
     #[test]
@@ -967,19 +970,20 @@ mod tests {
         use time::macros::date;
         let mut bond = InflationLinkedBond::example().expect("example");
         bond.base_cpi = 100.0;
-        bond.lag = InflationLag::Months(3);
-        let index = InflationIndex::new(
-            "US-CPI",
-            vec![(date!(2025 - 03 - 01), 150.0)],
-            Currency::USD,
-        )
-        .expect("index")
-        .with_interpolation(SeriesInterpolation::Linear)
-        .with_publication_dates(vec![(date!(2025 - 03 - 01), date!(2025 - 04 - 15))])
-        .expect("publication");
+        bond.lag = InflationLag::months(3);
+        let index = InflationIndex::new("US-CPI", vec![], Currency::USD, date!(2025 - 04 - 14))
+            .expect("index")
+            .with_expected_releases(vec![InflationExpectedRelease {
+                reference_month: date!(2025 - 03 - 01),
+                expected_release: date!(2025 - 04 - 15),
+                known_on: date!(2025 - 04 - 14),
+            }])
+            .expect("publication");
         let curve = InflationCurve::builder("US-CPI")
             .base_date(date!(2025 - 03 - 01))
-            .base_cpi(120.0)
+            .day_count(DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .knots([(0.0, 120.0), (2.0, 120.0)])
             .build()
             .expect("curve");
@@ -994,29 +998,55 @@ mod tests {
         for as_of in [date!(2025 - 04 - 15), date!(2025 - 04 - 16)] {
             assert_eq!(
                 bond.index_ratio_from_market(date!(2025 - 06 - 01), &market, as_of)
-                    .expect("published"),
-                1.5
+                    .expect("unchanged explicit snapshot"),
+                1.2
             );
         }
+        let published = InflationIndex::new(
+            "US-CPI",
+            vec![InflationObservation {
+                reference_month: date!(2025 - 03 - 01),
+                value: 150.0,
+                available_on: date!(2025 - 04 - 15),
+            }],
+            Currency::USD,
+            date!(2025 - 04 - 15),
+        )
+        .unwrap();
+        assert_eq!(
+            bond.index_ratio_from_market(
+                date!(2025 - 06 - 01),
+                &market.insert_inflation_index(published),
+                date!(2025 - 04 - 15),
+            )
+            .unwrap(),
+            1.5
+        );
     }
 
     #[test]
     fn protected_unknown_cpi_includes_option_time_value() {
-        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::market_data::surfaces::{
+            VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+        };
         use time::macros::date;
         let mut bond = InflationLinkedBond::example().expect("example");
         bond.base_cpi = 100.0;
         bond.lag = InflationLag::None;
         let as_of = date!(2025 - 01 - 01);
         let payment = date!(2026 - 01 - 01);
-        let market = MarketContext::new().insert(
-            InflationCurve::builder("US-CPI")
-                .base_date(as_of)
-                .base_cpi(100.0)
-                .knots([(0.0, 100.0), (2.0, 100.0)])
-                .build()
-                .expect("curve"),
-        );
+        let market = MarketContext::new()
+            .insert(
+                InflationCurve::builder("US-CPI")
+                    .base_date(as_of)
+                    .day_count(DayCount::Act365F)
+                    .interp(InterpStyle::LogLinear)
+                    .extrapolation(ExtrapolationPolicy::Flat)
+                    .knots([(0.0, 100.0), (2.0, 100.0)])
+                    .build()
+                    .expect("curve"),
+            )
+            .insert_inflation_index(simple_index("US-CPI", as_of, 100.0, Currency::USD));
         assert!(
             (bond
                 .payment_index_ratio(payment, &market, as_of, false)
@@ -1033,7 +1063,10 @@ mod tests {
         for sigma in [0.0, 0.2] {
             let surface = VolSurface::builder("CPI-RATIO-VOL")
                 .expiries(&[0.1, 2.0])
-                .strikes(&[0.5, 1.5])
+                .secondary_values(&[0.5, 1.5])
+                .secondary_axis(VolSurfaceAxis::Strike)
+                .quote_type(VolQuoteType::BlackLognormal)
+                .interpolation_mode(VolInterpolationMode::Vol)
                 .row(&[sigma, sigma])
                 .row(&[sigma, sigma])
                 .build()
@@ -1369,21 +1402,36 @@ mod tests {
         let discount = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (3.0, 1.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve should build");
         let inflation = InflationCurve::builder("US-CPI")
             .base_date(as_of)
-            .base_cpi(100.0)
+            .day_count(DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .knots([(0.0, 100.0), (1.0, 95.0), (2.0, 90.0)])
             .build()
             .expect("inflation curve should build");
         MarketContext::new()
             .insert(discount)
             .insert(inflation)
+            .insert_inflation_index(simple_index("US-CPI", as_of, 100.0, Currency::USD))
             .insert_surface(
                 finstack_quant_core::market_data::surfaces::VolSurface::builder("CPI-ZERO-VOL")
                     .expiries(&[0.1, 40.0])
-                    .strikes(&[0.5, 1.5])
+                    .secondary_values(&[0.5, 1.5])
+                    .secondary_axis(
+                        finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+                    )
+                    .quote_type(
+                        finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+                    )
+                    .interpolation_mode(
+                        finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+                    )
                     .row(&[0.0, 0.0])
                     .row(&[0.0, 0.0])
                     .build()
@@ -1459,24 +1507,37 @@ mod tests {
 
     #[test]
     fn hybrid_ref_cpi_resolves_published_and_projected_anchors_independently() {
-        use finstack_quant_core::market_data::scalars::{InflationIndex, SeriesInterpolation};
-
         let mut bond = sample_bond(DeflationProtection::None);
-        bond.lag = InflationLag::Months(3);
+        bond.lag = InflationLag::months(3);
         let index = InflationIndex::new(
             "US-CPI",
             vec![
                 (d(2025, Month::January, 1), 100.0),
                 (d(2025, Month::February, 1), 105.0),
                 (d(2025, Month::March, 1), 110.0),
-            ],
+            ]
+            .into_iter()
+            .map(|(reference_month, value)| InflationObservation {
+                reference_month,
+                value,
+                available_on: d(2025, Month::March, 1),
+            })
+            .collect(),
             Currency::USD,
+            d(2025, Month::March, 1),
         )
         .expect("published CPI")
-        .with_interpolation(SeriesInterpolation::Linear);
+        .with_expected_releases(vec![InflationExpectedRelease {
+            reference_month: d(2025, Month::April, 1),
+            expected_release: d(2025, Month::May, 15),
+            known_on: d(2025, Month::March, 1),
+        }])
+        .unwrap();
         let curve = InflationCurve::builder("US-CPI")
             .base_date(d(2025, Month::March, 1))
-            .base_cpi(110.0)
+            .day_count(DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .knots([(0.0, 110.0), (31.0 / 365.0, 120.0)])
             .build()
             .expect("projected CPI");
@@ -1503,11 +1564,15 @@ mod tests {
         bond.maturity = d(2034, Month::January, 15); // Sunday
         let inflation = InflationCurve::builder("US-CPI")
             .base_date(as_of)
-            .base_cpi(100.0)
+            .day_count(DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .knots([(0.0, 100.0), (12.0, 100.0)])
             .build()
             .expect("inflation curve");
-        let market = MarketContext::new().insert(inflation);
+        let market = MarketContext::new()
+            .insert(inflation)
+            .insert_inflation_index(simple_index("US-CPI", as_of, 100.0, Currency::USD));
 
         let adjusted = d(2034, Month::January, 16);
         let schedule = bond.cashflow_schedule(&market, as_of).expect("pv schedule");
@@ -1626,19 +1691,17 @@ mod tests {
 
         let mut bond = sample_bond(DeflationProtection::None);
         bond.indexation_method = IndexationMethod::Uk;
-        bond.lag = InflationLag::Months(8);
+        bond.lag = InflationLag::months(8);
         let curve = InflationCurve::builder("US-CPI")
             .base_date(d(2024, Month::October, 1))
-            .base_cpi(100.0)
+            .day_count(DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .knots([(0.0, 100.0), (31.0 / 365.0, 110.0)])
             .build()
             .expect("curve");
         let date = d(2025, Month::June, 15);
 
-        let ratio = bond
-            .index_ratio_from_curve(date, &curve)
-            .expect("curve ratio");
-        assert!((ratio - 1.0).abs() < 1e-12, "curve ratio {ratio}");
         let mid_month = curve
             .cpi_on_date(d(2024, Month::October, 15))
             .expect("mid-month cpi");
@@ -1651,10 +1714,24 @@ mod tests {
             vec![
                 (d(2024, Month::August, 1), 98.0),
                 (d(2024, Month::September, 1), 99.0),
-            ],
+            ]
+            .into_iter()
+            .map(|(reference_month, value)| InflationObservation {
+                reference_month,
+                value,
+                available_on: d(2024, Month::September, 1),
+            })
+            .collect(),
             Currency::USD,
+            d(2024, Month::September, 1),
         )
-        .expect("published CPI");
+        .expect("published CPI")
+        .with_expected_releases(vec![InflationExpectedRelease {
+            reference_month: d(2024, Month::October, 1),
+            expected_release: d(2024, Month::November, 15),
+            known_on: d(2024, Month::September, 1),
+        }])
+        .unwrap();
         let market = MarketContext::new()
             .insert(curve)
             .insert_inflation_index(index);
@@ -1673,22 +1750,30 @@ mod tests {
         let as_of = d(2024, Month::January, 15);
         let mut bond = sample_bond(DeflationProtection::AllPayments);
         bond.indexation_method = IndexationMethod::Uk;
-        bond.lag = InflationLag::Months(5); // non-standard
+        bond.lag = InflationLag::months(5); // non-standard
 
         let index = InflationIndex::new(
             "UK-RPI",
             vec![
                 (d(2023, Month::January, 1), 100.0),
                 (d(2024, Month::January, 1), 102.0),
-            ],
+            ]
+            .into_iter()
+            .map(|(reference_month, value)| InflationObservation {
+                reference_month,
+                value,
+                available_on: as_of,
+            })
+            .collect(),
             Currency::USD,
+            as_of,
         )
         .expect("index builds");
 
         let result = bond.index_ratio(as_of, &index);
         let err = result.expect_err("non-standard UK lag must fail at runtime");
         assert!(
-            err.to_string().contains("Non-standard UK gilt lag"),
+            err.to_string().contains("UK gilt indexation"),
             "error message should identify the issue: {err}"
         );
     }
@@ -1698,19 +1783,26 @@ mod tests {
         let as_of = d(2024, Month::January, 15);
         let mut bond = sample_bond(DeflationProtection::AllPayments);
         bond.indexation_method = IndexationMethod::Uk;
-        bond.lag = InflationLag::Months(3); // modern UK standard
+        bond.lag = InflationLag::months(3); // modern UK standard
 
         // Use a Linear-interpolated index to satisfy the modern UK invariant.
         let index = InflationIndex::new(
-            "UK-RPI",
+            "US-CPI",
             vec![
                 (d(2023, Month::October, 1), 100.0),
                 (d(2023, Month::November, 1), 102.0),
-            ],
+            ]
+            .into_iter()
+            .map(|(reference_month, value)| InflationObservation {
+                reference_month,
+                value,
+                available_on: as_of,
+            })
+            .collect(),
             Currency::USD,
+            as_of,
         )
-        .expect("index builds")
-        .with_interpolation(SeriesInterpolation::Linear);
+        .expect("index builds");
 
         // Modern (3-month) lag must succeed; we don't care about the exact ratio,
         // just that the validation didn't reject the bond.
@@ -1734,15 +1826,27 @@ mod tests {
                     .insert(
                         InflationCurve::builder("US-CPI")
                             .base_date(as_of)
-                            .base_cpi(100.0 * forward)
+                            .day_count(DayCount::Act365F)
+                            .interp(InterpStyle::LogLinear)
+                            .extrapolation(ExtrapolationPolicy::Flat)
                             .knots([(0.0, 100.0 * forward), (2.0, 100.0 * forward)])
                             .build()
                             .unwrap(),
                     )
+                    .insert_inflation_index(simple_index("US-CPI", as_of, 100.0, Currency::USD))
                     .insert_surface(
                         VolSurface::builder("RATIO-VOL")
                             .expiries(&[1.0])
-                            .strikes(&[1.0])
+                            .secondary_values(&[1.0])
+                            .secondary_axis(
+                                finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+                            )
+                            .quote_type(
+                                finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+                            )
+                            .interpolation_mode(
+                                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+                            )
                             .row(&[sigma])
                             .build()
                             .unwrap(),

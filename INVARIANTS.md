@@ -1356,6 +1356,21 @@ cash and inherited reporting FX. Apply signed quantity once, reduce atomically
 and assess economic residual and monetary closure on the current report basis.
 [Accepted reporting FX, sizing and residual qualification](docs/decisions/financial/attribution/13-target-currency-and-scaling.md#accepted-decision-for-checked-reporting-fx-sizing-aggregation-and-residual-qualification).
 
+Single-period return contributions use one dated basis and elected signed
+weights. Check contributions before projection and reconcile each elected
+group partition and factor view to the same total.
+[Accepted single-period return contributions](docs/decisions/financial/attribution/14-return-contribution-weights.md#accepted-decision-for-checked-single-period-return-contributions).
+
+Attribution projections retain typed detail identities, exact amounts and
+explicit row ownership. Validate each complete partition against its parent
+and carry checked availability, report basis and replay status through hosts.
+[Accepted detail identities and report projections](docs/decisions/financial/attribution/15-detail-and-reporting-contracts.md#accepted-decision-for-checked-detail-identities-report-projections-and-schemas).
+
+Grouped benchmark attribution binds an explicit benchmark and common
+partition. Require exact opening weight sums and distinguish true absence
+from zero net active weight before applying centered effects.
+[Accepted grouped benchmark-relative returns](docs/decisions/financial/attribution/16-benchmark-relative-return.md#accepted-decision-for-checked-grouped-benchmark-relative-returns).
+
 Valuation model inputs bind an exact source, unit, clock and parameter block.
 Use dated relative factors for GBM carry. Simulations retain explicit controls,
 exact seed identity and actual work. Apply each tree and quote control on its

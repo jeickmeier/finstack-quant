@@ -1,94 +1,147 @@
-//! Validated construction.
+//! Validated construction for [`HazardCurve`].
 
+use super::super::common::{signed_curve_year_fraction, validate_curve_clock};
 use super::*;
 
 /// Fluent builder for [`HazardCurve`].
 ///
+/// Requires explicit `base_date`, `day_count` (plus `calendar_id` for `Bus/252`),
+/// `recovery_rate`, and strictly positive strictly ordered `knots` before
+/// calling [`HazardCurveBuilder::build`].
+///
 /// # Examples
 ///
 /// ```rust
+/// use finstack_quant_core::dates::{Date, DayCount};
 /// use finstack_quant_core::market_data::term_structures::HazardCurve;
-/// use finstack_quant_core::dates::Date;
 /// use time::Month;
 ///
 /// let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
 /// let curve = HazardCurve::builder("USD-CREDIT")
 ///     .base_date(base)
+///     .day_count(DayCount::Act365F)
 ///     .recovery_rate(0.40)
 ///     .knots([(1.0, 0.01), (5.0, 0.015), (10.0, 0.02)])
 ///     .build()
 ///     .expect("HazardCurve builder should succeed");
-/// assert!(curve.sp(5.0) < 1.0);
+/// assert!(curve.sp(5.0).expect("valid survival") < 1.0);
 /// ```
 pub struct HazardCurveBuilder {
     pub(super) id: CurveId,
     pub(super) base: Option<Date>,
-    pub(super) points: Vec<(f64, f64)>, // (t, lambda)
+    pub(super) points: Vec<(f64, f64)>,
     pub(super) recovery_rate: Option<f64>,
     pub(super) issuer: Option<String>,
     pub(super) seniority: Option<Seniority>,
     pub(super) currency: Option<Currency>,
-    pub(super) day_count: DayCount,
-    pub(super) par_points: Vec<(f64, f64)>, // (t, spread_bp)
-    pub(super) par_interp: ParInterp,
-    /// Maximum allowed hazard rate (default [`DEFAULT_MAX_HAZARD_RATE`]).
-    /// Rates above this trigger an error in `build()`.
-    pub(super) max_hazard_rate: f64,
+    pub(super) day_count: Option<DayCount>,
+    pub(super) calendar_id: Option<String>,
     pub(super) hazard_calibration:
         Option<crate::market_data::term_structures::HazardCalibrationRecipe>,
     pub(super) fx_policy: Option<String>,
+    pub(super) source: Option<HazardConditionSource>,
 }
 
 impl HazardCurveBuilder {
     /// Set the **base date** for the curve.
+    ///
+    /// # Arguments
+    ///
+    /// * `d` - Valuation anchor date corresponding to `t = 0`.
     pub fn base_date(mut self, d: Date) -> Self {
         self.base = Some(d);
         self
     }
+
     /// Set issuer metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Obligor or reference entity name stored as curve metadata.
     pub fn issuer(mut self, name: impl Into<String>) -> Self {
         self.issuer = Some(name.into());
         self
     }
+
     /// Set seniority metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `s` - Debt seniority classification associated with the curve.
     pub fn seniority(mut self, s: Seniority) -> Self {
         self.seniority = Some(s);
         self
     }
+
     /// Set currency metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `ccy` - Currency of the underlying credit obligation or protection leg.
     pub fn currency(mut self, ccy: Currency) -> Self {
         self.currency = Some(ccy);
         self
     }
+
     /// Set day-count convention for the curve time axis.
+    ///
+    /// # Arguments
+    ///
+    /// * `day_count` - Explicit supported curve day-count convention (cannot be
+    ///   `ActActIsma`, `Act365L`, `ThirtyE360Isda`, or calendarless `Bus252`).
     pub fn day_count(mut self, day_count: DayCount) -> Self {
-        self.day_count = day_count;
+        self.day_count = Some(day_count);
         self
     }
+
+    /// Set the registered holiday calendar of the curve's time axis.
+    ///
+    /// Required for business-day day counts such as `Bus252`.
+    ///
+    /// # Arguments
+    ///
+    /// * `calendar_id` - Registered calendar id, or a `+`-joined union such as
+    ///   `"usny+target2"`; resolved and canonicalized at [`Self::build`].
+    pub fn calendar_id(mut self, calendar_id: impl Into<String>) -> Self {
+        self.calendar_id = Some(calendar_id.into());
+        self
+    }
+
+    /// Optionally set the time-axis holiday calendar; `None` clears it.
+    ///
+    /// # Arguments
+    ///
+    /// * `calendar_id` - Registered calendar id, or `None` for day counts that
+    ///   need no holiday calendar.
+    pub fn calendar_id_opt(mut self, calendar_id: Option<String>) -> Self {
+        self.calendar_id = calendar_id;
+        self
+    }
+
     /// Set recovery rate metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `r` - Assumed recovery on default as a decimal fraction in `[0, 1]`.
     pub fn recovery_rate(mut self, r: f64) -> Self {
         self.recovery_rate = Some(r);
         self
     }
-    /// Supply knot points `(t, λ)` where λ is the hazard rate.
+
+    /// Supply strictly ordered positive ending knot points `(t, λ)`.
+    ///
+    /// Each `t > 0` ends the piecewise-constant interval `(tᵢ₋₁, tᵢ]` carrying
+    /// finite annual default intensity `λ >= 0` (decimal per source-clock year).
+    ///
+    /// # Arguments
+    ///
+    /// * `pts` - Strictly ascending `(t, lambda)` pairs with `t > 0` and
+    ///   `lambda >= 0`.
     pub fn knots<I>(mut self, pts: I) -> Self
     where
         I: IntoIterator<Item = (f64, f64)>,
     {
         self.points.extend(pts);
-        self
-    }
-    /// Store the market par spreads used for bootstrap for reporting.
-    pub fn par_spreads<I>(mut self, pts: I) -> Self
-    where
-        I: IntoIterator<Item = (f64, f64)>,
-    {
-        self.par_points.extend(pts);
-        self
-    }
-    /// Set the interpolation method for par spreads.
-    pub fn par_interp(mut self, method: ParInterp) -> Self {
-        self.par_interp = method;
         self
     }
 
@@ -120,99 +173,85 @@ impl HazardCurveBuilder {
         self
     }
 
-    /// Set the maximum allowed hazard rate.
-    ///
-    /// During `build()`, any hazard rate exceeding this value triggers an error.
-    /// The default is `10.0` (implies >99.995% 1Y default probability).
-    pub fn max_hazard_rate(mut self, max: f64) -> Self {
-        self.max_hazard_rate = max;
-        self
-    }
-
-    /// Optionally set issuer metadata (no-op if `None`).
+    /// Optionally set issuer metadata (`None` clears it).
     pub(crate) fn issuer_opt(mut self, name: Option<impl Into<String>>) -> Self {
         self.issuer = name.map(Into::into);
         self
     }
 
-    /// Optionally set seniority metadata (no-op if `None`).
+    /// Optionally set seniority metadata (`None` clears it).
     pub(crate) fn seniority_opt(mut self, s: Option<Seniority>) -> Self {
         self.seniority = s;
         self
     }
 
-    /// Optionally set currency metadata (no-op if `None`).
+    /// Optionally set currency metadata (`None` clears it).
     pub(crate) fn currency_opt(mut self, ccy: Option<Currency>) -> Self {
         self.currency = ccy;
         self
     }
 
-    /// Stamp an opaque FX policy on the curve. See [`HazardCurve::fx_policy`].
+    /// Stamp an opaque FX policy on the curve.
+    ///
+    /// # Arguments
+    ///
+    /// * `policy` - FX policy metadata identifier preserved across rebuilds.
     pub fn fx_policy(mut self, policy: impl Into<String>) -> Self {
         self.fx_policy = Some(policy.into());
         self
     }
 
-    /// Optionally stamp an FX policy; `None` is a no-op. Used by the serde
-    /// round-trip path and by curve builders propagating metadata.
+    /// Optionally stamp an FX policy; `None` clears it.
+    ///
+    /// # Arguments
+    ///
+    /// * `policy` - Optional FX policy metadata identifier.
     pub fn fx_policy_opt(mut self, policy: Option<String>) -> Self {
         self.fx_policy = policy;
         self
     }
 
-    /// Validate input and build the [`HazardCurve`].
-    ///
-    /// # Validation
-    ///
-    /// - Base date must be explicitly set
-    /// - At least one knot point required
-    /// - All hazard rates must be non-negative and finite
-    /// - Hazard rates > `max_hazard_rate` (default 10.0) trigger an error
-    /// - Recovery rate must be supplied explicitly and lie in [0, 1]
-    /// - Knot times must be strictly increasing after sorting by time
-    /// - Stored par-spread tenors must be finite and non-negative, and spreads
-    ///   must be finite; they are retained for reporting rather than used to
-    ///   re-bootstrap hazards
-    ///
-    /// The only supported survival interpolation is log-linear, which corresponds to
-    /// piecewise-constant hazards between pillars. A zero-time knot is allowed;
-    /// its hazard applies from the base date onward.
+    /// Validate inputs and construct the [`HazardCurve`].
     ///
     /// # Errors
     ///
-    /// Returns an error when the base date was not explicitly set, no knots
-    /// are supplied, a time, rate, recovery rate, or stored par spread is
-    /// invalid, knot times are duplicated, or a hazard rate exceeds the
-    /// configured maximum.
-    /// Input points are sorted by time before the curve is
-    /// constructed; callers need not pre-sort them.
+    /// Returns an error if `base_date`, `day_count`, or `recovery_rate` is
+    /// missing, `recovery_rate` is outside `[0, 1]`, the day-count clock is
+    /// unsupported or missing its `Bus252` calendar, `knots` is empty, any
+    /// knot time is non-finite, `<= 0.0`, or not strictly increasing as supplied,
+    /// any intensity is non-finite or negative, or retained conditioned-source
+    /// invariants fail.
     pub fn build(self) -> crate::Result<HazardCurve> {
         let base = self.base.ok_or_else(|| {
             crate::Error::Validation("HazardCurve requires base_date".to_string())
         })?;
-        if self.points.is_empty() {
-            return Err(InputError::TooFewPoints.into());
-        }
-
+        let day_count = self.day_count.ok_or_else(|| {
+            crate::Error::Validation("HazardCurve requires day_count".to_string())
+        })?;
         let recovery_rate = self.recovery_rate.ok_or_else(|| {
             crate::Error::Validation(
                 "HazardCurve requires an explicit recovery_rate in [0, 1]".to_string(),
             )
         })?;
-        if !self.max_hazard_rate.is_finite() || self.max_hazard_rate <= 0.0 {
-            return Err(crate::Error::Validation(format!(
-                "HazardCurve max_hazard_rate must be finite and positive, got {}",
-                self.max_hazard_rate
-            )));
+        crate::validation::validate_f64_unit_interval(recovery_rate, "recovery_rate")?;
+
+        let calendar = validate_curve_clock(
+            "HazardCurve",
+            self.id.as_str(),
+            day_count,
+            self.calendar_id.as_deref(),
+        )?;
+
+        if self.points.is_empty() {
+            return Err(InputError::TooFewPoints.into());
         }
 
-        // Validate knot times and hazard rates: times must be finite/non-negative;
-        // rates non-negative and finite; a zero-time anchor is allowed, but all
-        // subsequent knots must increase strictly.
-        for &(t, lambda) in &self.points {
-            if !t.is_finite() || t < 0.0 {
+        let mut kvec = Vec::with_capacity(self.points.len());
+        let mut lvec = Vec::with_capacity(self.points.len());
+        for (idx, &(t, lambda)) in self.points.iter().enumerate() {
+            if !t.is_finite() || t <= 0.0 {
                 return Err(crate::Error::Validation(format!(
-                    "HazardCurve knot time must be finite and non-negative, got t={t}"
+                    "HazardCurve knot time must be finite and strictly positive (t > 0), got t={t}"
                 )));
             }
             if lambda < 0.0 {
@@ -223,47 +262,53 @@ impl HazardCurveBuilder {
                     "HazardCurve hazard rate must be finite, got lambda={lambda} at t={t}"
                 )));
             }
-            // Sanity check: λ exceeding max_hazard_rate is almost certainly a
-            // data error (units confusion, etc.).  Default limit is 10.0 which
-            // implies >99.995% 1Y default probability.
-            if lambda > self.max_hazard_rate {
+            if idx > 0 && t <= self.points[idx - 1].0 {
+                return Err(InputError::NonMonotonicKnots.into());
+            }
+            kvec.push(t);
+            lvec.push(lambda);
+        }
+
+        let mut source = self.source;
+        if let Some(src) = &mut source {
+            if base < src.base_date {
                 return Err(crate::Error::Validation(format!(
-                    "Hazard rate {lambda:.4} at t={t:.4}y exceeds maximum {:.4}. \
-                     Use .max_hazard_rate() to override.",
-                    self.max_hazard_rate
+                    "HazardCurve base_date ({base}) cannot precede source base_date ({})",
+                    src.base_date
                 )));
             }
-        }
-
-        crate::validation::validate_f64_unit_interval(recovery_rate, "recovery_rate")?;
-
-        let mut points = self.points;
-        points.sort_by(|a, b| a.0.total_cmp(&b.0));
-        let (kvec, lvec): (Vec<f64>, Vec<f64>) = points.into_iter().unzip();
-        if kvec.len() > 1 {
-            for i in 1..kvec.len() {
-                if kvec[i] <= kvec[i - 1] {
-                    return Err(crate::Error::Validation(
-                        "hazard curve knot times must be strictly increasing".to_string(),
-                    ));
+            if src.knot_points.is_empty() {
+                return Err(InputError::TooFewPoints.into());
+            }
+            for (idx, &(t, lambda)) in src.knot_points.iter().enumerate() {
+                if !t.is_finite() || t <= 0.0 || !lambda.is_finite() || lambda < 0.0 {
+                    return Err(crate::Error::Validation(format!(
+                        "HazardCurve source knot ({t}, {lambda}) must have finite t > 0 and lambda >= 0"
+                    )));
+                }
+                if idx > 0 && t <= src.knot_points[idx - 1].0 {
+                    return Err(InputError::NonMonotonicKnots.into());
                 }
             }
-        }
-        let mut par_pts = self.par_points;
-        for &(t, spread) in &par_pts {
-            if !t.is_finite() || t < 0.0 || !spread.is_finite() {
-                return Err(crate::Error::Validation(
-                    "hazard curve par spread pillars must be finite with non-negative tenors"
-                        .to_string(),
-                ));
+            src.offset =
+                signed_curve_year_fraction(src.base_date, base, day_count, calendar.as_ref())?;
+            if !src.offset.is_finite() || src.offset < 0.0 {
+                return Err(crate::Error::Validation(format!(
+                    "hazard curve condition offset must be finite and non-negative, got {}",
+                    src.offset
+                )));
             }
-        }
-        par_pts.sort_by(|a, b| a.0.total_cmp(&b.0));
-        let (p_ten, p_spd): (Vec<f64>, Vec<f64>) = par_pts.into_iter().unzip();
-        for pair in p_ten.windows(2) {
-            if pair[1] <= pair[0] {
+            let expected_points = surviving_source_knots(&src.knot_points, src.offset);
+            if kvec.len() != expected_points.len()
+                || kvec
+                    .iter()
+                    .zip(lvec.iter())
+                    .zip(expected_points.iter())
+                    .any(|((&kt, &kl), &(et, el))| !exact_f64_eq(kt, et) || !exact_f64_eq(kl, el))
+            {
                 return Err(crate::Error::Validation(
-                    "hazard curve par spread tenors must be strictly increasing".to_string(),
+                    "conditioned hazard curve pillars do not match retained source curve"
+                        .to_string(),
                 ));
             }
         }
@@ -277,13 +322,31 @@ impl HazardCurveBuilder {
             issuer: self.issuer,
             seniority: self.seniority,
             currency: self.currency,
-            day_count: self.day_count,
-            par_tenors: p_ten.into_boxed_slice(),
-            par_spreads_bp: p_spd.into_boxed_slice(),
-            par_interp: self.par_interp,
+            day_count,
+            calendar,
             hazard_calibration: self.hazard_calibration,
-            max_hazard_rate: self.max_hazard_rate,
             fx_policy: self.fx_policy,
+            source,
         })
     }
+}
+
+/// Compute conditioned surviving `(rem, lambda)` pillars relative to `offset`.
+pub(super) fn surviving_source_knots(source_knots: &[(f64, f64)], offset: f64) -> Vec<(f64, f64)> {
+    let mut surviving: Vec<(f64, f64)> = source_knots
+        .iter()
+        .filter_map(|&(source_t, source_lambda)| {
+            if source_t > offset {
+                let rem = source_t - offset;
+                (rem.is_finite() && rem > 0.0).then_some((rem, source_lambda))
+            } else {
+                None
+            }
+        })
+        .collect();
+    if surviving.is_empty() {
+        let tail_lambda = source_knots[source_knots.len() - 1].1;
+        surviving.push((1.0, tail_lambda));
+    }
+    surviving
 }

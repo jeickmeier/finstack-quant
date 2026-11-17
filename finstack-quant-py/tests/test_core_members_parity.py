@@ -84,12 +84,12 @@ def test_hazard_curve_json_round_trip() -> None:
         "2025-01-01",
         [(1.0, 0.02), (5.0, 0.03)],
         recovery_rate=0.4,
-        par_spreads=[(1.0, 120.0), (5.0, 180.0)],
-        par_interp="log_linear",
+        day_count="act_365f",
         issuer="ACME",
         seniority="senior",
         currency="USD",
     )
     assert HazardCurve.from_json(curve.to_json()).to_json() == curve.to_json()
     assert curve.knot_points == [(1.0, 0.02), (5.0, 0.03)]
-    assert curve.cds_quote_bp(3.0) == curve.cds_quote_bp(3.0, "log_linear")
+    assert curve.day_count == "act_365f"
+    assert curve.calendar_id is None

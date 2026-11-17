@@ -27,7 +27,7 @@ use finstack_quant_models::monte_carlo::pricer::path_dependent::{
 use finstack_quant_models::monte_carlo::process::gbm::{GbmParams, GbmProcess};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::common_impl::vol_resolution::{
-    resolve_fx_sigma_at, resolve_sigma_at,
+    FxVolatilityRequest, resolve_fx_sigma, resolve_sigma_at,
 };
 use finstack_quant_valuations_core::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, expect_inst,
@@ -83,14 +83,27 @@ fn asset_growth(
         )?;
     finstack_quant_core::validation::validate_f64_positive(fx_spot, "RangeAccrual quanto FX spot")?;
     let fx_forward = fx_spot * asset_df / payoff_df;
-    let sigma_fx = resolve_fx_sigma_at(
-        &Default::default(),
-        curves,
-        quanto.fx_vol_surface_id.as_str(),
-        t,
+    finstack_quant_core::validation::validate_f64_positive(
         fx_forward,
-        fx_forward,
+        "RangeAccrual quanto FX forward",
     )?;
+    let fx_pair = finstack_quant_core::money::fx::CurrencyPair::try_new(
+        quanto.asset_currency,
+        inst.terms.notional.currency(),
+    )?;
+    let fx_overrides =
+        finstack_quant_valuations_core::instruments::pricing_overrides::MarketQuoteOverrides::default();
+    let sigma_fx = resolve_fx_sigma(FxVolatilityRequest {
+        overrides: &fx_overrides,
+        curves,
+        vol_surface_id: quanto.fx_vol_surface_id.as_str(),
+        pair: fx_pair,
+        as_of,
+        expiry: date,
+        model_time: t,
+        strike: fx_forward,
+        forward: fx_forward,
+    })?;
     Ok((-(q + quanto.correlation * sigma * sigma_fx) * t).exp() / asset_df)
 }
 
@@ -568,7 +581,9 @@ mod tests {
     use crate::exotics::range_accrual::types::RangeAccrual;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use time::Month;
@@ -583,11 +598,16 @@ mod tests {
             .base_date(as_of)
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, 0.97), (2.0, 0.94)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let surface = VolSurface::builder("SPX-VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&[80.0, 100.0, 120.0, 140.0])
+            .secondary_values(&[80.0, 100.0, 120.0, 140.0])
             .row(&[0.20, 0.20, 0.20, 0.20])
             .row(&[0.20, 0.20, 0.20, 0.20])
             .row(&[0.20, 0.20, 0.20, 0.20])
@@ -598,8 +618,14 @@ mod tests {
         MarketContext::new()
             .insert(curve)
             .insert_surface(surface)
-            .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0))
-            .insert_price("SPX-DIV", MarketScalar::Unitless(0.02))
+            .insert_price(
+                "SPX-SPOT",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "SPX-DIV",
+                MarketScalar::unitless(0.02).expect("valid scalar"),
+            )
     }
 
     #[test]
@@ -682,13 +708,18 @@ mod tests {
                     .base_date(as_of)
                     .day_count(finstack_quant_core::dates::DayCount::Act365F)
                     .knots([(0.0, 1.0), (1.0, 0.97), (2.0, 0.94)])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("curve"),
             )
             .insert_surface(
                 VolSurface::builder("SPX-VOL")
+                    .secondary_axis(VolSurfaceAxis::Strike)
+                    .quote_type(VolQuoteType::BlackLognormal)
+                    .interpolation_mode(VolInterpolationMode::Vol)
                     .expiries(&[0.25, 0.5, 1.0, 2.0])
-                    .strikes(&[80.0, 100.0, 120.0, 140.0])
+                    .secondary_values(&[80.0, 100.0, 120.0, 140.0])
                     .row(&[0.20, 0.20, 0.20, 0.20])
                     .row(&[0.20, 0.20, 0.20, 0.20])
                     .row(&[0.20, 0.20, 0.20, 0.20])
@@ -696,10 +727,13 @@ mod tests {
                     .build()
                     .expect("surface"),
             )
-            .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0));
+            .insert_price(
+                "SPX-SPOT",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            );
         let price_div_market = market(as_of).insert_price(
             "SPX-DIV",
-            MarketScalar::Price(Money::from((2_i64, Currency::USD))),
+            MarketScalar::price(Money::from((2_i64, Currency::USD))),
         );
 
         assert!(compute_pv(&inst, &no_div_market, as_of).is_err());
@@ -857,6 +891,8 @@ mod tests {
             .base_date(as_of)
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.0, 1.0), (0.5, 1.0), (1.0, 0.9), (2.0, 0.8)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let curves = market(as_of).insert(curve);
@@ -882,11 +918,17 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (2.0, 1.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let surface = VolSurface::builder("SPX-VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.5, 1.0])
-            .strikes(&[90.0, 100.0, 110.0])
+            .secondary_values(&[90.0, 100.0, 110.0])
             .row(&[0.0, 0.0, 0.0])
             .row(&[0.0, 0.0, 0.0])
             .build()
@@ -912,8 +954,11 @@ mod tests {
         }
         // An isolated zero ATM quote is not a deterministic distribution.
         let smile = VolSurface::builder("SPX-VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.5, 1.0])
-            .strikes(&[90.0, 100.0, 110.0])
+            .secondary_values(&[90.0, 100.0, 110.0])
             .row(&[0.2, 0.0, 0.2])
             .row(&[0.2, 0.0, 0.2])
             .build()
@@ -952,6 +997,8 @@ mod tests {
             .base_date(as_of)
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, (-0.05_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let first_forward = 100.0 / curve.df_between_dates(as_of, first).expect("first DF");
@@ -990,17 +1037,24 @@ mod tests {
             .base_date(as_of)
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.0, 1.0), (182.0 / 365.0, 0.99), (1.0, 0.90)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("USD curve");
         let asset_curve = DiscountCurve::builder("EUR-OIS")
             .base_date(as_of)
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.0, 1.0), (182.0 / 365.0, 0.98), (1.0, 0.92)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("EUR curve");
         let fx_surface = VolSurface::builder("EURUSD-VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.1, 2.0])
-            .strikes(&[0.5, 2.0])
+            .secondary_values(&[0.5, 2.0])
             .row(&[sigma_fx; 2])
             .row(&[sigma_fx; 2])
             .build()
@@ -1009,8 +1063,8 @@ mod tests {
             .insert(payment_curve)
             .insert(asset_curve)
             .insert_surface(fx_surface)
-            .insert_price("SPX-DIV", MarketScalar::Unitless(q))
-            .insert_price("EURUSD", MarketScalar::Unitless(1.1));
+            .insert_price("SPX-DIV", MarketScalar::unitless(q).expect("valid scalar"))
+            .insert_price("EURUSD", MarketScalar::unitless(1.1).expect("valid scalar"));
         let pricer = RangeAccrualMcPricer {
             config: PathDependentPricerConfig {
                 steps_per_year: 4.0,
@@ -1069,11 +1123,16 @@ mod tests {
             .base_date(as_of)
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.0, 1.0), (182.0 / 365.0, 0.8), (1.0, 0.75)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let zero_surface = VolSurface::builder("SPX-VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.1, 2.0])
-            .strikes(&[90.0, 150.0])
+            .secondary_values(&[90.0, 150.0])
             .row(&[0.0; 2])
             .row(&[0.0; 2])
             .build()

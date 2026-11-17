@@ -199,16 +199,27 @@ pub fn convert_atm_volatility(
         p - price_from
     };
 
-    let solver = BrentSolver::new();
+    let solver = BrentSolver::new(1e-12, 100)?;
+    let min_vol = VOL_FLOOR;
+    let max_vol = (guess.abs().max(vol.abs()) * 1e4).max(100.0);
+    let guess_clamped = guess.clamp(min_vol, max_vol);
+    let half_width = (0.5 * guess_clamped).clamp(1e-4, 0.25 * (max_vol - min_vol));
 
-    match solver.solve(objective, guess) {
+    match solver.solve(
+        |v| Ok(objective(v)),
+        guess_clamped,
+        min_vol,
+        max_vol,
+        half_width,
+        20,
+    ) {
         Ok(solved) => {
             let result = solved.max(VOL_FLOOR);
             if result.is_finite() && result > 0.0 {
                 Ok(result)
             } else {
                 Err(InputError::VolatilityConversionFailed {
-                    tolerance: solver.tolerance,
+                    tolerance: solver.get_tolerance(),
                     residual: objective(solved).abs(),
                 }
                 .into())
@@ -217,7 +228,7 @@ pub fn convert_atm_volatility(
         Err(_) => {
             let residual = objective(guess).abs();
             Err(InputError::VolatilityConversionFailed {
-                tolerance: solver.tolerance,
+                tolerance: solver.get_tolerance(),
                 residual,
             }
             .into())

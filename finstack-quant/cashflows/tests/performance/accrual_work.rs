@@ -166,9 +166,11 @@ fn selected(
 fn scalar(active: &[(&PeriodInputs, f64)], config: &AccrualConfig) -> f64 {
     let mut total = finstack_quant_core::math::summation::NeumaierAccumulator::default();
     for &(inputs, elapsed) in active {
-        total.add(accrue_in_period(inputs, elapsed, &config.method).unwrap());
+        total
+            .add(accrue_in_period(inputs, elapsed, &config.method).unwrap())
+            .unwrap();
     }
-    let value = total.total();
+    let value = total.get_total().unwrap();
     assert!(value.is_finite());
     value
 }

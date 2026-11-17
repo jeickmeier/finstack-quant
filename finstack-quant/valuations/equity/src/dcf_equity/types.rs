@@ -1525,6 +1525,9 @@ mod tests {
         DiscountCurve::builder(id.clone())
             .base_date(as_of)
             .knots(knots)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("failed to build flat discount curve")
     }

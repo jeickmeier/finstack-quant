@@ -52,6 +52,50 @@ fn sunday_substitute(date: Date) -> Date {
     }
 }
 
+fn push_hong_kong_historic(year: i32, dates: &mut Dates) {
+    if year <= 1982 {
+        fixed(year, Month::April, 21, dates);
+        if let Ok(july) = Date::from_calendar_date(year, Month::July, 1) {
+            dates.push(sunday_substitute(july));
+        }
+        nth_monday(year, Month::August, 1, dates);
+    } else if year <= 1997 {
+        // LegCo 1983-11-09 p.202 announced 1984 June 16/18, one week later.
+        let week = if year == 1984 { 3 } else { 2 };
+        if let Some(birthday) =
+            algo::nth_weekday_of_month(year, Month::June, Weekday::Saturday, week)
+        {
+            dates.extend([birthday, birthday + Duration::days(2)]);
+        }
+    }
+    if year <= 1996
+        && let Some(liberation) =
+            algo::nth_weekday_of_month(year, Month::August, Weekday::Monday, -1)
+    {
+        dates.push(liberation);
+        if year >= 1983 {
+            dates.push(liberation - Duration::days(2));
+        }
+    }
+    if (1997..=1998).contains(&year) {
+        fixed(year, Month::October, 2, dates);
+        nth_monday(year, Month::August, 3, dates);
+    }
+    if year == 1997 {
+        fixed(year, Month::July, 2, dates);
+    }
+    // One-off general holidays recorded in the 2015 LegCo holiday debate.
+    if year == 1981 {
+        fixed(year, Month::July, 29, dates);
+    }
+    if year == 1986 {
+        fixed(year, Month::October, 22, dates);
+    }
+    if year == 2015 {
+        fixed(year, Month::September, 3, dates);
+    }
+}
+
 /// Materialize Hong Kong general holidays excluding ordinary Sundays.
 pub(super) fn hong_kong<A: Array<Item = Date>>(
     year: i32,
@@ -117,47 +161,7 @@ pub(super) fn hong_kong<A: Array<Item = Date>>(
         fixed(year, Month::July, 1, &mut dates);
         fixed(year, Month::October, 1, &mut dates);
     }
-    if year <= 1982 {
-        fixed(year, Month::April, 21, &mut dates);
-        if let Ok(july) = Date::from_calendar_date(year, Month::July, 1) {
-            dates.push(sunday_substitute(july));
-        }
-        nth_monday(year, Month::August, 1, &mut dates);
-    } else if year <= 1997 {
-        // LegCo 1983-11-09 p.202 announced 1984 June 16/18, one week later.
-        let week = if year == 1984 { 3 } else { 2 };
-        if let Some(birthday) =
-            algo::nth_weekday_of_month(year, Month::June, Weekday::Saturday, week)
-        {
-            dates.extend([birthday, birthday + Duration::days(2)]);
-        }
-    }
-    if year <= 1996
-        && let Some(liberation) =
-            algo::nth_weekday_of_month(year, Month::August, Weekday::Monday, -1)
-    {
-        dates.push(liberation);
-        if year >= 1983 {
-            dates.push(liberation - Duration::days(2));
-        }
-    }
-    if (1997..=1998).contains(&year) {
-        fixed(year, Month::October, 2, &mut dates);
-        nth_monday(year, Month::August, 3, &mut dates);
-    }
-    if year == 1997 {
-        fixed(year, Month::July, 2, &mut dates);
-    }
-    // One-off general holidays recorded in the 2015 LegCo holiday debate.
-    if year == 1981 {
-        fixed(year, Month::July, 29, &mut dates);
-    }
-    if year == 1986 {
-        fixed(year, Month::October, 22, &mut dates);
-    }
-    if year == 2015 {
-        fixed(year, Month::September, 3, &mut dates);
-    }
+    push_hong_kong_historic(year, &mut dates);
 
     // Reserve every ordinary holiday before resolving collisions, so a
     // substitute cannot consume a later holiday. Saturday is a weekday in

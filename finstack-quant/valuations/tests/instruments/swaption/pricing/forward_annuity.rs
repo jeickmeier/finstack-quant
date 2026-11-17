@@ -58,9 +58,11 @@ fn expected_discount_projected_par_rate(
         let df_pay = disc
             .df_between_dates(as_of, period.payment_date)
             .expect("payment discount factor");
-        float_pv.add((df_start / df_end - 1.0) * df_pay);
+        float_pv
+            .add((df_start / df_end - 1.0) * df_pay)
+            .expect("finite float pv term");
     }
-    float_pv.total() / fixed_annuity
+    float_pv.get_total().expect("finite float pv") / fixed_annuity
 }
 
 #[test]

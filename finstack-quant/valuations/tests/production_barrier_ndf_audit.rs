@@ -5,7 +5,9 @@ use finstack_quant_core::{
     currency::Currency,
     dates::{Date, DayCount},
     market_data::{
-        context::MarketContext, scalars::MarketScalar, surfaces::VolSurface,
+        context::MarketContext,
+        scalars::MarketScalar,
+        surfaces::{VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis},
         term_structures::DiscountCurve,
     },
     money::Money,
@@ -22,14 +24,23 @@ fn market(as_of: Date) -> MarketContext {
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (2.0, 1.0)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("zero discount curve"),
         )
-        .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0))
+        .insert_price(
+            "SPX-SPOT",
+            MarketScalar::unitless(100.0).expect("valid scalar"),
+        )
         .insert_surface(
             VolSurface::builder("SPX-VOL")
+                .secondary_axis(VolSurfaceAxis::Strike)
+                .quote_type(VolQuoteType::BlackLognormal)
+                .interpolation_mode(VolInterpolationMode::Vol)
                 .expiries(&[1.0])
-                .strikes(&[100.0])
+                .secondary_values(&[100.0])
                 .row(&[0.2])
                 .build()
                 .expect("volatility"),
@@ -127,18 +138,24 @@ fn production_barrier_ndf_quanto_uses_asset_financing_and_payoff_discounting() {
             DiscountCurve::builder("EUR-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (2.0, (-0.2_f64).exp())])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("asset financing curve"),
         )
         .insert_price(
             "SPX-SPOT",
-            MarketScalar::Price(Money::from((100_i64, Currency::EUR))),
+            MarketScalar::price(Money::from((100_i64, Currency::EUR))),
         )
-        .insert_price("EURUSD", MarketScalar::Unitless(1.1))
+        .insert_price("EURUSD", MarketScalar::unitless(1.1).expect("valid scalar"))
         .insert_surface(
             VolSurface::builder("FX-VOL")
+                .secondary_axis(VolSurfaceAxis::Strike)
+                .quote_type(VolQuoteType::BlackLognormal)
+                .interpolation_mode(VolInterpolationMode::Vol)
                 .expiries(&[1.0])
-                .strikes(&[1.0])
+                .secondary_values(&[1.0])
                 .row(&[0.1])
                 .build()
                 .expect("FX volatility"),
@@ -273,16 +290,37 @@ fn production_barrier_ndf_discrete_gbm_and_heston_do_not_observe_between_dates()
         .year_fraction(as_of, expiry, Default::default())
         .expect("time");
     let market = market(as_of)
-        .insert_price("DIV", MarketScalar::Unitless(-(0.8_f64).ln() / t))
-        .insert_price("HESTON_KAPPA", MarketScalar::Unitless(1.0))
-        .insert_price("HESTON_THETA", MarketScalar::Unitless(1e-16))
-        .insert_price("HESTON_V0", MarketScalar::Unitless(1e-16))
-        .insert_price("HESTON_SIGMA_V", MarketScalar::Unitless(1e-12))
-        .insert_price("HESTON_RHO", MarketScalar::Unitless(0.0))
+        .insert_price(
+            "DIV",
+            MarketScalar::unitless(-(0.8_f64).ln() / t).expect("valid scalar"),
+        )
+        .insert_price(
+            "HESTON_KAPPA",
+            MarketScalar::unitless(1.0).expect("valid scalar"),
+        )
+        .insert_price(
+            "HESTON_THETA",
+            MarketScalar::unitless(1e-16).expect("valid scalar"),
+        )
+        .insert_price(
+            "HESTON_V0",
+            MarketScalar::unitless(1e-16).expect("valid scalar"),
+        )
+        .insert_price(
+            "HESTON_SIGMA_V",
+            MarketScalar::unitless(1e-12).expect("valid scalar"),
+        )
+        .insert_price(
+            "HESTON_RHO",
+            MarketScalar::unitless(0.0).expect("valid scalar"),
+        )
         .insert_surface(
             VolSurface::builder("SPX-VOL")
+                .secondary_axis(VolSurfaceAxis::Strike)
+                .quote_type(VolQuoteType::BlackLognormal)
+                .interpolation_mode(VolInterpolationMode::Vol)
                 .expiries(&[1.0])
-                .strikes(&[100.0])
+                .secondary_values(&[100.0])
                 .row(&[1e-8])
                 .build()
                 .expect("near-zero vol"),

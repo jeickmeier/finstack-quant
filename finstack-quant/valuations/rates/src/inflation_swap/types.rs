@@ -78,11 +78,9 @@ pub struct InflationSwap {
     pub day_count: DayCount,
     /// Trade side
     pub side: PayReceive,
-    /// Contractual CPI observation lag; when `None` the index lag, then the
-    /// curve's indexation lag, applies.
+    /// Explicit contractual CPI observation lag; missing terms fail reference resolution.
     pub lag: Option<InflationLag>,
-    /// Contractual monthly reference-index interpolation; takes precedence over index metadata;
-    /// without either source the default is monthly step interpolation.
+    /// Explicit contractual monthly reference-index interpolation; no source default is used.
     pub interpolation: Option<SeriesInterpolation>,
     /// Explicit Base CPI (reference index level at start with lag applied).
     /// If not provided, it will be looked up/calculated from start date.
@@ -141,7 +139,8 @@ impl InflationSwap {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
-            .lag(InflationLag::Months(3))
+            .lag(InflationLag::months(3))
+            .interpolation(SeriesInterpolation::Linear)
             .business_day_convention(BusinessDayConvention::Following)
             .attributes(Attributes::new())
             .build()
@@ -179,36 +178,28 @@ impl InflationSwap {
         Ok(())
     }
 
-    fn effective_lag(&self, curves: &MarketContext) -> InflationLag {
-        finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_inflation_lag(
-            self.lag,
-            self.inflation_index_id.as_str(),
-            curves,
-        )
-    }
-
     fn cpi_value(
         &self,
         curves: &MarketContext,
-        as_of: Date,
+        _as_of: Date,
         date: Date,
     ) -> finstack_quant_core::Result<f64> {
-        let interpolation = self
-            .interpolation
-            .or_else(|| {
-                curves
-                    .get_inflation_index(self.inflation_index_id.as_str())
-                    .ok()
-                    .map(|index| index.interpolation())
-            })
-            .unwrap_or_default();
+        let lag = self.lag.ok_or_else(|| {
+            finstack_quant_core::Error::Validation("InflationSwap requires an explicit lag".into())
+        })?;
+        let interpolation = self.interpolation.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "InflationSwap requires explicit reference interpolation".into(),
+            )
+        })?;
+        let index = curves.get_inflation_index(self.inflation_index_id.as_str())?;
         Ok(
             finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_reference_inflation(
                 curves,
                 self.inflation_index_id.as_str(),
                 date,
-                as_of,
-                self.effective_lag(curves),
+                index.knowledge_date(),
+                lag,
                 interpolation,
             )?
             .value,
@@ -217,9 +208,8 @@ impl InflationSwap {
 
     /// Calculate the projected index ratio I(T_mat - Lag) / I(T_start - Lag).
     ///
-    /// When using an InflationIndex, the index applies its own lag internally via `value_on()`,
-    /// so we pass unlagged dates. When falling back to the inflation curve, we must apply
-    /// the lag ourselves since the curve works in year fractions from its base date.
+    /// The shared resolver applies contractual lag once and uses the explicitly
+    /// selected observation snapshot, independently of the valuation date.
     ///
     /// # Errors
     ///
@@ -562,13 +552,13 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
             self.maturity,
             self.day_count,
             None,
-            finstack_quant_core::dates::DayCountContextState {
-                calendar_id: None,
-                coupon_period: None,
-                end_is_termination_date: Some(false),
-                frequency: None,
-                bus_basis: None,
-            },
+            finstack_quant_core::dates::DayCountContextState::try_new(
+                None,
+                None,
+                None,
+                None,
+                Some(false),
+            )?,
         )?)
         .build()?;
         let inflation_flow = CashFlowParams::new(
@@ -584,13 +574,13 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
             self.maturity,
             self.day_count,
             inflation_rate,
-            finstack_quant_core::dates::DayCountContextState {
-                calendar_id: None,
-                coupon_period: None,
-                end_is_termination_date: Some(false),
-                frequency: None,
-                bus_basis: None,
-            },
+            finstack_quant_core::dates::DayCountContextState::try_new(
+                None,
+                None,
+                None,
+                None,
+                Some(false),
+            )?,
         )?)
         .build()?;
         let schedule = finstack_quant_cashflows::schedule_from_classified_flows(
@@ -658,11 +648,9 @@ pub struct YoYInflationSwap {
     pub day_count: DayCount,
     /// Trade side
     pub side: PayReceive,
-    /// Contractual CPI observation lag; when `None` the index lag, then the
-    /// curve's indexation lag, applies.
+    /// Explicit contractual CPI observation lag; missing terms fail reference resolution.
     pub lag: Option<InflationLag>,
-    /// Contractual monthly reference-index interpolation; takes precedence over index metadata;
-    /// without either source the default is monthly step interpolation.
+    /// Explicit contractual monthly reference-index interpolation; no source default is used.
     pub interpolation: Option<SeriesInterpolation>,
     /// Observed contractual reference CPI at start, with lag and interpolation
     /// already applied. If absent, start CPI must resolve from market observations.
@@ -722,7 +710,8 @@ impl YoYInflationSwap {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
-            .lag(InflationLag::Months(3))
+            .lag(InflationLag::months(3))
+            .interpolation(SeriesInterpolation::Linear)
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)
             .attributes(Attributes::new())
             .build()
@@ -753,18 +742,10 @@ impl YoYInflationSwap {
         Ok(())
     }
 
-    fn effective_lag(&self, curves: &MarketContext) -> InflationLag {
-        finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_inflation_lag(
-            self.lag,
-            self.inflation_index_id.as_str(),
-            curves,
-        )
-    }
-
     fn cpi_value(
         &self,
         curves: &MarketContext,
-        as_of: Date,
+        _as_of: Date,
         date: Date,
     ) -> finstack_quant_core::Result<f64> {
         if date == self.start_date
@@ -775,22 +756,24 @@ impl YoYInflationSwap {
             }
             return Ok(base);
         }
-        let interpolation = self
-            .interpolation
-            .or_else(|| {
-                curves
-                    .get_inflation_index(self.inflation_index_id.as_str())
-                    .ok()
-                    .map(|index| index.interpolation())
-            })
-            .unwrap_or_default();
+        let lag = self.lag.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "YoYInflationSwap requires an explicit lag".into(),
+            )
+        })?;
+        let interpolation = self.interpolation.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "YoYInflationSwap requires explicit reference interpolation".into(),
+            )
+        })?;
+        let index = curves.get_inflation_index(self.inflation_index_id.as_str())?;
         Ok(
             finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_reference_inflation(
                 curves,
                 self.inflation_index_id.as_str(),
                 date,
-                as_of,
-                self.effective_lag(curves),
+                index.knowledge_date(),
+                lag,
                 interpolation,
             )?
             .value,
@@ -986,13 +969,13 @@ impl YoYInflationSwap {
                 end,
                 self.day_count,
                 None,
-                finstack_quant_core::dates::DayCountContextState {
-                    calendar_id: None,
-                    coupon_period: None,
-                    end_is_termination_date: Some(false),
-                    frequency: None,
-                    bus_basis: None,
-                },
+                finstack_quant_core::dates::DayCountContextState::try_new(
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(false),
+                )?,
             )?)
             .build()?;
             let inflation_flow = CashFlowParams::new(
@@ -1008,13 +991,13 @@ impl YoYInflationSwap {
                 end,
                 self.day_count,
                 Some(inflation_rate),
-                finstack_quant_core::dates::DayCountContextState {
-                    calendar_id: None,
-                    coupon_period: None,
-                    end_is_termination_date: Some(false),
-                    frequency: None,
-                    bus_basis: None,
-                },
+                finstack_quant_core::dates::DayCountContextState::try_new(
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(false),
+                )?,
             )?)
             .build()?;
             flows.push(fixed_flow);
@@ -1125,8 +1108,9 @@ mod tests {
     use super::*;
     use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::market_data::scalars::InflationIndex;
+    use finstack_quant_core::market_data::scalars::{InflationIndex, InflationObservation};
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
+    use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
     use finstack_quant_valuations_core::instruments::Instrument;
     use time::Month;
 
@@ -1137,7 +1121,9 @@ mod tests {
     fn sample_inflation_curve(base_date: Date) -> InflationCurve {
         InflationCurve::builder("US-CPI")
             .base_date(base_date)
-            .base_cpi(100.0)
+            .day_count(DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .knots([(0.0, 100.0), (1.0, 110.0), (2.0, 121.0)])
             .build()
             .expect("inflation curve should build")
@@ -1147,20 +1133,37 @@ mod tests {
         DiscountCurve::builder("USD-OIS")
             .base_date(base_date)
             .knots([(0.0, 1.0), (2.0, 1.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve should build")
     }
 
     fn flat_historical_index() -> InflationIndex {
+        let knowledge_date = d(2025, Month::January, 1);
+        let fixture = finstack_quant_valuations_test_support::inflation::simple_index(
+            "US-CPI",
+            knowledge_date,
+            100.0,
+            Currency::USD,
+        );
         InflationIndex::new(
             "US-CPI",
-            vec![
-                (d(2020, Month::January, 1), 100.0),
-                (d(2030, Month::January, 1), 100.0),
-            ],
+            fixture
+                .observations()
+                .iter()
+                .map(|observation| InflationObservation {
+                    value: 100.0,
+                    ..*observation
+                })
+                .collect(),
             Currency::USD,
+            knowledge_date,
         )
         .expect("inflation index should build")
+        .with_expected_releases(fixture.get_expected_releases().to_vec())
+        .expect("explicit synthetic releases")
     }
 
     fn sample_swap(start_date: Date, maturity: Date) -> InflationSwap {
@@ -1175,6 +1178,7 @@ mod tests {
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
             .lag(InflationLag::None)
+            .interpolation(SeriesInterpolation::Step)
             .attributes(Attributes::new())
             .build()
             .expect("swap should build")
@@ -1192,20 +1196,20 @@ mod tests {
             .insert(
                 InflationCurve::builder("US-CPI")
                     .base_date(as_of)
-                    .base_cpi(310.0)
+                    .day_count(DayCount::Act365F)
+                    .interp(InterpStyle::LogLinear)
+                    .extrapolation(ExtrapolationPolicy::Flat)
                     .knots([(0.0, 310.0), (1.0, 310.0)])
-                    .indexation_lag_months(0)
                     .build()
                     .expect("CPI curve"),
             )
             .insert_inflation_index(
-                InflationIndex::new(
+                finstack_quant_valuations_test_support::inflation::simple_index(
                     "US-CPI",
-                    vec![(date!(2024 - 01 - 01), 300.0), (maturity, 310.0)],
+                    as_of,
+                    300.0,
                     Currency::USD,
-                )
-                .expect("published CPI")
-                .with_lag(InflationLag::None),
+                ),
             );
         let mut swap = sample_swap(date!(2025 - 01 - 01), maturity);
         swap.base_cpi = Some(300.0);
@@ -1299,7 +1303,8 @@ mod tests {
         let as_of = d(2025, Month::January, 1);
         let market = MarketContext::new()
             .insert(sample_discount_curve(as_of))
-            .insert(sample_inflation_curve(as_of));
+            .insert(sample_inflation_curve(as_of))
+            .insert_inflation_index(flat_historical_index());
         let swap = YoYInflationSwap::builder()
             .id(InstrumentId::new("YOY-CURVE-ONLY"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
@@ -1313,6 +1318,7 @@ mod tests {
             .side(PayReceive::Pay)
             .lag(InflationLag::None)
             .base_cpi(100.0)
+            .interpolation(SeriesInterpolation::Step)
             .attributes(Attributes::new())
             .build()
             .expect("yoy swap should build");
@@ -1339,8 +1345,20 @@ mod tests {
             .insert_inflation_index(
                 InflationIndex::new(
                     "US-CPI",
-                    vec![(start, 100.0), (maturity, 110.0)],
+                    vec![
+                        InflationObservation {
+                            reference_month: start.replace_day(1).unwrap(),
+                            value: 100.0,
+                            available_on: start,
+                        },
+                        InflationObservation {
+                            reference_month: maturity.replace_day(1).unwrap(),
+                            value: 110.0,
+                            available_on: maturity,
+                        },
+                    ],
                     Currency::USD,
+                    as_of,
                 )
                 .expect("inflation index should build"),
             );
@@ -1371,6 +1389,7 @@ mod tests {
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
             .lag(InflationLag::None)
+            .interpolation(SeriesInterpolation::Step)
             .attributes(Attributes::new())
             .build()
             .expect("swap should build");
@@ -1415,12 +1434,17 @@ mod tests {
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(curve_base)
             .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.88), (3.0, 0.80)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve should build");
         // Flat CPI so the inflation leg is exactly zero.
         let infl = InflationCurve::builder("US-CPI")
             .base_date(curve_base)
-            .base_cpi(100.0)
+            .day_count(DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .knots([(0.0, 100.0), (3.0, 100.0)])
             .build()
             .expect("inflation curve should build");
@@ -1441,6 +1465,7 @@ mod tests {
             .day_count(DayCount::Act365F)
             .side(PayReceive::Receive)
             .lag(InflationLag::None)
+            .interpolation(SeriesInterpolation::Step)
             .attributes(Attributes::new())
             .build()
             .expect("yoy swap should build");
@@ -1462,7 +1487,7 @@ mod tests {
         let t_wrong = DayCount::Act365F
             .year_fraction(as_of, maturity, DayCountContext::default())
             .expect("yf");
-        let df_wrong = disc.df(t_wrong);
+        let df_wrong = disc.df(t_wrong).expect("df");
         assert!(
             (df_expected - df_wrong).abs() > 1e-3,
             "test setup must distinguish the two discounting conventions"
@@ -1479,7 +1504,9 @@ mod tests {
         let disc = sample_discount_curve(as_of);
         let infl = InflationCurve::builder("US-CPI")
             .base_date(as_of)
-            .base_cpi(100.0)
+            .day_count(DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .knots([(0.0, 100.0), (2.0, 110.0)])
             .build()
             .expect("inflation curve should build");
@@ -1489,17 +1516,24 @@ mod tests {
             .insert(infl.clone())
             .insert_inflation_index(flat_historical_index());
 
-        // Index with a *future* fixing wildly different from the curve.
-        let index = InflationIndex::new(
-            "US-CPI",
-            vec![(d(2024, Month::December, 1), 100.0), (maturity, 500.0)],
-            Currency::USD,
-        )
-        .expect("index should build");
+        // A future version cannot be admitted to the earlier information snapshot.
+        assert!(
+            InflationIndex::new(
+                "US-CPI",
+                vec![InflationObservation {
+                    reference_month: maturity,
+                    value: 500.0,
+                    available_on: maturity,
+                }],
+                Currency::USD,
+                as_of,
+            )
+            .is_err()
+        );
         let market_with_future_fixing = MarketContext::new()
             .insert(disc)
             .insert(infl)
-            .insert_inflation_index(index);
+            .insert_inflation_index(flat_historical_index());
 
         let swap = YoYInflationSwap::builder()
             .id(InstrumentId::new("YOY-LOOKAHEAD"))
@@ -1513,6 +1547,7 @@ mod tests {
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
             .lag(InflationLag::None)
+            .interpolation(SeriesInterpolation::Step)
             .attributes(Attributes::new())
             .build()
             .expect("yoy swap should build");
@@ -1550,6 +1585,7 @@ mod tests {
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
             .lag(InflationLag::None)
+            .interpolation(SeriesInterpolation::Step)
             .attributes(Attributes::new())
             .build()
             .expect("yoy swap should build");

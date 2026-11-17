@@ -185,27 +185,26 @@ mod scalar_curve_invariants {
     }
 
     #[test]
-    fn roll_forward_advances_base_date_and_new_spot() {
+    fn context_condition_keeps_price_and_vol_curves_frozen() {
+        use finstack_quant_core::market_data::context::MarketContext;
+
         let pc = price_curve();
         let vc = vol_curve();
-        let days = 90_i64;
+        let horizon = base_date() + Duration::days(90);
 
-        let rolled_pc = pc.roll_forward(days).unwrap();
-        let rolled_vc = vc.roll_forward(days).unwrap();
+        let conditioned = MarketContext::new()
+            .insert(pc.clone())
+            .insert(vc.clone())
+            .condition(horizon)
+            .unwrap();
 
-        let expected_base = base_date() + Duration::days(days);
-        assert_eq!(rolled_pc.base_date(), expected_base);
-        assert_eq!(rolled_vc.base_date(), expected_base);
+        let kept_pc = conditioned.get_price_curve(pc.id().as_str()).unwrap();
+        let kept_vc = conditioned.get_vol_index_curve(vc.id().as_str()).unwrap();
 
-        let dt_years = {
-            use finstack_quant_core::dates::{DayCount, DayCountContext};
-            DayCount::Act365F
-                .year_fraction(base_date(), expected_base, DayCountContext::default())
-                .unwrap()
-        };
-
-        assert!((rolled_pc.spot_price() - pc.price(dt_years)).abs() < TOL);
-        assert!((rolled_vc.spot_price() - vc.price(dt_years)).abs() < TOL);
+        assert_eq!(kept_pc.base_date(), pc.base_date());
+        assert_eq!(kept_vc.base_date(), vc.base_date());
+        assert!((kept_pc.spot_price() - pc.spot_price()).abs() < TOL);
+        assert!((kept_vc.spot_price() - vc.spot_price()).abs() < TOL);
     }
 
     #[test]

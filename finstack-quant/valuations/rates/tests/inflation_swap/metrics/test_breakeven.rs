@@ -1,6 +1,7 @@
 //! Par inflation rate and configured carry breakeven tests for InflationSwap.
 
 use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::market_data::scalars::{InflationLag, SeriesInterpolation};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::pricing_overrides::MetricPricingOverrides;
 use finstack_quant_valuations_core::instruments::{
@@ -29,6 +30,8 @@ fn test_breakeven_requires_configuration_and_measures_carry_shift() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -87,6 +90,8 @@ fn test_par_rate_gives_zero_pv() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -113,6 +118,8 @@ fn test_par_rate_gives_zero_pv() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -145,6 +152,8 @@ fn test_par_rate_increases_with_inflation() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();

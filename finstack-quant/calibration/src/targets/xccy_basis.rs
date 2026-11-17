@@ -1,8 +1,7 @@
 //! Cross-currency basis curve bootstrap target.
 //!
 //! Derives a foreign currency discount curve from a domestic OIS curve,
-//! FX spot rate, and FX forward or XCCY basis swap quotes. Optionally
-//! produces a `BasisSpreadCurve` as a byproduct.
+//! FX spot rate, and FX forward or XCCY basis swap quotes.
 //!
 //! ## Spot-Date Convention
 //!
@@ -39,10 +38,7 @@ use crate::targets::util::{
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{
-    BasisSpreadCurve, DiscountCurve, DiscountCurveBuilder, ValidationMode as CurveValidationMode,
-};
-use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, DiscountCurveBuilder};
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::CurveId;
 use std::sync::Arc;
@@ -77,13 +73,6 @@ impl XccyCalibrationQuote {
         match self {
             Self::Rates(pq) => pq.pillar_time,
             Self::XccyBasis(pq) => pq.pillar_time,
-        }
-    }
-
-    fn pillar_date(&self) -> Date {
-        match self {
-            Self::Rates(pq) => pq.pillar_date,
-            Self::XccyBasis(pq) => pq.pillar_date,
         }
     }
 
@@ -144,7 +133,7 @@ impl XccyBasisTarget {
         quotes: &[MarketQuote],
         context: &MarketContext,
         global_config: &CalibrationConfig,
-    ) -> Result<(DiscountCurve, Option<BasisSpreadCurve>, CalibrationReport)> {
+    ) -> Result<(DiscountCurve, CalibrationReport)> {
         if schema_params.method != crate::config::CalibrationMethod::Bootstrap {
             return Err(finstack_quant_core::Error::Validation(
                 "XCCY basis calibration supports only Bootstrap; GlobalSolve is unsupported".into(),
@@ -248,55 +237,7 @@ impl XccyBasisTarget {
             success_tolerance,
         )?;
 
-        // Extract basis spread curve as byproduct if requested.
-        let spread_curve = if let Some(spread_id) = &schema_params.basis_spread_curve_id {
-            let mut spread_knots = Vec::with_capacity(prepared_quotes.len() + 1);
-            spread_knots.push((0.0, 0.0));
-            for quote in &prepared_quotes {
-                let t = quote.pillar_time();
-                let pillar_date = quote.pillar_date();
-                let df_foreign = curve.df_between_dates(schema_params.base_date, pillar_date)?;
-                let df_domestic =
-                    domestic_discount.df_between_dates(schema_params.base_date, pillar_date)?;
-                if !df_foreign.is_finite() || df_foreign <= 0.0 {
-                    return Err(finstack_quant_core::Error::Calibration {
-                        message: format!(
-                            "Spread curve {spread_id}: foreign DF at t={t:.6} is non-positive or non-finite ({df_foreign})"
-                        ),
-                        category: "xccy_basis".to_string(),
-                    });
-                }
-                if !df_domestic.is_finite() || df_domestic <= 0.0 {
-                    return Err(finstack_quant_core::Error::Calibration {
-                        message: format!(
-                            "Spread curve {spread_id}: domestic DF at t={t:.6} is non-positive or non-finite ({df_domestic})"
-                        ),
-                        category: "xccy_basis".to_string(),
-                    });
-                }
-                let z_foreign = -df_foreign.ln() / t;
-                let z_domestic = -df_domestic.ln() / t;
-                spread_knots.push((t, z_foreign - z_domestic));
-            }
-
-            let spread_curve = BasisSpreadCurve::builder(spread_id.clone())
-                .base_date(schema_params.base_date)
-                .day_count(curve_day_count)
-                .knots(spread_knots)
-                // Spreads include zero and may be negative, unlike discount factors.
-                .interp(InterpStyle::Linear)
-                .extrapolation(schema_params.extrapolation)
-                .build()
-                .map_err(|e| finstack_quant_core::Error::Calibration {
-                    message: format!("Failed to build basis spread curve {spread_id}: {e}"),
-                    category: "xccy_basis".to_string(),
-                })?;
-            Some(spread_curve)
-        } else {
-            None
-        };
-
-        Ok((curve, spread_curve, report))
+        Ok((curve, report))
     }
 }
 
@@ -321,12 +262,7 @@ impl BootstrapTarget for XccyBasisTarget {
     }
 
     fn build_curve_for_solver(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
-        self.curve_builder(knots)
-            .validation(CurveValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            })
-            .build()
+        self.curve_builder(knots).build()
     }
 
     fn residual_units(&self) -> crate::report::ResidualUnits {
@@ -350,7 +286,7 @@ impl BootstrapTarget for XccyBasisTarget {
             }
             Ok(prev_df)
         } else {
-            Ok(self.params.domestic_discount.df(t))
+            self.params.domestic_discount.df(t)
         }
     }
 
@@ -389,7 +325,7 @@ mod xccy_quote_calibration_tests {
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (10.0, (-0.02_f64 * 10.0).exp())])
             .interp(InterpStyle::Linear)
-            .extrapolation(ExtrapolationPolicy::FlatZero)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .build()
             .expect("USD-OIS");
         let eur_disc_seed = DiscountCurve::builder(CurveId::new("EUR-OIS"))
@@ -397,22 +333,14 @@ mod xccy_quote_calibration_tests {
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (10.0, (-0.01_f64 * 10.0).exp())])
             .interp(InterpStyle::Linear)
-            .extrapolation(ExtrapolationPolicy::FlatZero)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .build()
             .expect("EUR-OIS seed");
         // Forward curve names must match the EUR/USD-XCCY pair convention's index ids
         // (`USD-SOFR-OIS` and `EUR-ESTR-OIS` per the registry JSON).
-        let usd_fwd = ForwardCurve::builder(CurveId::new("USD-SOFR-OIS"), 0.25)
-            .base_date(base)
-            .knots(vec![(0.0, 0.02), (10.0, 0.02)])
-            .interp(InterpStyle::Linear)
-            .build()
+        let usd_fwd = ForwardCurve::flat("USD-SOFR-OIS", base, 0.02, DayCount::Act365F)
             .expect("USD-SOFR-OIS fwd");
-        let eur_fwd = ForwardCurve::builder(CurveId::new("EUR-ESTR-OIS"), 0.25)
-            .base_date(base)
-            .knots(vec![(0.0, 0.01), (10.0, 0.01)])
-            .interp(InterpStyle::Linear)
-            .build()
+        let eur_fwd = ForwardCurve::flat("EUR-ESTR-OIS", base, 0.01, DayCount::Act365F)
             .expect("EUR-ESTR-OIS fwd");
 
         let provider = Arc::new(SimpleFxProvider::new());
@@ -449,12 +377,11 @@ mod xccy_quote_calibration_tests {
             domestic_discount_id: CurveId::new("USD-OIS"),
             method: crate::config::CalibrationMethod::Bootstrap,
             interpolation: InterpStyle::Linear,
-            extrapolation: ExtrapolationPolicy::FlatZero,
+            extrapolation: ExtrapolationPolicy::Flat,
             conventions: crate::config::RatesStepConventions {
                 curve_day_count: Some(DayCount::Act365F),
                 ois_compounding: None,
             },
-            basis_spread_curve_id: None,
         };
 
         let quote_5y = MarketQuote::Xccy(XccyQuote {
@@ -468,7 +395,7 @@ mod xccy_quote_calibration_tests {
         let cfg = CalibrationConfig::default();
         let result = XccyBasisTarget::solve(&params, &[quote_5y], &ctx, &cfg);
 
-        let (calibrated, _, report) =
+        let (calibrated, report) =
             result.expect("XccyBasisTarget::solve should accept XccyQuote quotes");
 
         assert!(
@@ -479,9 +406,9 @@ mod xccy_quote_calibration_tests {
         assert!(report.residuals["EURUSD-XCCY-5Y"].is_finite());
 
         assert!(
-            calibrated.df(5.0) > 0.0 && calibrated.df(5.0) < 1.0,
+            calibrated.df(5.0).expect("valid") > 0.0 && calibrated.df(5.0).expect("valid") < 1.0,
             "calibrated 5Y DF must be in (0,1); got {}",
-            calibrated.df(5.0)
+            calibrated.df(5.0).expect("valid")
         );
     }
 }

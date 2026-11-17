@@ -87,7 +87,8 @@ fn build_market(as_of: finstack_quant_core::dates::Date) -> MarketContext {
     MarketContext::new()
         .insert_price(
             "CL-SPOT",
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
+                .expect("valid scalar"),
         )
         .insert(discount_curve)
         .insert(price_curve)

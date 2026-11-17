@@ -67,6 +67,8 @@ fn create_realistic_market() -> MarketContext {
         .base_date(base_date)
         .knots(knots)
         .interp(InterpStyle::LogLinear) // Log-linear interpolation for discount factors
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("Failed to build realistic discount curve");
 

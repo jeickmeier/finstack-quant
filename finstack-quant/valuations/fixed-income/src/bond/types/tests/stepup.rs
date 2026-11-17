@@ -39,13 +39,35 @@ fn test_bond_dated_cashflows_include_floating_cfkind() {
         .base_date(issue)
         .knots([(0.0, 1.0), (2.0, 0.90)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("CashFlowSchedule builder should succeed with valid test data");
 
-    let fwd = ForwardCurve::builder("USD-LIBOR-3M", 0.25)
+    let fwd = ForwardCurve::builder("USD-LIBOR-3M")
         .base_date(issue - time::Duration::days(10))
         .day_count(DayCount::Act360)
-        .knots([(0.0, 0.04), (2.0, 0.045)])
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.99499304554498),
+            (0.25, 0.98997248912722),
+            (0.375, 0.984938790613548),
+            (0.5, 0.979892409077625),
+            (0.625, 0.974833802732431),
+            (0.75, 0.969763428863262),
+            (0.875, 0.964681743761261),
+            (1.0, 0.959589202657473),
+            (1.125, 0.954486259657466),
+            (1.25, 0.949373367676503),
+            (1.375, 0.944250978375297),
+            (1.5, 0.939119542096347),
+            (1.625, 0.933979507800882),
+            (1.75, 0.928831323006405),
+            (1.875, 0.923675433724863),
+            (2.0, 0.918512284401457),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("CashFlowSchedule builder should succeed with valid test data");
 
@@ -386,6 +408,8 @@ fn build_step_up_bond_schedule(
             .base_date(issue)
             .knots([(0.0, 1.0), (5.0, 0.90)])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("DiscountCurve builder should succeed in test"),
     );
@@ -431,6 +455,8 @@ fn step_up_no_steps_equals_fixed_rate() {
             .base_date(issue)
             .knots([(0.0, 1.0), (5.0, 0.90)])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("DiscountCurve builder should succeed in test"),
     );

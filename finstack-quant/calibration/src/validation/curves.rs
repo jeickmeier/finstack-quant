@@ -72,8 +72,8 @@ impl CurveValidator for DiscountCurve {
             let t1 = segment[0];
             let t2 = segment[1];
 
-            let df1 = self.df(t1);
-            let df2 = self.df(t2);
+            let df1 = self.df(t1)?;
+            let df2 = self.df(t2)?;
 
             // Signed continuously compounded segment forward. Rising discount
             // factors still have to satisfy the configured negative-rate floor.
@@ -129,7 +129,7 @@ impl CurveValidator for DiscountCurve {
             if t > max_knot + 0.01 {
                 break;
             }
-            let df = self.df(t);
+            let df = self.df(t)?;
 
             // Compute this segment's continuously-compounded forward rate.
             // For t == prev_t (the t=0 point), no segment exists yet.
@@ -179,7 +179,7 @@ impl CurveValidator for DiscountCurve {
             if t > max_knot_bounds + 0.01 {
                 break;
             }
-            let df = self.df(t);
+            let df = self.df(t)?;
 
             if df <= 0.0 {
                 return Err(Error::Validation(format!(
@@ -210,7 +210,7 @@ impl CurveValidator for DiscountCurve {
             if t > max_knot_bounds + 0.01 {
                 break;
             }
-            let rate = self.zero_rate(t, finstack_quant_core::math::Compounding::Continuous);
+            let rate = self.zero_rate(t, finstack_quant_core::math::Compounding::Continuous)?;
 
             // Allow slightly negative rates but not too extreme
             if rate < config.min_forward_rate * 5.0 {
@@ -245,18 +245,38 @@ impl CurveValidator for ForwardCurve {
             return Ok(());
         }
 
-        // Forward rates should be positive (with small tolerance for negative rates)
-        for &t in FWD_ARBI_POINTS {
-            let fwd = self.rate(t);
+        let max_knot_arbi = self.knots().last().copied().unwrap_or(0.0);
+        let mut points: Vec<f64> = std::iter::once(0.0)
+            .chain(self.knots().iter().copied())
+            .chain(
+                FWD_ARBI_POINTS
+                    .iter()
+                    .copied()
+                    .filter(|&time| time < max_knot_arbi),
+            )
+            .collect();
+        points.sort_by(f64::total_cmp);
+        points.dedup();
 
-            if fwd < config.min_forward_rate {
-                return Err(Error::Validation(format!(
-                    "Negative forward rate {:.4}% at t={} in {} (limit: {:.2}%)",
-                    fwd * 100.0,
-                    t,
-                    self.id().as_str(),
-                    config.min_forward_rate * 100.0
-                )));
+        // Check segment continuous forward rates (with small tolerance for negative rates)
+        for segment in points.windows(2) {
+            let t1 = segment[0];
+            let t2 = segment[1];
+            let df1 = self.df(t1)?;
+            let df2 = self.df(t2)?;
+            if df1.is_finite() && df2.is_finite() && df1 > 0.0 && df2 > 0.0 {
+                let fwd = (df1.ln() - df2.ln()) / (t2 - t1);
+
+                if fwd < config.min_forward_rate {
+                    return Err(Error::Validation(format!(
+                        "Negative forward rate {:.4}% between t={} and t={} in {} (limit: {:.2}%)",
+                        fwd * 100.0,
+                        t1,
+                        t2,
+                        self.id().as_str(),
+                        config.min_forward_rate * 100.0
+                    )));
+                }
             }
         }
 
@@ -269,27 +289,34 @@ impl CurveValidator for ForwardCurve {
         }
 
         // Forward curves don't have strict monotonicity requirements
-        // but we check for reasonable smoothness
-        let test_points = [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0];
+        // but we check for reasonable smoothness within the calibrated horizon
+        let max_knot = self.knots().last().copied().unwrap_or(0.0);
+        let test_points: Vec<f64> = FWD_ARBI_POINTS
+            .iter()
+            .copied()
+            .filter(|&time| time <= max_knot)
+            .collect();
 
-        for i in 0..test_points.len() - 1 {
-            let t1 = test_points[i];
-            let t2 = test_points[i + 1];
+        for i in 0..test_points.len().saturating_sub(2) {
+            let df0 = self.df(test_points[i])?;
+            let df1 = self.df(test_points[i + 1])?;
+            let df2 = self.df(test_points[i + 2])?;
+            if df0 > 0.0 && df1 > 0.0 && df2 > 0.0 {
+                let fwd1 = (df0.ln() - df1.ln()) / (test_points[i + 1] - test_points[i]);
+                let fwd2 = (df1.ln() - df2.ln()) / (test_points[i + 2] - test_points[i + 1]);
 
-            let fwd1 = self.rate(t1);
-            let fwd2 = self.rate(t2);
-
-            // Check for unreasonable jumps (more than 10% absolute change)
-            let jump = (fwd2 - fwd1).abs();
-            if jump > 0.10 {
-                // This is a warning, not necessarily an error
-                tracing::warn!(
-                    "Large forward rate jump of {:.2}% between t={} and t={} in {}",
-                    jump * 100.0,
-                    t1,
-                    t2,
-                    self.id().as_str()
-                );
+                // Check for unreasonable jumps (more than 10% absolute change)
+                let jump = (fwd2 - fwd1).abs();
+                if jump > 0.10 {
+                    // This is a warning, not necessarily an error
+                    tracing::warn!(
+                        "Large forward rate jump of {:.2}% between t={} and t={} in {}",
+                        jump * 100.0,
+                        test_points[i],
+                        test_points[i + 2],
+                        self.id().as_str()
+                    );
+                }
             }
         }
 
@@ -297,8 +324,13 @@ impl CurveValidator for ForwardCurve {
     }
 
     fn validate_bounds(&self, config: &ValidationConfig) -> Result<()> {
+        let max_knot_bounds = self.knots().last().copied().unwrap_or(0.0);
         for &t in FWD_BOUNDS_POINTS {
-            let rate = self.rate(t);
+            if t > max_knot_bounds {
+                break;
+            }
+            let rate =
+                finstack_quant_core::math::Compounding::Continuous.rate_from_df(self.df(t)?, t)?;
 
             // Allow slightly negative but bounded
             if rate < config.min_forward_rate * 5.0 {
@@ -336,7 +368,7 @@ impl CurveValidator for HazardCurve {
         for &t in HAZARD_ARBI_POINTS {
             // Use the curve's native hazard_rate(t) method directly
             // instead of finite-difference approximation.
-            let lambda = self.hazard_rate(t);
+            let lambda = self.hazard_rate(t)?;
 
             if lambda < 0.0 {
                 return Err(Error::Validation(format!(
@@ -371,7 +403,7 @@ impl CurveValidator for HazardCurve {
         let mut prev_sp = 1.0;
 
         for &t in HAZARD_MONO_POINTS {
-            let sp = self.sp(t);
+            let sp = self.sp(t)?;
 
             // Allow for numerical tolerance
             if sp > prev_sp + config.tolerance {
@@ -393,7 +425,7 @@ impl CurveValidator for HazardCurve {
     fn validate_bounds(&self, _config: &ValidationConfig) -> Result<()> {
         // Check that survival probabilities are in [0, 1]
         for &t in HAZARD_BOUNDS_POINTS {
-            let sp = self.sp(t);
+            let sp = self.sp(t)?;
 
             if sp < 0.0 {
                 return Err(Error::Validation(format!(
@@ -435,7 +467,7 @@ impl CurveValidator for InflationCurve {
 
         // CPI levels should be positive
         for &t in INFL_ARBI_POINTS {
-            let cpi = self.cpi(t);
+            let cpi = self.cpi(t)?;
 
             if cpi <= 0.0 {
                 return Err(Error::Validation(format!(
@@ -457,11 +489,8 @@ impl CurveValidator for InflationCurve {
 
         // CPI doesn't need to be strictly monotonic (deflation is possible)
         // but check for reasonable growth rates
-        let base_cpi = self.cpi(0.0);
-
         for &t in INFL_MONO_POINTS {
-            let cpi = self.cpi(t);
-            let annual_inflation = (cpi / base_cpi).powf(1.0 / t) - 1.0;
+            let annual_inflation = self.inflation_rate(0.0, t)?;
 
             // Check for extreme deflation (< -10% annual)
             if annual_inflation < config.min_cpi_growth {
@@ -493,9 +522,7 @@ impl CurveValidator for InflationCurve {
         // Check reasonable inflation expectations
         for &t in INFL_BOUNDS_POINTS {
             // Calculate forward inflation over 1-year period
-            let cpi_t = self.cpi(t);
-            let cpi_t1 = self.cpi(t + 1.0);
-            let fwd_inflation = cpi_t1 / cpi_t - 1.0;
+            let fwd_inflation = self.inflation_rate(t, t + 1.0)?;
 
             // Forward inflation should be in reasonable range
             if !(config.min_fwd_inflation..=config.max_fwd_inflation).contains(&fwd_inflation) {

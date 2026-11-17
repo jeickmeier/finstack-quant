@@ -60,11 +60,14 @@ fn forward_only_envelope(
     base_date: Date,
     quote: RateQuote,
     curve_id: &str,
-    tenor_years: f64,
+    index_tenor: Option<finstack_quant_core::dates::Tenor>,
 ) -> CalibrationEnvelope {
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
         .knots([(0.0, 1.0), (5.0, 0.78)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
     let source_market = MarketContext::new().insert(discount);
@@ -89,12 +92,13 @@ fn forward_only_envelope(
                     curve_id: curve_id.into(),
                     currency: Currency::USD,
                     base_date,
-                    tenor_years,
+                    index_tenor,
                     discount_curve_id: "USD-OIS".into(),
                     method: CalibrationMethod::GlobalSolve {
                         use_analytical_jacobian: false,
                     },
                     interpolation: Default::default(),
+                    extrapolation: ExtrapolationPolicy::Extend,
                     conventions: Default::default(),
                 }),
             }],
@@ -163,7 +167,7 @@ fn discount_curve_deposit_repricing() {
                 base_date,
                 method: CalibrationMethod::Bootstrap,
                 interpolation: Default::default(),
-                extrapolation: ExtrapolationPolicy::FlatForward,
+                extrapolation: ExtrapolationPolicy::Extend,
                 pricing_discount_id: None,
                 pricing_forward_id: None,
                 conventions: Default::default(),
@@ -281,7 +285,7 @@ fn discount_curve_swap_repricing() {
                     use_analytical_jacobian: true,
                 },
                 interpolation: Default::default(),
-                extrapolation: ExtrapolationPolicy::FlatForward,
+                extrapolation: ExtrapolationPolicy::Extend,
                 pricing_discount_id: None,
                 pricing_forward_id: None,
                 conventions: Default::default(),
@@ -411,7 +415,7 @@ fn forward_curve_fra_repricing() {
                     base_date,
                     method: CalibrationMethod::Bootstrap,
                     interpolation: Default::default(),
-                    extrapolation: ExtrapolationPolicy::FlatForward,
+                    extrapolation: ExtrapolationPolicy::Extend,
                     pricing_discount_id: None,
                     pricing_forward_id: None,
                     conventions: Default::default(),
@@ -424,12 +428,13 @@ fn forward_curve_fra_repricing() {
                     curve_id: CurveId::from("USD-SOFR-3M"),
                     currency,
                     base_date,
-                    tenor_years: 0.25,
+                    index_tenor: Some(finstack_quant_core::dates::Tenor::quarterly()),
                     discount_curve_id: CurveId::from("USD-OIS"),
                     method: CalibrationMethod::GlobalSolve {
                         use_analytical_jacobian: false,
                     },
                     interpolation: Default::default(),
+                    extrapolation: ExtrapolationPolicy::Extend,
                     conventions: Default::default(),
                 }),
             },
@@ -488,19 +493,20 @@ fn forward_curve_fra_repricing() {
             )
             .expect("valid FRA end time");
         let implied_rate = forward
-            .rate_between(t_start, t_end)
+            .rate_between(
+                t_start,
+                t_end,
+                fra.day_count
+                    .year_fraction(fra.start_date, fra.maturity, DayCountContext::default())
+                    .expect("contractual FRA accrual"),
+            )
             .expect("valid DF-implied FRA rate");
         assert!(
             forward
                 .knots()
                 .iter()
-                .any(|knot| (*knot - t_start).abs() < 1e-12),
-            "calibrated curve should retain actual reset time {t_start:.12}"
-        );
-        assert!(
-            (forward.rate(t_start) - rate).abs() <= tolerances::FWD_RATE_ABS_TOL,
-            "reset-date knot should retain fixed-tenor quote meaning: knot={:.12}, quote={rate:.12}",
-            forward.rate(t_start)
+                .any(|knot| (*knot - t_end).abs() < 1e-12),
+            "calibrated curve should retain terminal pillar time {t_end:.12}"
         );
         assert!(
             (implied_rate - rate).abs() <= tolerances::FWD_RATE_ABS_TOL,
@@ -530,9 +536,7 @@ fn forward_curve_fra_repricing() {
         .day_count()
         .year_fraction(forward.base_date(), final_end, DayCountContext::default())
         .expect("valid final reset-grid end");
-    let projection_grid = forward
-        .projection_grid()
-        .expect("calibrated curve must carry contractual projection boundaries");
+    let projection_grid = forward.knots();
     assert!((projection_grid[projection_grid.len() - 1] - final_end_time).abs() < 1e-12);
 }
 
@@ -546,7 +550,12 @@ fn forward_curve_future_global_solve_reprices_compounded_settlement_quote() {
         price: 95.0,
         convexity_adjustment: 0.0,
     };
-    let envelope = forward_only_envelope(base_date, quote.clone(), "USD-SOFR-3M", 0.25);
+    let envelope = forward_only_envelope(
+        base_date,
+        quote.clone(),
+        "USD-SOFR-3M",
+        Some(Tenor::quarterly()),
+    );
     let output = engine::calibrate(&envelope).expect("future forward calibration");
     let report = output
         .result
@@ -560,9 +569,7 @@ fn forward_curve_future_global_solve_reprices_compounded_settlement_quote() {
     );
     let context = MarketContext::try_from(output.result.final_market).expect("calibrated context");
     let curve = context.get_forward("USD-SOFR-3M").expect("forward curve");
-    let projection_grid = curve
-        .projection_grid()
-        .expect("calibrated curve must retain contractual projection boundaries");
+    let projection_grid = curve.knots();
     let build_ctx = BuildCtx::new(
         base_date,
         fixtures::STANDARD_NOTIONAL,
@@ -578,12 +585,7 @@ fn forward_curve_future_global_solve_reprices_compounded_settlement_quote() {
         .as_any()
         .downcast_ref::<InterestRateFuture>()
         .expect("interest-rate future");
-    let period_start = future.period_start.expect("resolved future period start");
     let period_end = future.period_end.expect("resolved future period end");
-    let t_start = curve
-        .day_count()
-        .year_fraction(curve.base_date(), period_start, DayCountContext::default())
-        .expect("start time");
     let t_end = curve
         .day_count()
         .year_fraction(curve.base_date(), period_end, DayCountContext::default())
@@ -591,12 +593,8 @@ fn forward_curve_future_global_solve_reprices_compounded_settlement_quote() {
     assert!(
         projection_grid
             .iter()
-            .any(|time| (*time - t_start).abs() < 1e-12)
-    );
-    assert!(
-        projection_grid
-            .iter()
-            .any(|time| (*time - t_end).abs() < 1e-12)
+            .any(|time| (*time - t_end).abs() < 1e-12),
+        "retain terminal futures projection pillar"
     );
     let settlement_rate = future
         .model_settlement_rate(&context, base_date)
@@ -618,7 +616,12 @@ fn forward_curve_swap_global_solve_reprices_df_implied_periods() {
         rate: 0.05,
         spread_decimal: None,
     };
-    let envelope = forward_only_envelope(base_date, quote.clone(), "USD-LIBOR-3M", 0.25);
+    let envelope = forward_only_envelope(
+        base_date,
+        quote.clone(),
+        "USD-LIBOR-3M",
+        Some(Tenor::quarterly()),
+    );
     let output = engine::calibrate(&envelope).expect("swap forward calibration");
     let report = output
         .result
@@ -632,7 +635,6 @@ fn forward_curve_swap_global_solve_reprices_df_implied_periods() {
     );
     let context = MarketContext::try_from(output.result.final_market).expect("calibrated context");
     let curve = context.get_forward("USD-LIBOR-3M").expect("forward curve");
-    assert!(curve.projection_grid().is_some());
     let build_ctx = BuildCtx::new(
         base_date,
         fixtures::STANDARD_NOTIONAL,
@@ -648,17 +650,10 @@ fn forward_curve_swap_global_solve_reprices_df_implied_periods() {
         .as_any()
         .downcast_ref::<InterestRateSwap>()
         .expect("interest-rate swap");
-    let projection_grid = curve
-        .projection_grid()
-        .expect("contractual swap projection grid");
-    for period in projection_grid.windows(2) {
-        let t_start = period[0];
-        let t_end = period[1];
-        let df_implied = curve
-            .rate_between(t_start, t_end)
-            .expect("DF-implied swap period");
-        assert!((df_implied - curve.rate(t_start)).abs() < 1e-10);
-    }
+    assert!(
+        curve.knots().len() >= 2,
+        "retain origin and terminal projection factor pillar"
+    );
     let pv = instrument
         .value(&context, base_date)
         .expect("swap repricing");
@@ -745,7 +740,7 @@ fn hazard_curve_cds_repricing() {
                     base_date,
                     method: CalibrationMethod::Bootstrap,
                     interpolation: Default::default(),
-                    extrapolation: ExtrapolationPolicy::FlatForward,
+                    extrapolation: ExtrapolationPolicy::Extend,
                     pricing_discount_id: None,
                     pricing_forward_id: None,
                     conventions: Default::default(),
@@ -765,8 +760,6 @@ fn hazard_curve_cds_repricing() {
                     notional: 1.0,
                     method: CalibrationMethod::Bootstrap,
 
-                    par_interp:
-                        finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                     doc_clause: None,
                     cds_valuation_convention: None,
                 }),
@@ -868,7 +861,7 @@ fn hazard_curve_step_report_matches_market_built_cds_repricing() {
                     base_date,
                     method: CalibrationMethod::Bootstrap,
                     interpolation: Default::default(),
-                    extrapolation: ExtrapolationPolicy::FlatForward,
+                    extrapolation: ExtrapolationPolicy::Extend,
                     pricing_discount_id: None,
                     pricing_forward_id: None,
                     conventions: Default::default(),
@@ -888,8 +881,6 @@ fn hazard_curve_step_report_matches_market_built_cds_repricing() {
                     notional: 1.0,
                     method: CalibrationMethod::Bootstrap,
 
-                    par_interp:
-                        finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                     doc_clause: None,
                     cds_valuation_convention: None,
                 }),
@@ -1026,7 +1017,7 @@ fn hazard_recipe_upfront_inputs_support_par_space_replay() {
                     base_date,
                     method: CalibrationMethod::Bootstrap,
                     interpolation: Default::default(),
-                    extrapolation: ExtrapolationPolicy::FlatForward,
+                    extrapolation: ExtrapolationPolicy::Extend,
                     pricing_discount_id: None,
                     pricing_forward_id: None,
                     conventions: Default::default(),
@@ -1046,8 +1037,6 @@ fn hazard_recipe_upfront_inputs_support_par_space_replay() {
                     notional: 1.0,
                     method: CalibrationMethod::Bootstrap,
 
-                    par_interp:
-                        finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                     doc_clause: None,
                     cds_valuation_convention: None,
                 }),
@@ -1155,6 +1144,14 @@ fn inflation_curve_swap_repricing() {
     let mut market_data = Vec::new();
     cal_utils::extend_market_data(&mut market_data, &disc_quote_bundle);
     cal_utils::extend_market_data(&mut market_data, &infl_quote_bundle);
+    let snapshot = finstack_quant_valuations_test_support::inflation::simple_index(
+        "USD-CPI", base_date, base_cpi, currency,
+    );
+    let (_, snapshot_data) = cal_utils::split_market_context(
+        &finstack_quant_core::market_data::context::MarketContext::new()
+            .insert_inflation_index(snapshot),
+    );
+    market_data.extend(snapshot_data);
     let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
     quote_sets.insert(
         "disc".to_string(),
@@ -1180,7 +1177,7 @@ fn inflation_curve_swap_repricing() {
                     base_date,
                     method: CalibrationMethod::Bootstrap,
                     interpolation: Default::default(),
-                    extrapolation: ExtrapolationPolicy::FlatForward,
+                    extrapolation: ExtrapolationPolicy::Extend,
                     pricing_discount_id: None,
                     pricing_forward_id: None,
                     conventions: Default::default(),
@@ -1197,6 +1194,11 @@ fn inflation_curve_swap_repricing() {
                     index: "USD-CPI".to_string(),
                     observation_lag: "3M".to_string(),
                     base_cpi,
+                    source_base_date: base_date,
+                    source_base_cpi: base_cpi,
+                    day_count: finstack_quant_core::dates::DayCount::Act365F,
+                    calendar_id: None,
+                    extrapolation: ExtrapolationPolicy::Flat,
                     notional: 1.0,
                     method: CalibrationMethod::Bootstrap,
                     interpolation: Default::default(),
@@ -1222,7 +1224,7 @@ fn inflation_curve_swap_repricing() {
     let lag = conventions
         .inflation_lag
         .months()
-        .map(|months| InflationLag::Months(months as u8))
+        .map(|months| InflationLag::months(months as u8))
         .unwrap_or(InflationLag::None);
 
     for quote in &infl_quotes {

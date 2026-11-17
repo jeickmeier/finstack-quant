@@ -272,9 +272,12 @@ where
     let v_down = &per_state[1];
     let mut stats = OnlineStats::new();
     for i in 0..v_up.len() {
-        stats.update((v_up[i] - v_down[i]) / (2.0 * h));
+        stats.update((v_up[i] - v_down[i]) / (2.0 * h))?;
     }
-    Ok((stats.mean(), stats.stderr()))
+    Ok((
+        stats.get_mean()?.unwrap_or(f64::NAN),
+        stats.get_stderr()?.unwrap_or(f64::NAN),
+    ))
 }
 
 /// Compute gamma by a second central difference with common random numbers.
@@ -336,9 +339,12 @@ where
     let v_down = &per_state[2];
     let mut stats = OnlineStats::new();
     for i in 0..v_up.len() {
-        stats.update((v_up[i] - 2.0 * v_base[i] + v_down[i]) / (h * h));
+        stats.update((v_up[i] - 2.0 * v_base[i] + v_down[i]) / (h * h))?;
     }
-    Ok((stats.mean(), stats.stderr()))
+    Ok((
+        stats.get_mean()?.unwrap_or(f64::NAN),
+        stats.get_stderr()?.unwrap_or(f64::NAN),
+    ))
 }
 
 #[cfg(test)]

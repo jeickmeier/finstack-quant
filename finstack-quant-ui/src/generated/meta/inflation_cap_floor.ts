@@ -19,7 +19,7 @@ export default [
             },
             "id": "INFLCAP-USD-5Y",
             "inflation_index_id": "US-CPI",
-            "interpolation": null,
+            "interpolation": "linear",
             "lag": {
               "months": 3
             },
@@ -528,7 +528,7 @@ export default [
   {
     "path": "#/$defs/d_2572320f93343dabe361/properties/interpolation",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/interpolation",
-    "description": "Contractual monthly CPI interpolation; takes precedence over index metadata.\nDefaults to monthly step interpolation when neither source supplies it."
+    "description": "Explicit contractual monthly CPI interpolation; no source default is used.\nDefaults to monthly step interpolation when neither source supplies it."
   },
   {
     "path": "#/$defs/d_2572320f93343dabe361/properties/interpolation/anyOf/0",
@@ -543,7 +543,7 @@ export default [
   {
     "path": "#/$defs/d_2572320f93343dabe361/properties/lag",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationCapFloor/properties/lag",
-    "description": "Contractual CPI observation lag; when `None` the index lag, then the\ncurve's indexation lag, applies."
+    "description": "Explicit contractual CPI observation lag; missing terms fail reference resolution."
   },
   {
     "path": "#/$defs/d_2572320f93343dabe361/properties/lag/anyOf/0",
@@ -2600,7 +2600,7 @@ export default [
   {
     "path": "#/$defs/d_a3b019065dc7c1f4e426",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/SeriesInterpolation",
-    "description": "Interpolation strategy for [`ScalarTimeSeries`].\n\n# Examples\n```rust\nuse finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"TS\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\"), 100.0),\n        (Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\"), 105.0),\n    ],\n    None,\n)\n.expect(\"Series creation should succeed\");\nlet stepped = series.clone().with_interpolation(SeriesInterpolation::Step);\nlet mid_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nassert_eq!(stepped.value_on(mid_date).expect(\"Value lookup should succeed\"), 100.0);\n```"
+    "description": "Interpolation strategy for [`ScalarTimeSeries`].\n\n# Examples\n```rust\nuse finstack_quant_core::market_data::scalars::{\n    ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,\n};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"TS\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\"), 100.0),\n        (Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\"), 105.0),\n    ],\n    None,\n    SeriesInterpolation::Step,\n    SeriesExtrapolation::Error,\n)\n.expect(\"Series creation should succeed\");\nlet mid_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nassert_eq!(series.get_value(mid_date).expect(\"Value lookup should succeed\"), 100.0);\n```"
   },
   {
     "path": "#/$defs/d_a3b019065dc7c1f4e426/oneOf/0",
@@ -3905,37 +3905,37 @@ export default [
   {
     "path": "#/$defs/d_c8d5a8dc925586cc9b9d",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationLag",
-    "description": "Contractual observation lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate an observation lag to ensure the reference\nindex is published by settlement. This lag does not specify the actual\npublication date; use [`InflationIndex::with_publication_dates`] for that.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```"
+    "description": "Contractual observation lag for inflation index reference dates.\n\nSpecifies how far before a contractual reference date the historical or\nprojected CPI anchor is sampled. Publication and knowledge cutoffs are\ntracked separately on [`InflationIndex`].\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::months(3);\nlet day_lag = InflationLag::days(90);\nlet no_lag = InflationLag::None;\nassert_eq!(tips_lag.to_string(), \"3M\");\nassert_eq!(day_lag.to_string(), \"90D\");\nassert_eq!(no_lag.to_string(), \"none\");\n```"
   },
   {
     "path": "#/$defs/d_c8d5a8dc925586cc9b9d/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationLag/oneOf/0",
-    "description": "Lag by specified number of months.\n\nStandard: 3 months for TIPS and most inflation-linked bonds."
+    "description": "Lag by a strictly positive number of whole calendar months."
   },
   {
     "path": "#/$defs/d_c8d5a8dc925586cc9b9d/oneOf/0/properties/months",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationLag/oneOf/0/properties/months",
     "format": "uint8",
     "maximum": 255,
-    "minimum": 0
+    "minimum": 1
   },
   {
     "path": "#/$defs/d_c8d5a8dc925586cc9b9d/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationLag/oneOf/1",
-    "description": "Lag by specified number of calendar days.\n\nAlternative specification for non-standard contracts."
+    "description": "Lag by a strictly positive number of literal calendar days."
   },
   {
     "path": "#/$defs/d_c8d5a8dc925586cc9b9d/oneOf/1/properties/days",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationLag/oneOf/1/properties/days",
     "format": "uint16",
     "maximum": 65535,
-    "minimum": 0
+    "minimum": 1
   },
   {
     "path": "#/$defs/d_c8d5a8dc925586cc9b9d/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json#/$defs/InflationLag/oneOf/2",
     "const": "none",
-    "description": "No lag applied.\n\nUsed for inflation swaps where forecast indices are used."
+    "description": "Zero contractual shift."
   },
   {
     "path": "#/$defs/d_cc8ed166abbb10ad4451",

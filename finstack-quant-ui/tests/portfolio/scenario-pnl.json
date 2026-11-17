@@ -12,16 +12,16 @@
         "scenario_id": "up_10bp",
         "pnl": {
           "total": {
-            "amount": "-1487.4153790392",
+            "amount": "-1487.4153790397",
             "currency": "USD"
           },
           "by_position": {
             "POS-0": {
-              "amount": "-495.8051263468",
+              "amount": "-495.8051263467",
               "currency": "USD"
             },
             "POS-1": {
-              "amount": "-991.6102526935",
+              "amount": "-991.6102526933",
               "currency": "USD"
             }
           }
@@ -80,7 +80,7 @@
         "scenario_id": "down_15bp",
         "pnl": {
           "total": {
-            "amount": "2232.5065165438",
+            "amount": "2232.5065165433",
             "currency": "USD"
           },
           "by_position": {
@@ -158,11 +158,11 @@
             "position_id": "POS-0",
             "entity_id": "FUND",
             "value_native": {
-              "amount": "999580.1351439571",
+              "amount": "999580.1351439572",
               "currency": "USD"
             },
             "value_base": {
-              "amount": "999580.1351439571",
+              "amount": "999580.1351439572",
               "currency": "USD"
             },
             "metric_scale": 1,
@@ -220,11 +220,11 @@
             "position_id": "POS-1",
             "entity_id": "FUND",
             "value_native": {
-              "amount": "1999160.2702879142",
+              "amount": "1999160.2702879144",
               "currency": "USD"
             },
             "value_base": {
-              "amount": "1999160.2702879142",
+              "amount": "1999160.2702879144",
               "currency": "USD"
             },
             "metric_scale": 1,
@@ -348,16 +348,16 @@
         "scenario_id": "up_10bp",
         "pnl": {
           "total": {
-            "amount": "-1487.4153790392",
+            "amount": "-1487.4153790397",
             "currency": "USD"
           },
           "by_position": {
             "POS-0": {
-              "amount": "-495.8051263468",
+              "amount": "-495.8051263467",
               "currency": "USD"
             },
             "POS-1": {
-              "amount": "-991.6102526935",
+              "amount": "-991.6102526933",
               "currency": "USD"
             }
           }
@@ -416,7 +416,7 @@
         "scenario_id": "down_15bp",
         "pnl": {
           "total": {
-            "amount": "2232.5065165438",
+            "amount": "2232.5065165433",
             "currency": "USD"
           },
           "by_position": {

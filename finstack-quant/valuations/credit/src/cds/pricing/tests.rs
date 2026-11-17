@@ -48,6 +48,9 @@ fn create_test_curves() -> (DiscountCurve, HazardCurve) {
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date"))
         .knots(vec![(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.65)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("should succeed");
 
@@ -55,12 +58,7 @@ fn create_test_curves() -> (DiscountCurve, HazardCurve) {
         .base_date(Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date"))
         .recovery_rate(0.40)
         .knots(vec![(1.0, 0.02), (3.0, 0.03), (5.0, 0.04), (10.0, 0.05)])
-        .par_spreads(vec![
-            (1.0, 100.0),
-            (3.0, 150.0),
-            (5.0, 200.0),
-            (10.0, 250.0),
-        ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("should succeed");
 
@@ -561,12 +559,16 @@ fn test_full_premium_par_spread_is_below_risky_annuity_par_spread() {
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots(vec![(0.0, 1.0), (1.0, 0.975), (5.0, 0.86), (10.0, 0.72)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
     let credit = HazardCurve::builder("TEST-CREDIT")
         .base_date(as_of)
         .recovery_rate(0.40)
         .knots(vec![(0.25, 0.08), (1.0, 0.12), (3.0, 0.16), (5.0, 0.20)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("hazard curve");
     let mut cds = create_test_cds(
@@ -707,7 +709,7 @@ fn test_time_and_settlement_helpers_match_curve_and_calendar_conventions() {
         "fallback settlement = 4 calendar days rolled forward off weekends"
     );
 
-    let nyse = finstack_quant_core::dates::resolve_calendar(Some("nyse")).expect("nyse calendar");
+    let nyse = finstack_quant_core::dates::resolve_calendar("nyse").expect("nyse calendar");
     let friday =
         Date::from_calendar_date(2025, time::Month::January, 3).expect("valid Friday date");
     let monday =
@@ -727,7 +729,8 @@ fn test_survival_and_default_density_helpers_cover_boundary_cases() {
 
     let t_asof = haz_t(&credit, as_of).expect("haz_t as_of");
     let t_one_year = haz_t(&credit, one_year).expect("haz_t future");
-    let expected_conditional_survival = credit.sp(t_one_year) / credit.sp(t_asof);
+    let expected_conditional_survival =
+        credit.sp(t_one_year).expect("sp") / credit.sp(t_asof).expect("sp");
     assert!(
         (sp_cond_to(&credit, as_of, one_year).expect("conditional survival")
             - expected_conditional_survival)
@@ -736,7 +739,9 @@ fn test_survival_and_default_density_helpers_cover_boundary_cases() {
     );
 
     let mut late_as_of = as_of;
-    while credit.sp(haz_t(&credit, late_as_of).expect("haz_t late"))
+    while credit
+        .sp(haz_t(&credit, late_as_of).expect("haz_t late"))
+        .expect("sp")
         > credit::SURVIVAL_PROBABILITY_FLOOR
     {
         late_as_of = late_as_of.add_months(600).expect("valid fixture date");

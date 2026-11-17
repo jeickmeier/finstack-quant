@@ -23,6 +23,8 @@ fn build_discount_curve(rate: f64, base_date: Date, id: &str) -> DiscountCurve {
             (5.0, (-rate * 5.0).exp()),
             (10.0, (-rate * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -32,12 +34,8 @@ fn build_hazard_curve(hazard_rate: f64, recovery: f64, base_date: Date, id: &str
     HazardCurve::builder(id)
         .base_date(base_date)
         .recovery_rate(recovery)
-        .knots([
-            (0.0, hazard_rate),
-            (1.0, hazard_rate),
-            (5.0, hazard_rate),
-            (10.0, hazard_rate),
-        ])
+        .knots([(1.0, hazard_rate), (5.0, hazard_rate), (10.0, hazard_rate)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap()
 }

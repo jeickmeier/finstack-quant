@@ -11,7 +11,10 @@ use time::macros::date;
 #[test]
 fn generic_greeks_follow_the_active_override_without_a_surface() {
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::{surfaces::VolSurface, term_structures::DiscountCurve};
+    use finstack_quant_core::market_data::{
+        surfaces::{VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis},
+        term_structures::DiscountCurve,
+    };
     use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
     use finstack_quant_valuations::metrics::{MetricCalculator, MetricContext};
     let as_of = date!(2025 - 01 - 01);
@@ -26,14 +29,23 @@ fn generic_greeks_follow_the_active_override_without_a_surface() {
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (10.0, 1.0)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
         )
-        .insert_price("EQ-SPOT", MarketScalar::Unitless(100.0));
+        .insert_price(
+            "EQ-SPOT",
+            MarketScalar::unitless(100.0).expect("valid scalar"),
+        );
     let quoted = bare.clone().insert_surface(
         VolSurface::builder("EQ-VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[1.0])
-            .strikes(&[120.0])
+            .secondary_values(&[120.0])
             .row(&[0.2])
             .build()
             .expect("surface"),
@@ -73,7 +85,9 @@ mod asian {
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
@@ -117,20 +131,25 @@ mod asian {
                     .base_date(as_of)
                     .day_count(DayCount::Act365F)
                     .knots([(0.0, 1.0), (2.0, (-0.05_f64 * 2.0).exp())])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount curve"),
             )
             .insert_surface(
                 VolSurface::builder("SPX-VOL")
+                    .secondary_axis(VolSurfaceAxis::Strike)
+                    .quote_type(VolQuoteType::BlackLognormal)
+                    .interpolation_mode(VolInterpolationMode::Vol)
                     .expiries(&[0.5, 1.0, 2.0])
-                    .strikes(&[80.0, 100.0, 120.0])
+                    .secondary_values(&[80.0, 100.0, 120.0])
                     .row(&[0.25; 3])
                     .row(&[0.25; 3])
                     .row(&[0.25; 3])
                     .build()
                     .expect("volatility surface"),
             )
-            .insert_price("SPX", MarketScalar::Unitless(100.0));
+            .insert_price("SPX", MarketScalar::unitless(100.0).expect("valid scalar"));
         let metrics = [
             MetricId::Delta,
             MetricId::Gamma,

@@ -37,6 +37,8 @@ fn create_benchmark_market() -> MarketContext {
             (10.0, 0.7800),
         ])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 

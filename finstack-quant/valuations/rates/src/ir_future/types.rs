@@ -447,7 +447,7 @@ impl InterestRateFuture {
             FloatingLegCompounding::Simple => {
                 if fixing_date < as_of {
                     Ok(RateFutureProjection {
-                        rate: require_fixing_value_exact(fixings, fixing_id, fixing_date, as_of)?,
+                        rate: require_fixing_value_exact(fixings, fixing_id, fixing_date)?,
                         parallel_forward_sensitivity: 0.0,
                     })
                 } else {
@@ -1002,16 +1002,20 @@ mod tests {
                 DiscountCurve::builder(future.discount_curve_id.clone())
                     .base_date(base)
                     .knots([(0.0, 1.0), (1.0, 0.96)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount"),
             )
             .insert(
-                ForwardCurve::builder(future.forward_curve_id.clone(), 0.25)
-                    .base_date(base)
-                    .day_count(DayCount::Act360)
-                    .knots([(0.0, 0.04), (1.0, 0.04)])
-                    .build()
-                    .expect("forward"),
+                ForwardCurve::flat(
+                    future.forward_curve_id.clone(),
+                    base,
+                    0.04,
+                    DayCount::Act360,
+                )
+                .expect("forward"),
             )
             .insert_series(
                 ScalarTimeSeries::new(
@@ -1020,6 +1024,8 @@ mod tests {
                         .map(|day| (start + time::Duration::days(day), 0.06))
                         .collect(),
                     None,
+                    finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                    finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
                 )
                 .expect("fixings"),
             );
@@ -1067,7 +1073,7 @@ mod tests {
                     let variance = 0.02_f64.powi(2) * (1.0 - (-0.2 * t).exp()) / 0.2;
                     let shift = 0.5
                         * (variance_integral(u) - variance_integral(t) - variance_integral(u - t));
-                    let factor = 1.0 + 0.04_f64 / 360.0;
+                    let factor = (0.04_f64 / 360.0).exp();
                     expected_sum += factor * (shift + 0.5 * b * b * variance).exp() - 1.0;
                     expected_product *= factor;
                     total_shift += shift;
@@ -1112,27 +1118,44 @@ mod tests {
 
     #[test]
     fn convexity_requires_normal_quote_metadata_even_below_sanity_bound() {
-        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::market_data::surfaces::{
+            VolGridOpts, VolInterpolationMode, VolSurface,
+        };
         let mut future = InterestRateFuture::example().expect("future");
         future.vol_surface_id = Some(CurveId::new("VOL"));
         let base = VolSurface::builder("VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[1.0])
-            .strikes(&[0.04])
+            .secondary_values(&[0.04])
             .row(&[0.01])
             .build()
             .unwrap();
         for surface in [
             base.clone(),
-            base.clone().with_displacements(&[0.02]).unwrap(),
-            finstack_quant_core::market_data::surfaces::VolSurface::from_grid(
+            VolSurface::from_grid(
                 base.id(),
                 base.expiries(),
-                base.strikes(),
+                base.secondary_values(),
                 base.vols(),
-                finstack_quant_core::market_data::surfaces::VolGridOpts {
+                VolGridOpts {
+                    secondary_axis: base.secondary_axis(),
+                    quote_type: VolQuoteType::ShiftedBlackLognormal,
+                    interpolation_mode: base.interpolation_mode(),
+                },
+                Some(&[0.02]),
+            )
+            .unwrap(),
+            VolSurface::from_grid(
+                base.id(),
+                base.expiries(),
+                base.secondary_values(),
+                base.vols(),
+                VolGridOpts {
                     secondary_axis: VolSurfaceAxis::Tenor,
                     quote_type: VolQuoteType::Normal,
-                    ..finstack_quant_core::market_data::surfaces::VolGridOpts::default()
+                    interpolation_mode: VolInterpolationMode::Vol,
                 },
                 None,
             )
@@ -1297,20 +1320,25 @@ mod tests {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 0.97)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount curve"),
             )
             .insert(
-                ForwardCurve::builder("USD-SOFR", 1.0 / 365.0)
-                    .base_date(as_of)
-                    .day_count(DayCount::Act360)
-                    .knots([(0.0, 0.05), (1.0, 0.05)])
-                    .build()
+                ForwardCurve::flat("USD-SOFR", as_of, 0.05, DayCount::Act360)
                     .expect("forward curve"),
             )
             .insert_series(
-                ScalarTimeSeries::new("FIXING:USD-SOFR", vec![(date!(2025 - 01 - 02), 0.04)], None)
-                    .expect("fixings"),
+                ScalarTimeSeries::new(
+                    "FIXING:USD-SOFR",
+                    vec![(date!(2025 - 01 - 02), 0.04)],
+                    None,
+                    finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                    finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+                )
+                .expect("fixings"),
             );
 
         let projected_rate = future
@@ -1350,7 +1378,7 @@ mod tests {
 
     #[test]
     fn convexity_adjustment_rolls_with_valuation_date_not_curve_base() {
-        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::market_data::surfaces::{VolInterpolationMode, VolSurface};
         use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 
         let curve_base = date!(2025 - 01 - 02);
@@ -1365,21 +1393,23 @@ mod tests {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(curve_base)
                     .knots(vec![(0.0, 1.0), (2.0, (-0.03_f64 * 2.0).exp())])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount curve"),
             )
             .insert(
-                ForwardCurve::builder("USD-SOFR-3M", 0.25)
-                    .base_date(curve_base)
-                    .knots(vec![(0.0, 0.04), (2.0, 0.04)])
-                    .build()
+                ForwardCurve::flat("USD-SOFR-3M", curve_base, 0.04, DayCount::Act360)
                     .expect("forward curve"),
             )
             .insert_surface(
                 VolSurface::builder("USD-SR3-NORMAL-VOL")
+                    .secondary_axis(VolSurfaceAxis::Strike)
                     .quote_type(VolQuoteType::Normal)
+                    .interpolation_mode(VolInterpolationMode::Vol)
                     .expiries(&[0.1, 0.25, 0.5, 1.0])
-                    .strikes(&[0.0, 0.04, 0.10])
+                    .secondary_values(&[0.0, 0.04, 0.10])
                     .row(&[normal_vol; 3])
                     .row(&[normal_vol; 3])
                     .row(&[normal_vol; 3])
@@ -1438,11 +1468,13 @@ mod tests {
             .build()
             .expect("future");
         let market = MarketContext::new().insert(
-            ForwardCurve::builder("USD-SOFR-3M", 0.25)
-                .base_date(date!(2025 - 02 - 01))
-                .knots([(0.0, 0.04), (2.0, 0.04)])
-                .build()
-                .expect("forward curve"),
+            ForwardCurve::flat(
+                "USD-SOFR-3M",
+                date!(2025 - 02 - 01),
+                0.04,
+                finstack_quant_core::dates::DayCount::Act365F,
+            )
+            .expect("forward curve"),
         );
 
         let error = future

@@ -52,6 +52,9 @@
 //! // Build a discount curve
 //! let curve = DiscountCurve::builder("USD-OIS")
 //!     .base_date(base)
+//!     .day_count(finstack_quant_core::dates::DayCount::Act365F)
+//!     .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+//!     .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
 //!     .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.78)])
 //!     .build()?;
 //!
@@ -72,6 +75,7 @@
 
 /// Bump functionality for scenario analysis and stress testing.
 pub mod bumps;
+pub use bumps::MarketDataTarget;
 /// Market data context with enum-based storage.
 pub mod context;
 /// Market data comparison and shift measurement.

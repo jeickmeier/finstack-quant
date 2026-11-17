@@ -472,11 +472,11 @@ fn assemble_valuation(
     let by_entity: IndexMap<EntityId, Money> = entity_amounts
         .into_iter()
         .map(|(entity_id, amounts)| {
-            Money::new(neumaier_sum(amounts), base_currency).map(|money| (entity_id, money))
+            Money::new(neumaier_sum(amounts)?, base_currency).map(|money| (entity_id, money))
         })
         .collect::<finstack_quant_core::Result<_>>()?;
     let total_base_currency = Money::new(
-        neumaier_sum(by_entity.values().map(Money::amount)),
+        neumaier_sum(by_entity.values().map(Money::amount))?,
         base_currency,
     )?;
     let degraded_positions: Vec<PositionId> = position_values

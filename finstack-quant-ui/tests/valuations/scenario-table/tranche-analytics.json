@@ -167,10 +167,7 @@
               [40, 0.3]
             ],
             "interp_style": "log_linear",
-            "extrapolation": "flat_forward",
-            "min_forward_rate": null,
-            "allow_non_monotonic": false,
-            "min_forward_tenor": 0.000001,
+            "extrapolation": "extend",
             "rate_calibration": null,
             "fx_policy": null
           },
@@ -185,10 +182,7 @@
               [40, 0.3]
             ],
             "interp_style": "log_linear",
-            "extrapolation": "flat_forward",
-            "min_forward_rate": null,
-            "allow_non_monotonic": false,
-            "min_forward_tenor": 0.000001,
+            "extrapolation": "extend",
             "rate_calibration": null,
             "fx_policy": null
           },
@@ -203,10 +197,7 @@
               [40, 0.3]
             ],
             "interp_style": "log_linear",
-            "extrapolation": "flat_forward",
-            "min_forward_rate": null,
-            "allow_non_monotonic": false,
-            "min_forward_tenor": 0.000001,
+            "extrapolation": "extend",
             "rate_calibration": null,
             "fx_policy": null
           },
@@ -221,10 +212,7 @@
               [40, 0.3]
             ],
             "interp_style": "log_linear",
-            "extrapolation": "flat_forward",
-            "min_forward_rate": null,
-            "allow_non_monotonic": false,
-            "min_forward_tenor": 0.000001,
+            "extrapolation": "extend",
             "rate_calibration": null,
             "fx_policy": null
           },
@@ -239,10 +227,7 @@
               [40, 0.3]
             ],
             "interp_style": "log_linear",
-            "extrapolation": "flat_forward",
-            "min_forward_rate": null,
-            "allow_non_monotonic": false,
-            "min_forward_tenor": 0.000001,
+            "extrapolation": "extend",
             "rate_calibration": null,
             "fx_policy": null
           },
@@ -257,10 +242,7 @@
               [40, 0.3]
             ],
             "interp_style": "log_linear",
-            "extrapolation": "flat_forward",
-            "min_forward_rate": null,
-            "allow_non_monotonic": false,
-            "min_forward_tenor": 0.000001,
+            "extrapolation": "extend",
             "rate_calibration": null,
             "fx_policy": null
           },
@@ -268,16 +250,17 @@
             "type": "forward",
             "id": "USD-SOFR-3M",
             "base": "2023-12-28",
-            "reset_lag": 2,
             "day_count": "act_365f",
-            "tenor": 0.25,
+            "index_tenor": {
+              "count": 3,
+              "unit": "months"
+            },
             "knot_points": [
-              [0, 0.04],
-              [40, 0.04]
+              [0, 1],
+              [40.25, 0.20149247013311578]
             ],
-            "projection_grid": null,
-            "interp_style": "linear",
-            "extrapolation": "flat_forward",
+            "interp_style": "log_linear",
+            "extrapolation": "extend",
             "rate_calibration": null,
             "fx_policy": null
           },
@@ -285,16 +268,17 @@
             "type": "forward",
             "id": "USD-SOFR-1M",
             "base": "2023-12-28",
-            "reset_lag": 2,
             "day_count": "act_365f",
-            "tenor": 0.08333333333333333,
+            "index_tenor": {
+              "count": 1,
+              "unit": "months"
+            },
             "knot_points": [
-              [0, 0.035],
-              [40, 0.035]
+              [0, 1],
+              [40.08333333333338, 0.2463813559374612]
             ],
-            "projection_grid": null,
-            "interp_style": "linear",
-            "extrapolation": "flat_forward",
+            "interp_style": "log_linear",
+            "extrapolation": "extend",
             "rate_calibration": null,
             "fx_policy": null
           },
@@ -302,16 +286,17 @@
             "type": "forward",
             "id": "USD-SOFR-6M",
             "base": "2023-12-28",
-            "reset_lag": 2,
             "day_count": "act_365f",
-            "tenor": 0.5,
+            "index_tenor": {
+              "count": 6,
+              "unit": "months"
+            },
             "knot_points": [
-              [0, 0.04],
-              [40, 0.04]
+              [0, 1],
+              [40.5, 0.2010879687908384]
             ],
-            "projection_grid": null,
-            "interp_style": "linear",
-            "extrapolation": "flat_forward",
+            "interp_style": "log_linear",
+            "extrapolation": "extend",
             "rate_calibration": null,
             "fx_policy": null
           },
@@ -319,16 +304,17 @@
             "type": "forward",
             "id": "USD-LIBOR-3M",
             "base": "2023-12-28",
-            "reset_lag": 2,
             "day_count": "act_365f",
-            "tenor": 0.25,
+            "index_tenor": {
+              "count": 3,
+              "unit": "months"
+            },
             "knot_points": [
-              [0, 0.04],
-              [40, 0.04]
+              [0, 1],
+              [40.25, 0.20149247013311578]
             ],
-            "projection_grid": null,
-            "interp_style": "linear",
-            "extrapolation": "flat_forward",
+            "interp_style": "log_linear",
+            "extrapolation": "extend",
             "rate_calibration": null,
             "fx_policy": null
           },
@@ -336,16 +322,17 @@
             "type": "forward",
             "id": "EUR-EURIBOR-3M",
             "base": "2023-12-28",
-            "reset_lag": 2,
             "day_count": "act_365f",
-            "tenor": 0.25,
+            "index_tenor": {
+              "count": 3,
+              "unit": "months"
+            },
             "knot_points": [
-              [0, 0.03],
-              [40, 0.03]
+              [0, 1],
+              [40.25, 0.30029366822983944]
             ],
-            "projection_grid": null,
-            "interp_style": "linear",
-            "extrapolation": "flat_forward",
+            "interp_style": "log_linear",
+            "extrapolation": "extend",
             "rate_calibration": null,
             "fx_policy": null
           },
@@ -353,68 +340,48 @@
             "type": "hazard",
             "id": "CDX.NA.IG.HAZARD",
             "base": "2023-12-28",
-            "knot_points": [
-              [0, 0.02],
-              [40, 0.02]
-            ],
+            "knot_points": [[40, 0.02]],
             "recovery_rate": 0.4,
             "issuer": null,
             "seniority": null,
             "currency": null,
             "day_count": "act_365f",
-            "par_points": [],
-            "par_interp": "linear",
             "hazard_calibration": null
           },
           {
             "type": "hazard",
             "id": "CORP-HAZARD",
             "base": "2023-12-28",
-            "knot_points": [
-              [0, 0.02],
-              [40, 0.02]
-            ],
+            "knot_points": [[40, 0.02]],
             "recovery_rate": 0.4,
             "issuer": null,
             "seniority": null,
             "currency": null,
             "day_count": "act_365f",
-            "par_points": [],
-            "par_interp": "linear",
             "hazard_calibration": null
           },
           {
             "type": "hazard",
             "id": "USD-CREDIT-BBB",
             "base": "2023-12-28",
-            "knot_points": [
-              [0, 0.02],
-              [40, 0.02]
-            ],
+            "knot_points": [[40, 0.02]],
             "recovery_rate": 0.4,
             "issuer": null,
             "seniority": null,
             "currency": null,
             "day_count": "act_365f",
-            "par_points": [],
-            "par_interp": "linear",
             "hazard_calibration": null
           },
           {
             "type": "hazard",
             "id": "ACME-HAZARD",
             "base": "2023-12-28",
-            "knot_points": [
-              [0, 0.02],
-              [40, 0.02]
-            ],
+            "knot_points": [[40, 0.02]],
             "recovery_rate": 0.4,
             "issuer": null,
             "seniority": null,
             "currency": null,
             "day_count": "act_365f",
-            "par_points": [],
-            "par_interp": "linear",
             "hazard_calibration": null
           },
           {
@@ -428,7 +395,7 @@
               [40, 80]
             ],
             "interp_style": "linear",
-            "extrapolation": "flat_forward"
+            "extrapolation": "extend"
           },
           {
             "type": "price",
@@ -441,7 +408,7 @@
               [40, 80]
             ],
             "interp_style": "linear",
-            "extrapolation": "flat_forward"
+            "extrapolation": "extend"
           },
           {
             "type": "price",
@@ -454,7 +421,7 @@
               [40, 4]
             ],
             "interp_style": "linear",
-            "extrapolation": "flat_forward"
+            "extrapolation": "extend"
           },
           {
             "type": "price",
@@ -467,7 +434,7 @@
               [40, 4]
             ],
             "interp_style": "linear",
-            "extrapolation": "flat_forward"
+            "extrapolation": "extend"
           },
           {
             "type": "price",
@@ -480,7 +447,7 @@
               [40, 90]
             ],
             "interp_style": "linear",
-            "extrapolation": "flat_forward"
+            "extrapolation": "extend"
           },
           {
             "type": "price",
@@ -493,7 +460,7 @@
               [40, 110]
             ],
             "interp_style": "linear",
-            "extrapolation": "flat_forward"
+            "extrapolation": "extend"
           },
           {
             "type": "price",
@@ -506,22 +473,20 @@
               [40, 22]
             ],
             "interp_style": "linear",
-            "extrapolation": "flat_forward"
+            "extrapolation": "extend"
           },
           {
             "type": "inflation",
             "id": "US-CPI",
             "base_date": "2023-10-01",
-            "base_cpi": 300,
             "day_count": "act_365f",
-            "indexation_lag_months": 3,
             "knot_points": [
               [0, 300],
               [4, 330],
               [40, 500]
             ],
             "interp_style": "linear",
-            "extrapolation": "flat_zero"
+            "extrapolation": "flat"
           }
         ],
         "fx": {
@@ -541,7 +506,7 @@
           {
             "id": "SPX-VOL",
             "expiries": [0.01, 1, 40],
-            "strikes": [450, 4500, 9000],
+            "secondary_values": [450, 4500, 9000],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -550,7 +515,7 @@
           {
             "id": "SPX",
             "expiries": [0.01, 1, 40],
-            "strikes": [450, 4500, 9000],
+            "secondary_values": [450, 4500, 9000],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -559,7 +524,7 @@
           {
             "id": "SX5E-VOL",
             "expiries": [0.01, 1, 40],
-            "strikes": [500, 5000, 10000],
+            "secondary_values": [500, 5000, 10000],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -568,7 +533,7 @@
           {
             "id": "NKY-VOL",
             "expiries": [0.01, 1, 40],
-            "strikes": [3500, 35000, 70000],
+            "secondary_values": [3500, 35000, 70000],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -577,7 +542,7 @@
           {
             "id": "EURUSD-VOL",
             "expiries": [0.01, 1, 40],
-            "strikes": [0.11000000000000001, 1.1, 2.2],
+            "secondary_values": [0.11000000000000001, 1.1, 2.2],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -588,7 +553,7 @@
           {
             "id": "JPYUSD-VOL",
             "expiries": [0.01, 1, 40],
-            "strikes": [0.0007000000000000001, 0.007, 0.014],
+            "secondary_values": [0.0007000000000000001, 0.007, 0.014],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -597,7 +562,7 @@
           {
             "id": "WTI-VOL",
             "expiries": [0.01, 1, 40],
-            "strikes": [8, 80, 160],
+            "secondary_values": [8, 80, 160],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -606,7 +571,7 @@
           {
             "id": "CL-VOL",
             "expiries": [0.01, 1, 40],
-            "strikes": [8, 80, 160],
+            "secondary_values": [8, 80, 160],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -615,7 +580,7 @@
           {
             "id": "RBOB-VOL",
             "expiries": [0.01, 1, 40],
-            "strikes": [9, 90, 180],
+            "secondary_values": [9, 90, 180],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -624,7 +589,7 @@
           {
             "id": "NG-VOL",
             "expiries": [0.01, 1, 40],
-            "strikes": [0.4, 4, 8],
+            "secondary_values": [0.4, 4, 8],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -633,7 +598,7 @@
           {
             "id": "USD-CAPFLOOR-VOL",
             "expiries": [0.01, 1, 40],
-            "strikes": [0.003, 0.03, 0.06],
+            "secondary_values": [0.003, 0.03, 0.06],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -642,7 +607,7 @@
           {
             "id": "USD-SWPNVOL",
             "expiries": [0.01, 1, 40],
-            "strikes": [0.003, 0.03, 0.06],
+            "secondary_values": [0.003, 0.03, 0.06],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -651,7 +616,7 @@
           {
             "id": "USD-CMS10Y-VOL",
             "expiries": [0.01, 1, 40],
-            "strikes": [0.003, 0.03, 0.06],
+            "secondary_values": [0.003, 0.03, 0.06],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -660,7 +625,7 @@
           {
             "id": "USD-SWAPTION-VOL-10Y",
             "expiries": [0.01, 1, 40],
-            "strikes": [0.003, 0.03, 0.06],
+            "secondary_values": [0.003, 0.03, 0.06],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -669,7 +634,7 @@
           {
             "id": "USD-SWAPTION-VOL-2Y",
             "expiries": [0.01, 1, 40],
-            "strikes": [0.003, 0.03, 0.06],
+            "secondary_values": [0.003, 0.03, 0.06],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -678,7 +643,7 @@
           {
             "id": "USD-INFL-VOL",
             "expiries": [0.01, 1, 40],
-            "strikes": [0.003, 0.03, 0.06],
+            "secondary_values": [0.003, 0.03, 0.06],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -687,7 +652,7 @@
           {
             "id": "CDSOPT-VOL",
             "expiries": [0.01, 1, 40],
-            "strikes": [0.001, 0.01, 0.02],
+            "secondary_values": [0.001, 0.01, 0.02],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -696,7 +661,7 @@
           {
             "id": "SOFR-VOL",
             "expiries": [0.01, 1, 40],
-            "strikes": [0.005000000000000001, 0.05, 0.1],
+            "secondary_values": [0.005000000000000001, 0.05, 0.1],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -707,7 +672,7 @@
           {
             "id": "USD-SOFR-HW-VOL",
             "expiries": [0.01, 1, 40],
-            "strikes": [0.004, 0.04, 0.08],
+            "secondary_values": [0.004, 0.04, 0.08],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -718,7 +683,7 @@
           {
             "id": "EQUITY-VOL",
             "expiries": [0.01, 1, 40],
-            "strikes": [450, 4500, 9000],
+            "secondary_values": [450, 4500, 9000],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -727,7 +692,7 @@
           {
             "id": "US-CPI-FLOOR-VOL",
             "expiries": [0.01, 40],
-            "strikes": [0.5, 1.5],
+            "secondary_values": [0.5, 1.5],
             "secondary_axis": "strike",
             "quote_type": "black_lognormal",
             "interpolation_mode": "vol",
@@ -822,17 +787,636 @@
           {
             "id": "US-CPI",
             "currency": "USD",
+            "knowledge_date": "2023-12-28",
             "observations": [
-              ["2023-09-01", 299],
-              ["2023-10-01", 300],
-              ["2023-11-01", 301],
-              ["2023-12-01", 302]
+              {
+                "reference_month": "2023-09-01",
+                "value": 299,
+                "available_on": "2023-10-12"
+              },
+              {
+                "reference_month": "2023-10-01",
+                "value": 300,
+                "available_on": "2023-11-14"
+              },
+              {
+                "reference_month": "2023-11-01",
+                "value": 301,
+                "available_on": "2023-12-12"
+              }
             ],
-            "interpolation": "linear",
-            "lag": {
-              "months": 3
-            },
-            "seasonality": null
+            "expected_releases": [
+              {
+                "reference_month": "2023-12-01",
+                "expected_release": "2024-01-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2024-01-01",
+                "expected_release": "2024-02-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2024-02-01",
+                "expected_release": "2024-03-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2024-03-01",
+                "expected_release": "2024-04-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2024-04-01",
+                "expected_release": "2024-05-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2024-05-01",
+                "expected_release": "2024-06-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2024-06-01",
+                "expected_release": "2024-07-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2024-07-01",
+                "expected_release": "2024-08-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2024-08-01",
+                "expected_release": "2024-09-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2024-09-01",
+                "expected_release": "2024-10-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2024-10-01",
+                "expected_release": "2024-11-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2024-11-01",
+                "expected_release": "2024-12-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2024-12-01",
+                "expected_release": "2025-01-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2025-01-01",
+                "expected_release": "2025-02-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2025-02-01",
+                "expected_release": "2025-03-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2025-03-01",
+                "expected_release": "2025-04-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2025-04-01",
+                "expected_release": "2025-05-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2025-05-01",
+                "expected_release": "2025-06-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2025-06-01",
+                "expected_release": "2025-07-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2025-07-01",
+                "expected_release": "2025-08-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2025-08-01",
+                "expected_release": "2025-09-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2025-09-01",
+                "expected_release": "2025-10-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2025-10-01",
+                "expected_release": "2025-11-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2025-11-01",
+                "expected_release": "2025-12-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2025-12-01",
+                "expected_release": "2026-01-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2026-01-01",
+                "expected_release": "2026-02-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2026-02-01",
+                "expected_release": "2026-03-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2026-03-01",
+                "expected_release": "2026-04-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2026-04-01",
+                "expected_release": "2026-05-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2026-05-01",
+                "expected_release": "2026-06-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2026-06-01",
+                "expected_release": "2026-07-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2026-07-01",
+                "expected_release": "2026-08-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2026-08-01",
+                "expected_release": "2026-09-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2026-09-01",
+                "expected_release": "2026-10-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2026-10-01",
+                "expected_release": "2026-11-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2026-11-01",
+                "expected_release": "2026-12-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2026-12-01",
+                "expected_release": "2027-01-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2027-01-01",
+                "expected_release": "2027-02-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2027-02-01",
+                "expected_release": "2027-03-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2027-03-01",
+                "expected_release": "2027-04-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2027-04-01",
+                "expected_release": "2027-05-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2027-05-01",
+                "expected_release": "2027-06-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2027-06-01",
+                "expected_release": "2027-07-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2027-07-01",
+                "expected_release": "2027-08-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2027-08-01",
+                "expected_release": "2027-09-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2027-09-01",
+                "expected_release": "2027-10-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2027-10-01",
+                "expected_release": "2027-11-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2027-11-01",
+                "expected_release": "2027-12-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2027-12-01",
+                "expected_release": "2028-01-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2028-01-01",
+                "expected_release": "2028-02-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2028-02-01",
+                "expected_release": "2028-03-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2028-03-01",
+                "expected_release": "2028-04-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2028-04-01",
+                "expected_release": "2028-05-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2028-05-01",
+                "expected_release": "2028-06-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2028-06-01",
+                "expected_release": "2028-07-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2028-07-01",
+                "expected_release": "2028-08-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2028-08-01",
+                "expected_release": "2028-09-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2028-09-01",
+                "expected_release": "2028-10-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2028-10-01",
+                "expected_release": "2028-11-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2028-11-01",
+                "expected_release": "2028-12-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2028-12-01",
+                "expected_release": "2029-01-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2029-01-01",
+                "expected_release": "2029-02-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2029-02-01",
+                "expected_release": "2029-03-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2029-03-01",
+                "expected_release": "2029-04-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2029-04-01",
+                "expected_release": "2029-05-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2029-05-01",
+                "expected_release": "2029-06-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2029-06-01",
+                "expected_release": "2029-07-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2029-07-01",
+                "expected_release": "2029-08-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2029-08-01",
+                "expected_release": "2029-09-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2029-09-01",
+                "expected_release": "2029-10-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2029-10-01",
+                "expected_release": "2029-11-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2029-11-01",
+                "expected_release": "2029-12-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2029-12-01",
+                "expected_release": "2030-01-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2030-01-01",
+                "expected_release": "2030-02-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2030-02-01",
+                "expected_release": "2030-03-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2030-03-01",
+                "expected_release": "2030-04-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2030-04-01",
+                "expected_release": "2030-05-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2030-05-01",
+                "expected_release": "2030-06-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2030-06-01",
+                "expected_release": "2030-07-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2030-07-01",
+                "expected_release": "2030-08-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2030-08-01",
+                "expected_release": "2030-09-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2030-09-01",
+                "expected_release": "2030-10-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2030-10-01",
+                "expected_release": "2030-11-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2030-11-01",
+                "expected_release": "2030-12-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2030-12-01",
+                "expected_release": "2031-01-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2031-01-01",
+                "expected_release": "2031-02-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2031-02-01",
+                "expected_release": "2031-03-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2031-03-01",
+                "expected_release": "2031-04-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2031-04-01",
+                "expected_release": "2031-05-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2031-05-01",
+                "expected_release": "2031-06-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2031-06-01",
+                "expected_release": "2031-07-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2031-07-01",
+                "expected_release": "2031-08-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2031-08-01",
+                "expected_release": "2031-09-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2031-09-01",
+                "expected_release": "2031-10-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2031-10-01",
+                "expected_release": "2031-11-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2031-11-01",
+                "expected_release": "2031-12-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2031-12-01",
+                "expected_release": "2032-01-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2032-01-01",
+                "expected_release": "2032-02-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2032-02-01",
+                "expected_release": "2032-03-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2032-03-01",
+                "expected_release": "2032-04-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2032-04-01",
+                "expected_release": "2032-05-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2032-05-01",
+                "expected_release": "2032-06-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2032-06-01",
+                "expected_release": "2032-07-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2032-07-01",
+                "expected_release": "2032-08-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2032-08-01",
+                "expected_release": "2032-09-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2032-09-01",
+                "expected_release": "2032-10-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2032-10-01",
+                "expected_release": "2032-11-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2032-11-01",
+                "expected_release": "2032-12-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2032-12-01",
+                "expected_release": "2033-01-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2033-01-01",
+                "expected_release": "2033-02-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2033-02-01",
+                "expected_release": "2033-03-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2033-03-01",
+                "expected_release": "2033-04-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2033-04-01",
+                "expected_release": "2033-05-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2033-05-01",
+                "expected_release": "2033-06-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2033-06-01",
+                "expected_release": "2033-07-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2033-07-01",
+                "expected_release": "2033-08-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2033-08-01",
+                "expected_release": "2033-09-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2033-09-01",
+                "expected_release": "2033-10-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2033-10-01",
+                "expected_release": "2033-11-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2033-11-01",
+                "expected_release": "2033-12-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2033-12-01",
+                "expected_release": "2034-01-15",
+                "known_on": "2023-12-28"
+              },
+              {
+                "reference_month": "2034-01-01",
+                "expected_release": "2034-02-15",
+                "known_on": "2023-12-28"
+              }
+            ]
           }
         ],
         "dividends": [],
@@ -852,12 +1436,12 @@
             "dirty_price_pct": 108.94134975314726,
             "accrued": 0,
             "factor": 1,
-            "wal": 3.9269094938065607,
-            "ytm": 0.029880883634640344,
-            "z_spread_bp": 8.06924406917676e-13,
+            "wal": 3.9269094938065603,
+            "ytm": 0.029880875657419675,
+            "z_spread_bp": 1.0831548336170174e-12,
             "cs01": -38842.49571467936,
             "spread_duration": 3.5654501989091814,
-            "spread_convexity": 21.045113449875874,
+            "spread_convexity": 21.045113422519577,
             "effective_duration": 3.566502454582359,
             "effective_convexity": 21.045113531944775,
             "target_price_pct": 108.94134975314726
@@ -872,19 +1456,19 @@
             "dirty_price_pct": 108.94134975314726,
             "accrued": 0,
             "factor": 1,
-            "wal": 3.9269094938065607,
-            "ytm": 0.05451355276141925,
-            "z_spread_bp": 247.09626972701432,
-            "cs01": -33664.048766329885,
-            "spread_duration": 3.3664048766329886,
-            "spread_convexity": 19.131606251001354,
+            "wal": 3.9269094938065603,
+            "ytm": 0.05451376978879531,
+            "z_spread_bp": 247.09626972701452,
+            "cs01": -33664.04876631498,
+            "spread_duration": 3.3664048766314982,
+            "spread_convexity": 19.13160628080368,
             "effective_duration": 3.566502454582359,
             "effective_convexity": 21.045113531944775,
             "target_price_pct": 100,
             "metrics": {
               "default01": -13204.83756671109,
               "dv01": -38853.9591299966,
-              "prepayment01": -3271.9821329865485,
+              "prepayment01": -3271.982132993999,
               "severity01": -56403.627560868816
             }
           }
@@ -1036,11 +1620,11 @@
         },
         "oas": {
           "value": {
-            "oas": 0.024260946559192656,
-            "model_price": 99.99999983481536,
+            "oas": 0.02426094655919271,
+            "model_price": 99.99999983481523,
             "market_price": 100,
             "num_paths": 256,
-            "price_std_error": 0.05213612323385638
+            "price_std_error": 0.052136123233856704
           }
         },
         "schedule": {
@@ -1079,7 +1663,7 @@
                 [
                   "2025-04-01",
                   {
-                    "amount": "5738358.99671182716",
+                    "amount": "5738358.99671182736",
                     "currency": "USD"
                   }
                 ],
@@ -1093,7 +1677,7 @@
                 [
                   "2025-10-01",
                   {
-                    "amount": "5110640.7440460934",
+                    "amount": "5110640.7440460936",
                     "currency": "USD"
                   }
                 ],
@@ -1114,7 +1698,7 @@
                 [
                   "2026-07-01",
                   {
-                    "amount": "4256784.00742299835",
+                    "amount": "4256784.00742299825",
                     "currency": "USD"
                   }
                 ],
@@ -1170,7 +1754,7 @@
                 [
                   "2028-07-03",
                   {
-                    "amount": "2636411.8725438531",
+                    "amount": "2636411.8725438532",
                     "currency": "USD"
                   }
                 ],
@@ -1191,7 +1775,7 @@
                 [
                   "2029-04-02",
                   {
-                    "amount": "2208812.07871780424",
+                    "amount": "2208812.07871780428",
                     "currency": "USD"
                   }
                 ],
@@ -1219,14 +1803,14 @@
                 [
                   "2030-04-01",
                   {
-                    "amount": "1646194.1629252391",
+                    "amount": "1646194.16292523905",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2030-07-01",
                   {
-                    "amount": "1647082.86603479516",
+                    "amount": "1647082.86603479523",
                     "currency": "USD"
                   }
                 ],
@@ -1240,7 +1824,7 @@
                 [
                   "2031-01-02",
                   {
-                    "amount": "1462169.26067766826",
+                    "amount": "1462169.26067766833",
                     "currency": "USD"
                   }
                 ],
@@ -1282,7 +1866,7 @@
                 [
                   "2032-07-01",
                   {
-                    "amount": "1013910.721546133246",
+                    "amount": "1013910.721546133216",
                     "currency": "USD"
                   }
                 ],
@@ -1437,7 +2021,7 @@
                   "date": "2025-01-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "1299371.0240867193",
+                    "amount": "1299371.0240867203",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -1447,13 +2031,13 @@
                   "date": "2025-01-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "4497907.053740233",
+                    "amount": "4497907.053740232",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-4497907.053740233",
+                    "amount": "-4497907.053740232",
                     "currency": "USD"
                   },
                   "principal_date": "2025-01-02"
@@ -1462,7 +2046,7 @@
                   "date": "2025-04-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "1203655.22210481916",
+                    "amount": "1203655.22210481936",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -1512,7 +2096,7 @@
                   "date": "2025-10-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "1095442.8603082229",
+                    "amount": "1095442.8603082236",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -1522,13 +2106,13 @@
                   "date": "2025-10-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "4015197.8837378705",
+                    "amount": "4015197.88373787",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-4015197.8837378705",
+                    "amount": "-4015197.88373787",
                     "currency": "USD"
                   },
                   "principal_date": "2025-10-01"
@@ -1562,7 +2146,7 @@
                   "date": "2026-04-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "954727.78297210463",
+                    "amount": "954727.78297210493",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -1572,13 +2156,13 @@
                   "date": "2026-04-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "3555207.7592918933",
+                    "amount": "3555207.759291893",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-3555207.7592918933",
+                    "amount": "-3555207.759291893",
                     "currency": "USD"
                   },
                   "principal_date": "2026-04-01"
@@ -1587,7 +2171,7 @@
                   "date": "2026-07-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "911415.21843364585",
+                    "amount": "911415.21843364575",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -1787,7 +2371,7 @@
                   "date": "2028-07-03",
                   "reset_date": null,
                   "amount": {
-                    "amount": "580160.8741788161",
+                    "amount": "580160.8741788162",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -1812,7 +2396,7 @@
                   "date": "2028-10-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "555007.0864256313",
+                    "amount": "555007.086425631",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -1822,13 +2406,13 @@
                   "date": "2028-10-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "1934884.928814595",
+                    "amount": "1934884.9288145953",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-1934884.928814595",
+                    "amount": "-1934884.9288145953",
                     "currency": "USD"
                   },
                   "principal_date": "2028-10-02"
@@ -1862,7 +2446,7 @@
                   "date": "2029-04-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "488428.66695088684",
+                    "amount": "488428.66695088688",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -1887,7 +2471,7 @@
                   "date": "2029-07-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "467763.17039409807",
+                    "amount": "467763.17039409837",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -1897,13 +2481,13 @@
                   "date": "2029-07-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "1618841.2493694539",
+                    "amount": "1618841.2493694536",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-1618841.2493694539",
+                    "amount": "-1618841.2493694536",
                     "currency": "USD"
                   },
                   "principal_date": "2029-07-02"
@@ -1937,7 +2521,7 @@
                   "date": "2030-01-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "424724.04226154284",
+                    "amount": "424724.04226154304",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -1947,13 +2531,13 @@
                   "date": "2030-01-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "1528532.500409143",
+                    "amount": "1528532.5004091428",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-1528532.500409143",
+                    "amount": "-1528532.5004091428",
                     "currency": "USD"
                   },
                   "principal_date": "2030-01-02"
@@ -1962,7 +2546,7 @@
                   "date": "2030-04-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "392562.923401894",
+                    "amount": "392562.92340189405",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -1972,13 +2556,13 @@
                   "date": "2030-04-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "1253631.2395233451",
+                    "amount": "1253631.239523345",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-1253631.2395233451",
+                    "amount": "-1253631.239523345",
                     "currency": "USD"
                   },
                   "principal_date": "2030-04-01"
@@ -1987,7 +2571,7 @@
                   "date": "2030-07-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "377911.32652914436",
+                    "amount": "377911.32652914443",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -2037,7 +2621,7 @@
                   "date": "2031-01-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "343075.99356888096",
+                    "amount": "343075.99356888103",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -2087,7 +2671,7 @@
                   "date": "2031-07-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "306418.4991077246",
+                    "amount": "306418.4991077248",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -2097,13 +2681,13 @@
                   "date": "2031-07-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "986834.97225214",
+                    "amount": "986834.9722521398",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-986834.97225214",
+                    "amount": "-986834.9722521398",
                     "currency": "USD"
                   },
                   "principal_date": "2031-07-01"
@@ -2137,7 +2721,7 @@
                   "date": "2032-01-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "280464.88936103383",
+                    "amount": "280464.88936103393",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -2147,13 +2731,13 @@
                   "date": "2032-01-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "867572.5952617782",
+                    "amount": "867572.5952617781",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-867572.5952617782",
+                    "amount": "-867572.5952617781",
                     "currency": "USD"
                   },
                   "principal_date": "2032-01-02"
@@ -2187,7 +2771,7 @@
                   "date": "2032-07-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "251923.877163541746",
+                    "amount": "251923.877163541716",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -2212,7 +2796,7 @@
                   "date": "2032-10-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "243008.4731375529",
+                    "amount": "243008.473137553",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -2222,13 +2806,13 @@
                   "date": "2032-10-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "713509.4571995839",
+                    "amount": "713509.4571995838",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-713509.4571995839",
+                    "amount": "-713509.4571995838",
                     "currency": "USD"
                   },
                   "principal_date": "2032-10-01"
@@ -2262,7 +2846,7 @@
                   "date": "2033-04-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "217003.137488007696",
+                    "amount": "217003.137488007796",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -2272,13 +2856,13 @@
                   "date": "2033-04-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "625593.0920104723",
+                    "amount": "625593.0920104722",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-625593.0920104723",
+                    "amount": "-625593.0920104722",
                     "currency": "USD"
                   },
                   "principal_date": "2033-04-01"
@@ -2428,7 +3012,7 @@
                   "kind": "defaulted_notional",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-3301848.014227714911",
+                    "amount": "-3301848.014227717511",
                     "currency": "USD"
                   },
                   "principal_date": "2035-01-03"
@@ -2484,7 +3068,7 @@
                   "end": "2025-04-01",
                   "payment_date": "2025-04-01",
                   "opening_balance": {
-                    "amount": "80243681.47365459",
+                    "amount": "80243681.473654591",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2495,7 +3079,7 @@
                   "end": "2025-07-01",
                   "payment_date": "2025-07-01",
                   "opening_balance": {
-                    "amount": "75708977.699047582",
+                    "amount": "75708977.699047583",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2506,7 +3090,7 @@
                   "end": "2025-10-01",
                   "payment_date": "2025-10-01",
                   "opening_balance": {
-                    "amount": "71441925.672275446",
+                    "amount": "71441925.672275447",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2517,7 +3101,7 @@
                   "end": "2026-01-01",
                   "payment_date": "2026-01-02",
                   "opening_balance": {
-                    "amount": "67426727.7885375755",
+                    "amount": "67426727.788537577",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2528,7 +3112,7 @@
                   "end": "2026-04-01",
                   "payment_date": "2026-04-01",
                   "opening_balance": {
-                    "amount": "63648518.8648070121",
+                    "amount": "63648518.8648070136",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2539,7 +3123,7 @@
                   "end": "2026-07-01",
                   "payment_date": "2026-07-01",
                   "opening_balance": {
-                    "amount": "60093311.1055151188",
+                    "amount": "60093311.1055151206",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2550,7 +3134,7 @@
                   "end": "2026-10-01",
                   "payment_date": "2026-10-01",
                   "opening_balance": {
-                    "amount": "56747942.3165257663",
+                    "amount": "56747942.3165257681",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2561,7 +3145,7 @@
                   "end": "2027-01-01",
                   "payment_date": "2027-01-04",
                   "opening_balance": {
-                    "amount": "53600027.1756752783",
+                    "amount": "53600027.1756752801",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2572,7 +3156,7 @@
                   "end": "2027-04-01",
                   "payment_date": "2027-04-01",
                   "opening_balance": {
-                    "amount": "50637911.3794705186",
+                    "amount": "50637911.3794705204",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2583,7 +3167,7 @@
                   "end": "2027-07-01",
                   "payment_date": "2027-07-01",
                   "opening_balance": {
-                    "amount": "47850628.4961856769",
+                    "amount": "47850628.4961856787",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2594,7 +3178,7 @@
                   "end": "2027-10-01",
                   "payment_date": "2027-10-01",
                   "opening_balance": {
-                    "amount": "45227859.3656180266",
+                    "amount": "45227859.3656180284",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2605,7 +3189,7 @@
                   "end": "2028-01-01",
                   "payment_date": "2028-01-03",
                   "opening_balance": {
-                    "amount": "42759893.8951912456",
+                    "amount": "42759893.8951912474",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2616,7 +3200,7 @@
                   "end": "2028-04-01",
                   "payment_date": "2028-04-03",
                   "opening_balance": {
-                    "amount": "40592396.0977006241",
+                    "amount": "40592396.0977006259",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2627,7 +3211,7 @@
                   "end": "2028-07-01",
                   "payment_date": "2028-07-03",
                   "opening_balance": {
-                    "amount": "38252365.3304714001",
+                    "amount": "38252365.3304714019",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2638,7 +3222,7 @@
                   "end": "2028-10-01",
                   "payment_date": "2028-10-02",
                   "opening_balance": {
-                    "amount": "36196114.3321063631",
+                    "amount": "36196114.3321063649",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2649,7 +3233,7 @@
                   "end": "2029-01-01",
                   "payment_date": "2029-01-02",
                   "opening_balance": {
-                    "amount": "34261229.4032917681",
+                    "amount": "34261229.4032917696",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2660,7 +3244,7 @@
                   "end": "2029-04-01",
                   "payment_date": "2029-04-02",
                   "opening_balance": {
-                    "amount": "32561911.1300591221",
+                    "amount": "32561911.1300591236",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2671,7 +3255,7 @@
                   "end": "2029-07-01",
                   "payment_date": "2029-07-02",
                   "opening_balance": {
-                    "amount": "30841527.7182922047",
+                    "amount": "30841527.7182922062",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2682,7 +3266,7 @@
                   "end": "2029-10-01",
                   "payment_date": "2029-10-01",
                   "opening_balance": {
-                    "amount": "29222686.4689227508",
+                    "amount": "29222686.4689227526",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2693,7 +3277,7 @@
                   "end": "2030-01-01",
                   "payment_date": "2030-01-02",
                   "opening_balance": {
-                    "amount": "27699394.0605354125",
+                    "amount": "27699394.0605354143",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2704,7 +3288,7 @@
                   "end": "2030-04-01",
                   "payment_date": "2030-04-01",
                   "opening_balance": {
-                    "amount": "26170861.5601262695",
+                    "amount": "26170861.5601262715",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2715,7 +3299,7 @@
                   "end": "2030-07-01",
                   "payment_date": "2030-07-01",
                   "opening_balance": {
-                    "amount": "24917230.3206029244",
+                    "amount": "24917230.3206029265",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2726,7 +3310,7 @@
                   "end": "2030-10-01",
                   "payment_date": "2030-10-01",
                   "opening_balance": {
-                    "amount": "23648058.7810972736",
+                    "amount": "23648058.7810972757",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2737,7 +3321,7 @@
                   "end": "2031-01-01",
                   "payment_date": "2031-01-02",
                   "opening_balance": {
-                    "amount": "22374521.3197096214",
+                    "amount": "22374521.3197096235",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2748,7 +3332,7 @@
                   "end": "2031-04-01",
                   "payment_date": "2031-04-01",
                   "opening_balance": {
-                    "amount": "21255428.0526008341",
+                    "amount": "21255428.0526008362",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2759,7 +3343,7 @@
                   "end": "2031-07-01",
                   "payment_date": "2031-07-01",
                   "opening_balance": {
-                    "amount": "20203417.5235862471",
+                    "amount": "20203417.5235862492",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2770,7 +3354,7 @@
                   "end": "2031-10-01",
                   "payment_date": "2031-10-01",
                   "opening_balance": {
-                    "amount": "19216582.5513341071",
+                    "amount": "19216582.5513341094",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2781,7 +3365,7 @@
                   "end": "2032-01-01",
                   "payment_date": "2032-01-02",
                   "opening_balance": {
-                    "amount": "18291188.4365891671",
+                    "amount": "18291188.4365891694",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2792,7 +3376,7 @@
                   "end": "2032-04-01",
                   "payment_date": "2032-04-01",
                   "opening_balance": {
-                    "amount": "17423615.8413273889",
+                    "amount": "17423615.8413273913",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2803,7 +3387,7 @@
                   "end": "2032-07-01",
                   "payment_date": "2032-07-01",
                   "opening_balance": {
-                    "amount": "16610365.5272664824",
+                    "amount": "16610365.5272664848",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2814,7 +3398,7 @@
                   "end": "2032-10-01",
                   "payment_date": "2032-10-01",
                   "opening_balance": {
-                    "amount": "15848378.6828838909",
+                    "amount": "15848378.6828838933",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2825,7 +3409,7 @@
                   "end": "2033-01-01",
                   "payment_date": "2033-01-03",
                   "opening_balance": {
-                    "amount": "15134869.225684307",
+                    "amount": "15134869.2256843095",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2836,7 +3420,7 @@
                   "end": "2033-04-01",
                   "payment_date": "2033-04-01",
                   "opening_balance": {
-                    "amount": "14466875.832533849",
+                    "amount": "14466875.8325338515",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2847,7 +3431,7 @@
                   "end": "2033-07-01",
                   "payment_date": "2033-07-01",
                   "opening_balance": {
-                    "amount": "13841282.7405233767",
+                    "amount": "13841282.7405233793",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2858,7 +3442,7 @@
                   "end": "2033-10-01",
                   "payment_date": "2033-10-03",
                   "opening_balance": {
-                    "amount": "13256302.8563958133",
+                    "amount": "13256302.8563958159",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2869,7 +3453,7 @@
                   "end": "2034-01-01",
                   "payment_date": "2034-01-03",
                   "opening_balance": {
-                    "amount": "12709656.1094762344",
+                    "amount": "12709656.109476237",
                     "currency": "USD"
                   },
                   "coupon_rate": 0.06,
@@ -2901,14 +3485,14 @@
                 [
                   "2025-01-02",
                   {
-                    "amount": "1299371.0240867193",
+                    "amount": "1299371.0240867203",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2025-04-01",
                   {
-                    "amount": "1203655.22210481916",
+                    "amount": "1203655.22210481936",
                     "currency": "USD"
                   }
                 ],
@@ -2922,7 +3506,7 @@
                 [
                   "2025-10-01",
                   {
-                    "amount": "1095442.8603082229",
+                    "amount": "1095442.8603082236",
                     "currency": "USD"
                   }
                 ],
@@ -2936,14 +3520,14 @@
                 [
                   "2026-04-01",
                   {
-                    "amount": "954727.78297210463",
+                    "amount": "954727.78297210493",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2026-07-01",
                   {
-                    "amount": "911415.21843364585",
+                    "amount": "911415.21843364575",
                     "currency": "USD"
                   }
                 ],
@@ -2999,14 +3583,14 @@
                 [
                   "2028-07-03",
                   {
-                    "amount": "580160.8741788161",
+                    "amount": "580160.8741788162",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-10-02",
                   {
-                    "amount": "555007.0864256313",
+                    "amount": "555007.086425631",
                     "currency": "USD"
                   }
                 ],
@@ -3020,14 +3604,14 @@
                 [
                   "2029-04-02",
                   {
-                    "amount": "488428.66695088684",
+                    "amount": "488428.66695088688",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-07-02",
                   {
-                    "amount": "467763.17039409807",
+                    "amount": "467763.17039409837",
                     "currency": "USD"
                   }
                 ],
@@ -3041,21 +3625,21 @@
                 [
                   "2030-01-02",
                   {
-                    "amount": "424724.04226154284",
+                    "amount": "424724.04226154304",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2030-04-01",
                   {
-                    "amount": "392562.923401894",
+                    "amount": "392562.92340189405",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2030-07-01",
                   {
-                    "amount": "377911.32652914436",
+                    "amount": "377911.32652914443",
                     "currency": "USD"
                   }
                 ],
@@ -3069,7 +3653,7 @@
                 [
                   "2031-01-02",
                   {
-                    "amount": "343075.99356888096",
+                    "amount": "343075.99356888103",
                     "currency": "USD"
                   }
                 ],
@@ -3083,7 +3667,7 @@
                 [
                   "2031-07-01",
                   {
-                    "amount": "306418.4991077246",
+                    "amount": "306418.4991077248",
                     "currency": "USD"
                   }
                 ],
@@ -3097,7 +3681,7 @@
                 [
                   "2032-01-02",
                   {
-                    "amount": "280464.88936103383",
+                    "amount": "280464.88936103393",
                     "currency": "USD"
                   }
                 ],
@@ -3111,14 +3695,14 @@
                 [
                   "2032-07-01",
                   {
-                    "amount": "251923.877163541746",
+                    "amount": "251923.877163541716",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2032-10-01",
                   {
-                    "amount": "243008.4731375529",
+                    "amount": "243008.473137553",
                     "currency": "USD"
                   }
                 ],
@@ -3132,7 +3716,7 @@
                 [
                   "2033-04-01",
                   {
-                    "amount": "217003.137488007696",
+                    "amount": "217003.137488007796",
                     "currency": "USD"
                   }
                 ],
@@ -3183,7 +3767,7 @@
                 [
                   "2025-01-02",
                   {
-                    "amount": "4497907.053740233",
+                    "amount": "4497907.053740232",
                     "currency": "USD"
                   }
                 ],
@@ -3204,7 +3788,7 @@
                 [
                   "2025-10-01",
                   {
-                    "amount": "4015197.8837378705",
+                    "amount": "4015197.88373787",
                     "currency": "USD"
                   }
                 ],
@@ -3218,7 +3802,7 @@
                 [
                   "2026-04-01",
                   {
-                    "amount": "3555207.7592918933",
+                    "amount": "3555207.759291893",
                     "currency": "USD"
                   }
                 ],
@@ -3288,7 +3872,7 @@
                 [
                   "2028-10-02",
                   {
-                    "amount": "1934884.928814595",
+                    "amount": "1934884.9288145953",
                     "currency": "USD"
                   }
                 ],
@@ -3309,7 +3893,7 @@
                 [
                   "2029-07-02",
                   {
-                    "amount": "1618841.2493694539",
+                    "amount": "1618841.2493694536",
                     "currency": "USD"
                   }
                 ],
@@ -3323,14 +3907,14 @@
                 [
                   "2030-01-02",
                   {
-                    "amount": "1528532.500409143",
+                    "amount": "1528532.5004091428",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2030-04-01",
                   {
-                    "amount": "1253631.2395233451",
+                    "amount": "1253631.239523345",
                     "currency": "USD"
                   }
                 ],
@@ -3365,7 +3949,7 @@
                 [
                   "2031-07-01",
                   {
-                    "amount": "986834.97225214",
+                    "amount": "986834.9722521398",
                     "currency": "USD"
                   }
                 ],
@@ -3379,7 +3963,7 @@
                 [
                   "2032-01-02",
                   {
-                    "amount": "867572.5952617782",
+                    "amount": "867572.5952617781",
                     "currency": "USD"
                   }
                 ],
@@ -3400,7 +3984,7 @@
                 [
                   "2032-10-01",
                   {
-                    "amount": "713509.4571995839",
+                    "amount": "713509.4571995838",
                     "currency": "USD"
                   }
                 ],
@@ -3414,7 +3998,7 @@
                 [
                   "2033-04-01",
                   {
-                    "amount": "625593.0920104723",
+                    "amount": "625593.0920104722",
                     "currency": "USD"
                   }
                 ],
@@ -3474,7 +4058,7 @@
                 [
                   "2035-01-03",
                   {
-                    "amount": "3301848.0142277153",
+                    "amount": "3301848.0142277176",
                     "currency": "USD"
                   }
                 ]
@@ -3484,11 +4068,11 @@
                 "currency": "USD"
               },
               "total_interest": {
-                "amount": "25095323.954888896502",
+                "amount": "25095323.954888899602",
                 "currency": "USD"
               },
               "total_principal": {
-                "amount": "96698151.985772285089",
+                "amount": "96698151.985772282489",
                 "currency": "USD"
               },
               "total_pik": {
@@ -3500,7 +4084,7 @@
                 "currency": "USD"
               },
               "total_writedown": {
-                "amount": "3301848.0142277153",
+                "amount": "3301848.0142277176",
                 "currency": "USD"
               }
             },
@@ -3565,17 +4149,17 @@
                     "type": "float64",
                     "values": [
                       6915170.694942545, 6514657.567555619, 6152704.191327502,
-                      5797278.077826953, 5738358.996711827, 5415304.855207691,
-                      5110640.744046093, 4812085.41648814, 4509935.542263998,
+                      5797278.077826953, 5738358.996711828, 5415304.855207691,
+                      5110640.744046094, 4812085.41648814, 4509935.542263998,
                       4256784.007422999, 4018050.2563705496, 3783982.8795651137,
-                      3546851.553976899, 3348503.6627597995, 3161459.3140329244,
-                      2823149.5038835537, 2955682.10804435, 2636411.8725438532,
-                      2489892.0152402264, 2224657.12408312, 2208812.078717804,
-                      2086604.419763552, 1971373.6009108203, 1953256.5426706858,
-                      1646194.1629252392, 1647082.8660347953, 1636141.029364477,
-                      1462169.2606776683, 1370841.9498035994,
+                      3546851.5539768995, 3348503.6627597995,
+                      3161459.3140329244, 2823149.5038835537, 2955682.10804435,
+                      2636411.8725438532, 2489892.0152402264, 2224657.12408312,
+                      2208812.078717804, 2086604.419763552, 1971373.6009108203,
+                      1953256.5426706858, 1646194.162925239, 1647082.8660347953,
+                      1636141.029364477, 1462169.2606776683, 1370841.9498035994,
                       1293253.4713598646, 1220048.3805320628,
-                      1148037.4846228121, 1077508.487654372, 1013910.7215461333,
+                      1148037.4846228121, 1077508.487654372, 1013910.7215461332,
                       956517.9303371368, 900061.387944284, 842596.22949848,
                       794906.005692168, 749910.0573843147, 9478900.588230608,
                       33825.880979545465, 31829.37655142231, 29950.711771996714,
@@ -3589,19 +4173,20 @@
                     "type": "float64",
                     "values": [
                       1516666.6666666665, 1434789.355571149, 1372664.9589826744,
-                      1299371.0240867194, 1203655.2221048193,
-                      1148252.8284355546, 1095442.860308223, 1033876.4927575762,
-                      954727.7829721046, 911415.2184336459, 870135.1155200618,
-                      821867.0833603542, 759568.6706920579, 725734.5321921494,
-                      693493.8436061433, 655651.7063929323, 615651.3408151263,
-                      580160.8741788161, 555007.0864256313, 525338.8508504737,
-                      488428.6669508868, 467763.1703940981, 448081.1925234821,
-                      424724.04226154287, 392562.923401894, 377911.3265291444,
-                      362603.5679768248, 343075.99356888095, 318831.42078901245,
-                      306418.4991077246, 294654.26578712295, 280464.88936103386,
-                      264258.17359346536, 251923.87716354174, 243008.4731375529,
-                      232067.99479382604, 217003.1374880077, 209926.12156460455,
-                      203263.3104647358, 194881.39367863594, 0, 0, 0, 0
+                      1299371.0240867203, 1203655.2221048193,
+                      1148252.8284355546, 1095442.8603082236,
+                      1033876.4927575762, 954727.782972105, 911415.2184336458,
+                      870135.1155200617, 821867.0833603542, 759568.6706920579,
+                      725734.5321921494, 693493.8436061433, 655651.7063929323,
+                      615651.3408151263, 580160.8741788162, 555007.086425631,
+                      525338.8508504737, 488428.6669508869, 467763.1703940984,
+                      448081.1925234821, 424724.04226154304, 392562.92340189405,
+                      377911.3265291444, 362603.56797682476, 343075.993568881,
+                      318831.42078901245, 306418.4991077248, 294654.26578712295,
+                      280464.8893610339, 264258.17359346536, 251923.8771635417,
+                      243008.473137553, 232067.99479382604, 217003.1374880078,
+                      209926.12156460457, 203263.31046473578,
+                      194881.39367863594, 0, 0, 0, 0
                     ]
                   }
                 },
@@ -3611,21 +4196,20 @@
                     "type": "float64",
                     "values": [
                       5398504.028275879, 5079868.21198447, 4780039.232344828,
-                      4497907.053740233, 4534703.774607008, 4267052.026772136,
-                      4015197.8837378705, 3778208.9237305634,
-                      3555207.7592918933, 3345368.7889893525, 3147915.140850488,
-                      2962115.7962047597, 2787282.8832848417,
-                      2622769.1305676503, 2467965.470426781, 2167497.7974906215,
-                      2340030.767229224, 2056250.998365037, 1934884.928814595,
-                      1699318.273232646, 1720383.4117669174, 1618841.2493694539,
-                      1523292.4083873383, 1528532.500409143, 1253631.2395233451,
-                      1269171.5395056508, 1273537.4613876522,
-                      1119093.2671087873, 1052010.529014587, 986834.97225214,
-                      925394.11474494, 867572.5952617782, 813250.3140609065,
-                      761986.8443825915, 713509.4571995839, 667993.393150458,
-                      625593.0920104723, 584979.8841275634, 546646.7469195789,
-                      9284019.194551973, 33825.880979545465, 31829.37655142231,
-                      29950.711771996714, 28182.931393582
+                      4497907.053740232, 4534703.774607008, 4267052.026772136,
+                      4015197.88373787, 3778208.9237305634, 3555207.759291893,
+                      3345368.7889893525, 3147915.140850488, 2962115.7962047597,
+                      2787282.8832848417, 2622769.1305676503, 2467965.470426781,
+                      2167497.7974906215, 2340030.767229224, 2056250.998365037,
+                      1934884.9288145953, 1699318.273232646, 1720383.4117669174,
+                      1618841.2493694536, 1523292.4083873383,
+                      1528532.5004091428, 1253631.239523345, 1269171.5395056508,
+                      1273537.4613876522, 1119093.2671087873, 1052010.529014587,
+                      986834.9722521398, 925394.11474494, 867572.5952617781,
+                      813250.3140609065, 761986.8443825915, 713509.4571995838,
+                      667993.393150458, 625593.0920104722, 584979.8841275634,
+                      546646.7469195789, 9284019.194551973, 33825.880979545465,
+                      31829.37655142231, 29950.711771996714, 28182.931393582
                     ]
                   }
                 },
@@ -3658,7 +4242,7 @@
                     "values": [
                       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                      0, 0, 0, 0, 0, 3301848.0142277153
+                      0, 0, 0, 0, 0, 3301848.0142277176
                     ]
                   }
                 }
@@ -3671,7 +4255,7 @@
     {
       "name": "floating",
       "source": "finstack-quant/valuations/tests/golden/data/pricing/regression_goldens/structured_credit/clo_mezzanine_base_case.json",
-      "sha256": "34aa92548393eea843905bd17afa53fd301628d3fad3f7d519c6cd3c24eeb176",
+      "sha256": "8f42d41a972fd4086fba70a1457d189a746d2a3b9c1086377d45020606c1123e",
       "asOf": "2026-04-30",
       "trancheId": "SENIOR",
       "marketPricePct": 25,
@@ -3904,7 +4488,7 @@
             "discount_curve_id": "USD-SOFR-DISC",
             "instrument_pricing_overrides": {
               "market_quotes": {
-                "quoted_dirty_price_currency": 10952092.791475201
+                "quoted_dirty_price_currency": 10951774.467868539
               }
             },
             "attributes": {
@@ -3952,21 +4536,137 @@
             "type": "forward",
             "id": "SOFR-1M",
             "base": "2026-04-30",
-            "reset_lag": 2,
             "day_count": "act_360",
-            "tenor": 0.08333333333333333,
+            "index_tenor": {
+              "count": 1,
+              "unit": "months"
+            },
             "knot_points": [
-              [0, 0.042],
-              [0.25, 0.043],
-              [0.5, 0.044],
-              [1, 0.045],
-              [2, 0.046],
-              [5, 0.047],
-              [10, 0.048]
+              [0, 1],
+              [0.08333333333333333, 0.9965122072745392],
+              [0.16666666666666666, 0.993009091867119],
+              [0.25, 0.9894909019933648],
+              [0.3333333333333333, 0.9859578862343583],
+              [0.41666666666666663, 0.9824102935078024],
+              [0.49999999999999994, 0.978848373039243],
+              [0.5833333333333333, 0.975272374333354],
+              [0.6666666666666666, 0.9716959932470973],
+              [0.75, 0.9681193301662054],
+              [0.8333333333333334, 0.9645424851172291],
+              [0.9166666666666667, 0.9609655577633323],
+              [1, 0.957388647400129],
+              [1.0833333333333333, 0.9538118529515607],
+              [1.1666666666666665, 0.9502418471231328],
+              [1.2499999999999998, 0.9466786538565338],
+              [1.333333333333333, 0.9431222968621162],
+              [1.4166666666666663, 0.9395727996191108],
+              [1.4999999999999996, 0.936030185375848],
+              [1.5833333333333328, 0.9324944771499877],
+              [1.666666666666666, 0.9289656977287541],
+              [1.7499999999999993, 0.9254438696691797],
+              [1.8333333333333326, 0.9219290152983547],
+              [1.9166666666666659, 0.9184211567136844],
+              [1.9999999999999991, 0.914920315783153],
+              [2.0833333333333326, 0.911426514145595],
+              [2.166666666666666, 0.9079439605745947],
+              [2.2499999999999996, 0.9044726281268302],
+              [2.333333333333333, 0.9010124898844267],
+              [2.4166666666666665, 0.8975635189551086],
+              [2.5, 0.894125688472348],
+              [2.5833333333333335, 0.8906989715955151],
+              [2.666666666666667, 0.8872833415100264],
+              [2.7500000000000004, 0.8838787714274908],
+              [2.833333333333334, 0.8804852345858578],
+              [2.9166666666666674, 0.877102704249562],
+              [3.000000000000001, 0.8737311537096685],
+              [3.0833333333333344, 0.8703705562840164],
+              [3.166666666666668, 0.867020885317362],
+              [3.2500000000000013, 0.8636821141815214],
+              [3.333333333333335, 0.8603542162755112],
+              [3.4166666666666683, 0.8570371650256896],
+              [3.5000000000000018, 0.8537309338858954],
+              [3.5833333333333353, 0.8504354963375872],
+              [3.6666666666666687, 0.8471508258899814],
+              [3.750000000000002, 0.8438768960801888],
+              [3.8333333333333357, 0.8406136804733513],
+              [3.916666666666669, 0.8373611526627769],
+              [4.000000000000003, 0.8341192862700745],
+              [4.083333333333336, 0.8308880549452872],
+              [4.166666666666669, 0.8276674323670257],
+              [4.250000000000002, 0.8244573922425996],
+              [4.333333333333335, 0.8212579083081492],
+              [4.416666666666668, 0.8180689543287749],
+              [4.500000000000001, 0.8148905040986679],
+              [4.583333333333334, 0.8117225314412375],
+              [4.666666666666667, 0.8085650102092399],
+              [4.75, 0.8054179142849044],
+              [4.833333333333333, 0.8022812175800601],
+              [4.916666666666666, 0.7991548940362608],
+              [4.999999999999999, 0.7960389176249096],
+              [5.083333333333332, 0.7929332623473824],
+              [5.166666666666665, 0.7898386307123275],
+              [5.249999999999998, 0.7867549882445136],
+              [5.333333333333331, 0.7836823005577435],
+              [5.416666666666664, 0.7806205333546967],
+              [5.499999999999997, 0.7775696524267723],
+              [5.58333333333333, 0.7745296236539306],
+              [5.666666666666663, 0.7715004130045364],
+              [5.7499999999999964, 0.768481986535201],
+              [5.8333333333333295, 0.7654743103906244],
+              [5.9166666666666625, 0.7624773508034387],
+              [5.999999999999996, 0.7594910740940495],
+              [6.083333333333329, 0.7565154466704789],
+              [6.166666666666662, 0.7535504350282082],
+              [6.249999999999995, 0.75059600575002],
+              [6.333333333333328, 0.7476521255058407],
+              [6.416666666666661, 0.7447187610525835],
+              [6.499999999999994, 0.7417958792339907],
+              [6.583333333333327, 0.738883446980476],
+              [6.66666666666666, 0.7359814313089674],
+              [6.749999999999993, 0.7330897993227499],
+              [6.833333333333326, 0.7302085182113078],
+              [6.916666666666659, 0.7273375552501675],
+              [6.999999999999992, 0.7244768778007404],
+              [7.083333333333325, 0.7216264533101653],
+              [7.166666666666658, 0.7187862493111511],
+              [7.249999999999991, 0.7159562334218199],
+              [7.333333333333324, 0.7131363733455494],
+              [7.416666666666657, 0.7103266368708159],
+              [7.49999999999999, 0.7075269918710373],
+              [7.583333333333323, 0.7047374063044156],
+              [7.666666666666656, 0.7019578482137803],
+              [7.749999999999989, 0.6991882857264305],
+              [7.833333333333322, 0.6964286870539792],
+              [7.916666666666655, 0.6936790204921949],
+              [7.9999999999999885, 0.6909392544208456],
+              [8.083333333333321, 0.6882093573035415],
+              [8.166666666666655, 0.6854892976875785],
+              [8.24999999999999, 0.6827790442037807],
+              [8.333333333333323, 0.6800785655663443],
+              [8.416666666666657, 0.6773878305726806],
+              [8.499999999999991, 0.6747068081032591],
+              [8.583333333333325, 0.6720354671214513],
+              [8.666666666666659, 0.6693737766733738],
+              [8.749999999999993, 0.6667217058877315],
+              [8.833333333333327, 0.6640792239756617],
+              [8.91666666666666, 0.6614463002305772],
+              [8.999999999999995, 0.65882290402801],
+              [9.083333333333329, 0.6562090048254553],
+              [9.166666666666663, 0.6536045721622146],
+              [9.249999999999996, 0.6510095756592396],
+              [9.33333333333333, 0.6484239850189764],
+              [9.416666666666664, 0.6458477700252091],
+              [9.499999999999998, 0.6432809005429039],
+              [9.583333333333332, 0.6407233465180526],
+              [9.666666666666666, 0.6381750779775174],
+              [9.75, 0.6356360650288743],
+              [9.833333333333334, 0.6331062778602577],
+              [9.916666666666668, 0.6305856867402045],
+              [10.000000000000002, 0.6280742620174984],
+              [10.083333333333336, 0.6255719741210144]
             ],
-            "projection_grid": null,
-            "interp_style": "linear",
-            "extrapolation": "flat_forward",
+            "interp_style": "log_linear",
+            "extrapolation": "extend",
             "rate_calibration": null,
             "fx_policy": null
           },
@@ -3974,48 +4674,24 @@
             "type": "forward",
             "id": "SOFR-3M",
             "base": "2026-04-30",
-            "reset_lag": 2,
             "day_count": "act_365f",
-            "tenor": 0.25,
+            "index_tenor": {
+              "count": 3,
+              "unit": "months"
+            },
             "knot_points": [
-              [0, 0.04016983695652157],
-              [0.010958904109589041, 0.04016983695652157],
-              [0.26301369863013696, 0.03974489055866135],
-              [0.7671232876712328, 0.04095996609144743],
-              [1.7671232876712328, 0.04299612213750497],
-              [2.76986301369863, 0.045268577048177036],
-              [4.772602739726027, 0.04463402161781929],
-              [6.772602739726027, 0.04910553008255747],
-              [9.775342465753425, 0.047216900139164984]
+              [0, 1],
+              [0.26301369863013696, 0.9895429696217078],
+              [0.5150684931506849, 0.979723643194392],
+              [1.010958904109589, 0.9602754422737177],
+              [2.0136986301369864, 0.9206919044893409],
+              [3.0136986301369864, 0.8809377016824722],
+              [5.016438356164383, 0.8055501682268159],
+              [7.016438356164383, 0.7335583933653365],
+              [10.021917808219179, 0.6353438673627817]
             ],
-            "projection_grid": [
-              0, 0.010958904109589041, 0.0136986301369863, 0.26301369863013696,
-              0.26575342465753427, 0.5150684931506849, 0.5178082191780822,
-              0.7671232876712328, 0.7698630136986301, 1.010958904109589,
-              1.0136986301369864, 1.263013698630137, 1.2657534246575342,
-              1.515068493150685, 1.5178082191780822, 1.7671232876712328,
-              1.7698630136986302, 2.0136986301369864, 2.0164383561643837,
-              2.265753424657534, 2.2684931506849315, 2.5178082191780824,
-              2.5205479452054793, 2.76986301369863, 2.7726027397260276,
-              3.0136986301369864, 3.0164383561643837, 3.265753424657534,
-              3.2684931506849315, 3.5178082191780824, 3.5205479452054793,
-              3.76986301369863, 3.7726027397260276, 4.013698630136986,
-              4.016438356164383, 4.265753424657534, 4.2684931506849315,
-              4.517808219178082, 4.52054794520548, 4.76986301369863,
-              4.772602739726027, 5.013698630136986, 5.016438356164383,
-              5.265753424657534, 5.2684931506849315, 5.517808219178082,
-              5.52054794520548, 5.76986301369863, 5.772602739726027,
-              6.016438356164383, 6.019178082191781, 6.2684931506849315,
-              6.271232876712329, 6.52054794520548, 6.523287671232877,
-              6.772602739726027, 6.7753424657534245, 7.016438356164383,
-              7.019178082191781, 7.271232876712329, 7.523287671232877,
-              7.7753424657534245, 8.01917808219178, 8.271232876712329,
-              8.523287671232877, 8.775342465753425, 9.01917808219178,
-              9.271232876712329, 9.523287671232877, 9.775342465753425,
-              10.021917808219179
-            ],
-            "interp_style": "linear",
-            "extrapolation": "flat_zero",
+            "interp_style": "log_linear",
+            "extrapolation": "extend",
             "rate_calibration": {
               "currency": "USD",
               "method": {
@@ -4146,24 +4822,21 @@
             "day_count": "act_365f",
             "knot_points": [
               [0, 1],
-              [0.030136986301369864, 0.998778998869317],
+              [0.030136986301369864, 0.9987789988693171],
               [0.049315068493150684, 0.9980033772815557],
-              [0.07123287671232877, 0.9971184263817272],
-              [0.10684931506849316, 0.9956834060809285],
-              [0.2684931506849315, 0.9892232472075531],
-              [0.5205479452054794, 0.9793155569145362],
-              [1.0164383561643835, 0.9603911448988486],
-              [2.0246575342465754, 0.9208029557821575],
-              [3.0246575342465754, 0.8813419231524788],
-              [5.021917808219178, 0.8067213345194072],
-              [7.021917808219178, 0.735090396256002],
-              [10.027397260273972, 0.6373606760856555]
+              [0.07123287671232877, 0.9971184263817271],
+              [0.10684931506849316, 0.9956834060809278],
+              [0.2684931506849315, 0.9892232472075533],
+              [0.5205479452054794, 0.9793155569145361],
+              [1.0164383561643835, 0.9603911448988534],
+              [2.0246575342465754, 0.9208029557821582],
+              [3.0246575342465754, 0.881341923152983],
+              [5.021917808219178, 0.8067213345193819],
+              [7.021917808219178, 0.7350903962559738],
+              [10.027397260273972, 0.6373606760856279]
             ],
             "interp_style": "log_linear",
-            "extrapolation": "flat_forward",
-            "min_forward_rate": -0.005,
-            "allow_non_monotonic": false,
-            "min_forward_tenor": 0.000001,
+            "extrapolation": "extend",
             "rate_calibration": {
               "currency": "USD",
               "method": "bootstrap",
@@ -4346,9 +5019,11 @@
             "currency": null,
             "observations": [
               ["2026-03-30", 0.0405],
+              ["2026-04-01", 0.0405],
               ["2026-04-29", 0.0405]
             ],
-            "interpolation": "step"
+            "interpolation": "step",
+            "extrapolation": "flat"
           }
         ],
         "inflation_indices": [],
@@ -4364,47 +5039,47 @@
           "value": {
             "tranche_id": "SENIOR",
             "currency": "USD",
-            "pv": 13607106.197048739,
-            "clean_price_pct": 31.197349683059077,
-            "dirty_price_pct": 31.644433016392416,
+            "pv": 13606356.133032644,
+            "clean_price_pct": 31.195605348137928,
+            "dirty_price_pct": 31.64268868147126,
             "accrued": 192245.83333333334,
             "factor": 0.9555555555555556,
-            "wal": 2.868013679945946,
-            "ytm": 0.1422085297968565,
-            "z_spread_bp": 999.9999999995358,
-            "cs01": -2271.980176910758,
-            "spread_duration": 2.074471263318005,
-            "spread_convexity": 6.229805865784208,
-            "effective_duration": 0.21078653041199238,
-            "effective_convexity": 0.1653102121474036,
-            "target_price_pct": 25.022899902655503,
-            "dm_bp": 999.9999999995358
+            "wal": 2.8705058768490375,
+            "ytm": 0.1422084229961491,
+            "z_spread_bp": 1000.0000000000407,
+            "cs01": -2271.621661482379,
+            "spread_duration": 2.0742042014717343,
+            "spread_convexity": 6.2287899048684725,
+            "effective_duration": 0.18904150071550038,
+            "effective_convexity": 0.6000808098407995,
+            "target_price_pct": 25.022159615198152,
+            "dm_bp": 1000.0000000000407
           }
         },
         "metrics": {
           "value": {
             "tranche_id": "SENIOR",
             "currency": "USD",
-            "pv": 13607106.197048739,
-            "clean_price_pct": 31.197349683059077,
-            "dirty_price_pct": 31.644433016392416,
+            "pv": 13606356.133032644,
+            "clean_price_pct": 31.195605348137928,
+            "dirty_price_pct": 31.64268868147126,
             "accrued": 192245.83333333334,
             "factor": 0.9555555555555556,
-            "wal": 2.868013679945946,
-            "ytm": 0.14265109306472074,
-            "z_spread_bp": 1004.3362572612525,
-            "cs01": -2269.024209499359,
-            "spread_duration": 2.0736366592927724,
-            "spread_convexity": 6.22638698806144,
-            "effective_duration": 0.21078653041199238,
-            "effective_convexity": 0.1653102121474036,
+            "wal": 2.8705058768490375,
+            "ytm": 0.1426367372422783,
+            "z_spread_bp": 1004.1966528764311,
+            "cs01": -2268.7613434735686,
+            "spread_duration": 2.073396428877742,
+            "spread_convexity": 6.225480913773644,
+            "effective_duration": 0.18904150071550038,
+            "effective_convexity": 0.6000808098407995,
             "target_price_pct": 25,
-            "dm_bp": 1004.3362572612525,
+            "dm_bp": 1004.1966528764311,
             "metrics": {
               "default01": 0,
-              "dv01": -286.81947042327374,
+              "dv01": -257.216598264873,
               "prepayment01": 0,
-              "severity01": -14617.481497116372
+              "severity01": -14617.481497120098
             }
           }
         },
@@ -4547,12 +5222,12 @@
           "value": 0
         },
         "discountMargin": {
-          "value": 0.10043362572612526
+          "value": 0.10041966528764312
         },
         "oas": {
           "value": {
-            "oas": 0.10043362758717178,
-            "model_price": 24.999999901781337,
+            "oas": 0.10041966714570448,
+            "model_price": 24.999999901950243,
             "market_price": 25,
             "num_paths": 256,
             "price_std_error": 0
@@ -4580,315 +5255,308 @@
                 [
                   "2026-07-01",
                   {
-                    "amount": "214114.264112235",
+                    "amount": "214117.15497187452",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2026-08-03",
                   {
-                    "amount": "212811.1925073577",
+                    "amount": "212816.78158783553",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2026-09-01",
                   {
-                    "amount": "209178.83218072325",
+                    "amount": "209185.94718011162",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2026-10-01",
                   {
-                    "amount": "203589.93670592128",
+                    "amount": "203659.31852755467",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2026-11-02",
                   {
-                    "amount": "202671.52397268623",
+                    "amount": "202826.33186044989",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2026-12-01",
                   {
-                    "amount": "197305.76066311105",
+                    "amount": "197532.3248467757",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-01-04",
                   {
-                    "amount": "1196409.6092311946",
+                    "amount": "1196519.70270521553",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-02-01",
                   {
-                    "amount": "214530.1380019745",
+                    "amount": "214451.32968150057",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-03-01",
                   {
-                    "amount": "204800.43718400555",
+                    "amount": "204576.86279761433",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-04-01",
                   {
-                    "amount": "207838.326284377548",
+                    "amount": "207765.036320491488",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-05-03",
                   {
-                    "amount": "202519.004045819237",
+                    "amount": "202780.222561769607",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-06-01",
                   {
-                    "amount": "201345.938786759375",
+                    "amount": "201898.6116540313",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-07-01",
                   {
-                    "amount": "196159.296366328265",
+                    "amount": "196628.251967656365",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-08-02",
                   {
-                    "amount": "195046.64065102726",
+                    "amount": "195381.46893220536",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-09-01",
                   {
-                    "amount": "191968.275517060375",
+                    "amount": "192167.768101508925",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-10-01",
                   {
-                    "amount": "168489.838203215694",
+                    "amount": "168546.5849793476",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-11-01",
                   {
-                    "amount": "204501.505040011003",
+                    "amount": "204434.001757829157",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-12-01",
                   {
-                    "amount": "181161.529214540087",
+                    "amount": "180980.505485249687",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-01-03",
                   {
-                    "amount": "180147.89062231804",
+                    "amount": "179832.94188882659",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-02-01",
                   {
-                    "amount": "159958.395737494135",
+                    "amount": "159525.38210534669",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-03-01",
                   {
-                    "amount": "188279.820611543964",
+                    "amount": "187772.776866467614",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-04-03",
                   {
-                    "amount": "171767.419394057255",
+                    "amount": "171504.873749657676",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-05-01",
                   {
-                    "amount": "150836.50350467839",
+                    "amount": "150965.91204201372",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-06-01",
                   {
-                    "amount": "182915.404620414924",
+                    "amount": "183379.232292605784",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-07-03",
                   {
-                    "amount": "162119.288957385242",
+                    "amount": "162538.813766972942",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-08-01",
                   {
-                    "amount": "161234.68423936543",
+                    "amount": "161539.83420258136",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-09-01",
                   {
-                    "amount": "158697.097811060305",
+                    "amount": "158882.772086073459",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-10-02",
                   {
-                    "amount": "139405.720142039496",
+                    "amount": "139457.23957450497",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-11-01",
                   {
-                    "amount": "168947.586705890187",
+                    "amount": "168889.672706315443",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-12-01",
                   {
-                    "amount": "149776.488897219188",
+                    "amount": "149603.916945558394",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-01-02",
                   {
-                    "amount": "134510.711034914424",
+                    "amount": "134227.93567496507",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-02-01",
                   {
-                    "amount": "161074.353534754033",
+                    "amount": "160690.553381145123",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-03-01",
                   {
-                    "amount": "139808.2846462638",
+                    "amount": "139357.716664502604",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-04-02",
                   {
-                    "amount": "128208.45340305475",
+                    "amount": "127788.689659028926",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-05-01",
                   {
-                    "amount": "151910.842816760736",
+                    "amount": "151628.72670595398",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-06-01",
                   {
-                    "amount": "137302.32230894993",
+                    "amount": "137123.46241054191",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-07-02",
                   {
-                    "amount": "133618.915166557265",
+                    "amount": "133487.2184033942",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-08-01",
                   {
-                    "amount": "132793.53821333677",
+                    "amount": "132673.11947567463",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-09-04",
                   {
-                    "amount": "130594.838829240762",
+                    "amount": "130490.866897678396",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-10-01",
                   {
-                    "amount": "114642.93591258716",
+                    "amount": "114557.46280187394",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-11-01",
                   {
-                    "amount": "138757.573722926777",
+                    "amount": "138682.635200337037",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-12-03",
                   {
-                    "amount": "122921.460190845426",
+                    "amount": "122864.257911625582",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2030-01-02",
                   {
-                    "amount": "5811397.228095688855",
+                    "amount": "5811352.260150888176",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2030-01-02",
                   {
-                    "amount": "0.00000000001",
-                    "currency": "USD"
-                  }
-                ],
-                [
-                  "2030-01-02",
-                  {
-                    "amount": "74999.99999999999",
+                    "amount": "75000",
                     "currency": "USD"
                   }
                 ],
@@ -5011,7 +5679,7 @@
                   "date": "2026-07-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "193552.82007505192",
+                    "amount": "193463.78845262656",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5021,13 +5689,13 @@
                   "date": "2026-07-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "20561.44403718308",
+                    "amount": "20653.36651924796",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-20561.44403718308",
+                    "amount": "-20653.36651924796",
                     "currency": "USD"
                   },
                   "principal_date": "2026-07-01"
@@ -5036,7 +5704,7 @@
                   "date": "2026-08-03",
                   "reset_date": null,
                   "amount": {
-                    "amount": "199373.43056211862",
+                    "amount": "199823.613209275",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5046,13 +5714,13 @@
                   "date": "2026-08-03",
                   "reset_date": null,
                   "amount": {
-                    "amount": "13437.76194523908",
+                    "amount": "12993.16837856053",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-13437.76194523908",
+                    "amount": "-12993.16837856053",
                     "currency": "USD"
                   },
                   "principal_date": "2026-08-03"
@@ -5061,7 +5729,7 @@
                   "date": "2026-09-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "198792.7579779218",
+                    "amount": "198443.88215869493",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5071,13 +5739,13 @@
                   "date": "2026-09-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "10386.07420280145",
+                    "amount": "10742.06502141669",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-10386.07420280145",
+                    "amount": "-10742.06502141669",
                     "currency": "USD"
                   },
                   "principal_date": "2026-09-01"
@@ -5086,7 +5754,7 @@
                   "date": "2026-10-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "192806.82726700738",
+                    "amount": "191849.79261009084",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5096,13 +5764,13 @@
                   "date": "2026-10-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "10783.1094389139",
+                    "amount": "11809.52591746383",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-10783.1094389139",
+                    "amount": "-11809.52591746383",
                     "currency": "USD"
                   },
                   "principal_date": "2026-10-01"
@@ -5111,7 +5779,7 @@
                   "date": "2026-11-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "199946.9866813546",
+                    "amount": "198197.55017923514",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5121,13 +5789,13 @@
                   "date": "2026-11-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "2724.53729133163",
+                    "amount": "4628.78168121475",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-2724.53729133163",
+                    "amount": "-4628.78168121475",
                     "currency": "USD"
                   },
                   "principal_date": "2026-11-02"
@@ -5136,7 +5804,7 @@
                   "date": "2026-12-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "194177.5581480218",
+                    "amount": "194515.53177561265",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5146,13 +5814,13 @@
                   "date": "2026-12-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "3128.20251508925",
+                    "amount": "3016.79307116305",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-3128.20251508925",
+                    "amount": "-3016.79307116305",
                     "currency": "USD"
                   },
                   "principal_date": "2026-12-01"
@@ -5161,7 +5829,7 @@
                   "date": "2027-01-04",
                   "reset_date": null,
                   "amount": {
-                    "amount": "201327.434673253",
+                    "amount": "201307.80401584093",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5171,13 +5839,13 @@
                   "date": "2027-01-04",
                   "reset_date": null,
                   "amount": {
-                    "amount": "995082.1745579416",
+                    "amount": "995211.8986893746",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-995082.1745579416",
+                    "amount": "-995211.8986893746",
                     "currency": "USD"
                   },
                   "principal_date": "2027-01-04"
@@ -5186,7 +5854,7 @@
                   "date": "2027-02-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "197388.02468371694",
+                    "amount": "196598.8479554594",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5196,13 +5864,13 @@
                   "date": "2027-02-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "17142.11331825756",
+                    "amount": "17852.48172604117",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-17142.11331825756",
+                    "amount": "-17852.48172604117",
                     "currency": "USD"
                   },
                   "principal_date": "2027-02-01"
@@ -5211,7 +5879,7 @@
                   "date": "2027-03-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "178822.6083913257",
+                    "amount": "177475.40455916163",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5221,13 +5889,13 @@
                   "date": "2027-03-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "25977.82879267985",
+                    "amount": "27101.4582384527",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-25977.82879267985",
+                    "amount": "-27101.4582384527",
                     "currency": "USD"
                   },
                   "principal_date": "2027-03-01"
@@ -5236,7 +5904,7 @@
                   "date": "2027-04-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "198434.32581380074",
+                    "amount": "196386.143376353749",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5246,13 +5914,13 @@
                   "date": "2027-04-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "9404.000470576808",
+                    "amount": "11378.892944137739",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-9404.000470576808",
+                    "amount": "-11378.892944137739",
                     "currency": "USD"
                   },
                   "principal_date": "2027-04-01"
@@ -5261,7 +5929,7 @@
                   "date": "2027-05-03",
                   "reset_date": null,
                   "amount": {
-                    "amount": "192617.64768421548",
+                    "amount": "189991.34787353256",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5271,13 +5939,13 @@
                   "date": "2027-05-03",
                   "reset_date": null,
                   "amount": {
-                    "amount": "9901.356361603757",
+                    "amount": "12788.874688237047",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-9901.356361603757",
+                    "amount": "-12788.874688237047",
                     "currency": "USD"
                   },
                   "principal_date": "2027-05-03"
@@ -5286,7 +5954,7 @@
                   "date": "2027-06-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "199580.48522379706",
+                    "amount": "201210.51401191493",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5296,13 +5964,13 @@
                   "date": "2027-06-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "1765.453562962315",
+                    "amount": "688.09764211637",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-1765.453562962315",
+                    "amount": "-688.09764211637",
                     "currency": "USD"
                   },
                   "principal_date": "2027-06-01"
@@ -5311,7 +5979,7 @@
                   "date": "2027-07-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "193666.82937909558",
+                    "amount": "195220.47716567086",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5321,13 +5989,13 @@
                   "date": "2027-07-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "2492.466987232685",
+                    "amount": "1407.774801985505",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-2492.466987232685",
+                    "amount": "-1407.774801985505",
                     "currency": "USD"
                   },
                   "principal_date": "2027-07-01"
@@ -5336,7 +6004,7 @@
                   "date": "2027-08-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "195046.64065102726",
+                    "amount": "195381.46893220536",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5346,7 +6014,7 @@
                   "date": "2027-09-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "191968.275517060375",
+                    "amount": "192167.768101508925",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5356,7 +6024,7 @@
                   "date": "2027-10-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "168489.838203215694",
+                    "amount": "168546.5849793476",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5366,7 +6034,7 @@
                   "date": "2027-11-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "204501.505040011003",
+                    "amount": "204434.001757829157",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5376,7 +6044,7 @@
                   "date": "2027-12-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "181161.529214540087",
+                    "amount": "180980.505485249687",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5386,7 +6054,7 @@
                   "date": "2028-01-03",
                   "reset_date": null,
                   "amount": {
-                    "amount": "180147.89062231804",
+                    "amount": "179832.94188882659",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5396,7 +6064,7 @@
                   "date": "2028-02-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "159958.395737494135",
+                    "amount": "159525.38210534669",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5406,7 +6074,7 @@
                   "date": "2028-03-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "188279.820611543964",
+                    "amount": "187772.776866467614",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5416,7 +6084,7 @@
                   "date": "2028-04-03",
                   "reset_date": null,
                   "amount": {
-                    "amount": "171767.419394057255",
+                    "amount": "171504.873749657676",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5426,7 +6094,7 @@
                   "date": "2028-05-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "150836.50350467839",
+                    "amount": "150965.91204201372",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5436,7 +6104,7 @@
                   "date": "2028-06-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "182915.404620414924",
+                    "amount": "183379.232292605784",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5446,7 +6114,7 @@
                   "date": "2028-07-03",
                   "reset_date": null,
                   "amount": {
-                    "amount": "162119.288957385242",
+                    "amount": "162538.813766972942",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5456,7 +6124,7 @@
                   "date": "2028-08-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "161234.68423936543",
+                    "amount": "161539.83420258136",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5466,32 +6134,17 @@
                   "date": "2028-09-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "158697.097811060299",
+                    "amount": "158882.772086073459",
                     "currency": "USD"
                   },
                   "kind": "fixed",
                   "accrual_factor": 0
-                },
-                {
-                  "date": "2028-09-01",
-                  "reset_date": null,
-                  "amount": {
-                    "amount": "0.000000000006",
-                    "currency": "USD"
-                  },
-                  "kind": "amortization",
-                  "accrual_factor": 0,
-                  "principal_delta": {
-                    "amount": "-0.000000000006",
-                    "currency": "USD"
-                  },
-                  "principal_date": "2028-09-01"
                 },
                 {
                   "date": "2028-10-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "139405.720142039496",
+                    "amount": "139457.23957450497",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5501,7 +6154,7 @@
                   "date": "2028-11-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "168947.586705890187",
+                    "amount": "168889.672706315443",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5511,7 +6164,7 @@
                   "date": "2028-12-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "149776.488897219188",
+                    "amount": "149603.916945558394",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5521,7 +6174,7 @@
                   "date": "2029-01-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "134510.711034914424",
+                    "amount": "134227.93567496507",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5531,7 +6184,7 @@
                   "date": "2029-02-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "161074.353534754033",
+                    "amount": "160690.553381145123",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5541,7 +6194,7 @@
                   "date": "2029-03-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "139808.2846462638",
+                    "amount": "139357.716664502604",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5551,7 +6204,7 @@
                   "date": "2029-04-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "128208.45340305475",
+                    "amount": "127788.689659028926",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5561,7 +6214,7 @@
                   "date": "2029-05-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "151910.842816760736",
+                    "amount": "151628.72670595398",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5571,7 +6224,7 @@
                   "date": "2029-06-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "137302.32230894993",
+                    "amount": "137123.46241054191",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5581,7 +6234,7 @@
                   "date": "2029-07-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "133618.915166557265",
+                    "amount": "133487.2184033942",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5591,7 +6244,7 @@
                   "date": "2029-08-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "132793.53821333677",
+                    "amount": "132673.11947567463",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5601,32 +6254,17 @@
                   "date": "2029-09-04",
                   "reset_date": null,
                   "amount": {
-                    "amount": "130594.838829240752",
+                    "amount": "130490.866897678396",
                     "currency": "USD"
                   },
                   "kind": "fixed",
                   "accrual_factor": 0
-                },
-                {
-                  "date": "2029-09-04",
-                  "reset_date": null,
-                  "amount": {
-                    "amount": "0.00000000001",
-                    "currency": "USD"
-                  },
-                  "kind": "amortization",
-                  "accrual_factor": 0,
-                  "principal_delta": {
-                    "amount": "-0.00000000001",
-                    "currency": "USD"
-                  },
-                  "principal_date": "2029-09-04"
                 },
                 {
                   "date": "2029-10-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "114642.93591258716",
+                    "amount": "114557.46280187394",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5636,7 +6274,7 @@
                   "date": "2029-11-01",
                   "reset_date": null,
                   "amount": {
-                    "amount": "138757.573722926777",
+                    "amount": "138682.635200337037",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5646,7 +6284,7 @@
                   "date": "2029-12-03",
                   "reset_date": null,
                   "amount": {
-                    "amount": "122921.460190845426",
+                    "amount": "122864.257911625582",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5656,7 +6294,7 @@
                   "date": "2030-01-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "1617570.964217421555",
+                    "amount": "1579287.755083815176",
                     "currency": "USD"
                   },
                   "kind": "fixed",
@@ -5666,23 +6304,13 @@
                   "date": "2030-01-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "0.00000000001",
-                    "currency": "USD"
-                  },
-                  "kind": "fixed",
-                  "accrual_factor": 0
-                },
-                {
-                  "date": "2030-01-02",
-                  "reset_date": null,
-                  "amount": {
-                    "amount": "4193826.2638782673",
+                    "amount": "4232064.505067073",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-4193826.2638782673",
+                    "amount": "-4232064.505067073",
                     "currency": "USD"
                   },
                   "principal_date": "2030-01-02"
@@ -5691,13 +6319,13 @@
                   "date": "2030-01-02",
                   "reset_date": null,
                   "amount": {
-                    "amount": "74999.99999999999",
+                    "amount": "75000",
                     "currency": "USD"
                   },
                   "kind": "amortization",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-74999.99999999999",
+                    "amount": "-75000",
                     "currency": "USD"
                   },
                   "principal_date": "2030-01-02"
@@ -5847,7 +6475,7 @@
                   "kind": "defaulted_notional",
                   "accrual_factor": 0,
                   "principal_delta": {
-                    "amount": "-37119303.593069696742",
+                    "amount": "-37073578.69604329",
                     "currency": "USD"
                   },
                   "principal_date": "2030-10-02"
@@ -5884,7 +6512,7 @@
                     "amount": "42609138.08996632546",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.054510228204957774,
+                  "coupon_rate": 0.054485154253289265,
                   "day_count": "act_360"
                 },
                 {
@@ -5892,10 +6520,10 @@
                   "end": "2026-08-01",
                   "payment_date": "2026-08-03",
                   "opening_balance": {
-                    "amount": "42588576.64592914238",
+                    "amount": "42588484.7234470775",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.054364445521713295,
+                  "coupon_rate": 0.054487317346435714,
                   "day_count": "act_360"
                 },
                 {
@@ -5903,10 +6531,10 @@
                   "end": "2026-09-01",
                   "payment_date": "2026-09-01",
                   "opening_balance": {
-                    "amount": "42575138.8839839033",
+                    "amount": "42575491.55506851697",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.0542232185473202,
+                  "coupon_rate": 0.05412760992510295,
                   "day_count": "act_360"
                 },
                 {
@@ -5914,10 +6542,10 @@
                   "end": "2026-10-01",
                   "payment_date": "2026-10-01",
                   "opening_balance": {
-                    "amount": "42564752.80978110185",
+                    "amount": "42564749.49004710028",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05435675704599463,
+                  "coupon_rate": 0.054086950796207844,
                   "day_count": "act_360"
                 },
                 {
@@ -5925,10 +6553,10 @@
                   "end": "2026-11-01",
                   "payment_date": "2026-11-02",
                   "opening_balance": {
-                    "amount": "42553969.70034218795",
+                    "amount": "42552939.96412963645",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05456517976990315,
+                  "coupon_rate": 0.054089070502850584,
                   "day_count": "act_360"
                 },
                 {
@@ -5936,10 +6564,10 @@
                   "end": "2026-12-01",
                   "payment_date": "2026-12-01",
                   "opening_balance": {
-                    "amount": "42551245.16305085632",
+                    "amount": "42548311.1824484217",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05476057607356737,
+                  "coupon_rate": 0.05485967166354244,
                   "day_count": "act_360"
                 },
                 {
@@ -5947,10 +6575,10 @@
                   "end": "2027-01-01",
                   "payment_date": "2027-01-04",
                   "opening_balance": {
-                    "amount": "42548116.96053576707",
+                    "amount": "42545294.38937725865",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.054949459167109464,
+                  "coupon_rate": 0.05494774640034618,
                   "day_count": "act_360"
                 },
                 {
@@ -5958,10 +6586,10 @@
                   "end": "2027-02-01",
                   "payment_date": "2027-02-01",
                   "opening_balance": {
-                    "amount": "41553034.78597782547",
+                    "amount": "41550082.49068788405",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.055164395101140115,
+                  "coupon_rate": 0.054947746400346296,
                   "day_count": "act_360"
                 },
                 {
@@ -5969,10 +6597,10 @@
                   "end": "2027-03-01",
                   "payment_date": "2027-03-01",
                   "opening_balance": {
-                    "amount": "41535892.67265956791",
+                    "amount": "41532230.00896184288",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05535327819468221,
+                  "coupon_rate": 0.05494110548732852,
                   "day_count": "act_360"
                 },
                 {
@@ -5980,10 +6608,10 @@
                   "end": "2027-04-01",
                   "payment_date": "2027-04-01",
                   "opening_balance": {
-                    "amount": "41509914.84386688806",
+                    "amount": "41505128.55072339018",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.055514414592789545,
+                  "coupon_rate": 0.05494774640034691,
                   "day_count": "act_360"
                 },
                 {
@@ -5991,10 +6619,10 @@
                   "end": "2027-05-01",
                   "payment_date": "2027-05-03",
                   "opening_balance": {
-                    "amount": "41500510.843396311252",
+                    "amount": "41493749.657779252441",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05569598362132896,
+                  "coupon_rate": 0.05494553259914787,
                   "day_count": "act_360"
                 },
                 {
@@ -6002,10 +6630,10 @@
                   "end": "2027-06-01",
                   "payment_date": "2027-06-01",
                   "opening_balance": {
-                    "amount": "41490609.487034707495",
+                    "amount": "41480960.783091015394",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05586104637454661,
+                  "coupon_rate": 0.056330378639340255,
                   "day_count": "act_360"
                 },
                 {
@@ -6013,10 +6641,10 @@
                   "end": "2027-07-01",
                   "payment_date": "2027-07-01",
                   "opening_balance": {
-                    "amount": "41488844.03347174518",
+                    "amount": "41480272.685448899024",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.056015104944216416,
+                  "coupon_rate": 0.05647614092975431,
                   "day_count": "act_360"
                 },
                 {
@@ -6024,10 +6652,10 @@
                   "end": "2027-08-01",
                   "payment_date": "2027-08-02",
                   "opening_balance": {
-                    "amount": "41486351.566484512495",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05619667397275583,
+                  "coupon_rate": 0.056478527537576276,
                   "day_count": "act_360"
                 },
                 {
@@ -6035,10 +6663,10 @@
                   "end": "2027-09-01",
                   "payment_date": "2027-09-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512495",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.056361736725973485,
+                  "coupon_rate": 0.05647852753757677,
                   "day_count": "act_360"
                 },
                 {
@@ -6046,10 +6674,10 @@
                   "end": "2027-10-01",
                   "payment_date": "2027-10-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512495",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05653780366273897,
+                  "coupon_rate": 0.05647614092975589,
                   "day_count": "act_360"
                 },
                 {
@@ -6057,10 +6685,10 @@
                   "end": "2027-11-01",
                   "payment_date": "2027-11-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512495",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05670286641595662,
+                  "coupon_rate": 0.056478527537574104,
                   "day_count": "act_360"
                 },
                 {
@@ -6068,10 +6696,10 @@
                   "end": "2027-12-01",
                   "payment_date": "2027-12-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512495",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05686242707740036,
+                  "coupon_rate": 0.056476140929756564,
                   "day_count": "act_360"
                 },
                 {
@@ -6079,10 +6707,10 @@
                   "end": "2028-01-01",
                   "payment_date": "2028-01-03",
                   "opening_balance": {
-                    "amount": "41486351.566484512495",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.057038494014165844,
+                  "coupon_rate": 0.05647852753757562,
                   "day_count": "act_360"
                 },
                 {
@@ -6090,10 +6718,10 @@
                   "end": "2028-02-01",
                   "payment_date": "2028-02-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512495",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05720905885915742,
+                  "coupon_rate": 0.05647852753757643,
                   "day_count": "act_360"
                 },
                 {
@@ -6101,10 +6729,10 @@
                   "end": "2028-03-01",
                   "payment_date": "2028-03-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512495",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05736861952060115,
+                  "coupon_rate": 0.056473754504974126,
                   "day_count": "act_360"
                 },
                 {
@@ -6112,10 +6740,10 @@
                   "end": "2028-04-01",
                   "payment_date": "2028-04-03",
                   "opening_balance": {
-                    "amount": "41486351.566484512495",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05755410631982829,
+                  "coupon_rate": 0.056478527537576304,
                   "day_count": "act_360"
                 },
                 {
@@ -6123,10 +6751,10 @@
                   "end": "2028-05-01",
                   "payment_date": "2028-05-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512495",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05774394535570747,
+                  "coupon_rate": 0.05647614092975505,
                   "day_count": "act_360"
                 },
                 {
@@ -6134,10 +6762,10 @@
                   "end": "2028-06-01",
                   "payment_date": "2028-06-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512495",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05791541287198545,
+                  "coupon_rate": 0.05840877898376722,
                   "day_count": "act_360"
                 },
                 {
@@ -6145,10 +6773,10 @@
                   "end": "2028-07-01",
                   "payment_date": "2028-07-03",
                   "opening_balance": {
-                    "amount": "41486351.566484512495",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05811749958759877,
+                  "coupon_rate": 0.05861297189416154,
                   "day_count": "act_360"
                 },
                 {
@@ -6156,10 +6784,10 @@
                   "end": "2028-08-01",
                   "payment_date": "2028-08-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512495",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05830121478361089,
+                  "coupon_rate": 0.05861561059940055,
                   "day_count": "act_360"
                 },
                 {
@@ -6167,10 +6795,10 @@
                   "end": "2028-09-01",
                   "payment_date": "2028-09-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512495",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05847880613975593,
+                  "coupon_rate": 0.058615610599399785,
                   "day_count": "act_360"
                 },
                 {
@@ -6178,10 +6806,10 @@
                   "end": "2028-10-01",
                   "payment_date": "2028-10-02",
                   "opening_balance": {
-                    "amount": "41486351.566484512489",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05868089285536925,
+                  "coupon_rate": 0.058612971894162355,
                   "day_count": "act_360"
                 },
                 {
@@ -6189,10 +6817,10 @@
                   "end": "2028-11-01",
                   "payment_date": "2028-11-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512489",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.0588584842115143,
+                  "coupon_rate": 0.0586156105994007,
                   "day_count": "act_360"
                 },
                 {
@@ -6200,10 +6828,10 @@
                   "end": "2028-12-01",
                   "payment_date": "2028-12-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512489",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.059054447087260556,
+                  "coupon_rate": 0.05861297189416372,
                   "day_count": "act_360"
                 },
                 {
@@ -6211,10 +6839,10 @@
                   "end": "2029-01-01",
                   "payment_date": "2029-01-02",
                   "opening_balance": {
-                    "amount": "41486351.566484512489",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.059238162283272666,
+                  "coupon_rate": 0.05861561059939944,
                   "day_count": "act_360"
                 },
                 {
@@ -6222,10 +6850,10 @@
                   "end": "2029-02-01",
                   "payment_date": "2029-02-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512489",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05941575363941771,
+                  "coupon_rate": 0.05861561059940003,
                   "day_count": "act_360"
                 },
                 {
@@ -6233,10 +6861,10 @@
                   "end": "2029-03-01",
                   "payment_date": "2029-03-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512489",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.059617840355031045,
+                  "coupon_rate": 0.05860769512202042,
                   "day_count": "act_360"
                 },
                 {
@@ -6244,10 +6872,10 @@
                   "end": "2029-04-01",
                   "payment_date": "2029-04-02",
                   "opening_balance": {
-                    "amount": "41486351.566484512489",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05962876756192458,
+                  "coupon_rate": 0.05861561059939982,
                   "day_count": "act_360"
                 },
                 {
@@ -6255,10 +6883,10 @@
                   "end": "2029-05-01",
                   "payment_date": "2029-05-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512489",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.059603082354391775,
+                  "coupon_rate": 0.05861297189416389,
                   "day_count": "act_360"
                 },
                 {
@@ -6266,10 +6894,10 @@
                   "end": "2029-06-01",
                   "payment_date": "2029-06-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512489",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.059578253320443406,
+                  "coupon_rate": 0.059090417770050925,
                   "day_count": "act_360"
                 },
                 {
@@ -6277,10 +6905,10 @@
                   "end": "2029-07-01",
                   "payment_date": "2029-07-02",
                   "opening_balance": {
-                    "amount": "41486351.566484512489",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05954999959215733,
+                  "coupon_rate": 0.05913858846104066,
                   "day_count": "act_360"
                 },
                 {
@@ -6288,10 +6916,10 @@
                   "end": "2029-08-01",
                   "payment_date": "2029-08-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512489",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05952517055820896,
+                  "coupon_rate": 0.05914129111399633,
                   "day_count": "act_360"
                 },
                 {
@@ -6299,10 +6927,10 @@
                   "end": "2029-09-01",
                   "payment_date": "2029-09-04",
                   "opening_balance": {
-                    "amount": "41486351.566484512489",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.0594977730035073,
+                  "coupon_rate": 0.05914129111399696,
                   "day_count": "act_360"
                 },
                 {
@@ -6310,10 +6938,10 @@
                   "end": "2029-10-01",
                   "payment_date": "2029-10-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512479",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05947123162239008,
+                  "coupon_rate": 0.05913858846103848,
                   "day_count": "act_360"
                 },
                 {
@@ -6321,10 +6949,10 @@
                   "end": "2029-11-01",
                   "payment_date": "2029-11-01",
                   "opening_balance": {
-                    "amount": "41486351.566484512479",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.05944725876202613,
+                  "coupon_rate": 0.0591412911139975,
                   "day_count": "act_360"
                 },
                 {
@@ -6332,10 +6960,10 @@
                   "end": "2029-12-01",
                   "payment_date": "2029-12-03",
                   "opening_balance": {
-                    "amount": "41486351.566484512479",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.059419005033740056,
+                  "coupon_rate": 0.05913858846104069,
                   "day_count": "act_360"
                 },
                 {
@@ -6343,10 +6971,10 @@
                   "end": "2030-01-01",
                   "payment_date": "2030-01-02",
                   "opening_balance": {
-                    "amount": "41486351.566484512479",
+                    "amount": "41478864.910646913519",
                     "currency": "USD"
                   },
-                  "coupon_rate": 0.059393319826207255,
+                  "coupon_rate": 0.05914129111399595,
                   "day_count": "act_360"
                 }
               ],
@@ -6368,308 +6996,301 @@
                 [
                   "2026-07-01",
                   {
-                    "amount": "193552.82007505192",
+                    "amount": "193463.78845262656",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2026-08-03",
                   {
-                    "amount": "199373.43056211862",
+                    "amount": "199823.613209275",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2026-09-01",
                   {
-                    "amount": "198792.7579779218",
+                    "amount": "198443.88215869493",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2026-10-01",
                   {
-                    "amount": "192806.82726700738",
+                    "amount": "191849.79261009084",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2026-11-02",
                   {
-                    "amount": "199946.9866813546",
+                    "amount": "198197.55017923514",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2026-12-01",
                   {
-                    "amount": "194177.5581480218",
+                    "amount": "194515.53177561265",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-01-04",
                   {
-                    "amount": "201327.434673253",
+                    "amount": "201307.80401584093",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-02-01",
                   {
-                    "amount": "197388.02468371694",
+                    "amount": "196598.8479554594",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-03-01",
                   {
-                    "amount": "178822.6083913257",
+                    "amount": "177475.40455916163",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-04-01",
                   {
-                    "amount": "198434.32581380074",
+                    "amount": "196386.143376353749",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-05-03",
                   {
-                    "amount": "192617.64768421548",
+                    "amount": "189991.34787353256",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-06-01",
                   {
-                    "amount": "199580.48522379706",
+                    "amount": "201210.51401191493",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-07-01",
                   {
-                    "amount": "193666.82937909558",
+                    "amount": "195220.47716567086",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-08-02",
                   {
-                    "amount": "195046.64065102726",
+                    "amount": "195381.46893220536",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-09-01",
                   {
-                    "amount": "191968.275517060375",
+                    "amount": "192167.768101508925",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-10-01",
                   {
-                    "amount": "168489.838203215694",
+                    "amount": "168546.5849793476",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-11-01",
                   {
-                    "amount": "204501.505040011003",
+                    "amount": "204434.001757829157",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-12-01",
                   {
-                    "amount": "181161.529214540087",
+                    "amount": "180980.505485249687",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-01-03",
                   {
-                    "amount": "180147.89062231804",
+                    "amount": "179832.94188882659",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-02-01",
                   {
-                    "amount": "159958.395737494135",
+                    "amount": "159525.38210534669",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-03-01",
                   {
-                    "amount": "188279.820611543964",
+                    "amount": "187772.776866467614",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-04-03",
                   {
-                    "amount": "171767.419394057255",
+                    "amount": "171504.873749657676",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-05-01",
                   {
-                    "amount": "150836.50350467839",
+                    "amount": "150965.91204201372",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-06-01",
                   {
-                    "amount": "182915.404620414924",
+                    "amount": "183379.232292605784",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-07-03",
                   {
-                    "amount": "162119.288957385242",
+                    "amount": "162538.813766972942",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-08-01",
                   {
-                    "amount": "161234.68423936543",
+                    "amount": "161539.83420258136",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-09-01",
                   {
-                    "amount": "158697.097811060299",
+                    "amount": "158882.772086073459",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-10-02",
                   {
-                    "amount": "139405.720142039496",
+                    "amount": "139457.23957450497",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-11-01",
                   {
-                    "amount": "168947.586705890187",
+                    "amount": "168889.672706315443",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-12-01",
                   {
-                    "amount": "149776.488897219188",
+                    "amount": "149603.916945558394",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-01-02",
                   {
-                    "amount": "134510.711034914424",
+                    "amount": "134227.93567496507",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-02-01",
                   {
-                    "amount": "161074.353534754033",
+                    "amount": "160690.553381145123",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-03-01",
                   {
-                    "amount": "139808.2846462638",
+                    "amount": "139357.716664502604",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-04-02",
                   {
-                    "amount": "128208.45340305475",
+                    "amount": "127788.689659028926",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-05-01",
                   {
-                    "amount": "151910.842816760736",
+                    "amount": "151628.72670595398",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-06-01",
                   {
-                    "amount": "137302.32230894993",
+                    "amount": "137123.46241054191",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-07-02",
                   {
-                    "amount": "133618.915166557265",
+                    "amount": "133487.2184033942",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-08-01",
                   {
-                    "amount": "132793.53821333677",
+                    "amount": "132673.11947567463",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-09-04",
                   {
-                    "amount": "130594.838829240752",
+                    "amount": "130490.866897678396",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-10-01",
                   {
-                    "amount": "114642.93591258716",
+                    "amount": "114557.46280187394",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-11-01",
                   {
-                    "amount": "138757.573722926777",
+                    "amount": "138682.635200337037",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-12-03",
                   {
-                    "amount": "122921.460190845426",
+                    "amount": "122864.257911625582",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2030-01-02",
                   {
-                    "amount": "1617570.964217421555",
-                    "currency": "USD"
-                  }
-                ],
-                [
-                  "2030-01-02",
-                  {
-                    "amount": "0.00000000001",
+                    "amount": "1579287.755083815176",
                     "currency": "USD"
                   }
                 ]
@@ -6692,119 +7313,105 @@
                 [
                   "2026-07-01",
                   {
-                    "amount": "20561.44403718308",
+                    "amount": "20653.36651924796",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2026-08-03",
                   {
-                    "amount": "13437.76194523908",
+                    "amount": "12993.16837856053",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2026-09-01",
                   {
-                    "amount": "10386.07420280145",
+                    "amount": "10742.06502141669",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2026-10-01",
                   {
-                    "amount": "10783.1094389139",
+                    "amount": "11809.52591746383",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2026-11-02",
                   {
-                    "amount": "2724.53729133163",
+                    "amount": "4628.78168121475",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2026-12-01",
                   {
-                    "amount": "3128.20251508925",
+                    "amount": "3016.79307116305",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-01-04",
                   {
-                    "amount": "995082.1745579416",
+                    "amount": "995211.8986893746",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-02-01",
                   {
-                    "amount": "17142.11331825756",
+                    "amount": "17852.48172604117",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-03-01",
                   {
-                    "amount": "25977.82879267985",
+                    "amount": "27101.4582384527",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-04-01",
                   {
-                    "amount": "9404.000470576808",
+                    "amount": "11378.892944137739",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-05-03",
                   {
-                    "amount": "9901.356361603757",
+                    "amount": "12788.874688237047",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-06-01",
                   {
-                    "amount": "1765.453562962315",
+                    "amount": "688.09764211637",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-07-01",
                   {
-                    "amount": "2492.466987232685",
-                    "currency": "USD"
-                  }
-                ],
-                [
-                  "2028-09-01",
-                  {
-                    "amount": "0.000000000006",
-                    "currency": "USD"
-                  }
-                ],
-                [
-                  "2029-09-04",
-                  {
-                    "amount": "0.00000000001",
+                    "amount": "1407.774801985505",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2030-01-02",
                   {
-                    "amount": "4193826.2638782673",
+                    "amount": "4232064.505067073",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2030-01-02",
                   {
-                    "amount": "74999.99999999999",
+                    "amount": "75000",
                     "currency": "USD"
                   }
                 ],
@@ -6877,203 +7484,203 @@
                 [
                   "2027-08-02",
                   {
-                    "amount": "5712.370938768814",
+                    "amount": "6348.0356138633215",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-09-01",
                   {
-                    "amount": "15092.783105188224",
+                    "amount": "15909.77205842483",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-10-01",
                   {
-                    "amount": "42065.21153107789",
+                    "amount": "42577.038770744024",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-11-01",
                   {
-                    "amount": "40131.05810149273",
+                    "amount": "39872.54155897576",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2027-12-01",
                   {
-                    "amount": "55554.08227500427",
+                    "amount": "54105.88776539519",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-01-03",
                   {
-                    "amount": "79172.55132026873",
+                    "amount": "76002.45042263491",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-02-01",
                   {
-                    "amount": "123589.84721383014",
+                    "amount": "118206.57286335742",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-03-01",
                   {
-                    "amount": "127033.43446659402",
+                    "amount": "119132.5454112146",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-04-03",
                   {
-                    "amount": "160874.36661491444",
+                    "amount": "149357.1762076257",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-05-01",
                   {
-                    "amount": "199632.13482189583",
+                    "amount": "193605.11585727587",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-06-01",
                   {
-                    "amount": "206899.0960146778",
+                    "amount": "208623.9595693581",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-07-03",
                   {
-                    "amount": "200923.5850046784",
+                    "amount": "202599.9619341226",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-08-01",
                   {
-                    "amount": "208277.34858679495",
+                    "amount": "209362.7189026005",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-09-01",
                   {
-                    "amount": "208911.78231046785",
+                    "amount": "209362.71890259776",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-10-02",
                   {
-                    "amount": "202871.34593608815",
+                    "amount": "202599.9619341254",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-11-01",
                   {
-                    "amount": "210268.15785763078",
+                    "amount": "209362.71890260105",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2028-12-01",
                   {
-                    "amount": "204162.7961188707",
+                    "amount": "202599.96193413011",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-01-02",
                   {
-                    "amount": "211624.53340479356",
+                    "amount": "209362.71890259653",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-02-01",
                   {
-                    "amount": "212258.96712846658",
+                    "amount": "209362.71890259866",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-03-01",
                   {
-                    "amount": "192369.85324692843",
+                    "amount": "189076.27423149618",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-04-02",
                   {
-                    "amount": "213019.94569737758",
+                    "amount": "209362.7189025979",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-05-01",
                   {
-                    "amount": "206059.53575003555",
+                    "amount": "202599.9619341307",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-06-01",
                   {
-                    "amount": "212839.48681121843",
+                    "amount": "211058.63095035168",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-07-02",
                   {
-                    "amount": "205876.0182386873",
+                    "amount": "204416.79348182067",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-08-01",
                   {
-                    "amount": "212649.85204949195",
+                    "amount": "211240.33990977667",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-09-04",
                   {
-                    "amount": "212551.97604343956",
+                    "amount": "211240.3399097789",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-10-01",
                   {
-                    "amount": "205603.7019315255",
+                    "amount": "204416.7934818131",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-11-01",
                   {
-                    "amount": "212371.51715728053",
+                    "amount": "211240.33990978083",
                     "currency": "USD"
                   }
                 ],
                 [
                   "2029-12-03",
                   {
-                    "amount": "205423.14438003773",
+                    "amount": "204416.79348182076",
                     "currency": "USD"
                   }
                 ]
@@ -7082,7 +7689,7 @@
                 [
                   "2030-10-02",
                   {
-                    "amount": "37119303.59306971",
+                    "amount": "37073578.69604329",
                     "currency": "USD"
                   }
                 ]
@@ -7092,11 +7699,11 @@
                 "currency": "USD"
               },
               "total_interest": {
-                "amount": "9102051.423886323287",
+                "amount": "9055343.198555779434",
                 "currency": "USD"
               },
               "total_principal": {
-                "amount": "5880696.406930303258",
+                "amount": "5926421.303956707928",
                 "currency": "USD"
               },
               "total_pik": {
@@ -7104,11 +7711,11 @@
                 "currency": "USD"
               },
               "total_deferred": {
-                "amount": "4793820.484057526418",
+                "amount": "4737423.5626076097255",
                 "currency": "USD"
               },
               "total_writedown": {
-                "amount": "37119303.59306971",
+                "amount": "37073578.69604329",
                 "currency": "USD"
               }
             },
@@ -7182,24 +7789,23 @@
                   "data": {
                     "type": "float64",
                     "values": [
-                      572321.5299999997, 221134.7834923831, 214114.264112235,
-                      212811.1925073577, 209178.83218072323, 203589.93670592128,
-                      202671.52397268623, 197305.76066311105,
-                      1196409.6092311947, 214530.1380019745, 204800.4371840055,
-                      207838.32628437754, 202519.00404581922,
-                      201345.93878675936, 196159.29636632826, 195046.6406510273,
-                      191968.27551706036, 168489.83820321568, 204501.505040011,
-                      181161.5292145401, 180147.89062231805, 159958.39573749414,
-                      188279.82061154398, 171767.41939405724, 150836.5035046784,
-                      182915.40462041492, 162119.28895738523,
-                      161234.68423936542, 158697.09781106032, 139405.7201420395,
-                      168947.58670589022, 149776.48889721915,
-                      134510.71103491442, 161074.35353475405, 139808.2846462638,
-                      128208.45340305477, 151910.84281676073,
-                      137302.32230894992, 133618.91516655727,
-                      132793.53821333678, 130594.83882924076,
-                      114642.93591258716, 138757.57372292678,
-                      122921.46019084542, 5886397.228095689, 11651.401078816469,
+                      572321.5299999997, 221134.7834923831, 214117.15497187452,
+                      212816.78158783552, 209185.94718011163,
+                      203659.31852755466, 202826.3318604499, 197532.3248467757,
+                      1196519.7027052154, 214451.32968150056,
+                      204576.86279761433, 207765.0363204915, 202780.2225617696,
+                      201898.6116540313, 196628.25196765637, 195381.46893220535,
+                      192167.76810150893, 168546.5849793476, 204434.00175782916,
+                      180980.50548524968, 179832.94188882658,
+                      159525.38210534668, 187772.7768664676, 171504.87374965768,
+                      150965.91204201372, 183379.2322926058, 162538.81376697295,
+                      161539.83420258135, 158882.77208607347,
+                      139457.23957450496, 168889.67270631544, 149603.9169455584,
+                      134227.93567496506, 160690.55338114512, 139357.7166645026,
+                      127788.68965902893, 151628.72670595397,
+                      137123.46241054192, 133487.2184033942, 132673.11947567464,
+                      130490.8668976784, 114557.46280187395, 138682.63520033704,
+                      122864.25791162558, 5886352.260150888, 11651.401078816469,
                       11459.75487239573, 11271.26092793791, 11085.867395966472,
                       10903.523279842702, 10724.178421737935,
                       10547.783488836527, 10374.289959765758, 10203.650111248944
@@ -7211,24 +7817,24 @@
                   "data": {
                     "type": "float64",
                     "values": [
-                      198875, 203719.40345870832, 193552.82007505192,
-                      199373.43056211865, 198792.7579779218, 192806.82726700735,
-                      199946.9866813546, 194177.5581480218, 201327.434673253,
-                      197388.0246837169, 178822.6083913257, 198434.3258138007,
-                      192617.64768421548, 199580.4852237971, 193666.82937909555,
-                      195046.6406510273, 191968.27551706036, 168489.83820321568,
-                      204501.505040011, 181161.5292145401, 180147.89062231805,
-                      159958.39573749414, 188279.82061154398,
-                      171767.41939405724, 150836.5035046784, 182915.40462041492,
-                      162119.28895738523, 161234.68423936542, 158697.0978110603,
-                      139405.7201420395, 168947.58670589022, 149776.48889721915,
-                      134510.71103491442, 161074.35353475405, 139808.2846462638,
-                      128208.45340305477, 151910.84281676073,
-                      137302.32230894992, 133618.91516655727,
-                      132793.53821333678, 130594.83882924075,
-                      114642.93591258716, 138757.57372292678,
-                      122921.46019084542, 1617570.9642174216, 0, 0, 0, 0, 0, 0,
-                      0, 0, 0
+                      198875, 203719.40345870832, 193463.78845262656,
+                      199823.613209275, 198443.88215869493, 191849.79261009084,
+                      198197.55017923514, 194515.53177561265,
+                      201307.80401584093, 196598.8479554594, 177475.40455916163,
+                      196386.14337635375, 189991.34787353256,
+                      201210.51401191493, 195220.47716567086,
+                      195381.46893220535, 192167.76810150893, 168546.5849793476,
+                      204434.00175782916, 180980.50548524968,
+                      179832.94188882658, 159525.38210534668, 187772.7768664676,
+                      171504.87374965768, 150965.91204201372, 183379.2322926058,
+                      162538.81376697295, 161539.83420258135,
+                      158882.77208607347, 139457.23957450496,
+                      168889.67270631544, 149603.9169455584, 134227.93567496506,
+                      160690.55338114512, 139357.7166645026, 127788.68965902893,
+                      151628.72670595397, 137123.46241054192, 133487.2184033942,
+                      132673.11947567464, 130490.8668976784, 114557.46280187395,
+                      138682.63520033704, 122864.25791162558,
+                      1579287.7550838152, 0, 0, 0, 0, 0, 0, 0, 0, 0
                     ]
                   }
                 },
@@ -7237,13 +7843,13 @@
                   "data": {
                     "type": "float64",
                     "values": [
-                      373446.52999999974, 17415.3800336748, 20561.44403718308,
-                      13437.76194523908, 10386.07420280145, 10783.1094389139,
-                      2724.53729133163, 3128.20251508925, 995082.1745579416,
-                      17142.11331825756, 25977.82879267985, 9404.000470576808,
-                      9901.356361603757, 1765.453562962315, 2492.466987232685,
-                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6e-12, 0, 0, 0, 0,
-                      0, 0, 0, 0, 0, 0, 0, 1e-11, 0, 0, 0, 4268826.263878267,
+                      373446.52999999974, 17415.3800336748, 20653.36651924796,
+                      12993.16837856053, 10742.06502141669, 11809.52591746383,
+                      4628.78168121475, 3016.79307116305, 995211.8986893746,
+                      17852.48172604117, 27101.4582384527, 11378.892944137739,
+                      12788.874688237047, 688.09764211637, 1407.774801985505, 0,
+                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                      0, 0, 0, 0, 0, 0, 0, 0, 0, 4307064.505067073,
                       11651.401078816469, 11459.75487239573, 11271.26092793791,
                       11085.867395966472, 10903.523279842702,
                       10724.178421737935, 10547.783488836527,
@@ -7268,17 +7874,18 @@
                     "type": "float64",
                     "values": [
                       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                      5712.370938768814, 15092.783105188224, 42065.21153107789,
-                      40131.05810149273, 55554.08227500427, 79172.55132026873,
-                      123589.84721383014, 127033.43446659402,
-                      160874.36661491444, 199632.13482189583, 206899.0960146778,
-                      200923.5850046784, 208277.34858679495, 208911.78231046785,
-                      202871.34593608815, 210268.1578576308, 204162.7961188707,
-                      211624.53340479356, 212258.9671284666, 192369.85324692843,
-                      213019.9456973776, 206059.53575003555, 212839.48681121843,
-                      205876.0182386873, 212649.85204949195, 212551.97604343956,
-                      205603.7019315255, 212371.51715728053, 205423.14438003773,
-                      0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+                      6348.0356138633215, 15909.77205842483, 42577.038770744024,
+                      39872.54155897576, 54105.88776539519, 76002.45042263491,
+                      118206.57286335742, 119132.5454112146, 149357.1762076257,
+                      193605.11585727587, 208623.9595693581, 202599.9619341226,
+                      209362.7189026005, 209362.71890259776, 202599.9619341254,
+                      209362.71890260105, 202599.96193413011,
+                      209362.71890259653, 209362.71890259866,
+                      189076.27423149618, 209362.7189025979, 202599.9619341307,
+                      211058.63095035168, 204416.79348182067,
+                      211240.33990977667, 211240.3399097789, 204416.7934818131,
+                      211240.33990978083, 204416.79348182076, 0, 0, 0, 0, 0, 0,
+                      0, 0, 0, 0
                     ]
                   }
                 },
@@ -7290,7 +7897,7 @@
                       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                      37119303.59306971
+                      37073578.69604329
                     ]
                   }
                 }

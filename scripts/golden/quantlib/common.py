@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import date
 from itertools import pairwise
 import json
 import math
@@ -75,46 +74,69 @@ def flat_discount_curve(curve_id: str, rate: float) -> dict[str, Any]:
         "day_count": "act_365f",
         "knot_points": [[0.0, 1.0], [30.0, math.exp(-rate * 30.0)]],
         "interp_style": "log_linear",
-        "extrapolation": "flat_forward",
-        "min_forward_rate": None,
-        "allow_non_monotonic": False,
-        "min_forward_tenor": 1e-6,
+        "extrapolation": "extend",
         "rate_calibration": None,
     }
 
 
-def flat_forward_curve(
-    curve_id: str,
-    rate: float,
-    *,
-    day_count: str = "act_360",
-    projection_dates: list[str] | None = None,
-) -> dict[str, Any]:
-    """Build a flat simple forward curve with the benchmark index's annualization."""
-    year_days = {"act_360": 360.0, "act_365f": 365.0}[day_count]
-    curve = {
+def chained_simple_discounts(dates: list[ql.Date], rate: float, accrual_day_count: ql.DayCounter) -> list[float]:
+    """Return projection discount factors on ``dates`` for a flat simple index forward.
+
+    ``dates[0]`` is the curve reference date; each consecutive date pair
+    accrues ``rate`` with ``accrual_day_count``, so every contractual index
+    period on the grid projects exactly ``rate``.
+    """
+    discounts = [1.0]
+    for start, end in pairwise(dates):
+        discounts.append(discounts[-1] / (1.0 + rate * accrual_day_count.yearFraction(start, end)))
+    return discounts
+
+
+def projection_knots(dates: list[ql.Date], discounts: list[float], *, shift: float = 0.0) -> list[tuple[float, float]]:
+    """Return the Act/365F ``(time, factor)`` knots of a QuantLib projection curve.
+
+    ``dates[0]`` is the curve reference date. ``shift`` is the parallel
+    continuously compounded zero bump Finstack's DV01 applies to every curve,
+    ``P(t) * exp(-shift * t)``, so both engines bump identical factors.
+    """
+    day_count = ql.Actual365Fixed()
+    knots = []
+    for knot_date, discount in zip(dates, discounts, strict=True):
+        time = day_count.yearFraction(dates[0], knot_date)
+        knots.append((time, discount * math.exp(-shift * time)))
+    return knots
+
+
+def ql_projection_curve(
+    dates: list[ql.Date], discounts: list[float], *, shift: float = 0.0
+) -> ql.YieldTermStructureHandle:
+    """Build the log-linear QuantLib projection curve matching ``projection_knots``."""
+    factors = [factor for _, factor in projection_knots(dates, discounts, shift=shift)]
+    return ql.YieldTermStructureHandle(ql.DiscountCurve(dates, factors, ql.Actual365Fixed(), ql.NullCalendar()))
+
+
+def forward_curve(curve_id: str, knots: list[tuple[float, float]], *, index_months: int) -> dict[str, Any]:
+    """Build a Finstack projection curve from Act/365F projection-factor knots."""
+    return {
         "type": "forward",
         "id": curve_id,
         "base": VALUATION_DATE,
-        "reset_lag": 2,
-        "day_count": day_count,
-        "tenor": 0.25,
-        "knot_points": [[0.0, rate], [30.0, rate]],
-        "interp_style": "linear",
-        "extrapolation": "flat_forward",
+        "day_count": "act_365f",
+        "index_tenor": {"count": index_months, "unit": "months"},
+        "knot_points": [[time, factor] for time, factor in knots],
+        "interp_style": "log_linear",
+        "extrapolation": "extend",
         "rate_calibration": None,
     }
-    if projection_dates is not None:
-        base = date.fromisoformat(VALUATION_DATE)
-        contractual_times = [
-            (date.fromisoformat(projection_date) - base).days / year_days for projection_date in projection_dates
-        ]
-        projection_grid = [0.0, *contractual_times, 30.0]
-        if any(right <= left for left, right in pairwise(projection_grid)):
-            msg = "projection_dates must be strictly increasing, after the valuation date, and before 30 years"
-            raise ValueError(msg)
-        curve["projection_grid"] = projection_grid
-    return curve
+
+
+def flat_forward_curve(curve_id: str, continuous_rate: float, *, index_months: int = 3) -> dict[str, Any]:
+    """Build the Finstack twin of a QuantLib Act/365F continuous ``FlatForward`` projection curve."""
+    return forward_curve(
+        curve_id,
+        [(0.0, 1.0), (30.0, math.exp(-continuous_rate * 30.0))],
+        index_months=index_months,
+    )
 
 
 def constant_vol_surface(
@@ -129,7 +151,7 @@ def constant_vol_surface(
     return {
         "id": vol_surface_id,
         "expiries": [0.25, 1.0, 2.0],
-        "strikes": surface_strikes,
+        "secondary_values": surface_strikes,
         "secondary_axis": "strike",
         "quote_type": quote_type,
         "interpolation_mode": "vol",

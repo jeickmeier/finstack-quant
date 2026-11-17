@@ -8342,7 +8342,7 @@
               "type": "null"
             }
           ],
-          "description": "Excess Cash Flow (ECF) sweep specification.\nA positive sweep percentage requires the `Sweep` payment priority."
+          "description": "Excess Cash Flow (ECF) sweep specification.\nThis specification and the `Sweep` payment priority must be supplied together."
         },
         "mandatory_prepay_node": {
           "description": "Formula or node for the `MandatoryPrepayment` rung.\n\nRequired when `MandatoryPrepayment` appears in `priority_of_payments`.\nWhen configured, that priority must be present so payment consumes cash.\nSized independently of the ECF sweep and voluntary prepay buckets.",
@@ -8374,10 +8374,9 @@
             "fees",
             "interest",
             "amortization",
-            "sweep",
             "equity"
           ],
-          "description": "Priority order of payments (default: Fees > Interest > Amortization > Sweep > Equity)",
+          "description": "Priority order of payments (default: Fees > Interest > Amortization > Equity).\nInclude each prepayment priority explicitly alongside its sizing configuration.",
           "items": {
             "$ref": "#/$defs/PaymentPriority"
           },

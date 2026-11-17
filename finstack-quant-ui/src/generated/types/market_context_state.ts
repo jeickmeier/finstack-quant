@@ -9,17 +9,11 @@
 export type DA33B682660A7Dfa1Ea09 =
   | {
       /**
-       * Whether non-monotonic DFs are allowed (dangerous override)
-       */
-      allow_non_monotonic: boolean;
-      /**
        * Base date
        */
       base: string;
       /**
-       * Registered holiday calendar id of the business-day time axis (for
-       * example `"brbd"` for a Bus/252 curve). Omitted when the day count needs
-       * no calendar.
+       * Registered holiday calendar id of the business-day time axis.
        */
       calendar_id?: string | null;
       /**
@@ -43,7 +37,7 @@ export type DA33B682660A7Dfa1Ea09 =
       /**
        * Extrapolation policy
        */
-      extrapolation: "flat_zero" | "flat_forward" | "none";
+      extrapolation: "flat" | "extend" | "error";
       /**
        * Opaque FX policy stamp; see [`DiscountCurve::fx_policy`].
        */
@@ -57,17 +51,9 @@ export type DA33B682660A7Dfa1Ea09 =
        */
       interp_style: "linear" | "log_linear" | "monotone_convex" | "cubic_hermite" | "piecewise_quadratic_forward";
       /**
-       * Time/value pairs used to construct the curve
+       * Time/value pairs stored on the curve (must already contain origin `(0.0, 1.0)`).
        */
       knot_points: [number, number][];
-      /**
-       * Minimum forward rate floor (if set)
-       */
-      min_forward_rate?: number | null;
-      /**
-       * Minimum tenor for forward rate calculations
-       */
-      min_forward_tenor: number;
       /**
        * Exact typed calibration replay recipe.
        */
@@ -84,7 +70,11 @@ export type DA33B682660A7Dfa1Ea09 =
        */
       base: string;
       /**
-       * Day count convention
+       * Registered holiday calendar id of the business-day time axis.
+       */
+      calendar_id?: string | null;
+      /**
+       * Day-count convention for projection factor time basis.
        */
       day_count:
         | "one_one"
@@ -102,45 +92,35 @@ export type DA33B682660A7Dfa1Ea09 =
         | "act_act_afb"
         | "bus_252";
       /**
-       * Extrapolation policy
+       * Extrapolation policy.
        */
-      extrapolation: "flat_zero" | "flat_forward" | "none";
+      extrapolation: "flat" | "extend" | "error";
       /**
-       * Opaque FX policy stamp; see [`crate::market_data::term_structures::DiscountCurve::fx_policy`].
+       * Opaque FX policy stamp; see [`ForwardCurve::fx_policy`].
        */
       fx_policy?: string | null;
       /**
-       * Curve identifier
+       * Curve identifier.
        */
       id: string;
       /**
-       * Interpolation style
+       * Optional index accrual tenor metadata.
+       */
+      index_tenor?: D_061B61Ce4Cbde8C30057 | null;
+      /**
+       * Interpolation style.
        */
       interp_style: "linear" | "log_linear" | "monotone_convex" | "cubic_hermite" | "piecewise_quadratic_forward";
       /**
-       * Time/value pairs used to construct the curve
+       * Time/factor pairs stored on the curve (must already contain origin `(0.0, 1.0)`).
        */
       knot_points: [number, number][];
-      /**
-       * Optional contractual reset/end-date boundaries.
-       *
-       * `None` selects fixed numeric-tenor discount-factor stepping.
-       */
-      projection_grid?: number[] | null;
       /**
        * Exact typed calibration replay recipe.
        */
       rate_calibration?: D_17Ffcd7842A3F40268B1 | null;
       /**
-       * Reset lag in business days
-       */
-      reset_lag: number;
-      /**
-       * Index tenor in years
-       */
-      tenor: number;
-      /**
-       * Canonical source interpolation and cumulative continuous transformations.
+       * Canonical source interpolation and accumulated continuous transformations.
        */
       transform?: DF401C4E712E4F497Feef | null;
       type: "forward";
@@ -151,11 +131,15 @@ export type DA33B682660A7Dfa1Ea09 =
        */
       base: string;
       /**
-       * Currency
+       * Registered holiday calendar id of the business-day time axis.
+       */
+      calendar_id?: string | null;
+      /**
+       * Currency.
        */
       currency?: DB6A74Bd737Ef1567B144 | null;
       /**
-       * Day count convention
+       * Day count convention.
        */
       day_count:
         | "one_one"
@@ -181,53 +165,44 @@ export type DA33B682660A7Dfa1Ea09 =
        */
       hazard_calibration?: DA9791Cac4C0854B02Bbe | null;
       /**
-       * Curve identifier
+       * Curve identifier.
        */
       id: string;
       /**
-       * Optional issuer
+       * Optional issuer.
        */
       issuer?: string | null;
       /**
-       * Time/value pairs used to construct the curve
+       * Strictly positive ending `(time_years, hazard_rate)` pillars.
        */
       knot_points: [number, number][];
       /**
-       * Hazard-rate cap the curve was built with, when it differs from the
-       * default of 10; absent for curves built with the default.
-       */
-      max_hazard_rate?: number | null;
-      /**
-       * Par interpolation method
-       */
-      par_interp?: "linear" | "log_linear";
-      /**
-       * Par spread points for reporting
-       */
-      par_points: [number, number][];
-      /**
-       * Recovery rate
+       * Recovery rate in `[0, 1]`.
        */
       recovery_rate: number;
       /**
-       * Seniority
+       * Seniority.
        */
       seniority?: DB205675B4D5Addcd52Ba | null;
+      /**
+       * Source coordinate anchor for conditioned curves.
+       */
+      source?: D_8C12E8F6A6Ead66335D4 | null;
       type: "hazard";
     }
   | {
-      /**
-       * Base CPI level at t=0
-       */
-      base_cpi: number;
       /**
        * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
        */
       base_date: string;
       /**
-       * Day count convention
+       * Optional registered holiday calendar identifier (`"brbd"`, `"usny+target2"`, etc.).
        */
-      day_count?:
+      calendar_id?: string | null;
+      /**
+       * Explicit day-count convention.
+       */
+      day_count:
         | "one_one"
         | "act_360"
         | "act_365f"
@@ -243,29 +218,21 @@ export type DA33B682660A7Dfa1Ea09 =
         | "act_act_afb"
         | "bus_252";
       /**
-       * Extrapolation policy
+       * Explicit extrapolation policy (`flat`, `extend`, or `error`).
        */
-      extrapolation: "flat_zero" | "flat_forward" | "none";
+      extrapolation: "flat" | "extend" | "error";
       /**
-       * Curve identifier
+       * Curve identifier.
        */
       id: string;
       /**
-       * Indexation lag in months
-       */
-      indexation_lag_months?: number;
-      /**
-       * Interpolation style
+       * Explicit scalar interpolation style (`linear`, `cubic_hermite`, or `log_linear`).
        */
       interp_style: "linear" | "log_linear" | "monotone_convex" | "cubic_hermite" | "piecewise_quadratic_forward";
       /**
-       * Time/value pairs used to construct the curve
+       * Strictly increasing `(time_years, cpi_level)` pillars starting at `0.0`.
        */
       knot_points: [number, number][];
-      /**
-       * Source interpolation and accumulated time origin for a rolled curve.
-       */
-      roll_transform?: D_13Ceef63597B70Bc1A71 | null;
       type: "inflation";
     }
   | {
@@ -300,7 +267,7 @@ export type DA33B682660A7Dfa1Ea09 =
       /**
        * Extrapolation policy
        */
-      extrapolation: "flat_zero" | "flat_forward" | "none";
+      extrapolation: "flat" | "extend" | "error";
       /**
        * Curve identifier
        */
@@ -314,10 +281,6 @@ export type DA33B682660A7Dfa1Ea09 =
        */
       knot_points: [number, number][];
       /**
-       * Source interpolation and accumulated time origin for a rolled curve.
-       */
-      roll_transform?: D_13Ceef63597B70Bc1A71 | null;
-      /**
        * Spot index level (volatility index curves)
        */
       spot_level?: number | null;
@@ -329,55 +292,18 @@ export type DA33B682660A7Dfa1Ea09 =
     }
   | {
       /**
-       * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+       * Accumulated continuous-zero shock adjustment on the source clock.
        */
-      base: string;
-      /**
-       * Day count convention.
-       */
-      day_count:
-        | "one_one"
-        | "act_360"
-        | "act_365f"
-        | "act_365l"
-        | "30_360"
-        | "30_360_isda"
-        | "30e_360"
-        | "30e_360_isda"
-        | "30_360_it"
-        | "nl_365"
-        | "act_act"
-        | "act_act_isma"
-        | "act_act_afb"
-        | "bus_252";
-      /**
-       * Extrapolation policy.
-       */
-      extrapolation: "flat_zero" | "flat_forward" | "none";
-      /**
-       * Curve identifier.
-       */
-      id: string;
-      /**
-       * Interpolation style.
-       */
-      interp_style: "linear" | "log_linear" | "monotone_convex" | "cubic_hermite" | "piecewise_quadratic_forward";
-      /**
-       * Time/value pairs used to construct the curve.
-       */
-      knot_points: [number, number][];
-      /**
-       * Source interpolation and accumulated time origin for a rolled curve.
-       */
-      roll_transform?: D_13Ceef63597B70Bc1A71 | null;
-      type: "basis_spread";
-    }
-  | {
+      adjustment?: D_2A71F59Be0C75Aa6F4272 | null;
       /**
        * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
        */
       base_date: string;
       /**
+       * Registered holiday calendar id for Bus/252.
+       */
+      calendar_id?: string | null;
+      /**
        * Day count convention.
        */
       day_count:
@@ -400,62 +326,29 @@ export type DA33B682660A7Dfa1Ea09 =
        */
       id: string;
       /**
-       * Nelson-Siegel model parameters.
+       * Validated Nelson-Siegel model parameters.
        */
       model:
         | {
-            /**
-             * Long-term rate level.
-             */
             beta0: number;
-            /**
-             * Short-term component.
-             */
             beta1: number;
-            /**
-             * Medium-term hump.
-             */
             beta2: number;
-            /**
-             * Decay factor (must be > 0).
-             */
             tau: number;
             variant: "ns";
-            [k: string]: unknown;
           }
         | {
-            /**
-             * Long-term rate level.
-             */
             beta0: number;
-            /**
-             * Short-term component.
-             */
             beta1: number;
-            /**
-             * Medium-term hump.
-             */
             beta2: number;
-            /**
-             * Second hump.
-             */
             beta3: number;
-            /**
-             * First decay factor (must be > 0).
-             */
             tau1: number;
-            /**
-             * Second decay factor (must be > 0, ≠ τ₁).
-             */
             tau2: number;
             variant: "nss";
-            [k: string]: unknown;
           };
       /**
-       * Current origin in the source model's year-fraction coordinates;
-       * omitted means `0.0` (a curve that has never been rolled).
+       * Original anchor date when the curve has been conditioned.
        */
-      time_offset?: number;
+      source_base_date?: D_42Ed66Bb80D77E9Fa456 | null;
       type: "parametric";
     };
 /**
@@ -788,11 +681,6 @@ export type DB6A74Bd737Ef1567B144 =
 /**
  * Seniority level for credit exposures.
  *
- * Used to tag a hazard curve with the seniority of the issuer's debt
- * observed by the curve. Drives the recovery-rate prior in default
- * modelling and selects the right LGD prior in
- * `finstack_quant_models::credit::lgd::seniority`.
- *
  * Order is **not** total — `SeniorSecured` is strictly senior to `Senior`,
  * `Subordinated`, and `Junior`, but the relative ordering of `Subordinated`
  * vs. `Junior` is jurisdiction-dependent. Do not rely on `Ord` semantics.
@@ -850,6 +738,76 @@ export type D_33Ee2F2E4664717E30Ef = string;
  */
 export type D_1Ec33Fbdab11Dd6751Bf = "cashflow_date" | "period_end";
 /**
+ * Canonical family-typed identifier for an addressable entry in
+ * [`MarketContext`](crate::market_data::context::MarketContext).
+ *
+ * Identifiers in `MarketContext` are namespace-local: the same `CurveId` may
+ * coexist across distinct stores (for example a `VolSurface` and a
+ * `ScalarTimeSeries`). `MarketDataTarget` pairs an exact [`CurveId`] with the
+ * exact store and subkind to select without multi-store probing.
+ */
+export type D_6E573F412D0Be641B82F =
+  | {
+      id: D_33Ee2F2E4664717E30Ef;
+      kind: "discount_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: D_33Ee2F2E4664717E30Ef;
+      kind: "forward_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: D_33Ee2F2E4664717E30Ef;
+      kind: "parametric_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: D_33Ee2F2E4664717E30Ef;
+      kind: "hazard_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: D_33Ee2F2E4664717E30Ef;
+      kind: "inflation_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: D_33Ee2F2E4664717E30Ef;
+      kind: "price_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: D_33Ee2F2E4664717E30Ef;
+      kind: "vol_index_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: D_33Ee2F2E4664717E30Ef;
+      kind: "base_correlation";
+      [k: string]: unknown;
+    }
+  | {
+      id: D_33Ee2F2E4664717E30Ef;
+      kind: "vol_surface";
+      [k: string]: unknown;
+    }
+  | {
+      id: D_33Ee2F2E4664717E30Ef;
+      kind: "price_scalar";
+      [k: string]: unknown;
+    }
+  | {
+      id: D_33Ee2F2E4664717E30Ef;
+      kind: "unitless_scalar";
+      [k: string]: unknown;
+    }
+  | {
+      id: D_33Ee2F2E4664717E30Ef;
+      kind: "series";
+      [k: string]: unknown;
+    };
+/**
  * Single market observable that doesn't require a full curve.
  *
  * Represents point-in-time market data like spot prices, spreads, or unitless
@@ -870,17 +828,20 @@ export type D_1Ec33Fbdab11Dd6751Bf = "cashflow_date" | "period_end";
  * use finstack_quant_core::market_data::scalars::MarketScalar;
  * use finstack_quant_core::money::Money;
  * use finstack_quant_core::currency::Currency;
+ * # fn main() -> finstack_quant_core::Result<()> {
  *
  * // Equity beta (unitless)
- * let beta = MarketScalar::Unitless(1.2);
+ * let beta = MarketScalar::unitless(1.2)?;
  *
  * // Spot price (with currency)
- * let spot = MarketScalar::Price(Money::new(152.75, Currency::USD).expect("valid money fixture"));
+ * let spot = MarketScalar::price(Money::new(152.75, Currency::USD).expect("valid money fixture"));
  *
- * assert!(matches!(beta, MarketScalar::Unitless(_)));
- * if let MarketScalar::Price(m) = spot {
+ * assert!(beta.is_unitless());
+ * if let Some(m) = spot.get_price() {
  *     assert_eq!(m.currency(), Currency::USD);
  * }
+ * # Ok(())
+ * # }
  * ```
  */
 export type DCcdcf39725B3A38D5E6E =
@@ -1273,16 +1234,16 @@ export interface D_061B61Ce4Cbde8C30057 {
 export interface D_7Bf68715545Bd3D2B581 {
   adjustment: D_2A71F59Be0C75Aa6F427;
   /**
-   * Current origin in the source interpolation's year-fraction coordinates.
+   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */
-  offset: number;
+  source_base_date: string;
   /**
    * Original, untransformed interpolation pillars.
    */
   source_points: [number, number][];
 }
 /**
- * Cumulative derivative of the additive log-discount adjustment.
+ * Cumulative derivative of the additive log-factor adjustment.
  */
 export interface D_2A71F59Be0C75Aa6F427 {
   /**
@@ -1308,23 +1269,25 @@ export interface D_683Ec38B8D36Db5534Bc {
    */
   value: number;
 }
+/**
+ * Source interpolation and a single accumulated transformation, never a chain
+ * of nested curves. The adjustment is stored as its piecewise-linear derivative
+ * so evaluating beyond a completed triangular shock does not subtract large
+ * quadratic polynomials.
+ */
 export interface DF401C4E712E4F497Feef {
   adjustment: D_2A71F59Be0C75Aa6F4271;
   /**
-   * Current curve origin in the source curve's year-fraction coordinates.
+   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */
-  offset: number;
+  source_base_date: string;
   /**
-   * Accumulated parallel multiplicative factor on the source interpolation.
-   */
-  scale: number;
-  /**
-   * Original interpolation pillars, independent of current curve samples.
+   * Original, untransformed interpolation pillars.
    */
   source_points: [number, number][];
 }
 /**
- * Cumulative additive rate adjustment in source time coordinates.
+ * Cumulative derivative of the additive log-factor adjustment.
  */
 export interface D_2A71F59Be0C75Aa6F4271 {
   /**
@@ -1387,17 +1350,33 @@ export interface D_268127561C9D65277399 {
   };
 }
 /**
- * Serialized source grid and time origin of a rolled curve.
+ * Source coordinate anchor and original piecewise-constant hazard schedule
+ * retained across [`HazardCurve::condition`] transformations so dated survival
+ * integrates directly on the retained source timeline.
  */
-export interface D_13Ceef63597B70Bc1A71 {
+export interface D_8C12E8F6A6Ead66335D4 {
   /**
-   * Current origin in the source interpolation's year-fraction coordinates.
+   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */
-  offset: number;
+  base_date: string;
   /**
-   * Source pillars `(time, value)` in the source curve's own coordinates.
+   * Original `(time_years, hazard_rate)` pillars from `base_date`.
    */
-  source_points: [number, number][];
+  knot_points: [number, number][];
+}
+/**
+ * A flat function representation: repeated shocks merge on a breakpoint union
+ * rather than forming a recursively nested transformation history.
+ */
+export interface D_2A71F59Be0C75Aa6F4272 {
+  /**
+   * Constant value before the first breakpoint.
+   */
+  initial_value: number;
+  /**
+   * Sorted, merged linear segments.
+   */
+  segments: D_683Ec38B8D36Db5534Bc[];
 }
 /**
  * Dividend schedule for an equity or ETF underlying.
@@ -1764,45 +1743,68 @@ export interface D_7Fbd5A62C7C39Ad98666 {
  * Delta-quoted FX volatility surface.
  *
  * Stores market-standard FX vol quotes (ATM DNS, 25-delta risk-reversal,
- * 25-delta butterfly) across multiple expiries. Models-layer functions
- * perform delta conversion and volatility evaluation.
+ * 25-delta arithmetic smile butterfly, optional 10-delta wings) together with
+ * explicit currency pair, quote profile conventions, and optional [`VolatilityClock`].
+ * Models-layer functions perform delta conversion and volatility evaluation.
  *
  * # Examples
  *
  * ```rust
- * use finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;
+ * use finstack_quant_core::currency::Currency;
+ * use finstack_quant_core::market_data::surfaces::{
+ *     FxAtmConvention, FxButterflyConvention, FxDeltaConvention, FxDeltaVolSurface,
+ * };
+ * use finstack_quant_core::money::fx::CurrencyPair;
  *
- * let surface = FxDeltaVolSurface::new(
- *     "EURUSD-DELTA-VOL",
- *     vec![0.25, 0.5, 1.0],
- *     vec![0.08, 0.085, 0.09],
- *     vec![0.01, 0.012, 0.015],
- *     vec![0.005, 0.006, 0.007],
- *     None,
- *     None,
- * ).expect("surface should build");
+ * let pair = CurrencyPair::try_new(Currency::EUR, Currency::USD)?;
+ * let surface = FxDeltaVolSurface::builder("EURUSD-DELTA-VOL", pair)
+ *     .delta_convention(FxDeltaConvention::ForwardUnadjusted)
+ *     .atm_convention(FxAtmConvention::DeltaNeutralStraddle)
+ *     .butterfly_convention(FxButterflyConvention::Smile)
+ *     .expiries(&[0.25, 0.5, 1.0])
+ *     .atm_vols(&[0.08, 0.085, 0.09])
+ *     .rr_25d(&[0.01, 0.012, 0.015])
+ *     .bf_25d(&[0.005, 0.006, 0.007])
+ *     .build()?;
  *
  * assert_eq!(surface.expiries().len(), 3);
  * assert!((surface.atm_vols()[0] - 0.08).abs() < 1e-12);
+ * # Ok::<(), finstack_quant_core::Error>(())
  * ```
  */
 export interface DA154A0F59B6758A0E791 {
+  /**
+   * At-the-money strike convention.
+   */
+  atm_convention: "delta_neutral_straddle";
   /**
    * ATM delta-neutral straddle vols per expiry.
    */
   atm_vols: number[];
   /**
-   * Optional 10-delta butterfly per expiry.
+   * Optional 10-delta arithmetic smile butterfly per expiry.
    */
   bf_10d?: number[] | null;
   /**
-   * 25-delta butterfly per expiry.
+   * 25-delta arithmetic smile butterfly per expiry.
    */
   bf_25d: number[];
+  /**
+   * Butterfly quote convention.
+   */
+  butterfly_convention: "smile";
+  /**
+   * Delta convention governing wing delta-to-strike conversion.
+   */
+  delta_convention: "forward_unadjusted";
   /**
    * Expiry times in years.
    */
   expiries: number[];
+  /**
+   * Optional volatility clock translating calendar expiry dates to `expiries`.
+   */
+  expiry_clock?: DD7C93A9D6D6Ba5Ccd0Ac | null;
   /**
    * A phantom-typed identifier that prevents mixing different kinds of IDs.
    *
@@ -1844,6 +1846,7 @@ export interface DA154A0F59B6758A0E791 {
    * safely share and clone IDs with minimal synchronization overhead.
    */
   id: string;
+  pair: DC537Fd5E895Ccf0Af66D;
   /**
    * Optional 10-delta risk reversal per expiry.
    */
@@ -1854,129 +1857,509 @@ export interface DA154A0F59B6758A0E791 {
   rr_25d: number[];
 }
 /**
- * The top-level market data hierarchy containing root nodes.
+ * Explicit day-count clock translating calendar expiry dates into year fractions
+ * relative to a surface or cube reference date.
  *
- * Each root represents a major asset class or category (e.g., "Rates", "Credit",
- * "FX", "Equity", "Volatility"). The hierarchy is fully serializable and can be
- * loaded from JSON configuration files.
- */
-export interface DC190532De37B361Cba38 {
-  /**
-   * Top-level nodes, keyed by their name. The key becomes each node's
-   * `name` during deserialization. Insertion order is preserved.
-   */
-  roots: {
-    [k: string]: D_467E0D727Ff2Ae92C819;
-  };
-  [k: string]: unknown;
-}
-/**
- * A single node in the market data hierarchy tree.
- *
- * Nodes form a tree: each is named by its key in the parent map, and carries
- * optional key-value tags for cross-cutting queries, ordered children, and
- * leaf `CurveId` references.
- */
-export interface D_467E0D727Ff2Ae92C819 {
-  /**
-   * Child nodes, keyed by their name. The key becomes the child's `name`
-   * during deserialization. Insertion order is preserved.
-   */
-  children?: {
-    [k: string]: D_467E0D727Ff2Ae92C819;
-  };
-  /**
-   * Curves attached directly to this node. Serialized as `curves`.
-   */
-  curves?: D_33Ee2F2E4664717E30Ef[];
-  /**
-   * Free-form key/value labels on this node, used for selection and
-   * reporting. Insertion order is preserved.
-   */
-  tags?: {
-    [k: string]: string;
-  };
-}
-/**
- * Inflation index time series with lagging and seasonality.
- *
- * Wraps historical CPI/RPI observations with market-standard conventions for
- * lag application and interpolation. Used for pricing TIPS, linkers, and
- * inflation derivatives.
- *
- * # Components
- *
- * - **Observations**: Index levels labelled by reference date/month
- * - **Interpolation**: Daily interpolation between monthly observations
- * - **Lag**: Contractual observation lag (typically 3 months for TIPS)
- * - **Publication dates**: Optional explicit availability dates by reference month
- * - **Seasonality**: Optional monthly adjustment factors
- *
- * # Interpolation Methods
- *
- * - **Step**: Last observation carried forward (conservative)
- * - **Linear**: Daily interpolation between months (TIPS standard)
- *
- * # Lag Application
- *
- * Reference index calculation applies lag before interpolation:
- * ```text
- * For settlement date T with 3-month lag:
- * 1. Reference date = T - 3 months
- * 2. Find bracketing CPI observations
- * 3. Interpolate linearly between them
- * ```
+ * Market data objects such as [`FxDeltaVolSurface`](crate::market_data::surfaces::FxDeltaVolSurface)
+ * attach an optional `VolatilityClock` so downstream pricers can validate that
+ * the surface anchor matches `as_of` and bridge between instrument day-counts
+ * and surface variance time without silently assuming a day-count convention.
  *
  * # Examples
  *
  * ```rust
- * use finstack_quant_core::market_data::scalars::{
- *     InflationIndex, SeriesInterpolation, InflationLag,
- * };
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::dates::Date;
- * use time::Month;
+ * use finstack_quant_core::dates::{DayCount, DayCountContextState, VolatilityClock};
+ * use time::macros::date;
  *
- * // US CPI-U observations
- * let observations = vec![
- *     (Date::from_calendar_date(2023, Month::September, 30).expect("Valid date"), 296.8),
- *     (Date::from_calendar_date(2023, Month::October, 31).expect("Valid date"), 297.4),
- *     (Date::from_calendar_date(2023, Month::November, 30).expect("Valid date"), 298.1),
- *     (Date::from_calendar_date(2023, Month::December, 31).expect("Valid date"), 299.0),
- *     (Date::from_calendar_date(2024, Month::January, 31).expect("Valid date"), 300.5),
- *     (Date::from_calendar_date(2024, Month::February, 29).expect("Valid date"), 302.1),
- *     (Date::from_calendar_date(2024, Month::March, 31).expect("Valid date"), 303.8),
- *     (Date::from_calendar_date(2024, Month::April, 30).expect("Valid date"), 304.1),
- * ];
- *
- * let index = InflationIndex::new("US-CPI-U", observations, Currency::USD)
- *     .expect("Index creation should succeed")
- *     .with_interpolation(SeriesInterpolation::Linear)
- *     .with_lag(InflationLag::Months(3)); // TIPS standard
- *
- * // Calculate inflation ratio for TIPS coupon indexation
- * let base_date = Date::from_calendar_date(2024, Month::January, 15).expect("Valid date");
- * let settle_date = Date::from_calendar_date(2024, Month::June, 15).expect("Valid date");
- * let ratio = index.ratio(base_date, settle_date).expect("Ratio calculation should succeed");
- * assert!(ratio >= 1.0); // Inflation adjustment factor
+ * let clock = VolatilityClock::try_new(
+ *     date!(2025 - 01 - 15),
+ *     DayCount::Act365F,
+ *     DayCountContextState::default(),
+ * )?;
+ * let t = clock.expiry_time(date!(2026 - 01 - 15))?;
+ * assert!((t - 1.0).abs() < 1e-12);
+ * # Ok::<(), finstack_quant_core::Error>(())
  * ```
+ */
+export interface DD7C93A9D6D6Ba5Ccd0Ac {
+  context?: D_9B42F4252310211295F9;
+  /**
+   * Day-count convention used to measure expiry times from `reference_date`.
+   */
+  day_count:
+    | "one_one"
+    | "act_360"
+    | "act_365f"
+    | "act_365l"
+    | "30_360"
+    | "30_360_isda"
+    | "30e_360"
+    | "30e_360_isda"
+    | "30_360_it"
+    | "nl_365"
+    | "act_act"
+    | "act_act_isma"
+    | "act_act_afb"
+    | "bus_252";
+  /**
+   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+   */
+  reference_date: string;
+}
+/**
+ * Owned, canonicalized day-count context parameters.
+ */
+export interface D_9B42F4252310211295F9 {
+  /**
+   * Optional custom business-day divisor (defaults to 252 when `None`).
+   */
+  bus_basis?: number | null;
+  /**
+   * Optional calendar code (e.g. "target2").
+   */
+  calendar_id?: string | null;
+  /**
+   * Optional unadjusted regular ICMA reference period or ACT/365L enclosing
+   * coupon `(start, end)`, serialized as two ISO dates.
+   *
+   * Required for exact ICMA accrual on round-trip. `None` selects the
+   * frequency-only ICMA calculation path; ACT/365L requires these dates.
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  coupon_period?: [D_42Ed66Bb80D77E9Fa456, D_42Ed66Bb80D77E9Fa456] | null;
+  /**
+   * Whether the later accrual endpoint is the contractual termination
+   * date; `None` (omitted or `null` on the wire) means unspecified, which
+   * 30E/360 ISDA rejects.
+   */
+  end_is_termination_date?: boolean | null;
+  /**
+   * Optional coupon frequency, required for ACT/ACT ISMA.
+   */
+  frequency?: D_061B61Ce4Cbde8C30057 | null;
+}
+/**
+ * Currency pair (`base/quote`) matching quoted FX forward orientation.
+ */
+export interface DC537Fd5E895Ccf0Af66D {
+  /**
+   * ISO 4217 currency enumeration
+   */
+  base:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
+  /**
+   * ISO 4217 currency enumeration
+   */
+  quote:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
+}
+/**
+ * Top-level market-data hierarchy containing ordered root entries.
  *
- * # Thread Safety
+ * Each root represents a major organizational branch (such as `"Rates"`,
+ * `"Credit"`, `"FX"`, `"Equity"`, or `"Volatility"`). Roots and child levels
+ * use explicit name/node entry arrays so numeric-looking names retain their
+ * authored sequence across Rust, Python, and JavaScript.
+ */
+export interface DC190532De37B361Cba38 {
+  /**
+   * Top-level ordered `(name, node)` entries.
+   */
+  roots: D_487340Fb491E99067944[];
+}
+/**
+ * Named child or root entry preserving authored sequence order at a hierarchy level.
+ */
+export interface D_487340Fb491E99067944 {
+  /**
+   * Exact node segment name at this hierarchy level.
+   */
+  name: string;
+  node: D_467E0D727Ff2Ae92C819;
+}
+/**
+ * Node metadata tags, child entries, and typed market-data associations.
+ */
+export interface D_467E0D727Ff2Ae92C819 {
+  /**
+   * Ordered child entries at this level.
+   */
+  children?: D_487340Fb491E99067944[];
+  /**
+   * Metadata tags for tag-filter selection.
+   */
+  tags?: {
+    [k: string]: string;
+  };
+  /**
+   * Typed market-data targets stored directly at this node in authored order.
+   */
+  targets?: D_6E573F412D0Be641B82F[];
+}
+/**
+ * Immutable monthly CPI/RPI observation snapshot at an explicit knowledge date `K`.
  *
- * Immutable after construction; safe to share via `Arc<InflationIndex>`.
+ * Stores strictly ordered, unique first-of-month [`InflationObservation`] records
+ * whose `available_on` satisfies `reference_month <= available_on <= knowledge_date`,
+ * together with distinct [`InflationExpectedRelease`] assumptions (`known_on <= knowledge_date`).
+ * Empty histories are valid (allowing projection-only markets with release metadata).
  *
- * # References
+ * Lookups ([`get_observation`](Self::get_observation) and
+ * [`qualified_monthly_observation`](Self::qualified_monthly_observation)) are exact
+ * by canonical first-of-month key and perform no lag, interpolation, carry, or
+ * seasonal adjustment.
  *
- * - **TIPS Mechanics**:
- *   - US Treasury (2024). "TIPS In Depth." treasurydirect.gov. `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`
- *   - Deacon, M., Derry, A., & Mirfendereski, D. (2004). *Inflation-Indexed Securities*
- *     (2nd ed.). Wiley Finance. Chapter 2 (Index-linked bond mechanics). `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`
+ * # Examples
  *
- * - **Index Lagging**:
- *   - Kerkhof, J. (2005). "Inflation Derivatives Explained." *Journal of Derivatives
- *     Accounting*, 2(1), 1-19. `docs/REFERENCES.md#kerkhof-2005`
- *   - Hurd, M., & Relleen, J. (2006). "Estimating the Inflation Risk Premium."
- *     Bank of England Quarterly Bulletin, Q2 2006. `docs/REFERENCES.md#kerkhof-2005`
+ * ```rust
+ * use finstack_quant_core::currency::Currency;
+ * use finstack_quant_core::market_data::scalars::{InflationIndex, InflationObservation};
+ * use time::macros::date;
+ *
+ * let obs = vec![
+ *     InflationObservation {
+ *         reference_month: date!(2024 - 01 - 01),
+ *         value: 300.0,
+ *         available_on: date!(2024 - 02 - 13),
+ *     },
+ *     InflationObservation {
+ *         reference_month: date!(2024 - 02 - 01),
+ *         value: 302.0,
+ *         available_on: date!(2024 - 03 - 12),
+ *     },
+ * ];
+ * let index = InflationIndex::new("US-CPI-U", obs, Currency::USD, date!(2024 - 04 - 01))
+ *     .expect("valid fixing snapshot");
+ * assert_eq!(
+ *     index
+ *         .get_observation(date!(2024 - 02 - 01))
+ *         .expect("observation exists")
+ *         .value,
+ *     302.0
+ * );
+ * ```
  */
 export interface DE771E792357014C84Cb9 {
   /**
@@ -2145,49 +2528,55 @@ export interface DE771E792357014C84Cb9 {
     | "ZWG"
     | "ZWL";
   /**
-   * Unique identifier
+   * Distinct strictly ascending monthly expected-release schedule assumptions.
+   */
+  expected_releases?: D_86847D022D6Ee46C8364[];
+  /**
+   * Unique identifier.
    */
   id: string;
   /**
-   * Interpolation method
+   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */
-  interpolation: "step" | "linear";
+  knowledge_date: string;
   /**
-   * Lag policy
+   * Strictly ascending canonical monthly fixing observations.
    */
-  lag:
-    | {
-        months: number;
-      }
-    | {
-        days: number;
-      }
-    | "none";
-  /**
-   * Observations as (date, value) pairs
-   */
-  observations: [D_42Ed66Bb80D77E9Fa456, number][];
-  /**
-   * Explicit monthly observation availability; no release dates are inferred.
-   */
-  publication_dates?: D_952D2539685Fe1Adf99E[];
-  /**
-   * Optional seasonality factors
-   *
-   * @minItems 12
-   * @maxItems 12
-   */
-  seasonality?: [number, number, number, number, number, number, number, number, number, number, number, number] | null;
+  observations: D_5C1Ce413Ed4344Df4437[];
 }
-export interface D_952D2539685Fe1Adf99E {
+/**
+ * One expected-release schedule assumption for a monthly CPI/RPI reference period.
+ */
+export interface D_86847D022D6Ee46C8364 {
   /**
    * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */
-  publication_date: string;
+  expected_release: string;
+  /**
+   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+   */
+  known_on: string;
   /**
    * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */
   reference_month: string;
+}
+/**
+ * One published monthly CPI/RPI fixing record inside an [`InflationIndex`] snapshot.
+ */
+export interface D_5C1Ce413Ed4344Df4437 {
+  /**
+   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+   */
+  available_on: string;
+  /**
+   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
+   */
+  reference_month: string;
+  /**
+   * Published finite, strictly positive index level.
+   */
+  value: number;
 }
 /**
  * Date-indexed time series with flexible interpolation.
@@ -2218,7 +2607,9 @@ export interface D_952D2539685Fe1Adf99E {
  * # Examples
  *
  * ```rust
- * use finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};
+ * use finstack_quant_core::market_data::scalars::{
+ *     ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+ * };
  * use finstack_quant_core::dates::Date;
  * use time::Month;
  *
@@ -2229,12 +2620,13 @@ export interface D_952D2539685Fe1Adf99E {
  *         (Date::from_calendar_date(2024, Month::February, 29).expect("Valid date"), 3.9),
  *     ],
  *     None,
+ *     SeriesInterpolation::Linear,
+ *     SeriesExtrapolation::Error,
  * )
- * .expect("Series creation should succeed")
- * .with_interpolation(SeriesInterpolation::Linear);
+ * .expect("Series creation should succeed");
  *
  * let mid = Date::from_calendar_date(2024, Month::February, 14).expect("Valid date");
- * let interpolated = series.value_on(mid).expect("Value lookup should succeed");
+ * let interpolated = series.get_value(mid).expect("Value lookup should succeed");
  * assert!(interpolated > 3.7 && interpolated < 3.9);
  * ```
  */
@@ -2243,6 +2635,10 @@ export interface D_7631522C7759Bd704Ba6 {
    * Optional currency
    */
   currency?: DB6A74Bd737Ef1567B144 | null;
+  /**
+   * Right-tail extrapolation policy
+   */
+  extrapolation: "flat" | "error";
   /**
    * Series identifier
    */
@@ -2257,9 +2653,9 @@ export interface D_7631522C7759Bd704Ba6 {
   observations: [D_42Ed66Bb80D77E9Fa456, number][];
 }
 /**
- * Volatility surface defined on expiry × strike grid.
+ * Volatility surface defined on an expiry × secondary-coordinate grid.
  *
- * Internally stores volatilities in row-major order as a boxed slice.
+ * Internally stores annual volatilities in row-major order as a boxed slice.
  */
 export interface D_9D04Eee9F565B9C40882 {
   /**
@@ -2267,11 +2663,15 @@ export interface D_9D04Eee9F565B9C40882 {
    */
   displacements?: number[] | null;
   /**
-   * Expiry times in years
+   * Strictly positive option expiry times in years.
    */
   expiries: number[];
   /**
-   * Surface identifier
+   * Optional calibration clock mapping calendar dates to source expiry year fractions.
+   */
+  expiry_clock?: DD7C93A9D6D6Ba5Ccd0Ac | null;
+  /**
+   * Surface identifier.
    */
   id: string;
   /**
@@ -2287,11 +2687,11 @@ export interface D_9D04Eee9F565B9C40882 {
    */
   secondary_axis: "strike" | "tenor";
   /**
-   * Strike prices
+   * Secondary-axis coordinates (absolute strikes or positive underlying tenors).
    */
-  strikes: number[];
+  secondary_values: number[];
   /**
-   * Volatility values in row-major order
+   * Volatility values in row-major order.
    */
   vols_row_major: number[];
 }

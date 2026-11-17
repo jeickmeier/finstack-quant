@@ -34,11 +34,9 @@ function WorkbenchRoute() {
               repairIterations: 10,
             },
           })}
-          fxOptions={() => ({
+          fxOptions={(surface) => ({
             coordinates: [{ expiry: 1, strike: 1.1, forward: 1.12 }],
-            initialSpot: 1.1,
-            initialDomesticRate: 0.04,
-            initialForeignRate: 0.03,
+            initialDeliveryForwards: surface.expiries.map(() => 1.12),
             colorDomain: [0, 1],
           })}
           defaultInstrumentType={type}

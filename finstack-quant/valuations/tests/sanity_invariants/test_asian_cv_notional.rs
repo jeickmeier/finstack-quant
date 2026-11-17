@@ -15,7 +15,9 @@ mod cv_notional_tests {
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::InstrumentId;
@@ -42,11 +44,16 @@ mod cv_notional_tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (5.0, (-RATE * 5.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let surface = VolSurface::builder("SPX-VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&[70.0, 85.0, 100.0, 115.0, 130.0])
+            .secondary_values(&[70.0, 85.0, 100.0, 115.0, 130.0])
             .row(&[VOL; 5])
             .row(&[VOL; 5])
             .row(&[VOL; 5])
@@ -58,9 +65,12 @@ mod cv_notional_tests {
             .insert_surface(surface)
             .insert_price(
                 "SPX",
-                MarketScalar::Price(Money::new(SPOT, Currency::USD).expect("valid money fixture")),
+                MarketScalar::price(Money::new(SPOT, Currency::USD).expect("valid money fixture")),
             )
-            .insert_price("SPX-DIV", MarketScalar::Unitless(DIV_YIELD))
+            .insert_price(
+                "SPX-DIV",
+                MarketScalar::unitless(DIV_YIELD).expect("valid scalar"),
+            )
     }
 
     fn arithmetic_asian(option_type: OptionType, notional: f64, expiry: Date) -> AsianOption {

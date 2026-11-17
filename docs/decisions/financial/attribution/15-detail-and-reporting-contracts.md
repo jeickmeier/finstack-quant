@@ -1,11 +1,23 @@
 # ATTRIBUTION-015: Detail identities, schema encoding and table projection
 
-- Decision status: Draft (observed implementation; adoption pending).
-- Implementation status: Observed for the source scope listed below.
-- Validation status: Source evidence inspected; named test evidence located, not executed. No numerical accuracy certification.
+- Decision status: Accepted 2026-11-16 for checked detail identities, report projections and schemas.
+- Implementation status: Observed for the source scope listed below. Runtime, wire, schema and host reconciliation with the accepted contract are pending.
+- Validation status: Independent exact examples checked delimiter collisions, duplicate keys, partition closure, signed Waterfall cash and Decimal precision. Production and host qualification remain pending.
 - Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and representation
+## Accepted decision for checked detail identities, report projections and schemas
+
+1. Use ordered typed detail identities. Replace delimiter-encoded curve, FX and hierarchy keys with structured entries. Preserve source namespace, role and ID, exact producer coordinate, directed FX orientation, both mixed-pair axes and the applicable hierarchy or position path. Reject duplicate wire keys and duplicate resolved identities before insertion. Derive display labels from these identities. Preserve execution and producer order in arrays. [Accepted numeric wire contract](../core-numerics/numeric-wire-and-canonical.md#accepted-decision-strict-numeric-wire-and-canonical-content-identity).
+2. Make row ownership and additivity explicit. Identify each row's parent, partition and role as headline, subtotal, additive component, working row or diagnostic. Check each complete partition independently against its parent. Alternate curve and tenor views can explain the same effect. Count the effect once in the headline. Preserve a zero subtotal with offsetting nonzero children. [Accepted reporting and closure rules](13-target-currency-and-scaling.md#accepted-decision-for-checked-reporting-fx-sizing-aggregation-and-residual-qualification).
+3. Preserve exact amounts, currency and availability in every view. Use Decimal Money in canonical rows, with canonical decimal text and currency where the transport lacks a Decimal type. Validate currency and amount basis within each partition before publication. Retain native evidence separately from closing-equivalent views. Distinguish unelected detail, requested-empty detail, structural zero, evaluated zero, advisory unavailability and invalid results. Keep binary64 conversion explicit for display or plots. [Accepted Money precision](../core-conventions/012-money-decimal-precision.md#accepted-decision-monetary-precision-rounding-and-currency-identity).
+4. Project accepted carry and credit detail. Show gross and net carry, separate funding and any elected income, pull-to-par and roll-down partition. Retire the legacy coupon and roll-down `SourceLine` splits and use optional Money for those components. Show rates benchmark, credit carry and elected hierarchy in their own partition. Credit P&L detail retains measured shape, curvature, bridges and separate cash. Absolute adder magnitude is a diagnostic. [Accepted gross carry](03-total-return-carry.md#accepted-decision-for-checked-period-cash-gross-carry-and-funding) · [Accepted credit hierarchy](11-credit-factor-hierarchy.md#accepted-decision-for-checked-credit-hierarchy-and-spread-replay-allocation) · [Accepted credit carry](12-credit-carry-partition.md#accepted-decision-for-checked-rates-benchmark-and-credit-carry-allocation).
+5. Keep Waterfall and sensitivity working auditable. Waterfall preserves executed order, cuts, before and after marks, and separate price, cash and all-in effects. Sensitivity rows preserve the actual experiment, producer coordinates, units and increments, including both axes of mixed risk. A bucket with just sensitivity and movement remains working. Publish bucket P&L when the producer supplies it. Keep actual pricing work and reuse visible. [Accepted Waterfall](04-ordered-waterfall.md#accepted-decision-for-checked-ordered-waterfall-revaluation) · [Accepted mixed risk](10-metric-other-factors.md#accepted-decision-for-checked-metric-spot-fx-volatility-inflation-and-mixed-factor-pl).
+6. Separate wire decoding, semantic admission and replay qualification. Use bounded Rust decoding with exact supported markers and nested fields. Check identities, Money roles, availability and closure before projecting a restored result. Economic reuse or replay requires qualified historical inputs, cuts, controls and build evidence. Archived results can be shown with their replay limits. Python and WASM use the same Rust admission and projections. [Accepted execution](01-execution-and-endpoints.md#accepted-decision-for-checked-instrument-attribution-execution-and-endpoints) · [Replay policy](../../project/0025-auditable-results-and-replay.md#decision).
+7. Keep the four existing Rust-owned schema artifacts for the input envelope, shared inputs, result envelope and bucket share. Publish them deterministically from the checked contract and propagate approved shape changes through generated schemas, declarations and consumers. Label shape examples as such. Examples advertised as runnable must execute with qualified inputs. Report tables remain output projections. [Accepted schema publication](../core-numerics/schema-publication.md#accepted-decision-canonical-schemas-compact-views-and-bounded-publication).
+
+Exact examples verified that a rates headline of `10`, curve subtotal of `10` and tenor components of `6` and `4` sum to `30` if combined indiscriminately. Each detail partition explains `10`. An exact Decimal example preserved a `0.01` difference between large marks that became identical in binary64.
+
+## Observed choice and representation
 
 Output detail is a view of calculation results, not a second independently recomputed attribution. Rates/credit tenor maps encode tuple keys as `curve_id|tenor`, split on the last separator when decoding. FX maps encode `FROM/TO` and validate both currency names. Optional tenor maps preserve absence. SourceLine constructors merely store total and optional rates/credit parts; they do not enforce `total=rates+credit` or matching currencies. Broader currency validation belongs to PnlAttribution residual/reporting APIs.
 
@@ -31,6 +43,6 @@ Separate summary and work rows make calculations inspectable while preserving un
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#attribution). This record does not
-authorize a runtime change or certify the observed method.
+Runtime reconciliation and validation are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#attribution). Production and host
+qualification remain pending.

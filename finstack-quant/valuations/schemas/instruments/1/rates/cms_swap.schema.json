@@ -25,6 +25,17 @@
             "null"
           ]
         },
+        "cms_fixing_index_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Explicit CMS benchmark fixing identifier used for historical fixings\n(`FIXING:<cms_fixing_index_id>`), distinct from `forward_curve_id` and `index_id`."
+        },
         "cms_floor": {
           "description": "Optional floor on the CMS rate (decimal).",
           "format": "double",
@@ -334,6 +345,7 @@
             0.25
           ],
           "attributes": {},
+          "cms_fixing_index_id": "USD-CMS-10Y",
           "cms_spread_bp": "0",
           "cms_tenor": {
             "count": 10,

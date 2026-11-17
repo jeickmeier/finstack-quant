@@ -745,7 +745,60 @@ fn type_name(value: &JsValue) -> String {
         .unwrap_or_else(|| "unknown".to_string())
 }
 
-fn is_plain_object(value: &JsValue) -> bool {
+/// Extract a string representation from a live wasm-bindgen handle identified by prototype.
+///
+/// Returns `Ok(None)` when `value` is not an instance of the cached prototype;
+/// returns `Err` when a matching wrapper has already been freed (`__wbg_ptr == 0`).
+pub(crate) fn wasm_handle_string<T: Into<JsValue>>(
+    value: &JsValue,
+    label: &str,
+    cache: &'static std::thread::LocalKey<std::cell::OnceCell<js_sys::Object>>,
+    sample: impl FnOnce() -> Result<T, JsValue>,
+    method: &str,
+) -> Result<Option<String>, JsValue> {
+    use wasm_bindgen::JsCast as _;
+
+    let Some(obj) = value.dyn_ref::<js_sys::Object>() else {
+        return Ok(None);
+    };
+    let is_cached = cache.with(|slot| slot.get().is_some());
+    if !is_cached {
+        let sample_val: JsValue = sample()?.into();
+        let proto = js_sys::Object::get_prototype_of(&sample_val);
+        if let Ok(free) = js_sys::Reflect::get(&sample_val, &JsValue::from_str("free"))
+            && let Some(free_fn) = free.dyn_ref::<js_sys::Function>()
+        {
+            let _ = free_fn.call0(&sample_val);
+        }
+        cache.with(|slot| {
+            let _ = slot.set(proto);
+        });
+    }
+    let matches = cache.with(|slot| {
+        slot.get()
+            .is_some_and(|proto| js_sys::Object::is(&js_sys::Object::get_prototype_of(obj), proto))
+    });
+    if !matches {
+        return Ok(None);
+    }
+    let ptr = js_sys::Reflect::get(obj, &JsValue::from_str("__wbg_ptr"))
+        .ok()
+        .and_then(|v| v.as_f64());
+    if ptr.is_none_or(|addr| addr == 0.0) {
+        return Err(invalid_type(
+            label,
+            "expected a live handle (already freed)",
+        ));
+    }
+    let func_val = js_sys::Reflect::get(obj, &JsValue::from_str(method))?;
+    let func = func_val
+        .dyn_ref::<js_sys::Function>()
+        .ok_or_else(|| invalid_type(label, &format!("missing `{method}()` method on handle")))?;
+    let out = func.call0(obj)?;
+    js_string(&out, &format!("{label}.{method}()")).map(Some)
+}
+
+pub(crate) fn is_plain_object(value: &JsValue) -> bool {
     let Some(object) = value.dyn_ref::<Object>() else {
         return false;
     };

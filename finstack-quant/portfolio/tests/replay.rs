@@ -142,12 +142,8 @@ mod replay_tests {
                 (30.0, (-rate * 30.0_f64).exp()),
             ])
             .interp(InterpStyle::Linear)
-            .validation(
-                finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                    allow_non_monotonic: true,
-                    forward_floor: None,
-                },
-            )
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
         MarketContext::new().insert(curve)

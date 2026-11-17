@@ -1330,36 +1330,33 @@ export type DE939Dec829E78A9C8Ed9 =
   | {
       equals: {
         /**
-         * Tag key to match.
+         * Non-blank tag key to match.
          */
         key: string;
         /**
          * Expected tag value.
          */
         value: string;
-        [k: string]: unknown;
       };
     }
   | {
       in: {
         /**
-         * Tag key to match.
+         * Non-blank tag key to match.
          */
         key: string;
         /**
          * Accepted tag values.
          */
         values: string[];
-        [k: string]: unknown;
       };
     }
   | {
       exists: {
         /**
-         * Tag key that must be present.
+         * Non-blank tag key that must be present.
          */
         key: string;
-        [k: string]: unknown;
       };
     };
 
@@ -1371,13 +1368,6 @@ export interface ScenarioSpecWire {
    * Optional description.
    */
   description?: string | null;
-  /**
-   * How ParCDS curve operations rewrite hazard curves.
-   *
-   * Default: [`HazardBumpMode::SolveToPar`]. Omitted from JSON when left
-   * at that default so existing envelopes keep their wire shape.
-   */
-  hazard_bump_mode?: "solve_to_par" | "first_order_shift";
   /**
    * Unique identifier for this scenario.
    */
@@ -1513,14 +1503,14 @@ export interface D_28C0Dcc6E8C95F943D1E {
  */
 export interface D_3D218202D529576E2F82 {
   /**
-   * Path through the hierarchy (e.g., `["Credit", "US", "IG"]`).
+   * Non-empty path through the hierarchy (e.g., `["Credit", "US", "IG"]`).
    */
   path: string[];
   /**
-   * Optional tag filter applied to nodes in the subtree.
+   * Optional tag filter applied to nodes in the subtree; an empty filter
+   * canonicalizes to `None`.
    */
   tag_filter?: D_50465A01513B845F41C6 | null;
-  [k: string]: unknown;
 }
 /**
  * A filter combining multiple tag predicates (AND semantics).
@@ -1530,47 +1520,46 @@ export interface D_50465A01513B845F41C6 {
    * All predicates must match (AND semantics).
    */
   predicates: DE939Dec829E78A9C8Ed9[];
-  [k: string]: unknown;
 }
 /**
  * Hierarchy target to resolve to surfaces.
  */
 export interface D_3D218202D529576E2F821 {
   /**
-   * Path through the hierarchy (e.g., `["Credit", "US", "IG"]`).
+   * Non-empty path through the hierarchy (e.g., `["Credit", "US", "IG"]`).
    */
   path: string[];
   /**
-   * Optional tag filter applied to nodes in the subtree.
+   * Optional tag filter applied to nodes in the subtree; an empty filter
+   * canonicalizes to `None`.
    */
   tag_filter?: D_50465A01513B845F41C6 | null;
-  [k: string]: unknown;
 }
 /**
  * Hierarchy target to resolve to equity IDs.
  */
 export interface D_3D218202D529576E2F822 {
   /**
-   * Path through the hierarchy (e.g., `["Credit", "US", "IG"]`).
+   * Non-empty path through the hierarchy (e.g., `["Credit", "US", "IG"]`).
    */
   path: string[];
   /**
-   * Optional tag filter applied to nodes in the subtree.
+   * Optional tag filter applied to nodes in the subtree; an empty filter
+   * canonicalizes to `None`.
    */
   tag_filter?: D_50465A01513B845F41C6 | null;
-  [k: string]: unknown;
 }
 /**
  * Hierarchy target to resolve to surfaces.
  */
 export interface D_3D218202D529576E2F823 {
   /**
-   * Path through the hierarchy (e.g., `["Credit", "US", "IG"]`).
+   * Non-empty path through the hierarchy (e.g., `["Credit", "US", "IG"]`).
    */
   path: string[];
   /**
-   * Optional tag filter applied to nodes in the subtree.
+   * Optional tag filter applied to nodes in the subtree; an empty filter
+   * canonicalizes to `None`.
    */
   tag_filter?: D_50465A01513B845F41C6 | null;
-  [k: string]: unknown;
 }

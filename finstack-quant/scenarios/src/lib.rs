@@ -71,7 +71,6 @@
 //!     ],
 //!     priority: 0,
 //!     resolution_mode: Default::default(),
-//!     hazard_bump_mode: Default::default(),
 //! };
 //!
 //! let engine = ScenarioEngine::default();
@@ -130,8 +129,7 @@ pub use envelope::{ScenarioEnvelope, ScenarioSchema};
 pub use error::{Error, Result};
 pub use horizon::{HorizonAnalysis, HorizonReport, HorizonResult, HorizonSummary};
 pub use spec::{
-    CurveKind, HazardBumpMode, OperationSpec, RateBindingSpec, ScenarioSpec, TenorMatchMode,
-    TimeRollMode,
+    CurveKind, OperationSpec, RateBindingSpec, ScenarioSpec, TenorMatchMode, TimeRollMode,
 };
 pub use templates::{AssetClass, TemplateMetadata, TemplateRegistry, TemplateSeverity};
 pub use warning::Warning;

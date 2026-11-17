@@ -93,14 +93,22 @@ fn create_test_market_context() -> MarketContext {
         // three pillars let the market roll one day for theta.
         .knots([(0.0, 1.0), (5.0, 0.95), (10.0, 0.90)])
         .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("should succeed");
 
     MarketContext::new()
         .insert(discount_curve)
-        .insert_price("AAPL", MarketScalar::Unitless(150.0))
-        .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
-        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02))
+        .insert_price("AAPL", MarketScalar::unitless(150.0).expect("valid scalar"))
+        .insert_price(
+            "AAPL-VOL",
+            MarketScalar::unitless(0.25).expect("valid scalar"),
+        )
+        .insert_price(
+            "AAPL-DIVYIELD",
+            MarketScalar::unitless(0.02).expect("valid scalar"),
+        )
 }
 
 #[test]
@@ -158,6 +166,8 @@ fn deep_itm_convertible_matches_parity_on_non_flat_curve() {
             (5.0, (-0.04_f64 * 5.0).exp()),
         ])
         .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
 
@@ -165,9 +175,18 @@ fn deep_itm_convertible_matches_parity_on_non_flat_curve() {
     // so the redemption floor contributes only a ~1e-12 tail probability.
     let market = MarketContext::new()
         .insert(curve)
-        .insert_price("AAPL", MarketScalar::Unitless(5000.0))
-        .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
-        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.0));
+        .insert_price(
+            "AAPL",
+            MarketScalar::unitless(5000.0).expect("valid scalar"),
+        )
+        .insert_price(
+            "AAPL-VOL",
+            MarketScalar::unitless(0.25).expect("valid scalar"),
+        )
+        .insert_price(
+            "AAPL-DIVYIELD",
+            MarketScalar::unitless(0.0).expect("valid scalar"),
+        );
 
     let expected = 10.0 * 5000.0;
     let price = price_convertible_bond(&bond, &market, issue)
@@ -214,13 +233,24 @@ fn dividend_protection_restores_parity_independent_of_yield() {
                 (5.0, (-0.04_f64 * 5.0).exp()),
             ])
             .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         MarketContext::new()
             .insert(curve)
-            .insert_price("AAPL", MarketScalar::Unitless(5000.0))
-            .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
-            .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(q))
+            .insert_price(
+                "AAPL",
+                MarketScalar::unitless(5000.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "AAPL-VOL",
+                MarketScalar::unitless(0.25).expect("valid scalar"),
+            )
+            .insert_price(
+                "AAPL-DIVYIELD",
+                MarketScalar::unitless(q).expect("valid scalar"),
+            )
     };
 
     let expected = 10.0 * 5000.0;
@@ -352,13 +382,21 @@ fn theta_rolls_the_discount_curve() {
             (10.0, 0.30),
         ])
         .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("steep curve");
     let market = MarketContext::new()
         .insert(steep_curve)
-        .insert_price("AAPL", MarketScalar::Unitless(150.0))
-        .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
-        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
+        .insert_price("AAPL", MarketScalar::unitless(150.0).expect("valid scalar"))
+        .insert_price(
+            "AAPL-VOL",
+            MarketScalar::unitless(0.25).expect("valid scalar"),
+        )
+        .insert_price(
+            "AAPL-DIVYIELD",
+            MarketScalar::unitless(0.02).expect("valid scalar"),
+        );
 
     let bond = with_tree_steps(&bond, 80);
     let greeks =
@@ -367,7 +405,7 @@ fn theta_rolls_the_discount_curve() {
 
     let next_day = as_of.next_day().expect("next day");
     let base_price = greeks.price;
-    let rolled_market = market.roll_forward(1).expect("market roll");
+    let rolled_market = market.condition(next_day).expect("market condition");
     let rolled_price = price_convertible_bond(&bond, &rolled_market, next_day)
         .expect("rolled price")
         .amount();
@@ -432,14 +470,22 @@ fn test_mandatory_conversion_forced_at_loss() {
         .base_date(base_date)
         .knots([(0.0, 1.0), (10.0, 0.90)])
         .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("should succeed");
 
     let market = MarketContext::new()
         .insert(discount_curve)
-        .insert_price("AAPL", MarketScalar::Unitless(50.0))
-        .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
-        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
+        .insert_price("AAPL", MarketScalar::unitless(50.0).expect("valid scalar"))
+        .insert_price(
+            "AAPL-VOL",
+            MarketScalar::unitless(0.25).expect("valid scalar"),
+        )
+        .insert_price(
+            "AAPL-DIVYIELD",
+            MarketScalar::unitless(0.02).expect("valid scalar"),
+        );
 
     // At maturity: forced conversion at loss
     let price_at_mat = price_convertible_bond(&with_tree_steps(&bond, 10), &market, maturity)
@@ -514,13 +560,24 @@ fn call_branch_does_not_force_disallowed_conversion() {
         .base_date(base_date)
         .knots([(0.0, 1.0), (10.0, 0.90)])
         .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
     let market = MarketContext::new()
         .insert(discount_curve)
-        .insert_price("AAPL", MarketScalar::Unitless(5000.0))
-        .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
-        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
+        .insert_price(
+            "AAPL",
+            MarketScalar::unitless(5000.0).expect("valid scalar"),
+        )
+        .insert_price(
+            "AAPL-VOL",
+            MarketScalar::unitless(0.25).expect("valid scalar"),
+        )
+        .insert_price(
+            "AAPL-DIVYIELD",
+            MarketScalar::unitless(0.02).expect("valid scalar"),
+        );
 
     let price =
         price_convertible_bond(&with_tree_steps(&bond, 60), &market, as_of).expect("should price");
@@ -724,7 +781,7 @@ fn put_at_maturity_floors_terminal_payoff() {
 
     // Deep OTM equity so conversion never binds: conversion value = 5 * 10 = 50
     // against a 1000 face. The bond is a pure debt instrument here.
-    let market = market.insert_price("AAPL", MarketScalar::Unitless(5.0));
+    let market = market.insert_price("AAPL", MarketScalar::unitless(5.0).expect("valid scalar"));
 
     let plain_bond = create_test_bond();
     let pv_plain = price_convertible_bond(&plain_bond, &market, as_of)
@@ -759,8 +816,8 @@ fn put_at_maturity_floors_terminal_payoff() {
 }
 
 /// Theta must not silently reprice on an un-rolled market when the market
-/// cannot roll one day forward. The sparse curve below has its last pillar
-/// at 0.002y (< 1 day), so `roll_forward(1)` fails; theta must surface it.
+/// cannot condition one day forward. The sparse curve below has `ExtrapolationPolicy::Error`
+/// and its last pillar at 0.002y (< 1 day), so `condition(t+1d)` fails; theta must surface it.
 #[test]
 fn theta_propagates_market_roll_failure() {
     let bond = create_test_bond();
@@ -768,10 +825,17 @@ fn theta_propagates_market_roll_failure() {
     let sparse = DiscountCurve::builder("SPARSE")
         .base_date(as_of)
         .knots([(0.0, 1.0), (0.002, 0.99999)])
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Error)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
         .build()
         .expect("sparse curve");
     let market = create_test_market_context().insert(sparse);
-    assert!(market.roll_forward(1).is_err(), "fixture must fail to roll");
+    let next_day = as_of.next_day().expect("next day");
+    assert!(
+        market.condition(next_day).is_err(),
+        "fixture must fail to condition"
+    );
 
     let result = calculate_convertible_greeks(
         &with_tree_steps(&bond, 50),
@@ -865,21 +929,30 @@ fn atm_credit_risky_case(spot: f64) -> (ConvertibleBond, MarketContext) {
         .base_date(issue)
         .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
         .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
     let hazard =
         finstack_quant_core::market_data::term_structures::HazardCurve::builder("USD-RISKY")
             .base_date(issue)
-            .knots([(0.0, 0.03), (10.0, 0.03)])
+            .knots([(10.0, 0.03)])
             .recovery_rate(0.0)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard curve");
     let market = MarketContext::new()
         .insert(ois)
         .insert(hazard)
-        .insert_price("AAPL", MarketScalar::Unitless(spot))
-        .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
-        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.0));
+        .insert_price("AAPL", MarketScalar::unitless(spot).expect("valid scalar"))
+        .insert_price(
+            "AAPL-VOL",
+            MarketScalar::unitless(0.25).expect("valid scalar"),
+        )
+        .insert_price(
+            "AAPL-DIVYIELD",
+            MarketScalar::unitless(0.0).expect("valid scalar"),
+        );
     (bond, market)
 }
 
@@ -1001,12 +1074,21 @@ fn lifecycle_market(as_of: Date, spot: f64) -> MarketContext {
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (1.0, 1.0), (10.0, 1.0)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("flat curve"),
         )
-        .insert_price("AAPL", MarketScalar::Unitless(spot))
-        .insert_price("AAPL-VOL", MarketScalar::Unitless(0.01))
-        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.0))
+        .insert_price("AAPL", MarketScalar::unitless(spot).expect("valid scalar"))
+        .insert_price(
+            "AAPL-VOL",
+            MarketScalar::unitless(0.01).expect("valid scalar"),
+        )
+        .insert_price(
+            "AAPL-DIVYIELD",
+            MarketScalar::unitless(0.0).expect("valid scalar"),
+        )
 }
 
 #[test]
@@ -1018,8 +1100,10 @@ fn convertible_forced_delivery_overrides_put_and_retains_risky_coupon() {
     let as_of = date!(2025 - 01 - 01);
     let event = date!(2025 - 07 - 01);
     for hazard in [0.0, 0.1] {
-        let market = lifecycle_market(as_of, 50.0)
-            .insert(HazardCurve::flat("CREDIT", as_of, hazard, 0.0).expect("hazard curve"));
+        let market = lifecycle_market(as_of, 50.0).insert(
+            HazardCurve::flat("CREDIT", as_of, hazard, 0.0, DayCount::Act365F)
+                .expect("hazard curve"),
+        );
         for policy in [
             ConversionPolicy::MandatoryOn(event),
             ConversionPolicy::MandatoryVariable {
@@ -1164,12 +1248,17 @@ fn convertible_amortization_and_pik_follow_the_live_debt_schedule() {
         end: bond.maturity,
     };
     let market = lifecycle_market(as_of, 1.0)
-        .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
+        .insert_price(
+            "AAPL-VOL",
+            MarketScalar::unitless(0.25).expect("valid scalar"),
+        )
         .insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (10.0, (-1.0_f64).exp())])
                 .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("discount curve"),
         );
@@ -1200,7 +1289,11 @@ fn convertible_amortization_and_pik_follow_the_live_debt_schedule() {
             bond.recovery_rate = Some(recovery);
             let market = market.clone().insert(
                 finstack_quant_core::market_data::term_structures::HazardCurve::flat(
-                    "CREDIT", as_of, hazard, recovery,
+                    "CREDIT",
+                    as_of,
+                    hazard,
+                    recovery,
+                    DayCount::Act365F,
                 )
                 .expect("hazard"),
             );
@@ -1300,12 +1393,17 @@ fn convertible_clean_price_excludes_cash_paid_before_settlement() {
     bond.conversion.ratio = Some(1e-8);
     bond.settlement_days = Some(2);
     let market = lifecycle_market(as_of, 1.0)
-        .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
+        .insert_price(
+            "AAPL-VOL",
+            MarketScalar::unitless(0.25).expect("valid scalar"),
+        )
         .insert(
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (10.0, (-0.5_f64).exp())])
                 .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
         );

@@ -110,7 +110,7 @@ pub fn min_grid_vol(
 ) -> Option<f64> {
     let mut min_vol: Option<f64> = None;
     for &expiry in surface.expiries() {
-        for &strike in surface.strikes() {
+        for &strike in surface.secondary_values() {
             // Exact grid points evaluate to the stored vol with no interpolation.
             if let Ok(vol) =
                 finstack_quant_models::volatility::get_surface_vol(surface, expiry, strike)
@@ -178,10 +178,10 @@ pub const MIN_FINITE_DIFF_WIDTH: f64 = 1e-12;
 pub fn scalar_numeric_value(
     scalar: &finstack_quant_core::market_data::scalars::MarketScalar,
 ) -> f64 {
-    match scalar {
-        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
-        finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => money.amount(),
-    }
+    scalar
+        .get_unitless()
+        .or_else(|| scalar.get_price().map(|money| money.amount()))
+        .unwrap_or_default()
 }
 
 /// Rebuild a scalar quote using the same variant and currency as `template`.
@@ -190,16 +190,15 @@ pub fn scalar_with_numeric_value(
     template: &finstack_quant_core::market_data::scalars::MarketScalar,
     value: f64,
 ) -> finstack_quant_core::Result<finstack_quant_core::market_data::scalars::MarketScalar> {
-    Ok(match template {
-        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(_) => {
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value)
-        }
-        finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => {
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(
+    if let Some(money) = template.get_price() {
+        Ok(
+            finstack_quant_core::market_data::scalars::MarketScalar::price(
                 finstack_quant_core::money::Money::from_model_value(value, money.currency())?,
-            )
-        }
-    })
+            ),
+        )
+    } else {
+        finstack_quant_core::market_data::scalars::MarketScalar::unitless(value)
+    }
 }
 
 /// Clone a market context and replace a scalar quote with a new numeric value.
@@ -415,12 +414,10 @@ pub fn bump_discount_curve_parallel(
     curve_id: &finstack_quant_core::types::CurveId,
     bump_bp: f64,
 ) -> finstack_quant_core::Result<finstack_quant_core::market_data::context::MarketContext> {
-    use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+    use finstack_quant_core::market_data::bumps::BumpSpec;
 
-    context.bump([MarketBump::Curve {
-        id: curve_id.clone(),
-        spec: BumpSpec::parallel_bp(bump_bp),
-    }])
+    let target = context.curve_target(curve_id)?;
+    context.bump([target.into_bump(BumpSpec::parallel_bp(bump_bp))])
 }
 
 /// Helper to bump a volatility surface by an **absolute** volatility amount (vol points).
@@ -480,15 +477,20 @@ pub fn bump_surfaces_vol_absolute(
         return Ok(context.clone());
     }
 
-    context.bump(vol_surface_ids.iter().cloned().map(|id| MarketBump::Curve {
-        id,
-        spec: BumpSpec {
-            mode: BumpMode::Additive,
-            units: BumpUnits::Fraction,
-            value: bump_abs,
-            bump_type: BumpType::Parallel,
-        },
-    }))
+    context.bump(
+        vol_surface_ids
+            .iter()
+            .cloned()
+            .map(|id| MarketBump::VolSurface {
+                id,
+                spec: BumpSpec {
+                    mode: BumpMode::Additive,
+                    units: BumpUnits::Fraction,
+                    value: bump_abs,
+                    bump_type: BumpType::Parallel,
+                },
+            }),
+    )
 }
 
 /// Compute a mixed partial derivative using central differences for two
@@ -587,18 +589,14 @@ mod tests {
 
     #[test]
     fn scalar_helpers_preserve_variant_and_currency() {
-        let price_scalar = MarketScalar::Price(Money::from((99_i64, Currency::USD)));
+        let price_scalar = MarketScalar::price(Money::from((99_i64, Currency::USD)));
         let rebuilt = scalar_with_numeric_value(&price_scalar, 101.0)
             .expect("valid scalar_with_numeric_value fixture");
-        match rebuilt {
-            MarketScalar::Price(money) => {
-                assert_eq!(money.currency(), Currency::USD);
-                assert_eq!(money.amount(), 101.0);
-            }
-            MarketScalar::Unitless(_) => panic!("expected price scalar"),
-        }
+        let money = rebuilt.get_price().expect("expected price scalar");
+        assert_eq!(money.currency(), Currency::USD);
+        assert_eq!(money.amount(), 101.0);
 
-        let unitless = MarketScalar::Unitless(0.02);
+        let unitless = MarketScalar::unitless(0.02).expect("valid unitless scalar");
         let rebuilt = scalar_with_numeric_value(&unitless, 0.03)
             .expect("valid scalar_with_numeric_value fixture");
         assert_eq!(scalar_numeric_value(&rebuilt), 0.03);
@@ -607,10 +605,10 @@ mod tests {
     #[test]
     fn replace_scalar_value_updates_only_requested_quote() {
         let market = MarketContext::new()
-            .insert_price("A", MarketScalar::Unitless(1.0))
+            .insert_price("A", MarketScalar::unitless(1.0).expect("valid scalar"))
             .insert_price(
                 "B",
-                MarketScalar::Price(Money::from((2_i64, Currency::USD))),
+                MarketScalar::price(Money::from((2_i64, Currency::USD))),
             );
         let current = market.get_price("B").expect("quote should exist");
         let bumped = replace_scalar_value(&market, "B", current, 3.5)
@@ -630,19 +628,19 @@ mod tests {
     fn scalar_price_bump_preserves_exact_money_and_reports_overflow() {
         let exact =
             Money::from_decimal_str("1.0000000000000001", Currency::USD).expect("exact money");
-        let market = MarketContext::new().insert_price("P", MarketScalar::Price(exact));
+        let market = MarketContext::new().insert_price("P", MarketScalar::price(exact));
         let unchanged = bump_scalar_price(&market, "P", 0.0).expect("zero bump");
-        assert!(matches!(
-            unchanged.get_price("P").expect("quote"),
-            MarketScalar::Price(actual) if actual == &exact
-        ));
+        assert_eq!(
+            unchanged.get_price("P").expect("quote").get_price(),
+            Some(exact)
+        );
         let large = Money::from_decimal_str("1e28", Currency::USD).expect("large money");
-        let market = MarketContext::new().insert_price("P", MarketScalar::Price(large));
+        let market = MarketContext::new().insert_price("P", MarketScalar::price(large));
         assert!(bump_scalar_price(&market, "P", 900.0).is_err());
-        assert!(matches!(
-            market.get_price("P").expect("original quote"),
-            MarketScalar::Price(actual) if actual == &large
-        ));
+        assert_eq!(
+            market.get_price("P").expect("original quote").get_price(),
+            Some(large)
+        );
     }
 
     #[test]

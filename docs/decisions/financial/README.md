@@ -2572,6 +2572,22 @@ shared translator and covers atomic reduction, report-basis materiality
 and exact-zero share availability.
 [ATTRIBUTION-013](attribution/13-target-currency-and-scaling.md#accepted-decision-for-checked-reporting-fx-sizing-aggregation-and-residual-qualification).
 
+Single-period return contributions were accepted on 2026-11-16. The package
+covers a common dated basis, explicit signed weights, widened contributions,
+complete group partitions and an elected factor view.
+[ATTRIBUTION-014](attribution/14-return-contribution-weights.md#accepted-decision-for-checked-single-period-return-contributions).
+
+Detail identities, report projections and schemas were accepted on 2026-11-16.
+The package covers ordered typed detail, checked exact amounts and partitions,
+carry and pricing evidence, and separate restoration and replay qualification.
+[ATTRIBUTION-015](attribution/15-detail-and-reporting-contracts.md#accepted-decision-for-checked-detail-identities-report-projections-and-schemas).
+
+Grouped benchmark-relative returns were accepted on 2026-11-16. The package
+covers exact side weights, an explicit common partition, qualified absent-side
+comparators and centered closure before projection. All 16 attribution
+methodology records are accepted.
+[ATTRIBUTION-016](attribution/16-benchmark-relative-return.md#accepted-decision-for-checked-grouped-benchmark-relative-returns).
+
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the
 accepted perspective/sign contracts; broader margin methodology retains its

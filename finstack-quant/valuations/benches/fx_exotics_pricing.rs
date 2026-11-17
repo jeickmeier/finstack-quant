@@ -14,7 +14,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::math::stats::RealizedVarMethod;
@@ -70,6 +72,8 @@ fn create_market(as_of: Date) -> MarketContext {
             (10.0, 0.6065),
         ])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -83,6 +87,8 @@ fn create_market(as_of: Date) -> MarketContext {
             (10.0, 0.7408),
         ])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -95,6 +101,8 @@ fn create_market(as_of: Date) -> MarketContext {
             (10.0, 0.9900),
         ])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -103,8 +111,11 @@ fn create_market(as_of: Date) -> MarketContext {
     let eurusd_tenors = vec![0.25, 0.5, 1.0, 2.0, 5.0];
     let flat_eurusd_row = vec![0.10_f64; eurusd_strikes.len()];
     let mut eurusd_vol_builder = VolSurface::builder(CurveId::new("EURUSD-VOL"))
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&eurusd_tenors)
-        .strikes(&eurusd_strikes);
+        .secondary_values(&eurusd_strikes);
     for _ in 0..eurusd_tenors.len() {
         eurusd_vol_builder = eurusd_vol_builder.row(&flat_eurusd_row);
     }
@@ -115,8 +126,11 @@ fn create_market(as_of: Date) -> MarketContext {
     let nky_tenors = vec![0.25, 0.5, 1.0, 2.0, 5.0];
     let flat_nky_row = vec![0.20_f64; nky_strikes.len()];
     let mut nky_vol_builder = VolSurface::builder(CurveId::new("NKY-VOL"))
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&nky_tenors)
-        .strikes(&nky_strikes);
+        .secondary_values(&nky_strikes);
     for _ in 0..nky_tenors.len() {
         nky_vol_builder = nky_vol_builder.row(&flat_nky_row);
     }
@@ -134,8 +148,11 @@ fn create_market(as_of: Date) -> MarketContext {
     let jpyusd_tenors = vec![0.25, 0.5, 1.0, 2.0, 5.0];
     let flat_jpyusd_row = vec![0.08_f64; jpyusd_strikes.len()];
     let mut jpyusd_vol_builder = VolSurface::builder(CurveId::new("JPYUSD-VOL"))
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&jpyusd_tenors)
-        .strikes(&jpyusd_strikes);
+        .secondary_values(&jpyusd_strikes);
     for _ in 0..jpyusd_tenors.len() {
         jpyusd_vol_builder = jpyusd_vol_builder.row(&flat_jpyusd_row);
     }
@@ -161,11 +178,26 @@ fn create_market(as_of: Date) -> MarketContext {
         .insert_surface(nky_vol)
         .insert_surface(jpyusd_vol)
         .insert_fx(fx)
-        .insert_price("EURUSD", MarketScalar::Unitless(1.10))
-        .insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.10))
-        .insert_price("NKY-SPOT", MarketScalar::Unitless(35_000.0))
-        .insert_price("NKY-DIV", MarketScalar::Unitless(0.01))
-        .insert_price("JPYUSD-SPOT", MarketScalar::Unitless(1.0 / 150.0))
+        .insert_price(
+            "EURUSD",
+            MarketScalar::unitless(1.10).expect("valid scalar"),
+        )
+        .insert_price(
+            "EURUSD-SPOT",
+            MarketScalar::unitless(1.10).expect("valid scalar"),
+        )
+        .insert_price(
+            "NKY-SPOT",
+            MarketScalar::unitless(35_000.0).expect("valid scalar"),
+        )
+        .insert_price(
+            "NKY-DIV",
+            MarketScalar::unitless(0.01).expect("valid scalar"),
+        )
+        .insert_price(
+            "JPYUSD-SPOT",
+            MarketScalar::unitless(1.0 / 150.0).expect("valid scalar"),
+        )
 }
 
 // Instrument factories
@@ -358,10 +390,13 @@ fn bench_barrier_option_type(c: &mut Criterion) {
                 assert!(inst.expiry > as_of);
                 // The preserved 1.20 barrier is above spot: live for up barriers,
                 // already breached for the explicitly named down controls.
-                assert!(matches!(
-                    market.get_price("EURUSD-SPOT"),
-                    Ok(MarketScalar::Unitless(spot)) if inst.barrier > *spot
-                ));
+                assert!(
+                    market
+                        .get_price("EURUSD-SPOT")
+                        .ok()
+                        .and_then(|s| s.get_unitless())
+                        .is_some_and(|spot| inst.barrier > spot)
+                );
                 support::bench(
                     b,
                     || {

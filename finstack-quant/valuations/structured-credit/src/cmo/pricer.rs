@@ -284,6 +284,8 @@ mod tests {
                 (30.0, 0.30),
             ])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid curve");
 
@@ -569,7 +571,7 @@ mod tests {
                 .year_fraction(as_of, cf.payment_date, DayCountContext::default())
                 .expect("year fraction");
             let total = cf.interest + cf.scheduled_principal + cf.prepayment;
-            collateral_pv += total * curve.df(years);
+            collateral_pv += total * curve.df(years).expect("df");
         }
 
         let combined = io_pv.amount() + po_pv.amount();
@@ -941,6 +943,8 @@ mod rate_risk_rebuild_tests {
                 .base_date(AS_OF)
                 .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
                 .interp(InterpStyle::LogLinear)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
         )
@@ -948,7 +952,7 @@ mod rate_risk_rebuild_tests {
 
     fn bumped(bp: f64) -> MarketContext {
         market()
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::DiscountCurve {
                 id: "USD-OIS".into(),
                 spec: BumpSpec::parallel_bp(bp),
             }])

@@ -175,6 +175,7 @@ pub(super) fn recycle_reinvestment_principal(
                     index_floor_rate: state.pool_state.index_floors[i],
                 },
                 state.floating_rate_shift,
+                2,
             )?
         } else {
             state.pool_state.rates[i]
@@ -262,6 +263,7 @@ fn purchase_replacement_collateral(
                 index_floor_rate: None,
             },
             state.floating_rate_shift,
+            2,
         )?,
         None => spread,
     };

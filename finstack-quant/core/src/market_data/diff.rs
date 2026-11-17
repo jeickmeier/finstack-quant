@@ -1,1026 +1,2143 @@
-//! Market data comparison and shift measurement.
+//! Market change measurement primitives for curves, inflation, FX, and scalars.
 //!
-//! Provides utilities for measuring market movements between two `MarketContext`
-//! instances. Used primarily for metrics-based P&L attribution, risk reporting,
-//! and scenario analysis.
-//!
-//! # Purpose
-//!
-//! This module is symmetric to `bumps.rs`:
-//! - **bumps.rs**: Apply shifts to create scenarios
-//! - **diff.rs**: Measure shifts between markets
-//!
-//! # Use Cases
-//!
-//! - **P&L Attribution**: Explain P&L changes via DV01 × Δrates, CS01 × Δspreads
-//! - **Risk Reporting**: Measure daily market moves for VaR and stress testing
-//! - **Calibration**: Compare calibrated curves vs market inputs
-//! - **Market Analysis**: Track curve movements over time
+//! Each supported market quantity uses an explicit source coordinate or named
+//! contract coordinate, validates input domain and comparability invariants
+//! before evaluating differences, preserves declared row ordering, and fails
+//! closed on invalid or incomparable inputs rather than falling back across
+//! market-data families or proxies.
 //!
 //! # Examples
 //!
 //! ```rust
-//! use finstack_quant_core::market_data::diff::{measure_discount_curve_shift, TenorSamplingMethod};
+//! use finstack_quant_core::dates::DayCount;
 //! use finstack_quant_core::market_data::context::MarketContext;
-//! use finstack_quant_core::types::CurveId;
+//! use finstack_quant_core::market_data::diff::{
+//!     DateInterval, FactorRateDiffQuery, RateDiffScale, measure_discount_factor_rate_diff,
+//! };
+//! use finstack_quant_core::market_data::term_structures::DiscountCurve;
+//! use time::macros::date;
 //!
-//! # fn example(market_yesterday: MarketContext, market_today: MarketContext) -> finstack_quant_core::Result<()> {
-//! // Measure rate shift between two markets
-//! let shift_bp = measure_discount_curve_shift(
-//!     &CurveId::from("USD-OIS"),
-//!     &market_yesterday,
-//!     &market_today,
-//!     TenorSamplingMethod::Standard,
-//! )?;
+//! # fn main() -> finstack_quant_core::Result<()> {
+//! let base = date!(2025 - 01 - 01);
+//! let c0 = DiscountCurve::flat("USD-OIS", base, 0.04)?;
+//! let c1 = DiscountCurve::flat("USD-OIS", base, 0.0425)?;
+//! let m0 = MarketContext::new().insert(c0);
+//! let m1 = MarketContext::new().insert(c1);
 //!
-//! println!("USD-OIS moved {} basis points", shift_bp);
+//! let intervals = [DateInterval::new(date!(2025 - 07 - 01), date!(2026 - 07 - 01))?];
+//! let query = FactorRateDiffQuery::new(
+//!     "USD-OIS",
+//!     &intervals,
+//!     DayCount::Act365F,
+//!     RateDiffScale::BasisPoints,
+//! );
+//! let result = measure_discount_factor_rate_diff(&query, &m0, &m1)?;
+//! assert!((result.rows()[0].diff - 25.0).abs() < 1e-10);
 //! # Ok(())
 //! # }
 //! ```
 
-use super::context::{CurveStorage, MarketContext};
-use crate::Result;
+use std::collections::BTreeSet;
+use std::fmt;
+
+use time::Month;
+
 use crate::currency::Currency;
-use crate::dates::Date;
-use crate::math::units::BASIS_POINTS_PER_UNIT;
+use crate::dates::{Date, DayCount, DayCountContext};
+use crate::error::InputError;
+use crate::market_data::context::MarketContext;
+use crate::math::stats;
+use crate::money::Money;
+use crate::money::fx::{FxConversionPolicy, FxQuery};
+use crate::types::CurveId;
+use crate::{Error, Result};
 
-use serde::{Deserialize, Serialize};
-
-/// Standard market tenors for curve sampling (in years).
-///
-/// Based on liquid swap market points: 3M, 6M, 1Y, 2Y, 3Y, 5Y, 7Y, 10Y, 30Y.
-/// These are the conventional points where curves are most actively traded
-/// and quoted.
-pub const STANDARD_TENORS: &[f64] = &[0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 30.0];
-
-/// Method for selecting tenor points when measuring curve shifts.
-///
-/// Different sampling strategies trade off accuracy, performance, and
-/// robustness to curve structure.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum TenorSamplingMethod {
-    /// Standard swap market tenors (3M, 6M, 1Y, 2Y, 3Y, 5Y, 7Y, 10Y, 30Y).
-    ///
-    /// Most robust for typical interest rate curves. Matches market liquidity
-    /// points and works well for parallel shift detection.
-    #[default]
-    Standard,
-
-    /// Use curve's own knot points dynamically.
-    ///
-    /// Adapts to curve structure but may miss shifts between pillars.
-    /// Good for curves with non-standard pillar structure.
-    Dynamic,
-
-    /// Custom tenor list specified by caller.
-    ///
-    /// Allows fine-grained control for specific use cases (e.g., matching
-    /// an instrument's cashflow schedule).
-    Custom(Vec<f64>),
+/// Output scale for continuous zero-rate, forward-rate, or growth-rate shifts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum RateDiffScale {
+    /// Rate difference in annual decimal units (`0.0001` = 1 bp).
+    Decimal,
+    /// Rate difference in basis points (`1.0` = `0.0001` decimal).
+    BasisPoints,
 }
 
-impl TenorSamplingMethod {
-    /// Get the tenor points to sample based on the method.
-    ///
-    /// For `Dynamic`, uses the knot points from the provided curve.
-    /// For `Standard`, uses `STANDARD_TENORS`.
-    /// For `Custom`, uses the provided tenor list.
-    fn tenors<'a>(&'a self, curve_knots: Option<&'a [f64]>) -> &'a [f64] {
+impl RateDiffScale {
+    #[inline]
+    const fn scale_factor(self) -> f64 {
         match self {
-            Self::Standard => STANDARD_TENORS,
-            Self::Dynamic => curve_knots.unwrap_or(STANDARD_TENORS),
-            Self::Custom(tenors) => tenors.as_slice(),
+            Self::Decimal => 1.0,
+            Self::BasisPoints => 10_000.0,
         }
     }
 }
 
-/// Reject an empty tenor grid or a non-finite tenor.
-fn validate_measurement_grid(sample_points: &[f64]) -> Result<()> {
-    if sample_points.is_empty() || sample_points.iter().any(|t| !t.is_finite()) {
-        return Err(crate::Error::Validation(
-            "measurement tenor grid must be non-empty and finite".to_string(),
-        ));
+impl fmt::Display for RateDiffScale {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Decimal => f.write_str("decimal"),
+            Self::BasisPoints => f.write_str("bp"),
+        }
     }
-    Ok(())
 }
 
-/// Generic internal measurement helper for curve-like objects.
-fn measure_average_shift(
-    sample_points: &[f64],
-    scaling_factor: f64,
-    mut value_t0: impl FnMut(f64) -> f64,
-    mut value_t1: impl FnMut(f64) -> f64,
+/// Output scale for native piecewise-constant hazard intensity differences.
+///
+/// Always measures raw hazard intensity `λ` per source year without converting to
+/// par CDS spreads or coupling to recovery assumptions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum HazardDiffScale {
+    /// Intensity difference per source year (`λ₁ - λ₀`).
+    Decimal,
+    /// Intensity difference scaled by `10_000` (`intensity bp`).
+    IntensityBp,
+}
+
+impl HazardDiffScale {
+    #[inline]
+    const fn scale_factor(self) -> f64 {
+        match self {
+            Self::Decimal => 1.0,
+            Self::IntensityBp => 10_000.0,
+        }
+    }
+}
+
+impl fmt::Display for HazardDiffScale {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Decimal => f.write_str("decimal"),
+            Self::IntensityBp => f.write_str("intensity_bp"),
+        }
+    }
+}
+
+/// Output scale for exact algebraic proportional changes `(x₁ - x₀) / x₀`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum ProportionalDiffScale {
+    /// Unscaled decimal fraction (`(x₁ - x₀) / x₀`).
+    Fraction,
+    /// Percentage points (`100.0 * (x₁ - x₀) / x₀`).
+    Percent,
+}
+
+impl ProportionalDiffScale {
+    #[inline]
+    const fn scale_factor(self) -> f64 {
+        match self {
+            Self::Fraction => 1.0,
+            Self::Percent => 100.0,
+        }
+    }
+}
+
+impl fmt::Display for ProportionalDiffScale {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Fraction => f.write_str("fraction"),
+            Self::Percent => f.write_str("percent"),
+        }
+    }
+}
+
+/// Output scale for observed monthly CPI level differences.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum ObservationDiffScale {
+    /// Native CPI index-point difference `I₁ - I₀`.
+    NativePoints,
+    /// Unannualized relative-level change `(I₁ - I₀) / I₀` on the chosen scale.
+    Proportional(ProportionalDiffScale),
+}
+
+/// Classification of a same-period monthly CPI comparison across snapshots.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum ObservationChangeKind {
+    /// Both qualified snapshots observed the same index level for that month.
+    Unchanged,
+    /// The qualified level for the same calendar month changed across snapshots.
+    Revision,
+    /// Explicit cross-period comparison across distinct `(year, month)` snapshots.
+    CrossPeriod,
+}
+
+/// Trait implemented by ordered measurement rows that report a homogeneous scalar `f64` diff.
+pub trait MeasuredDiffValue {
+    /// Return the row's measured difference in its declared unit scale.
+    fn measured_diff(&self) -> f64;
+}
+
+/// Ordered, non-empty measurement vector returned by term-structure or observation diffs.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct DiffMeasurement<Row> {
+    rows: Vec<Row>,
+}
+
+impl<Row> DiffMeasurement<Row> {
+    fn from_validated_rows(rows: Vec<Row>) -> Result<Self> {
+        if rows.is_empty() {
+            return Err(Error::Validation(
+                "measurement row set must not be empty".to_string(),
+            ));
+        }
+        Ok(Self { rows })
+    }
+
+    /// Borrow the measured rows in the caller's declared coordinate order.
+    #[must_use]
+    pub fn rows(&self) -> &[Row] {
+        &self.rows
+    }
+
+    /// Number of rows in the measurement set (always at least `1`).
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.rows.len()
+    }
+
+    /// Returns `false` because validated measurements are always non-empty.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.rows.is_empty()
+    }
+
+    /// Consume the container and return the owned ordered rows.
+    #[must_use]
+    pub fn into_rows(self) -> Vec<Row> {
+        self.rows
+    }
+}
+
+impl<Row: MeasuredDiffValue> DiffMeasurement<Row> {
+    /// Compute the equal-weight arithmetic mean of the measured row values using compensated summation.
+    ///
+    /// Uses [`finstack_quant_core::math::stats::mean`](crate::math::stats::mean) so extreme
+    /// magnitudes are rescaled without overflow or premature sum collapse.
+    ///
+    /// # Errors
+    /// Returns [`Error::Validation`] if the row set is empty or any row value is non-finite.
+    pub fn mean(&self) -> Result<f64> {
+        let values: Vec<f64> = self
+            .rows
+            .iter()
+            .map(MeasuredDiffValue::measured_diff)
+            .collect();
+        let avg = stats::mean(&values)?.ok_or_else(|| {
+            Error::Validation("cannot compute mean of an empty measurement set".to_string())
+        })?;
+        if !avg.is_finite() {
+            return Err(Error::Validation(format!(
+                "measurement mean produced non-finite value {avg}"
+            )));
+        }
+        Ok(normalize_zero(avg))
+    }
+}
+
+/// Strict calendar interval `[anchor, maturity]` with `maturity > anchor`.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
+pub struct DateInterval {
+    /// Anchor date `V` for the comparison interval.
+    pub anchor: Date,
+    /// Maturity date `T` for the comparison interval; strictly after `anchor`.
+    pub maturity: Date,
+}
+
+impl DateInterval {
+    /// Construct a validated calendar interval with `maturity > anchor`.
+    ///
+    /// # Arguments
+    /// - `anchor` - Earlier comparison coordinate `V`.
+    /// - `maturity` - Later comparison coordinate `T`; must be strictly greater than `anchor`.
+    ///
+    /// # Errors
+    /// Returns [`Error::Validation`] if `maturity <= anchor`.
+    pub fn new(anchor: Date, maturity: Date) -> Result<Self> {
+        if maturity <= anchor {
+            return Err(Error::Validation(format!(
+                "interval maturity ({maturity}) must be strictly after anchor ({anchor})"
+            )));
+        }
+        Ok(Self { anchor, maturity })
+    }
+}
+
+/// Inputs for [`zero_rate_difference`] over two snapshots' factor endpoints `[V, T]`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ZeroRateDiffParams {
+    /// Earlier snapshot factor at the common anchor coordinate `D₀(V)`.
+    pub d0_anchor: f64,
+    /// Earlier snapshot factor at the common maturity coordinate `D₀(T)`.
+    pub d0_maturity: f64,
+    /// Later snapshot factor at the common anchor coordinate `D₁(V)`.
+    pub d1_anchor: f64,
+    /// Later snapshot factor at the common maturity coordinate `D₁(T)`.
+    pub d1_maturity: f64,
+    /// Strictly positive reporting year fraction `α` corresponding to `(V, T)`.
+    pub alpha: f64,
+    /// Output rate scale (`Decimal` or `BasisPoints`).
+    pub scale: RateDiffScale,
+}
+
+/// Compute the four-endpoint continuously compounded rate difference `(ℓ₀ - ℓ₁) / α`.
+///
+/// Here `ℓₛ = ln(Dₛ(T)) - ln(Dₛ(V))`, so positive output indicates higher rates in snapshot `1`
+/// than in snapshot `0`:
+/// `Δz = (1 / α) * ln((D₀(T) * D₁(V)) / (D₀(V) * D₁(T)))`.
+///
+/// Validates `alpha > 0` and strictly positive finite endpoints before evaluating any equal-value
+/// path, and uses binary-exponent decomposition with FMA `diff_of_products` and `ln_1p` near unit
+/// cross-ratios to avoid overflow and catastrophic cancellation.
+///
+/// # Arguments
+/// - `params` - Validated four-endpoint factors, positive year fraction `α`, and output scale.
+///
+/// # Errors
+/// Returns [`Error::Validation`] if `alpha` is non-finite or non-positive, any factor is
+/// non-finite or non-positive, or the scaled output overflows `f64`.
+pub fn zero_rate_difference(params: ZeroRateDiffParams) -> Result<f64> {
+    if !params.alpha.is_finite() || params.alpha <= 0.0 {
+        return Err(Error::Validation(format!(
+            "year fraction alpha must be finite and strictly positive, got {}",
+            params.alpha
+        )));
+    }
+    for (name, val) in [
+        ("d0_anchor", params.d0_anchor),
+        ("d0_maturity", params.d0_maturity),
+        ("d1_anchor", params.d1_anchor),
+        ("d1_maturity", params.d1_maturity),
+    ] {
+        if !val.is_finite() || val <= 0.0 {
+            return Err(Error::Validation(format!(
+                "factor '{name}' must be finite and strictly positive, got {val}"
+            )));
+        }
+    }
+
+    let ln_cross = super::term_structures::common::checked_log_cross_ratio(
+        params.d0_maturity,
+        params.d1_anchor,
+        params.d0_anchor,
+        params.d1_maturity,
+    );
+    let out = (ln_cross / params.alpha) * params.scale.scale_factor();
+    if !out.is_finite() || (!exact_f64_eq(ln_cross, 0.0) && exact_f64_eq(out, 0.0)) {
+        return Err(Error::Validation(format!(
+            "zero rate difference overflowed or underflowed f64: ln_cross={ln_cross}, alpha={}",
+            params.alpha
+        )));
+    }
+    Ok(normalize_zero(out))
+}
+
+/// Measure the continuously compounded zero-rate spread `(r_foreign - r_domestic)`
+/// between two explicitly selected [`Discounting`](super::traits::Discounting)
+/// sources over a dated reporting interval `(anchor, maturity)`.
+///
+/// Computes `(1 / alpha) * ln((D_D(T) * D_F(V)) / (D_D(V) * D_F(T)))` after
+/// admitting all four absolute factor endpoints on each source's own clock
+/// and computing `alpha = day_count.year_fraction(anchor, maturity, day_count_context)? > 0`.
+///
+/// # Arguments
+///
+/// * `domestic` - Selected domestic [`Discounting`](super::traits::Discounting) curve provider.
+/// * `foreign` - Selected foreign [`Discounting`](super::traits::Discounting) curve provider.
+/// * `anchor` - Common interval start date `V`.
+/// * `maturity` - Common interval end date `T` (`T > V`).
+/// * `day_count` - Explicit reporting day-count convention supplying `alpha`.
+/// * `day_count_context` - Complete day-count context (calendar, frequency, bus basis) required by `day_count`.
+/// * `scale` - Output rate units (`Decimal` or `BasisPoints`).
+///
+/// # Errors
+///
+/// Returns an error if `maturity <= anchor`, `day_count` fails or produces a
+/// non-positive `alpha`, any source endpoint factor cannot be admitted, or
+/// the difference overflows/underflows `f64`.
+pub fn measure_discounting_zero_rate_difference(
+    domestic: &dyn super::traits::Discounting,
+    foreign: &dyn super::traits::Discounting,
+    anchor: Date,
+    maturity: Date,
+    day_count: DayCount,
+    day_count_context: DayCountContext<'_>,
+    scale: RateDiffScale,
 ) -> Result<f64> {
-    validate_measurement_grid(sample_points)?;
-    if !scaling_factor.is_finite() {
-        return Err(crate::Error::Validation(
-            "shift scaling factor must be finite".to_string(),
+    if maturity <= anchor {
+        return Err(Error::Validation(format!(
+            "zero-rate difference maturity ({maturity}) must be strictly after anchor ({anchor})"
+        )));
+    }
+    let alpha = day_count.year_fraction(anchor, maturity, day_count_context)?;
+    if !alpha.is_finite() || alpha <= 0.0 {
+        return Err(Error::Validation(format!(
+            "reporting day count {day_count} produced invalid year fraction {alpha} for ({anchor}, {maturity})"
+        )));
+    }
+    let d0_anchor = domestic.df_on_date(anchor)?;
+    let d0_maturity = domestic.df_on_date(maturity)?;
+    let d1_anchor = foreign.df_on_date(anchor)?;
+    let d1_maturity = foreign.df_on_date(maturity)?;
+    zero_rate_difference(ZeroRateDiffParams {
+        d0_anchor,
+        d0_maturity,
+        d1_anchor,
+        d1_maturity,
+        alpha,
+        scale,
+    })
+}
+
+/// Request parameters for measuring rate shifts on discount or forward curves.
+#[derive(Debug, Clone)]
+pub struct FactorRateDiffQuery<'a> {
+    /// Curve identifier in the earlier snapshot `market_t0`.
+    pub source_t0: CurveId,
+    /// Curve identifier in the later snapshot `market_t1`.
+    pub source_t1: CurveId,
+    /// Non-empty, duplicate-free ordered slice of `[anchor, maturity]` intervals.
+    pub intervals: &'a [DateInterval],
+    /// Complete reporting day-count convention used to compute interval `α`.
+    pub day_count: DayCount,
+    /// Additional day-count context (calendar, frequency, bus basis) required by `day_count`.
+    pub day_count_context: DayCountContext<'a>,
+    /// Output unit scale (`Decimal` or `BasisPoints`).
+    pub scale: RateDiffScale,
+}
+
+impl<'a> FactorRateDiffQuery<'a> {
+    /// Create a query comparing the same curve identifier across two snapshots.
+    ///
+    /// # Arguments
+    /// - `curve_id` - Curve identifier present in both `market_t0` and `market_t1`.
+    /// - `intervals` - Non-empty ordered unique comparison intervals with `maturity > anchor`.
+    /// - `day_count` - Reporting day-count basis for interval year fractions.
+    /// - `scale` - Output rate scale (`Decimal` or `BasisPoints`).
+    #[must_use]
+    pub fn new(
+        curve_id: impl Into<CurveId>,
+        intervals: &'a [DateInterval],
+        day_count: DayCount,
+        scale: RateDiffScale,
+    ) -> Self {
+        let id = curve_id.into();
+        Self {
+            source_t0: id.clone(),
+            source_t1: id,
+            intervals,
+            day_count,
+            day_count_context: DayCountContext::default(),
+            scale,
+        }
+    }
+
+    /// Override the earlier and later curve identifiers explicitly when comparing renamed curves.
+    ///
+    /// # Arguments
+    /// - `source_t0` - Curve identifier in the earlier market snapshot.
+    /// - `source_t1` - Curve identifier in the later market snapshot.
+    #[must_use]
+    pub fn with_source_ids(
+        mut self,
+        source_t0: impl Into<CurveId>,
+        source_t1: impl Into<CurveId>,
+    ) -> Self {
+        self.source_t0 = source_t0.into();
+        self.source_t1 = source_t1.into();
+        self
+    }
+
+    /// Supply a reporting [`DayCountContext`] (e.g., holiday calendar for `Bus252`).
+    ///
+    /// # Arguments
+    /// - `context` - Reporting day-count context passed to [`DayCount::year_fraction`].
+    #[must_use]
+    pub fn with_day_count_context(mut self, context: DayCountContext<'a>) -> Self {
+        self.day_count_context = context;
+        self
+    }
+}
+
+/// Measured continuously compounded factor-rate change on a single `[anchor, maturity]` interval.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct RateDiffRow {
+    /// Source curve identifier in `market_t0`.
+    pub source_t0: CurveId,
+    /// Source curve identifier in `market_t1`.
+    pub source_t1: CurveId,
+    /// Common comparison anchor date `V`.
+    pub anchor: Date,
+    /// Common comparison maturity date `T`.
+    pub maturity: Date,
+    /// Reporting day-count convention used to compute `year_fraction`.
+    pub day_count: DayCount,
+    /// Positive reporting year fraction `α` for `[anchor, maturity]`.
+    pub year_fraction: f64,
+    /// Output unit scale of `diff`.
+    pub scale: RateDiffScale,
+    /// Measured rate change `Δz` in `scale` units (positive when rates rose).
+    pub diff: f64,
+}
+
+impl MeasuredDiffValue for RateDiffRow {
+    fn measured_diff(&self) -> f64 {
+        self.diff
+    }
+}
+
+/// Measure discount-curve zero-rate changes across common explicit intervals `[anchor, maturity]`.
+///
+/// Evaluates `market_t0.get_discount` and `market_t1.get_discount` directly on each curve's own
+/// clock (`df_on_date`) with no fallback to forward curves.
+///
+/// # Arguments
+/// - `query` - Factor-rate query specifying source IDs, intervals, day count, and scale.
+/// - `market_t0` - Earlier market snapshot.
+/// - `market_t1` - Later market snapshot.
+///
+/// # Errors
+/// Returns an error if either discount curve is missing, `intervals` is empty, contains
+/// duplicate `(anchor, maturity)` pairs, contains invalid dates (`maturity <= anchor` or
+/// `anchor` predating either curve's `source_base_date()`), reporting day-count evaluation
+/// fails, or any factor/output is invalid or non-finite.
+pub fn measure_discount_factor_rate_diff(
+    query: &FactorRateDiffQuery<'_>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Result<DiffMeasurement<RateDiffRow>> {
+    let c0 = market_t0.get_discount(query.source_t0.as_str())?;
+    let c1 = market_t1.get_discount(query.source_t1.as_str())?;
+    measure_curve_factor_diff(
+        query,
+        c0.source_base_date(),
+        c1.source_base_date(),
+        |d| c0.df_on_date(d),
+        |d| c1.df_on_date(d),
+    )
+}
+
+/// Measure forward-curve projection rate changes across common explicit intervals `[anchor, maturity]`.
+///
+/// Evaluates `market_t0.get_forward` and `market_t1.get_forward` directly (`df_on_date`) with
+/// no fallback to discount curves.
+///
+/// # Arguments
+/// - `query` - Factor-rate query specifying source IDs, intervals, day count, and scale.
+/// - `market_t0` - Earlier market snapshot.
+/// - `market_t1` - Later market snapshot.
+///
+/// # Errors
+/// Returns an error if either forward curve is missing, `intervals` is empty, contains
+/// duplicate `(anchor, maturity)` pairs, contains invalid dates (`maturity <= anchor` or
+/// `anchor` predating either curve's `source_base_date()`), reporting day-count evaluation
+/// fails, or any factor/output is invalid or non-finite.
+pub fn measure_forward_factor_rate_diff(
+    query: &FactorRateDiffQuery<'_>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Result<DiffMeasurement<RateDiffRow>> {
+    let c0 = market_t0.get_forward(query.source_t0.as_str())?;
+    let c1 = market_t1.get_forward(query.source_t1.as_str())?;
+    measure_curve_factor_diff(
+        query,
+        c0.source_base_date(),
+        c1.source_base_date(),
+        |d| c0.df_on_date(d),
+        |d| c1.df_on_date(d),
+    )
+}
+
+fn measure_curve_factor_diff<F0, F1>(
+    query: &FactorRateDiffQuery<'_>,
+    src_base_0: Date,
+    src_base_1: Date,
+    mut eval0: F0,
+    mut eval1: F1,
+) -> Result<DiffMeasurement<RateDiffRow>>
+where
+    F0: FnMut(Date) -> Result<f64>,
+    F1: FnMut(Date) -> Result<f64>,
+{
+    if query.intervals.is_empty() {
+        return Err(Error::Validation(
+            "factor rate diff requires at least one interval".to_string(),
         ));
     }
-    let mut total_shift = 0.0;
-    let mut count = 0;
-
-    for &t in sample_points {
-        if t <= 0.0 {
-            continue;
+    let mut seen = BTreeSet::new();
+    let mut rows = Vec::with_capacity(query.intervals.len());
+    for interval in query.intervals {
+        if interval.maturity <= interval.anchor {
+            return Err(Error::Validation(format!(
+                "interval maturity ({}) must be strictly after anchor ({})",
+                interval.maturity, interval.anchor
+            )));
         }
-        let v0 = value_t0(t);
-        let v1 = value_t1(t);
-        if !v0.is_finite() || !v1.is_finite() {
-            return Err(crate::Error::Validation(format!(
-                "curve values at tenor {t} must be finite"
+        if !seen.insert((interval.anchor, interval.maturity)) {
+            return Err(Error::Validation(format!(
+                "duplicate comparison interval ({}, {})",
+                interval.anchor, interval.maturity
+            )));
+        }
+        if interval.anchor < src_base_0 || interval.anchor < src_base_1 {
+            return Err(Error::Validation(format!(
+                "interval anchor ({}) predates curve source base dates ({src_base_0}, {src_base_1})",
+                interval.anchor
+            )));
+        }
+        let alpha = query.day_count.year_fraction(
+            interval.anchor,
+            interval.maturity,
+            query.day_count_context,
+        )?;
+        if !alpha.is_finite() || alpha <= 0.0 {
+            return Err(Error::Validation(format!(
+                "reporting day count {} produced invalid year fraction {alpha} for ({}, {})",
+                query.day_count, interval.anchor, interval.maturity
+            )));
+        }
+        let d0_anchor = eval0(interval.anchor)?;
+        let d0_maturity = eval0(interval.maturity)?;
+        let d1_anchor = eval1(interval.anchor)?;
+        let d1_maturity = eval1(interval.maturity)?;
+        let diff = zero_rate_difference(ZeroRateDiffParams {
+            d0_anchor,
+            d0_maturity,
+            d1_anchor,
+            d1_maturity,
+            alpha,
+            scale: query.scale,
+        })?;
+        rows.push(RateDiffRow {
+            source_t0: query.source_t0.clone(),
+            source_t1: query.source_t1.clone(),
+            anchor: interval.anchor,
+            maturity: interval.maturity,
+            day_count: query.day_count,
+            year_fraction: alpha,
+            scale: query.scale,
+            diff,
+        });
+    }
+    DiffMeasurement::from_validated_rows(rows)
+}
+
+/// Request parameters for comparing native piecewise-constant hazard intensities.
+#[derive(Debug, Clone)]
+pub struct HazardDiffQuery<'a> {
+    /// Hazard curve identifier in `market_t0`.
+    pub source_t0: CurveId,
+    /// Hazard curve identifier in `market_t1`.
+    pub source_t1: CurveId,
+    /// Strictly increasing non-negative source-year times relative to `source_base_date()`.
+    pub times: &'a [f64],
+    /// Native intensity output scale (`Decimal` or `IntensityBp`).
+    pub scale: HazardDiffScale,
+}
+
+impl<'a> HazardDiffQuery<'a> {
+    /// Create a native hazard intensity diff query for the same curve ID on both snapshots.
+    ///
+    /// # Arguments
+    /// - `curve_id` - Hazard curve identifier in `market_t0` and `market_t1`.
+    /// - `times` - Non-empty strictly increasing non-negative times on the source curve clock.
+    /// - `scale` - Output hazard intensity scale.
+    #[must_use]
+    pub fn new(curve_id: impl Into<CurveId>, times: &'a [f64], scale: HazardDiffScale) -> Self {
+        let id = curve_id.into();
+        Self {
+            source_t0: id.clone(),
+            source_t1: id,
+            times,
+            scale,
+        }
+    }
+
+    /// Override the earlier and later hazard curve identifiers explicitly.
+    ///
+    /// # Arguments
+    /// - `source_t0` - Hazard curve identifier in the earlier snapshot.
+    /// - `source_t1` - Hazard curve identifier in the later snapshot.
+    #[must_use]
+    pub fn with_source_ids(
+        mut self,
+        source_t0: impl Into<CurveId>,
+        source_t1: impl Into<CurveId>,
+    ) -> Self {
+        self.source_t0 = source_t0.into();
+        self.source_t1 = source_t1.into();
+        self
+    }
+}
+
+/// Native hazard intensity difference at a single source-clock time coordinate.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct HazardDiffRow {
+    /// Source curve identifier in `market_t0`.
+    pub source_t0: CurveId,
+    /// Source curve identifier in `market_t1`.
+    pub source_t1: CurveId,
+    /// Shared original unconditioned source base date.
+    pub source_base_date: Date,
+    /// Shared source day-count convention.
+    pub day_count: DayCount,
+    /// Source-clock evaluation time in years from `source_base_date`.
+    pub time_years: f64,
+    /// Intensity output scale (`Decimal` or `IntensityBp`).
+    pub scale: HazardDiffScale,
+    /// Measured intensity change `(λ₁ - λ₀) * scale_factor`.
+    pub diff: f64,
+}
+
+impl MeasuredDiffValue for HazardDiffRow {
+    fn measured_diff(&self) -> f64 {
+        self.diff
+    }
+}
+
+/// Measure native hazard intensity differences `λ₁(t) - λ₀(t)` on a compatible source clock.
+///
+/// Evaluates both curves via [`HazardCurve::source_hazard_rate`](crate::market_data::term_structures::HazardCurve::source_hazard_rate)
+/// on their retained pre-conditioning coordinate schedule, without inferring CDS spreads or
+/// falling back to discount curves.
+///
+/// # Arguments
+/// - `query` - Hazard query naming source curves, strictly increasing `times`, and scale.
+/// - `market_t0` - Earlier market snapshot.
+/// - `market_t1` - Later market snapshot.
+///
+/// # Errors
+/// Returns an error if either hazard curve is missing, `source_base_date()` or `day_count()`
+/// differs between snapshots, `times` is empty, contains non-finite, negative, duplicate, or
+/// unsorted times, or any evaluated hazard rate/diff is non-finite.
+pub fn measure_hazard_intensity_diff(
+    query: &HazardDiffQuery<'_>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Result<DiffMeasurement<HazardDiffRow>> {
+    if query.times.is_empty() {
+        return Err(Error::Validation(
+            "hazard intensity diff requires at least one time point".to_string(),
+        ));
+    }
+    let c0 = market_t0.get_hazard(query.source_t0.as_str())?;
+    let c1 = market_t1.get_hazard(query.source_t1.as_str())?;
+    if c0.source_base_date() != c1.source_base_date() {
+        return Err(Error::Validation(format!(
+            "hazard curves have incompatible source base dates ({} vs {})",
+            c0.source_base_date(),
+            c1.source_base_date()
+        )));
+    }
+    if c0.day_count() != c1.day_count() {
+        return Err(Error::Validation(format!(
+            "hazard curves have incompatible day counts ({} vs {})",
+            c0.day_count(),
+            c1.day_count()
+        )));
+    }
+
+    let mut rows = Vec::with_capacity(query.times.len());
+    let mut prev_t: Option<f64> = None;
+    for &t in query.times {
+        if !t.is_finite() || t < 0.0 {
+            return Err(Error::Validation(format!(
+                "hazard query time must be finite and non-negative, got {t}"
+            )));
+        }
+        if let Some(prev) = prev_t
+            && t <= prev
+        {
+            return Err(Error::Validation(format!(
+                "hazard query times must be strictly increasing ({t} after {prev})"
+            )));
+        }
+        prev_t = Some(t);
+
+        let l0 = c0.source_hazard_rate(t)?;
+        let l1 = c1.source_hazard_rate(t)?;
+        if !l0.is_finite() || !l1.is_finite() {
+            return Err(Error::Validation(format!(
+                "non-finite hazard rate at t={t}: ({l0}, {l1})"
+            )));
+        }
+        let delta = finite_f64_diff(l0, l1, query.scale.scale_factor())?;
+        rows.push(HazardDiffRow {
+            source_t0: query.source_t0.clone(),
+            source_t1: query.source_t1.clone(),
+            source_base_date: c0.source_base_date(),
+            day_count: c0.day_count(),
+            time_years: t,
+            scale: query.scale,
+            diff: delta,
+        });
+    }
+    DiffMeasurement::from_validated_rows(rows)
+}
+
+/// Request parameters for comparing projected CPI levels across two [`InflationCurve`] snapshots.
+#[derive(Debug, Clone)]
+pub struct InflationCpiDiffQuery<'a> {
+    /// Inflation curve identifier in `market_t0`.
+    pub source_t0: CurveId,
+    /// Inflation curve identifier in `market_t1`.
+    pub source_t1: CurveId,
+    /// Non-empty strictly increasing evaluation dates on or after both curves' base dates.
+    pub dates: &'a [Date],
+}
+
+impl<'a> InflationCpiDiffQuery<'a> {
+    /// Create a projected CPI level comparison query for matching curve IDs.
+    ///
+    /// # Arguments
+    /// - `curve_id` - Inflation curve identifier in both `market_t0` and `market_t1`.
+    /// - `dates` - Non-empty strictly increasing calendar dates to evaluate.
+    #[must_use]
+    pub fn new(curve_id: impl Into<CurveId>, dates: &'a [Date]) -> Self {
+        let id = curve_id.into();
+        Self {
+            source_t0: id.clone(),
+            source_t1: id,
+            dates,
+        }
+    }
+
+    /// Override the earlier and later curve identifiers explicitly.
+    ///
+    /// # Arguments
+    /// - `source_t0` - Inflation curve identifier in the earlier snapshot.
+    /// - `source_t1` - Inflation curve identifier in the later snapshot.
+    #[must_use]
+    pub fn with_source_ids(
+        mut self,
+        source_t0: impl Into<CurveId>,
+        source_t1: impl Into<CurveId>,
+    ) -> Self {
+        self.source_t0 = source_t0.into();
+        self.source_t1 = source_t1.into();
+        self
+    }
+}
+
+/// Native projected CPI level difference at a single explicit calendar date.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct InflationCpiDiffRow {
+    /// Source inflation curve identifier in `market_t0`.
+    pub source_t0: CurveId,
+    /// Source inflation curve identifier in `market_t1`.
+    pub source_t1: CurveId,
+    /// Comparison calendar date.
+    pub date: Date,
+    /// Projected native CPI index-point difference `I₁(date) - I₀(date)`.
+    pub diff: f64,
+}
+
+impl MeasuredDiffValue for InflationCpiDiffRow {
+    fn measured_diff(&self) -> f64 {
+        self.diff
+    }
+}
+
+/// Measure projected CPI level differences `I₁(d) - I₀(d)` directly on [`InflationCurve`]s.
+///
+/// Fails closed if either curve is missing or invalid, without falling back to [`InflationIndex`].
+///
+/// # Arguments
+/// - `query` - Projected CPI query naming source curves and strictly increasing `dates`.
+/// - `market_t0` - Earlier market snapshot.
+/// - `market_t1` - Later market snapshot.
+///
+/// # Errors
+/// Returns an error if either inflation curve is missing, `dates` is empty or not strictly
+/// increasing, any date predates either curve's `base_date()`, or any evaluated CPI level or
+/// difference is non-positive/non-finite.
+pub fn measure_inflation_cpi_level_diff(
+    query: &InflationCpiDiffQuery<'_>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Result<DiffMeasurement<InflationCpiDiffRow>> {
+    if query.dates.is_empty() {
+        return Err(Error::Validation(
+            "projected CPI level diff requires at least one date".to_string(),
+        ));
+    }
+    let c0 = market_t0.get_inflation_curve(query.source_t0.as_str())?;
+    let c1 = market_t1.get_inflation_curve(query.source_t1.as_str())?;
+    let mut rows = Vec::with_capacity(query.dates.len());
+    let mut prev_date: Option<Date> = None;
+
+    for &date in query.dates {
+        if let Some(prev) = prev_date
+            && date <= prev
+        {
+            return Err(Error::Validation(format!(
+                "projected CPI query dates must be strictly increasing ({date} after {prev})"
+            )));
+        }
+        prev_date = Some(date);
+        if date < c0.base_date() || date < c1.base_date() {
+            return Err(Error::Validation(format!(
+                "query date ({date}) predates inflation curve base dates ({}, {})",
+                c0.base_date(),
+                c1.base_date()
+            )));
+        }
+        let cpi0 = positive_finite(c0.cpi_on_date(date)?, "cpi0")?;
+        let cpi1 = positive_finite(c1.cpi_on_date(date)?, "cpi1")?;
+        let diff = finite_f64_diff(cpi0, cpi1, 1.0)?;
+        rows.push(InflationCpiDiffRow {
+            source_t0: query.source_t0.clone(),
+            source_t1: query.source_t1.clone(),
+            date,
+            diff,
+        });
+    }
+    DiffMeasurement::from_validated_rows(rows)
+}
+
+/// Request parameters for comparing projected annual CPI growth rates between snapshots.
+#[derive(Debug, Clone)]
+pub struct InflationGrowthDiffQuery<'a> {
+    /// Inflation curve identifier in `market_t0`.
+    pub source_t0: CurveId,
+    /// Inflation curve identifier in `market_t1`.
+    pub source_t1: CurveId,
+    /// Non-empty, duplicate-free ordered slice of `[anchor, maturity]` intervals.
+    pub intervals: &'a [DateInterval],
+    /// Reporting day-count convention used to annualize growth over `[anchor, maturity]`.
+    pub day_count: DayCount,
+    /// Reporting day-count context for `day_count`.
+    pub day_count_context: DayCountContext<'a>,
+    /// Output annual rate scale (`Decimal` or `BasisPoints`).
+    pub scale: RateDiffScale,
+}
+
+impl<'a> InflationGrowthDiffQuery<'a> {
+    /// Create a projected annual CPI growth comparison query.
+    ///
+    /// # Arguments
+    /// - `curve_id` - Inflation curve identifier in `market_t0` and `market_t1`.
+    /// - `intervals` - Non-empty unique ordered `[anchor, maturity]` intervals.
+    /// - `day_count` - Reporting day-count convention for interval year fraction `α`.
+    /// - `scale` - Output rate scale (`Decimal` or `BasisPoints`).
+    #[must_use]
+    pub fn new(
+        curve_id: impl Into<CurveId>,
+        intervals: &'a [DateInterval],
+        day_count: DayCount,
+        scale: RateDiffScale,
+    ) -> Self {
+        let id = curve_id.into();
+        Self {
+            source_t0: id.clone(),
+            source_t1: id,
+            intervals,
+            day_count,
+            day_count_context: DayCountContext::default(),
+            scale,
+        }
+    }
+
+    /// Override the earlier and later inflation curve identifiers explicitly.
+    ///
+    /// # Arguments
+    /// - `source_t0` - Inflation curve identifier in `market_t0`.
+    /// - `source_t1` - Inflation curve identifier in `market_t1`.
+    #[must_use]
+    pub fn with_source_ids(
+        mut self,
+        source_t0: impl Into<CurveId>,
+        source_t1: impl Into<CurveId>,
+    ) -> Self {
+        self.source_t0 = source_t0.into();
+        self.source_t1 = source_t1.into();
+        self
+    }
+
+    /// Attach a [`DayCountContext`] for reporting day-count calculations.
+    ///
+    /// # Arguments
+    /// - `context` - Reporting day-count context passed to [`DayCount::year_fraction`].
+    #[must_use]
+    pub fn with_day_count_context(mut self, context: DayCountContext<'a>) -> Self {
+        self.day_count_context = context;
+        self
+    }
+}
+
+/// Measured change in projected annual CPI compound growth over `[anchor, maturity]`.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct InflationGrowthDiffRow {
+    /// Source inflation curve identifier in `market_t0`.
+    pub source_t0: CurveId,
+    /// Source inflation curve identifier in `market_t1`.
+    pub source_t1: CurveId,
+    /// Common anchor date `V`.
+    pub anchor: Date,
+    /// Common maturity date `T`.
+    pub maturity: Date,
+    /// Reporting day count used to compute `year_fraction`.
+    pub day_count: DayCount,
+    /// Strictly positive reporting year fraction `α`.
+    pub year_fraction: f64,
+    /// Output unit scale (`Decimal` or `BasisPoints`).
+    pub scale: RateDiffScale,
+    /// Annualized compound growth change `π₁ - π₀` in `scale` units.
+    pub diff: f64,
+}
+
+impl MeasuredDiffValue for InflationGrowthDiffRow {
+    fn measured_diff(&self) -> f64 {
+        self.diff
+    }
+}
+
+/// Measure projected annual CPI compound growth differences `(I₁(T)/I₁(V))^(1/α) - (I₀(T)/I₀(V))^(1/α)`.
+///
+/// Requires compatible curve clocks (`c0.day_count() == c1.day_count()`) and computes the
+/// continuous log cross-ratio via [`zero_rate_difference`] before converting cleanly through
+/// `exp(r₀) * expm1(r₁ - r₀)` so small growth shifts retain full precision without subtraction
+/// cancellation near `1.0`.
+///
+/// # Arguments
+/// - `query` - Projected annual growth query naming curves, intervals, day count, and scale.
+/// - `market_t0` - Earlier market snapshot.
+/// - `market_t1` - Later market snapshot.
+///
+/// # Errors
+/// Returns an error if either curve is missing, their `day_count()` clocks differ, `intervals`
+/// is empty/duplicate/invalid, any date predates curve `base_date()`, reporting `α <= 0`, or any
+/// CPI level or derived annual growth overflows/is non-finite.
+pub fn measure_inflation_annual_growth_diff(
+    query: &InflationGrowthDiffQuery<'_>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Result<DiffMeasurement<InflationGrowthDiffRow>> {
+    if query.intervals.is_empty() {
+        return Err(Error::Validation(
+            "projected CPI annual growth diff requires at least one interval".to_string(),
+        ));
+    }
+    let c0 = market_t0.get_inflation_curve(query.source_t0.as_str())?;
+    let c1 = market_t1.get_inflation_curve(query.source_t1.as_str())?;
+    if c0.day_count() != c1.day_count() {
+        return Err(Error::Validation(format!(
+            "inflation curves have incompatible day counts ({} vs {})",
+            c0.day_count(),
+            c1.day_count()
+        )));
+    }
+
+    let mut seen = BTreeSet::new();
+    let mut rows = Vec::with_capacity(query.intervals.len());
+    for interval in query.intervals {
+        if interval.maturity <= interval.anchor {
+            return Err(Error::Validation(format!(
+                "interval maturity ({}) must be strictly after anchor ({})",
+                interval.maturity, interval.anchor
+            )));
+        }
+        if !seen.insert((interval.anchor, interval.maturity)) {
+            return Err(Error::Validation(format!(
+                "duplicate comparison interval ({}, {})",
+                interval.anchor, interval.maturity
+            )));
+        }
+        if interval.anchor < c0.base_date() || interval.anchor < c1.base_date() {
+            return Err(Error::Validation(format!(
+                "interval anchor ({}) predates inflation curve base dates ({}, {})",
+                interval.anchor,
+                c0.base_date(),
+                c1.base_date()
+            )));
+        }
+        let alpha = query.day_count.year_fraction(
+            interval.anchor,
+            interval.maturity,
+            query.day_count_context,
+        )?;
+        if !alpha.is_finite() || alpha <= 0.0 {
+            return Err(Error::Validation(format!(
+                "reporting day count {} produced invalid year fraction {alpha} for ({}, {})",
+                query.day_count, interval.anchor, interval.maturity
             )));
         }
 
-        let shift = if values_are_effectively_equal(v0, v1) {
+        let i0_a = positive_finite(c0.cpi_on_date(interval.anchor)?, "i0_anchor")?;
+        let i0_m = positive_finite(c0.cpi_on_date(interval.maturity)?, "i0_maturity")?;
+        let i1_a = positive_finite(c1.cpi_on_date(interval.anchor)?, "i1_anchor")?;
+        let i1_m = positive_finite(c1.cpi_on_date(interval.maturity)?, "i1_maturity")?;
+
+        // `zero_rate_difference` computes `(ell_0 - ell_1) / alpha`; for growth factor `I = exp(+r*t)`,
+        // later minus earlier continuous growth rate `r_1 - r_0` is its negation.
+        let delta_r = -zero_rate_difference(ZeroRateDiffParams {
+            d0_anchor: i0_a,
+            d0_maturity: i0_m,
+            d1_anchor: i1_a,
+            d1_maturity: i1_m,
+            alpha,
+            scale: RateDiffScale::Decimal,
+        })?;
+        let r0 =
+            super::term_structures::common::checked_log_cross_ratio(i0_m, 1.0, i0_a, 1.0) / alpha;
+        if !r0.is_finite() {
+            return Err(Error::Validation(format!(
+                "baseline annual CPI log-growth overflowed f64: r0={r0}"
+            )));
+        }
+        let diff_dec = if exact_f64_eq(delta_r, 0.0) {
             0.0
         } else {
-            (v1 - v0) * scaling_factor
+            r0.exp() * delta_r.exp_m1()
         };
-        total_shift += shift;
-        if !total_shift.is_finite() {
-            return Err(crate::Error::Validation(
-                "accumulated curve shift is not finite".to_string(),
-            ));
+        let diff = diff_dec * query.scale.scale_factor();
+        if !diff.is_finite() || (!exact_f64_eq(delta_r, 0.0) && exact_f64_eq(diff, 0.0)) {
+            return Err(Error::Validation(format!(
+                "projected annual CPI growth diff overflowed or underflowed f64: diff_dec={diff_dec}"
+            )));
         }
-        count += 1;
+        rows.push(InflationGrowthDiffRow {
+            source_t0: query.source_t0.clone(),
+            source_t1: query.source_t1.clone(),
+            anchor: interval.anchor,
+            maturity: interval.maturity,
+            day_count: query.day_count,
+            year_fraction: alpha,
+            scale: query.scale,
+            diff: normalize_zero(diff),
+        });
+    }
+    DiffMeasurement::from_validated_rows(rows)
+}
+
+/// Named monthly inflation reference period `(year, month)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct InflationPeriod {
+    /// Calendar year of the inflation index print.
+    pub year: i32,
+    /// Calendar month of the inflation index print.
+    pub month: Month,
+}
+
+impl InflationPeriod {
+    /// Construct a monthly reference coordinate `(year, month)`.
+    ///
+    /// # Arguments
+    /// - `year` - Calendar year of the monthly CPI print.
+    /// - `month` - Calendar month of the monthly CPI print.
+    #[must_use]
+    pub const fn new(year: i32, month: Month) -> Self {
+        Self { year, month }
+    }
+}
+
+/// Pair of monthly inflation reference periods `(period_t0, period_t1)` to compare across snapshots.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct InflationPeriodPair {
+    /// Reference `(year, month)` observed in `market_t0`.
+    pub period_t0: InflationPeriod,
+    /// Reference `(year, month)` observed in `market_t1`.
+    pub period_t1: InflationPeriod,
+}
+
+impl InflationPeriodPair {
+    /// Construct a same-period pair comparing the identical `(year, month)` print across snapshots.
+    ///
+    /// # Arguments
+    /// - `year` - Calendar year of the monthly CPI print in both snapshots.
+    /// - `month` - Calendar month of the monthly CPI print in both snapshots.
+    #[must_use]
+    pub const fn same(year: i32, month: Month) -> Self {
+        let period = InflationPeriod::new(year, month);
+        Self {
+            period_t0: period,
+            period_t1: period,
+        }
     }
 
-    if count == 0 {
-        return Err(crate::InputError::TooFewPoints.into());
+    /// Construct an explicit cross-period pair comparing `period_t0` in `market_t0` against `period_t1` in `market_t1`.
+    ///
+    /// # Arguments
+    /// - `period_t0` - Reference `(year, month)` queried in `market_t0`.
+    /// - `period_t1` - Reference `(year, month)` queried in `market_t1`.
+    #[must_use]
+    pub const fn cross(period_t0: InflationPeriod, period_t1: InflationPeriod) -> Self {
+        Self {
+            period_t0,
+            period_t1,
+        }
     }
-    let average = total_shift / count as f64;
-    if !average.is_finite() {
-        return Err(crate::Error::Validation(
-            "average curve shift is not finite".to_string(),
+}
+
+/// Request parameters for comparing observed monthly CPI prints with explicit knowledge cutoffs.
+#[derive(Debug, Clone)]
+pub struct InflationObservationDiffQuery<'a> {
+    /// Inflation index identifier in `market_t0`.
+    pub source_t0: &'a str,
+    /// Inflation index identifier in `market_t1`.
+    pub source_t1: &'a str,
+    /// Non-empty, duplicate-free ordered slice of reference `(period_t0, period_t1)` pairs.
+    pub periods: &'a [InflationPeriodPair],
+    /// Knowledge cutoff date `K₀` governing observation availability in `market_t0`.
+    pub knowledge_date_t0: Date,
+    /// Knowledge cutoff date `K₁` governing observation availability in `market_t1`.
+    pub knowledge_date_t1: Date,
+    /// Output scale (`NativePoints` or unannualized `Proportional`).
+    pub scale: ObservationDiffScale,
+}
+
+impl<'a> InflationObservationDiffQuery<'a> {
+    /// Create a query comparing monthly period pairs across two inflation index snapshots.
+    ///
+    /// # Arguments
+    /// - `index_id` - Inflation index identifier in `market_t0` and `market_t1`.
+    /// - `periods` - Non-empty ordered duplicate-free list of `(period_t0, period_t1)` pairs.
+    /// - `knowledge_date_t0` - Information cutoff date for snapshot `t0`.
+    /// - `knowledge_date_t1` - Information cutoff date for snapshot `t1`.
+    /// - `scale` - Output difference scale (`NativePoints` or `Proportional`).
+    #[must_use]
+    pub const fn new(
+        index_id: &'a str,
+        periods: &'a [InflationPeriodPair],
+        knowledge_date_t0: Date,
+        knowledge_date_t1: Date,
+        scale: ObservationDiffScale,
+    ) -> Self {
+        Self {
+            source_t0: index_id,
+            source_t1: index_id,
+            periods,
+            knowledge_date_t0,
+            knowledge_date_t1,
+            scale,
+        }
+    }
+
+    /// Override the earlier and later index identifiers explicitly.
+    ///
+    /// # Arguments
+    /// - `source_t0` - Inflation index identifier in `market_t0`.
+    /// - `source_t1` - Inflation index identifier in `market_t1`.
+    #[must_use]
+    pub const fn with_source_ids(mut self, source_t0: &'a str, source_t1: &'a str) -> Self {
+        self.source_t0 = source_t0;
+        self.source_t1 = source_t1;
+        self
+    }
+}
+
+/// Measured difference for a single monthly inflation observation across two snapshots.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct InflationObservationDiffRow {
+    /// Source inflation index identifier in `market_t0`.
+    pub source_t0: String,
+    /// Source inflation index identifier in `market_t1`.
+    pub source_t1: String,
+    /// Reference `(year, month)` queried in `market_t0`.
+    pub period_t0: InflationPeriod,
+    /// Reference `(year, month)` queried in `market_t1`.
+    pub period_t1: InflationPeriod,
+    /// Knowledge cutoff date enforced on `market_t0`.
+    pub knowledge_date_t0: Date,
+    /// Knowledge cutoff date enforced on `market_t1`.
+    pub knowledge_date_t1: Date,
+    /// Qualified print in `market_t0`.
+    pub value_t0: f64,
+    /// Qualified print in `market_t1`.
+    pub value_t1: f64,
+    /// Scale of `diff`.
+    pub scale: ObservationDiffScale,
+    /// Classification of the comparison (`Unchanged`, `Revision`, or `CrossPeriod`).
+    pub kind: ObservationChangeKind,
+    /// Measured difference in `scale` units.
+    pub diff: f64,
+}
+
+impl MeasuredDiffValue for InflationObservationDiffRow {
+    fn measured_diff(&self) -> f64 {
+        self.diff
+    }
+}
+
+/// Measure observed monthly CPI changes for explicitly named periods and knowledge cutoffs.
+///
+/// Enforces matching index currency and seasonal-adjustment identity across both snapshots,
+/// qualifies release eligibility using [`InflationIndex::qualified_monthly_observation`](crate::market_data::scalars::InflationIndex::qualified_monthly_observation),
+/// labels same-month changes as [`ObservationChangeKind::Revision`] and distinct-month
+/// comparisons as [`ObservationChangeKind::CrossPeriod`], and never falls back to
+/// [`InflationCurve`](crate::market_data::term_structures::InflationCurve) projections.
+///
+/// # Arguments
+/// - `query` - Observation diff query specifying index IDs, period pairs, cutoffs `K₀`/`K₁`, and scale.
+/// - `market_t0` - Earlier market snapshot.
+/// - `market_t1` - Later market snapshot.
+///
+/// # Errors
+/// Returns an error if either index is missing, currencies differ,
+/// `periods` is empty or contains duplicate `(period_t0, period_t1)` pairs, or any requested
+/// monthly print is missing, non-positive, non-finite, or
+/// unreleased as of its snapshot's `knowledge_date`.
+pub fn measure_inflation_observation_diff(
+    query: &InflationObservationDiffQuery<'_>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Result<DiffMeasurement<InflationObservationDiffRow>> {
+    if query.periods.is_empty() {
+        return Err(Error::Validation(
+            "observed CPI diff requires at least one period".to_string(),
         ));
     }
-    Ok(average)
-}
-
-/// Map each tenor through `shift`, rejecting a non-finite result; `what`
-/// names the measured quantity in the error.
-fn per_tenor_shifts(tenors: &[f64], what: &str, shift: impl Fn(f64) -> f64) -> Result<Vec<f64>> {
-    validate_measurement_grid(tenors)?;
-    tenors
-        .iter()
-        .map(|&t| {
-            let shift = shift(t);
-            if shift.is_finite() {
-                Ok(shift)
-            } else {
-                Err(crate::Error::Validation(format!(
-                    "{what} shift at tenor {t} is not finite"
-                )))
-            }
-        })
-        .collect()
-}
-
-fn values_are_effectively_equal(a: f64, b: f64) -> bool {
-    const RELATIVE_EQUALITY_TOLERANCE: f64 = 1.0e-14;
-
-    if !(a.is_finite() && b.is_finite()) {
-        return false;
+    let idx0 = market_t0.get_inflation_index(query.source_t0)?;
+    let idx1 = market_t1.get_inflation_index(query.source_t1)?;
+    if idx0.currency() != idx1.currency() {
+        return Err(Error::CurrencyMismatch {
+            expected: idx0.currency(),
+            actual: idx1.currency(),
+        });
     }
-    let scale = a.abs().max(b.abs()).max(1.0);
-    (a - b).abs() <= RELATIVE_EQUALITY_TOLERANCE * scale
+
+    let mut seen = BTreeSet::new();
+    let mut rows = Vec::with_capacity(query.periods.len());
+    for &pair in query.periods {
+        if !seen.insert((
+            pair.period_t0.year,
+            pair.period_t0.month as u8,
+            pair.period_t1.year,
+            pair.period_t1.month as u8,
+        )) {
+            return Err(Error::Validation(format!(
+                "duplicate inflation period pair ({} {}, {} {})",
+                pair.period_t0.year,
+                pair.period_t0.month,
+                pair.period_t1.year,
+                pair.period_t1.month
+            )));
+        }
+        let v0 = idx0.qualified_monthly_observation(
+            pair.period_t0.year,
+            pair.period_t0.month,
+            query.knowledge_date_t0,
+        )?;
+        let v1 = idx1.qualified_monthly_observation(
+            pair.period_t1.year,
+            pair.period_t1.month,
+            query.knowledge_date_t1,
+        )?;
+        let diff = match query.scale {
+            ObservationDiffScale::NativePoints => finite_f64_diff(v0, v1, 1.0)?,
+            ObservationDiffScale::Proportional(prop_scale) => {
+                proportional_f64_change(v0, v1, prop_scale)?
+            }
+        };
+        let kind = if pair.period_t0 != pair.period_t1 {
+            ObservationChangeKind::CrossPeriod
+        } else if exact_f64_eq(v1, v0) {
+            ObservationChangeKind::Unchanged
+        } else {
+            ObservationChangeKind::Revision
+        };
+        rows.push(InflationObservationDiffRow {
+            source_t0: query.source_t0.to_string(),
+            source_t1: query.source_t1.to_string(),
+            period_t0: pair.period_t0,
+            period_t1: pair.period_t1,
+            knowledge_date_t0: query.knowledge_date_t0,
+            knowledge_date_t1: query.knowledge_date_t1,
+            value_t0: v0,
+            value_t1: v1,
+            scale: query.scale,
+            kind,
+            diff,
+        });
+    }
+    DiffMeasurement::from_validated_rows(rows)
 }
 
-/// Measure average parallel rate shift in discount curve (basis points).
-///
-/// # Arguments
-///
-/// * `curve_id` - Identifier of the discount curve to retrieve from both market
-///   contexts. The same ID must resolve in each context.
-/// * `market_t0` - Baseline market context representing the earlier state.
-/// * `market_t1` - Comparison market context representing the later state.
-/// * `method` - Tenor-sampling policy used to average zero-rate differences.
-///   `Dynamic` samples the baseline curve's knots.
-///
-/// # Errors
-///
-/// Returns an error if `curve_id` is absent from either market context, the
-/// selected grid is empty or non-finite, or a curve cannot provide a finite
-/// sample value on that grid.
-pub fn measure_discount_curve_shift(
-    curve_id: impl AsRef<str>,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-    method: TenorSamplingMethod,
-) -> Result<f64> {
-    let curve_t0 = market_t0.get_discount(&curve_id)?;
-    let curve_t1 = market_t1.get_discount(&curve_id)?;
-
-    let tenors = method.tenors(Some(curve_t0.knots()));
-    measure_average_shift(
-        tenors,
-        BASIS_POINTS_PER_UNIT,
-        |t| curve_t0.zero_rate(t, crate::math::Compounding::Continuous),
-        |t| curve_t1.zero_rate(t, crate::math::Compounding::Continuous),
-    )
+/// Complete explicit FX quote query parameters for measuring ordered-pair proportional moves.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FxQuoteDiffParams {
+    /// Base ("from") currency whose unit is priced in `quote` units.
+    pub base: Currency,
+    /// Quote ("to") currency.
+    pub quote: Currency,
+    /// Query date in the earlier snapshot `market_t0`.
+    pub date_t0: Date,
+    /// Required provider selection policy in `market_t0`.
+    pub policy_t0: FxConversionPolicy,
+    /// Query date in the later snapshot `market_t1`.
+    pub date_t1: Date,
+    /// Required provider selection policy in `market_t1`.
+    pub policy_t1: FxConversionPolicy,
+    /// Output proportional scale (`Fraction` or `Percent`).
+    pub scale: ProportionalDiffScale,
 }
 
-/// Measure the average **par CDS spread** shift on a hazard curve (basis points).
-///
-/// Where a raw hazard-rate shift would sample `hazard_rate`, this samples
-/// the par CDS spread (via `HazardCurve::cds_quote_bp`) rather than the raw
-/// hazard rate. Credit sensitivities (`Cs01`, `BucketedCs01`) are defined per bp
-/// of **par-spread** move, so attribution must pair them with this — pairing a
-/// par-spread CS01 with a hazard-rate move overstates credit P&L by a factor of
-/// `1 / (1 - recovery)`.
-///
-/// # Arguments
-///
-/// * `curve_id` - Identifier of the hazard curve to retrieve from both market
-///   contexts. The same ID must resolve in each context.
-/// * `market_t0` - Baseline market context representing the earlier state.
-/// * `market_t1` - Comparison market context representing the later state.
-/// * `method` - Tenor-sampling policy used to average par-CDS-spread changes.
-///   `Dynamic` samples the baseline hazard curve's knots.
-///
-/// # Errors
-///
-/// Returns an error if `curve_id` is absent from either market context, the
-/// selected grid is empty or non-finite, or a curve cannot provide a finite
-/// sample value on that grid.
-pub fn measure_par_spread_shift(
-    curve_id: impl AsRef<str>,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-    method: TenorSamplingMethod,
-) -> Result<f64> {
-    let curve_t0 = market_t0.get_hazard(&curve_id)?;
-    let curve_t1 = market_t1.get_hazard(&curve_id)?;
-
-    let t0_knots: Vec<f64> = curve_t0.knot_points().map(|(t, _)| t).collect();
-    let tenors = match method {
-        TenorSamplingMethod::Dynamic => t0_knots.as_slice(),
-        _ => method.tenors(None),
-    };
-
-    let interp_t0 = curve_t0.par_interp();
-    let interp_t1 = curve_t1.par_interp();
-    // `cds_quote_bp` already returns basis points → scaling factor 1.0.
-    measure_average_shift(
-        tenors,
-        1.0,
-        |t| curve_t0.cds_quote_bp(t, interp_t0),
-        |t| curve_t1.cds_quote_bp(t, interp_t1),
-    )
+/// Provenance-bearing measurement of an ordered-pair FX proportional quote change.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct FxQuoteDiffMeasurement {
+    /// Base ("from") currency whose unit is priced in `quote` units.
+    pub base: Currency,
+    /// Quote ("to") currency.
+    pub quote: Currency,
+    /// Query date in the earlier snapshot `market_t0`.
+    pub date_t0: Date,
+    /// Required provider selection policy in `market_t0`.
+    pub policy_t0: FxConversionPolicy,
+    /// Query date in the later snapshot `market_t1`.
+    pub date_t1: Date,
+    /// Required provider selection policy in `market_t1`.
+    pub policy_t1: FxConversionPolicy,
+    /// Resolved `base/quote` FX rate in `market_t0` (`1.0` when `base == quote`).
+    pub rate_t0: f64,
+    /// Whether `rate_t0` required pivot triangulation rather than a direct quote (`false` for identity).
+    pub triangulated_t0: bool,
+    /// Resolved `base/quote` FX rate in `market_t1` (`1.0` when `base == quote`).
+    pub rate_t1: f64,
+    /// Whether `rate_t1` required pivot triangulation rather than a direct quote (`false` for identity).
+    pub triangulated_t1: bool,
+    /// Output proportional scale (`Fraction` or `Percent`).
+    pub scale: ProportionalDiffScale,
+    /// Measured proportional difference `(rate_t1 - rate_t0) / rate_t0` in `scale` units.
+    pub diff: f64,
 }
 
-/// Measure the **per-tenor** par CDS spread shift (basis points) at the given
-/// tenors.
+/// Measure ordered-pair FX proportional change `(r₁ - r₀) / r₀` with explicit date, policy, and provenance.
 ///
-/// Unlike [`measure_par_spread_shift`] (which averages over a tenor grid), this
-/// returns the shift at each requested tenor so callers can pair it with a
-/// per-tenor (key-rate) `BucketedCs01`, attributing non-parallel (twisted)
-/// credit-curve moves correctly. Returns one entry per input tenor, in order.
+/// Fast-paths `base == quote` to `diff = 0.0` (with unit resolved rates and `triangulated = false`)
+/// without requiring FX matrices on either snapshot.
 ///
 /// # Arguments
-///
-/// * `curve_id` - Identifier of the hazard curve to retrieve from both market
-///   contexts. The same ID must resolve in each context.
-/// * `market_t0` - Baseline market context representing the earlier state.
-/// * `market_t1` - Comparison market context representing the later state.
-/// * `tenors` - Year-fraction maturities at which to measure the par-CDS-spread
-///   change. Output positions match this input order.
+/// - `params` - Ordered currency pair, per-snapshot dates and conversion policies, and scale.
+/// - `market_t0` - Earlier market snapshot.
+/// - `market_t1` - Later market snapshot.
 ///
 /// # Errors
-///
-/// Returns an error if `curve_id` is absent from either market context, the
-/// selected grid is empty or non-finite, or a curve cannot provide a finite
-/// sample value on that grid.
-pub(crate) fn measure_per_tenor_par_spread_shift(
-    curve_id: impl AsRef<str>,
+/// Returns [`InputError::NotFound`] if either snapshot lacks an [`FxMatrix`](crate::money::fx::FxMatrix)
+/// when `base != quote` or cannot quote `base/quote`, or [`Error::Validation`] if either quote is
+/// non-positive/non-finite or the proportional ratio overflows or underflows `f64`.
+pub fn measure_fx_quote_diff(
+    params: &FxQuoteDiffParams,
     market_t0: &MarketContext,
     market_t1: &MarketContext,
-    tenors: &[f64],
-) -> Result<Vec<f64>> {
-    let curve_t0 = market_t0.get_hazard(&curve_id)?;
-    let curve_t1 = market_t1.get_hazard(&curve_id)?;
-    let interp_t0 = curve_t0.par_interp();
-    let interp_t1 = curve_t1.par_interp();
-    per_tenor_shifts(tenors, "par spread", |t| {
-        curve_t1.cds_quote_bp(t, interp_t1) - curve_t0.cds_quote_bp(t, interp_t0)
+) -> Result<FxQuoteDiffMeasurement> {
+    if params.base == params.quote {
+        return Ok(FxQuoteDiffMeasurement {
+            base: params.base,
+            quote: params.quote,
+            date_t0: params.date_t0,
+            policy_t0: params.policy_t0,
+            date_t1: params.date_t1,
+            policy_t1: params.policy_t1,
+            rate_t0: 1.0,
+            triangulated_t0: false,
+            rate_t1: 1.0,
+            triangulated_t1: false,
+            scale: params.scale,
+            diff: 0.0,
+        });
+    }
+    let fx0 = market_t0.fx().ok_or_else(|| InputError::NotFound {
+        id: "fx_matrix (t0)".to_string(),
+    })?;
+    let fx1 = market_t1.fx().ok_or_else(|| InputError::NotFound {
+        id: "fx_matrix (t1)".to_string(),
+    })?;
+    let res0 = fx0.rate(FxQuery::new(
+        params.base,
+        params.quote,
+        params.date_t0,
+        params.policy_t0,
+    ))?;
+    let res1 = fx1.rate(FxQuery::new(
+        params.base,
+        params.quote,
+        params.date_t1,
+        params.policy_t1,
+    ))?;
+    positive_finite(res0.rate, "fx_rate_t0")?;
+    positive_finite(res1.rate, "fx_rate_t1")?;
+    let diff = proportional_f64_change(res0.rate, res1.rate, params.scale)?;
+    Ok(FxQuoteDiffMeasurement {
+        base: params.base,
+        quote: params.quote,
+        date_t0: params.date_t0,
+        policy_t0: params.policy_t0,
+        date_t1: params.date_t1,
+        policy_t1: params.policy_t1,
+        rate_t0: res0.rate,
+        triangulated_t0: res0.triangulated,
+        rate_t1: res1.rate,
+        triangulated_t1: res1.triangulated,
+        scale: params.scale,
+        diff,
     })
 }
 
-/// Measure the average **credit-curve** shift (basis points), accepting either
-/// curve representation a credit-risky instrument may use.
+/// Measure exact native currency difference `m₁ - m₀` between two `MarketScalar::Price` entries.
 ///
-/// A credit curve declared in an instrument's `credit_curves` dependency can be
-/// modelled two ways:
-///
-/// - a [`HazardCurve`](crate::market_data::term_structures::HazardCurve) — the
-///   move is the **par CDS spread** shift ([`measure_par_spread_shift`]), the
-///   basis a hazard-curve `Cs01` is defined on; or
-/// - a [`DiscountCurve`](crate::market_data::term_structures::DiscountCurve)
-///   serving a credit role — the move is the **zero-rate** shift
-///   ([`measure_discount_curve_shift`]), the basis a discount-style `Cs01` is
-///   bumped on.
-///
-/// The baseline curve's stored type selects its interpretation; errors from
-/// that measurement are returned without switching models. The move matches the
-/// instrument's own CS01. Used by P&L attribution so credit-spread P&L from a
-/// discount-style credit curve is attributed to the credit factor rather than
-/// leaking into the residual.
+/// Uses checked [`Money::checked_sub`] so exact `Decimal` precision and currency identity are
+/// preserved without converting through `f64` or rounded accessors.
 ///
 /// # Arguments
-///
-/// * `curve_id` - Identifier that resolves to a hazard curve or risky discount
-///   curve in both market contexts.
-/// * `market_t0` - Baseline market context representing the earlier state.
-/// * `market_t1` - Comparison market context representing the later state.
-/// * `method` - Tenor-sampling policy used for the averaged move. It is passed
-///   to the selected hazard- or discount-curve measurement.
+/// - `id_t0` - Price scalar identifier in `market_t0`.
+/// - `id_t1` - Price scalar identifier in `market_t1`.
+/// - `market_t0` - Earlier market snapshot.
+/// - `market_t1` - Later market snapshot.
 ///
 /// # Errors
-///
-/// Returns an error for a missing curve, inconsistent or unsupported stored
-/// types, invalid sampling inputs, or a failure of the selected measurement.
-pub fn measure_credit_curve_shift(
-    curve_id: impl AsRef<str>,
+/// Returns [`InputError::NotFound`] if either scalar is missing, [`Error::CurrencyMismatch`]
+/// if their currencies differ, or [`Error::Validation`] if either entry is `Unitless` or the
+/// `Decimal` difference overflows.
+pub fn measure_price_scalar_diff(
+    id_t0: &str,
+    id_t1: &str,
     market_t0: &MarketContext,
     market_t1: &MarketContext,
-    method: TenorSamplingMethod,
-) -> Result<f64> {
-    let curve_id = curve_id.as_ref();
-    match market_t0.get_curve(curve_id)? {
-        CurveStorage::Hazard(_) => measure_par_spread_shift(curve_id, market_t0, market_t1, method),
-        CurveStorage::Discount(_) => {
-            measure_discount_curve_shift(curve_id, market_t0, market_t1, method)
-        }
-        storage => Err(unsupported_credit_curve(curve_id, storage)),
-    }
-}
-
-/// Measure the **per-tenor** credit-curve shift (basis points) at the given
-/// tenors, accepting either curve representation.
-///
-/// The per-tenor counterpart of [`measure_credit_curve_shift`] (see that
-/// function for the hazard / discount duality): the baseline curve's stored
-/// type selects par CDS spread or discount zero-rate measurement. Errors from
-/// that measurement propagate unchanged. Returns one entry per
-/// input tenor, in order, so callers can pair it with a per-tenor (key-rate)
-/// `BucketedCs01`.
-///
-/// # Arguments
-///
-/// * `curve_id` - Identifier that resolves to a hazard curve or risky discount
-///   curve in both market contexts.
-/// * `market_t0` - Baseline market context representing the earlier state.
-/// * `market_t1` - Comparison market context representing the later state.
-/// * `tenors` - Year-fraction maturities at which to measure the selected
-///   credit-curve move. Output positions match this input order.
-///
-/// # Errors
-///
-/// Returns an error for a missing curve, inconsistent or unsupported stored
-/// types, invalid sampling inputs, or a failure of the selected measurement.
-pub fn measure_per_tenor_credit_curve_shift(
-    curve_id: impl AsRef<str>,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-    tenors: &[f64],
-) -> Result<Vec<f64>> {
-    let curve_id = curve_id.as_ref();
-    match market_t0.get_curve(curve_id)? {
-        CurveStorage::Hazard(_) => {
-            return measure_per_tenor_par_spread_shift(curve_id, market_t0, market_t1, tenors);
-        }
-        CurveStorage::Discount(_) => {}
-        storage => return Err(unsupported_credit_curve(curve_id, storage)),
-    }
-    let curve_t0 = market_t0.get_discount(curve_id)?;
-    let curve_t1 = market_t1.get_discount(curve_id)?;
-    per_tenor_shifts(tenors, "zero-rate", |t| {
-        (curve_t1.zero_rate(t, crate::math::Compounding::Continuous)
-            - curve_t0.zero_rate(t, crate::math::Compounding::Continuous))
-            * BASIS_POINTS_PER_UNIT
-    })
-}
-
-fn unsupported_credit_curve(id: &str, storage: &CurveStorage) -> crate::Error {
-    crate::InputError::WrongCurveType {
-        id: id.to_owned(),
-        expected: "Hazard or Discount".to_owned(),
-        actual: storage.curve_type().to_owned(),
-    }
-    .into()
-}
-
-/// Measure average inflation rate shift (basis points).
-///
-/// # Arguments
-///
-/// * `curve_id` - Identifier of the projected inflation curve to retrieve from
-///   both market contexts.
-/// * `market_t0` - Baseline market context representing the earlier state.
-/// * `market_t1` - Comparison market context representing the later state.
-///
-/// # Errors
-///
-/// Returns an error if `curve_id` is absent from either market context.
-pub fn measure_inflation_curve_shift(
-    curve_id: impl AsRef<str>,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-) -> Result<f64> {
-    let curve_t0 = market_t0.get_inflation_curve(&curve_id)?;
-    let curve_t1 = market_t1.get_inflation_curve(&curve_id)?;
-    // Annualized zero inflation to `t`; `measure_average_shift` skips `t <= 0`.
-    let zero_inflation = |curve: &crate::market_data::term_structures::InflationCurve, t: f64| {
-        (curve.cpi(t) / curve.base_cpi()).powf(1.0 / t) - 1.0
-    };
-    measure_average_shift(
-        STANDARD_TENORS,
-        BASIS_POINTS_PER_UNIT,
-        |t| zero_inflation(&curve_t0, t),
-        |t| zero_inflation(&curve_t1, t),
-    )
-}
-
-/// Measure the change between the latest published index levels, in basis points.
-/// This is a level move, not an annualized growth rate over the full history.
-///
-/// # Errors
-///
-/// Returns an error if `index_id` is absent, has no observations, or has a
-/// non-finite or non-positive latest stored level. Contractual lag,
-/// interpolation, and seasonal adjustments are not applied to published prints.
-///
-/// # Arguments
-///
-/// * `index_id` - Identifier of the published inflation index to retrieve from
-///   both market contexts.
-/// * `market_t0` - Baseline market context representing the earlier state.
-/// * `market_t1` - Comparison market context representing the later state.
-pub fn measure_inflation_index_shift(
-    index_id: impl AsRef<str>,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-) -> Result<f64> {
-    let index_id = index_id.as_ref();
-    let index_t0 = market_t0.get_inflation_index(index_id)?;
-    let index_t1 = market_t1.get_inflation_index(index_id)?;
-    let (_, level_t0) = index_t0.get_latest_observation()?;
-    let (_, level_t1) = index_t1.get_latest_observation()?;
-    if !level_t0.is_finite() || !level_t1.is_finite() || level_t0 <= 0.0 || level_t1 <= 0.0 {
-        return Err(crate::Error::Validation(
-            "inflation index levels must be finite and positive".to_string(),
-        ));
-    }
-    Ok((level_t1 / level_t0 - 1.0) * BASIS_POINTS_PER_UNIT)
-}
-
-/// Measure a declared inflation source using one canonical risk factor.
-///
-/// When a projected curve is available, use its parallel-rate move. Published
-/// index levels are used only for index-only sources; adding both would apply a
-/// single Inflation01 to two different risk factors.
-///
-/// # Errors
-///
-/// Returns an error when the selected curve or index source is unavailable or
-/// when its latest values fail the validation performed by the delegated
-/// measurement.
-///
-/// # Arguments
-///
-/// * `source_id` - Shared identifier of an inflation curve or published index.
-///   A curve is preferred when both source forms are available.
-/// * `market_t0` - Baseline market context representing the earlier state.
-/// * `market_t1` - Comparison market context representing the later state.
-pub fn measure_inflation_source_shift(
-    source_id: impl AsRef<str>,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-) -> Result<f64> {
-    let source_id = source_id.as_ref();
-    let has_curve = market_t0.get_inflation_curve(source_id).is_ok()
-        && market_t1.get_inflation_curve(source_id).is_ok();
-    let has_index = market_t0.get_inflation_index(source_id).is_ok()
-        && market_t1.get_inflation_index(source_id).is_ok();
-    if has_curve || !has_index {
-        measure_inflation_curve_shift(source_id, market_t0, market_t1)
-    } else {
-        measure_inflation_index_shift(source_id, market_t0, market_t1)
-    }
-}
-
-/// Measure FX spot rate shift (percentage change).
-///
-/// Calculates the percentage change in FX rate between two markets.
-///
-/// # Arguments
-///
-/// * `base_currency` - Base currency of the FX quote; the measured rate is units
-///   of `quote_currency` received for one unit of this currency.
-/// * `quote_currency` - Quote currency of the FX quote whose change is measured.
-/// * `market_t0` - Baseline market context supplying the earlier FX matrix.
-/// * `market_t1` - Comparison market context supplying the later FX matrix.
-/// * `as_of_t0` - Valuation date used to query the baseline FX matrix.
-/// * `as_of_t1` - Valuation date used to query the comparison FX matrix.
-///
-/// # Returns
-///
-/// Percentage change in FX rate: (rate_t1 / rate_t0 - 1) * 100
-///
-/// # Errors
-///
-/// Returns error if FX matrix not available in either market or conversion fails.
-///
-/// # Examples
-///
-/// ```rust
-/// # use finstack_quant_core::market_data::diff::measure_fx_shift;
-/// # use finstack_quant_core::market_data::context::MarketContext;
-/// # use finstack_quant_core::currency::Currency;
-/// # use time::macros::date;
-/// # fn example(market_t0: MarketContext, market_t1: MarketContext) -> finstack_quant_core::Result<()> {
-/// let date_t0 = date!(2024 - 01 - 01);
-/// let date_t1 = date!(2024 - 01 - 02);
-/// let fx_shift = measure_fx_shift(
-///     Currency::USD,
-///     Currency::EUR,
-///     &market_t0,
-///     &market_t1,
-///     date_t0,
-///     date_t1,
-/// )?;
-///
-/// println!("USD/EUR moved {}%", fx_shift);
-/// # Ok(())
-/// # }
-/// ```
-pub fn measure_fx_shift(
-    base_currency: Currency,
-    quote_currency: Currency,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-    as_of_t0: Date,
-    as_of_t1: Date,
-) -> Result<f64> {
-    use crate::money::fx::FxQuery;
-
-    // Get FX matrices via the shared helper on MarketContext.
-    let fx_t0 = market_t0.fx_required()?;
-    let fx_t1 = market_t1.fx_required()?;
-
-    // Get rates using FxQuery with the provided valuation dates
-    let query_t0 = FxQuery::new(
-        base_currency,
-        quote_currency,
-        as_of_t0,
-        crate::money::fx::FxConversionPolicy::CashflowDate,
-    );
-    let query_t1 = FxQuery::new(
-        base_currency,
-        quote_currency,
-        as_of_t1,
-        crate::money::fx::FxConversionPolicy::CashflowDate,
-    );
-    let rate_t0 = fx_t0.rate(query_t0)?.rate;
-    let rate_t1 = fx_t1.rate(query_t1)?.rate;
-
-    // `FxMatrix::rate` returns only finite, strictly positive rates.
-    // Percentage change
-    let pct_change = (rate_t1 / rate_t0 - 1.0) * 100.0;
-
-    Ok(pct_change)
-}
-
-/// Measure market scalar shift (percentage change).
-///
-/// Measures the change in market scalar values (equity prices, commodities, etc.).
-///
-/// # Arguments
-///
-/// * `scalar_id` - Market scalar identifier
-/// * `market_t0` - Market context at T₀
-/// * `market_t1` - Market context at T₁
-///
-/// # Returns
-///
-/// Percentage change in scalar value.
-///
-/// # Errors
-///
-/// Returns an error if the scalar is absent, its kind differs between markets,
-/// monetary prices use different currencies, the baseline is zero, or the
-/// resulting shift is non-finite. Currency changes require explicit conversion
-/// before comparison.
-pub fn measure_scalar_shift(
-    scalar_id: impl AsRef<str>,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-) -> Result<f64> {
-    let scalar_t0 = market_t0.get_price(&scalar_id)?;
-    let scalar_t1 = market_t1.get_price(&scalar_id)?;
-    let (value_t0, value_t1) = comparable_scalar_values(scalar_id.as_ref(), scalar_t0, scalar_t1)?;
-
-    // Guard against division by zero
-    if value_t0.abs() < 1e-15 {
-        return Err(crate::Error::Validation(format!(
-            "Cannot compute percentage shift: baseline value is zero for scalar '{}'",
-            scalar_id.as_ref()
-        )));
-    }
-
-    // Percentage change
-    let pct_change = (value_t1 / value_t0 - 1.0) * 100.0;
-
-    if !pct_change.is_finite() {
-        return Err(crate::Error::Validation(format!(
-            "Non-finite percentage shift computed for scalar '{}': t0={}, t1={}",
-            scalar_id.as_ref(),
-            value_t0,
-            value_t1
-        )));
-    }
-
-    Ok(pct_change)
-}
-
-/// Compute the **absolute** change in a market scalar between two market states.
-///
-/// Unlike [`measure_scalar_shift`], which returns a percentage change, this
-/// returns `value_t1 - value_t0` in the scalar's native units. Use this when
-/// applying a sensitivity defined per unit of underlying move — e.g. an option
-/// delta `dPV/dS` or a dividend sensitivity `dPV/d(dividend)` — where
-/// multiplying by a percentage shift would introduce a `100 / level` scaling
-/// error.
-///
-/// # Errors
-///
-/// Returns an error if either market lacks the scalar, scalar kinds differ,
-/// monetary currencies differ, or the computed shift is non-finite. Prices
-/// must be converted explicitly to the same currency before comparison.
-///
-/// # Arguments
-///
-/// * `scalar_id` - Identifier of the unitless scalar or money-denominated
-///   price to compare in both market contexts.
-/// * `market_t0` - Baseline market context representing the earlier state.
-/// * `market_t1` - Comparison market context representing the later state.
-pub fn measure_scalar_absolute_shift(
-    scalar_id: impl AsRef<str>,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-) -> Result<f64> {
-    let scalar_t0 = market_t0.get_price(&scalar_id)?;
-    let scalar_t1 = market_t1.get_price(&scalar_id)?;
-    let (value_t0, value_t1) = comparable_scalar_values(scalar_id.as_ref(), scalar_t0, scalar_t1)?;
-
-    let abs_change = value_t1 - value_t0;
-    if !abs_change.is_finite() {
-        return Err(crate::Error::Validation(format!(
-            "Non-finite absolute shift computed for scalar '{}': t0={}, t1={}",
-            scalar_id.as_ref(),
-            value_t0,
-            value_t1
-        )));
-    }
-    Ok(abs_change)
-}
-
-fn comparable_scalar_values(
-    scalar_id: &str,
-    baseline: &super::scalars::MarketScalar,
-    comparison: &super::scalars::MarketScalar,
-) -> Result<(f64, f64)> {
-    use super::scalars::MarketScalar;
-
-    match (baseline, comparison) {
-        (MarketScalar::Unitless(a), MarketScalar::Unitless(b)) => Ok((*a, *b)),
-        (MarketScalar::Price(a), MarketScalar::Price(b)) => {
-            if a.currency() != b.currency() {
-                return Err(crate::Error::CurrencyMismatch {
-                    expected: a.currency(),
-                    actual: b.currency(),
-                });
-            }
-            Ok((a.amount(), b.amount()))
-        }
-        _ => Err(crate::Error::Validation(format!(
-            "Cannot compare scalar '{scalar_id}': monetary and unitless values have different units"
+) -> Result<Money> {
+    let s0 = market_t0.get_price(id_t0)?;
+    let s1 = market_t1.get_price(id_t1)?;
+    match (s0.get_price(), s1.get_price()) {
+        (Some(m0), Some(m1)) => m1.checked_sub(m0),
+        _ => Err(Error::Validation(format!(
+            "measure_price_scalar_diff requires MarketScalar::Price entries for '{id_t0}' and '{id_t1}'"
         ))),
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::currency::Currency;
-    use crate::dates::Date;
-    use crate::market_data::scalars::InflationIndex;
-    use crate::market_data::term_structures::{DiscountCurve, HazardCurve, InflationCurve};
-    use crate::math::interp::InterpStyle;
-    use time::Month;
+/// Measure exact native difference `x₁ - x₀` between two `MarketScalar::Unitless` entries.
+///
+/// # Arguments
+/// - `id_t0` - Unitless scalar identifier in `market_t0`.
+/// - `id_t1` - Unitless scalar identifier in `market_t1`.
+/// - `market_t0` - Earlier market snapshot.
+/// - `market_t1` - Later market snapshot.
+///
+/// # Errors
+/// Returns [`InputError::NotFound`] if either scalar is missing, or [`Error::Validation`] if
+/// either entry is `Price`, non-finite, or `x₁ - x₀` overflows `f64`.
+pub fn measure_unitless_scalar_diff(
+    id_t0: &str,
+    id_t1: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Result<f64> {
+    let s0 = market_t0.get_price(id_t0)?;
+    let s1 = market_t1.get_price(id_t1)?;
+    match (s0.get_unitless(), s1.get_unitless()) {
+        (Some(x0), Some(x1)) => finite_f64_diff(x0, x1, 1.0),
+        _ => Err(Error::Validation(format!(
+            "measure_unitless_scalar_diff requires MarketScalar::Unitless entries for '{id_t0}' and '{id_t1}'"
+        ))),
+    }
+}
 
-    fn sample_date() -> Date {
-        Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date")
+/// Measure exact algebraic proportional change `(x₁ - x₀) / x₀` for two matched `MarketScalar` entries.
+///
+/// Dispatches strictly within matching scalar kinds (`Price` via [`Money::proportional_change`],
+/// `Unitless` via `ldexp`-rescaled `f64` differences). Rejects zero baselines even when `x₁ == x₀`,
+/// allows negative and arbitrarily small non-zero finite baselines, and errors on kind or currency
+/// mismatches.
+///
+/// # Arguments
+/// - `id_t0` - Scalar identifier in `market_t0`.
+/// - `id_t1` - Scalar identifier in `market_t1`.
+/// - `market_t0` - Earlier market snapshot.
+/// - `market_t1` - Later market snapshot.
+/// - `scale` - Output proportional scale (`Fraction` or `Percent`).
+///
+/// # Errors
+/// Returns [`InputError::NotFound`] if either scalar is missing, [`Error::CurrencyMismatch`]
+/// for differing `Price` currencies, or [`Error::Validation`] for kind mismatch (`Price` vs
+/// `Unitless`), zero baseline, non-finite inputs, or `f64` overflow/underflow of non-zero moves.
+pub fn measure_scalar_proportional_diff(
+    id_t0: &str,
+    id_t1: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    scale: ProportionalDiffScale,
+) -> Result<f64> {
+    let s0 = market_t0.get_price(id_t0)?;
+    let s1 = market_t1.get_price(id_t1)?;
+    if let (Some(m0), Some(m1)) = (s0.get_price(), s1.get_price()) {
+        let frac = m1.proportional_change(m0)?;
+        let out = frac * scale.scale_factor();
+        if !out.is_finite() {
+            return Err(Error::Validation(format!(
+                "proportional price change scaled overflowed f64: {out}"
+            )));
+        }
+        return Ok(normalize_zero(out));
+    }
+    if let (Some(x0), Some(x1)) = (s0.get_unitless(), s1.get_unitless()) {
+        return proportional_f64_change(x0, x1, scale);
+    }
+    Err(Error::Validation(format!(
+        "scalar kind mismatch between '{id_t0}' and '{id_t1}'"
+    )))
+}
+
+#[inline]
+fn exact_f64_eq(a: f64, b: f64) -> bool {
+    a <= b && b <= a
+}
+
+#[inline]
+fn normalize_zero(x: f64) -> f64 {
+    if exact_f64_eq(x, 0.0) { 0.0 } else { x }
+}
+
+#[inline]
+fn positive_finite(val: f64, label: &str) -> Result<f64> {
+    if !val.is_finite() || val <= 0.0 {
+        return Err(Error::Validation(format!(
+            "'{label}' must be finite and strictly positive, got {val}"
+        )));
+    }
+    Ok(val)
+}
+
+fn finite_f64_diff(x0: f64, x1: f64, scale: f64) -> Result<f64> {
+    if !x0.is_finite() || !x1.is_finite() {
+        return Err(Error::Validation(format!(
+            "difference inputs must be finite, got ({x0}, {x1})"
+        )));
+    }
+    if exact_f64_eq(x1, x0) {
+        return Ok(0.0);
+    }
+    let diff = (x1 - x0) * scale;
+    if !diff.is_finite() {
+        return Err(Error::Validation(format!(
+            "difference ({x1} - {x0}) * {scale} overflowed f64"
+        )));
+    }
+    Ok(normalize_zero(diff))
+}
+
+fn proportional_f64_change(x0: f64, x1: f64, scale: ProportionalDiffScale) -> Result<f64> {
+    if !x0.is_finite() || !x1.is_finite() {
+        return Err(Error::Validation(format!(
+            "proportional change inputs must be finite, got ({x0}, {x1})"
+        )));
+    }
+    if exact_f64_eq(x0, 0.0) {
+        return Err(Error::Validation(
+            "proportional change baseline cannot be zero".to_string(),
+        ));
+    }
+    if exact_f64_eq(x1, x0) {
+        return Ok(0.0);
     }
 
-    #[test]
-    fn inflation_print_shift_ignores_lag_interpolation_and_seasonality() {
-        use crate::market_data::scalars::{InflationLag, SeriesInterpolation};
+    let e0 = stats::frexp_exp(x0);
+    let e1 = stats::frexp_exp(x1);
+    let de = e1 - e0;
+    let factor = scale.scale_factor();
+    let m0 = stats::ldexp(x0, -e0);
 
-        let observations = vec![
-            (time::macros::date!(2025 - 01 - 01), 300.0),
-            (time::macros::date!(2025 - 02 - 01), 301.0),
-            (time::macros::date!(2025 - 03 - 01), 302.0),
-            (time::macros::date!(2025 - 04 - 01), 303.0),
-            (time::macros::date!(2025 - 05 - 01), 306.0),
-        ];
-        let mut seasonality = [1.0; 12];
-        seasonality[0] = 1.1;
-        seasonality[1] = 0.9;
-        seasonality[3] = 1.2;
-        seasonality[4] = 0.8;
-        for lag in [InflationLag::None, InflationLag::Months(3)] {
-            for interpolation in [SeriesInterpolation::Step, SeriesInterpolation::Linear] {
-                let context = |observations| {
-                    let index = InflationIndex::new("CPI", observations, Currency::USD)
-                        .expect("index")
-                        .with_lag(lag)
-                        .with_interpolation(interpolation)
-                        .with_seasonality(seasonality)
-                        .expect("seasonality");
-                    MarketContext::new().insert_inflation_index(index)
-                };
-                let t0 = context(observations[..4].to_vec());
-                let t1 = context(observations.clone());
-                let shift = measure_inflation_index_shift("CPI", &t0, &t1).expect("print shift");
-                assert!((shift - (306.0 / 303.0 - 1.0) * 10_000.0).abs() < 1e-10);
+    let out = if de <= 10 {
+        let s1 = stats::ldexp(x1, -e0);
+        ((s1 - m0) / m0) * factor
+    } else {
+        let m1 = stats::ldexp(x1, -e1);
+        (stats::ldexp(m1 / m0, de) - 1.0) * factor
+    };
+
+    if !out.is_finite() || exact_f64_eq(out, 0.0) {
+        return Err(Error::Validation(format!(
+            "proportional change ({x1} - {x0}) / {x0} overflowed or underflowed f64"
+        )));
+    }
+    Ok(normalize_zero(out))
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
+mod tests {
+    use super::*;
+    use crate::dates::DayCount;
+    use crate::market_data::scalars::{InflationIndex, MarketScalar};
+    use crate::market_data::term_structures::{
+        DiscountCurve, ForwardCurve, HazardCurve, InflationCurve,
+    };
+    use crate::money::fx::{FxMatrix, FxProvider};
+    use std::sync::Arc;
+    use time::macros::date;
+
+    #[derive(Debug)]
+    struct StaticFx {
+        rate: f64,
+    }
+
+    impl FxProvider for StaticFx {
+        fn rate(
+            &self,
+            from: Currency,
+            to: Currency,
+            _on: Date,
+            _policy: FxConversionPolicy,
+        ) -> Result<f64> {
+            match (from, to) {
+                (Currency::EUR, Currency::USD) => Ok(self.rate),
+                (Currency::USD, Currency::EUR) => Ok(1.0 / self.rate),
+                _ => Err(InputError::NotFound {
+                    id: format!("{from}/{to}"),
+                }
+                .into()),
             }
         }
     }
 
     #[test]
-    fn inflation_print_shift_does_not_require_lagged_history() {
-        use crate::market_data::scalars::InflationLag;
-
-        let context = |value| {
-            let index = InflationIndex::new("CPI", vec![(sample_date(), value)], Currency::USD)
-                .expect("single print")
-                .with_lag(InflationLag::Months(3));
-            MarketContext::new().insert_inflation_index(index)
-        };
-        let shift = measure_inflation_index_shift("CPI", &context(100.0), &context(101.0))
-            .expect("raw print does not need lagged history");
-        assert!((shift - 100.0).abs() < 1e-10);
-    }
-
-    #[test]
-    fn scalar_shifts_reject_incompatible_units_and_currencies() {
-        use crate::market_data::scalars::MarketScalar;
-        use crate::money::Money;
-
-        let price = |currency| MarketScalar::Price(Money::new(100.0, currency).expect("price"));
-        for (left, right) in [
-            (price(Currency::USD), price(Currency::EUR)),
-            (price(Currency::USD), MarketScalar::Unitless(100.0)),
-            (MarketScalar::Unitless(100.0), price(Currency::USD)),
-        ] {
-            let t0 = MarketContext::new().insert_price("SPOT", left);
-            let t1 = MarketContext::new().insert_price("SPOT", right);
-            assert!(measure_scalar_shift("SPOT", &t0, &t1).is_err());
-            assert!(measure_scalar_absolute_shift("SPOT", &t0, &t1).is_err());
-        }
-
-        for (left, right) in [
-            (MarketScalar::Unitless(100.0), MarketScalar::Unitless(120.0)),
-            (
-                price(Currency::USD),
-                MarketScalar::Price(Money::new(120.0, Currency::USD).expect("price")),
-            ),
-        ] {
-            let t0 = MarketContext::new().insert_price("SPOT", left);
-            let t1 = MarketContext::new().insert_price("SPOT", right);
-            assert!(
-                (measure_scalar_shift("SPOT", &t0, &t1).expect("same units") - 20.0).abs() < 1e-12
-            );
-            assert_eq!(
-                measure_scalar_absolute_shift("SPOT", &t0, &t1).expect("same units"),
-                20.0
-            );
-        }
-    }
-
-    #[test]
-    fn inflation_index_shift_measures_newly_published_print() {
-        let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
-        let prior_end = Date::from_calendar_date(2025, Month::December, 1).expect("date");
-        let new_end = Date::from_calendar_date(2026, Month::January, 1).expect("date");
-        let index_t0 = InflationIndex::new(
-            "US-CPI",
-            vec![(start, 100.0), (prior_end, 110.0)],
-            Currency::USD,
-        )
-        .expect("t0 index");
-        let index_t1 = InflationIndex::new(
-            "US-CPI",
-            vec![(start, 100.0), (prior_end, 110.0), (new_end, 112.0)],
-            Currency::USD,
-        )
-        .expect("t1 index");
-        let market_t0 = MarketContext::new().insert_inflation_index(index_t0);
-        let market_t1 = MarketContext::new().insert_inflation_index(index_t1);
-
-        let shift = measure_inflation_source_shift("US-CPI", &market_t0, &market_t1)
-            .expect("published-print shift");
+    fn zero_rate_difference_validates_before_equal_shortcut() {
         assert!(
-            shift > 0.0,
-            "a higher newly published CPI print must be measured"
+            zero_rate_difference(ZeroRateDiffParams {
+                d0_anchor: 0.99,
+                d0_maturity: 0.95,
+                d1_anchor: 0.99,
+                d1_maturity: 0.95,
+                alpha: 0.0,
+                scale: RateDiffScale::Decimal,
+            })
+            .is_err()
+        );
+        assert!(
+            zero_rate_difference(ZeroRateDiffParams {
+                d0_anchor: 0.0,
+                d0_maturity: 0.95,
+                d1_anchor: 0.0,
+                d1_maturity: 0.95,
+                alpha: 1.0,
+                scale: RateDiffScale::Decimal,
+            })
+            .is_err()
+        );
+        assert!(
+            zero_rate_difference(ZeroRateDiffParams {
+                d0_anchor: 1.0,
+                d0_maturity: f64::NAN,
+                d1_anchor: 1.0,
+                d1_maturity: 1.0,
+                alpha: 1.0,
+                scale: RateDiffScale::Decimal,
+            })
+            .is_err()
         );
     }
 
     #[test]
-    fn hybrid_inflation_source_prefers_projected_curve_shift() {
-        let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
-        let prior_end = Date::from_calendar_date(2025, Month::December, 1).expect("date");
-        let new_end = Date::from_calendar_date(2026, Month::January, 1).expect("date");
-        let curve = || {
-            InflationCurve::builder("US-CPI")
-                .base_date(start)
-                .base_cpi(100.0)
-                .knots([(0.0, 100.0), (5.0, 110.0)])
-                .build()
-                .expect("inflation curve")
-        };
-        let index_t0 = InflationIndex::new(
-            "US-CPI",
-            vec![(start, 100.0), (prior_end, 110.0)],
-            Currency::USD,
-        )
-        .expect("t0 index");
-        let index_t1 = InflationIndex::new(
-            "US-CPI",
-            vec![(start, 100.0), (prior_end, 110.0), (new_end, 112.0)],
-            Currency::USD,
-        )
-        .expect("t1 index");
-        let market_t0 = MarketContext::new()
-            .insert(curve())
-            .insert_inflation_index(index_t0);
-        let market_t1 = MarketContext::new()
-            .insert(curve())
-            .insert_inflation_index(index_t1);
+    fn zero_rate_difference_handles_extreme_scale_and_tiny_shift() {
+        let scale_lo = 2.0_f64.powi(-800);
+        let scale_hi = 2.0_f64.powi(800);
+        let eq = zero_rate_difference(ZeroRateDiffParams {
+            d0_anchor: scale_lo,
+            d0_maturity: 0.95 * scale_lo,
+            d1_anchor: scale_hi,
+            d1_maturity: 0.95 * scale_hi,
+            alpha: 1.0,
+            scale: RateDiffScale::BasisPoints,
+        })
+        .expect("identical factor ratio across 2^1600 dynamic range");
+        assert_eq!(eq, 0.0);
 
-        let source_shift =
-            measure_inflation_source_shift("US-CPI", &market_t0, &market_t1).expect("hybrid shift");
-        assert!(source_shift.abs() < 1e-12);
-    }
+        let tiny_shift = 1e-12_f64;
+        let alpha = 2.0_f64;
+        let d0_m = (-0.04_f64 * alpha).exp();
+        let d1_m = (-(0.04_f64 + tiny_shift) * alpha).exp();
+        let diff = zero_rate_difference(ZeroRateDiffParams {
+            d0_anchor: 1.0,
+            d0_maturity: d0_m,
+            d1_anchor: 1.0,
+            d1_maturity: d1_m,
+            alpha,
+            scale: RateDiffScale::Decimal,
+        })
+        .expect("tiny shift");
+        assert!((diff - tiny_shift).abs() < 1e-15);
 
-    #[test]
-    fn test_credit_curve_shift_selects_discount_zero_rate() {
-        // A credit curve modelled as a `DiscountCurve` has no par CDS quote — `measure_credit_curve_shift`
-        // selects the zero-rate shift from the stored curve type.
-        let base_date = sample_date();
-        let curve = |rate: f64| {
-            DiscountCurve::builder("USD-CREDIT")
-                .base_date(base_date)
-                .knots([(0.0, 1.0), (10.0, (-rate * 10.0).exp())])
-                .interp(InterpStyle::LogLinear)
-                .build()
-                .expect("discount curve should build")
-        };
-        // +40bp move in the risky discount curve's zero rate.
-        let market_t0 = MarketContext::new().insert(curve(0.05));
-        let market_t1 = MarketContext::new().insert(curve(0.054));
-
-        let shift = measure_credit_curve_shift(
-            "USD-CREDIT",
-            &market_t0,
-            &market_t1,
-            TenorSamplingMethod::Standard,
-        )
-        .expect("credit-curve shift should use discount measurement");
         assert!(
-            (shift - 40.0).abs() < 1.0,
-            "expected ~40bp zero-rate shift, got {shift}"
+            zero_rate_difference(ZeroRateDiffParams {
+                d0_anchor: 1.0,
+                d0_maturity: 1.0,
+                d1_anchor: 1.0,
+                d1_maturity: 1.0 - 0.5 * f64::EPSILON,
+                alpha: 1e308,
+                scale: RateDiffScale::Decimal,
+            })
+            .is_err()
         );
-
-        let per_tenor = measure_per_tenor_credit_curve_shift(
-            "USD-CREDIT",
-            &market_t0,
-            &market_t1,
-            &[1.0, 5.0, 10.0],
-        )
-        .expect("per-tenor credit-curve shift should use discount measurement");
-        assert_eq!(per_tenor.len(), 3, "one entry per requested tenor");
-        for s in per_tenor {
-            assert!(
-                (s - 40.0).abs() < 1.0,
-                "per-tenor zero-rate shift ~40bp, got {s}"
-            );
-        }
     }
 
     #[test]
-    fn test_credit_curve_shift_uses_par_spread_for_hazard_curve() {
-        // For a `HazardCurve`, `measure_credit_curve_shift` must use the par
-        // CDS spread move (== hazard shift × LGD), matching `measure_par_spread_shift`.
-        let base_date = sample_date();
-        let curve_t0 = HazardCurve::builder("CORP-01")
-            .base_date(base_date)
-            .recovery_rate(0.4)
-            .knots(vec![(1.0, 0.01), (5.0, 0.02), (10.0, 0.025)])
-            .build()
-            .expect("hazard curve t0");
-        let curve_t1 = HazardCurve::builder("CORP-01")
-            .base_date(base_date)
-            .recovery_rate(0.4)
-            .knots(vec![(1.0, 0.0125), (5.0, 0.0225), (10.0, 0.0275)])
-            .build()
-            .expect("hazard curve t1");
-        let market_t0 = MarketContext::new().insert(curve_t0);
-        let market_t1 = MarketContext::new().insert(curve_t1);
+    fn discount_diff_uses_retained_clock_and_rejects_cross_family_fallback() {
+        let base0 = date!(2025 - 01 - 01);
+        let cond_date = date!(2025 - 07 - 01);
+        let v = date!(2025 - 07 - 01);
+        let t = date!(2026 - 07 - 01);
 
-        let credit_shift = measure_credit_curve_shift(
-            "CORP-01",
-            &market_t0,
-            &market_t1,
-            TenorSamplingMethod::Standard,
-        )
-        .expect("credit shift");
-        let par_shift = measure_par_spread_shift(
-            "CORP-01",
-            &market_t0,
-            &market_t1,
-            TenorSamplingMethod::Standard,
-        )
-        .expect("par-spread shift");
+        let c0 = DiscountCurve::flat("USD-OIS", base0, 0.04, DayCount::Act365F).expect("c0");
+        let c1_raw = DiscountCurve::flat("USD-OIS", base0, 0.0425, DayCount::Act365F).expect("c1");
+        let c1_cond = c1_raw.condition(cond_date).expect("conditioned c1");
+
+        let m0 = MarketContext::new().insert(c0);
+        let m1 = MarketContext::new().insert(c1_cond);
+
+        let intervals = [DateInterval::new(v, t).expect("valid interval")];
+        let query = FactorRateDiffQuery::new(
+            "USD-OIS",
+            &intervals,
+            DayCount::Act365F,
+            RateDiffScale::BasisPoints,
+        );
+        let measured = measure_discount_factor_rate_diff(&query, &m0, &m1).expect("discount diff");
+        assert_eq!(measured.len(), 1);
+        assert!((measured.rows()[0].diff - 25.0).abs() < 1e-10);
+        assert!((measured.mean().expect("mean") - 25.0).abs() < 1e-10);
+
+        // No fallback from ForwardCurve to DiscountCurve or vice versa.
+        let fwd = ForwardCurve::builder("FWD-ONLY")
+            .base_date(base0)
+            .day_count(DayCount::Act365F)
+            .knots([(1.0, 0.96), (5.0, 0.80)])
+            .interp(crate::math::interp::InterpStyle::LogLinear)
+            .extrapolation(crate::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .expect("fwd");
+        let mf = MarketContext::new().insert(fwd);
+        let fwd_query = FactorRateDiffQuery::new(
+            "FWD-ONLY",
+            &intervals,
+            DayCount::Act365F,
+            RateDiffScale::BasisPoints,
+        );
+        assert!(measure_discount_factor_rate_diff(&fwd_query, &mf, &mf).is_err());
         assert_eq!(
-            credit_shift, par_shift,
-            "hazard-curve credit shift must equal the par-spread shift"
+            measure_forward_factor_rate_diff(&fwd_query, &mf, &mf)
+                .expect("identical forward")
+                .rows()[0]
+                .diff,
+            0.0
         );
     }
 
     #[test]
-    fn credit_curve_dispatch_preserves_selected_errors() {
-        let hazard = HazardCurve::builder("CREDIT")
-            .base_date(sample_date())
-            .recovery_rate(0.4)
+    fn factor_diff_rejects_empty_duplicate_and_out_of_domain_intervals() {
+        let base = date!(2025 - 01 - 01);
+        let m0 = MarketContext::new()
+            .insert(DiscountCurve::flat("C0", base, 0.04, DayCount::Act365F).unwrap());
+        let empty: [DateInterval; 0] = [];
+        let q_empty =
+            FactorRateDiffQuery::new("C0", &empty, DayCount::Act365F, RateDiffScale::Decimal);
+        assert!(measure_discount_factor_rate_diff(&q_empty, &m0, &m0).is_err());
+
+        let i1 = DateInterval::new(date!(2025 - 07 - 01), date!(2026 - 07 - 01)).unwrap();
+        let dup = [i1, i1];
+        let q_dup = FactorRateDiffQuery::new("C0", &dup, DayCount::Act365F, RateDiffScale::Decimal);
+        assert!(measure_discount_factor_rate_diff(&q_dup, &m0, &m0).is_err());
+
+        let early = [DateInterval::new(date!(2024 - 12 - 01), date!(2026 - 01 - 01)).unwrap()];
+        let q_early =
+            FactorRateDiffQuery::new("C0", &early, DayCount::Act365F, RateDiffScale::Decimal);
+        assert!(measure_discount_factor_rate_diff(&q_early, &m0, &m0).is_err());
+    }
+
+    #[test]
+    fn hazard_intensity_diff_preserves_source_clock_and_no_recovery_coupling() {
+        let base = date!(2025 - 01 - 01);
+        let cond_date = date!(2026 - 01 - 01);
+        let h0 = HazardCurve::builder("ACME")
+            .base_date(base)
+            .recovery_rate(0.40)
             .knots([(1.0, 0.01), (5.0, 0.02)])
+            .day_count(crate::dates::DayCount::Act365F)
             .build()
-            .expect("hazard");
-        let market = MarketContext::new().insert(hazard);
-        let invalid = TenorSamplingMethod::Custom(vec![f64::NAN]);
-        let selected = measure_par_spread_shift("CREDIT", &market, &market, invalid.clone())
-            .expect_err("invalid grid");
-        let actual = measure_credit_curve_shift("CREDIT", &market, &market, invalid)
-            .expect_err("invalid grid");
-        assert_eq!(actual.to_string(), selected.to_string());
-        let selected = measure_per_tenor_par_spread_shift("CREDIT", &market, &market, &[f64::NAN])
-            .expect_err("invalid tenor");
-        let actual = measure_per_tenor_credit_curve_shift("CREDIT", &market, &market, &[f64::NAN])
-            .expect_err("invalid tenor");
-        assert_eq!(actual.to_string(), selected.to_string());
-        let discount = DiscountCurve::builder("CREDIT")
-            .base_date(sample_date())
-            .knots([(0.0, 1.0), (5.0, 0.9)])
+            .unwrap();
+        // Change recovery rate and bump intensity by +0.0020 (20 intensity bp):
+        // native hazard diff must remain 0.0020 / 20.0 intensity bp regardless of recovery.
+        let h1 = HazardCurve::builder("ACME")
+            .base_date(base)
+            .recovery_rate(0.20)
+            .knots([(1.0, 0.012), (5.0, 0.022)])
+            .day_count(crate::dates::DayCount::Act365F)
             .build()
-            .expect("discount");
-        let wrong_kind = MarketContext::new().insert(discount);
-        for other in [MarketContext::new(), wrong_kind] {
-            let selected =
-                measure_par_spread_shift("CREDIT", &market, &other, TenorSamplingMethod::Standard)
-                    .expect_err("missing or wrong curve");
-            let actual = measure_credit_curve_shift(
-                "CREDIT",
-                &market,
-                &other,
-                TenorSamplingMethod::Standard,
+            .unwrap()
+            .condition(cond_date)
+            .unwrap();
+
+        let m0 = MarketContext::new().insert(h0);
+        let m1 = MarketContext::new().insert(h1);
+        let q = HazardDiffQuery::new("ACME", &[1.0, 5.0], HazardDiffScale::IntensityBp);
+        let res = measure_hazard_intensity_diff(&q, &m0, &m1).expect("hazard diff");
+        assert!((res.rows()[0].diff - 20.0).abs() < 1e-12);
+        assert!((res.rows()[1].diff - 20.0).abs() < 1e-12);
+
+        // Incompatible day count or unsorted times must error.
+        let bad_order = HazardDiffQuery::new("ACME", &[5.0, 1.0], HazardDiffScale::Decimal);
+        assert!(measure_hazard_intensity_diff(&bad_order, &m0, &m1).is_err());
+    }
+
+    #[test]
+    fn inflation_cpi_and_annual_growth_diffs() {
+        use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
+
+        let base = date!(2025 - 01 - 01);
+        let c0 = InflationCurve::builder("US-CPI")
+            .base_date(base)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 100.0), (1.0, 102.0), (5.0, 110.408_080_32)])
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Flat)
+            .build()
+            .unwrap();
+        let c1 = InflationCurve::builder("US-CPI")
+            .base_date(base)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 100.0), (1.0, 103.0), (5.0, 115.927_407_43)])
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Flat)
+            .build()
+            .unwrap();
+        let m0 = MarketContext::new().insert(c0);
+        let m1 = MarketContext::new().insert(c1);
+
+        let d1 = date!(2026 - 01 - 01);
+        let dates = [d1];
+        let q_lvl = InflationCpiDiffQuery::new("US-CPI", &dates);
+        let lvl = measure_inflation_cpi_level_diff(&q_lvl, &m0, &m1).unwrap();
+        assert!((lvl.rows()[0].diff - 1.0).abs() < 1e-2);
+
+        let intervals = [DateInterval::new(base, d1).unwrap()];
+        let q_gr = InflationGrowthDiffQuery::new(
+            "US-CPI",
+            &intervals,
+            DayCount::Act365F,
+            RateDiffScale::BasisPoints,
+        );
+        let gr = measure_inflation_annual_growth_diff(&q_gr, &m0, &m1).unwrap();
+        assert!((gr.rows()[0].diff - 100.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn inflation_observation_diff_enforces_knowledge_date_and_revisions() {
+        use crate::market_data::scalars::InflationObservation;
+
+        let pub_jan = date!(2025 - 02 - 12);
+        let pub_feb = date!(2025 - 03 - 12);
+        let obs_jan = InflationObservation {
+            reference_month: date!(2025 - 01 - 01),
+            value: 310.0,
+            available_on: pub_jan,
+        };
+        let idx0 = InflationIndex::new("US-CPI-U", vec![obs_jan], Currency::USD, pub_jan).unwrap();
+
+        let idx1 = InflationIndex::new(
+            "US-CPI-U",
+            vec![
+                InflationObservation {
+                    reference_month: date!(2025 - 01 - 01),
+                    value: 310.5,
+                    available_on: pub_jan,
+                },
+                InflationObservation {
+                    reference_month: date!(2025 - 02 - 01),
+                    value: 311.5,
+                    available_on: pub_feb,
+                },
+            ],
+            Currency::USD,
+            pub_feb,
+        )
+        .unwrap();
+
+        let m0 = MarketContext::new().insert_inflation_index(idx0);
+        let m1 = MarketContext::new().insert_inflation_index(idx1);
+        let periods = [InflationPeriodPair::same(2025, Month::January)];
+
+        // Knowledge cutoff before publication date fails closed.
+        let premature = InflationObservationDiffQuery::new(
+            "US-CPI-U",
+            &periods,
+            date!(2025 - 02 - 10),
+            date!(2025 - 02 - 15),
+            ObservationDiffScale::NativePoints,
+        );
+        assert!(measure_inflation_observation_diff(&premature, &m0, &m1).is_err());
+
+        // Knowledge cutoff on/after publication date succeeds and labels revision.
+        let qualified = InflationObservationDiffQuery::new(
+            "US-CPI-U",
+            &periods,
+            date!(2025 - 02 - 12),
+            date!(2025 - 02 - 15),
+            ObservationDiffScale::NativePoints,
+        );
+        let res = measure_inflation_observation_diff(&qualified, &m0, &m1).unwrap();
+        assert_eq!(res.rows()[0].kind, ObservationChangeKind::Revision);
+        assert_eq!(
+            res.rows()[0].period_t0,
+            InflationPeriod::new(2025, Month::January)
+        );
+        assert_eq!(
+            res.rows()[0].period_t1,
+            InflationPeriod::new(2025, Month::January)
+        );
+        assert!((res.rows()[0].diff - 0.5).abs() < 1e-12);
+
+        // Explicit cross-period comparison across months labels CrossPeriod.
+        let cross_periods = [InflationPeriodPair::cross(
+            InflationPeriod::new(2025, Month::January),
+            InflationPeriod::new(2025, Month::February),
+        )];
+        let cross_query = InflationObservationDiffQuery::new(
+            "US-CPI-U",
+            &cross_periods,
+            date!(2025 - 02 - 12),
+            date!(2025 - 03 - 12),
+            ObservationDiffScale::NativePoints,
+        );
+        let cross_res = measure_inflation_observation_diff(&cross_query, &m0, &m1).unwrap();
+        assert_eq!(cross_res.rows()[0].kind, ObservationChangeKind::CrossPeriod);
+        assert!((cross_res.rows()[0].diff - 1.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn fx_quote_diff_fast_paths_identity_without_matrices_and_uses_explicit_policy() {
+        let empty = MarketContext::new();
+        let d0 = date!(2025 - 01 - 01);
+        let d1 = date!(2025 - 02 - 01);
+        let same_ccy = FxQuoteDiffParams {
+            base: Currency::USD,
+            quote: Currency::USD,
+            date_t0: d0,
+            policy_t0: FxConversionPolicy::CashflowDate,
+            date_t1: d1,
+            policy_t1: FxConversionPolicy::PeriodEnd,
+            scale: ProportionalDiffScale::Percent,
+        };
+        let id_meas = measure_fx_quote_diff(&same_ccy, &empty, &empty).unwrap();
+        assert_eq!(id_meas.diff, 0.0);
+        assert_eq!(id_meas.rate_t0, 1.0);
+        assert_eq!(id_meas.rate_t1, 1.0);
+        assert!(!id_meas.triangulated_t0);
+        assert!(!id_meas.triangulated_t1);
+
+        let eur_usd = FxQuoteDiffParams {
+            base: Currency::EUR,
+            quote: Currency::USD,
+            ..same_ccy
+        };
+        assert!(measure_fx_quote_diff(&eur_usd, &empty, &empty).is_err());
+
+        let fx0 = FxMatrix::new(Arc::new(StaticFx { rate: 1.0 }), None);
+        let fx1 = FxMatrix::new(Arc::new(StaticFx { rate: 1.1 }), None);
+        let m0 = MarketContext::new().insert_fx(fx0);
+        let m1 = MarketContext::new().insert_fx(fx1);
+        let meas = measure_fx_quote_diff(&eur_usd, &m0, &m1).unwrap();
+        assert!((meas.diff - 10.0).abs() < 1e-12);
+        assert_eq!(meas.rate_t0, 1.0);
+        assert_eq!(meas.rate_t1, 1.1);
+        assert!(!meas.triangulated_t0);
+        assert!(!meas.triangulated_t1);
+    }
+
+    #[test]
+    fn scalar_diffs_preserve_money_exactness_and_algebraic_proportional_domain() {
+        let m0 = MarketContext::new()
+            .insert_price(
+                "BIG_USD",
+                MarketScalar::price(Money::from_decimal(
+                    rust_decimal::Decimal::from_i128_with_scale(100_000_000_000_000_000, 0),
+                    Currency::USD,
+                )),
             )
-            .expect_err("missing or wrong curve");
-            assert_eq!(actual.to_string(), selected.to_string());
-            let selected = measure_per_tenor_par_spread_shift("CREDIT", &market, &other, &[1.0])
-                .expect_err("missing or wrong curve");
-            let actual = measure_per_tenor_credit_curve_shift("CREDIT", &market, &other, &[1.0])
-                .expect_err("missing or wrong curve");
-            assert_eq!(actual.to_string(), selected.to_string());
-        }
-    }
+            .insert_price("NEG", MarketScalar::unitless(-10.0).unwrap())
+            .insert_price("TINY", MarketScalar::unitless(1e-200).unwrap())
+            .insert_price("HUGE", MarketScalar::unitless(1e308).unwrap())
+            .insert_price("ZERO_U", MarketScalar::unitless(0.0).unwrap())
+            .insert_price("ZERO_M", MarketScalar::price(Money::zero(Currency::USD)));
 
-    #[test]
-    fn average_shift_uses_relative_equality_for_large_magnitudes() {
-        let shift = measure_average_shift(&[1.0], 10_000.0, |_| 1.0e9, |_| 1.0e9 + 1.0e-6)
-            .expect("finite sample should measure");
+        let m1 = MarketContext::new()
+            .insert_price(
+                "BIG_USD",
+                MarketScalar::price(Money::from_decimal(
+                    rust_decimal::Decimal::from_i128_with_scale(10_000_000_000_000_000_001, 2),
+                    Currency::USD,
+                )),
+            )
+            .insert_price("NEG", MarketScalar::unitless(-15.0).unwrap())
+            .insert_price("TINY", MarketScalar::unitless(1.5e-200).unwrap())
+            .insert_price("HUGE", MarketScalar::unitless(-1e308).unwrap())
+            .insert_price("ZERO_U", MarketScalar::unitless(0.0).unwrap())
+            .insert_price("ZERO_M", MarketScalar::price(Money::zero(Currency::USD)));
 
-        assert_eq!(shift, 0.0);
-    }
+        // Exact Decimal subtraction preserves $0.01 at 1e17 USD without f64 cancellation.
+        let price_delta = measure_price_scalar_diff("BIG_USD", "BIG_USD", &m0, &m1).unwrap();
+        assert_eq!(
+            price_delta.amount_decimal(),
+            rust_decimal::Decimal::from_i128_with_scale(1, 2)
+        );
 
-    #[test]
-    fn shift_measurement_rejects_empty_or_non_finite_grids_and_samples() {
-        assert!(measure_average_shift(&[], 1.0, |_| 0.0, |_| 1.0).is_err());
-        assert!(measure_average_shift(&[f64::NAN], 1.0, |_| 0.0, |_| 1.0).is_err());
-        assert!(measure_average_shift(&[1.0], 1.0, |_| f64::INFINITY, |_| 1.0).is_err());
-        assert!(validate_measurement_grid(&[]).is_err());
-        assert!(validate_measurement_grid(&[f64::INFINITY]).is_err());
+        // Algebraic proportional delta admits negative and sub-1e-15 baselines.
+        assert!(
+            (measure_scalar_proportional_diff(
+                "NEG",
+                "NEG",
+                &m0,
+                &m1,
+                ProportionalDiffScale::Fraction
+            )
+            .unwrap()
+                - 0.5)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (measure_scalar_proportional_diff(
+                "TINY",
+                "TINY",
+                &m0,
+                &m1,
+                ProportionalDiffScale::Fraction
+            )
+            .unwrap()
+                - 0.5)
+                .abs()
+                < 1e-12
+        );
+
+        // Overflow-rescaled opposite-sign f64 ratio avoids spurious inf.
+        assert_eq!(
+            measure_scalar_proportional_diff(
+                "HUGE",
+                "HUGE",
+                &m0,
+                &m1,
+                ProportionalDiffScale::Fraction
+            )
+            .unwrap(),
+            -2.0
+        );
+
+        // Zero baseline fails even for 0 -> 0; Price vs Unitless fails closed.
+        assert!(
+            measure_scalar_proportional_diff(
+                "ZERO_U",
+                "ZERO_U",
+                &m0,
+                &m1,
+                ProportionalDiffScale::Fraction
+            )
+            .is_err()
+        );
+        assert!(
+            measure_scalar_proportional_diff(
+                "ZERO_M",
+                "ZERO_M",
+                &m0,
+                &m1,
+                ProportionalDiffScale::Fraction
+            )
+            .is_err()
+        );
+        assert!(measure_unitless_scalar_diff("BIG_USD", "NEG", &m0, &m1).is_err());
     }
 }

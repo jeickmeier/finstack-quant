@@ -71,12 +71,13 @@ fn hw1f_cap_floor_price(
     let periods: Vec<_> = cap_floor_periods(spec.maturity, spec.frequency).collect();
     finstack_quant_models::rates::hull_white::hw1f_cap_floor_price(
         HullWhiteCalibrationParams { kappa, sigma },
-        discount_df,
-        forward_df,
+        &|t| Ok(discount_df(t)),
+        &|t| Ok(forward_df(t)),
         &periods,
         spec.strike,
         spec.is_cap,
     )
+    .expect("hw1f cap/floor price")
 }
 
 /// Flat normal vol that reproduces the constant-sigma HW1F cap/floor price.
@@ -205,8 +206,8 @@ fn piecewise_cap_floor_bootstrap_recovers_synthetic_segments() {
                 spec.is_cap,
             )
             .expect("model price");
-            let normal_vol = BrentSolver::new()
-                .with_tolerance(1.0e-12)
+            let normal_vol = BrentSolver::new(1.0e-12, 100)
+                .expect("valid solver")
                 .solve_in_bracket(
                     |vol| {
                         Ok(bachelier_cap_floor_price(

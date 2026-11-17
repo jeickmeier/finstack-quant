@@ -448,7 +448,8 @@ mod tests {
         ];
         let market = MarketContext::new().insert_price(
             "REPLACEMENT-SPOT",
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(50.0),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(50.0)
+                .expect("valid scalar"),
         );
         assert_current_definition(&basket, &market, 280.0);
 

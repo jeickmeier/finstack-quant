@@ -24,13 +24,14 @@
 //! for _ in 0..10000 {
 //!     let mc_value = 10.0; // simulated payoff
 //!     let control_value = 9.8; // BS control value
-//!     cov.update(mc_value, control_value);
+//!     cov.update(mc_value, control_value)?;
 //! }
 //!
 //! // Get optimal beta and statistics for control variate adjustment
-//! let beta = cov.optimal_beta();
-//! let mc_mean = cov.mean_x();
-//! let control_mean = cov.mean_y();
+//! let beta = cov.optimal_beta()?;
+//! let mc_mean = cov.get_mean_x()?;
+//! let control_mean = cov.get_mean_y()?;
+//! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
 
 use crate::monte_carlo::estimate::Estimate;
@@ -138,7 +139,9 @@ mod tests {
             .sum::<f64>()
             / (control_samples.len() - 1) as f64;
 
-        let cov = finstack_quant_core::math::stats::covariance(&mc_samples, &control_samples);
+        let cov = finstack_quant_core::math::stats::covariance(&mc_samples, &control_samples)
+            .expect("finite aligned samples")
+            .expect("at least 2 samples");
 
         let result = apply_control_variate(
             mc_mean,
@@ -164,7 +167,9 @@ mod tests {
         let x = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let y = vec![2.0, 4.0, 6.0, 8.0, 10.0];
 
-        let cov = finstack_quant_core::math::stats::covariance(&x, &y);
+        let cov = finstack_quant_core::math::stats::covariance(&x, &y)
+            .expect("finite aligned samples")
+            .expect("at least 2 samples");
 
         // Perfect positive correlation: y = 2x
         // Var(x) = 2.5, Var(y) = 10, Cov(x,y) = 5
@@ -173,12 +178,12 @@ mod tests {
     }
 
     #[test]
-    /// The covariance utility retains its zero singleton convention; the
-    /// control-variate estimate separately reports unknown sampling uncertainty.
-    fn covariance_returns_zero_for_single_sample() {
+    /// Sample covariance is undefined for fewer than two aligned observations.
+    fn covariance_returns_none_for_single_sample() {
         assert_eq!(
-            finstack_quant_core::math::stats::covariance(&[1.0], &[2.0]),
-            0.0
+            finstack_quant_core::math::stats::covariance(&[1.0], &[2.0])
+                .expect("valid singleton inputs"),
+            None
         );
     }
 

@@ -621,7 +621,6 @@ impl XccySwap {
                     fixings,
                     leg.leg.forward_curve_id.as_str(),
                     fixing_date,
-                    as_of,
                 )?
             } else {
                 fwd.rate_between_dates(
@@ -849,7 +848,7 @@ impl XccySwap {
             let df = disc.as_ref().df_between_dates(as_of, start_date)?;
             let cf_leg_currency = initial_principal_sign(leg.side) * leg.notional.amount() * df;
             let cf_rep = convert_pv(cf_leg_currency)?;
-            pv.add(cf_rep);
+            pv.add(cf_rep)?;
         }
 
         // MtmResetting also requires final exchange; same defensive note as above — the MtM live-pricing path dispatches before this method is reached.
@@ -863,7 +862,7 @@ impl XccySwap {
             let df = disc.as_ref().df_between_dates(as_of, end_date)?;
             let cf_leg_currency = leg.side.sign() * leg.notional.amount() * df;
             let cf_rep = convert_pv(cf_leg_currency)?;
-            pv.add(cf_rep);
+            pv.add(cf_rep)?;
         }
 
         // Floating coupons
@@ -895,10 +894,10 @@ impl XccySwap {
             let cf_leg_currency = coupon * df;
 
             let cf_rep = convert_pv(cf_leg_currency)?;
-            pv.add(cf_rep);
+            pv.add(cf_rep)?;
         }
 
-        Ok(pv.total())
+        pv.get_total()
     }
 }
 
@@ -1110,6 +1109,9 @@ mod tests {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots(vec![(0.0, 1.0), (1.0, 0.95)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("usd curve"),
             )
@@ -1117,22 +1119,29 @@ mod tests {
                 DiscountCurve::builder("EUR-OIS")
                     .base_date(as_of)
                     .knots(vec![(0.0, 1.0), (1.0, 0.97)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("eur curve"),
             )
             .insert(
-                ForwardCurve::builder("USD-SOFR-3M", 0.25)
-                    .base_date(as_of)
-                    .knots(vec![(0.0, 0.04), (1.0, 0.04)])
-                    .build()
-                    .expect("usd forward"),
+                ForwardCurve::flat(
+                    "USD-SOFR-3M",
+                    as_of,
+                    0.04,
+                    finstack_quant_core::dates::DayCount::Act365F,
+                )
+                .expect("usd forward"),
             )
             .insert(
-                ForwardCurve::builder("EUR-EURIBOR-3M", 0.25)
-                    .base_date(as_of)
-                    .knots(vec![(0.0, 0.03), (1.0, 0.03)])
-                    .build()
-                    .expect("eur forward"),
+                ForwardCurve::flat(
+                    "EUR-EURIBOR-3M",
+                    as_of,
+                    0.03,
+                    finstack_quant_core::dates::DayCount::Act365F,
+                )
+                .expect("eur forward"),
             );
 
         let start = date(2025, Month::January, 2);
@@ -1218,6 +1227,9 @@ mod tests {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots(vec![(0.0, 1.0), (1.0, 0.95)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("usd curve"),
             )
@@ -1225,22 +1237,29 @@ mod tests {
                 DiscountCurve::builder("EUR-OIS")
                     .base_date(as_of)
                     .knots(vec![(0.0, 1.0), (1.0, 0.97)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("eur curve"),
             )
             .insert(
-                ForwardCurve::builder("USD-SOFR-3M", 0.25)
-                    .base_date(as_of)
-                    .knots(vec![(0.0, 0.04), (1.0, 0.04)])
-                    .build()
-                    .expect("usd forward"),
+                ForwardCurve::flat(
+                    "USD-SOFR-3M",
+                    as_of,
+                    0.04,
+                    finstack_quant_core::dates::DayCount::Act365F,
+                )
+                .expect("usd forward"),
             )
             .insert(
-                ForwardCurve::builder("EUR-EURIBOR-3M", 0.25)
-                    .base_date(as_of)
-                    .knots(vec![(0.0, 0.03), (1.0, 0.03)])
-                    .build()
-                    .expect("eur forward"),
+                ForwardCurve::flat(
+                    "EUR-EURIBOR-3M",
+                    as_of,
+                    0.03,
+                    finstack_quant_core::dates::DayCount::Act365F,
+                )
+                .expect("eur forward"),
             );
 
         let start = date(2025, Month::January, 2);
@@ -1523,15 +1542,20 @@ mod tests {
             DiscountCurve::builder(CurveId::new(id))
                 .base_date(base)
                 .knots(vec![(0.0, 1.0), (5.0, (-rate * 5.0).exp())])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("discount curve")
         };
         let forward = |id: &str, rate: f64| {
-            ForwardCurve::builder(CurveId::new(id), 0.25)
-                .base_date(base)
-                .knots(vec![(0.0, rate), (5.0, rate)])
-                .build()
-                .expect("forward curve")
+            ForwardCurve::flat(
+                CurveId::new(id),
+                base,
+                rate,
+                finstack_quant_core::dates::DayCount::Act365F,
+            )
+            .expect("forward curve")
         };
         let provider = Arc::new(SimpleFxProvider::new());
         provider
@@ -1587,23 +1611,33 @@ mod tests {
         let usd_disc = DiscountCurve::builder(CurveId::new("USD-OIS"))
             .base_date(base)
             .knots(vec![(0.0, 1.0), (5.0, (-0.02_f64 * 5.0).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("usd disc");
         let eur_disc = DiscountCurve::builder(CurveId::new("EUR-OIS"))
             .base_date(base)
             .knots(vec![(0.0, 1.0), (5.0, (-0.01_f64 * 5.0).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("eur disc");
-        let usd_fwd = ForwardCurve::builder(CurveId::new("USD-SOFR-3M"), 0.25)
-            .base_date(base)
-            .knots(vec![(0.0, 0.02), (5.0, 0.02)])
-            .build()
-            .expect("usd fwd");
-        let eur_fwd = ForwardCurve::builder(CurveId::new("EUR-EURIBOR-3M"), 0.25)
-            .base_date(base)
-            .knots(vec![(0.0, 0.01), (5.0, 0.01)])
-            .build()
-            .expect("eur fwd");
+        let usd_fwd = ForwardCurve::flat(
+            CurveId::new("USD-SOFR-3M"),
+            base,
+            0.02,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("usd fwd");
+        let eur_fwd = ForwardCurve::flat(
+            CurveId::new("EUR-EURIBOR-3M"),
+            base,
+            0.01,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("eur fwd");
 
         let provider = Arc::new(SimpleFxProvider::new());
         provider
@@ -1648,11 +1682,13 @@ mod tests {
 
         let start = Date::from_calendar_date(2025, time::Month::January, 2).expect("date");
         let end = Date::from_calendar_date(2025, time::Month::April, 2).expect("date");
-        let fwd = ForwardCurve::builder("EUR-ESTR-OIS", 1.0 / 365.0)
-            .base_date(start)
-            .knots(vec![(0.0, 0.03), (1.0, 0.03)])
-            .build()
-            .expect("estr forward");
+        let fwd = ForwardCurve::flat(
+            "EUR-ESTR-OIS",
+            start,
+            0.03,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("estr forward");
         let compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
         let period = finstack_quant_cashflows::builder::SchedulePeriod {
             accrual_start: start,
@@ -1733,11 +1769,13 @@ mod tests {
 
         let start = Date::from_calendar_date(2025, time::Month::January, 2).expect("date");
         let end = Date::from_calendar_date(2025, time::Month::April, 2).expect("date");
-        let fwd = ForwardCurve::builder("EUR-ESTR-OIS", 1.0 / 365.0)
-            .base_date(start)
-            .knots(vec![(0.0, 0.03), (1.0, 0.03)])
-            .build()
-            .expect("estr forward");
+        let fwd = ForwardCurve::flat(
+            "EUR-ESTR-OIS",
+            start,
+            0.03,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("estr forward");
         let period = finstack_quant_cashflows::builder::SchedulePeriod {
             accrual_start: start,
             accrual_end: end,
@@ -1780,6 +1818,9 @@ mod tests {
             finstack_quant_core::market_data::term_structures::DiscountCurve::builder("EUR-OIS")
                 .base_date(start)
                 .knots(vec![(0.0, 1.0), (1.0, 0.97)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("discount");
         let market = MarketContext::new().insert(disc).insert(fwd);

@@ -6,77 +6,122 @@
 use super::types::ExtrapolationPolicy;
 use crate::InputError;
 
-/// Extension rule applied outside the knot range.
-///
-/// [`check_extrapolation`] resolves [`ExtrapolationPolicy::None`] to `NaN`
-/// before any rule runs, so the rules only ever see the two flat extensions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Extension {
-    /// Hold the boundary value constant.
-    FlatZero,
-    /// Extend the boundary slope.
-    FlatForward,
+/// Action resolved for an interpolation query before interior evaluation.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(super) enum BoundaryDecision {
+    /// Query hits a boundary / out-of-range flat result directly.
+    Return(f64),
+    /// Query is below `knots[0]` under `ExtrapolationPolicy::Extend`.
+    ExtendLeft,
+    /// Query is above `knots[last]` under `ExtrapolationPolicy::Extend`.
+    ExtendRight,
+    /// Query is strictly inside `(knots[0], knots[last])`, or on an exact boundary knot
+    /// when evaluating derivatives or interior formulas.
+    Interior,
 }
 
-/// Helper to check and apply extrapolation if x is out of bounds.
+/// Validate query finiteness and resolve out-of-range extrapolation and exact knot hits
+/// for value evaluation (`interp`).
 ///
-/// A non-finite `x` returns `NaN` before any knot checks, so interpolators
-/// do not repeat the finiteness check. If `x` is before the first knot, calls
-/// `on_left` with the extension rule; if `x` is after the last knot, calls
-/// `on_right`. [`ExtrapolationPolicy::None`] returns `NaN` for out-of-range
-/// `x` without calling either closure. Otherwise returns `None`.
+/// Always rejects `!x.is_finite()` regardless of extrapolation policy, rejects
+/// out-of-range queries under [`ExtrapolationPolicy::Error`], returns exact boundary
+/// stored `values` under [`ExtrapolationPolicy::Flat`], and returns exact stored
+/// `values[idx]` whenever `x == knots[idx]` so no strategy introduces log/exp round-trip
+/// drift or `0.0 * inf = NaN`.
 #[inline]
-pub(super) fn check_extrapolation<F1, F2>(
+pub(super) fn classify_value_query(
+    x: f64,
+    knots: &[f64],
+    values: &[f64],
+    extrapolation: ExtrapolationPolicy,
+) -> crate::Result<BoundaryDecision> {
+    if !x.is_finite() {
+        return Err(crate::Error::Validation(format!(
+            "interpolation query coordinate must be finite (got {x})"
+        )));
+    }
+    if x < knots[0] {
+        return match extrapolation {
+            ExtrapolationPolicy::Flat => Ok(BoundaryDecision::Return(values[0])),
+            ExtrapolationPolicy::Extend => Ok(BoundaryDecision::ExtendLeft),
+            ExtrapolationPolicy::Error => Err(crate::Error::Validation(format!(
+                "interpolation query {x} is below minimum knot {}",
+                knots[0]
+            ))),
+        };
+    }
+    let last = knots.len() - 1;
+    if x > knots[last] {
+        return match extrapolation {
+            ExtrapolationPolicy::Flat => Ok(BoundaryDecision::Return(values[last])),
+            ExtrapolationPolicy::Extend => Ok(BoundaryDecision::ExtendRight),
+            ExtrapolationPolicy::Error => Err(crate::Error::Validation(format!(
+                "interpolation query {x} exceeds maximum knot {}",
+                knots[last]
+            ))),
+        };
+    }
+    let idx = locate_segment_unchecked(knots, x);
+    if exact_f64_eq(x, knots[idx]) {
+        return Ok(BoundaryDecision::Return(values[idx]));
+    }
+    if exact_f64_eq(x, knots[idx + 1]) {
+        return Ok(BoundaryDecision::Return(values[idx + 1]));
+    }
+    Ok(BoundaryDecision::Interior)
+}
+
+#[inline]
+pub(crate) fn exact_f64_eq(a: f64, b: f64) -> bool {
+    a.is_finite() && b.is_finite() && (a.to_bits() == b.to_bits() || (a == 0.0 && b == 0.0))
+}
+
+/// Validate query finiteness and resolve out-of-range extrapolation for derivative
+/// evaluation (`interp_prime`).
+///
+/// Queries at exact boundary knots (`x == knots[0]` or `x == knots[last]`) remain inside
+/// the closed domain and therefore return [`BoundaryDecision::Interior`] (yielding the
+/// inward derivative), whereas strictly external queries under
+/// [`ExtrapolationPolicy::Flat`] return `Ok(0.0)`.
+#[inline]
+pub(super) fn classify_prime_query(
     x: f64,
     knots: &[f64],
     extrapolation: ExtrapolationPolicy,
-    on_left: F1,
-    on_right: F2,
-) -> Option<f64>
-where
-    F1: FnOnce(Extension) -> f64,
-    F2: FnOnce(Extension) -> f64,
-{
+) -> crate::Result<BoundaryDecision> {
     if !x.is_finite() {
-        return Some(f64::NAN);
+        return Err(crate::Error::Validation(format!(
+            "interpolation derivative query coordinate must be finite (got {x})"
+        )));
     }
-
-    if knots.is_empty() {
-        return None;
-    }
-
-    // Left extrapolation
     if x < knots[0] {
-        return Some(apply_extension(extrapolation, on_left));
+        return match extrapolation {
+            ExtrapolationPolicy::Flat => Ok(BoundaryDecision::Return(0.0)),
+            ExtrapolationPolicy::Extend => Ok(BoundaryDecision::ExtendLeft),
+            ExtrapolationPolicy::Error => Err(crate::Error::Validation(format!(
+                "interpolation derivative query {x} is below minimum knot {}",
+                knots[0]
+            ))),
+        };
     }
-
-    // Right extrapolation
-    if let Some(&last_knot) = knots.last()
-        && x > last_knot
-    {
-        return Some(apply_extension(extrapolation, on_right));
+    let last = knots.len() - 1;
+    if x > knots[last] {
+        return match extrapolation {
+            ExtrapolationPolicy::Flat => Ok(BoundaryDecision::Return(0.0)),
+            ExtrapolationPolicy::Extend => Ok(BoundaryDecision::ExtendRight),
+            ExtrapolationPolicy::Error => Err(crate::Error::Validation(format!(
+                "interpolation derivative query {x} exceeds maximum knot {}",
+                knots[last]
+            ))),
+        };
     }
-
-    None
-}
-
-/// Resolve an out-of-range policy: `None` is `NaN`, the flat rules call `on_flat`.
-fn apply_extension<F>(policy: ExtrapolationPolicy, on_flat: F) -> f64
-where
-    F: FnOnce(Extension) -> f64,
-{
-    match policy {
-        ExtrapolationPolicy::None => f64::NAN,
-        ExtrapolationPolicy::FlatZero => on_flat(Extension::FlatZero),
-        ExtrapolationPolicy::FlatForward => on_flat(Extension::FlatForward),
-    }
+    Ok(BoundaryDecision::Interior)
 }
 
 /// Validate a finite, strictly increasing interpolation knot axis.
 ///
 /// The values are arbitrary real coordinates; this helper does not require
-/// times to be positive or start at zero. It checks monotonicity but not the
-/// stronger minimum-spacing requirement used by slope-sensitive strategies.
+/// times to be positive or start at zero.
 ///
 /// # Arguments
 ///
@@ -102,36 +147,8 @@ pub fn validate_knots(knots: &[f64]) -> crate::Result<()> {
     Ok(())
 }
 
-/// Default minimum relative gap between consecutive knots.
-///
-/// Knots closer than `gap < MIN_RELATIVE_KNOT_GAP * max(|k[i]|, 1.0)` are
-/// rejected to prevent numerical instability in slope/derivative calculations.
-pub(crate) const MIN_RELATIVE_KNOT_GAP: f64 = 1e-10;
-
-/// Validate that consecutive knots have sufficient spacing for stable interpolation.
-///
-/// The minimum gap is relative to knot magnitude:
-/// `gap >= min_relative_gap * max(|k[i]|, 1.0)`.
-/// This prevents division-by-near-zero in slope calculations while allowing
-/// tight spacing for small-magnitude knots. The `max(|k[i]|, 1.0)` floor
-/// ensures the threshold never shrinks below `min_relative_gap` for knots near
-/// zero.
-pub(crate) fn validate_knot_spacing(knots: &[f64], min_relative_gap: f64) -> crate::Result<()> {
-    for w in knots.windows(2) {
-        let gap = w[1] - w[0];
-        let scale = w[0].abs().max(1.0);
-        if gap < min_relative_gap * scale {
-            return Err(InputError::KnotSpacingTooSmall.into());
-        }
-    }
-    Ok(())
-}
-
-/// Fast-path segment lookup for callers that already verified x is finite
-/// and in-bounds (e.g., after `check_extrapolation` returned `None`).
-///
-/// Skips finite/bounds checks. Returns the segment index directly.
-/// Caller MUST ensure: x is finite, xs has >= 2 elements, xs[0] <= x <= xs[last].
+/// Fast-path segment lookup for callers that already verified `x` is finite
+/// and in-bounds (`knots[0] <= x <= knots[last]`).
 #[inline(always)]
 pub(crate) fn locate_segment_unchecked(xs: &[f64], x: f64) -> usize {
     let idx = xs.partition_point(|k| *k < x);
@@ -154,57 +171,4 @@ pub(crate) fn validate_finite_series(values: &[f64]) -> crate::Result<()> {
         ));
     }
     Ok(())
-}
-
-/// Find the first violation of non-increasing monotonicity with a relative tolerance.
-///
-/// Returns `Some((index, prev_value, curr_value))` for the first pair where
-/// `values[index + 1] > values[index] + tolerance`, or `None` if the sequence
-/// is monotone non-increasing within tolerance.
-///
-/// The tolerance is computed as `base_tol * max(|prev|, 1.0)` to handle both
-/// small and large value ranges.
-pub(crate) fn find_monotone_violation(values: &[f64], base_tol: f64) -> Option<(usize, f64, f64)> {
-    values.windows(2).enumerate().find_map(|(i, w)| {
-        let (prev, curr) = (w[0], w[1]);
-        let tol = base_tol * prev.abs().max(1.0);
-        if curr > prev + tol {
-            Some((i, prev, curr))
-        } else {
-            None
-        }
-    })
-}
-
-#[cfg(test)]
-mod knot_spacing_tests {
-    use super::*;
-
-    #[test]
-    fn rejects_knots_too_close() {
-        let knots = [1.0, 1.0 + 1e-16];
-        let result = validate_knot_spacing(&knots, MIN_RELATIVE_KNOT_GAP);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn accepts_knots_with_sufficient_spacing() {
-        let knots = [0.0, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0];
-        let result = validate_knot_spacing(&knots, MIN_RELATIVE_KNOT_GAP);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn near_zero_knots_use_absolute_floor() {
-        let knots = [0.001, 0.002];
-        let result = validate_knot_spacing(&knots, MIN_RELATIVE_KNOT_GAP);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn large_knots_use_relative_threshold() {
-        let knots = [1_000_000.0, 1_000_000.000_01];
-        let result = validate_knot_spacing(&knots, MIN_RELATIVE_KNOT_GAP);
-        assert!(result.is_err());
-    }
 }

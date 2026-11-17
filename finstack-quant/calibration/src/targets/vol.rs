@@ -12,8 +12,11 @@ use crate::targets::util::{
 };
 use crate::validation::attach_validation_result;
 use finstack_quant_core::Result;
+use finstack_quant_core::dates::{DayCount, DayCountContextState, VolatilityClock};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::{VolGridOpts, VolInterpolationMode, VolSurface};
+use finstack_quant_core::market_data::surfaces::{
+    VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_models::volatility::sabr::{SabrCalibrator, SabrParameters, SabrShift};
 use std::collections::BTreeMap;
 
@@ -211,11 +214,17 @@ pub(crate) fn solve(
         &params.target_strikes,
         &grid,
         VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
             interpolation_mode: VolInterpolationMode::TotalVariance,
-            ..VolGridOpts::default()
         },
         None,
-    )?;
+    )?
+    .with_expiry_clock(VolatilityClock::try_new(
+        params.base_date,
+        DayCount::Act365F,
+        DayCountContextState::default(),
+    )?);
 
     let residuals = surface_quote_residuals(
         &surface,
@@ -541,6 +550,8 @@ mod tests {
             .base_date(base_date)
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.0, 1.0), (10.0, 0.80)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let ctx = MarketContext::new().insert(disc);

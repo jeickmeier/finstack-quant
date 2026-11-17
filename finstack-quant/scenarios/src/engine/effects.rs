@@ -202,14 +202,15 @@ fn market_target_for_bump(op: &OperationSpec, bump: &MarketBump) -> Option<Scena
                 quote: *quote,
             })
         }
-        (_, MarketBump::Curve { id, .. }) => market_target_for_id(op, id),
         (_, MarketBump::VolBucketPct { vol_surface_id, .. }) => {
             market_target_for_id(op, vol_surface_id)
         }
         (_, MarketBump::BaseCorrBucketPts { surface_id, .. }) => {
             market_target_for_id(op, surface_id)
         }
-        _ => None,
+        (_, other) => other
+            .target_and_spec()
+            .and_then(|(target, _)| market_target_for_id(op, target.id())),
     }
 }
 
@@ -306,8 +307,8 @@ fn requested_shock(op: &OperationSpec) -> Option<ShockMagnitude> {
 /// snapped surface expiries of a bucket bump) reports that location; every
 /// other bump reports the operation's request.
 fn shock_for_bump(op: &OperationSpec, bump: &MarketBump) -> Option<ShockMagnitude> {
-    match (op, bump) {
-        (OperationSpec::CurveNodeBp { curve_kind, .. }, MarketBump::Curve { spec, .. }) => {
+    match (op, bump.target_and_spec(), bump) {
+        (OperationSpec::CurveNodeBp { curve_kind, .. }, Some((_, spec)), _) => {
             match spec.bump_type {
                 BumpType::TriangularKeyRate { target_bucket, .. } => {
                     Some(ShockMagnitude::KeyRate {
@@ -324,15 +325,16 @@ fn shock_for_bump(op: &OperationSpec, bump: &MarketBump) -> Option<ShockMagnitud
         }
         (
             OperationSpec::VolSurfaceBucketPct { .. },
+            _,
             MarketBump::VolBucketPct {
                 expiries,
-                strikes,
+                secondary_values,
                 pct,
                 ..
             },
         ) => Some(ShockMagnitude::VolBucket {
             expiries_years: expiries.clone(),
-            strikes: strikes.clone(),
+            strikes: secondary_values.clone(),
             value: *pct,
             unit: ShockUnit::Percent,
         }),
@@ -342,10 +344,11 @@ fn shock_for_bump(op: &OperationSpec, bump: &MarketBump) -> Option<ShockMagnitud
 
 /// Numeric level of a stored scalar: the value itself, or a price's amount.
 fn scalar_level(scalar: &MarketScalar) -> f64 {
-    match scalar {
-        MarketScalar::Unitless(value) => *value,
-        MarketScalar::Price(money) => money.amount(),
-    }
+    let level = scalar
+        .get_unitless()
+        .or_else(|| scalar.get_price().map(|money| money.amount()));
+    debug_assert!(level.is_some(), "unexpected MarketScalar variant");
+    level.unwrap_or(0.0)
 }
 
 fn replace_curve_id(op: &OperationSpec) -> Option<&CurveId> {

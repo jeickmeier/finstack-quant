@@ -196,9 +196,22 @@ impl Equity {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<Money> {
-        let price = match scalar {
-            MarketScalar::Price(m) => market.convert_money(*m, self.currency, as_of)?.amount,
-            MarketScalar::Unitless(v) => Money::new(*v, self.currency)?,
+        let price = if let Some(m) = scalar.get_price() {
+            market
+                .convert_money(
+                    m,
+                    self.currency,
+                    as_of,
+                    finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+                )?
+                .amount
+        } else {
+            let v = scalar.get_unitless().ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "Unsupported MarketScalar variant".to_string(),
+                )
+            })?;
+            Money::new(v, self.currency)?
         };
         finstack_quant_core::validation::validate_f64_non_negative(
             price.amount(),
@@ -243,19 +256,22 @@ impl Equity {
     /// Resolve dividend yield (annualized, decimal) for the equity
     pub fn dividend_yield(&self, market: &MarketContext) -> finstack_quant_core::Result<f64> {
         if let Some(explicit_id) = self.div_yield_id.as_deref() {
-            return match market.get_price(explicit_id)? {
-                MarketScalar::Unitless(value) if value.is_finite() => Ok(*value),
-                MarketScalar::Unitless(value) => {
-                    Err(finstack_quant_core::Error::Validation(format!(
-                        "Equity '{}' dividend yield '{}' must be finite, got {value}",
+            let value = market
+                .get_price(explicit_id)?
+                .get_unitless()
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "Equity '{}' dividend yield '{}' must be unitless",
                         self.id, explicit_id
-                    )))
-                }
-                MarketScalar::Price(_) => Err(finstack_quant_core::Error::Validation(format!(
-                    "Equity '{}' dividend yield '{}' must be unitless",
+                    ))
+                })?;
+            if !value.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Equity '{}' dividend yield '{}' must be finite, got {value}",
                     self.id, explicit_id
-                ))),
-            };
+                )));
+            }
+            return Ok(value);
         }
         Ok(0.0)
     }
@@ -285,8 +301,8 @@ impl Equity {
             as_of,
             finstack_quant_core::dates::DayCountContext::default(),
         )?;
-        let df_as_of = disc.df(curve_time_to_as_of);
-        let df_terminal = disc.df(curve_time_to_as_of + t);
+        let df_as_of = disc.df(curve_time_to_as_of)?;
+        let df_terminal = disc.df(curve_time_to_as_of + t)?;
         if !df_as_of.is_finite()
             || df_as_of <= 0.0
             || !df_terminal.is_finite()
@@ -423,7 +439,8 @@ mod tests {
         let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_spot_id("AAPL-PRIMARY");
         let market = MarketContext::new().insert_price(
             "EQUITY-SPOT",
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(999.0),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(999.0)
+                .expect("valid scalar"),
         );
         let as_of = Date::from_calendar_date(2025, Month::January, 2).expect("valid date");
 
@@ -513,6 +530,9 @@ mod lifecycle_tests {
         let discount_curve = DiscountCurve::builder("USD-OIS")
             .base_date(base_date)
             .knots(vec![(0.0, 1.0), (1.0, 0.95), (5.0, 0.85)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("should succeed");
 

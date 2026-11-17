@@ -2183,30 +2183,6 @@
       "description": "A single warning emitted by an adapter, the engine, or a downstream helper.\n\nNew variants will be added over time; pattern matches on `Warning` should\nalways include a wildcard arm.",
       "oneOf": [
         {
-          "description": "Par-spread shocks used the approximation delta hazard = delta spread / (1 - recovery).",
-          "properties": {
-            "curve_id": {
-              "description": "Hazard curve affected by the approximate spread shock.",
-              "type": "string"
-            },
-            "kind": {
-              "const": "hazard_spread_first_order",
-              "type": "string"
-            },
-            "recovery_rate": {
-              "description": "Decimal recovery fraction used in the loss-given-default conversion.",
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "kind",
-            "curve_id",
-            "recovery_rate"
-          ],
-          "type": "object"
-        },
-        {
           "description": "A discount curve was resolved heuristically (currency-prefix or single-\ncurve fallback) instead of via an explicit `discount_curve_id`.",
           "properties": {
             "chosen_discount": {
@@ -2601,6 +2577,24 @@
           "type": "object"
         },
         {
+          "description": "Vol-surface bucket shock selected zero grid points (no-op).",
+          "properties": {
+            "kind": {
+              "const": "vol_surface_bucket_empty_selection",
+              "type": "string"
+            },
+            "vol_surface_id": {
+              "description": "Volatility-surface identifier.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "vol_surface_id"
+          ],
+          "type": "object"
+        },
+        {
           "description": "Vol-surface negative bucket shock that may produce non-positive vols.",
           "properties": {
             "bucket": {
@@ -2626,52 +2620,6 @@
             "vol_surface_id",
             "pct",
             "bucket"
-          ],
-          "type": "object"
-        },
-        {
-          "description": "A hierarchy-targeted operation expanded to zero curves. This is almost\nalways a configuration mistake — the target path exists but has no\ncurves attached to it, or the tag filter excluded everything.",
-          "properties": {
-            "kind": {
-              "const": "hierarchy_no_match",
-              "type": "string"
-            },
-            "op_kind": {
-              "description": "Operation `kind` tag (e.g., `\"hierarchy_curve_parallel_bp\"`).",
-              "type": "string"
-            },
-            "target_path": {
-              "description": "Hierarchy path the operation targeted, joined with `/`.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "target_path",
-            "op_kind"
-          ],
-          "type": "object"
-        },
-        {
-          "description": "A hierarchy-resolved identifier was skipped because it does not exist\nin the market collection targeted by the operation kind (e.g. a\n`HierarchyCurveParallelBp { curve_kind: Discount }` matched an id that\nis an equity price or vol surface, not a discount curve). The remaining\nresolved identifiers are still applied.",
-          "properties": {
-            "curve_id": {
-              "description": "The resolved identifier that was skipped.",
-              "type": "string"
-            },
-            "kind": {
-              "const": "hierarchy_resolved_id_skipped",
-              "type": "string"
-            },
-            "op_kind": {
-              "description": "Operation `kind` tag (e.g., `\"hierarchy_curve_parallel_bp\"`).",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "curve_id",
-            "op_kind"
           ],
           "type": "object"
         },

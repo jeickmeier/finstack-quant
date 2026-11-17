@@ -10,7 +10,9 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::ExerciseStyle;
@@ -22,12 +24,7 @@ use rust_decimal::Decimal;
 use time::macros::date;
 
 fn build_flat_forward_curve(rate: f64, base_date: Date, curve_id: &str) -> ForwardCurve {
-    ForwardCurve::builder(curve_id, 0.25)
-        .base_date(base_date)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, rate), (10.0, rate)])
-        .build()
-        .unwrap()
+    ForwardCurve::flat(curve_id, base_date, rate, DayCount::Act360).unwrap()
 }
 
 fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve {
@@ -40,15 +37,19 @@ fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> Disc
             (5.0, (-rate * 5.0).exp()),
             (10.0, (-rate * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
 
 fn build_normal_vol_surface(vol: f64, _base_date: Date, vol_surface_id: &str) -> VolSurface {
     VolSurface::builder(vol_surface_id)
-        .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::Normal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[0.25, 1.0, 5.0, 10.0])
-        .strikes(&[-0.02, 0.0, 0.03, 0.05, 0.10])
+        .secondary_values(&[-0.02, 0.0, 0.03, 0.05, 0.10])
         .row(&[vol, vol, vol, vol, vol])
         .row(&[vol, vol, vol, vol, vol])
         .row(&[vol, vol, vol, vol, vol])

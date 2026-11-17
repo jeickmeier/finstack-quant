@@ -246,20 +246,21 @@ fn short_builder(
 }
 
 fn short_market(observations: Vec<(Date, f64)>) -> MarketContext {
-    let forward = ForwardCurve::builder("CCM-SHORT", 1.0 / 360.0)
-        .base_date(d(2025, Month::June, 9))
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.09), (40.0, 0.09)])
-        .build()
-        .unwrap();
+    let forward =
+        ForwardCurve::flat("CCM-SHORT", d(2025, Month::June, 9), 0.09, DayCount::Act360).unwrap();
     let market = MarketContext::new().insert(forward);
     if observations.is_empty() {
         market
     } else {
         market.insert_series(
-            ScalarTimeSeries::new("FIXING:CCM-SHORT", observations, Some(Currency::USD))
-                .unwrap()
-                .with_interpolation(SeriesInterpolation::Linear),
+            ScalarTimeSeries::new(
+                "FIXING:CCM-SHORT",
+                observations,
+                Some(Currency::USD),
+                SeriesInterpolation::Linear,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .unwrap(),
         )
     }
 }
@@ -289,6 +290,7 @@ fn short_record() -> Value {
         .build_as_of(&short_market(future_history), cutoff)
         .unwrap();
     assert_eq!(flow_record(&output), flow_record(&future_output));
+    let proj_1d = ((0.09_f64 / 360.0).exp() - 1.0) * 360.0;
     let weights = [
         (0.020, 1.0),
         (0.021, 1.0),
@@ -296,10 +298,10 @@ fn short_record() -> Value {
         (0.023, 1.0),
         (0.024, 3.0),
         (0.032, 1.0),
-        (0.09, 1.0),
-        (0.09, 1.0),
-        (0.09, 1.0),
-        (0.09, 3.0),
+        (proj_1d, 1.0),
+        (proj_1d, 1.0),
+        (proj_1d, 1.0),
+        (proj_1d, 3.0),
     ];
     let expected = 1_000_000.0
         * (weights.iter().fold(1.0, |product, (rate, days)| {
@@ -353,14 +355,16 @@ fn ccm_history_same_day_future_and_missing_controls() {
 fn holiday_record() -> Value {
     let start = d(2025, Month::April, 17);
     let end = d(2025, Month::April, 21);
-    let forward = ForwardCurve::builder("USD-SOFR", 1.0 / 360.0)
-        .base_date(end)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.07), (40.0, 0.07)])
-        .build()
-        .unwrap();
+    let forward = ForwardCurve::flat("USD-SOFR", end, 0.07, DayCount::Act360).unwrap();
     let market = MarketContext::new().insert(forward).insert_series(
-        ScalarTimeSeries::new("FIXING:USD-SOFR", vec![(start, 0.05)], None).unwrap(),
+        ScalarTimeSeries::new(
+            "FIXING:USD-SOFR",
+            vec![(start, 0.05)],
+            None,
+            SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .unwrap(),
     );
     let mut builder = CashFlowSchedule::builder();
     let output = builder
@@ -495,8 +499,7 @@ fn roll_record(leg: Leg) -> Value {
     assert_eq!(content_hash(&fixture.market).unwrap(), before);
     let curve_base_before = realized.get_forward(leg.index()).unwrap().base_date();
     assert_eq!(curve_base_before, history_workloads::curve_base());
-    let roll_days = (horizon - curve_base_before).whole_days();
-    let rolled = realized.roll_forward(roll_days).unwrap();
+    let rolled = realized.condition(horizon).unwrap();
     let curve_base_after = rolled.get_forward(leg.index()).unwrap().base_date();
     assert_eq!(curve_base_after, horizon);
     let direct = fixture.builder.build_as_of(&realized, horizon).unwrap();
@@ -517,7 +520,7 @@ fn roll_record(leg: Leg) -> Value {
     let preserved = realized.get_series(&series_id).unwrap();
     for (date, value) in &fixture.history {
         assert_eq!(
-            preserved.value_on_exact(*date).unwrap().to_bits(),
+            preserved.get_value_exact(*date).unwrap().to_bits(),
             value.to_bits()
         );
     }
@@ -525,7 +528,7 @@ fn roll_record(leg: Leg) -> Value {
         .map(|fixing| json!({"date":fixing.date.to_string(),"value_bits":fixing.value.map(f64::to_bits)})).collect();
     assert!(!origin_fixings.is_empty());
     json!({"id":format!("{}_materialize_roll_rebuild",leg.index()),"origin":fixture.as_of.to_string(),"horizon":horizon.to_string(),
-        "curve_base_before":curve_base_before.to_string(),"curve_base_after":curve_base_after.to_string(),"roll_days":roll_days,
+        "curve_base_before":curve_base_before.to_string(),"curve_base_after":curve_base_after.to_string(),"roll_days":(horizon - curve_base_before).whole_days(),
         "crossed_raw_observations":origin_fixings,"input_market_hash":before,
         "realized_market":realized,"rolled_market":rolled,"initial":flow_record(&initial),
         "unrolled_forward_rebuild":flow_record(&direct),"rolled_forward_rebuild":flow_record(&advanced),

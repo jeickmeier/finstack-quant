@@ -71,7 +71,7 @@ fn test_usd_eur_spot_new_year_2024() {
     // CLS-consistent rule: USD calendar gates only the final value date
     // . Same result here since
     // Jan 1 is a joint closure.
-    let spot = resolve_joint_calendar(Some("nyse"), Some("target2"))
+    let spot = resolve_joint_calendar("nyse", "target2")
         .and_then(|cal| trade_date.add_business_days(2, cal))
         .expect("Valid calendars");
 
@@ -113,7 +113,7 @@ fn test_usd_eur_spot_christmas_2024() {
 
     // CLS-consistent rule : same result here
     // since the skipped days are TARGET2 (non-USD) closures.
-    let spot = resolve_joint_calendar(Some("nyse"), Some("target2"))
+    let spot = resolve_joint_calendar("nyse", "target2")
         .and_then(|cal| trade_date.add_business_days(2, cal))
         .expect("Valid calendars");
 
@@ -159,7 +159,7 @@ fn test_usd_eur_spot_christmas_2024() {
 fn test_gbp_jpy_spot_may_bank_holiday_2025() {
     let trade_date = create_date(2025, Month::May, 1).expect("Valid date");
 
-    let spot = resolve_joint_calendar(Some("gblo"), Some("jpx"))
+    let spot = resolve_joint_calendar("gblo", "jpx")
         .and_then(|cal| trade_date.add_business_days(2, cal))
         .expect("Valid calendars");
 
@@ -192,7 +192,7 @@ fn test_gbp_jpy_spot_may_bank_holiday_2025() {
 fn test_gbp_jpy_spot_spring_bank_holiday_2025() {
     let trade_date = create_date(2025, Month::May, 22).expect("Valid date");
 
-    let spot = resolve_joint_calendar(Some("gblo"), Some("jpx"))
+    let spot = resolve_joint_calendar("gblo", "jpx")
         .and_then(|cal| trade_date.add_business_days(2, cal))
         .expect("Valid calendars");
 
@@ -229,7 +229,7 @@ fn test_usd_gbp_spot_july_4th_2025() {
     let trade_date = create_date(2025, Month::July, 2).expect("Valid date");
 
     // CLS-consistent rule .
-    let spot = resolve_joint_calendar(Some("nyse"), Some("gblo"))
+    let spot = resolve_joint_calendar("nyse", "gblo")
         .and_then(|cal| trade_date.add_business_days(2, cal))
         .expect("Valid calendars");
 
@@ -267,7 +267,7 @@ fn test_usd_gbp_spot_july_4th_2025() {
 fn test_joint_business_days_christmas_week_2024() {
     let start = create_date(2024, Month::December, 20).expect("Valid date");
 
-    let result = resolve_joint_calendar(Some("nyse"), Some("target2"))
+    let result = resolve_joint_calendar("nyse", "target2")
         .and_then(|cal| start.add_business_days(5, cal))
         .expect("Valid calendars");
 
@@ -292,7 +292,7 @@ fn test_joint_business_days_christmas_week_2024() {
 fn test_usd_gbp_spot_mlk_day_2025() {
     let trade_date = create_date(2025, Month::January, 17).expect("Valid date");
 
-    let spot = resolve_joint_calendar(Some("nyse"), Some("gblo"))
+    let spot = resolve_joint_calendar("nyse", "gblo")
         .and_then(|cal| trade_date.add_business_days(2, cal))
         .expect("Valid calendars");
 
@@ -310,7 +310,7 @@ fn test_usd_gbp_spot_mlk_day_2025() {
 fn test_unknown_base_calendar_errors() {
     let trade_date = create_date(2024, Month::January, 15).expect("Valid date");
 
-    let result = resolve_joint_calendar(Some("unknown_calendar"), Some("gblo"))
+    let result = resolve_joint_calendar("unknown_calendar", "gblo")
         .and_then(|cal| trade_date.add_business_days(2, cal));
 
     assert!(result.is_err(), "Unknown base calendar should return error");
@@ -331,7 +331,7 @@ fn test_unknown_base_calendar_errors() {
 fn test_unknown_quote_calendar_errors() {
     let trade_date = create_date(2024, Month::January, 15).expect("Valid date");
 
-    let result = resolve_joint_calendar(Some("nyse"), Some("invalid_cal"))
+    let result = resolve_joint_calendar("nyse", "invalid_cal")
         .and_then(|cal| trade_date.add_business_days(2, cal));
 
     assert!(
@@ -349,18 +349,17 @@ fn test_unknown_quote_calendar_errors() {
     }
 }
 
-/// Test weekends-only calendar (explicit None)
+/// Test weekends-only calendar (explicit `"weekends_only"`)
 ///
-/// When no calendar is specified (None), we should get weekends-only behavior
-/// without erroring. This is useful for testing or for currencies without
-/// established holiday calendars.
+/// Selecting `"weekends_only"` gives weekend-only behavior without extra
+/// market holidays.
 #[test]
 fn test_weekends_only_no_holidays() {
     let trade_date = create_date(2024, Month::January, 15).expect("Valid date"); // Monday
 
-    let spot = resolve_joint_calendar(None, None)
+    let spot = resolve_joint_calendar("weekends_only", "weekends_only")
         .and_then(|cal| trade_date.add_business_days(2, cal))
-        .expect("None should use weekends-only");
+        .expect("weekends_only should succeed");
 
     // Expected: Wednesday, January 17, 2024 (simple +2 business days, no holidays)
     let expected = create_date(2024, Month::January, 17).expect("Valid expected date");
@@ -375,10 +374,10 @@ fn test_weekends_only_no_holidays() {
 #[test]
 fn test_resolve_calendar_returns_correct_calendar() {
     // Test that valid calendars resolve successfully
-    let nyse = resolve_calendar(Some("nyse")).expect("NYSE should exist");
-    let gblo = resolve_calendar(Some("gblo")).expect("GBLO should exist");
-    let _target2 = resolve_calendar(Some("target2")).expect("TARGET2 should exist");
-    let _jpx = resolve_calendar(Some("jpx")).expect("JPX should exist");
+    let nyse = resolve_calendar("nyse").expect("NYSE should exist");
+    let gblo = resolve_calendar("gblo").expect("GBLO should exist");
+    let _target2 = resolve_calendar("target2").expect("TARGET2 should exist");
+    let _jpx = resolve_calendar("jpx").expect("JPX should exist");
 
     // Verify they're actually different calendars by checking a known holiday
     // MLK Day 2024 (Jan 15) - NYSE closed, others may be open
@@ -396,8 +395,8 @@ fn test_resolve_calendar_returns_correct_calendar() {
         "GBLO should be open on MLK Day (not a UK holiday)"
     );
 
-    // Verify None returns weekends-only
-    let weekends = resolve_calendar(None).expect("None should return weekends-only");
+    // Verify explicit weekends_only returns weekends-only
+    let weekends = resolve_calendar("weekends_only").expect("weekends_only should succeed");
 
     // Monday should be a business day in weekends-only
     let monday = create_date(2024, Month::January, 15).expect("Valid date");
@@ -423,8 +422,8 @@ fn test_joint_business_days_iteration_limit() {
     // Adding 20 business days should complete well under MAX_ITERS (1000)
     let start = create_date(2024, Month::January, 1).expect("Valid date");
 
-    let result = resolve_joint_calendar(Some("nyse"), Some("target2"))
-        .and_then(|cal| start.add_business_days(20, cal));
+    let result =
+        resolve_joint_calendar("nyse", "target2").and_then(|cal| start.add_business_days(20, cal));
 
     // Should succeed without hitting iteration limit
     assert!(

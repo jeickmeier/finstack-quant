@@ -17,14 +17,12 @@ use crate::targets::util::{
     ContextScratch, discount_and_forward_curve_ids, prepare_rate_calibration_quotes,
     pv01_residual_weight, sorted_knot_grid, validate_global_knot_grid,
 };
-use crate::validation::RateBoundsPolicy;
 use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
     DiscountCurve, DiscountCurveBuilder, RateCalibrationCurveRole,
-    ValidationMode as CurveValidationMode,
 };
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::CurveId;
@@ -226,51 +224,18 @@ impl DiscountCurveTarget {
         (log_lo + t * (log_hi - log_lo)).exp()
     }
 
-    /// Whether discount factors may increase with maturity (negative forwards):
-    /// the explicit config flag, else the rate-bounds policy for the currency.
-    fn allow_non_monotonic(&self) -> bool {
-        let policy_allow = match self.params.config.rate_bounds_policy {
-            RateBoundsPolicy::Explicit => self.params.config.rate_bounds.min_rate < 0.0,
-            RateBoundsPolicy::AutoCurrency => {
-                matches!(
-                    self.params.currency,
-                    Currency::EUR | Currency::JPY | Currency::CHF
-                )
-            }
-        };
-        self.params
-            .config
-            .discount_curve
-            .allow_non_monotonic_final
-            .unwrap_or(policy_allow)
-    }
-
     /// Curve builder shared by the solver and final builds.
     ///
     /// Stamps the calibration OIS cut-off convention so bootstrap-internal swap
     /// repricing and downstream single-curve OIS pricing take the same
     /// compounded fast-path branch.
-    fn curve_builder(
-        &self,
-        id: &CurveId,
-        knots: &[(f64, f64)],
-        allow_non_monotonic: bool,
-    ) -> DiscountCurveBuilder {
-        let validation = if allow_non_monotonic {
-            CurveValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            }
-        } else {
-            CurveValidationMode::MarketStandard
-        };
+    fn curve_builder(&self, id: &CurveId, knots: &[(f64, f64)]) -> DiscountCurveBuilder {
         DiscountCurve::builder(id.clone())
             .base_date(self.params.base_date)
             .day_count(self.params.curve_day_count)
             .knots(knots.iter().copied())
             .interp(self.params.solve_interp)
             .extrapolation(self.params.extrapolation)
-            .validation(validation)
     }
 
     fn knots_from_params(&self, times: &[f64], params: &[f64]) -> Result<Vec<(f64, f64)>> {
@@ -541,18 +506,7 @@ impl BootstrapTarget for DiscountCurveTarget {
             });
         }
 
-        // The solver curve should respect the same monotonic/no-arbitrage policy as the final
-        // curve. Allowing non-monotone solver curves can make bootstrapping converge to
-        // an infeasible (arbitrage) shape and then fail only at the end.
-        let allow_non_monotonic = self.allow_non_monotonic();
-
-        // The solver curve respects the final curve's monotonic policy but not
-        // its forward floor, which only the final build enforces.
-        self.curve_builder(&self.params.discount_curve_id, knots, allow_non_monotonic)
-            .validation(CurveValidationMode::Raw {
-                allow_non_monotonic,
-                forward_floor: None,
-            })
+        self.curve_builder(&self.params.discount_curve_id, knots)
             .build()
             .map_err(|e| finstack_quant_core::Error::Calibration {
                 message: format!("Failed to build temp curve: {}", e),
@@ -563,7 +517,7 @@ impl BootstrapTarget for DiscountCurveTarget {
     fn build_curve_final(&self, knots: &[(f64, f64)]) -> Result<Self::Curve> {
         // MonotoneConvex handles non-monotone (negative-rate) discount factors
         // itself, so no interpolation-style guard is needed here.
-        self.curve_builder(&self.params.curve_id, knots, self.allow_non_monotonic())
+        self.curve_builder(&self.params.curve_id, knots)
             .build()
             .map_err(|e| finstack_quant_core::Error::Calibration {
                 message: e.to_string(),
@@ -670,7 +624,7 @@ impl GlobalSolveTarget for DiscountCurveTarget {
 
             // Prefer seeded zeros from an initial curve (bootstrap) if available.
             let z = if let Some(curve) = seed_curve {
-                let df = if t > 0.0 { curve.df(t) } else { 1.0 };
+                let df = if t > 0.0 { curve.df(t)? } else { 1.0 };
                 if df.is_finite() && df > 0.0 {
                     let implied_z = -df.ln() / t.max(1e-9);
                     implied_z.clamp(bounds.min_rate, bounds.max_rate)
@@ -927,7 +881,7 @@ mod tests {
                 curve_id: CurveId::new("USD-OIS"),
                 discount_curve_id: CurveId::new("USD-OIS"),
                 solve_interp: InterpStyle::Linear,
-                extrapolation: ExtrapolationPolicy::FlatZero,
+                extrapolation: ExtrapolationPolicy::Flat,
                 config: CalibrationConfig::default(),
                 curve_day_count: DayCount::Act365F,
                 residual_notional: 1.0,
@@ -977,7 +931,7 @@ mod tests {
                 curve_id: CurveId::new("USD-OIS"),
                 discount_curve_id: CurveId::new("USD-OIS"),
                 solve_interp: InterpStyle::Linear,
-                extrapolation: ExtrapolationPolicy::FlatZero,
+                extrapolation: ExtrapolationPolicy::Flat,
                 config: config.clone(),
                 curve_day_count: DayCount::Act365F,
                 residual_notional: 1.0,
@@ -1047,7 +1001,7 @@ mod tests {
                     curve_id: CurveId::new("USD-OIS"),
                     discount_curve_id: CurveId::new("USD-OIS"),
                     solve_interp: InterpStyle::Linear,
-                    extrapolation: ExtrapolationPolicy::FlatZero,
+                    extrapolation: ExtrapolationPolicy::Flat,
                     config: config.clone(),
                     curve_day_count: DayCount::Act365F,
                     residual_notional: notional, // Different notionals
@@ -1125,8 +1079,8 @@ mod tests {
         // Compare curves at several points - they should be identical (within numerical tolerance)
         let test_times = vec![0.0, 0.25, 0.5, 0.75, 1.0];
         for t in test_times {
-            let df_1 = curve_notional_1.df(t);
-            let df_1m = curve_notional_1m.df(t);
+            let df_1 = curve_notional_1.df(t).expect("df");
+            let df_1m = curve_notional_1m.df(t).expect("df");
 
             println!(
                 "t={:.2}: df(notional=1.0)={:.12}, df(notional=1M)={:.12}, diff={:.2e}",
@@ -1159,7 +1113,7 @@ mod tests {
                 curve_id: CurveId::new("USD-OIS"),
                 discount_curve_id: CurveId::new("USD-OIS"),
                 solve_interp: InterpStyle::Linear,
-                extrapolation: ExtrapolationPolicy::FlatZero,
+                extrapolation: ExtrapolationPolicy::Flat,
                 config,
                 curve_day_count: DayCount::Act365F,
                 residual_notional: 1.0,

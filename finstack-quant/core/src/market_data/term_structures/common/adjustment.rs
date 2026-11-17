@@ -34,8 +34,6 @@ pub(crate) enum RateShock {
     /// The derivative of `-rate * t * w(t)`, whose integral is the
     /// continuously compounded log-discount shock.
     ZeroRate,
-    /// The continuous rate shock `rate * w(t)` itself.
-    ForwardRate,
 }
 
 impl PiecewiseLinearAdjustment {
@@ -52,8 +50,28 @@ impl PiecewiseLinearAdjustment {
         }
     }
 
-    pub(crate) fn value(&self, x: f64) -> f64 {
-        self.coefficients(x).0
+    pub(crate) fn value_with_left_interior(&self, x: f64, source_first_knot: f64) -> f64 {
+        let index = if x <= source_first_knot {
+            self.segments.partition_point(|segment| segment.start <= x)
+        } else {
+            self.segments.partition_point(|segment| segment.start < x)
+        };
+        if index == 0 {
+            self.initial_value
+        } else {
+            let segment = &self.segments[index - 1];
+            segment.value + segment.slope * (x - segment.start)
+        }
+    }
+
+    pub(crate) fn checked_integral(&self, from: f64, to: f64) -> crate::Result<f64> {
+        let total = self.integral(from, to);
+        if !total.is_finite() {
+            return Err(crate::Error::Validation(format!(
+                "curve adjustment integral over [{from}, {to}] is non-finite: {total}"
+            )));
+        }
+        Ok(total)
     }
 
     pub(crate) fn integral(&self, from: f64, to: f64) -> f64 {
@@ -64,6 +82,8 @@ impl PiecewiseLinearAdjustment {
             return -self.integral(to, from);
         }
         let mut sum = NeumaierAccumulator::new();
+        let mut fallback = false;
+        let mut raw = 0.0_f64;
         let mut current = from;
         let (mut value, mut slope) = self.coefficients(from);
         let first = self
@@ -74,23 +94,26 @@ impl PiecewiseLinearAdjustment {
                 break;
             }
             let width = segment.start - current;
-            sum.add(width * (value + 0.5 * slope * width));
+            let term = width * (value + 0.5 * slope * width);
+            raw += term;
+            if !fallback && sum.add(term).is_err() {
+                fallback = true;
+            }
             current = segment.start;
             value = segment.value;
             slope = segment.slope;
         }
         let width = to - current;
-        sum.add(width * (value + 0.5 * slope * width));
-        sum.total()
-    }
-
-    pub(crate) fn scale(&mut self, factor: f64) -> crate::Result<()> {
-        self.initial_value *= factor;
-        for segment in &mut self.segments {
-            segment.value *= factor;
-            segment.slope *= factor;
+        let term = width * (value + 0.5 * slope * width);
+        raw += term;
+        if !fallback && sum.add(term).is_err() {
+            fallback = true;
         }
-        self.validate()
+        if fallback {
+            raw
+        } else {
+            sum.get_total().unwrap_or(raw)
+        }
     }
 
     fn add_constant(&mut self, value: f64) -> crate::Result<()> {
@@ -113,7 +136,6 @@ impl PiecewiseLinearAdjustment {
         // Function value where the shape is flat at one.
         let flat = match shock {
             RateShock::ZeroRate => -rate,
-            RateShock::ForwardRate => rate,
         };
         let BumpType::TriangularKeyRate {
             prev_bucket: prev,
@@ -135,10 +157,6 @@ impl PiecewiseLinearAdjustment {
                             let coefficient = -rate / (target - p);
                             (coefficient * (2.0 * t - p), 2.0 * coefficient)
                         }
-                        RateShock::ForwardRate => {
-                            let slope = rate / (target - p);
-                            (slope * (t - p), slope)
-                        }
                     };
                 }
             } else if x < offset + target {
@@ -150,10 +168,6 @@ impl PiecewiseLinearAdjustment {
                         RateShock::ZeroRate => {
                             let coefficient = rate / (n - target);
                             (coefficient * (2.0 * t - n), 2.0 * coefficient)
-                        }
-                        RateShock::ForwardRate => {
-                            let slope = -rate / (n - target);
-                            (-slope * (n - t), slope)
                         }
                     }
                 } else {

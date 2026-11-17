@@ -129,6 +129,8 @@ def _market(as_of: str = AS_OF, bump: float = 0.0) -> MarketContext:
             date.fromisoformat(as_of),
             [(0.0, 1.0), (0.5, 0.98 - bump), (1.0, 0.95 - bump)],
             day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
         )
     )
     return market
@@ -311,8 +313,8 @@ def test_cell_returns_from_reference_returns_typed_table() -> None:
 
 
 def test_cell_returns_from_curves_returns_typed_table() -> None:
-    start = DiscountCurve.flat("start", date(2025, 1, 1), 0.02)
-    end = DiscountCurve.flat("end", date(2025, 4, 1), 0.03)
+    start = DiscountCurve.flat("start", date(2025, 1, 1), 0.02, "act_365f")
+    end = DiscountCurve.flat("end", date(2025, 4, 1), 0.03, "act_365f")
     config = json.dumps({"width": 1.0})
 
     table = pf.cell_returns_from_curves(start, end, 0.25, 2.0, "UST", config)

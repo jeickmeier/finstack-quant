@@ -467,3 +467,65 @@ impl JsFinstackConfig {
         from_js_json::<FinstackConfig>(&json, "json").map(|inner| Self { inner })
     }
 }
+
+thread_local! {
+    static CONFIG_PROTOTYPE: std::cell::OnceCell<js_sys::Object> = const { std::cell::OnceCell::new() };
+}
+
+/// Extract an optional borrowed `FinstackConfig` from a JS argument without
+/// consuming the caller's WASM handle.
+///
+/// Accepts `None`, `null`, or `undefined` as `Ok(None)`; validates exact
+/// `FinstackConfig` prototype identity and a live (`__wbg_ptr != 0`) handle
+/// before reading the canonical config JSON.
+pub(crate) fn js_opt_finstack_config(
+    value: Option<&JsValue>,
+    label: &str,
+) -> Result<Option<FinstackConfig>, JsValue> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    if value.is_null() || value.is_undefined() {
+        return Ok(None);
+    }
+    let Some(obj) = value.dyn_ref::<js_sys::Object>() else {
+        return Err(crate::utils::input::invalid_type(
+            label,
+            "expected a FinstackConfig instance",
+        ));
+    };
+    let expected_proto = CONFIG_PROTOTYPE.with(|cell| -> Result<js_sys::Object, JsValue> {
+        if let Some(proto) = cell.get() {
+            return Ok(proto.clone());
+        }
+        let sample = JsValue::from(JsFinstackConfig::new(None, None)?);
+        let proto = js_sys::Object::get_prototype_of(&sample);
+        if let Ok(free_fn) = js_sys::Reflect::get(&sample, &JsValue::from("free"))
+            && let Some(free_fn) = free_fn.dyn_ref::<js_sys::Function>()
+        {
+            let _ = free_fn.call0(&sample);
+        }
+        let _ = cell.set(proto.clone());
+        Ok(proto)
+    })?;
+    if !js_sys::Object::is(&js_sys::Object::get_prototype_of(obj), &expected_proto) {
+        return Err(crate::utils::input::invalid_type(
+            label,
+            "expected a FinstackConfig instance",
+        ));
+    }
+    let ptr = js_sys::Reflect::get(obj, &JsValue::from("__wbg_ptr"))?;
+    if ptr.as_f64().unwrap_or(0.0) == 0.0 {
+        return Err(to_js_err("FinstackConfig handle has been freed"));
+    }
+    let to_json_fn = js_sys::Reflect::get(obj, &JsValue::from("toJson"))?
+        .dyn_into::<js_sys::Function>()
+        .map_err(|_| to_js_err("FinstackConfig instance is missing toJson()"))?;
+    let json = to_json_fn
+        .call0(obj)?
+        .as_string()
+        .ok_or_else(|| to_js_err("FinstackConfig.toJson() did not return a string"))?;
+    serde_json::from_str::<FinstackConfig>(&json)
+        .map(Some)
+        .map_err(to_js_err)
+}

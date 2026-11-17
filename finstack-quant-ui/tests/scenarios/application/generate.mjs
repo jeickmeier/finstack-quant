@@ -32,11 +32,11 @@ const specs = [
     },
   },
   {
-    name: "hz-par-cds-25bp",
+    // The bond market carries no equity, so Rust skips the shock with a warning.
+    name: "missing-equity-10pct",
     spec: {
-      id: "hz-par-cds-25bp",
-      operations: [shift("par_cds", "HZ", 25)],
-      hazard_bump_mode: "first_order_shift",
+      id: "missing-equity-10pct",
+      operations: [{ kind: "equity_price_pct", ids: ["ACME"], pct: -10 }],
     },
   },
 ];

@@ -90,52 +90,37 @@ impl MetricCalculator for OasCalculator {
         };
 
         // Lower bound: the most negative spread the shifted curve admits.
-        let (lower_spread, forward_floor) = match &hazard {
+        let (lower_spread, intensity_floor) = match &hazard {
             Some(curve) => {
                 let min_hazard = curve
                     .knot_points()
                     .map(|(_, lambda)| lambda)
                     .fold(f64::INFINITY, f64::min);
-                ((-min_hazard).max(-0.10), 0.0)
+                ((-min_hazard).max(-0.10), Some(0.0))
             }
-            None => {
-                let curve = base_market.get_discount(bond.discount_curve_id.as_str())?;
-                let mut forward_floor = curve.min_forward_rate().unwrap_or(f64::NEG_INFINITY);
-                if !curve.allows_non_monotonic() {
-                    forward_floor = forward_floor.max(0.0);
-                }
-                let lower = curve.knots().windows(2).zip(curve.dfs().windows(2)).fold(
-                    -0.10_f64,
-                    |lower, (times, dfs)| {
-                        let forward = -(dfs[1] / dfs[0]).ln() / (times[1] - times[0]);
-                        lower.max(forward_floor - forward)
-                    },
-                );
-                (lower, forward_floor)
-            }
+            None => (-0.10_f64, None),
         };
         let lower_spread = (lower_spread + 1e-12).min(0.0);
-        let solver = BrentSolver::new()
-            .with_tolerance(1e-8)
-            .with_max_iterations(100)
-            .with_bracket_bounds(lower_spread, 0.50); // Curve-policy floor to +5000bp in decimal
+        let upper_spread = 0.50;
+        let solver = BrentSolver::new(1e-8, 100)?;
 
         let price_tolerance = 1e-10 * target_dirty.abs().max(1.0);
         if objective(0.0)?.abs() <= price_tolerance {
             return Ok(0.0);
         }
-        match solver.solve_fallible(objective, 0.0) {
+        match solver.solve(objective, 0.0, lower_spread, upper_spread, 0.05, 20) {
             Ok(oas) => Ok(oas),
             Err(mut solver_err) => {
                 if let finstack_quant_core::Error::Input(
                     finstack_quant_core::InputError::SolverConvergenceFailed { reason, .. },
                 ) = &mut solver_err
                 {
+                    let floor_note = intensity_floor.map_or_else(String::new, |floor| {
+                        format!("; curve imposes an intensity floor of {floor:.6e} (decimal)")
+                    });
                     *reason = format!(
                         "Convertible OAS on curve '{curve_to_bump}' failed within decimal spread bounds \
-                         [{lower_spread:.6e}, {upper_spread:.6e}]; curve policy imposes an effective \
-                         forward floor of {forward_floor:.6e} (decimal): {reason}",
-                        upper_spread = solver.bracket_max,
+                         [{lower_spread:.6e}, {upper_spread:.6e}]{floor_note}: {reason}",
                     );
                 }
                 Err(solver_err)
@@ -231,14 +216,22 @@ mod tests {
             .base_date(base_date)
             .knots([(0.0, 1.0), (10.0, 0.90)])
             .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("should succeed");
 
         finstack_quant_core::market_data::context::MarketContext::new()
             .insert(discount_curve)
-            .insert_price("AAPL", MarketScalar::Unitless(150.0))
-            .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
-            .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02))
+            .insert_price("AAPL", MarketScalar::unitless(150.0).expect("valid scalar"))
+            .insert_price(
+                "AAPL-VOL",
+                MarketScalar::unitless(0.25).expect("valid scalar"),
+            )
+            .insert_price(
+                "AAPL-DIVYIELD",
+                MarketScalar::unitless(0.02).expect("valid scalar"),
+            )
     }
 
     /// Regression: quoted_clean_price_pct is percentage-of-par, so it must be scaled
@@ -290,17 +283,14 @@ mod tests {
     }
 
     #[test]
-    fn oas_search_respects_negative_rate_friendly_floor() {
-        use finstack_quant_core::market_data::term_structures::ValidationMode;
-
+    fn oas_search_solves_negative_discount_spread() {
         let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
+            .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (10.0, 0.95)])
             .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
-            .validation(ValidationMode::NegativeRateFriendly {
-                forward_floor: -0.005,
-            })
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
         let market = make_market(as_of).insert(curve);
@@ -331,91 +321,43 @@ mod tests {
 
     #[test]
     fn oas_floor_curve_reports_search_constraints_and_accepts_boundary_root() {
-        use finstack_quant_core::market_data::term_structures::ValidationMode;
+        use finstack_quant_core::market_data::term_structures::HazardCurve;
 
         let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-        for (end_df, policy) in [
-            (1.0, ValidationMode::MarketStandard),
-            (
-                1.05,
-                ValidationMode::NegativeRateFriendly {
-                    forward_floor: -1.05_f64.ln() / 10.0,
-                },
-            ),
+        let hazard = HazardCurve::flat("CREDIT", as_of, 0.005, 0.4, DayCount::Act365F).unwrap();
+        let market = make_market(as_of).insert(hazard);
+        let mut bond = make_bond_with_quote(1_000_000.0, 100.0);
+        bond.credit_curve_id = Some("CREDIT".into());
+        bond.recovery_rate = Some(0.4);
+        // A quote richer than zero-intensity credit spread lies below the
+        // admissible non-negative hazard bound (-0.005).
+        bond.instrument_pricing_overrides
+            .market_quotes
+            .quoted_clean_price_pct = Some(125.0);
+        let base_value = bond.value(&market, as_of).unwrap();
+        let mut ctx = MetricContext::new(
+            Arc::new(bond),
+            Arc::new(market),
+            as_of,
+            base_value,
+            Arc::new(FinstackConfig::default()),
+        );
+        let error = super::OasCalculator.calculate(&mut ctx).unwrap_err();
+        assert!(matches!(
+            error,
+            finstack_quant_core::Error::Input(
+                finstack_quant_core::InputError::SolverConvergenceFailed { .. }
+            )
+        ));
+        let message = error.to_string();
+        for detail in [
+            "Convertible OAS",
+            "CREDIT",
+            "decimal spread bounds",
+            "intensity floor",
+            "no sign change",
         ] {
-            let curve_id = "USD-OIS";
-            let curve_builder = || {
-                DiscountCurve::builder(curve_id)
-                    .base_date(as_of)
-                    .knots([(0.0, 1.0), (10.0, end_df)])
-                    .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
-            };
-            let unrestricted = curve_builder()
-                .validation(ValidationMode::Raw {
-                    allow_non_monotonic: true,
-                    forward_floor: None,
-                })
-                .build()
-                .unwrap();
-            let market =
-                make_market(as_of).insert(curve_builder().validation(policy).build().unwrap());
-            let unrestricted_market = market.clone().insert(unrestricted);
-            for expected_spread in [-0.01, 0.0, 0.05] {
-                let mut bond = make_bond_with_quote(1_000_000.0, 100.0);
-                let bumped = super::bump_discount_curve_parallel(
-                    &unrestricted_market,
-                    &curve_id.into(),
-                    expected_spread * 10_000.0,
-                )
-                .unwrap();
-                let target = super::price_convertible_bond(&bond, &bumped, as_of).unwrap();
-                bond.instrument_pricing_overrides
-                    .market_quotes
-                    .quoted_clean_price_pct =
-                    Some(target.amount() / bond.notional.amount() * 100.0);
-                let base_value = bond.value(&market, as_of).unwrap();
-                let mut ctx = MetricContext::new(
-                    Arc::new(bond),
-                    Arc::new(market.clone()),
-                    as_of,
-                    base_value,
-                    Arc::new(FinstackConfig::default()),
-                );
-                let result = super::OasCalculator.calculate(&mut ctx);
-                if expected_spread < 0.0 {
-                    let error = result.unwrap_err();
-                    assert!(matches!(
-                        error,
-                        finstack_quant_core::Error::Input(
-                            finstack_quant_core::InputError::SolverConvergenceFailed { .. }
-                        )
-                    ));
-                    let message = error.to_string();
-                    for detail in [
-                        "Convertible OAS",
-                        curve_id,
-                        "decimal spread bounds",
-                        "forward floor",
-                        "no sign change",
-                    ] {
-                        assert!(message.contains(detail), "{message}");
-                    }
-                    let mut unrestricted_ctx = MetricContext::new(
-                        Arc::clone(&ctx.instrument),
-                        Arc::new(unrestricted_market.clone()),
-                        as_of,
-                        base_value,
-                        Arc::new(FinstackConfig::default()),
-                    );
-                    let solved = super::OasCalculator
-                        .calculate(&mut unrestricted_ctx)
-                        .unwrap();
-                    assert!((solved - expected_spread).abs() < 1e-8, "{solved}");
-                } else {
-                    let solved = result.unwrap();
-                    assert!((solved - expected_spread).abs() < 1e-8, "{solved}");
-                }
-            }
+            assert!(message.contains(detail), "{message}");
         }
     }
 
@@ -424,7 +366,7 @@ mod tests {
         use finstack_quant_core::market_data::term_structures::HazardCurve;
 
         let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-        let hazard = HazardCurve::flat("CREDIT", as_of, 0.02, 0.4).unwrap();
+        let hazard = HazardCurve::flat("CREDIT", as_of, 0.02, 0.4, DayCount::Act365F).unwrap();
         let market = make_market(as_of).insert(hazard.clone());
         // Spreads down to -λ are admissible; each target is priced on the
         // hazard curve shifted by exactly that spread.

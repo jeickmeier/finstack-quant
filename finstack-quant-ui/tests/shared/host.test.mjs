@@ -204,6 +204,7 @@ it("transports bond and mixed-currency cashflow envelopes through structured clo
 it("preserves the scoped published Float64Array return through structured clone", () => {
   const surface = new core.FxDeltaVolSurface(
     "EURUSD-VOL",
+    "EUR/USD",
     [1],
     [0.12],
     [0.01],

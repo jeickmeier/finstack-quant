@@ -21,8 +21,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::SabrParameterData;
 use finstack_quant_core::market_data::surfaces::VolCube;
 use finstack_quant_core::market_data::term_structures::{
-    BaseCorrelationCurve, BasisSpreadCurve, ForwardCurve, HazardCurve, InflationCurve,
-    NelsonSiegelModel, ParametricCurve, PriceCurve, PriceCurveKind,
+    BaseCorrelationCurve, ForwardCurve, HazardCurve, InflationCurve, NelsonSiegelModel,
+    ParametricCurve, PriceCurve, PriceCurveKind,
 };
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
@@ -134,12 +134,12 @@ impl Instrument for RestoreTestInstrument {
                     )
             }
             Kind::RatesInflation => {
-                let rate = market.get_forward("USD-FWD")?.rate(1.0);
-                let cpi = market.get_inflation_curve("USD-CPI")?.cpi(1.0);
+                let rate = -market.get_forward("USD-FWD")?.df(1.0)?.ln();
+                let cpi = market.get_inflation_curve("USD-CPI")?.cpi(1.0)?;
                 1_000_000.0 * (1.0 + rate) * (cpi / 100.0)
             }
             Kind::CreditCorrelation => {
-                let hazard = market.get_hazard("ACME-HAZ")?.hazard_rate(1.0);
+                let hazard = market.get_hazard("ACME-HAZ")?.hazard_rate(1.0)?;
                 let corr = market.get_base_correlation("CDX-BC")?.correlation(0.07);
                 1_000_000.0 * hazard * corr
             }
@@ -182,23 +182,14 @@ fn vol_index_curve(level: f64) -> PriceCurve {
         .expect("vol index curve should build")
 }
 
-fn basis_spread_curve(spread: f64) -> BasisSpreadCurve {
-    BasisSpreadCurve::builder("BASIS-3M6M")
-        .base_date(AS_OF_T0)
-        .knots([(0.25, spread), (5.0, spread)])
-        .build()
-        .expect("basis spread curve should build")
-}
-
 fn parametric_curve(beta0: f64) -> ParametricCurve {
     ParametricCurve::builder("USD-NS")
         .base_date(AS_OF_T0)
-        .model(NelsonSiegelModel::Ns {
-            beta0,
-            beta1: -0.01,
-            beta2: 0.005,
-            tau: 2.0,
-        })
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .model(
+            NelsonSiegelModel::ns(beta0, -0.01, 0.005, 2.0)
+                .expect("valid Nelson-Siegel parameters"),
+        )
         .build()
         .expect("parametric curve should build")
 }
@@ -216,17 +207,21 @@ fn vol_cube(alpha: f64) -> VolCube {
 }
 
 fn forward_curve(rate: f64) -> ForwardCurve {
-    ForwardCurve::builder("USD-FWD", 0.25)
-        .base_date(AS_OF_T0)
-        .knots([(0.0, rate), (5.0, rate)])
-        .build()
-        .expect("forward curve should build")
+    ForwardCurve::flat(
+        "USD-FWD",
+        AS_OF_T0,
+        rate,
+        finstack_quant_core::dates::DayCount::Act360,
+    )
+    .expect("forward curve should build")
 }
 
 fn inflation_curve(cpi_1y: f64) -> InflationCurve {
     InflationCurve::builder("USD-CPI")
         .base_date(AS_OF_T0)
-        .base_cpi(100.0)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .knots([(0.0, 100.0), (1.0, cpi_1y), (5.0, cpi_1y + 8.0)])
         .build()
         .expect("inflation curve should build")
@@ -235,7 +230,8 @@ fn inflation_curve(cpi_1y: f64) -> InflationCurve {
 fn hazard_curve(hazard: f64) -> HazardCurve {
     HazardCurve::builder("ACME-HAZ")
         .base_date(AS_OF_T0)
-        .knots([(0.0, hazard), (5.0, hazard)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([(1.0, hazard), (5.0, hazard)])
         .recovery_rate(0.40)
         .build()
         .expect("hazard curve should build")
@@ -340,24 +336,23 @@ fn parallel_price_curve_pnl_lands_in_market_scalars_not_residual() {
 }
 
 /// B8 invariant: an all-flags snapshot/restore must move EVERY curve storage
-/// family — including Price, VolIndex, BasisSpread and Parametric — to the
+/// family — including Price, VolIndex, and Parametric — to the
 /// snapshot's state.
 #[test]
-fn restore_market_moves_all_nine_curve_storage_families() {
+fn restore_market_moves_all_eight_curve_storage_families() {
     let market_t0 = MarketContext::new()
         .insert(price_curve(3.00))
         .insert(vol_index_curve(15.0))
-        .insert(basis_spread_curve(0.0010))
         .insert(parametric_curve(0.045));
     let market_t1 = MarketContext::new()
         .insert(price_curve(3.30))
         .insert(vol_index_curve(19.0))
-        .insert(basis_spread_curve(0.0025))
         .insert(parametric_curve(0.050));
 
     let snapshot_t1 = MarketSnapshot::extract(&market_t1, MarketRestoreFlags::all());
     let restored =
-        MarketSnapshot::restore_market(&market_t0, &snapshot_t1, MarketRestoreFlags::all());
+        MarketSnapshot::restore_market(&market_t0, &snapshot_t1, MarketRestoreFlags::all())
+            .expect("restore_market should succeed");
 
     let spot = restored
         .get_price_curve("WTI")
@@ -377,26 +372,13 @@ fn restore_market_moves_all_nine_curve_storage_families() {
         "VolIndex curve must restore to T1 level 19.0, got {level}"
     );
 
-    let spread = restored
-        .curve("BASIS-3M6M")
-        .and_then(|c| c.basis_spread())
-        .cloned()
-        .expect("basis spread curve present")
-        .spread(1.0);
-    assert!(
-        (spread - 0.0025).abs() < 1e-12,
-        "BasisSpread curve must restore to T1 spread 0.0025, got {spread}"
-    );
-
-    let long_rate = match restored
+    let long_rate = restored
         .curve("USD-NS")
         .and_then(|c| c.parametric())
         .cloned()
         .expect("parametric curve present")
         .params()
-    {
-        NelsonSiegelModel::Ns { beta0, .. } | NelsonSiegelModel::Nss { beta0, .. } => *beta0,
-    };
+        .to_params_vec()[0];
     assert!(
         (long_rate - 0.050).abs() < 1e-12,
         "Parametric curve must restore to T1 beta0 0.050, got {long_rate}"
@@ -593,7 +575,6 @@ fn broad_snapshot_respects_narrow_restore_flags() {
     let opening = MarketContext::new()
         .insert(price_curve(3.0))
         .insert(vol_index_curve(15.0))
-        .insert(basis_spread_curve(0.001))
         .insert(parametric_curve(0.045))
         .insert(forward_curve(0.04))
         .insert(hazard_curve(0.02))
@@ -602,7 +583,6 @@ fn broad_snapshot_respects_narrow_restore_flags() {
     let closing = MarketContext::new()
         .insert(price_curve(3.3))
         .insert(vol_index_curve(19.0))
-        .insert(basis_spread_curve(0.002))
         .insert(parametric_curve(0.05))
         .insert(forward_curve(0.05))
         .insert(hazard_curve(0.03))
@@ -618,9 +598,11 @@ fn broad_snapshot_respects_narrow_restore_flags() {
         MarketRestoreFlags::VOL,
         MarketRestoreFlags::SCALARS,
     ] {
-        let restored = MarketSnapshot::restore_market(&closing, &snapshot, flag);
+        let restored = MarketSnapshot::restore_market(&closing, &snapshot, flag)
+            .expect("restore_market should succeed");
         let narrow = MarketSnapshot::extract(&opening, flag);
-        let expected = MarketSnapshot::restore_market(&closing, &narrow, flag);
+        let expected = MarketSnapshot::restore_market(&closing, &narrow, flag)
+            .expect("restore_market should succeed");
         let state = |market: &MarketContext| {
             serde_json::to_value(
                 finstack_quant_core::market_data::context::MarketContextState::try_from(market)

@@ -89,7 +89,9 @@ mod gbm_barrier {
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Attributes;
@@ -126,11 +128,16 @@ mod gbm_barrier {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (5.0, (-RATE * 5.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let surface = VolSurface::builder("SPX-VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&[70.0, 85.0, 100.0, 115.0, 130.0])
+            .secondary_values(&[70.0, 85.0, 100.0, 115.0, 130.0])
             .row(&[VOL; 5])
             .row(&[VOL; 5])
             .row(&[VOL; 5])
@@ -147,14 +154,32 @@ mod gbm_barrier {
             .insert_surface(surface)
             .insert_price(
                 "SPX",
-                MarketScalar::Price(Money::new(SPOT, Currency::USD).expect("valid money fixture")),
+                MarketScalar::price(Money::new(SPOT, Currency::USD).expect("valid money fixture")),
             )
-            .insert_price("SPX-DIV", MarketScalar::Unitless(DIV_YIELD))
-            .insert_price("HESTON_V0", MarketScalar::Unitless(variance))
-            .insert_price("HESTON_THETA", MarketScalar::Unitless(variance))
-            .insert_price("HESTON_SIGMA_V", MarketScalar::Unitless(1.0e-8))
-            .insert_price("HESTON_RHO", MarketScalar::Unitless(0.0))
-            .insert_price("HESTON_KAPPA", MarketScalar::Unitless(2.0))
+            .insert_price(
+                "SPX-DIV",
+                MarketScalar::unitless(DIV_YIELD).expect("valid scalar"),
+            )
+            .insert_price(
+                "HESTON_V0",
+                MarketScalar::unitless(variance).expect("valid scalar"),
+            )
+            .insert_price(
+                "HESTON_THETA",
+                MarketScalar::unitless(variance).expect("valid scalar"),
+            )
+            .insert_price(
+                "HESTON_SIGMA_V",
+                MarketScalar::unitless(1.0e-8).expect("valid scalar"),
+            )
+            .insert_price(
+                "HESTON_RHO",
+                MarketScalar::unitless(0.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "HESTON_KAPPA",
+                MarketScalar::unitless(2.0).expect("valid scalar"),
+            )
     }
 
     /// A genuinely-active down-and-out call: barrier `85` sits below the `100`
@@ -528,7 +553,9 @@ mod asian_geometric {
     use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Attributes;
@@ -556,11 +583,16 @@ mod asian_geometric {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (3.0, (-RATE * 3.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let surface = VolSurface::builder("SPX-VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&[70.0, 85.0, 100.0, 115.0, 130.0])
+            .secondary_values(&[70.0, 85.0, 100.0, 115.0, 130.0])
             .row(&[VOL; 5])
             .row(&[VOL; 5])
             .row(&[VOL; 5])
@@ -572,9 +604,12 @@ mod asian_geometric {
             .insert_surface(surface)
             .insert_price(
                 "SPX",
-                MarketScalar::Price(Money::new(SPOT, Currency::USD).expect("valid money fixture")),
+                MarketScalar::price(Money::new(SPOT, Currency::USD).expect("valid money fixture")),
             )
-            .insert_price("SPX-DIV", MarketScalar::Unitless(DIV_YIELD))
+            .insert_price(
+                "SPX-DIV",
+                MarketScalar::unitless(DIV_YIELD).expect("valid scalar"),
+            )
     }
 
     /// A geometric-average Asian call with `N_FIXINGS` fixings at `i·T/n`,

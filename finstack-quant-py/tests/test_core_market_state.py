@@ -20,19 +20,28 @@ from finstack_quant.portfolio import (
 
 
 def test_credit_index_resolves_canonical_curves_before_snapshot() -> None:
-    canonical = HazardCurve.flat("HAZ", "2025-01-01", 0.02, 0.4)
-    stale = HazardCurve.flat("HAZ", "2025-01-01", 0.10, 0.4)
+    canonical = HazardCurve.flat("HAZ", "2025-01-01", 0.02, 0.4, "act_365f")
+    stale = HazardCurve.flat("HAZ", "2025-01-01", 0.10, 0.4, "act_365f")
     correlation = BaseCorrelationCurve("CORR", [(3.0, 0.2), (100.0, 0.3)])
     market = MarketContext().insert(canonical).insert(correlation)
     assert market.insert_credit_index("INDEX", CreditIndexData(125, 0.4, stale, correlation)) is market
     restored = MarketContext.from_json(market.to_json())
-    market.insert(DiscountCurve("UNRELATED", "2025-01-01", [(0.0, 1.0), (5.0, 0.9)]))
+    market.insert(
+        DiscountCurve(
+            "UNRELATED",
+            "2025-01-01",
+            [(0.0, 1.0), (5.0, 0.9)],
+            interp="monotone_convex",
+            extrapolation="extend",
+            day_count="act_365f",
+        )
+    )
     for context in (market, restored):
         assert context.get_credit_index("INDEX").index_credit_curve.sp(5.0) == pytest.approx(math.exp(-0.1))
 
 
 def test_credit_index_missing_or_wrong_type_reference_is_atomic() -> None:
-    hazard = HazardCurve.flat("HAZ", "2025-01-01", 0.02, 0.4)
+    hazard = HazardCurve.flat("HAZ", "2025-01-01", 0.02, 0.4, "act_365f")
     correlation = BaseCorrelationCurve("CORR", [(3.0, 0.2), (100.0, 0.3)])
     index = CreditIndexData(125, 0.4, hazard, correlation)
     market = MarketContext().insert(correlation)
@@ -41,7 +50,16 @@ def test_credit_index_missing_or_wrong_type_reference_is_atomic() -> None:
         market.insert_credit_index("INDEX", index)
     assert market.to_json() == before
 
-    market.insert(DiscountCurve("HAZ", "2025-01-01", [(0.0, 1.0), (5.0, 0.9)]))
+    market.insert(
+        DiscountCurve(
+            "HAZ",
+            "2025-01-01",
+            [(0.0, 1.0), (5.0, 0.9)],
+            interp="monotone_convex",
+            extrapolation="extend",
+            day_count="act_365f",
+        )
+    )
     before = market.to_json()
     with pytest.raises(ValueError, match="HAZ"):
         market.insert_credit_index("INDEX", index)
@@ -49,7 +67,7 @@ def test_credit_index_missing_or_wrong_type_reference_is_atomic() -> None:
 
 
 def _state() -> dict[str, object]:
-    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", "2025-01-02", 0.04))
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", "2025-01-02", 0.04, "act_365f"))
     return json.loads(market.to_json())
 
 
@@ -65,9 +83,9 @@ def test_from_json_is_the_strict_persisted_state_load() -> None:
 def test_from_json_rejects_nesting_beyond_the_canonical_depth_limit() -> None:
     state = _state()
     node: dict[str, object] = {}
-    for level in range(50):
-        node = {"children": {f"Level{level}": node}}
-    state["hierarchy"] = {"roots": {"Rates": node}}
+    for level in range(40):
+        node = {"children": [{"name": f"Level{level}", "node": node}]}
+    state["hierarchy"] = {"roots": [{"name": "Rates", "node": node}]}
     with pytest.raises(ContractLimitExceededError, match=r"JSON depth.*96") as excinfo:
         MarketContext.from_json(json.dumps(state))
     assert isinstance(excinfo.value, ContractValidationError)

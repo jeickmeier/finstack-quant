@@ -512,35 +512,56 @@ pub(crate) fn bracket_solve_1d(
     // uses safeguarded interpolation first, but may not accept an x-space stop
     // as convergence. Keep the same per-phase iteration budgets and retain
     // the last feasible bracket for the established Illinois recovery below.
-    let evaluated = [(a, fa), (b, fb)];
+    let (lo, hi) = (a, b);
+    let init_a = if lo == 0.0 { 0.0 } else { lo };
+    let init_b = if hi == 0.0 { 0.0 } else { hi };
+    let mut cached_a = Some((init_a.to_bits(), fa));
+    let mut cached_b = Some((init_b.to_bits(), fb));
+    let mut brent_evals = vec![(init_a.to_bits(), fa), (init_b.to_bits(), fb)];
     let mut invalid_interior = None;
-    let root = BrentSolver::new()
-        .with_tolerance(tol)
-        .with_max_iterations(max_iters.max(50))
-        .solve_evaluated_bracket(
-            |x| {
-                let value = objective(x);
-                diag.update(x, value);
-                if !value.is_finite() || value.abs() >= OBJECTIVE_VALID_ABS_MAX {
-                    invalid_interior = Some(x);
-                    return Ok(f64::NAN);
+    let root = BrentSolver::new(tol.max(f64::MIN_POSITIVE), max_iters.max(50))?.solve_in_bracket(
+        |x| {
+            let x_bits = if x == 0.0 { 0.0_f64 } else { x }.to_bits();
+            if cached_a.is_some_and(|(bits, _)| bits == x_bits) {
+                return Ok(cached_a.take().map_or(fa, |(_, v)| v));
+            }
+            if cached_b.is_some_and(|(bits, _)| bits == x_bits) {
+                return Ok(cached_b.take().map_or(fb, |(_, v)| v));
+            }
+            let value = objective(x);
+            diag.update(x, value);
+            if !value.is_finite() || value.abs() >= OBJECTIVE_VALID_ABS_MAX {
+                invalid_interior = Some(x);
+                return Err(finstack_quant_core::Error::Validation(
+                    "invalid interior objective value".into(),
+                ));
+            }
+            brent_evals.push((x_bits, value));
+            if a < x && x < b {
+                if opposite_signs(fa, value) {
+                    b = x;
+                    fb = value;
+                } else if opposite_signs(value, fb) {
+                    a = x;
+                    fa = value;
                 }
-                if a < x && x < b {
-                    if opposite_signs(fa, value) {
-                        b = x;
-                        fb = value;
-                    } else if opposite_signs(value, fb) {
-                        a = x;
-                        fa = value;
-                    }
-                }
-                Ok(value)
-            },
-            evaluated,
-        );
+            }
+            Ok(value)
+        },
+        lo,
+        hi,
+    );
     if let Ok(root) = root {
-        diag.bracket_found = true;
-        return Ok((Some(root), diag));
+        let root_bits = if root == 0.0 { 0.0_f64 } else { root }.to_bits();
+        let f_root = brent_evals
+            .iter()
+            .rev()
+            .find(|&&(bits, _)| bits == root_bits)
+            .map(|&(_, v)| v);
+        if f_root.is_some_and(|v| v.is_finite() && v.abs() < tol) {
+            diag.bracket_found = true;
+            return Ok((Some(root), diag));
+        }
     }
 
     let mut recovery_budget = max_iters.max(50);
@@ -594,10 +615,13 @@ pub(crate) fn bracket_solve_1d(
         let mut candidate = if denom.is_finite() && denom.abs() > f64::EPSILON {
             a - fa * (b - a) / denom
         } else {
-            0.5 * (a + b)
+            0.5 * a + 0.5 * b
         };
         if !candidate.is_finite() || candidate <= a || candidate >= b {
-            candidate = 0.5 * (a + b);
+            candidate = 0.5 * a + 0.5 * b;
+            if !candidate.is_finite() || candidate <= a || candidate >= b {
+                break;
+            }
         }
 
         let fc = objective(candidate);

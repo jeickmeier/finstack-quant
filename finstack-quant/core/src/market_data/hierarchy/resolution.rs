@@ -1,176 +1,382 @@
 //! Resolution engine for hierarchy-targeted operations.
 //!
-//! Resolves hierarchy paths + tag filters to sets of `CurveId`s, with
-//! configurable inheritance modes (most-specific-wins vs. cumulative).
+//! Resolves hierarchy paths and optional tag filters to unique typed
+//! [`ResolvedTargetMatch`] candidates in preorder placement order, recording
+//! each candidate's deepest matching ancestor node depth and path.
 
-use super::{HierarchyNode, MarketDataHierarchy};
-use crate::types::CurveId;
-use crate::{FxHashMap, FxHashSet};
+use super::{
+    HierarchyNode, MarketDataHierarchy, parse_contract_json, validate_segment, validate_tag_key,
+};
+use crate::market_data::bumps::MarketDataTarget;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
+/// A typed market-data target matched at a specific hierarchy node depth and path.
 #[derive(Debug, Clone, PartialEq, Eq)]
-/// A curve matched at a specific hierarchy depth.
-pub struct ResolvedCurveMatch {
-    /// Identifier of the matched curve.
-    pub curve_id: CurveId,
-    /// Depth of the node whose subtree matched, counting roots as depth one.
+pub struct ResolvedTargetMatch {
+    /// Typed market-data target held by the matched subtree node.
+    pub target: MarketDataTarget,
+    /// Depth of the deepest matching node covering this target, counting roots as depth one.
     pub matched_depth: usize,
+    /// Full hierarchy path from root to that deepest matching node.
+    pub matched_path: Vec<String>,
 }
 
-/// Controls how shocks at multiple hierarchy levels combine for a single curve.
+/// Controls how shocks at multiple hierarchy levels combine for a single market target.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ResolutionMode {
-    /// The deepest (most specific) matching node's shock wins.
-    /// Parent-level shocks are ignored if a more specific one exists.
+    /// The deepest (most specific) matching hierarchy operation wins per exact target.
     #[default]
     MostSpecificWins,
 
-    /// Shocks accumulate walking down the tree.
-    /// A curve gets the sum of all shocks from root to its leaf node.
+    /// Matching hierarchy operations accumulate in authored and preorder placement order.
     Cumulative,
 }
 
 /// A predicate for filtering nodes by their tags.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "json-schema", schemars(!try_from))]
+#[serde(
+    rename_all = "snake_case",
+    deny_unknown_fields,
+    try_from = "RawTagPredicate"
+)]
 pub enum TagPredicate {
     /// Tag value must exactly equal the given value.
     Equals {
-        /// Tag key to match.
+        /// Non-blank tag key to match.
         key: String,
         /// Expected tag value.
         value: String,
     },
-    /// Tag value must be one of the given values.
+    /// Tag value must be one of the given values. An empty `values` list never matches.
     In {
-        /// Tag key to match.
+        /// Non-blank tag key to match.
         key: String,
         /// Accepted tag values.
         values: Vec<String>,
     },
     /// Tag key must exist (any value).
     Exists {
-        /// Tag key that must be present.
+        /// Non-blank tag key that must be present.
         key: String,
     },
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+enum RawTagPredicate {
+    Equals { key: String, value: String },
+    In { key: String, values: Vec<String> },
+    Exists { key: String },
+}
+
+impl TryFrom<RawTagPredicate> for TagPredicate {
+    type Error = crate::Error;
+
+    fn try_from(raw: RawTagPredicate) -> crate::Result<Self> {
+        let predicate = match raw {
+            RawTagPredicate::Equals { key, value } => Self::Equals { key, value },
+            RawTagPredicate::In { key, values } => Self::In { key, values },
+            RawTagPredicate::Exists { key } => Self::Exists { key },
+        };
+        predicate.validate()?;
+        Ok(predicate)
+    }
+}
+
 impl TagPredicate {
-    /// Check if a node's tags satisfy this predicate.
+    /// Validate that the predicate carries a non-blank tag key.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if `key` is empty or whitespace-only.
+    pub fn validate(&self) -> crate::Result<()> {
+        let key = match self {
+            TagPredicate::Equals { key, .. }
+            | TagPredicate::In { key, .. }
+            | TagPredicate::Exists { key } => key,
+        };
+        validate_tag_key(key)
+    }
+
+    /// Check whether a node's tags satisfy this predicate.
+    ///
+    /// # Arguments
+    ///
+    /// * `tags` - Tag map attached to the node being inspected.
+    #[must_use]
     pub fn matches(&self, tags: &IndexMap<String, String>) -> bool {
         match self {
             TagPredicate::Equals { key, value } => tags.get(key).is_some_and(|v| v == value),
-            TagPredicate::In { key, values } => tags.get(key).is_some_and(|v| values.contains(v)),
+            TagPredicate::In { key, values } => {
+                !values.is_empty() && tags.get(key).is_some_and(|v| values.contains(v))
+            }
             TagPredicate::Exists { key } => tags.contains_key(key),
         }
     }
 }
 
 /// A filter combining multiple tag predicates (AND semantics).
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct TagFilter {
     /// All predicates must match (AND semantics).
     pub predicates: Vec<TagPredicate>,
 }
 
 impl TagFilter {
-    /// Check if a node's tags satisfy all predicates.
+    /// Validate every predicate in this filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if any predicate carries a blank tag key.
+    pub fn validate(&self) -> crate::Result<()> {
+        for predicate in &self.predicates {
+            predicate.validate()?;
+        }
+        Ok(())
+    }
+
+    /// Return `true` when the filter contains no predicates.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.predicates.is_empty()
+    }
+
+    /// Check whether a node's tags satisfy all predicates.
+    ///
+    /// # Arguments
+    ///
+    /// * `tags` - Tag map attached to the node being inspected.
+    #[must_use]
     pub fn matches(&self, tags: &IndexMap<String, String>) -> bool {
         self.predicates.iter().all(|p| p.matches(tags))
     }
 }
 
-/// A target specifying a hierarchy path with optional tag filtering.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+fn tag_filter_is_empty(filter: &Option<TagFilter>) -> bool {
+    filter.as_ref().is_none_or(TagFilter::is_empty)
+}
+
+/// A target specifying a hierarchy path with an optional tag filter.
+#[derive(Debug, Clone, Serialize, Deserialize, Eq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(!try_from, deny_unknown_fields))]
+#[serde(deny_unknown_fields, try_from = "RawHierarchyTarget")]
 pub struct HierarchyTarget {
-    /// Path through the hierarchy (e.g., `["Credit", "US", "IG"]`).
+    /// Non-empty path through the hierarchy (e.g., `["Credit", "US", "IG"]`).
     pub path: Vec<String>,
-    /// Optional tag filter applied to nodes in the subtree.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Optional tag filter applied to nodes in the subtree; an empty filter
+    /// canonicalizes to `None`.
+    #[serde(default, skip_serializing_if = "tag_filter_is_empty")]
     pub tag_filter: Option<TagFilter>,
 }
 
-impl MarketDataHierarchy {
-    /// Resolve a target while retaining matching-node depths and traversal order.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawHierarchyTarget {
+    path: Vec<String>,
+    #[serde(default)]
+    tag_filter: Option<TagFilter>,
+}
+
+impl TryFrom<RawHierarchyTarget> for HierarchyTarget {
+    type Error = crate::Error;
+
+    fn try_from(raw: RawHierarchyTarget) -> crate::Result<Self> {
+        Self::new(raw.path, raw.tag_filter)
+    }
+}
+
+impl PartialEq for HierarchyTarget {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path && self.effective_tag_filter() == other.effective_tag_filter()
+    }
+}
+
+impl HierarchyTarget {
+    /// Construct and validate a [`HierarchyTarget`], canonicalizing any empty
+    /// [`TagFilter`] to `None`.
     ///
     /// # Arguments
     ///
-    /// * `target` - Hierarchy path and optional tag predicates; a missing path matches nothing.
-    /// * `mode` - Whether to retain all matches or only the deepest match per curve.
+    /// * `path` - Non-empty list of valid segment names (non-blank, no `'/'`).
+    /// * `tag_filter` - Optional AND-predicate tag filter; an empty predicate list
+    ///   becomes `None`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if `path` is empty, any segment is
+    /// blank or contains `'/'`, or any predicate carries a blank tag key.
+    pub fn new(path: Vec<String>, tag_filter: Option<TagFilter>) -> crate::Result<Self> {
+        let canonical = Self {
+            path,
+            tag_filter: tag_filter.filter(|f| !f.is_empty()),
+        };
+        canonical.validate()?;
+        Ok(canonical)
+    }
+
+    /// Construct and validate an unfiltered [`HierarchyTarget`] from path segments.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Non-empty list of valid segment names (non-blank, no `'/'`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if `path` is empty or any segment is
+    /// blank or contains `'/'`.
+    pub fn unfiltered(path: Vec<String>) -> crate::Result<Self> {
+        Self::new(path, None)
+    }
+
+    /// Return the effective non-empty tag filter, treating an empty filter identically to `None`.
+    #[must_use]
+    pub fn effective_tag_filter(&self) -> Option<&TagFilter> {
+        self.tag_filter.as_ref().filter(|f| !f.is_empty())
+    }
+
+    /// Validate path segments and predicate keys on this target.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if `path` is empty, any segment is
+    /// blank or contains `'/'`, or any predicate carries a blank tag key.
+    pub fn validate(&self) -> crate::Result<()> {
+        if self.path.is_empty() {
+            return Err(crate::Error::Validation(
+                "Hierarchy target path cannot be empty".to_string(),
+            ));
+        }
+        for segment in &self.path {
+            validate_segment(segment)?;
+        }
+        if let Some(filter) = &self.tag_filter {
+            filter.validate()?;
+        }
+        Ok(())
+    }
+
+    /// Deserialize a [`HierarchyTarget`] from JSON under strict contract checks.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - UTF-8 JSON representation of a [`HierarchyTarget`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] on malformed JSON, duplicate object
+    /// keys, unknown fields, container limit violations, or invalid path/tag syntax.
+    pub fn from_json(json: &str) -> crate::Result<Self> {
+        parse_contract_json(json)
+    }
+
+    /// Serialize this target to canonical JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if serialization fails.
+    pub fn to_json(&self) -> crate::Result<String> {
+        serde_json::to_string(self).map_err(|err| {
+            crate::Error::Validation(format!("Failed to serialize HierarchyTarget: {err}"))
+        })
+    }
+}
+
+impl MarketDataHierarchy {
+    /// Resolve a hierarchy selector to unique matched [`ResolvedTargetMatch`]
+    /// entries in stable preorder placement order.
+    ///
+    /// Within a single selector, an unfiltered path or an ancestor matching a
+    /// `tag_filter` includes all descendant nodes (and each descendant that also
+    /// matches `tag_filter` refines `matched_depth` and `matched_path` to that
+    /// deeper matching node). Each typed target appears at most once across the
+    /// result, in preorder placement order.
+    ///
+    /// # Arguments
+    ///
+    /// * `target` - Hierarchy path and optional tag predicates selecting a
+    ///   non-empty set of typed market targets.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if `target` fails validation, the
+    /// path does not exist in `self`, or the selector matches zero targets.
     pub fn resolve_matches(
         &self,
         target: &HierarchyTarget,
-        mode: ResolutionMode,
-    ) -> Vec<ResolvedCurveMatch> {
+    ) -> crate::Result<Vec<ResolvedTargetMatch>> {
+        target.validate()?;
         let Some(node) = self.get_node(&target.path) else {
-            return Vec::new();
+            return Err(crate::Error::Validation(format!(
+                "Hierarchy target path '{}' does not exist",
+                target.path.join("/")
+            )));
         };
 
         let mut matches = Vec::new();
-        let start_depth = target.path.len();
-        match &target.tag_filter {
-            None => collect_subtree_matches(node, start_depth, &mut matches),
-            Some(filter) => collect_filtered_matches(node, filter, start_depth, &mut matches),
-        }
+        let mut node_path = target.path.clone();
+        let filter = target.effective_tag_filter();
 
-        match mode {
-            ResolutionMode::Cumulative => matches,
-            ResolutionMode::MostSpecificWins => {
-                let mut max_depth: FxHashMap<CurveId, usize> = FxHashMap::default();
-                for matched in &matches {
-                    max_depth
-                        .entry(matched.curve_id.clone())
-                        .and_modify(|best| *best = (*best).max(matched.matched_depth))
-                        .or_insert(matched.matched_depth);
-                }
-
-                let mut emitted = FxHashSet::default();
-                matches
-                    .into_iter()
-                    .filter(|matched| {
-                        max_depth
-                            .get(&matched.curve_id)
-                            .is_some_and(|best| *best == matched.matched_depth)
-                            && emitted.insert(matched.curve_id.clone())
-                    })
-                    .collect()
+        match filter {
+            None => {
+                let anchor = Some((target.path.len(), target.path.clone()));
+                collect_preorder_matches(node, &mut node_path, anchor.as_ref(), None, &mut matches);
+            }
+            Some(filter) => {
+                collect_preorder_matches(node, &mut node_path, None, Some(filter), &mut matches);
             }
         }
+
+        if matches.is_empty() {
+            return Err(crate::Error::Validation(format!(
+                "Hierarchy target path '{}' matched zero targets",
+                target.path.join("/")
+            )));
+        }
+        Ok(matches)
     }
 }
 
-fn collect_subtree_matches(
+fn collect_preorder_matches(
     node: &HierarchyNode,
-    matched_depth: usize,
-    matches: &mut Vec<ResolvedCurveMatch>,
+    current_path: &mut Vec<String>,
+    inherited_match: Option<&(usize, Vec<String>)>,
+    filter: Option<&TagFilter>,
+    matches: &mut Vec<ResolvedTargetMatch>,
 ) {
-    for curve_id in node.curve_ids() {
-        matches.push(ResolvedCurveMatch {
-            curve_id: curve_id.clone(),
-            matched_depth,
-        });
-    }
-    for child in node.children().values() {
-        collect_subtree_matches(child, matched_depth, matches);
-    }
-}
+    let matched_here = match filter {
+        Some(tag_filter) if tag_filter.matches(node.tags()) => {
+            Some((current_path.len(), current_path.clone()))
+        }
+        None | Some(_) => inherited_match.cloned(),
+    };
 
-fn collect_filtered_matches(
-    node: &HierarchyNode,
-    filter: &TagFilter,
-    depth: usize,
-    matches: &mut Vec<ResolvedCurveMatch>,
-) {
-    if filter.matches(node.tags()) {
-        collect_subtree_matches(node, depth, matches);
+    if let Some((matched_depth, matched_path)) = &matched_here {
+        for target in node.targets() {
+            matches.push(ResolvedTargetMatch {
+                target: target.clone(),
+                matched_depth: *matched_depth,
+                matched_path: matched_path.clone(),
+            });
+        }
     }
-    for child in node.children().values() {
-        collect_filtered_matches(child, filter, depth + 1, matches);
+
+    for child in node.children() {
+        current_path.push(child.name.clone());
+        collect_preorder_matches(
+            &child.node,
+            current_path,
+            matched_here.as_ref(),
+            filter,
+            matches,
+        );
+        current_path.pop();
     }
 }

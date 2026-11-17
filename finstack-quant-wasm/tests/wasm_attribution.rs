@@ -34,8 +34,9 @@ fn bond_json() -> String {
 }
 
 fn market_json(as_of: finstack_quant_core::dates::Date, rate: f64) -> String {
+    use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_core::math::interp::InterpStyle;
+    use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 
     let knots: Vec<(f64, f64)> = [0.0, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0]
         .iter()
@@ -43,8 +44,10 @@ fn market_json(as_of: finstack_quant_core::dates::Date, rate: f64) -> String {
         .collect();
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
+        .day_count(DayCount::Act365F)
         .knots(knots)
         .interp(InterpStyle::Linear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
     let market = MarketContext::new().insert(curve);

@@ -728,13 +728,11 @@ fn maturity_wall(
 
 /// Compensated sum over a window, which finite inputs can still overflow.
 fn finite_sum(values: &[f64], node: &str) -> Result<f64> {
-    let sum = neumaier_sum(values.iter().copied());
-    if !sum.is_finite() {
-        return Err(Error::invalid_input(format!(
+    neumaier_sum(values.iter().copied()).map_err(|_| {
+        Error::invalid_input(format!(
             "Capital structure summary: LTM sum of node '{node}' is non-finite"
-        )));
-    }
-    Ok(sum)
+        ))
+    })
 }
 
 /// LTM EBITDA over LTM interest, when both are available and interest is positive.

@@ -19,6 +19,8 @@ fn market(as_of: Date) -> MarketContext {
         .base_date(as_of)
         .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.85), (10.0, 0.70)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     MarketContext::new().insert(curve)
@@ -196,19 +198,33 @@ fn callable_bond_tree_prices_are_bit_pinned() {
     // Ho-Lee, BDT, Black-Karasinski, then the bond-pricer BDT and Hull-White
     // values. The first and last move by one ulp between macOS and the Linux
     // libm on GitHub Actions.
-    const PINS: [[u64; 5]; 2] = [
+    const PINS: [[u64; 5]; 4] = [
         [
-            4_652_395_558_412_783_183,
-            4_652_417_570_083_781_352,
-            4_652_420_412_340_861_640,
-            4_652_412_935_098_629_592,
+            4_652_395_558_412_783_184,
+            4_652_417_570_083_781_364,
+            4_652_420_412_340_861_641,
+            4_652_412_935_098_629_610,
             4_652_317_577_597_138_786,
         ],
         [
+            4_652_395_558_412_783_183,
+            4_652_417_570_083_781_364,
+            4_652_420_412_340_861_641,
+            4_652_412_935_098_629_610,
+            4_652_317_577_597_138_786,
+        ],
+        [
+            4_652_395_558_412_783_183,
+            4_652_417_570_083_781_364,
+            4_652_420_412_340_861_641,
+            4_652_412_935_098_629_610,
+            4_652_317_577_597_138_787,
+        ],
+        [
             4_652_395_558_412_783_184,
-            4_652_417_570_083_781_352,
-            4_652_420_412_340_861_640,
-            4_652_412_935_098_629_592,
+            4_652_417_570_083_781_364,
+            4_652_420_412_340_861_641,
+            4_652_412_935_098_629_610,
             4_652_317_577_597_138_787,
         ],
     ];

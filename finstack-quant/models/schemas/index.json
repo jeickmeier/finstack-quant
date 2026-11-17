@@ -479,7 +479,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/local_vol_params.schema.json",
-      "bytes": 3610,
+      "bytes": 3838,
       "kind": "input",
       "path": "schemas/models/1/local_vol_params.schema.json",
       "summary": "Rates and local volatility surface of the Dupire local-volatility process.",
@@ -650,7 +650,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/path_simulation_spec.schema.json",
-      "bytes": 41663,
+      "bytes": 41891,
       "kind": "input",
       "path": "schemas/models/1/path_simulation_spec.schema.json",
       "summary": "Complete, serializable description of one path simulation.",
@@ -740,7 +740,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/process_spec.schema.json",
-      "bytes": 30966,
+      "bytes": 31194,
       "kind": "input",
       "path": "schemas/models/1/process_spec.schema.json",
       "summary": "Stochastic process to simulate, with its parameters.",

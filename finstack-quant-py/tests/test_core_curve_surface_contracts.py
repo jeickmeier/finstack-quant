@@ -49,15 +49,31 @@ def test_bus252_discount_curve_counts_business_days_on_its_own_calendar() -> Non
         day_count="bus_252",
         calendar_id="brbd",
         interp="log_linear",
+        extrapolation="extend",
     )
     assert curve.calendar_id == "brbd"
     # 5 Brazilian business days from Mon 2025-01-06 to Mon 2025-01-13.
     assert curve.df_between_dates("2025-01-06", "2025-01-13") == pytest.approx(curve.df(5.0 / 252.0), rel=1e-14)
     assert DiscountCurve.from_json(curve.to_json()).calendar_id == "brbd"
     with pytest.raises(ValueError, match="requires a holiday calendar"):
-        DiscountCurve("BRL-CDI", "2025-01-06", [(0.0, 1.0), (1.0, 0.9)], day_count="bus_252")
+        DiscountCurve(
+            "BRL-CDI",
+            "2025-01-06",
+            [(0.0, 1.0), (1.0, 0.9)],
+            interp="log_linear",
+            extrapolation="extend",
+            day_count="bus_252",
+        )
     with pytest.raises(KeyError):
-        DiscountCurve("BRL-CDI", "2025-01-06", [(0.0, 1.0), (1.0, 0.9)], day_count="bus_252", calendar_id="nope")
+        DiscountCurve(
+            "BRL-CDI",
+            "2025-01-06",
+            [(0.0, 1.0), (1.0, 0.9)],
+            interp="log_linear",
+            extrapolation="extend",
+            day_count="bus_252",
+            calendar_id="nope",
+        )
 
 
 @pytest.mark.parametrize(

@@ -38,13 +38,21 @@ fn usd(amount: f64) -> Money {
 
 fn market(forward: f64) -> MarketContext {
     let fixings: Vec<(Date, f64)> = (0..25)
+        .rev()
         .map(|days| (CLOSE - time::Duration::days(days), forward))
         .collect();
     MarketContext::new()
         .insert(flat_discount_curve(0.03, CLOSE, "USD-OIS"))
         .insert(flat_forward_curve(forward, CLOSE, INDEX))
         .insert_series(
-            ScalarTimeSeries::new(format!("FIXING:{INDEX}"), fixings, None).expect("fixings"),
+            ScalarTimeSeries::new(
+                format!("FIXING:{INDEX}"),
+                fixings,
+                None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .expect("fixings"),
         )
 }
 

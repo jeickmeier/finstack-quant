@@ -46,6 +46,9 @@ pub fn ctx_with_flat_rate(base: Date, id: &str, rate: f64) -> MarketContext {
             (2.0, (-rate * 2.0).exp()),
             (5.0, (-rate * 5.0).exp()),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     MarketContext::new().insert(disc)
@@ -61,6 +64,9 @@ pub fn ctx_with_standard_disc(base: Date, id: &str) -> MarketContext {
     let disc = DiscountCurve::builder(id)
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, 0.98), (2.0, 0.96)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     MarketContext::new().insert(disc)
@@ -71,6 +77,9 @@ pub fn ctx_with_steep_curve(base: Date, id: &str) -> MarketContext {
     let disc = DiscountCurve::builder(id)
         .base_date(base)
         .knots([(0.0, 1.0), (0.5, 0.95), (1.0, 0.90), (2.0, 0.80)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     MarketContext::new().insert(disc)

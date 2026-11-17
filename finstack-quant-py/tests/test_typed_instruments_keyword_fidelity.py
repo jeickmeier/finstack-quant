@@ -23,7 +23,7 @@ import json
 
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, Tenor
-from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext, ScalarTimeSeries
+from finstack_quant.core.market_data import DiscountCurve, MarketContext, ScalarTimeSeries
 from finstack_quant.core.money import Money
 from finstack_quant.valuations.instruments import (
     AssetPool,
@@ -48,7 +48,7 @@ from finstack_quant.valuations.instruments import (
     TrancheStructure,
     tranche_breakeven_cdr,
 )
-from tests.tests_typed_helpers import canonical_structured_credit_json
+from tests.tests_typed_helpers import canonical_structured_credit_json, projection_curve
 
 
 def _single_tranche() -> Tranche:
@@ -391,10 +391,10 @@ def test_structured_credit_analytics_function_accepts_keyword_arguments() -> Non
     as_of = datetime.date(2024, 1, 1)
     market = (
         MarketContext()
-        .insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
-        .insert(ForwardCurve("SOFR-3M", 0.25, as_of, [(0.0, 0.04), (10.0, 0.04)], day_count="act_360"))
+        .insert(DiscountCurve.flat("USD-OIS", as_of, 0.04, "act_365f"))
+        .insert(projection_curve("SOFR-3M", as_of, [(10.0, 0.04)]))
     )
-    market.insert_series(ScalarTimeSeries("FIXING:SOFR-3M", [(datetime.date(2023, 12, 28), 0.04)]))
+    market.insert_series(ScalarTimeSeries("FIXING:SOFR-3M", [(datetime.date(2023, 12, 28), 0.04)], "step", "error"))
 
     result = tranche_breakeven_cdr(
         instrument=deal,

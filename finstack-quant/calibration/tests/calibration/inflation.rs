@@ -13,7 +13,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationLag, SeriesInterpolation,
+    InflationIndex, InflationLag, InflationObservation, SeriesInterpolation,
 };
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
@@ -40,40 +40,58 @@ fn create_discount_curve(base_date: Date) -> DiscountCurve {
             (5.0, 0.82),
             (10.0, 0.68),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve")
 }
 
-fn create_us_cpi_fixings_with_seasonality() -> InflationIndex {
+fn create_us_cpi_fixings() -> InflationIndex {
     let observations = vec![
         (
-            Date::from_calendar_date(2024, Month::September, 30).expect("date"),
+            Date::from_calendar_date(2024, Month::September, 1).expect("date"),
             300.0,
         ),
         (
-            Date::from_calendar_date(2024, Month::October, 31).expect("date"),
+            Date::from_calendar_date(2024, Month::October, 1).expect("date"),
             301.0,
         ),
         (
-            Date::from_calendar_date(2024, Month::November, 30).expect("date"),
+            Date::from_calendar_date(2024, Month::November, 1).expect("date"),
             302.0,
         ),
         (
-            Date::from_calendar_date(2024, Month::December, 31).expect("date"),
+            Date::from_calendar_date(2024, Month::December, 1).expect("date"),
             303.0,
         ),
     ];
 
-    // Simple seasonality pattern: October +1%, others neutral.
-    let mut factors = [1.0_f64; 12];
-    factors[(Month::October as usize) - 1] = 1.01;
-
-    InflationIndex::new("USD-CPI", observations, Currency::USD)
-        .expect("index")
-        .with_interpolation(SeriesInterpolation::Linear)
-        .with_lag(InflationLag::Months(3))
-        .with_seasonality(factors)
-        .expect("seasonality")
+    let cutoff = time::macros::date!(2025 - 01 - 15);
+    InflationIndex::new(
+        "USD-CPI",
+        observations
+            .into_iter()
+            .map(|(reference_month, value)| InflationObservation {
+                reference_month,
+                value,
+                available_on: cutoff,
+            })
+            .collect(),
+        Currency::USD,
+        cutoff,
+    )
+    .expect("index")
+    .with_expected_releases(
+        finstack_quant_valuations_test_support::inflation::simple_index(
+            "USD-CPI",
+            cutoff,
+            100.0,
+            Currency::USD,
+        )
+        .get_expected_releases()
+        .to_vec(),
+    )
+    .expect("explicit releases")
 }
 
 fn calibrated_market(index: Option<InflationIndex>, base_cpi: f64) -> (MarketContext, Date, Date) {
@@ -87,9 +105,15 @@ fn calibrated_market(index: Option<InflationIndex>, base_cpi: f64) -> (MarketCon
         convention: InflationSwapConventionId::new("USD"),
     })];
     let mut source_market = MarketContext::new().insert(create_discount_curve(base_date));
-    if let Some(index) = index {
-        source_market = source_market.insert_inflation_index(index);
-    }
+    let index = index.unwrap_or_else(|| {
+        finstack_quant_valuations_test_support::inflation::simple_index(
+            "USD-CPI",
+            base_date,
+            base_cpi,
+            Currency::USD,
+        )
+    });
+    source_market = source_market.insert_inflation_index(index);
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &quotes);
     let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
@@ -111,6 +135,11 @@ fn calibrated_market(index: Option<InflationIndex>, base_cpi: f64) -> (MarketCon
                 index: "USA-CPI-U".to_string(),
                 observation_lag: "3M".to_string(),
                 base_cpi,
+                source_base_date: time::macros::date!(2024 - 01 - 01),
+                source_base_cpi: 100.0,
+                day_count: DayCount::Act365F,
+                calendar_id: None,
+                extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::Flat,
                 notional: 1.0,
                 method: Default::default(),
                 interpolation: Default::default(),
@@ -134,14 +163,14 @@ fn calibrated_market(index: Option<InflationIndex>, base_cpi: f64) -> (MarketCon
 
 #[test]
 fn inflation_quote_time_uses_lagged_fixing_date() {
-    let (ctx, base_date, maturity) = calibrated_market(None, 100.0);
+    let (ctx, _, maturity) = calibrated_market(None, 100.0);
     let curve = ctx.get_inflation_curve("USD-CPI").expect("inflation curve");
     let fixing_date = maturity
         .replace_day(1)
         .expect("month start")
         .add_months(-2)
         .expect("valid date shift");
-    let reference_date = base_date.add_months(-3).expect("valid date shift");
+    let reference_date = time::macros::date!(2024 - 01 - 01);
     let expected_t = DayCount::Act365F
         .year_fraction(reference_date, fixing_date, DayCountContext::default())
         .expect("clock");
@@ -156,10 +185,10 @@ fn inflation_quote_time_uses_lagged_fixing_date() {
 }
 
 #[test]
-fn b17_inflation_curve_origin_matches_reference_cpi_date() {
-    let (ctx, base_date, maturity) = calibrated_market(None, 100.0);
+fn inflation_curve_origin_is_independent_of_contract_lag() {
+    let (ctx, _, maturity) = calibrated_market(None, 100.0);
     let curve = ctx.get_inflation_curve("USD-CPI").expect("inflation curve");
-    let reference_date = base_date.add_months(-3).expect("valid date shift");
+    let reference_date = time::macros::date!(2024 - 01 - 01);
     assert_eq!(curve.base_date(), reference_date);
     assert_eq!(
         curve.cpi_on_date(reference_date).expect("reference CPI"),
@@ -185,7 +214,7 @@ fn b17_inflation_curve_origin_matches_reference_cpi_date() {
 }
 
 #[test]
-fn inflation_preflight_rejects_base_cpi_mismatch_with_fixings() {
+fn inflation_calibration_preserves_explicit_contract_denominator() {
     let base_date = Date::from_calendar_date(2025, Month::January, 15).expect("base_date");
     let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("maturity");
 
@@ -198,7 +227,7 @@ fn inflation_preflight_rejects_base_cpi_mismatch_with_fixings() {
     })];
     let source_market = MarketContext::new()
         .insert(create_discount_curve(base_date))
-        .insert_inflation_index(create_us_cpi_fixings_with_seasonality());
+        .insert_inflation_index(create_us_cpi_fixings());
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &quotes);
     let mut quote_sets: FxHashMap<String, Vec<QuoteId>> = FxHashMap::default();
@@ -219,7 +248,12 @@ fn inflation_preflight_rejects_base_cpi_mismatch_with_fixings() {
                 discount_curve_id: "USD-OIS".into(),
                 index: "USA-CPI-U".to_string(),
                 observation_lag: "3M".to_string(),
-                base_cpi: 100.0, // intentionally wrong when fixings are provided
+                base_cpi: 100.0,
+                source_base_date: time::macros::date!(2024 - 01 - 01),
+                source_base_cpi: 105.0,
+                day_count: DayCount::Act365F,
+                calendar_id: None,
+                extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::Flat,
                 notional: 1.0,
                 method: Default::default(),
                 interpolation: Default::default(),
@@ -236,9 +270,13 @@ fn inflation_preflight_rejects_base_cpi_mismatch_with_fixings() {
         prior_market: prior,
     };
 
-    let err = engine::calibrate(&envelope).expect_err("base CPI mismatch should error");
-    let msg = err.to_string();
-    assert!(msg.contains("base_cpi mismatch") || msg.contains("base_cpi"));
+    let result = engine::calibrate(&envelope)
+        .expect("explicit denominator is not replaced by a source observation");
+    let market = MarketContext::try_from(result.result.final_market).expect("market");
+    assert_eq!(
+        market.get_inflation_curve("USD-CPI").unwrap().base_cpi(),
+        105.0
+    );
 }
 
 #[test]
@@ -247,14 +285,32 @@ fn b17_inflation_calibration_matches_observed_and_explicit_base_cpi() {
     let index = InflationIndex::new(
         "USD-CPI",
         vec![
-            (date!(2024 - 10 - 31), 300.0),
-            (date!(2024 - 11 - 30), 303.0),
+            InflationObservation {
+                reference_month: date!(2024 - 10 - 01),
+                value: 300.0,
+                available_on: date!(2024 - 11 - 13),
+            },
+            InflationObservation {
+                reference_month: date!(2024 - 11 - 01),
+                value: 303.0,
+                available_on: date!(2024 - 12 - 13),
+            },
         ],
         Currency::USD,
+        date!(2025 - 01 - 15),
     )
     .expect("monthly CPI")
-    .with_lag(InflationLag::Months(3))
-    .with_interpolation(SeriesInterpolation::Linear);
+    .with_expected_releases(
+        finstack_quant_valuations_test_support::inflation::simple_index(
+            "USD-CPI",
+            date!(2025 - 01 - 15),
+            100.0,
+            Currency::USD,
+        )
+        .get_expected_releases()
+        .to_vec(),
+    )
+    .unwrap();
     let reference_cpi = 300.0 + 3.0 * 14.0 / 31.0;
     let (explicit, _, _) = calibrated_market(None, reference_cpi);
     let (observed, _, _) = calibrated_market(Some(index), reference_cpi);
@@ -264,11 +320,14 @@ fn b17_inflation_calibration_matches_observed_and_explicit_base_cpi() {
     let right = observed
         .get_inflation_curve("USD-CPI")
         .expect("observed curve");
-    assert_eq!(left.base_date(), date!(2024 - 10 - 15));
+    assert_eq!(left.base_date(), date!(2024 - 01 - 01));
     assert_eq!(left.base_date(), right.base_date());
     assert_eq!(left.knots(), right.knots());
     for t in [0.0, 0.1, 1.0, 3.0, 5.0] {
-        assert!((left.cpi(t) - right.cpi(t)).abs() < 1e-9, "{t}");
+        assert!(
+            (left.cpi(t).unwrap() - right.cpi(t).unwrap()).abs() < 1e-9,
+            "{t}"
+        );
     }
 }
 
@@ -281,6 +340,11 @@ fn lag_calibration_params(lag: &str, method: CalibrationMethod) -> InflationCurv
         index: "UK-RPI".to_string(),
         observation_lag: lag.to_string(),
         base_cpi: 100.0,
+        source_base_date: time::macros::date!(2024 - 01 - 01),
+        source_base_cpi: 100.0,
+        day_count: DayCount::Act365F,
+        calendar_id: None,
+        extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::Flat,
         notional: 1.0,
         method,
         interpolation: InterpStyle::Linear,
@@ -288,13 +352,25 @@ fn lag_calibration_params(lag: &str, method: CalibrationMethod) -> InflationCurv
 }
 
 fn lag_calibration_market() -> MarketContext {
-    MarketContext::new().insert(
-        DiscountCurve::builder("GBP-SONIA")
-            .base_date(time::macros::date!(2025 - 01 - 15))
-            .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
-            .build()
-            .expect("GBP discount curve"),
-    )
+    MarketContext::new()
+        .insert(
+            DiscountCurve::builder("GBP-SONIA")
+                .base_date(time::macros::date!(2025 - 01 - 15))
+                .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("GBP discount curve"),
+        )
+        .insert_inflation_index(
+            finstack_quant_valuations_test_support::inflation::simple_index(
+                "UK-RPI",
+                time::macros::date!(2025 - 01 - 15),
+                100.0,
+                Currency::GBP,
+            ),
+        )
 }
 
 fn lag_calibration_quotes() -> Vec<MarketQuote> {
@@ -308,7 +384,7 @@ fn lag_calibration_quotes() -> Vec<MarketQuote> {
 }
 
 #[test]
-fn delivered_inflation_curve_preserves_lag_and_reprices_without_an_override() {
+fn delivered_inflation_curve_reprices_with_explicit_contract_lag() {
     for method in [
         CalibrationMethod::Bootstrap,
         CalibrationMethod::GlobalSolve {
@@ -334,19 +410,13 @@ fn delivered_inflation_curve_preserves_lag_and_reprices_without_an_override() {
             );
 
             let curve = market.get_inflation_curve("UK-RPI").expect("curve");
-            assert_eq!(curve.indexation_lag_months(), expected_months);
-            assert_eq!(
-                curve.base_date(),
-                params
-                    .base_date
-                    .add_months(-(expected_months as i32))
-                    .expect("lagged origin")
-            );
+            assert_eq!(curve.base_date(), params.source_base_date);
 
             // No index history and no contractual lag override: pricing must
             // inherit the same lag that calibrated the delivered curve.
             let mut swap = InflationSwap::builder()
                 .id("DOWNSTREAM-RPI".into())
+                .lag(InflationLag::months(expected_months))
                 .notional(Money::new(1_000_000.0, Currency::GBP).expect("notional"))
                 .start_date(params.base_date)
                 .maturity(time::macros::date!(2030 - 01 - 15))
@@ -360,7 +430,7 @@ fn delivered_inflation_curve_preserves_lag_and_reprices_without_an_override() {
                 .calendar_id_opt(Some("gblo".into()))
                 .build()
                 .expect("downstream swap");
-            assert!(swap.lag.is_none());
+            assert_eq!(swap.lag, Some(InflationLag::months(expected_months)));
             let inherited_pv = swap
                 .npv_raw(&market, params.base_date)
                 .expect("inherited PV");
@@ -403,6 +473,9 @@ fn inflation_month_lags_preserve_leap_day_and_monthly_anchor_contracts() {
         DiscountCurve::builder("GBP-SONIA")
             .base_date(base)
             .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve"),
     );
@@ -413,16 +486,20 @@ fn inflation_month_lags_preserve_leap_day_and_monthly_anchor_contracts() {
         index: "UK-RPI".to_string(),
         convention: InflationSwapConventionId::new("UK-RPI"),
     })];
-    for (lag, origin, anchor) in [
-        (
-            "1M",
-            time::macros::date!(2028 - 01 - 29),
-            time::macros::date!(2032 - 01 - 01),
+    let market = market.insert_inflation_index(
+        finstack_quant_valuations_test_support::inflation::simple_index(
+            "UK-RPI",
+            base,
+            100.0,
+            Currency::GBP,
         ),
-        // The canonical parser normalizes 0M to None, while 00M is Months(0).
-        ("00M", base, time::macros::date!(2032 - 02 - 01)),
-        ("0M", base, maturity),
-        ("none", base, maturity),
+    );
+    let source_origin = time::macros::date!(2024 - 01 - 01);
+    for (lag, origin, anchor) in [
+        ("1M", source_origin, time::macros::date!(2032 - 01 - 01)),
+        ("00M", source_origin, time::macros::date!(2032 - 02 - 01)),
+        ("0M", source_origin, time::macros::date!(2032 - 02 - 01)),
+        ("none", source_origin, time::macros::date!(2032 - 02 - 01)),
     ] {
         let mut params = lag_calibration_params(lag, CalibrationMethod::Bootstrap);
         params.base_date = base;

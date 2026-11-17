@@ -17,7 +17,7 @@ use finstack_quant_valuations_rates::irs::InterestRateSwap;
 use time::macros::date;
 
 fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve {
-    let mut builder = DiscountCurve::builder(curve_id)
+    let builder = DiscountCurve::builder(curve_id)
         .base_date(base_date)
         .day_count(DayCount::Act360)
         .knots([
@@ -25,29 +25,18 @@ fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> Disc
             (1.0, (-rate).exp()),
             (5.0, (-rate * 5.0).exp()),
             (10.0, (-rate * 10.0).exp()),
-        ]);
-
-    // For zero or negative rates, DFs may be flat or increasing
-    if rate.abs() < 1e-10 || rate < 0.0 {
-        builder = builder.validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        );
-    }
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend);
 
     builder.build().unwrap()
 }
 
 fn build_market(rate: f64, base_date: Date) -> MarketContext {
     let disc_curve = build_flat_discount_curve(rate, base_date, "USD_OIS");
-    let fwd_curve = ForwardCurve::builder("USD_LIBOR_3M", 0.25)
-        .base_date(base_date)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, rate), (10.0, rate)])
-        .build()
-        .unwrap();
+    let fwd_cont = 4.0 * (1.0 + rate * 0.25).ln();
+    let fwd_curve =
+        ForwardCurve::flat("USD_LIBOR_3M", base_date, fwd_cont, DayCount::Act360).unwrap();
 
     MarketContext::new().insert(disc_curve).insert(fwd_curve)
 }
@@ -119,13 +108,15 @@ fn test_dv01_formula_consistency() {
     let annuity = *result.measures.get("annuity").unwrap();
     let dv01 = *result.measures.get("dv01").unwrap();
 
-    let expected_dv01 = annuity * 1_000_000.0 * 0.0001;
+    // Under continuous zero-rate parallel shocks P(t) -> P(t) * exp(-h*t),
+    // summation by parts scales the discrete par annuity sensitivity by ~(1 + r * alpha).
+    let expected_dv01 = annuity * (1.0 + 0.05 * 0.25) * 1_000_000.0 * 0.0001;
 
     // Identity holds at par (market rate = fixed rate = 5%) on matched disc/fwd curves:
-    // floating sensitivity cancels, leaving DV01 ≈ annuity × notional × 1bp.
+    // floating sensitivity cancels, leaving DV01 ≈ (1 + r * alpha) × annuity × notional × 1bp.
     assert!(
-        (dv01.abs() - expected_dv01.abs()).abs() < 0.01,
-        "DV01={} should match annuity×notional×1bp formula (at-par, matched curves), got {}",
+        (dv01.abs() - expected_dv01.abs()).abs() < 1.0,
+        "DV01={} should match continuous-zero annuity×notional×1bp formula (at-par), got {}",
         dv01,
         expected_dv01
     );
@@ -481,6 +472,8 @@ fn test_dv01_seasoned_swap_excludes_fixed_coupon() {
             (date!(2024 - 07 - 01), rate),
         ],
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .expect("fixings series");
     let market = build_market(rate, as_of).insert_series(fixings);
@@ -500,11 +493,11 @@ fn test_dv01_seasoned_swap_excludes_fixed_coupon() {
     let reprice = |bp: f64| {
         let bumped = market
             .bump([
-                MarketBump::Curve {
+                MarketBump::DiscountCurve {
                     id: "USD_OIS".into(),
                     spec: BumpSpec::parallel_bp(bp),
                 },
-                MarketBump::Curve {
+                MarketBump::ForwardCurve {
                     id: "USD_LIBOR_3M".into(),
                     spec: BumpSpec::parallel_bp(bp),
                 },

@@ -147,6 +147,8 @@ fn create_mc_market(as_of: Date, spot: f64, vol: f64, rate: f64) -> MarketContex
             (1.0_f64, (-rate).exp()),
             (2.0_f64, (-rate * 2.0_f64).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -160,8 +162,11 @@ fn create_mc_market(as_of: Date, spot: f64, vol: f64, rate: f64) -> MarketContex
     MarketContext::new()
         .insert(disc_curve)
         .insert_surface(vol_surface)
-        .insert_price("SPOT", MarketScalar::Unitless(spot))
-        .insert_price("SPOT_DIV", MarketScalar::Unitless(0.0))
+        .insert_price("SPOT", MarketScalar::unitless(spot).expect("valid scalar"))
+        .insert_price(
+            "SPOT_DIV",
+            MarketScalar::unitless(0.0).expect("valid scalar"),
+        )
 }
 
 fn asian_option(mc_paths: usize) -> AsianOption {
@@ -539,11 +544,11 @@ fn bench_barrier_monitoring(c: &mut Criterion) {
         ] {
             group.bench_function(format!("{monitoring_name}/{model_name}"), |b| {
                 let market = create_mc_market(as_of, 100.0, 0.25, 0.05)
-                    .insert_price("HESTON_KAPPA", MarketScalar::Unitless(2.0))
-                    .insert_price("HESTON_THETA", MarketScalar::Unitless(0.0625))
-                    .insert_price("HESTON_SIGMA_V", MarketScalar::Unitless(0.3))
-                    .insert_price("HESTON_RHO", MarketScalar::Unitless(-0.5))
-                    .insert_price("HESTON_V0", MarketScalar::Unitless(0.0625));
+                    .insert_price("HESTON_KAPPA", MarketScalar::unitless(2.0).expect("valid scalar"))
+                    .insert_price("HESTON_THETA", MarketScalar::unitless(0.0625).expect("valid scalar"))
+                    .insert_price("HESTON_SIGMA_V", MarketScalar::unitless(0.3).expect("valid scalar"))
+                    .insert_price("HESTON_RHO", MarketScalar::unitless(-0.5).expect("valid scalar"))
+                    .insert_price("HESTON_V0", MarketScalar::unitless(0.0625).expect("valid scalar"));
                 let mut option = BarrierOption::example().unwrap();
                 option.expiry = as_of + time::Duration::days(365);
                 option.strike = 100.0;

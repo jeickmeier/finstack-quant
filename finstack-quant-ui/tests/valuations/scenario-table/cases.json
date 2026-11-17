@@ -2,7 +2,7 @@
   "instrumentSource": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
   "instrumentSha256": "e9d9d5e91e3fa883e21c003bf92de64bf4bd5e0ed8af881b71bad9b2f1120c5e",
   "marketSource": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-  "marketSha256": "3ee1b64c7eb259dfa64ffbcc2d253995ca398d7c10794631a247b6f7111ee2c3",
+  "marketSha256": "91b9c85cfc0472093142fed8ccd69a008c068f3cfd8b484c7d9d09495ae91b89",
   "asOf": "2024-01-01",
   "trancheId": "CLONOTES-A",
   "grid": {
@@ -216,9 +216,9 @@
             "cpr": 0.05,
             "cdr": 0.03,
             "severity": 0.2,
-            "price": 116.43303559870557,
+            "price": 116.43303559870559,
             "wal": 7.199600142347672,
-            "writedown": 4188232.9028089694
+            "writedown": 4188232.9028089684
           },
           {
             "cpr": 0.05,
@@ -250,7 +250,7 @@
             "severity": 0.2,
             "price": 111.15312796634234,
             "wal": 4.684749490307588,
-            "writedown": 2785660.2127017113
+            "writedown": 2785660.2127017123
           },
           {
             "cpr": 0.15,
@@ -258,7 +258,7 @@
             "severity": 0.6,
             "price": 106.99965109085419,
             "wal": 4.639337413310316,
-            "writedown": 9468364.342691522
+            "writedown": 9468364.34269152
           }
         ]
       },
@@ -537,15 +537,15 @@
             "severity": 0.2,
             "price": 111.15312796634234,
             "wal": 4.684749490307588,
-            "writedown": 1392830.1063508561
+            "writedown": 1392830.1063508566
           },
           {
             "cpr": 0.15,
             "cdr": 0.03,
             "severity": 0.6,
-            "price": 106.99965109085421,
+            "price": 106.99965109085419,
             "wal": 4.639337413310316,
-            "writedown": 4734182.171345759
+            "writedown": 4734182.171345758
           }
         ]
       },

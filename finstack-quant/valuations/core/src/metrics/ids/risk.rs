@@ -165,6 +165,20 @@ impl MetricId {
     /// annualized financing spread.
     pub const Spread01: Self = Self(Cow::Borrowed("spread01"));
 
+    /// Direct hazard-rate intensity sensitivity (Hazard01) for a parallel intensity bump.
+    ///
+    /// Measures present value change per **+1bp (`1e-4` annual decimal)** parallel shift
+    /// directly to stored hazard intensities `λᵢ` without credit-triangle `1/(1-R)`
+    /// par-spread conversion.
+    pub const Hazard01: Self = Self(Cow::Borrowed("hazard01"));
+
+    /// Bucketed direct hazard-rate intensity sensitivity per positive hazard knot.
+    ///
+    /// Measures present value change per **+1bp (`1e-4` annual decimal)** intensity shift
+    /// at each exact positive knot `tᵢ` on the credit curve, reported under
+    /// `bucketed_hazard01::<curve_id>::<bucket>`.
+    pub const BucketedHazard01: Self = Self(Cow::Borrowed("bucketed_hazard01"));
+
     /// Correlation sensitivity per 1% change (unified for all correlation risks)
     pub const Correlation01: Self = Self(Cow::Borrowed("correlation01"));
 

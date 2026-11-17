@@ -43,7 +43,7 @@ const EMPTY_MARKET = JSON.stringify({
   dividends: [],
   fx: null,
   fx_delta_vol_surfaces: [],
-  hierarchy: { roots: {} },
+  hierarchy: { roots: [] },
   inflation_indices: [],
   prices: {},
   series: [],

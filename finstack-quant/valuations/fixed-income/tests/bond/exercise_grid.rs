@@ -37,12 +37,15 @@ fn market() -> MarketContext {
             (30.0, 0.40),
         ])
         .interp(InterpStyle::MonotoneConvex)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
     let hazard = HazardCurve::builder("USD-HAZARD")
         .base_date(base)
         .recovery_rate(0.40)
-        .knots([(0.0, 0.02), (10.0, 0.02)])
+        .knots([(10.0, 0.02)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("hazard");
     MarketContext::new().insert(curve).insert(hazard)

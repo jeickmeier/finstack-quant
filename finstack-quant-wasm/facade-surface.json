@@ -723,6 +723,7 @@
       "VolCube",
       "VolCubeExpirySlice",
       "VolSurface",
+      "VolatilityClock",
       "addBusinessDays",
       "addMonths",
       "addWeekdays",
@@ -736,7 +737,7 @@
       "cashFlowWithAccrual",
       "cashFlowWithPrincipal",
       "cfKindIsCashSettlement",
-      "cfKindIsInterestLike",
+      "cfKindIsCoupon",
       "cfKindIsPrincipalLike",
       "cfKindParse",
       "choleskyDecomposition",
@@ -749,8 +750,8 @@
       "endOfMonth",
       "erf",
       "finiteCount",
-      "finiteMaxOrNan",
-      "finiteMinOrNan",
+      "finiteMax",
+      "finiteMin",
       "fiscalYear",
       "invertFxRate",
       "isCdsDate",
@@ -762,9 +763,8 @@
       "logNormCdf",
       "logReturns",
       "mean",
-      "meanOrNan",
       "meanVar",
-      "medianOrNan",
+      "median",
       "monthsUntil",
       "neumaierSum",
       "nextCdsDate",
@@ -788,14 +788,13 @@
       "realizedVarianceOhlc",
       "registryFromConfig",
       "sabrParameterDataNew",
-      "sampleStdOrNan",
-      "sampleVarianceOrNan",
       "schema",
       "scorecardScaleClassify",
       "scorecardScaleLevelPosition",
       "scorecardScaleTryNew",
       "sifmaSettlementDate",
       "standardNormalInvCdf",
+      "stdDev",
       "studentTCdf",
       "studentTInvCdf",
       "symmetricEigen",
@@ -1002,7 +1001,9 @@
     "constructor": true,
     "statics": ["fromDecimalStr", "fromJson", "zero"],
     "methods": [
+      "abs",
       "checkedAdd",
+      "checkedCmp",
       "checkedDiv",
       "checkedDivF64",
       "checkedMul",
@@ -1013,6 +1014,7 @@
       "convertAtRateF64",
       "formatWith",
       "free",
+      "ratio",
       "round",
       "toJson",
       "toString"
@@ -1178,6 +1180,13 @@
     "methods": ["free", "toJson"],
     "getters": ["busBasis", "calendarId", "couponPeriod", "endIsTerminationDate", "frequency"]
   },
+  "core.VolatilityClock": {
+    "kind": "class",
+    "constructor": true,
+    "statics": ["fromJson"],
+    "methods": ["expiryTime", "free", "toJson"],
+    "getters": ["context", "dayCount", "referenceDate"]
+  },
   "core.Tenor": {
     "kind": "class",
     "constructor": true,
@@ -1187,7 +1196,6 @@
       "biweekly",
       "daily",
       "fromPaymentsPerYear",
-      "fromYears",
       "monthly",
       "parse",
       "quarterly",
@@ -1357,7 +1365,7 @@
     "kind": "class",
     "constructor": true,
     "statics": ["flat", "fromDates", "fromJson", "fromZeroRates"],
-    "methods": ["df", "dfBetweenDates", "forward", "free", "toForwardCurve", "toJson", "zeroRate"],
+    "methods": ["df", "dfBetweenDates", "forward", "free", "toJson", "zeroRate"],
     "getters": [
       "baseDate",
       "calendarId",
@@ -1375,7 +1383,6 @@
     "constructor": true,
     "statics": ["flat", "fromJson", "fromSurvivalProbs"],
     "methods": [
-      "cdsQuoteBp",
       "conditionalDefaultProb",
       "defaultProb",
       "free",
@@ -1387,14 +1394,13 @@
     ],
     "getters": [
       "baseDate",
+      "calendarId",
       "currency",
       "dayCount",
       "hazardCalibration",
       "id",
       "issuer",
       "knotPoints",
-      "parInterp",
-      "parSpreadPoints",
       "recoveryRate",
       "seniority"
     ]
@@ -1402,35 +1408,42 @@
   "core.ForwardCurve": {
     "kind": "class",
     "constructor": true,
-    "statics": ["flat", "fromJson"],
-    "methods": ["df", "free", "rate", "rateBetween", "ratePeriod", "toJson"],
+    "statics": ["flat", "fromDates", "fromDiscountCurve", "fromJson", "fromZeroRates"],
+    "methods": [
+      "df",
+      "dfBetweenDates",
+      "free",
+      "instantaneousForward",
+      "rateBetween",
+      "rateBetweenDates",
+      "toJson"
+    ],
     "getters": [
       "baseDate",
+      "calendarId",
       "dayCount",
       "extrapolation",
-      "forwards",
+      "factors",
       "id",
+      "indexTenor",
       "interpStyle",
       "knots",
-      "projectionGrid",
-      "rateCalibration",
-      "resetLag",
-      "tenor"
+      "rateCalibration"
     ]
   },
   "core.InflationCurve": {
     "kind": "class",
     "constructor": true,
     "statics": ["fromJson"],
-    "methods": ["cpi", "cpiWithLag", "free", "indexRatio", "inflationRate", "toJson"],
+    "methods": ["cpi", "free", "inflationRate", "toJson"],
     "getters": [
       "baseCpi",
       "baseDate",
+      "calendarId",
       "cpiLevels",
       "dayCount",
       "extrapolation",
       "id",
-      "indexationLagMonths",
       "interpStyle",
       "knots"
     ]
@@ -1477,16 +1490,17 @@
     "kind": "class",
     "constructor": true,
     "statics": ["fromJson"],
-    "methods": ["free", "toJson", "withDisplacements"],
+    "methods": ["free", "toJson"],
     "getters": [
       "displacements",
       "expiries",
+      "expiryClock",
       "gridShape",
       "id",
       "interpolationMode",
       "quoteType",
       "secondaryAxis",
-      "strikes",
+      "secondaryValues",
       "vols"
     ]
   },
@@ -1518,14 +1532,36 @@
     "constructor": true,
     "statics": ["fromJson"],
     "methods": ["free", "toJson"],
-    "getters": ["atmVols", "bf10d", "bf25d", "expiries", "id", "rr10d", "rr25d"]
+    "getters": [
+      "atmConvention",
+      "atmVols",
+      "bf10d",
+      "bf25d",
+      "butterflyConvention",
+      "deltaConvention",
+      "expiries",
+      "expiryClock",
+      "id",
+      "pair",
+      "quoteType",
+      "rr10d",
+      "rr25d"
+    ]
   },
   "core.ScalarTimeSeries": {
     "kind": "class",
     "constructor": true,
     "statics": ["fromJson"],
-    "methods": ["free", "toJson", "valueOn", "valueOnExact"],
-    "getters": ["currency", "firstDate", "id", "interpolation", "lastDate", "observations"]
+    "methods": ["free", "getValue", "getValueExact", "toJson"],
+    "getters": [
+      "currency",
+      "extrapolation",
+      "firstDate",
+      "id",
+      "interpolation",
+      "lastDate",
+      "observations"
+    ]
   },
   "core.InflationIndex": {
     "kind": "class",
@@ -1534,21 +1570,21 @@
     "methods": [
       "dateRange",
       "free",
-      "getPublicationDate",
-      "getPublicationDates",
-      "ratio",
-      "refCpiMonthsLag",
+      "getExpectedRelease",
+      "getExpectedReleases",
+      "getObservation",
+      "qualifiedMonthlyObservation",
       "toJson",
-      "valueOn",
-      "withPublicationDates"
+      "withExpectedReleases"
     ],
-    "getters": ["currency", "id", "interpolation", "lag", "observations", "seasonality"]
+    "getters": ["currency", "id", "knowledgeDate", "observations"]
   },
   "core.MarketContext": {
     "kind": "class",
     "constructor": true,
     "statics": ["fromJson"],
     "methods": [
+      "condition",
       "contains",
       "convertMoney",
       "curveIds",
@@ -1576,7 +1612,6 @@
       "insertSeries",
       "isEmpty",
       "len",
-      "rollForward",
       "stats",
       "toJson"
     ],
@@ -1644,25 +1679,19 @@
   "core.populationVariance": {
     "kind": "function"
   },
+  "core.stdDev": {
+    "kind": "function"
+  },
   "core.meanVar": {
     "kind": "function"
   },
-  "core.meanOrNan": {
+  "core.median": {
     "kind": "function"
   },
-  "core.sampleVarianceOrNan": {
+  "core.finiteMin": {
     "kind": "function"
   },
-  "core.sampleStdOrNan": {
-    "kind": "function"
-  },
-  "core.medianOrNan": {
-    "kind": "function"
-  },
-  "core.finiteMinOrNan": {
-    "kind": "function"
-  },
-  "core.finiteMaxOrNan": {
+  "core.finiteMax": {
     "kind": "function"
   },
   "core.finiteCount": {
@@ -1737,7 +1766,7 @@
   "core.cfKindIsCashSettlement": {
     "kind": "function"
   },
-  "core.cfKindIsInterestLike": {
+  "core.cfKindIsCoupon": {
     "kind": "function"
   },
   "core.cfKindIsPrincipalLike": {

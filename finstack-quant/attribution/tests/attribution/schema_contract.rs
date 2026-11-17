@@ -246,15 +246,12 @@ fn attribution_schema_validates_non_empty_market_data() {
     .expect("canonical attribution fixture parses");
     let market = &mut fixture["attribution"]["market_t0"];
     market["curves"] = json!([{
-        "allow_non_monotonic": false,
         "base": "2025-01-15",
         "day_count": "act_365f",
-        "extrapolation": "flat_forward",
+        "extrapolation": "extend",
         "id": "USD-OIS",
         "interp_style": "log_linear",
         "knot_points": [[0.0, 1.0], [30.0, 0.30]],
-        "min_forward_rate": null,
-        "min_forward_tenor": 0.000001,
         "rate_calibration": null,
         "type": "discount"
     }]);
@@ -300,15 +297,12 @@ fn attribution_schema_rejects_malformed_discount_curve_internals() {
     ))
     .expect("canonical attribution fixture parses");
     fixture["attribution"]["market_t0"]["curves"] = json!([{
-        "allow_non_monotonic": false,
         "base": "2025-01-15",
         "day_count": "act_365f",
-        "extrapolation": "flat_forward",
+        "extrapolation": "extend",
         "id": "USD-OIS",
         "interp_style": "log_linear",
         "knot_points": [[0.0, 1.0], [30.0, 0.30]],
-        "min_forward_rate": null,
-        "min_forward_tenor": 0.000001,
         "rate_calibration": null,
         "type": "discount"
     }]);

@@ -1,6 +1,7 @@
 //! Bucketed DV01 metric tests for InflationSwap.
 
 use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::market_data::scalars::{InflationLag, SeriesInterpolation};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::MetricId;
@@ -26,6 +27,8 @@ fn test_bucketed_dv01_computed() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -73,6 +76,8 @@ fn test_bucketed_dv01_reasonable_magnitude() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -131,6 +136,8 @@ fn test_bucketed_dv01_zero_for_matured() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();

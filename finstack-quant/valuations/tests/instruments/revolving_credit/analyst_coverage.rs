@@ -39,6 +39,8 @@ fn market() -> MarketContext {
                 (1.0, (-0.04_f64).exp()),
                 (10.0, (-0.40_f64).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve"),
     )
@@ -680,11 +682,13 @@ fn sofr_plus(spread_bp: i64) -> RateSpec {
 
 fn market_with_forward() -> MarketContext {
     market().insert(
-        ForwardCurve::builder("USD-SOFR-3M", 0.25)
-            .base_date(AS_OF)
-            .knots(vec![(0.0, 0.04), (10.0, 0.04)])
-            .build()
-            .expect("forward"),
+        ForwardCurve::flat(
+            "USD-SOFR-3M",
+            AS_OF,
+            0.04,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("forward"),
     )
 }
 
@@ -927,13 +931,17 @@ fn flat_consistent_market() -> MarketContext {
             (1.0, (-0.04_f64).exp()),
             (10.0, (-0.40_f64).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(AS_OF)
-        .knots(vec![(0.0, 0.04), (10.0, 0.04)])
-        .build()
-        .expect("forward");
+    let fwd = ForwardCurve::flat(
+        "USD-SOFR-3M",
+        AS_OF,
+        0.04,
+        finstack_quant_core::dates::DayCount::Act365F,
+    )
+    .expect("forward");
     MarketContext::new().insert(disc).insert(fwd)
 }
 
@@ -1034,6 +1042,8 @@ fn model_discount_margin_excludes_flows_inside_the_settlement_window() {
             "FIXING:USD-SOFR-3M",
             vec![(date!(2024 - 10 - 20), 0.04)],
             None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .expect("fixings"),
     );
@@ -1194,9 +1204,9 @@ fn leq_without_a_default_model_is_rejected() {
 }
 
 /// Audit probe: the z-spread fallback sees the undrawn line only through its
-/// fee annuity, while the hazard-based CS01 with `leq` carries the contingent
-/// exposure. A knot-built (non-replayable) hazard curve now gives a finite,
-/// negative direct-bump CS01 instead of an error.
+/// fee annuity, while direct-intensity `Hazard01` with `leq` carries the
+/// contingent exposure. Requesting quote-space `Cs01` on a knot-built
+/// (uncalibrated) hazard curve fails closed naming the missing recipe.
 #[test]
 fn undrawn_exposure_shows_in_hazard_cs01_but_not_in_the_z_spread_fallback() {
     let market = market_with_forward().insert(knot_hazard());
@@ -1208,27 +1218,43 @@ fn undrawn_exposure_shows_in_hazard_cs01_but_not_in_the_z_spread_fallback() {
     let hazard_no_leq = measure(
         &exposure_facility(1_000_000.0, 0.0, true),
         &market,
-        MetricId::Cs01,
+        MetricId::Hazard01,
     );
     let hazard_leq = measure(
         &exposure_facility(1_000_000.0, 0.5, true),
         &market,
-        MetricId::Cs01,
+        MetricId::Hazard01,
     );
     assert!(z_spread < 0.0 && hazard_no_leq < 0.0 && hazard_leq < 0.0);
     assert!(
         hazard_leq < 2.0 * hazard_no_leq,
         "leq must at least double the credit sensitivity: {hazard_leq} vs {hazard_no_leq} (z-spread {z_spread})"
     );
-    // Bucketed direct-bump series reconciles to the parallel figure.
+    // Bucketed direct-intensity series reconciles to the parallel figure.
     let bucketed = measure(
         &exposure_facility(1_000_000.0, 0.5, true),
         &market,
-        MetricId::BucketedCs01,
+        MetricId::BucketedHazard01,
     );
     assert!(
         (bucketed - hazard_leq).abs() < 0.02 * hazard_leq.abs(),
         "bucketed {bucketed} vs parallel {hazard_leq}"
+    );
+    let unreplayable_err = finstack_quant_valuations::pricer::STANDARD
+        .pricers()
+        .price_with_metrics(
+            &exposure_facility(1_000_000.0, 0.5, true),
+            ModelKey::Discounting,
+            &market,
+            AS_OF,
+            &[MetricId::Cs01],
+            Default::default(),
+        )
+        .expect_err("uncalibrated knot hazard curve must reject quote-space CS01")
+        .to_string();
+    assert!(
+        unreplayable_err.contains("calibration recipe"),
+        "expected missing recipe error, got {unreplayable_err}"
     );
 }
 
@@ -1555,6 +1581,8 @@ fn accordion_allows_draws_above_the_opening_commitment() {
             "FIXING:USD-SOFR-3M",
             vec![(date!(2026 - 01 - 15), 0.04)],
             None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .expect("fixings"),
     );

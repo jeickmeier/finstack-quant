@@ -8,7 +8,9 @@
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_valuations::instruments::equity::autocallable::Autocallable;
 use finstack_quant_valuations::instruments::equity::cliquet_option::CliquetOption;
@@ -26,11 +28,16 @@ fn market(as_of: Date) -> MarketContext {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, 0.97), (2.0, 0.94), (5.0, 0.86)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
     let surface = VolSurface::builder("SPX-VOL")
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[0.25, 0.5, 1.0, 2.0])
-        .strikes(&[60.0, 80.0, 100.0, 120.0, 140.0])
+        .secondary_values(&[60.0, 80.0, 100.0, 120.0, 140.0])
         .row(&[0.20; 5])
         .row(&[0.20; 5])
         .row(&[0.20; 5])
@@ -40,8 +47,14 @@ fn market(as_of: Date) -> MarketContext {
     MarketContext::new()
         .insert(curve)
         .insert_surface(surface)
-        .insert_price("SPX-SPOT", MarketScalar::Unitless(SPOT))
-        .insert_price("SPX-DIV", MarketScalar::Unitless(0.01))
+        .insert_price(
+            "SPX-SPOT",
+            MarketScalar::unitless(SPOT).expect("valid scalar"),
+        )
+        .insert_price(
+            "SPX-DIV",
+            MarketScalar::unitless(0.01).expect("valid scalar"),
+        )
 }
 
 fn theta(instrument: &dyn Instrument, as_of: Date) -> f64 {
@@ -63,14 +76,13 @@ fn theta(instrument: &dyn Instrument, as_of: Date) -> f64 {
 fn one_day_reprice(instrument: &dyn Instrument, observed: &dyn Instrument, as_of: Date) -> f64 {
     let base = market(as_of);
     let rolled_date = as_of + time::Duration::days(1);
+    let rolled_market = base.condition(rolled_date).expect("condition market");
     let rolled = observed
-        .value(&base.roll_forward(1).expect("roll market"), rolled_date)
+        .value(&rolled_market, rolled_date)
         .expect("rolled reprice")
         .amount();
     assert!(
-        instrument
-            .value(&base.roll_forward(1).expect("roll market"), rolled_date)
-            .is_err(),
+        instrument.value(&rolled_market, rolled_date).is_err(),
         "ordinary pricing past a fixing date still requires the recorded fixing"
     );
     rolled - instrument.value(&base, as_of).expect("base PV").amount()

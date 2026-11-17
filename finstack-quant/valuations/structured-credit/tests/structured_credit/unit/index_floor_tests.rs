@@ -104,8 +104,10 @@ fn an_index_floor_above_the_forward_lifts_the_pool_coupon() {
         };
     let base = first(&unfloored);
     let lifted = first(&floored);
+    // `flat_forward_curve` calibrates exact 4% simple over 0.25y (90/360);
+    // Jan 15 -> Apr 15 2024 is 91 days (~0.0022 bp continuous convexity).
     assert!(
-        (lifted / base - 10.0 / 8.0).abs() < 1e-6,
+        (lifted / base - 10.0 / 8.0).abs() < 1e-4,
         "a 6% floor on a 4% index lifts SOFR+400 from 8% to 10%: {base} -> {lifted}"
     );
     assert!(

@@ -257,7 +257,7 @@ impl BondFuturePricer {
         for (date, amount) in &flows {
             if *date > as_of && *date <= delivery_date {
                 let df = disc.df_between_dates(as_of, *date)?;
-                pv_interim.add(amount.amount() * df);
+                pv_interim.add(amount.amount() * df)?;
             }
         }
 
@@ -272,7 +272,7 @@ impl BondFuturePricer {
         }
 
         // Carry-adjusted forward dirty price of the CTD at delivery.
-        let forward_dirty = (spot_dirty - pv_interim.total()) / df_to_delivery;
+        let forward_dirty = (spot_dirty - pv_interim.get_total()?) / df_to_delivery;
 
         // Forward clean price = forward dirty minus accrued at the delivery date.
         let accrued_at_delivery =
@@ -461,6 +461,8 @@ mod tests {
                 (10.0, df_10y), // 10 years
             ])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("Failed to build discount curve");
 
@@ -1102,6 +1104,9 @@ mod tests {
             DiscountCurve::builder("USD-SPECIAL-REPO")
                 .base_date(as_of)
                 .knots(vec![(0.0, 1.0), (1.0, (-0.02_f64).exp())])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("repo curve"),
         );

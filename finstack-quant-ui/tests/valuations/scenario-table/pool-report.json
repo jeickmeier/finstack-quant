@@ -233,7 +233,7 @@
             "discount_curve_id": "USD-SOFR-DISC",
             "instrument_pricing_overrides": {
               "market_quotes": {
-                "quoted_dirty_price_currency": 10952092.791475201
+                "quoted_dirty_price_currency": 10951774.467868539
               }
             },
             "attributes": {
@@ -863,7 +863,7 @@
             "discount_curve_id": "USD-SOFR-DISC",
             "instrument_pricing_overrides": {
               "market_quotes": {
-                "quoted_dirty_price_currency": 10952092.791475201
+                "quoted_dirty_price_currency": 10951774.467868539
               }
             },
             "attributes": {

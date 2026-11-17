@@ -1056,23 +1056,24 @@ mod tests {
     }
     #[test]
     fn parallel_batch_conflicts_use_all_step_io_writes() {
-        let xccy: CalibrationStep = serde_json::from_value(serde_json::json!({
-            "id": "xccy-a",
+        let base_corr_a: CalibrationStep = serde_json::from_value(serde_json::json!({
+            "id": "bc-a",
             "quote_set": "quotes",
-            "kind": "xccy_basis",
-            "curve_id": "EUR-OIS",
-            "currency": "EUR",
+            "kind": "base_correlation",
+            "index_id": "CDX-NA-IG",
+            "series": 42,
+            "maturity_years": 5.0,
+            "discount_curve_id": "USD-OIS",
+            "currency": "USD",
             "base_date": "2025-01-01",
-            "fx_spot": 1.1,
-            "domestic_discount_id": "USD-OIS",
-            "basis_spread_curve_id": "EUR-BASIS"
+            "date_regime": "standard"
         }))
-        .expect("first xccy step");
+        .expect("base correlation step");
         let conflicting: CalibrationStep = serde_json::from_value(serde_json::json!({
             "id": "xccy-b",
             "quote_set": "quotes",
             "kind": "xccy_basis",
-            "curve_id": "EUR-BASIS",
+            "curve_id": "CDX-NA-IG",
             "currency": "EUR",
             "base_date": "2025-01-01",
             "fx_spot": 1.1,
@@ -1099,7 +1100,7 @@ mod tests {
             id: "io-conflicts".to_string(),
             description: None,
             quote_sets: Default::default(),
-            steps: vec![xccy, conflicting, student_a, student_b],
+            steps: vec![base_corr_a, conflicting, student_a, student_b],
             settings: Default::default(),
         };
         let market_data = Vec::new();

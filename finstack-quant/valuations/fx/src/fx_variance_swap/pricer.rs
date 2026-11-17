@@ -85,7 +85,7 @@ fn get_historical_prices_with_dates(
         if !dates.is_empty() {
             return dates
                 .iter()
-                .map(|&date| series.value_on_exact(date))
+                .map(|&date| series.get_value_exact(date))
                 .collect();
         }
     }
@@ -150,7 +150,7 @@ fn get_historical_ohlc_with_dates(
         let series = context.get_series(id)?;
         dates
             .iter()
-            .map(|&date| series.value_on_exact(date))
+            .map(|&date| series.get_value_exact(date))
             .collect()
     };
     let open_vals = exact_values(open_id)?;
@@ -303,10 +303,10 @@ fn remaining_squared_returns(
             0.0
         };
         let mean = partial_return + carry - 0.5 * variation;
-        total.add(variation + mean * mean);
+        total.add(variation + mean * mean)?;
         count += 1;
     }
-    Ok((total.total(), count))
+    Ok((total.get_total()?, count))
 }
 
 fn cumulative_variation(
@@ -379,7 +379,7 @@ fn replicated_variance_to(
     let r_d = zero_rate_from_df(df_dom, t, "FxVarianceSwap domestic discount")?;
     let r_f = zero_rate_from_df(df_for, t, "FxVarianceSwap foreign discount")?;
     let fwd = spot * ((r_d - r_f) * t).exp();
-    let strikes = surface.strikes();
+    let strikes = surface.secondary_values();
     let vol_fn = |t_exp: f64, k: f64| {
         finstack_quant_models::volatility::get_surface_vol_clamped(&surface, t_exp, k)
     };
@@ -415,11 +415,17 @@ mod tests {
         let usd_curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("usd curve");
         let eur_curve = DiscountCurve::builder("EUR-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, (-0.01_f64).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("eur curve");
         let provider = SimpleFxProvider::new();
@@ -434,13 +440,16 @@ mod tests {
     }
 
     fn zero_rate_market(as_of: Date, volatility: f64) -> MarketContext {
-        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::market_data::surfaces::{VolInterpolationMode, VolSurface};
         let mut market = build_market(as_of);
         for id in ["USD-OIS", "EUR-OIS"] {
             market = market.insert(
                 DiscountCurve::builder(id)
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (5.0, 1.0)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("curve"),
             );
@@ -456,7 +465,10 @@ mod tests {
             .insert_surface(
                 VolSurface::builder("EURUSD-VOL")
                     .expiries(&[1.0, 3.0])
-                    .strikes(&strikes)
+                    .secondary_values(&strikes)
+                    .secondary_axis(VolSurfaceAxis::Strike)
+                    .quote_type(VolQuoteType::BlackLognormal)
+                    .interpolation_mode(VolInterpolationMode::Vol)
                     .row(&vols)
                     .row(&vols)
                     .build()
@@ -466,26 +478,40 @@ mod tests {
 
     #[test]
     fn replication_rejects_non_black_and_non_strike_surfaces() {
+        use finstack_quant_core::market_data::surfaces::VolSurface;
         let swap = FxVarianceSwap::example().expect("swap");
         let market = zero_rate_market(swap.start_date, 0.2);
         let base = market
             .get_surface(swap.vol_surface_id.as_str())
             .expect("surface");
         for surface in [
-            base.as_ref().clone().with_displacements(&[0.1; 2]).unwrap(),
+            VolSurface::from_grid(
+                base.id(),
+                base.expiries(),
+                base.secondary_values(),
+                base.vols(),
+                finstack_quant_core::market_data::surfaces::VolGridOpts {
+                    secondary_axis: base.secondary_axis(),
+                    quote_type: VolQuoteType::ShiftedBlackLognormal,
+                    interpolation_mode: base.interpolation_mode(),
+                },
+                Some(&[0.1; 2]),
+            )
+            .expect("shifted surface"),
             finstack_quant_valuations_test_support::volatility::relabel_quote_type(
                 base.as_ref(),
                 VolQuoteType::Normal,
             )
             .unwrap(),
-            finstack_quant_core::market_data::surfaces::VolSurface::from_grid(
+            VolSurface::from_grid(
                 base.id(),
                 base.expiries(),
-                base.strikes(),
+                base.secondary_values(),
                 base.vols(),
                 finstack_quant_core::market_data::surfaces::VolGridOpts {
                     secondary_axis: VolSurfaceAxis::Tenor,
-                    ..finstack_quant_core::market_data::surfaces::VolGridOpts::default()
+                    quote_type: base.quote_type(),
+                    interpolation_mode: base.interpolation_mode(),
                 },
                 None,
             )
@@ -531,10 +557,24 @@ mod tests {
                     .collect();
                 let control_observations = dates.iter().map(|&date| (date, 1.0)).collect();
                 let known = market.clone().insert_series(
-                    ScalarTimeSeries::new("EURUSD", observations, None).expect("series"),
+                    ScalarTimeSeries::new(
+                        "EURUSD",
+                        observations,
+                        None,
+                        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+                    )
+                    .expect("series"),
                 );
                 let control = market.insert_series(
-                    ScalarTimeSeries::new("EURUSD", control_observations, None).expect("series"),
+                    ScalarTimeSeries::new(
+                        "EURUSD",
+                        control_observations,
+                        None,
+                        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+                    )
+                    .expect("series"),
                 );
                 let before_difference = expected_variance(&swap, &known, as_of).expect("known")
                     - expected_variance(&swap, &control, as_of).expect("control");
@@ -549,7 +589,7 @@ mod tests {
     #[test]
     fn forward_start_uses_only_the_observed_window_and_discrete_mean_correction() {
         use finstack_quant_core::dates::Tenor;
-        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::market_data::surfaces::{VolInterpolationMode, VolSurface};
         let as_of = date!(2025 - 01 - 06);
         let mut swap = FxVarianceSwap::example().expect("example");
         swap.start_date = date!(2026 - 01 - 06);
@@ -570,7 +610,10 @@ mod tests {
         let strikes: Vec<_> = (1..=800).map(|i| f64::from(i) * 0.005).collect();
         let mut surface = VolSurface::builder("EURUSD-VOL")
             .expiries(&times)
-            .strikes(&strikes);
+            .secondary_values(&strikes)
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol);
         for &time in &times {
             surface = surface.row(&vec![(integrated(time) / time).sqrt(); strikes.len()]);
         }
@@ -627,7 +670,7 @@ mod tests {
     #[test]
     fn negative_forward_variation_is_rejected() {
         use finstack_quant_core::dates::Tenor;
-        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::market_data::surfaces::{VolInterpolationMode, VolSurface};
         let as_of = date!(2025 - 01 - 06);
         let mut swap = FxVarianceSwap::example().expect("example");
         swap.start_date = date!(2026 - 01 - 06);
@@ -638,7 +681,10 @@ mod tests {
         let low = vec![0.1; strikes.len()];
         let surface = VolSurface::builder("EURUSD-VOL")
             .expiries(&[1.0, 2.0])
-            .strikes(&strikes)
+            .secondary_values(&strikes)
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&high)
             .row(&low)
             .build()
@@ -672,7 +718,14 @@ mod tests {
             ("EURUSD", 1.0),
         ] {
             market = market.insert_series(
-                ScalarTimeSeries::new(name, vec![(as_of, value)], None).expect("series"),
+                ScalarTimeSeries::new(
+                    name,
+                    vec![(as_of, value)],
+                    None,
+                    finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                    finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+                )
+                .expect("series"),
             );
         }
         let realized = partial_realized_variance(&swap, &market, as_of).expect("single bar");
@@ -742,7 +795,16 @@ mod tests {
             .expect("spot");
         let market = zero_rate_market(as_of, 0.2)
             .insert_fx(FxMatrix::new(Arc::new(provider), None))
-            .insert_series(ScalarTimeSeries::new("EURUSD", observations, None).expect("series"));
+            .insert_series(
+                ScalarTimeSeries::new(
+                    "EURUSD",
+                    observations,
+                    None,
+                    finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                    finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+                )
+                .expect("series"),
+            );
         let q =
             cumulative_variation(&swap, &market, as_of, swap.maturity).expect("future variation");
         let mean = 1.02_f64.ln() - 0.5 * q;
@@ -777,8 +839,16 @@ mod tests {
                 .enumerate()
                 .map(|(i, &date)| (date, if i == 0 { first } else { later }))
                 .collect();
-            market = market
-                .insert_series(ScalarTimeSeries::new(id, observations, None).expect("series"));
+            market = market.insert_series(
+                ScalarTimeSeries::new(
+                    id,
+                    observations,
+                    None,
+                    finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                    finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+                )
+                .expect("series"),
+            );
         }
         let range_mean =
             ((1.2_f64 / 0.8).ln().powi(2) + 3.0 * (1.01_f64 / 0.99).ln().powi(2)) / 4.0;
@@ -826,7 +896,14 @@ mod tests {
             .into_iter()
             .map(|date| (date, 1.10))
             .collect();
-        let series = ScalarTimeSeries::new("EURUSD", observations, None).expect("series");
+        let series = ScalarTimeSeries::new(
+            "EURUSD",
+            observations,
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("series");
         let market = build_market(as_of).insert_series(series);
 
         let via_pricer = compute_pv(&swap, &market, as_of).expect("pricer pv");
@@ -864,7 +941,7 @@ mod tests {
     fn fx_seasoned_mtm_uses_contractual_sample_normalization() {
         use finstack_quant_core::dates::{DayCount, Tenor};
         use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
-        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::market_data::surfaces::{VolInterpolationMode, VolSurface};
         use finstack_quant_core::math::stats::RealizedVarMethod;
         use finstack_quant_core::types::Attributes;
         use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -933,10 +1010,20 @@ mod tests {
             .enumerate()
             .map(|(i, &d)| (d, 1.10 * (1.0 + 0.002 * (i as f64 % 3.0 - 1.0))))
             .collect();
-        let series = ScalarTimeSeries::new("EURUSD", obs, None).expect("series");
+        let series = ScalarTimeSeries::new(
+            "EURUSD",
+            obs,
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("series");
         let surface = VolSurface::builder("EURUSD-VOL")
             .expiries(&[1.0])
-            .strikes(&[0.9, 1.1, 1.3])
+            .secondary_values(&[0.9, 1.1, 1.3])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.12, 0.10, 0.12])
             .build()
             .expect("surface");
@@ -993,7 +1080,7 @@ mod tests {
     #[test]
     fn fx_variance_swap_forward_recovery_is_date_based() {
         use finstack_quant_core::dates::{DayCount, DayCountContext, Tenor};
-        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::market_data::surfaces::{VolInterpolationMode, VolSurface};
         use finstack_quant_core::math::stats::RealizedVarMethod;
         use finstack_quant_core::types::Attributes;
         use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -1042,12 +1129,16 @@ mod tests {
             .base_date(curve_base)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (t_near, df_near_dom), (t_mat, df_mat_dom)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("usd curve");
         let eur_curve = DiscountCurve::builder("EUR-OIS")
             .base_date(curve_base)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (t_near, df_near_for), (t_mat, df_mat_for)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("eur curve");
         let provider = SimpleFxProvider::new();
@@ -1057,7 +1148,10 @@ mod tests {
         // Dense wings support Carr-Madan replication while preserving a strong slope.
         let surface = VolSurface::builder("EURUSD-VOL")
             .expiries(&[1.0])
-            .strikes(&[0.80, 0.90, 1.00, 1.10, 1.20, 1.30])
+            .secondary_values(&[0.80, 0.90, 1.00, 1.10, 1.20, 1.30])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.34, 0.30, 0.24, 0.18, 0.10, 0.05])
             .build()
             .expect("surface");
@@ -1108,8 +1202,8 @@ mod tests {
             .day_count()
             .year_fraction(as_of, maturity, DayCountContext::default())
             .expect("yf for");
-        let df_dom_bug = dom.df(t_dom_axis.max(0.0));
-        let df_for_bug = for_curve.df(t_for_axis.max(0.0));
+        let df_dom_bug = dom.df(t_dom_axis.max(0.0)).expect("df");
+        let df_for_bug = for_curve.df(t_for_axis.max(0.0)).expect("df");
 
         assert!(
             (df_dom_date - df_dom_bug).abs() > 1e-3,
@@ -1163,7 +1257,7 @@ mod tests {
         // Recompute Carr-Madan with each candidate forward and assert the pricer
         // follows the date-based one.
         let surface_ref = market.get_surface("EURUSD-VOL").expect("surface");
-        let strikes = surface_ref.strikes();
+        let strikes = surface_ref.secondary_values();
         let vol_fn = |t_exp: f64, k: f64| {
             finstack_quant_models::volatility::get_surface_vol_clamped(&surface_ref, t_exp, k)
         };
@@ -1197,7 +1291,7 @@ mod tests {
     #[test]
     fn fx_variance_swap_terminal_discount_is_date_based() {
         use finstack_quant_core::dates::{DayCount, Tenor};
-        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::market_data::surfaces::{VolInterpolationMode, VolSurface};
         use finstack_quant_core::math::stats::RealizedVarMethod;
         use finstack_quant_core::types::Attributes;
         use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -1215,12 +1309,16 @@ mod tests {
             .base_date(curve_base)
             .day_count(DayCount::Act360)
             .knots([(0.0, 1.0), (2.0, (-0.06_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("usd curve");
         let eur_curve = DiscountCurve::builder("EUR-OIS")
             .base_date(curve_base)
             .day_count(DayCount::Act360)
             .knots([(0.0, 1.0), (2.0, (-0.02_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("eur curve");
         let provider = SimpleFxProvider::new();
@@ -1229,7 +1327,10 @@ mod tests {
             .expect("valid rate");
         let surface = VolSurface::builder("EURUSD-VOL")
             .expiries(&[1.0])
-            .strikes(&[0.9, 1.1, 1.3])
+            .secondary_values(&[0.9, 1.1, 1.3])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.12, 0.10, 0.12])
             .build()
             .expect("surface");
@@ -1285,7 +1386,7 @@ mod tests {
             .day_count
             .year_fraction(as_of, maturity, DayCountContext::default())
             .expect("yf");
-        let df_bug = dom.df(t_bug.max(0.0));
+        let df_bug = dom.df(t_bug.max(0.0)).expect("df");
         assert!(
             (df_correct - df_bug).abs() > 1e-4,
             "fixture must expose the discount-axis bug: df_correct={df_correct} df_bug={df_bug}"

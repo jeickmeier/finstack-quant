@@ -517,6 +517,7 @@ impl HolidayCalendar for MetadataCal {
             id: "meta-cal",
             name: "Metadata Calendar",
             ignore_weekends: false,
+            supported_years: None,
         })
     }
 }
@@ -548,14 +549,14 @@ fn joint_business_days_t0_returns_start_unadjusted() {
     // Saturday Jan 4, 2025 is not a business day on either calendar, but
     // n_days = 0 pins the documented behavior: return start unadjusted.
     let saturday = make_date(2025, 1, 4);
-    let result = resolve_joint_calendar(Some("nyse"), Some("gblo"))
+    let result = resolve_joint_calendar("nyse", "gblo")
         .and_then(|cal| saturday.add_business_days(0, cal))
         .expect("calendars resolve");
     assert_eq!(result, saturday, "T+0 returns start unadjusted");
 
     // Holiday (Jan 1, 2025, Wednesday) also returned unadjusted at T+0.
     let new_year = make_date(2025, 1, 1);
-    let result = resolve_joint_calendar(Some("nyse"), Some("gblo"))
+    let result = resolve_joint_calendar("nyse", "gblo")
         .and_then(|cal| new_year.add_business_days(0, cal))
         .expect("calendars resolve");
     assert_eq!(result, new_year);

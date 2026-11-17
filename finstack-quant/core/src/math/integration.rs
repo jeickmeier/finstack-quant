@@ -314,10 +314,21 @@ impl GaussHermiteQuadrature {
         use crate::math::summation::NeumaierAccumulator;
         let sqrt_2 = std::f64::consts::SQRT_2;
         let mut acc = NeumaierAccumulator::new();
+        let mut fallback = false;
+        let mut raw = 0.0_f64;
         for (i, &z) in self.points.iter().enumerate() {
-            acc.add(self.weights[i] * f(sqrt_2 * z));
+            let term = self.weights[i] * f(sqrt_2 * z);
+            raw += term;
+            if !fallback && acc.add(term).is_err() {
+                fallback = true;
+            }
         }
-        acc.total() / std::f64::consts::PI.sqrt()
+        let sum = if fallback {
+            raw
+        } else {
+            acc.get_total().unwrap_or(raw)
+        };
+        sum / std::f64::consts::PI.sqrt()
     }
 }
 

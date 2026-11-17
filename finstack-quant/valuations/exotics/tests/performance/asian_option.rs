@@ -164,6 +164,8 @@ fn fixture(case: Case, scenario: &str) -> (AsianOption, MarketContext, Date) {
             (1.0, (-0.05_f64).exp()),
             (2.0, (-0.10_f64).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount fixture");
     let surface = finstack_quant_valuations_test_support::volatility::flat_vol_surface(
@@ -175,8 +177,11 @@ fn fixture(case: Case, scenario: &str) -> (AsianOption, MarketContext, Date) {
     let market = MarketContext::new()
         .insert(curve)
         .insert_surface(surface)
-        .insert_price("SPOT", MarketScalar::Unitless(100.0))
-        .insert_price("SPOT_DIV", MarketScalar::Unitless(0.0));
+        .insert_price("SPOT", MarketScalar::unitless(100.0).expect("valid scalar"))
+        .insert_price(
+            "SPOT_DIV",
+            MarketScalar::unitless(0.0).expect("valid scalar"),
+        );
     (option, market, as_of)
 }
 
@@ -192,15 +197,18 @@ struct Moments {
 fn batch_moments(xs: &[f64], ys: &[f64]) -> Moments {
     assert_eq!(xs.len(), ys.len());
     assert!(xs.len() >= 2);
-    let mean_x = neumaier_sum(xs.iter().copied()) / xs.len() as f64;
-    let mean_y = neumaier_sum(ys.iter().copied()) / ys.len() as f64;
+    let mean_x = neumaier_sum(xs.iter().copied()).expect("finite sum") / xs.len() as f64;
+    let mean_y = neumaier_sum(ys.iter().copied()).expect("finite sum") / ys.len() as f64;
     let denominator = (xs.len() - 1) as f64;
     Moments {
         mean_x,
         mean_y,
-        var_x: neumaier_sum(xs.iter().map(|x| (x - mean_x).powi(2))) / denominator,
-        var_y: neumaier_sum(ys.iter().map(|y| (y - mean_y).powi(2))) / denominator,
+        var_x: neumaier_sum(xs.iter().map(|x| (x - mean_x).powi(2))).expect("finite sum")
+            / denominator,
+        var_y: neumaier_sum(ys.iter().map(|y| (y - mean_y).powi(2))).expect("finite sum")
+            / denominator,
         covariance: neumaier_sum(xs.iter().zip(ys).map(|(x, y)| (x - mean_x) * (y - mean_y)))
+            .expect("finite sum")
             / denominator,
     }
 }
@@ -245,7 +253,8 @@ fn geometric_oracle(option: &AsianOption, market: &MarketContext, as_of: Date) -
             .ln()
         })
         .collect();
-    let past_log = neumaier_sum(option.past_fixings.iter().map(|(_, value)| value.ln()));
+    let past_log =
+        neumaier_sum(option.past_fixings.iter().map(|(_, value)| value.ln())).expect("finite sum");
     let n = option.fixing_dates.len() as f64;
     let sigma2 = 0.25_f64.powi(2);
     let mu = (past_log
@@ -254,7 +263,8 @@ fn geometric_oracle(option: &AsianOption, market: &MarketContext, as_of: Date) -
                 .iter()
                 .zip(&times)
                 .map(|(log_f, t)| log_f - 0.5 * sigma2 * t),
-        ))
+        )
+        .expect("finite sum"))
         / n;
     let variance = sigma2
         * neumaier_sum(
@@ -262,6 +272,7 @@ fn geometric_oracle(option: &AsianOption, market: &MarketContext, as_of: Date) -
                 .iter()
                 .flat_map(|a| times.iter().map(move |b| a.min(*b))),
         )
+        .expect("finite sum")
         / (n * n);
     let std_dev = variance.sqrt();
     let forward = (mu + 0.5 * variance).exp();
@@ -449,38 +460,62 @@ fn run_case(case: Case, scenario: &str, use_parallel: bool, retain_path_bits: bo
             df,
         )
         .expect("production paired moments");
-    assert_eq!(candidate.count(), case.paths);
+    assert_eq!(candidate.get_count(), case.paths);
     let batch = batch_moments(&xs, &ys);
     let online = paired_moments(&xs, &ys);
+    let online_mean_x = online.get_mean_x().expect("finite").expect("mean_x");
+    let online_mean_y = online.get_mean_y().expect("finite").expect("mean_y");
+    let online_variance_x = online
+        .get_variance_x()
+        .expect("finite")
+        .expect("variance_x");
+    let online_variance_y = online
+        .get_variance_y()
+        .expect("finite")
+        .expect("variance_y");
+    let online_covariance = online
+        .get_covariance()
+        .expect("finite")
+        .expect("covariance");
+    let candidate_mean_x = candidate.get_mean_x().expect("finite").expect("mean_x");
+    let candidate_mean_y = candidate.get_mean_y().expect("finite").expect("mean_y");
+    let candidate_variance_x = candidate
+        .get_variance_x()
+        .expect("finite")
+        .expect("variance_x");
+    let candidate_variance_y = candidate
+        .get_variance_y()
+        .expect("finite")
+        .expect("variance_y");
+    let candidate_covariance = candidate
+        .get_covariance()
+        .expect("finite")
+        .expect("covariance");
     for (label, actual, reference) in [
-        ("arithmetic mean", online.mean_x(), batch.mean_x),
-        ("geometric mean", online.mean_y(), batch.mean_y),
-        ("arithmetic variance", online.variance_x(), batch.var_x),
-        ("geometric variance", online.variance_y(), batch.var_y),
-        ("paired covariance", online.covariance(), batch.covariance),
+        ("arithmetic mean", online_mean_x, batch.mean_x),
+        ("geometric mean", online_mean_y, batch.mean_y),
+        ("arithmetic variance", online_variance_x, batch.var_x),
+        ("geometric variance", online_variance_y, batch.var_y),
+        ("paired covariance", online_covariance, batch.covariance),
     ] {
         close(label, actual, reference);
     }
     for (label, actual, reference) in [
-        (
-            "candidate arithmetic mean",
-            candidate.mean_x(),
-            batch.mean_x,
-        ),
-        ("candidate geometric mean", candidate.mean_y(), batch.mean_y),
+        ("candidate arithmetic mean", candidate_mean_x, batch.mean_x),
+        ("candidate geometric mean", candidate_mean_y, batch.mean_y),
         (
             "candidate arithmetic variance",
-            candidate.variance_x(),
+            candidate_variance_x,
             batch.var_x,
         ),
         (
             "candidate geometric variance",
-            candidate.variance_y(),
+            candidate_variance_y,
             batch.var_y,
         ),
         (
             "candidate covariance",
-            candidate.covariance(),
+            candidate_covariance,
             batch.covariance,
         ),
     ] {
@@ -502,7 +537,8 @@ fn run_case(case: Case, scenario: &str, use_parallel: bool, retain_path_bits: bo
         &times,
         Some(drift.as_ref()),
         Some(&multipliers),
-    );
+    )
+    .expect("finite seasoned control");
     let analytic_reference = geometric_oracle(&option, &market, as_of);
     close(
         "independent geometric control",
@@ -510,35 +546,35 @@ fn run_case(case: Case, scenario: &str, use_parallel: bool, retain_path_bits: bo
         analytic_reference,
     );
     let adjusted = apply_control_variate(
-        online.mean_x(),
-        online.variance_x(),
-        online.mean_y(),
-        online.variance_y(),
-        online.covariance(),
+        online_mean_x,
+        online_variance_x,
+        online_mean_y,
+        online_variance_y,
+        online_covariance,
         analytic,
         case.paths,
     );
     let candidate_adjusted = apply_control_variate(
-        candidate.mean_x(),
-        candidate.variance_x(),
-        candidate.mean_y(),
-        candidate.variance_y(),
-        candidate.covariance(),
+        candidate_mean_x,
+        candidate_variance_x,
+        candidate_mean_y,
+        candidate_variance_y,
+        candidate_covariance,
         analytic,
-        candidate.count(),
+        candidate.get_count(),
     );
     let beta = if batch.var_y > 1e-10 {
         batch.covariance / batch.var_y
     } else {
         0.0
     };
-    let online_beta = if online.variance_y() > 1e-10 {
-        online.covariance() / online.variance_y()
+    let online_beta = if online_variance_y > 1e-10 {
+        online_covariance / online_variance_y
     } else {
         0.0
     };
-    let candidate_beta = if candidate.variance_y() > 1e-10 {
-        candidate.covariance() / candidate.variance_y()
+    let candidate_beta = if candidate_variance_y > 1e-10 {
+        candidate_covariance / candidate_variance_y
     } else {
         0.0
     };
@@ -552,7 +588,9 @@ fn run_case(case: Case, scenario: &str, use_parallel: bool, retain_path_bits: bo
         xs.iter()
             .zip(&ys)
             .map(|(x, y)| (x - beta * y - residual_mean).powi(2)),
-    ) / (case.paths - 1) as f64;
+    )
+    .expect("finite sum")
+        / (case.paths - 1) as f64;
     close("adjusted mean", adjusted.mean, adjusted_mean);
     close(
         "adjusted variance",
@@ -567,7 +605,7 @@ fn run_case(case: Case, scenario: &str, use_parallel: bool, retain_path_bits: bo
     );
     close(
         "candidate adjusted variance",
-        candidate.count() as f64 * candidate_adjusted.stderr.powi(2),
+        candidate.get_count() as f64 * candidate_adjusted.stderr.powi(2),
         adjusted_var,
     );
     // A variance-scale gate remains meaningful at zero; this derived bound
@@ -607,11 +645,11 @@ fn run_case(case: Case, scenario: &str, use_parallel: bool, retain_path_bits: bo
         candidate_adjusted.mean,
     );
     let candidate_bits = [
-        candidate.mean_x().to_bits(),
-        candidate.mean_y().to_bits(),
-        candidate.variance_x().to_bits(),
-        candidate.variance_y().to_bits(),
-        candidate.covariance().to_bits(),
+        candidate_mean_x.to_bits(),
+        candidate_mean_y.to_bits(),
+        candidate_variance_x.to_bits(),
+        candidate_variance_y.to_bits(),
+        candidate_covariance.to_bits(),
         candidate_beta.to_bits(),
         candidate_adjusted.mean.to_bits(),
         candidate_adjusted.stderr.to_bits(),
@@ -629,8 +667,8 @@ fn run_case(case: Case, scenario: &str, use_parallel: bool, retain_path_bits: bo
         "counts": { "independent_estimators": case.paths, "distinct_physical_paths": case.paths,
             "physical_paths_per_payoff_pass": case.paths, "reference_simulated_path_traversals": 2 * case.paths,
             "historical_fixings": hist_count, "future_fixings": case.fixings - hist_count },
-        "moments": { "arithmetic_mean": online.mean_x(), "geometric_mean": online.mean_y(),
-            "arithmetic_variance": online.variance_x(), "geometric_variance": online.variance_y(), "covariance": online.covariance(),
+        "moments": { "arithmetic_mean": online_mean_x, "geometric_mean": online_mean_y,
+            "arithmetic_variance": online_variance_x, "geometric_variance": online_variance_y, "covariance": online_covariance,
             "batch_arithmetic_mean": batch.mean_x, "batch_geometric_mean": batch.mean_y,
             "batch_arithmetic_variance": batch.var_x, "batch_geometric_variance": batch.var_y,
             "batch_covariance": batch.covariance, "beta": online_beta, "batch_beta": beta, "analytic_control": analytic,
@@ -642,12 +680,12 @@ fn run_case(case: Case, scenario: &str, use_parallel: bool, retain_path_bits: bo
             "arithmetic_stderr": (batch.var_x / case.paths as f64).sqrt(), "direct_residual_variance": residual_var },
         "production_value": production.value.amount(), "currency": "USD",
         "candidate": { "source": "PathDependentPricer::price_asian_pair",
-            "independent_estimators": candidate.count(), "configured_physical_paths": config.num_paths,
-            "retains_paths": false, "arithmetic_mean": candidate.mean_x(), "geometric_mean": candidate.mean_y(),
-            "arithmetic_variance": candidate.variance_x(), "geometric_variance": candidate.variance_y(),
-            "covariance": candidate.covariance(), "beta": candidate_beta,
+            "independent_estimators": candidate.get_count(), "configured_physical_paths": config.num_paths,
+            "retains_paths": false, "arithmetic_mean": candidate_mean_x, "geometric_mean": candidate_mean_y,
+            "arithmetic_variance": candidate_variance_x, "geometric_variance": candidate_variance_y,
+            "covariance": candidate_covariance, "beta": candidate_beta,
             "analytic_control": analytic, "adjusted_mean": candidate_adjusted.mean,
-            "adjusted_variance": candidate.count() as f64 * candidate_adjusted.stderr.powi(2),
+            "adjusted_variance": candidate.get_count() as f64 * candidate_adjusted.stderr.powi(2),
             "adjusted_stderr": candidate_adjusted.stderr, "adjusted_ci95": candidate_adjusted.ci_95,
             "moment_estimate_f64_bits": candidate_bits },
         "tolerances": { "absolute_per_unit_moments": MOMENT_TOLERANCE, "geometric_sampling_standard_errors": 5.0 },

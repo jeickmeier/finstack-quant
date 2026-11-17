@@ -72,7 +72,7 @@ pub fn df_from_yield(
 
     Ok(match comp {
         YieldCompounding::Rate(rate_comp) => {
-            let df = rate_comp.df_from_rate(ytm, t);
+            let df = rate_comp.df_from_rate(ytm, t)?;
             if !df.is_finite() {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "{rate_comp} compounding base is non-positive for ytm={ytm}, t={t}"
@@ -321,10 +321,10 @@ pub(crate) fn price_from_ytm_timed(
                 }
                 _ => df_from_yield(ytm, t, comp, frequency)?,
             };
-            pv.add(amount.amount() * df);
+            pv.add(amount.amount() * df)?;
         }
     }
-    Ok(pv.total())
+    pv.get_total()
 }
 
 /// Moosmüller discount factor of the coupon `k_minus_1` whole periods after
@@ -1271,6 +1271,9 @@ mod tests {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (2.0, 0.90)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount curve"),
             )
@@ -1278,6 +1281,9 @@ mod tests {
                 DiscountCurve::builder("USD-REF")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (2.0, 1.0)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("reference curve"),
             );
@@ -1349,6 +1355,9 @@ mod tests {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (2.0, 0.90)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount curve"),
             )
@@ -1356,6 +1365,9 @@ mod tests {
                 DiscountCurve::builder("USD-REF")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (2.0, 1.0)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("reference curve"),
             );

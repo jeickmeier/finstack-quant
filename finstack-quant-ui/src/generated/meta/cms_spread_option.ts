@@ -16,6 +16,7 @@ export default [
             "forward_curve_id": "USD-SOFR-3M",
             "id": "CMS-SPREAD-10Y2Y",
             "index_id": "USD-SOFR-OIS",
+            "long_cms_fixing_index_id": "USD-SOFR-CMS-10Y",
             "long_cms_tenor": {
               "count": 10,
               "unit": "years"
@@ -27,6 +28,7 @@ export default [
             },
             "option_type": "call",
             "payment_date": "2027-03-31",
+            "short_cms_fixing_index_id": "USD-SOFR-CMS-2Y",
             "short_cms_tenor": {
               "count": 2,
               "unit": "years"
@@ -4065,6 +4067,21 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#"
   },
   {
+    "path": "#/$defs/d_ff58eb1d8c0cb6416b15/properties/long_cms_fixing_index_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json#/$defs/CmsSpreadOption/properties/long_cms_fixing_index_id",
+    "description": "Explicit CMS benchmark fixing identifier for the long-tenor leg\n(`FIXING:<long_cms_fixing_index_id>`), distinct from `forward_curve_id`,\n`index_id`, and `short_cms_fixing_index_id`."
+  },
+  {
+    "path": "#/$defs/d_ff58eb1d8c0cb6416b15/properties/long_cms_fixing_index_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json#/$defs/CmsSpreadOption/properties/long_cms_fixing_index_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_ff58eb1d8c0cb6416b15/properties/long_cms_fixing_index_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json#/$defs/CmsSpreadOption/properties/long_cms_fixing_index_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_ff58eb1d8c0cb6416b15/properties/long_cms_tenor",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json#/$defs/CmsSpreadOption/properties/long_cms_tenor",
     "description": "Long CMS tenor (e.g., 10Y).",
@@ -4112,6 +4129,21 @@ export default [
     "description": "Scenario-only pricing adjustments.",
     "ref": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/scenario_pricing_overrides.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_ff58eb1d8c0cb6416b15/properties/short_cms_fixing_index_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json#/$defs/CmsSpreadOption/properties/short_cms_fixing_index_id",
+    "description": "Explicit CMS benchmark fixing identifier for the short-tenor leg\n(`FIXING:<short_cms_fixing_index_id>`), distinct from `forward_curve_id`,\n`index_id`, and `long_cms_fixing_index_id`."
+  },
+  {
+    "path": "#/$defs/d_ff58eb1d8c0cb6416b15/properties/short_cms_fixing_index_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json#/$defs/CmsSpreadOption/properties/short_cms_fixing_index_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_ff58eb1d8c0cb6416b15/properties/short_cms_fixing_index_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json#/$defs/CmsSpreadOption/properties/short_cms_fixing_index_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_ff58eb1d8c0cb6416b15/properties/short_cms_tenor",

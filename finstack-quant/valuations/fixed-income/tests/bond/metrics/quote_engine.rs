@@ -26,6 +26,7 @@ fn build_simple_discount_curve(as_of: finstack_quant_core::dates::Date) -> Disco
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (5.0, 0.85)])
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve builder should succeed in test")
 }
@@ -151,14 +152,12 @@ fn test_quote_engine_roundtrip_dm_for_frn() {
         .base_date(as_of)
         .knots([(0.0, 1.0), (10.0, 0.6)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(date!(2024 - 12 - 30))
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.03), (10.0, 0.03)])
-        .build()
-        .unwrap();
+    let fwd =
+        ForwardCurve::flat("USD-SOFR-3M", date!(2024 - 12 - 30), 0.03, DayCount::Act360).unwrap();
     let market = MarketContext::new().insert(disc).insert(fwd);
 
     let target_dm = 0.01; // 100bp
@@ -224,6 +223,7 @@ fn test_quote_engine_roundtrip_oas_and_asw_market_fixed_bond() {
             (5.0, 0.85),
         ])
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve builder should succeed");
     let market = MarketContext::new().insert(disc);

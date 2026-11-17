@@ -690,7 +690,7 @@ pub fn calibrate_lognormal_mean(ctx: &ForwardCdsContext) -> Result<f64> {
              f(m_min)={lo_f:.6e}, f(m_max)={hi_f:.6e}",
         )));
     };
-    let solver = BrentSolver::new().with_tolerance(1e-12);
+    let solver = BrentSolver::new(1e-12, 100)?;
     let log_m = solver.solve_in_bracket(|x| Ok(f(x)), bracket_lo, bracket_hi)?;
     Ok(log_m.exp())
 }
@@ -834,17 +834,19 @@ mod tests {
                 (5.0, (-rate * 5.0).exp()),
                 (10.0, (-rate * 10.0).exp()),
             ])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("flat discount curve")
     }
 
     fn flat_hazard(id: &str, base: Date, recovery: f64, hazard_rate: f64) -> HazardCurve {
-        let par = hazard_rate * BASIS_POINTS_PER_UNIT * (1.0 - recovery);
         HazardCurve::builder(id)
             .base_date(base)
             .recovery_rate(recovery)
             .knots([(1.0, hazard_rate), (5.0, hazard_rate), (10.0, hazard_rate)])
-            .par_spreads([(1.0, par), (5.0, par), (10.0, par)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("flat hazard curve")
     }

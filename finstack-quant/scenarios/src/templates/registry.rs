@@ -40,7 +40,6 @@ impl RegisteredTemplate {
             operations: composite_operations,
             priority: composite.priority,
             resolution_mode: finstack_quant_core::market_data::hierarchy::ResolutionMode::default(),
-            hazard_bump_mode: crate::HazardBumpMode::default(),
         };
         composite_spec.validate()?;
 
@@ -225,7 +224,6 @@ mod tests {
             operations: Vec::new(),
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         }
     }
 
@@ -284,7 +282,6 @@ mod tests {
             }],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         }
     }
 

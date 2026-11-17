@@ -272,6 +272,9 @@ fn test_npv_at_maturity_without_prices_errors() {
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder(DISC_ID)
             .base_date(swap.start_date)
             .knots([(0.0, 1.0), (1.0, 0.95)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap(),
     );

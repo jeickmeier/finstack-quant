@@ -39,7 +39,6 @@ export async function pricingCases() {
     [40, 0.193980042],
   ];
   hazard.knot_points = [
-    [0, 0.012],
     [1, 0.014],
     [3, 0.016],
     [5, 0.018],

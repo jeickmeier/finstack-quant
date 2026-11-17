@@ -444,32 +444,36 @@ impl PathDependentPricer {
                     path_id,
                     capture_enabled.then_some(&mut captured_paths),
                 )?;
-                replicate_stats.update(discounted_value);
-                overall.update(discounted_value);
+                replicate_stats.update(discounted_value)?;
+                overall.update(discounted_value)?;
                 if last_in_replicate {
-                    replicate_means.update(replicate_stats.mean());
+                    if let Some(replicate_mean) = replicate_stats.get_mean()? {
+                        replicate_means.update(replicate_mean)?;
+                    }
                     replicate_stats = OnlineStats::new();
                 }
                 Ok(())
             },
         )?;
 
-        // Unbiased point estimate across all simulated paths (`overall.mean()`),
+        // Unbiased point estimate across all simulated paths (`overall.get_mean()`),
         // with RQMC standard error across the R independently scrambled replicate
-        // means (`replicate_means.stderr()`). When `num_paths % replicates != 0`,
+        // means (`replicate_means.get_stderr()`). When `num_paths % replicates != 0`,
         // an unweighted mean of replicate means would overweight shorter replicates.
         // The 95% half-width is the Student-t interval over the R replicate
         // means (R - 1 degrees of freedom); `validate_runtime` guarantees
         // `num_paths >= 2`, so R >= 2 and the interval is defined.
-        let mean = overall.mean();
-        let half_width = replicate_means.ci_half_width();
+        let mean = overall.get_mean()?.unwrap_or(f64::NAN);
+        let half_width = replicate_means.get_ci_half_width(0.05)?.unwrap_or(f64::NAN);
+        let stderr = replicate_means.get_stderr()?.unwrap_or(f64::NAN);
+        let std_dev = overall.get_std_dev()?.unwrap_or(f64::NAN);
         let estimate = Estimate::new(
             mean,
-            replicate_means.stderr(),
+            stderr,
             (mean - half_width, mean + half_width),
-            overall.count(),
+            overall.get_count(),
         )
-        .with_std_dev(overall.std_dev());
+        .with_std_dev(std_dev);
 
         let mut result = engine.finalize_captured_result(
             estimate,
@@ -653,7 +657,7 @@ impl PathDependentPricer {
                     path_id,
                     &AsianPair::control_value,
                 )?;
-                moments.update(arithmetic, geometric);
+                moments.update(arithmetic, geometric)?;
                 Ok(())
             },
         )?;
@@ -1169,8 +1173,8 @@ impl PathDependentPricer {
             vol,
             dt,
             discount_factor,
-        );
-        let vega = lrm_vega_from_scores(&payoffs, &vega_scores, discount_factor);
+        )?;
+        let vega = lrm_vega_from_scores(&payoffs, &vega_scores, discount_factor)?;
         Ok(LrmGreeks {
             price: full.estimate,
             delta,
@@ -2154,30 +2158,30 @@ mod tests {
     #[test]
     fn gbm_asian_call_and_put_are_bit_stable() {
         const EXPECTED: &[u64] = &[
-            0x40195cdbec2b01c3,
-            0x3fdc249afb333879,
+            0x40195cdbec2b01c4,
+            0x3fdc249afb33387a,
             0x40176ee1abd3fb0a,
             0x3fd593ce944bf327,
-            0x4027c98e1c4e20d6,
-            0x3fe31c6bc20af5c3,
+            0x4027c98e1c4e20cc,
+            0x3fe31c6bc20af5c2,
             0x40027bb6f761ef02,
             0x3fcb758de16af18e,
             0x3fff484575b19363,
-            0x3fd05d4dc80f367d,
-            0x402ec1b62a42dd33,
+            0x3fd05d4dc80f367e,
+            0x402ec1b62a42dd2e,
             0x3fe04e9f5a5800d4,
-            0x401bd9967d816614,
-            0x3fce5f17b4811b70,
-            0x40155dfccc842987,
-            0x3fc45f08a6f61ea9,
-            0x402a9e8a223bfe87,
-            0x3fcbdb8abd307aed,
-            0x400061190e6e3a55,
-            0x3fc0720e85396db8,
-            0x3fff670343656928,
+            0x401bd9967d816613,
+            0x3fce5f17b4811b71,
+            0x40155dfccc84297c,
+            0x3fc45f08a6f61eaa,
+            0x402a9e8a223bfe8b,
+            0x3fcbdb8abd307aec,
+            0x400061190e6e3a50,
+            0x3fc0720e85396db7,
+            0x3fff670343656927,
             0x3fc56479aab3b6e9,
-            0x402d4a5a81aee852,
-            0x3fb5f30fcc19ac91,
+            0x402d4a5a81aee858,
+            0x3fb5f30fcc19ac92,
             0x4019f174aceea582,
             0x3fe50d0985e19da9,
             0x3fe521515a7bdef1,
@@ -2185,10 +2189,10 @@ mod tests {
             0x3fcebd9d3d2cc032,
             0x3fc5c2462919b2c4,
             0x40143d71cec9488b,
-            0x3fdb41a13d264d1d,
+            0x3fdb41a13d264d1e,
             0xbfd3e8b6c02d1c02,
             0x3facdadbb65e9911,
-            0x3f9cbc02b2a93f06,
+            0x3f9cbc02b2a93ef0,
             0x3fb4c48e3872a8e8,
         ];
         let mut actual = Vec::new();
@@ -2372,11 +2376,26 @@ mod asian_pair_tests {
 
     fn values(moments: &OnlineCovariance) -> [f64; 5] {
         [
-            moments.mean_x(),
-            moments.mean_y(),
-            moments.variance_x(),
-            moments.variance_y(),
-            moments.covariance(),
+            moments
+                .get_mean_x()
+                .expect("finite mean_x")
+                .expect("non-empty mean_x"),
+            moments
+                .get_mean_y()
+                .expect("finite mean_y")
+                .expect("non-empty mean_y"),
+            moments
+                .get_variance_x()
+                .expect("finite variance_x")
+                .expect("at least 2 samples for variance_x"),
+            moments
+                .get_variance_y()
+                .expect("finite variance_y")
+                .expect("at least 2 samples for variance_y"),
+            moments
+                .get_covariance()
+                .expect("finite covariance")
+                .expect("at least 2 samples for covariance"),
         ]
     }
 
@@ -2425,7 +2444,9 @@ mod asian_pair_tests {
             assert_eq!(arithmetic.path_id, path_id);
             assert_eq!(geometric.path_id, path_id);
             assert!(arithmetic.final_value.is_finite() && geometric.final_value.is_finite());
-            reference.update(arithmetic.final_value, geometric.final_value);
+            reference
+                .update(arithmetic.final_value, geometric.final_value)
+                .expect("finite paired payoffs");
         }
         reference
     }
@@ -2435,7 +2456,7 @@ mod asian_pair_tests {
         reference: &OnlineCovariance,
         quantity: f64,
     ) {
-        assert_eq!(actual.count(), reference.count());
+        assert_eq!(actual.get_count(), reference.get_count());
         for (index, (actual, reference)) in values(actual)
             .into_iter()
             .zip(values(reference))
@@ -2476,7 +2497,7 @@ mod asian_pair_tests {
                 };
                 let serial = price(false);
                 let parallel = price(true);
-                assert_eq!(serial.count(), config.num_paths);
+                assert_eq!(serial.get_count(), config.num_paths);
                 assert_moments_close(&serial, &reference, quantity);
                 assert_moments_close(&parallel, &reference, quantity);
                 assert_eq!(
@@ -2507,7 +2528,7 @@ mod asian_pair_tests {
                             DISCOUNT_FACTOR,
                         )
                         .expect("paired Sobol moments");
-                    assert_eq!(actual.count(), 35);
+                    assert_eq!(actual.get_count(), 35);
                     assert_eq!(
                         values(&actual).map(f64::to_bits),
                         values(&reference).map(f64::to_bits),
@@ -2560,20 +2581,40 @@ mod asian_pair_tests {
                             DISCOUNT_FACTOR,
                         )
                         .expect("deterministic paired payoffs");
-                    assert_eq!(actual.count(), 35);
-                    assert!((actual.mean_x() - 10.0 * DISCOUNT_FACTOR).abs() < 1e-12);
-                    assert!((actual.mean_y() - 10.0 * DISCOUNT_FACTOR).abs() < 1e-12);
+                    assert_eq!(actual.get_count(), 35);
+                    let mean_x = actual
+                        .get_mean_x()
+                        .expect("finite mean_x")
+                        .expect("non-empty");
+                    let mean_y = actual
+                        .get_mean_y()
+                        .expect("finite mean_y")
+                        .expect("non-empty");
+                    let var_x = actual
+                        .get_variance_x()
+                        .expect("finite var_x")
+                        .expect("35 samples");
+                    let var_y = actual
+                        .get_variance_y()
+                        .expect("finite var_y")
+                        .expect("35 samples");
+                    let cov = actual
+                        .get_covariance()
+                        .expect("finite cov")
+                        .expect("35 samples");
+                    assert!((mean_x - 10.0 * DISCOUNT_FACTOR).abs() < 1e-12);
+                    assert!((mean_y - 10.0 * DISCOUNT_FACTOR).abs() < 1e-12);
                     // One Philox chunk and the global Sobol fold give exact
                     // zero. Weighted multi-chunk means can round, but the
                     // variance must stay below the existing CV cutoff.
                     if sobol || chunk_size == 35 {
-                        assert_eq!(actual.variance_x(), 0.0);
-                        assert_eq!(actual.variance_y(), 0.0);
-                        assert_eq!(actual.covariance(), 0.0);
+                        assert_eq!(var_x, 0.0);
+                        assert_eq!(var_y, 0.0);
+                        assert_eq!(cov, 0.0);
                     } else {
-                        assert!(actual.variance_x().abs() < 1e-10);
-                        assert!(actual.variance_y().abs() < 1e-10);
-                        assert!(actual.covariance().abs() < 1e-10);
+                        assert!(var_x.abs() < 1e-10);
+                        assert!(var_y.abs() < 1e-10);
+                        assert!(cov.abs() < 1e-10);
                     }
                 }
             }
@@ -2585,9 +2626,13 @@ mod asian_pair_tests {
         let config = config(65, false);
         let gbm = process();
         let unit_reference = captured_reference(&config, OptionType::Call, 1.0);
-        assert!(unit_reference.variance_y().is_finite() && unit_reference.variance_y() > 0.0);
+        let unit_var_y = unit_reference
+            .get_variance_y()
+            .expect("finite var_y")
+            .expect("65 samples");
+        assert!(unit_var_y.is_finite() && unit_var_y > 0.0);
         for target_variance in [0.5e-10, 2.0e-10] {
-            let quantity = (target_variance / unit_reference.variance_y()).sqrt();
+            let quantity = (target_variance / unit_var_y).sqrt();
             let reference = captured_reference(&config, OptionType::Call, quantity);
             let actual = PathDependentPricer::new(config.clone())
                 .price_asian_pair(
@@ -2601,34 +2646,52 @@ mod asian_pair_tests {
                 .expect("paired moments near variance cutoff");
             assert_moments_close(&actual, &reference, quantity);
             let applies_control = target_variance > 1e-10;
-            assert_eq!(reference.variance_y() > 1e-10, applies_control);
-            assert_eq!(actual.variance_y() > 1e-10, applies_control);
+            let ref_var_y = reference
+                .get_variance_y()
+                .expect("finite var_y")
+                .expect("65 samples");
+            let actual_var_y = actual
+                .get_variance_y()
+                .expect("finite var_y")
+                .expect("65 samples");
+            assert_eq!(ref_var_y > 1e-10, applies_control);
+            assert_eq!(actual_var_y > 1e-10, applies_control);
 
             // A synthetic control anchor makes the existing coefficient
             // cutoff observable. This tests its propagation, not an Asian
             // analytical pricing formula.
-            let control_mean = 0.9 * reference.mean_y();
+            let ref_mean_y = reference
+                .get_mean_y()
+                .expect("finite mean_y")
+                .expect("65 samples");
+            let control_mean = 0.9 * ref_mean_y;
             let adjust = |moments: &OnlineCovariance| {
+                let [mean_x, mean_y, variance_x, variance_y, covariance] = values(moments);
                 apply_control_variate(
-                    moments.mean_x(),
-                    moments.variance_x(),
-                    moments.mean_y(),
-                    moments.variance_y(),
-                    moments.covariance(),
+                    mean_x,
+                    variance_x,
+                    mean_y,
+                    variance_y,
+                    covariance,
                     control_mean,
-                    moments.count(),
+                    moments.get_count(),
                 )
             };
             let actual_adjusted = adjust(&actual);
             let reference_adjusted = adjust(&reference);
             assert!(((actual_adjusted.mean - reference_adjusted.mean) / quantity).abs() <= 1e-10);
-            let actual_variance = actual.count() as f64 * actual_adjusted.stderr.powi(2);
-            let reference_variance = reference.count() as f64 * reference_adjusted.stderr.powi(2);
+            let actual_variance = actual.get_count() as f64 * actual_adjusted.stderr.powi(2);
+            let reference_variance =
+                reference.get_count() as f64 * reference_adjusted.stderr.powi(2);
             assert!(((actual_variance - reference_variance) / quantity.powi(2)).abs() <= 1e-10);
+            let actual_mean_x = actual
+                .get_mean_x()
+                .expect("finite mean_x")
+                .expect("65 samples");
             if applies_control {
-                assert!(actual_adjusted.mean < actual.mean_x());
+                assert!(actual_adjusted.mean < actual_mean_x);
             } else {
-                assert_eq!(actual_adjusted.mean.to_bits(), actual.mean_x().to_bits());
+                assert_eq!(actual_adjusted.mean.to_bits(), actual_mean_x.to_bits());
             }
         }
     }

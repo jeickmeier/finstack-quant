@@ -2341,6 +2341,21 @@ requiring reproduction, adoption choices and missing validation are distinct.
   representation adjustments and report-basis qualification under the
   [accepted reporting and residual contract](financial/attribution/13-target-currency-and-scaling.md#accepted-decision-for-checked-reporting-fx-sizing-aggregation-and-residual-qualification).
 
+- **Single-period return contributions.** Reconcile the dated return basis,
+  signed weighting and widened calculations, complete grouping and factor
+  views, and host ingress under the
+  [accepted return contribution contract](financial/attribution/14-return-contribution-weights.md#accepted-decision-for-checked-single-period-return-contributions).
+
+- **Attribution detail identities and reports.** Reconcile ordered typed
+  detail, checked exact-money projections, independently closing partitions,
+  and restored result and schema boundaries under the
+  [accepted detail and reporting contract](financial/attribution/15-detail-and-reporting-contracts.md#accepted-decision-for-checked-detail-identities-report-projections-and-schemas).
+
+- **Grouped benchmark-relative returns.** Reconcile exact side weights and
+  dates, explicit benchmark and taxonomy, one-sided comparators and centered
+  closure before projection under the
+  [accepted benchmark-relative contract](financial/attribution/16-benchmark-relative-return.md#accepted-decision-for-checked-grouped-benchmark-relative-returns).
+
 ### Implementation reconciliation
 
 - **Related scope:** retain the option-bearing CS01/OAS reconciliation above.

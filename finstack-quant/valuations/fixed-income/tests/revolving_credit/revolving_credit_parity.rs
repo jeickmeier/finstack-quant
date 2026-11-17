@@ -43,20 +43,51 @@ mod tests {
                 (2.0, 0.96),
                 (5.0, 0.90),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
-        let fwd_curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+        let fwd_curve = ForwardCurve::builder("USD-SOFR-3M")
             .base_date(base_date)
             .day_count(DayCount::Act360)
             .knots([
-                (0.0, 0.03),
-                (0.25, 0.031),
-                (0.5, 0.032),
-                (1.0, 0.033),
-                (2.0, 0.034),
-                (5.0, 0.035),
+                (0.0, 1.0),
+                (0.125, 0.996225889923667),
+                (0.25, 0.992403996566088),
+                (0.375, 0.988534980047098),
+                (0.5, 0.984619506751733),
+                (0.625, 0.980673572044391),
+                (0.75, 0.976712928203149),
+                (0.875, 0.972737881670257),
+                (1.0, 0.96874873899307),
+                (1.125, 0.964753343891434),
+                (1.25, 0.96075941495148),
+                (1.375, 0.956767070654488),
+                (1.5, 0.952776428916194),
+                (1.625, 0.948787607081793),
+                (1.75, 0.944800721920996),
+                (1.875, 0.940815889623161),
+                (2.0, 0.936833225792477),
+                (2.1875, 0.930874455974773),
+                (2.375, 0.924942747943839),
+                (2.5625, 0.919038067837505),
+                (2.75, 0.91316038106241),
+                (2.9375, 0.907309652300291),
+                (3.125, 0.901485845514268),
+                (3.3125, 0.89568892395513),
+                (3.5, 0.889918850167626),
+                (3.6875, 0.884175585996756),
+                (3.875, 0.878459092594062),
+                (4.0625, 0.872769330423914),
+                (4.25, 0.867106259269804),
+                (4.4375, 0.861469838240635),
+                (4.625, 0.855860025777008),
+                (4.8125, 0.850276779657507),
+                (5.0, 0.844720057004983),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
@@ -64,7 +95,6 @@ mod tests {
             .base_date(base_date)
             .day_count(DayCount::Act360)
             .knots([
-                (0.0, 0.01),  // 100 bp
                 (1.0, 0.012), // 120 bp
                 (2.0, 0.015), // 150 bp
                 (5.0, 0.02),  // 200 bp
@@ -81,9 +111,12 @@ mod tests {
                 ScalarTimeSeries::new(
                     "FIXING:USD-SOFR-3M",
                     (1..=4)
+                        .rev()
                         .map(|days| (base_date - time::Duration::days(days), 0.03))
                         .collect(),
                     None,
+                    finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                    finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
                 )
                 .unwrap(),
             )

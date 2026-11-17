@@ -83,24 +83,23 @@ fn test_valuation_with_negative_rates() {
                 (0.5, 1.01),
                 (1.0, 1.02),
             ])
-            .validation(
-                finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                    allow_non_monotonic: true,
-                    forward_floor: None,
-                },
-            ) // Increasing DFs for negative rates
+            // Increasing DFs for negative rates
             .interp(finstack_quant_core::math::interp::InterpStyle::Linear) // MonotoneConvex doesn't work for increasing DFs
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
     let ctx = MarketContext::new()
         .insert(disc_curve)
         .insert_price(
             UNDERLYING_ID,
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(5_000.0),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(5_000.0)
+                .expect("valid scalar"),
         )
         .insert_price(
             format!("{}-DIVYIELD", UNDERLYING_ID),
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(0.0),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(0.0)
+                .expect("valid scalar"),
         );
     let as_of = curve_base;
 
@@ -302,7 +301,8 @@ fn test_valuation_with_missing_discount_curve_fails_gracefully() {
     let swap = sample_swap(PayReceive::Receive);
     let ctx = MarketContext::new().insert_price(
         UNDERLYING_ID,
-        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(5_000.0),
+        finstack_quant_core::market_data::scalars::MarketScalar::unitless(5_000.0)
+            .expect("valid scalar"),
     );
     let as_of = swap.start_date;
 

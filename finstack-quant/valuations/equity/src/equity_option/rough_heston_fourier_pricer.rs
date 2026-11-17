@@ -125,7 +125,9 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -144,24 +146,50 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let surface = VolSurface::builder("SPX-VOL")
             .expiries(&[1.0])
-            .strikes(&[100.0])
+            .secondary_values(&[100.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.20])
             .build()
             .expect("surface");
         MarketContext::new()
             .insert(curve)
             .insert_surface(surface)
-            .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0))
-            .insert_price("ROUGH_HESTON_V0", MarketScalar::Unitless(0.04))
-            .insert_price("ROUGH_HESTON_KAPPA", MarketScalar::Unitless(2.0))
-            .insert_price("ROUGH_HESTON_THETA", MarketScalar::Unitless(0.04))
-            .insert_price("ROUGH_HESTON_SIGMA_V", MarketScalar::Unitless(0.3))
-            .insert_price("ROUGH_HESTON_RHO", MarketScalar::Unitless(-0.7))
-            .insert_price("ROUGH_HESTON_HURST", MarketScalar::Unitless(0.1))
+            .insert_price(
+                "SPX-SPOT",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "ROUGH_HESTON_V0",
+                MarketScalar::unitless(0.04).expect("valid scalar"),
+            )
+            .insert_price(
+                "ROUGH_HESTON_KAPPA",
+                MarketScalar::unitless(2.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "ROUGH_HESTON_THETA",
+                MarketScalar::unitless(0.04).expect("valid scalar"),
+            )
+            .insert_price(
+                "ROUGH_HESTON_SIGMA_V",
+                MarketScalar::unitless(0.3).expect("valid scalar"),
+            )
+            .insert_price(
+                "ROUGH_HESTON_RHO",
+                MarketScalar::unitless(-0.7).expect("valid scalar"),
+            )
+            .insert_price(
+                "ROUGH_HESTON_HURST",
+                MarketScalar::unitless(0.1).expect("valid scalar"),
+            )
     }
 
     fn option(expiry: Date) -> EquityOption {

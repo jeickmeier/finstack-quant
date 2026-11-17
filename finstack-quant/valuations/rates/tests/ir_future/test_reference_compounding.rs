@@ -11,12 +11,7 @@ use finstack_quant_valuations_rates::ir_future::{FutureContractSpecs, InterestRa
 use time::macros::date;
 
 fn flat_forward(id: &str, as_of: Date, rate: f64, day_count: DayCount) -> ForwardCurve {
-    ForwardCurve::builder(id, 1.0 / 365.0)
-        .base_date(as_of)
-        .day_count(day_count)
-        .knots([(0.0, rate), (1.0, rate)])
-        .build()
-        .expect("forward curve")
+    ForwardCurve::flat(id, as_of, rate, day_count).expect("forward curve")
 }
 
 fn overnight_future(
@@ -74,6 +69,8 @@ fn one_month_sofr_uses_calendar_day_weighted_arithmetic_average() {
             (date!(2025 - 01 - 06), 0.06),
         ],
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .expect("fixings");
     let market = MarketContext::new()
@@ -106,6 +103,8 @@ fn one_month_sofr_carries_the_prior_fixing_when_month_starts_on_weekend() {
         "FIXING:USD-SOFR",
         vec![(date!(2025 - 01 - 31), 0.04), (date!(2025 - 02 - 03), 0.06)],
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .expect("fixings");
     let market = MarketContext::new()
@@ -142,6 +141,8 @@ fn corra_compounds_on_actual_365_with_weekend_weights() {
             (date!(2025 - 01 - 06), 0.06),
         ],
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .expect("fixings");
     let market = MarketContext::new()
@@ -171,9 +172,14 @@ fn seasoned_overnight_future_requires_every_published_fixing() {
         DayCount::Act360,
         FloatingLegCompounding::SimpleAverage,
     );
-    let incomplete =
-        ScalarTimeSeries::new("FIXING:USD-SOFR", vec![(date!(2025 - 01 - 02), 0.04)], None)
-            .expect("fixings");
+    let incomplete = ScalarTimeSeries::new(
+        "FIXING:USD-SOFR",
+        vec![(date!(2025 - 01 - 02), 0.04)],
+        None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+    )
+    .expect("fixings");
     let market = MarketContext::new()
         .insert(flat_forward(curve_id, as_of, 0.05, DayCount::Act360))
         .insert_series(incomplete);
@@ -199,14 +205,34 @@ fn realized_arithmetic_observations_drop_out_of_forward_risk() {
         DayCount::Act360,
         FloatingLegCompounding::SimpleAverage,
     );
-    let fixings =
-        ScalarTimeSeries::new("FIXING:USD-SOFR", vec![(date!(2025 - 01 - 02), 0.04)], None)
-            .expect("fixings");
+    let fixings = ScalarTimeSeries::new(
+        "FIXING:USD-SOFR",
+        vec![(date!(2025 - 01 - 02), 0.04)],
+        None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+    )
+    .expect("fixings");
+    let simple_forward = |rate: f64| {
+        let mon = date!(2025 - 01 - 06);
+        let f0 = 1.0;
+        let f1 = f0 / (1.0 + rate * 3.0 / 360.0);
+        let f2 = f1 / (1.0 + rate * 1.0 / 360.0);
+        ForwardCurve::from_dates(
+            curve_id,
+            as_of,
+            &[(as_of, f0), (mon, f1), (end, f2)],
+            DayCount::Act360,
+            finstack_quant_core::math::interp::InterpStyle::LogLinear,
+            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+        )
+        .expect("simple forward curve")
+    };
     let low = MarketContext::new()
-        .insert(flat_forward(curve_id, as_of, 0.03, DayCount::Act360))
+        .insert(simple_forward(0.03))
         .insert_series(fixings.clone());
     let high = MarketContext::new()
-        .insert(flat_forward(curve_id, as_of, 0.05, DayCount::Act360))
+        .insert(simple_forward(0.05))
         .insert_series(fixings);
 
     let low_rate = future

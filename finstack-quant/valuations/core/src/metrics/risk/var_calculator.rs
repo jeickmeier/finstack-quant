@@ -225,8 +225,10 @@ impl VarResult {
         // losses are negative. Clamp to zero only when the tail quantile is
         // actually a gain (all-profit distributions).
         let p = 1.0 - confidence_level;
-        let var = quantile_sorted(&pnl_distribution, p.clamp(0.0, 1.0)).min(0.0);
-        let expected_shortfall = tail_quantile_mean(&pnl_distribution, p).min(0.0);
+        let var = quantile_sorted(&pnl_distribution, p.clamp(0.0, 1.0))?
+            .unwrap_or(0.0)
+            .min(0.0);
+        let expected_shortfall = tail_quantile_mean(&pnl_distribution, p)?.min(0.0);
 
         // Warn about statistical reliability for small sample sizes
         // With fewer than 20 scenarios, the quantile estimates may be unreliable
@@ -270,12 +272,15 @@ impl VarResult {
 /// hence (with the positive-loss sign convention) `ES >= VaR` always holds.
 ///
 /// `sorted` must be non-empty and sorted ascending; `p` must lie in `(0, 1)`.
-fn tail_quantile_mean(sorted: &[f64], p: f64) -> f64 {
+fn tail_quantile_mean(sorted: &[f64], p: f64) -> Result<f64> {
     let n = sorted.len();
     // Single observation: the quantile function is constant, so its tail mean
     // is that single value.
-    if n <= 1 {
-        return sorted[0];
+    if n == 0 {
+        return Ok(0.0);
+    }
+    if n == 1 {
+        return Ok(sorted[0]);
     }
     let n_minus_1 = (n - 1) as f64;
     let p = p.clamp(0.0, 1.0);
@@ -299,10 +304,10 @@ fn tail_quantile_mean(sorted: &[f64], p: f64) -> f64 {
         let width = (b_h - a_h) / n_minus_1;
         Some(width * 0.5 * (q_a + q_b))
     });
-    let integral = neumaier_sum(segment_area);
+    let integral = neumaier_sum(segment_area)?;
 
     // `p` is strictly positive (confidence_level is validated to (0, 1)).
-    integral / p
+    Ok(integral / p)
 }
 
 /// Calculate historical portfolio VaR and expected shortfall.
@@ -471,9 +476,9 @@ fn calculate_var_full_revaluation(
                 as_of,
                 "Historical VaR",
             )?;
-            acc.add(scenario_amount - base_amount);
+            acc.add(scenario_amount - base_amount)?;
         }
-        Ok(acc.total())
+        acc.get_total()
     };
 
     let pnls =
@@ -633,7 +638,7 @@ fn directional_taylor_pnl(
                     .iter()
                     .position(|v| v.to_bits() == expiry_years.to_bits());
                 let col = surface
-                    .strikes()
+                    .secondary_values()
                     .iter()
                     .position(|v| v.to_bits() == strike.to_bits());
                 let (Some(row), Some(col)) = (row, col) else {
@@ -641,7 +646,7 @@ fn directional_taylor_pnl(
                         "Taylor volatility point ({expiry_years}, {strike}) must exactly match a grid node on '{vol_surface_id}'"
                     )));
                 };
-                let vol = surface.vols()[row * surface.strikes().len() + col];
+                let vol = surface.vols()[row * surface.secondary_values().len() + col];
                 if vol + shift.shift < 0.0 {
                     return Err(finstack_quant_core::Error::Validation(
                         "Taylor volatility scenario would be negative".into(),
@@ -745,9 +750,9 @@ fn calculate_var_taylor(
                     let market = scaled.apply(base_market, provider.as_deref())?;
                     reporting_value(&market)
                 },
-            )?);
+            )?)?;
         }
-        pnls.push(total.total());
+        pnls.push(total.get_total()?);
     }
     VarResult::from_distribution(pnls, config.confidence_level)
 }
@@ -776,6 +781,8 @@ mod tests {
             .base_date(as_of)
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots(vec![(0.0, 1.0), (5.0, 0.85), (10.0, 0.70)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
         Ok(MarketContext::new().insert(curve))
     }
@@ -951,11 +958,12 @@ mod tests {
         }
 
         fn base_value(&self, market: &MarketContext, _as_of: Date) -> Result<Money> {
-            match market.get_price(&self.price_id)? {
-                MarketScalar::Price(m) => Ok(*m),
-                MarketScalar::Unitless(v) => {
-                    Ok(Money::new(*v, self.currency).expect("valid money fixture"))
-                }
+            let scalar = market.get_price(&self.price_id)?;
+            if let Some(m) = scalar.get_price() {
+                Ok(m)
+            } else {
+                let v = scalar.get_unitless().unwrap_or_default();
+                Ok(Money::new(v, self.currency).expect("valid money fixture"))
             }
         }
     }
@@ -1053,11 +1061,11 @@ mod tests {
         let base_market = MarketContext::new()
             .insert_price(
                 "USD-INST",
-                MarketScalar::Price(Money::from((100_i64, Currency::USD))),
+                MarketScalar::price(Money::from((100_i64, Currency::USD))),
             )
             .insert_price(
                 "EUR-INST",
-                MarketScalar::Price(Money::from((100_i64, Currency::EUR))),
+                MarketScalar::price(Money::from((100_i64, Currency::EUR))),
             );
 
         let scenario = MarketScenario::new(
@@ -1104,11 +1112,11 @@ mod tests {
         let base_market = MarketContext::new()
             .insert_price(
                 "USD-INST",
-                MarketScalar::Price(Money::from((100_i64, Currency::USD))),
+                MarketScalar::price(Money::from((100_i64, Currency::USD))),
             )
             .insert_price(
                 "EUR-INST",
-                MarketScalar::Price(Money::from((100_i64, Currency::EUR))),
+                MarketScalar::price(Money::from((100_i64, Currency::EUR))),
             )
             .insert_fx(fx);
 

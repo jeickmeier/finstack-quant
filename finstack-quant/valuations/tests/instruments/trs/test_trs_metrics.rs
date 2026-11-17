@@ -546,9 +546,10 @@ fn test_equity_trs_delta_magnitude_check() {
     let spot_base = 5000.0;
     let spot_bump = 50.0; // $50 = 1% bump
 
-    let market_bumped = market
-        .clone()
-        .insert_price("SPX-SPOT", MarketScalar::Unitless(spot_base + spot_bump));
+    let market_bumped = market.clone().insert_price(
+        "SPX-SPOT",
+        MarketScalar::unitless(spot_base + spot_bump).expect("valid scalar"),
+    );
 
     let npv_base = trs.value(&market, as_of).unwrap();
     let npv_bumped = trs.value(&market_bumped, as_of).unwrap();

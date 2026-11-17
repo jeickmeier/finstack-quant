@@ -427,7 +427,6 @@ fn scenario_pnl_rejects_noncanonical_pv_fallback() {
         operations: Vec::new(),
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let error = finstack_quant_portfolio::scenarios::scenario_pnl(

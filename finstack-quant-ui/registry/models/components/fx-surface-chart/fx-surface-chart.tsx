@@ -35,12 +35,8 @@ export interface FxSurfaceChartProps extends Omit<
     strike: number;
     forward?: number | null;
   }[];
-  /** Initial FX spot for the strike grid, domestic per unit of foreign. Omitted leaves the field empty. */
-  initialSpot?: number;
-  /** Initial continuously compounded domestic rate for the strike grid, as a decimal. */
-  initialDomesticRate?: number;
-  /** Initial continuously compounded foreign rate for the strike grid, as a decimal. */
-  initialForeignRate?: number;
+  /** Initial qualified delivery forward rates aligned with `surface.expiries` (quote per base). Omitted leaves fields empty. */
+  initialDeliveryForwards?: readonly number[];
 }
 const decimal = new RegExp(contracts.decimal.schema.pattern);
 /** Exact typed text as a number; null while the text is empty, incomplete or non-finite. */
@@ -49,26 +45,34 @@ function decimalValue(text: string): number | null {
     ? Number(text)
     : null;
 }
-/** Rust-materialized strike-space grid for the explicit spot and rates; no local conversion. */
+function initialForwardValues(
+  expiries: readonly number[],
+  initial?: readonly number[],
+): string[] {
+  return expiries.map((_, index) => {
+    const value = initial?.[index];
+    return value === undefined ? "" : String(value);
+  });
+}
+
+/** Rust-materialized strike-space grid for the explicit delivery forwards; no local conversion. */
 function FxStrikeGrid(props: FxSurfaceChartProps) {
-  const [spot, setSpot] = useState(String(props.initialSpot ?? ""));
-  const [domesticRate, setDomesticRate] = useState(
-    String(props.initialDomesticRate ?? ""),
+  const [forwardInputs, setForwardInputs] = useState<string[]>(() =>
+    initialForwardValues(props.surface.expiries, props.initialDeliveryForwards),
   );
-  const [foreignRate, setForeignRate] = useState(
-    String(props.initialForeignRate ?? ""),
+  const alignedInputs = useMemo(
+    () => props.surface.expiries.map((_, index) => forwardInputs[index] ?? ""),
+    [props.surface.expiries, forwardInputs],
   );
   const request = useMemo<FxStrikeSurfaceRequest | null>(() => {
-    const inputs = [spot, domesticRate, foreignRate].map(decimalValue);
-    if (inputs.some((value) => value === null)) return null;
-    const [s, d, f] = inputs as number[];
+    if (props.surface.expiries.length === 0) return null;
+    const parsed = alignedInputs.map(decimalValue);
+    if (parsed.some((value) => value === null)) return null;
     return {
       surface: props.surface,
-      spot: s!,
-      domesticRate: d!,
-      foreignRate: f!,
+      deliveryForwards: parsed as number[],
     };
-  }, [props.surface, spot, domesticRate, foreignRate]);
+  }, [props.surface, alignedInputs]);
   const query = useFxStrikeSurface(request);
   const grid = query.data;
   const nodes = useMemo(() => (grid ? surfaceNodes(grid) : []), [grid]);
@@ -77,21 +81,20 @@ function FxStrikeGrid(props: FxSurfaceChartProps) {
     <section aria-label={id} className="space-y-3">
       <h3 className="text-sm font-medium">Strike grid</h3>
       <div className="grid gap-3 sm:grid-cols-3">
-        <DecimalInput
-          label="Spot (domestic per unit of foreign)"
-          value={spot}
-          onValueChange={setSpot}
-        />
-        <DecimalInput
-          label="Domestic rate (continuously compounded decimal)"
-          value={domesticRate}
-          onValueChange={setDomesticRate}
-        />
-        <DecimalInput
-          label="Foreign rate (continuously compounded decimal)"
-          value={foreignRate}
-          onValueChange={setForeignRate}
-        />
+        {props.surface.expiries.map((expiry, index) => (
+          <DecimalInput
+            key={`${index}:${expiry}`}
+            label={`Delivery forward (${expiry}y)`}
+            value={alignedInputs[index] ?? ""}
+            onValueChange={(next) =>
+              setForwardInputs((current) =>
+                props.surface.expiries.map((_, i) =>
+                  i === index ? next : (current[i] ?? ""),
+                ),
+              )
+            }
+          />
+        ))}
       </div>
       <EvaluatedSurfaceStatus
         request={request}
@@ -99,8 +102,8 @@ function FxStrikeGrid(props: FxSurfaceChartProps) {
         data={grid}
         missing={
           <p>
-            Enter a spot and both continuously compounded rates to materialize
-            the strike grid.
+            Enter a delivery forward for every expiry to materialize the strike
+            grid.
           </p>
         }
         pending="Evaluating FX strike grid…"
@@ -113,7 +116,7 @@ function FxStrikeGrid(props: FxSurfaceChartProps) {
             ? surfaceLabels(grid)
             : { expiry: "Expiry (years)", secondary: "Strike", value: "" }
         }
-        description={`Native models.volatility.materializeFxDeltaSurface output at the supplied spot and rates: the returned expiry by strike grid${grid ? ` (interpolation metadata: ${grid.interpolation_mode})` : ""}. Nodes are returned values; no local interpolation or delta-to-strike conversion.`}
+        description={`Native models.volatility.materializeFxDeltaSurface output at the supplied delivery forwards: the returned expiry by strike grid${grid ? ` (interpolation metadata: ${grid.interpolation_mode})` : ""}. Nodes are returned values; no local interpolation or delta-to-strike conversion.`}
         colorDomain={props.colorDomain}
         width={props.width}
         height={props.height}

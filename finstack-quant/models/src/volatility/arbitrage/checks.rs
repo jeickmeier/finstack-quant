@@ -133,7 +133,7 @@ impl ButterflyCheck {
     ///   strike grid; expiries pair positionally with `self.forwards`.
     pub fn check(&self, surface: &VolSurface) -> Vec<ArbitrageViolation> {
         let expiries = surface.expiries();
-        let strikes = surface.strikes();
+        let strikes = surface.secondary_values();
         let mut violations = Vec::new();
 
         if strikes.len() < 3 || self.forwards.is_empty() {
@@ -250,7 +250,7 @@ impl CalendarSpreadCheck {
     ///   strike grid; expiries pair positionally with `self.forwards`.
     pub fn check(&self, surface: &VolSurface) -> Vec<ArbitrageViolation> {
         let expiries = surface.expiries();
-        let strikes = surface.strikes();
+        let strikes = surface.secondary_values();
         let mut violations = Vec::new();
 
         if expiries.len() < 2 || self.forwards.is_empty() {
@@ -336,7 +336,7 @@ impl LocalVolDensityCheck {
     ///   strike grid; expiries pair positionally with `self.forwards`.
     pub fn check(&self, surface: &VolSurface) -> Vec<ArbitrageViolation> {
         let expiries = surface.expiries();
-        let strikes = surface.strikes();
+        let strikes = surface.secondary_values();
         let mut violations = Vec::new();
 
         if expiries.len() < 2
@@ -415,6 +415,9 @@ impl LocalVolDensityCheck {
 mod tests {
     use super::*;
     use crate::volatility::dupire::finite_diff_time;
+    use finstack_quant_core::market_data::surfaces::{
+        VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
+    };
 
     #[test]
     fn time_derivative_holds_log_moneyness_fixed_under_carry() {
@@ -433,7 +436,11 @@ mod tests {
             &expiries,
             &strikes,
             &values,
-            Default::default(),
+            VolGridOpts {
+                secondary_axis: VolSurfaceAxis::Strike,
+                quote_type: VolQuoteType::BlackLognormal,
+                interpolation_mode: VolInterpolationMode::Vol,
+            },
             None,
         )
         .unwrap();
@@ -505,13 +512,20 @@ mod tests {
             &[0.25, 0.5, 1.0, 2.0],
             &[80.0, 90.0, 100.0, 110.0, 120.0],
             &[0.2; 20],
-            Default::default(),
+            VolGridOpts {
+                secondary_axis: VolSurfaceAxis::Strike,
+                quote_type: VolQuoteType::BlackLognormal,
+                interpolation_mode: VolInterpolationMode::Vol,
+            },
             None,
         )
         .unwrap();
         let calendar = VolSurface::builder("CALENDAR-BAD")
             .expiries(&[0.5, 1.0, 2.0])
-            .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
+            .secondary_values(&[80.0, 90.0, 100.0, 110.0, 120.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.30, 0.25, 0.20, 0.25, 0.30])
             .row(&[0.30, 0.25, 0.25, 0.25, 0.30])
             .row(&[0.20, 0.15, 0.15, 0.15, 0.20])
@@ -519,7 +533,10 @@ mod tests {
             .unwrap();
         let butterfly = VolSurface::builder("BUTTERFLY-BAD")
             .expiries(&[0.5, 1.0, 2.0])
-            .strikes(&[70.0, 85.0, 100.0, 115.0, 130.0])
+            .secondary_values(&[70.0, 85.0, 100.0, 115.0, 130.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.20, 0.45, 0.20, 0.45, 0.20])
             .row(&[0.21, 0.46, 0.21, 0.46, 0.21])
             .row(&[0.22, 0.47, 0.22, 0.47, 0.22])
@@ -527,7 +544,10 @@ mod tests {
             .unwrap();
         let smile = VolSurface::builder("SMILE")
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&[80.0, 90.0, 95.0, 100.0, 105.0, 110.0, 120.0])
+            .secondary_values(&[80.0, 90.0, 95.0, 100.0, 105.0, 110.0, 120.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.30, 0.25, 0.22, 0.20, 0.21, 0.23, 0.28])
             .row(&[0.28, 0.24, 0.21, 0.19, 0.20, 0.22, 0.26])
             .row(&[0.26, 0.22, 0.20, 0.18, 0.19, 0.21, 0.24])

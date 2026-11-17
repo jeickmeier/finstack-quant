@@ -242,6 +242,7 @@ fn schedule_rich_swap(index: usize) -> CmsSwap {
                 .expect("valid money fixture"),
             day_count: DayCount::Act360,
             index_id: IndexId::new("USD-SOFR-OIS"),
+            cms_fixing_index_id: None,
             side: if index % 4 == 1 {
                 PayReceive::Pay
             } else {

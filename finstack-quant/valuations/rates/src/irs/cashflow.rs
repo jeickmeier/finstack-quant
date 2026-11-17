@@ -532,9 +532,9 @@ pub(crate) fn fixed_leg_annuity(
             as_of,
             period.payment_date,
         )?;
-        annuity.add(period.accrual_year_fraction * df);
+        annuity.add(period.accrual_year_fraction * df)?;
     }
-    Ok(annuity.total())
+    annuity.get_total()
 }
 
 #[cfg(test)]
@@ -562,11 +562,13 @@ mod tests {
         irs.float_leg.day_count = DayCount::Act360;
         irs.float_leg.calendar_id = Some("weekends_only".into());
         irs.float_leg.fixing_calendar_id = Some("weekends_only".into());
-        let curve = ForwardCurve::builder("TEST-TERM", 0.25)
-            .base_date(date!(2025 - 01 - 01))
-            .knots([(0.0, 0.04), (1.0, 0.04)])
-            .build()
-            .expect("curve");
+        let curve = ForwardCurve::flat(
+            "TEST-TERM",
+            date!(2025 - 01 - 01),
+            0.04,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("curve");
         let market = MarketContext::new().insert(curve);
         let as_of = date!(2025 - 02 - 01);
         assert!(
@@ -577,6 +579,8 @@ mod tests {
                 "FIXING:TEST-TERM",
                 vec![(date!(2025 - 01 - 02), 0.06)],
                 None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
             )
             .expect("fixing"),
         );
@@ -631,6 +635,7 @@ mod tests {
                 .day_count(DayCount::Act365F)
                 .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
                 .interp(InterpStyle::Linear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("discount curve"),
         );
@@ -907,17 +912,12 @@ mod tests {
                     .base_date(as_of)
                     .day_count(DayCount::Act365F)
                     .knots([(0.0, 1.0), (1.0, 0.97)])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount"),
             )
-            .insert(
-                ForwardCurve::builder("USD-SOFR", 1.0 / 360.0)
-                    .base_date(as_of)
-                    .day_count(DayCount::Act360)
-                    .knots([(0.0, 0.0), (1.0, 0.0)])
-                    .build()
-                    .expect("forward"),
-            );
+            .insert(ForwardCurve::flat("USD-SOFR", as_of, 0.0, DayCount::Act360).expect("forward"));
 
         let schedule = float_leg_schedule_with_curves_as_of(&irs, Some(&market), Some(as_of), true)
             .expect("compounded schedule");
@@ -999,6 +999,9 @@ mod tests {
                 (0.25, (-0.08f64 * 0.25).exp()),
                 (1.0, (-0.08f64).exp()),
             ])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 

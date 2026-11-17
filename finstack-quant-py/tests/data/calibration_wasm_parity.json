@@ -201,7 +201,7 @@
       "base_date": "2026-05-08",
       "method": "bootstrap",
       "interpolation": "log_linear",
-      "extrapolation": "flat_forward",
+      "extrapolation": "extend",
       "pricing_discount_id": null,
       "pricing_forward_id": null,
       "conventions": {
@@ -218,7 +218,7 @@
       "base_date": "2026-05-08",
       "method": "bootstrap",
       "interpolation": "linear",
-      "extrapolation": "flat_forward",
+      "extrapolation": "extend",
       "pricing_discount_id": null,
       "pricing_forward_id": null,
       "conventions": {
@@ -233,14 +233,18 @@
       "curve_id": "USD-SOFR-3M",
       "currency": "USD",
       "base_date": "2026-05-08",
-      "tenor_years": 0.25,
+      "index_tenor": {
+        "count": 3,
+        "unit": "months"
+      },
       "discount_curve_id": "USD-OIS",
       "method": {
         "global_solve": {
           "use_analytical_jacobian": false
         }
       },
-      "interpolation": "cubic_hermite",
+      "interpolation": "log_linear",
+      "extrapolation": "extend",
       "conventions": {
         "curve_day_count": null,
         "ois_compounding": null
@@ -258,8 +262,7 @@
       "discount_curve_id": "USD-OIS",
       "recovery_rate": 0.4,
       "notional": 1.0,
-      "method": "bootstrap",
-      "par_interp": "linear"
+      "method": "bootstrap"
     },
     "inflation": {
       "id": "USA-CPI",
@@ -272,6 +275,11 @@
       "index": "USA-CPI-U",
       "observation_lag": "3M",
       "base_cpi": 310.0,
+      "source_base_date": "2024-10-01",
+      "source_base_cpi": 310.0,
+      "day_count": "act_365f",
+      "calendar_id": null,
+      "extrapolation": "extend",
       "notional": 1.0,
       "method": "bootstrap",
       "interpolation": "linear"
@@ -393,12 +401,11 @@
       "domestic_discount_id": "USD-OIS",
       "method": "bootstrap",
       "interpolation": "log_linear",
-      "extrapolation": "flat_forward",
+      "extrapolation": "extend",
       "conventions": {
         "curve_day_count": null,
         "ois_compounding": null
-      },
-      "basis_spread_curve_id": null
+      }
     },
     "parametric": {
       "id": "USD-NS",
@@ -463,7 +470,7 @@
   },
   "step_report": {
     "success": true,
-    "iterations": 13,
+    "iterations": 15,
     "residual_ids": [
       "USD-DEP-3M",
       "USD-SWAP-2Y"

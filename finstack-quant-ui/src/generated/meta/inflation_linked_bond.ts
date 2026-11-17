@@ -1125,37 +1125,37 @@ export default [
   {
     "path": "#/$defs/d_647da623d36ff2b229f7",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json#/$defs/InflationLag",
-    "description": "Contractual observation lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate an observation lag to ensure the reference\nindex is published by settlement. This lag does not specify the actual\npublication date; use [`InflationIndex::with_publication_dates`] for that.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```"
+    "description": "Contractual observation lag for inflation index reference dates.\n\nSpecifies how far before a contractual reference date the historical or\nprojected CPI anchor is sampled. Publication and knowledge cutoffs are\ntracked separately on [`InflationIndex`].\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::months(3);\nlet day_lag = InflationLag::days(90);\nlet no_lag = InflationLag::None;\nassert_eq!(tips_lag.to_string(), \"3M\");\nassert_eq!(day_lag.to_string(), \"90D\");\nassert_eq!(no_lag.to_string(), \"none\");\n```"
   },
   {
     "path": "#/$defs/d_647da623d36ff2b229f7/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json#/$defs/InflationLag/oneOf/0",
-    "description": "Lag by specified number of months.\n\nStandard: 3 months for TIPS and most inflation-linked bonds."
+    "description": "Lag by a strictly positive number of whole calendar months."
   },
   {
     "path": "#/$defs/d_647da623d36ff2b229f7/oneOf/0/properties/months",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json#/$defs/InflationLag/oneOf/0/properties/months",
     "format": "uint8",
     "maximum": 255,
-    "minimum": 0
+    "minimum": 1
   },
   {
     "path": "#/$defs/d_647da623d36ff2b229f7/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json#/$defs/InflationLag/oneOf/1",
-    "description": "Lag by specified number of calendar days.\n\nAlternative specification for non-standard contracts."
+    "description": "Lag by a strictly positive number of literal calendar days."
   },
   {
     "path": "#/$defs/d_647da623d36ff2b229f7/oneOf/1/properties/days",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json#/$defs/InflationLag/oneOf/1/properties/days",
     "format": "uint16",
     "maximum": 65535,
-    "minimum": 0
+    "minimum": 1
   },
   {
     "path": "#/$defs/d_647da623d36ff2b229f7/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json#/$defs/InflationLag/oneOf/2",
     "const": "none",
-    "description": "No lag applied.\n\nUsed for inflation swaps where forecast indices are used."
+    "description": "Zero contractual shift."
   },
   {
     "path": "#/$defs/d_69148dfad1155676d8a6",

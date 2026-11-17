@@ -34,6 +34,8 @@ def _market_and_portfolio() -> tuple[MarketContext, Portfolio]:
             date(2025, 1, 15),
             [(0.0, 1.0), (0.5, 0.975), (1.0, 0.95), (5.0, 0.75), (10.0, 0.55)],
             day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
         )
     )
     bond = {

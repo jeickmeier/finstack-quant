@@ -491,7 +491,6 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
     use time::Month;
 
@@ -530,18 +529,7 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
         CashFlowMeta::default(),
     );
 
-    let curve = DiscountCurve::builder("USD-OIS")
-        .base_date(base)
-        .knots([(0.0, 1.0), (5.0, 1.0)])
-        .interp(InterpStyle::Linear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        )
-        .build()
-        .unwrap();
+    let curve = DiscountCurve::flat("USD-OIS", base, 0.0, DayCount::Act365F).unwrap();
 
     let pv =
         finstack_quant_core::cashflow::npv(&curve, base, &schedule.dated_flows().unwrap(), false)
@@ -561,7 +549,6 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, Period, PeriodId};
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
-    use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
     use time::Month;
 
@@ -607,21 +594,11 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
         is_actual: true,
     }];
 
-    let disc = DiscountCurve::builder("USD-OIS")
-        .base_date(base)
-        .knots([(0.0, 1.0), (5.0, 1.0)])
-        .interp(InterpStyle::Linear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        )
-        .build()
-        .unwrap();
+    let disc = DiscountCurve::flat("USD-OIS", base, 0.0, DayCount::Act365F).unwrap();
 
     let hazard = HazardCurve::builder("USD-HZD")
         .base_date(base)
+        .day_count(DayCount::Act365F)
         .recovery_rate(0.40)
         .knots([(1.0, 0.50)])
         .build()
@@ -649,6 +626,7 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
     // Recovery flow is discounted normally.
     let hazard_zero_recovery = HazardCurve::builder("USD-HZD")
         .base_date(base)
+        .day_count(DayCount::Act365F)
         .recovery_rate(0.0)
         .knots([(1.0, 0.50)])
         .build()

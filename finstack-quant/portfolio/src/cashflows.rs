@@ -233,8 +233,10 @@ impl PortfolioCashflows {
     /// # Arguments
     ///
     /// * `currency` - ISO currency whose kind buckets are summed at each date.
-    #[must_use]
-    pub fn net_in_currency_by_date(&self, currency: Currency) -> Vec<(Date, f64)> {
+    /// # Errors
+    ///
+    /// Returns [`Error::Core`] if summing flows overflows finite `f64` range.
+    pub fn net_in_currency_by_date(&self, currency: Currency) -> Result<Vec<(Date, f64)>> {
         net_by_date(&self.by_date, currency)
     }
 }
@@ -245,20 +247,22 @@ impl PortfolioCashflows {
 fn net_by_date<K>(
     by_date: &IndexMap<Date, IndexMap<Currency, IndexMap<K, Money>>>,
     currency: Currency,
-) -> Vec<(Date, f64)> {
-    by_date
-        .iter()
-        .filter_map(|(date, per_currency)| {
-            let per_kind = per_currency
-                .get(&currency)
-                .filter(|kinds| !kinds.is_empty())?;
-            let mut acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
-            for money in per_kind.values() {
-                acc.add(money.amount());
-            }
-            Some((*date, acc.total()))
-        })
-        .collect()
+) -> Result<Vec<(Date, f64)>> {
+    let mut rows = Vec::new();
+    for (date, per_currency) in by_date {
+        let Some(per_kind) = per_currency
+            .get(&currency)
+            .filter(|kinds| !kinds.is_empty())
+        else {
+            continue;
+        };
+        let mut acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
+        for money in per_kind.values() {
+            acc.add(money.amount())?;
+        }
+        rows.push((*date, acc.get_total()?));
+    }
+    Ok(rows)
 }
 
 /// Classified totals keyed by payment date, currency and an opaque kind label.
@@ -313,7 +317,7 @@ pub fn net_in_currency_by_date_json(
             }
         }
     }
-    let mut rows = net_by_date(&by_date, currency);
+    let mut rows = net_by_date(&by_date, currency)?;
     rows.sort_by_key(|row| row.0);
     Ok(rows
         .into_iter()
@@ -511,9 +515,7 @@ mod tests {
     use crate::test_utils::build_test_market_at;
     use crate::types::Entity;
     use finstack_quant_core::cashflow::CFKind;
-    use finstack_quant_core::market_data::term_structures::{
-        DiscountCurve, HazardCurve, ValidationMode,
-    };
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::types::{Attributes, CurveId};
@@ -860,7 +862,8 @@ mod tests {
                 .base_date(as_of)
                 .currency(Currency::USD)
                 .recovery_rate(0.40)
-                .knots([(0.0, 0.02), (5.0, 0.02)])
+                .knots([(5.0, 0.02)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .expect("hazard curve should build"),
         );
@@ -1030,10 +1033,8 @@ mod tests {
             .base_date(as_of)
             .knots(vec![(0.0, 1.0), (1.0, df_1y)])
             .interp(InterpStyle::Linear)
-            .validation(ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            })
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("test discount curve should build")
     }

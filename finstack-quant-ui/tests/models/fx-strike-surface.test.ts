@@ -31,9 +31,7 @@ beforeAll(async () => {
 afterAll(async () => worker?.close());
 const request: FxStrikeSurfaceRequest = {
   surface: fxQuotes,
-  spot: 1.1,
-  domesticRate: 0.04,
-  foreignRate: 0.03,
+  deliveryForwards: [1.105, 1.11],
 };
 function direct(request: FxStrikeSurfaceRequest) {
   const surface = native.FxDeltaVolSurface.fromJson(
@@ -42,9 +40,7 @@ function direct(request: FxStrikeSurfaceRequest) {
   try {
     const grid = native.materializeFxDeltaSurface(
       surface,
-      request.spot,
-      request.domesticRate,
-      request.foreignRate,
+      request.deliveryForwards,
     );
     try {
       return JSON.parse(grid.toJson());
@@ -55,15 +51,18 @@ function direct(request: FxStrikeSurfaceRequest) {
     surface.free();
   }
 }
-it("returns the native strike-space surface JSON after every quote, spot and rate change and frees both handles", async () => {
+it("returns the native strike-space surface JSON after every quote and delivery-forward change and frees both handles", async () => {
   const variants: FxStrikeSurfaceRequest[] = [request];
   for (const key of ["atm_vols", "rr_25d", "bf_25d"] as const) {
     const r = structuredClone(request);
     r.surface[key][1] += 0.001;
     variants.push(r);
   }
-  for (const key of ["spot", "domesticRate", "foreignRate"] as const)
-    variants.push({ ...request, [key]: request[key] + 0.01 });
+  for (let i = 0; i < request.deliveryForwards.length; i++) {
+    const next = [...request.deliveryForwards];
+    next[i]! += 0.01;
+    variants.push({ ...request, deliveryForwards: next });
+  }
   variants.push({
     ...request,
     surface: { ...fxQuotes, rr_10d: [0.02, 0.025], bf_10d: [0.008, 0.009] },
@@ -82,7 +81,7 @@ it("returns the native strike-space surface JSON after every quote, spot and rat
     // The returned JSON is the canonical stored grid the surface views read.
     expect(grid.secondary_axis).toBe("strike");
     expect(surfaceNodes(grid)).toHaveLength(
-      grid.expiries.length * grid.strikes.length,
+      grid.expiries.length * grid.secondary_values.length,
     );
   }
   const after = await resources();
@@ -95,9 +94,10 @@ it("retains native constructor and materialization failures and frees the quote 
   const before = await resources();
   const invalid: FxStrikeSurfaceRequest[] = [
     { ...request, surface: { ...fxQuotes, rr_10d: [0.02, 0.025] } },
-    { ...request, spot: -1 },
-    { ...request, spot: 0 },
-    { ...request, domesticRate: NaN },
+    { ...request, deliveryForwards: [-1, 1.11] },
+    { ...request, deliveryForwards: [0, 1.11] },
+    { ...request, deliveryForwards: [NaN, 1.11] },
+    { ...request, deliveryForwards: [1.105] },
   ];
   for (const r of invalid) {
     let error;
@@ -114,10 +114,10 @@ it("retains native constructor and materialization failures and frees the quote 
   }
   const after = await resources();
   // The constructor rejects the unpaired 10-delta wing before a handle exists;
-  // the three spot/rate failures happen in materialization, after construction,
-  // so no strike-space handle is ever returned.
-  expect(after.fxConstructed - before.fxConstructed).toBe(3);
-  expect(after.fxFreed - before.fxFreed).toBe(3);
+  // the four delivery-forward failures happen in materialization, after
+  // construction, so no strike-space handle is ever returned.
+  expect(after.fxConstructed - before.fxConstructed).toBe(4);
+  expect(after.fxFreed - before.fxFreed).toBe(4);
   expect(after.gridConstructed - before.gridConstructed).toBe(0);
 });
 it("snapshots the complete request and disables a missing one", async () => {
@@ -131,7 +131,7 @@ it("snapshots the complete request and disables a missing one", async () => {
   const mutable = structuredClone(request),
     options = fxStrikeSurfaceOptions(client, 1, mutable);
   mutable.surface.atm_vols[0] = 0.3;
-  (mutable as { spot: number }).spot = 1.2;
+  (mutable.deliveryForwards as number[])[0] = 1.2;
   const cache = new QueryClient();
   try {
     expect(await cache.fetchQuery(options)).toEqual(direct(request));

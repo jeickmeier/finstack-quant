@@ -12,7 +12,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
@@ -59,6 +61,8 @@ fn create_market() -> MarketContext {
             (5.0, 0.80),
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -67,7 +71,11 @@ fn create_market() -> MarketContext {
         &[0.25, 0.5, 1.0, 2.0],
         &[80.0, 90.0, 100.0, 110.0, 120.0],
         &[0.25; 20], // Flat 25% vol
-        Default::default(),
+        VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
+            interpolation_mode: VolInterpolationMode::Vol,
+        },
         None,
     )
     .unwrap();
@@ -77,9 +85,12 @@ fn create_market() -> MarketContext {
         .insert_surface(vol_surface)
         .insert_price(
             "EQUITY-SPOT",
-            MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
         )
-        .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(0.02))
+        .insert_price(
+            "EQUITY-DIVYIELD",
+            MarketScalar::unitless(0.02).expect("valid scalar"),
+        )
 }
 
 fn create_barrier_option() -> BarrierOption {
@@ -123,6 +134,8 @@ fn create_barrier_market() -> MarketContext {
             (5.0, 0.80),
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let vol_surface = VolSurface::from_grid(
@@ -130,7 +143,11 @@ fn create_barrier_market() -> MarketContext {
         &[0.25, 0.5, 1.0, 2.0],
         &[80.0, 90.0, 100.0, 110.0, 120.0],
         &[0.25; 20],
-        Default::default(),
+        VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
+            interpolation_mode: VolInterpolationMode::Vol,
+        },
         None,
     )
     .unwrap();
@@ -140,9 +157,12 @@ fn create_barrier_market() -> MarketContext {
         .insert_surface(vol_surface)
         .insert_price(
             "SPX",
-            MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
         )
-        .insert_price("SPX_DIV", MarketScalar::Unitless(0.02))
+        .insert_price(
+            "SPX_DIV",
+            MarketScalar::unitless(0.02).expect("valid scalar"),
+        )
 }
 
 fn bench_option_pv(c: &mut Criterion) {

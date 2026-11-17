@@ -21,6 +21,8 @@ fn simple_discount_curve(id: &str, as_of: finstack_quant_core::dates::Date) -> D
         .base_date(as_of)
         .knots([(0.0, 1.0), (5.0, 0.9)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -39,9 +41,47 @@ fn simple_fixed_bond(as_of: finstack_quant_core::dates::Date) -> Bond {
 }
 
 fn simple_forward_curve(id: &str, as_of: finstack_quant_core::dates::Date) -> ForwardCurve {
-    ForwardCurve::builder(id, 0.25)
+    ForwardCurve::builder(id)
         .base_date(as_of)
-        .knots(vec![(0.5, 0.04), (5.0, 0.045), (10.0, 0.05)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (0.5, 0.980198673306755),
+            (0.78125, 0.969190642154843),
+            (1.0625, 0.958222013252738),
+            (1.34375, 0.947294257757767),
+            (1.625, 0.936408819398875),
+            (1.90625, 0.925567114284795),
+            (2.1875, 0.914770530726466),
+            (2.46875, 0.904020429073654),
+            (2.75, 0.893318141565682),
+            (3.03125, 0.882664972196188),
+            (3.3125, 0.872062196591816),
+            (3.59375, 0.861511061904742),
+            (3.875, 0.85101278671892),
+            (4.15625, 0.840568560969936),
+            (4.4375, 0.830179545878352),
+            (4.71875, 0.819846873896397),
+            (5.0, 0.809571648667887),
+            (5.3125, 0.798227744511339),
+            (5.625, 0.786965937854089),
+            (5.9375, 0.775787254371116),
+            (6.25, 0.764692681039293),
+            (6.5625, 0.753683166304304),
+            (6.875, 0.742759620263856),
+            (7.1875, 0.731922914866853),
+            (7.5, 0.721173884128187),
+            (7.8125, 0.710513324358785),
+            (8.125, 0.699941994410566),
+            (8.4375, 0.689460615935943),
+            (8.75, 0.679069873661504),
+            (9.0625, 0.668770415675498),
+            (9.375, 0.658562853728759),
+            (9.6875, 0.648447763548691),
+            (10.0, 0.63842568516592),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -194,6 +234,7 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
         .day_count(DayCount::Act360)
         .knots([(0.0, 1.0), (5.0, 0.9)])
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve should build");
     let market = MarketContext::new().insert(disc.clone());
@@ -643,6 +684,9 @@ fn seasoned_asw_keeps_full_next_coupon_and_inverts_on_same_basis() {
         DiscountCurve::builder("D")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 1.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap(),
     );

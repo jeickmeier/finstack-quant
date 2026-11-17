@@ -2,6 +2,10 @@
 // JSON wire shape only; runtime constraints remain in the schema.
 
 /**
+ * Opaque string identifier.
+ */
+export type Id = string;
+/**
  * Additive spread over the CMS rate in basis points (10 = 10bp).
  */
 export type Decimal = string;
@@ -24,17 +28,17 @@ export type DayCount =
   | "act_act_afb"
   | "bus_252";
 /**
- * Discount curve ID for present value calculations.
+ * Opaque string identifier.
  */
-export type Id = string;
+export type Id1 = string;
 /**
  * ISO 8601 calendar date string.
  */
 export type Date = string;
 /**
- * Forward/projection curve ID for CMS rate projection.
+ * Opaque string identifier.
  */
-export type Id1 = string;
+export type Id2 = string;
 /**
  * Day count convention used to calculate period year fractions.
  */
@@ -92,17 +96,13 @@ export type DayCount2 =
   | "act_act_afb"
   | "bus_252";
 /**
- * Forward curve for floating rate projection.
+ * Opaque string identifier.
  */
-export type Id2 = string;
+export type Id3 = string;
 /**
  * Additive spread over the floating index in basis points (10 = 10bp).
  */
 export type Decimal2 = string;
-/**
- * Unique instrument identifier.
- */
-export type Id3 = string;
 /**
  * Opaque string identifier.
  */
@@ -440,18 +440,23 @@ export interface D_3Dbd4A1Aab74E98Eef06 {
    */
   cms_cap?: number | null;
   /**
+   * Explicit CMS benchmark fixing identifier used for historical fixings
+   * (`FIXING:<cms_fixing_index_id>`), distinct from `forward_curve_id` and `index_id`.
+   */
+  cms_fixing_index_id?: Id | null;
+  /**
    * Optional floor on the CMS rate (decimal).
    */
   cms_floor?: number | null;
   cms_spread_bp?: Decimal;
   cms_tenor: Tenor;
   day_count: DayCount;
-  discount_curve_id: Id;
+  discount_curve_id: Id1;
   /**
    * Fixing dates for CMS rate observations.
    */
   fixing_dates: Date[];
-  forward_curve_id: Id1;
+  forward_curve_id: Id2;
   /**
    * Funding leg definition (fixed or floating).
    */
@@ -467,7 +472,7 @@ export interface D_3Dbd4A1Aab74E98Eef06 {
       }
     | {
         day_count: DayCount2;
-        forward_curve_id: Id2;
+        forward_curve_id: Id3;
         /**
          * Funding accrual, reset and payment schedule, in chronological order.
          */
@@ -475,12 +480,12 @@ export interface D_3Dbd4A1Aab74E98Eef06 {
         spread_bp: Decimal2;
         type: "floating";
       };
-  id: Id3;
+  id: Id4;
   /**
    * Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).
    * Required for USD CMS; legacy contracts must name their legacy index explicitly.
    */
-  index_id?: Id4 | null;
+  index_id?: Id | null;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   metric_pricing_overrides?: MetricPricingOverrides;
   notional: Money;

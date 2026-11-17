@@ -344,6 +344,8 @@ fn test_accrued_interest_amortizing_schedule_driven() {
         .base_date(issue)
         .knots([(0.0, 1.0), (3.0, 0.9)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let curves = MarketContext::new().insert(disc);

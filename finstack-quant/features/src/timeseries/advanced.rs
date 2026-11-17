@@ -70,12 +70,12 @@ pub(super) fn rolling_rank_value(current: Option<f64>, sample: &mut [f64]) -> Op
     Some(pos as f64 / (sample.len() - 1) as f64)
 }
 
-pub(super) fn skewness(values: &[f64]) -> Option<f64> {
+pub(super) fn skewness(values: &[f64]) -> Result<Option<f64>> {
     let n = values.len();
     if n < 3 {
-        return None;
+        return Ok(None);
     }
-    let (_, centered) = scaled_centered(values);
+    let (_, centered) = scaled_centered(values)?;
     let (sum_sq, sum_cubed) = centered
         .iter()
         .fold((0.0, 0.0), |(sum_sq, sum_cubed), value| {
@@ -83,19 +83,21 @@ pub(super) fn skewness(values: &[f64]) -> Option<f64> {
         });
     let sample_var = sum_sq / (n - 1) as f64;
     if sample_var <= 0.0 {
-        return Some(0.0);
+        return Ok(Some(0.0));
     }
     let sample_std = sample_var.sqrt();
     let n = n as f64;
-    Some((n / ((n - 1.0) * (n - 2.0))) * sum_cubed / sample_std.powi(3))
+    Ok(Some(
+        (n / ((n - 1.0) * (n - 2.0))) * sum_cubed / sample_std.powi(3),
+    ))
 }
 
-pub(super) fn excess_kurtosis(values: &[f64]) -> Option<f64> {
+pub(super) fn excess_kurtosis(values: &[f64]) -> Result<Option<f64>> {
     let n = values.len();
     if n < 4 {
-        return None;
+        return Ok(None);
     }
-    let (_, centered) = scaled_centered(values);
+    let (_, centered) = scaled_centered(values)?;
     let (sum_sq, sum_fourth) = centered
         .iter()
         .fold((0.0, 0.0), |(sum_sq, sum_fourth), value| {
@@ -104,26 +106,28 @@ pub(super) fn excess_kurtosis(values: &[f64]) -> Option<f64> {
         });
     let sample_var = sum_sq / (n - 1) as f64;
     if sample_var <= 0.0 {
-        return Some(0.0);
+        return Ok(Some(0.0));
     }
     let n = n as f64;
     let g2_leading = n * (n + 1.0) / ((n - 1.0) * (n - 2.0) * (n - 3.0));
     let g2_correction = 3.0 * (n - 1.0).powi(2) / ((n - 2.0) * (n - 3.0));
-    Some(g2_leading * sum_fourth / sample_var.powi(2) - g2_correction)
+    Ok(Some(
+        g2_leading * sum_fourth / sample_var.powi(2) - g2_correction,
+    ))
 }
 
-pub(super) fn rolling_slope(values: &[Option<f64>], indices: &[usize]) -> Option<f64> {
+pub(super) fn rolling_slope(values: &[Option<f64>], indices: &[usize]) -> Result<Option<f64>> {
     let pairs: Vec<_> = indices
         .iter()
         .enumerate()
         .filter_map(|(pos, &idx)| finite(values[idx]).map(|value| (pos as f64, value)))
         .collect();
     if pairs.len() < 2 {
-        return None;
+        return Ok(None);
     }
     let x_mean = pairs.iter().map(|(pos, _)| pos).sum::<f64>() / pairs.len() as f64;
     let (scale, centered) =
-        scaled_centered(&pairs.iter().map(|(_, value)| *value).collect::<Vec<_>>());
+        scaled_centered(&pairs.iter().map(|(_, value)| *value).collect::<Vec<_>>())?;
     let (cov, var) =
         pairs
             .iter()
@@ -133,19 +137,21 @@ pub(super) fn rolling_slope(values: &[Option<f64>], indices: &[usize]) -> Option
                 (cov + x * value, var + x * x)
             });
     if var <= 0.0 {
-        Some(0.0)
+        Ok(Some(0.0))
     } else {
-        Some((cov / var) * scale)
+        Ok(Some((cov / var) * scale))
     }
 }
 
-pub(super) fn rolling_sharpe(values: &[f64], risk_free: f64) -> Option<f64> {
-    let mean = mean(values)?;
-    match sample_std(values) {
+pub(super) fn rolling_sharpe(values: &[f64], risk_free: f64) -> Result<Option<f64>> {
+    let Some(mean) = mean(values)? else {
+        return Ok(None);
+    };
+    Ok(match sample_std(values)? {
         Some(std) if std > 0.0 => Some((mean - risk_free) / std),
         Some(_) => Some(0.0),
         None => None,
-    }
+    })
 }
 
 pub(super) fn hampel_value(

@@ -31,7 +31,7 @@
         "base_date": "2026-05-08",
         "method": "bootstrap",
         "interpolation": "linear",
-        "extrapolation": "flat_forward",
+        "extrapolation": "extend",
         "pricing_discount_id": null,
         "pricing_forward_id": null,
         "conventions": {
@@ -50,8 +50,7 @@
         "discount_curve_id": "USD-OIS",
         "recovery_rate": 0.4,
         "notional": 1.0,
-        "method": "bootstrap",
-        "par_interp": "linear"
+        "method": "bootstrap"
       }
     ],
     "settings": {}

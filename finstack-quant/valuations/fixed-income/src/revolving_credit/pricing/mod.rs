@@ -63,6 +63,8 @@ mod tests {
                 (1.0, (-0.03f64).exp()),
                 (5.0, (-0.03f64 * 5.0).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("should succeed");
 
@@ -135,6 +137,8 @@ mod tests {
                 (1.0, (-0.03f64).exp()),
                 (5.0, (-0.03f64 * 5.0).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("should succeed");
 

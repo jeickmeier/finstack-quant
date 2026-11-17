@@ -373,8 +373,8 @@ def compute() -> dict[str, Any]:
     }
 
     profile = im_profile_from_simm(calculator, sens, "USD", linear, [1.0, 2.0, 4.0])
-    discount = DiscountCurve.flat("USD-OIS", date(2025, 1, 1), 0.03)
-    hazard = HazardCurve.flat("BANK", date(2025, 1, 1), 0.02, 0.4)
+    discount = DiscountCurve.flat("USD-OIS", date(2025, 1, 1), 0.03, "act_365f")
+    hazard = HazardCurve.flat("BANK", date(2025, 1, 1), 0.02, 0.4, "act_365f")
     spreads = [(0.0, 50.0), (5.0, 80.0)]
     out["mva"] = {
         "profile": _wire(profile),

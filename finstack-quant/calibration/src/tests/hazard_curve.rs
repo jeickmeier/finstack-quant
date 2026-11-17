@@ -38,6 +38,8 @@ fn create_test_discount_curve(base: Date) -> DiscountCurve {
             (10.0, 0.75),
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -138,7 +140,6 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
                 notional: 1.0,
                 method: CalibrationMethod::Bootstrap,
 
-                par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                 doc_clause: Some("isda_as".to_string()),
                 cds_valuation_convention: None,
             }),
@@ -369,7 +370,10 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
                 curve.knot_points().collect::<Vec<_>>()
             );
         } else {
-            assert!(direct.hazard_rate(first_tenor) > curve.hazard_rate(first_tenor));
+            assert!(
+                direct.hazard_rate(first_tenor).expect("valid")
+                    > curve.hazard_rate(first_tenor).expect("valid")
+            );
         }
     }
 
@@ -391,8 +395,8 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
         None,
     )
     .expect("down replay");
-    assert!(up.hazard_rate(3.0) > zero.hazard_rate(3.0));
-    assert!(down.hazard_rate(3.0) < zero.hazard_rate(3.0));
+    assert!(up.hazard_rate(3.0).expect("valid") > zero.hazard_rate(3.0).expect("valid"));
+    assert!(down.hazard_rate(3.0).expect("valid") < zero.hazard_rate(3.0).expect("valid"));
 }
 
 #[test]
@@ -442,7 +446,6 @@ fn hazard_calibration_rejects_zero_spread() {
                 notional: 1.0,
                 method: CalibrationMethod::Bootstrap,
 
-                par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                 doc_clause: None,
                 cds_valuation_convention: None,
             }),
@@ -516,7 +519,6 @@ fn hazard_calibration_rejects_negative_spread() {
                 notional: 1.0,
                 method: CalibrationMethod::Bootstrap,
 
-                par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                 doc_clause: None,
                 cds_valuation_convention: None,
             }),
@@ -588,7 +590,6 @@ fn hazard_calibration_rejects_non_standard_upfront_running_coupon() {
                 notional: 1.0,
                 method: CalibrationMethod::Bootstrap,
 
-                par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                 doc_clause: None,
                 cds_valuation_convention: None,
             }),
@@ -696,7 +697,6 @@ fn hazard_calibration_handles_extreme_high_spread() {
                 notional: 1.0,
                 method: CalibrationMethod::Bootstrap,
 
-                par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                 doc_clause: None,
                 cds_valuation_convention: None,
             }),
@@ -827,7 +827,6 @@ fn hazard_calibration_global_solve_sqrt_time_is_not_rougher_than_bootstrap() {
                 notional: 1.0,
                 method: CalibrationMethod::Bootstrap,
 
-                par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                 doc_clause: None,
                 cds_valuation_convention: None,
             }),
@@ -881,7 +880,6 @@ fn hazard_calibration_global_solve_sqrt_time_is_not_rougher_than_bootstrap() {
                     use_analytical_jacobian: false,
                 },
 
-                par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                 doc_clause: None,
                 cds_valuation_convention: None,
             }),
@@ -981,7 +979,6 @@ fn hazard_calibration_reprices_par_spread() {
                 notional: 1.0,
                 method: CalibrationMethod::Bootstrap,
 
-                par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                 doc_clause: None,
                 cds_valuation_convention: None,
             }),

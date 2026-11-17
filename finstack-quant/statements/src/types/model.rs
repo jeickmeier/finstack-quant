@@ -1037,10 +1037,12 @@ mod period_timeline_tests {
             .expect("Receive swaps are supported");
     }
 
-    /// A bond plus a prepayment rung is rejected: this engine rebuilds loan
-    /// schedules, and bond coupons stay on original face.
+    /// A bond can use the default waterfall. Explicit prepayment requires an
+    /// engine that can rebuild the instrument's schedule after each prepayment.
     #[test]
-    fn bond_plus_sweep_in_priority_of_payments_is_rejected() {
+    fn bond_accepts_default_waterfall_and_rejects_explicit_sweep() {
+        use crate::capital_structure::{EcfSweepSpec, PaymentPriority, WaterfallSpec};
+
         let bond = Bond::fixed(
             finstack_quant_core::types::InstrumentId::new("BOND-SWEEP"),
             finstack_quant_core::money::Money::from((
@@ -1058,7 +1060,11 @@ mod period_timeline_tests {
             PeriodId::quarter(2025, 1).expect("valid period fixture"),
             true,
         )]);
-        model.capital_structure = Some(CapitalStructureSpec {
+        let default_waterfall: WaterfallSpec =
+            serde_json::from_value(serde_json::json!({ "available_cash_node": "cash" }))
+                .expect("waterfall with omitted payment order");
+        assert_eq!(default_waterfall, WaterfallSpec::default());
+        let mut capital = CapitalStructureSpec {
             debt_instruments: vec![DebtInstrumentSpec {
                 id: "BOND-SWEEP".to_string(),
                 spec: FinancialStatementInstrument::Bond(bond),
@@ -1066,22 +1072,31 @@ mod period_timeline_tests {
             meta: IndexMap::new(),
             reporting_currency: None,
             fx_policy: None,
-            waterfall: Some(crate::capital_structure::WaterfallSpec {
-                priority_of_payments: crate::capital_structure::default_priority_of_payments(),
-                available_cash_node: "cash".into(),
-                ecf_sweep: Some(crate::capital_structure::EcfSweepSpec {
-                    ebitda_node: "ebitda".into(),
-                    taxes_node: None,
-                    capex_node: None,
-                    working_capital_node: None,
-                    cash_interest_node: None,
-                    sweep_percentage: 0.5,
-                    target_instrument_id: None,
-                }),
-                pik_toggle: None,
-                ..Default::default()
+            waterfall: Some(default_waterfall.clone()),
+        };
+        capital
+            .validate()
+            .expect("a bond can use the default scheduled-payment waterfall");
+        capital.waterfall = Some(WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Amortization,
+                PaymentPriority::Sweep,
+                PaymentPriority::Equity,
+            ],
+            ecf_sweep: Some(EcfSweepSpec {
+                ebitda_node: "ebitda".into(),
+                taxes_node: None,
+                capex_node: None,
+                working_capital_node: None,
+                cash_interest_node: None,
+                sweep_percentage: 0.5,
+                target_instrument_id: None,
             }),
+            ..default_waterfall
         });
+        model.capital_structure = Some(capital);
         let err = model
             .validate_semantics()
             .expect_err("Bond + Sweep must be a build error");

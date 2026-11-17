@@ -43,12 +43,8 @@ fn make_curve(id: &str, knots: &[(f64, f64)]) -> DiscountCurve {
         .base_date(base_date())
         .knots(knots.to_vec())
         .interp(InterpStyle::Linear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        )
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }

@@ -145,7 +145,7 @@ fn triangular_weight(t: f64, prev: Option<f64>, target: f64, next: Option<f64>) 
         None if t <= target => return 1.0,
         Some(p) if t <= p => return 0.0,
         Some(p) if t <= target => {
-            let denom = (target - p).max(1e-10);
+            let denom = target - p;
             return (t - p) / denom;
         }
         _ => {}
@@ -155,7 +155,7 @@ fn triangular_weight(t: f64, prev: Option<f64>, target: f64, next: Option<f64>) 
         None => 1.0,
         Some(n) => {
             if t < n {
-                let denom = (n - target).max(1e-10);
+                let denom = n - target;
                 (n - t) / denom
             } else {
                 0.0
@@ -496,15 +496,23 @@ impl BumpSpec {
         supported: &str,
     ) -> crate::Result<(f64, bool)> {
         self.validate()?;
-        self.resolve_standard_values().ok_or_else(|| {
-            crate::InputError::UnsupportedBump {
-                reason: format!(
-                    "{context} {supported}, got {:?}/{:?}",
-                    self.mode, self.units
-                ),
-            }
-            .into()
-        })
+        let (raw, is_multiplicative) =
+            self.resolve_standard_values()
+                .ok_or_else(|| crate::InputError::UnsupportedBump {
+                    reason: format!(
+                        "{context} {supported}, got {:?}/{:?}",
+                        self.mode, self.units
+                    ),
+                })?;
+        let eq = crate::math::interp::exact_f64_eq;
+        if !raw.is_finite() || (!eq(self.value, 0.0) && eq(raw, 0.0)) {
+            return Err(crate::Error::Validation(format!(
+                "{context} bump value {} underflowed to zero after unit normalization",
+                self.value
+            )));
+        }
+        let normalized = if eq(raw, 0.0) { 0.0 } else { raw };
+        Ok((normalized, is_multiplicative))
     }
 
     /// Additive shift (decimal fraction) of a bump that `context` can only
@@ -527,7 +535,7 @@ impl BumpSpec {
         match self.units {
             BumpUnits::RateBp => id_bump_bp(id.as_str(), self.value),
             BumpUnits::Percent => id_bump_pct(id.as_str(), self.value),
-            _ => CurveId::new(format!("{}_bump_{:.4}", id, self.value)),
+            _ => CurveId::new(format!("{}_bump_{}", id, format_bump_magnitude(self.value))),
         }
     }
 
@@ -535,24 +543,211 @@ impl BumpSpec {
         match self.units {
             BumpUnits::RateBp => id_spread_bp(id.as_str(), self.value),
             BumpUnits::Percent => id_bump_pct(id.as_str(), self.value),
-            BumpUnits::Fraction => CurveId::new(format!("{}_shift_{:.4}", id, self.value)),
-            BumpUnits::Factor => CurveId::new(format!("{}_shift_factor_{:.4}", id, self.value)),
+            BumpUnits::Fraction => CurveId::new(format!(
+                "{}_shift_{}",
+                id,
+                format_bump_magnitude(self.value)
+            )),
+            BumpUnits::Factor => CurveId::new(format!(
+                "{}_shift_factor_{}",
+                id,
+                format_bump_magnitude(self.value)
+            )),
         }
     }
 }
 
-/// Unified bump description spanning curves, surfaces, FX, and scalar prices.
+/// Canonical family-typed identifier for an addressable entry in
+/// [`MarketContext`](crate::market_data::context::MarketContext).
+///
+/// Identifiers in `MarketContext` are namespace-local: the same `CurveId` may
+/// coexist across distinct stores (for example a `VolSurface` and a
+/// `ScalarTimeSeries`). `MarketDataTarget` pairs an exact [`CurveId`] with the
+/// exact store and subkind to select without multi-store probing.
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(tag = "kind", content = "id", rename_all = "snake_case")]
+pub enum MarketDataTarget {
+    /// Discount curve stored in `curves`.
+    DiscountCurve(CurveId),
+    /// Forward curve stored in `curves`.
+    ForwardCurve(CurveId),
+    /// Parametric yield curve stored in `curves`.
+    ParametricCurve(CurveId),
+    /// Hazard / survival curve stored in `curves`.
+    HazardCurve(CurveId),
+    /// Inflation curve stored in `curves`.
+    InflationCurve(CurveId),
+    /// Forward price curve (`PriceCurveKind::Price`) stored in `curves`.
+    PriceCurve(CurveId),
+    /// Volatility index curve (`PriceCurveKind::VolIndex`) stored in `curves`.
+    VolIndexCurve(CurveId),
+    /// Base correlation curve stored in `curves`.
+    BaseCorrelation(CurveId),
+    /// Implied volatility surface stored in `surfaces`.
+    VolSurface(CurveId),
+    /// Monetary scalar price (`MarketScalar::Price`) stored in `prices`.
+    PriceScalar(CurveId),
+    /// Unitless scalar quote (`MarketScalar::Unitless`) stored in `prices`.
+    UnitlessScalar(CurveId),
+    /// Time series stored in `series`.
+    Series(CurveId),
+}
+
+impl MarketDataTarget {
+    /// Borrow the underlying market identifier.
+    #[must_use]
+    pub fn id(&self) -> &CurveId {
+        match self {
+            Self::DiscountCurve(id)
+            | Self::ForwardCurve(id)
+            | Self::ParametricCurve(id)
+            | Self::HazardCurve(id)
+            | Self::InflationCurve(id)
+            | Self::PriceCurve(id)
+            | Self::VolIndexCurve(id)
+            | Self::BaseCorrelation(id)
+            | Self::VolSurface(id)
+            | Self::PriceScalar(id)
+            | Self::UnitlessScalar(id)
+            | Self::Series(id) => id,
+        }
+    }
+
+    /// Return a human-readable label for this target's family and subkind.
+    #[must_use]
+    pub const fn kind_name(&self) -> &'static str {
+        match self {
+            Self::DiscountCurve(_) => "DiscountCurve",
+            Self::ForwardCurve(_) => "ForwardCurve",
+            Self::ParametricCurve(_) => "ParametricCurve",
+            Self::HazardCurve(_) => "HazardCurve",
+            Self::InflationCurve(_) => "InflationCurve",
+            Self::PriceCurve(_) => "PriceCurve",
+            Self::VolIndexCurve(_) => "VolIndexCurve",
+            Self::BaseCorrelation(_) => "BaseCorrelation",
+            Self::VolSurface(_) => "VolSurface",
+            Self::PriceScalar(_) => "PriceScalar",
+            Self::UnitlessScalar(_) => "UnitlessScalar",
+            Self::Series(_) => "Series",
+        }
+    }
+
+    /// Validate that the target carries a non-blank identifier.
+    pub fn validate(&self) -> crate::Result<()> {
+        if self.id().as_str().trim().is_empty() {
+            return Err(crate::Error::Validation(format!(
+                "{} target id cannot be blank",
+                self.kind_name()
+            )));
+        }
+        Ok(())
+    }
+
+    /// Wrap this typed target and a [`BumpSpec`] into a [`MarketBump`].
+    ///
+    /// # Arguments
+    ///
+    /// * `spec` - Bump mode, units, magnitude, and shape to apply to `self`.
+    #[must_use]
+    pub fn into_bump(self, spec: BumpSpec) -> MarketBump {
+        MarketBump::from_target(self, spec)
+    }
+}
+
+/// Unified typed bump description spanning curves, surfaces, scalars, series, and FX.
 ///
 /// This enum is the heterogeneous input consumed by
 /// [`MarketContext::bump`](crate::market_data::context::MarketContext::bump).
+/// Every variant specifies the exact target family and subkind rather than
+/// probing multiple collections by bare identifier.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum MarketBump {
-    /// Standard curve/surface/price bumps addressed by `CurveId`.
-    Curve {
-        /// Identifier of the curve/surface/price entry.
+    /// Discount curve bump.
+    DiscountCurve {
+        /// Identifier of the discount curve.
         id: CurveId,
-        /// How to bump the entry (parallel/key-rate, additive/multiplicative).
+        /// How to bump the discount curve.
+        spec: BumpSpec,
+    },
+    /// Forward curve bump.
+    ForwardCurve {
+        /// Identifier of the forward curve.
+        id: CurveId,
+        /// How to bump the forward curve.
+        spec: BumpSpec,
+    },
+    /// Parametric yield curve bump.
+    ParametricCurve {
+        /// Identifier of the parametric curve.
+        id: CurveId,
+        /// How to bump the parametric curve.
+        spec: BumpSpec,
+    },
+    /// Hazard curve bump.
+    HazardCurve {
+        /// Identifier of the hazard curve.
+        id: CurveId,
+        /// How to bump the hazard curve.
+        spec: BumpSpec,
+    },
+    /// Inflation curve bump.
+    InflationCurve {
+        /// Identifier of the inflation curve.
+        id: CurveId,
+        /// How to bump the inflation curve.
+        spec: BumpSpec,
+    },
+    /// Forward price curve bump (`PriceCurveKind::Price`).
+    PriceCurve {
+        /// Identifier of the price curve.
+        id: CurveId,
+        /// How to bump the price curve.
+        spec: BumpSpec,
+    },
+    /// Volatility index curve bump (`PriceCurveKind::VolIndex`).
+    VolIndexCurve {
+        /// Identifier of the volatility index curve.
+        id: CurveId,
+        /// How to bump the volatility index curve.
+        spec: BumpSpec,
+    },
+    /// Base correlation curve bump.
+    BaseCorrelation {
+        /// Identifier of the base correlation curve.
+        id: CurveId,
+        /// How to bump the base correlation curve.
+        spec: BumpSpec,
+    },
+    /// Implied volatility surface bump (`surfaces` namespace).
+    VolSurface {
+        /// Identifier of the volatility surface.
+        id: CurveId,
+        /// How to bump the volatility surface.
+        spec: BumpSpec,
+    },
+    /// Monetary scalar price bump (`MarketScalar::Price`).
+    PriceScalar {
+        /// Identifier of the monetary price scalar.
+        id: CurveId,
+        /// How to bump the price scalar.
+        spec: BumpSpec,
+    },
+    /// Unitless scalar quote bump (`MarketScalar::Unitless`).
+    UnitlessScalar {
+        /// Identifier of the unitless scalar.
+        id: CurveId,
+        /// How to bump the unitless scalar.
+        spec: BumpSpec,
+    },
+    /// Time series bump (`series` namespace; historical `FIXING:*` series reject all bumps).
+    Series {
+        /// Identifier of the time series.
+        id: CurveId,
+        /// How to bump the time series.
         spec: BumpSpec,
     },
     /// FX rate percentage shock (positive strengthens the base currency).
@@ -573,11 +768,11 @@ pub enum MarketBump {
     VolBucketPct {
         /// Volatility-surface identifier.
         vol_surface_id: CurveId,
-        /// Optional expiry filters (year fractions).
+        /// Optional exact expiry filters (year fractions).
         expiries: Option<Vec<f64>>,
-        /// Optional strike filters.
-        strikes: Option<Vec<f64>>,
-        /// Percentage change to apply to matching buckets.
+        /// Optional exact secondary-axis coordinate filters (strikes or tenors).
+        secondary_values: Option<Vec<f64>>,
+        /// Percentage change to apply to matching buckets (`factor = 1 + pct / 100 >= 0`).
         pct: f64,
     },
     /// Base correlation bucket bump (additive points).
@@ -591,21 +786,106 @@ pub enum MarketBump {
     },
 }
 
+impl MarketBump {
+    /// Construct a typed `MarketBump` from a [`MarketDataTarget`] and [`BumpSpec`].
+    ///
+    /// # Arguments
+    ///
+    /// * `target` - Typed namespace and identifier of the market object to bump.
+    /// * `spec` - Bump mode, units, magnitude, and shape to apply.
+    #[must_use]
+    pub fn from_target(target: MarketDataTarget, spec: BumpSpec) -> Self {
+        match target {
+            MarketDataTarget::DiscountCurve(id) => Self::DiscountCurve { id, spec },
+            MarketDataTarget::ForwardCurve(id) => Self::ForwardCurve { id, spec },
+            MarketDataTarget::ParametricCurve(id) => Self::ParametricCurve { id, spec },
+            MarketDataTarget::HazardCurve(id) => Self::HazardCurve { id, spec },
+            MarketDataTarget::InflationCurve(id) => Self::InflationCurve { id, spec },
+            MarketDataTarget::PriceCurve(id) => Self::PriceCurve { id, spec },
+            MarketDataTarget::VolIndexCurve(id) => Self::VolIndexCurve { id, spec },
+            MarketDataTarget::BaseCorrelation(id) => Self::BaseCorrelation { id, spec },
+            MarketDataTarget::VolSurface(id) => Self::VolSurface { id, spec },
+            MarketDataTarget::PriceScalar(id) => Self::PriceScalar { id, spec },
+            MarketDataTarget::UnitlessScalar(id) => Self::UnitlessScalar { id, spec },
+            MarketDataTarget::Series(id) => Self::Series { id, spec },
+        }
+    }
+
+    /// Extract the target descriptor and bump spec when this is a target-spec bump.
+    #[must_use]
+    pub fn target_and_spec(&self) -> Option<(MarketDataTarget, &BumpSpec)> {
+        match self {
+            Self::DiscountCurve { id, spec } => {
+                Some((MarketDataTarget::DiscountCurve(id.clone()), spec))
+            }
+            Self::ForwardCurve { id, spec } => {
+                Some((MarketDataTarget::ForwardCurve(id.clone()), spec))
+            }
+            Self::ParametricCurve { id, spec } => {
+                Some((MarketDataTarget::ParametricCurve(id.clone()), spec))
+            }
+            Self::HazardCurve { id, spec } => {
+                Some((MarketDataTarget::HazardCurve(id.clone()), spec))
+            }
+            Self::InflationCurve { id, spec } => {
+                Some((MarketDataTarget::InflationCurve(id.clone()), spec))
+            }
+            Self::PriceCurve { id, spec } => Some((MarketDataTarget::PriceCurve(id.clone()), spec)),
+            Self::VolIndexCurve { id, spec } => {
+                Some((MarketDataTarget::VolIndexCurve(id.clone()), spec))
+            }
+            Self::BaseCorrelation { id, spec } => {
+                Some((MarketDataTarget::BaseCorrelation(id.clone()), spec))
+            }
+            Self::VolSurface { id, spec } => Some((MarketDataTarget::VolSurface(id.clone()), spec)),
+            Self::PriceScalar { id, spec } => {
+                Some((MarketDataTarget::PriceScalar(id.clone()), spec))
+            }
+            Self::UnitlessScalar { id, spec } => {
+                Some((MarketDataTarget::UnitlessScalar(id.clone()), spec))
+            }
+            Self::Series { id, spec } => Some((MarketDataTarget::Series(id.clone()), spec)),
+            Self::FxPct { .. } | Self::VolBucketPct { .. } | Self::BaseCorrBucketPts { .. } => None,
+        }
+    }
+
+    /// Borrow the identifier targeted by this bump, when it addresses a `CurveId` entry.
+    #[must_use]
+    pub fn curve_id(&self) -> Option<&CurveId> {
+        match self {
+            Self::DiscountCurve { id, .. }
+            | Self::ForwardCurve { id, .. }
+            | Self::ParametricCurve { id, .. }
+            | Self::HazardCurve { id, .. }
+            | Self::InflationCurve { id, .. }
+            | Self::PriceCurve { id, .. }
+            | Self::VolIndexCurve { id, .. }
+            | Self::BaseCorrelation { id, .. }
+            | Self::VolSurface { id, .. }
+            | Self::PriceScalar { id, .. }
+            | Self::UnitlessScalar { id, .. }
+            | Self::Series { id, .. } => Some(id),
+            Self::VolBucketPct { vol_surface_id, .. } => Some(vol_surface_id),
+            Self::BaseCorrBucketPts { surface_id, .. } => Some(surface_id),
+            Self::FxPct { .. } => None,
+        }
+    }
+
+    /// Borrow the [`BumpSpec`] when this bump carries one.
+    #[must_use]
+    pub fn spec(&self) -> Option<&BumpSpec> {
+        self.target_and_spec().map(|(_, spec)| spec)
+    }
+}
+
 /// Format a bump magnitude for embedding in a derived curve ID.
 ///
-/// Integral values keep the compact `{:.0}` form (`25bp`, `-10bp`); fractional
-/// values keep one decimal so distinct bumps yield distinct IDs (`0.4bp` vs
-/// `-0.4bp` vs `0bp`). A rounded `-0` is normalized to `0`.
+/// Normalizes `-0.0` to `0.0` and uses Rust's shortest lossless round-trip
+/// decimal representation so distinct bump sizes remain distinguishable.
 #[inline]
 fn format_bump_magnitude(value: f64) -> String {
-    let rounded = value.round();
-    if (value - rounded).abs() < 1e-9 {
-        // Normalize -0.0 so "+0" and "-0" bumps share one ID.
-        let normalized = if rounded == 0.0 { 0.0 } else { rounded };
-        format!("{:.0}", normalized)
-    } else {
-        format!("{:.1}", value)
-    }
+    let normalized = if value == 0.0 { 0.0 } else { value };
+    format!("{normalized}")
 }
 
 #[inline]
@@ -670,19 +950,23 @@ fn validate_triangular_bucket_grid(
             "key-rate target bucket must be finite".to_string(),
         ));
     }
-    if let Some(p) = prev
-        && (!p.is_finite() || p >= target)
-    {
-        return Err(crate::Error::Validation(
-            "key-rate prev bucket must be finite and before the target bucket".to_string(),
-        ));
+    if let Some(p) = prev {
+        let width = target - p;
+        if !p.is_finite() || p >= target || !width.is_finite() || width <= 0.0 {
+            return Err(crate::Error::Validation(
+                "key-rate prev bucket must be finite and have a finite positive width to target"
+                    .to_string(),
+            ));
+        }
     }
-    if let Some(n) = next
-        && (!n.is_finite() || target >= n)
-    {
-        return Err(crate::Error::Validation(
-            "key-rate next bucket must be finite and after the target bucket".to_string(),
-        ));
+    if let Some(n) = next {
+        let width = n - target;
+        if !n.is_finite() || target >= n || !width.is_finite() || width <= 0.0 {
+            return Err(crate::Error::Validation(
+                "key-rate next bucket must be finite and have a finite positive width from target"
+                    .to_string(),
+            ));
+        }
     }
     Ok(())
 }
@@ -825,7 +1109,7 @@ mod tests {
 
     #[test]
     fn test_market_scalar_price_fraction_bump_is_absolute() -> crate::Result<()> {
-        let price = MarketScalar::Price(crate::money::Money::from((
+        let price = MarketScalar::price(crate::money::Money::from((
             100_i64,
             crate::currency::Currency::USD,
         )));
@@ -836,7 +1120,7 @@ mod tests {
             bump_type: BumpType::Parallel,
         })?;
 
-        let MarketScalar::Price(m) = bumped else {
+        let Some(m) = bumped.get_price() else {
             return Err(crate::Error::Validation(
                 "expected MarketScalar::Price result".to_string(),
             ));
@@ -847,32 +1131,39 @@ mod tests {
     }
 
     #[test]
-    fn test_market_scalar_price_percent_bump_is_proportional() -> crate::Result<()> {
-        let price = MarketScalar::Price(crate::money::Money::from((
+    fn test_market_scalar_multiplier_and_percent_rejection() -> crate::Result<()> {
+        let price = MarketScalar::price(crate::money::Money::from((
             100_i64,
             crate::currency::Currency::USD,
         )));
-        let bumped = price.apply_bump(BumpSpec {
-            mode: BumpMode::Additive,
-            units: BumpUnits::Percent,
-            value: 2.5,
-            bump_type: BumpType::Parallel,
-        })?;
+        let bumped = price.apply_bump(BumpSpec::multiplier(1.025))?;
 
-        let MarketScalar::Price(m) = bumped else {
+        let Some(m) = bumped.get_price() else {
             return Err(crate::Error::Validation(
                 "expected MarketScalar::Price result".to_string(),
             ));
         };
         assert!((m.amount() - 102.5).abs() < 1e-12);
+
+        assert!(
+            price
+                .apply_bump(BumpSpec {
+                    mode: BumpMode::Additive,
+                    units: BumpUnits::Percent,
+                    value: 2.5,
+                    bump_type: BumpType::Parallel,
+                })
+                .is_err()
+        );
 
         Ok(())
     }
 
     #[test]
     fn test_forward_curve_bump() -> crate::Result<()> {
-        use crate::dates::Date;
+        use crate::dates::{Date, DayCount, Tenor};
         use crate::market_data::term_structures::ForwardCurve;
+        use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
         use time::Month;
 
         let base = Date::from_calendar_date(2025, Month::January, 1).map_err(|_| {
@@ -882,29 +1173,29 @@ mod tests {
                 day: 1,
             }
         })?;
-        let height_check = 0.04; // rate at 1.0 (knot)
 
-        let fc = ForwardCurve::builder("USD-TEST-3M", 0.25)
+        let fc = ForwardCurve::builder("USD-TEST-3M")
             .base_date(base)
-            .knots([(0.5, 0.038), (1.0, height_check)]) // Minimum 2 points required
+            .day_count(DayCount::Act360)
+            .index_tenor(Tenor::quarterly())
+            .knots([(0.0, 1.0), (1.0, (-0.04_f64).exp())])
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Extend)
             .build()?;
 
-        // 1. Additive RateBp
-        let spec = BumpSpec::parallel_bp(10.0); // +10bps = +0.0010
+        // 1. Additive RateBp shifts continuous zero rate: P_b(1) = P(1) * exp(-0.001)
+        let spec = BumpSpec::parallel_bp(10.0);
         let bumped = fc.apply_bump(spec)?;
-        assert!((bumped.rate(1.0) - 0.0410).abs() < 1e-12);
+        assert!((bumped.df(1.0)? - (-0.0410_f64).exp()).abs() < 1e-12);
 
-        // 2. Additive Percent
-        let spec_pct = BumpSpec::inflation_shift_pct(0.5); // Using helper, treated as Additive Percent
-        // ForwardCurve generic logic handles Additive/Percent -> value/100
-        // So 0.5 -> 0.005. rate = 0.04 + 0.005 = 0.045
+        // 2. Additive Percent (+0.5% = +0.005)
+        let spec_pct = BumpSpec::inflation_shift_pct(0.5);
         let bumped_pct = fc.apply_bump(spec_pct)?;
-        assert!((bumped_pct.rate(1.0) - 0.045).abs() < 1e-12);
+        assert!((bumped_pct.df(1.0)? - (-0.045_f64).exp()).abs() < 1e-12);
 
-        // 3. Multiplicative Factor
-        let spec_mul = BumpSpec::multiplier(1.10); // +10%
-        let bumped_mul = fc.apply_bump(spec_mul)?;
-        assert!((bumped_mul.rate(1.0) - 0.044).abs() < 1e-12);
+        // 3. Multiplicative Factor is rejected on rate factor curves
+        let spec_mul = BumpSpec::multiplier(1.10);
+        assert!(fc.apply_bump(spec_mul).is_err());
 
         Ok(())
     }
@@ -924,16 +1215,16 @@ mod tests {
         })?;
         let hc = HazardCurve::builder("CDS-TEST")
             .base_date(base)
+            .day_count(crate::dates::DayCount::Act365F)
             .recovery_rate(0.40)
             .knots([(1.0, 0.02)]) // lambda = 0.02
             .build()?;
 
-        // Additive RateBp
-        // shift = 10bps / (1 - R) = 0.0010 / 0.6 = 0.001666...
+        // Additive RateBp directly bumps hazard intensity
         let spec = BumpSpec::parallel_bp(10.0);
         let bumped = hc.apply_bump(spec)?;
-        let expected_lambda = 0.02 + (0.0010 / 0.60);
-        assert!((bumped.hazard_rate(1.0) - expected_lambda).abs() < 1e-10);
+        let expected_lambda = 0.02 + 0.0010;
+        assert!((bumped.hazard_rate(1.0)? - expected_lambda).abs() < 1e-10);
 
         // Verify Multiplicative raises error
         let spec_mul = BumpSpec::multiplier(1.10);
@@ -946,9 +1237,8 @@ mod tests {
     fn test_hazard_curve_negative_bump_errors() -> crate::Result<()> {
         // A down-bump that would push a hazard rate negative now fails loudly
         // instead of clamping to zero (clamping made two-sided CS01 silently
-        // asymmetric for tight names) — unified with `bump_in_place`; see
-        //
-        use crate::dates::Date;
+        // asymmetric for tight names) — unified with `bump_in_place`.
+        use crate::dates::{Date, DayCount};
         use crate::market_data::term_structures::HazardCurve;
         use time::Month;
 
@@ -961,6 +1251,7 @@ mod tests {
         })?;
         let hc = HazardCurve::builder("CDS-CLAMP")
             .base_date(base)
+            .day_count(DayCount::Act365F)
             .recovery_rate(0.40)
             .knots([(1.0, 0.0010)])
             .build()?;
@@ -976,8 +1267,9 @@ mod tests {
 
     #[test]
     fn test_discount_curve_bump() -> crate::Result<()> {
-        use crate::dates::Date;
+        use crate::dates::{Date, DayCount};
         use crate::market_data::term_structures::DiscountCurve;
+        use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
         use time::Month;
 
         let base = Date::from_calendar_date(2025, Month::January, 1).map_err(|_| {
@@ -990,6 +1282,9 @@ mod tests {
         // Flat curve: 5% continuously compounded -> DF(1) = exp(-0.05) ≈ 0.951229
         let day_count = DiscountCurve::builder("USD-OIS")
             .base_date(base)
+            .day_count(DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Extend)
             .knots([(0.5, 0.975309912), (1.0, 0.9512294245)]) // Minimum 2 points
             .build()?;
 
@@ -998,13 +1293,13 @@ mod tests {
         let bumped = day_count.apply_bump(spec)?;
         // New rate = 5% + 1% = 6%
         // DF(1) = exp(-0.06) ≈ 0.9417645336
-        assert!((bumped.df(1.0) - 0.9417645336).abs() < 1e-8);
+        assert!((bumped.df(1.0)? - 0.9417645336).abs() < 1e-8);
 
         // 2. Additive Percent (New capability!)
         // 1% additive bump (same as 100bp)
         let spec_pct = BumpSpec::inflation_shift_pct(1.0);
         let bumped_pct = day_count.apply_bump(spec_pct)?;
-        assert!((bumped_pct.df(1.0) - 0.9417645336).abs() < 1e-8);
+        assert!((bumped_pct.df(1.0)? - 0.9417645336).abs() < 1e-8);
 
         // 3. Verify Multiplicative raises error
         let spec_mul = BumpSpec::multiplier(1.10);

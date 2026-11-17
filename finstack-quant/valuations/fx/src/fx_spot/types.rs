@@ -200,7 +200,7 @@ impl FxSpot {
                     self.id
                 )));
             };
-            let calendar = resolve_joint_calendar(Some(base), Some(quote))?;
+            let calendar = resolve_joint_calendar(base, quote)?;
             crate::shared::spot_date_from_lag(as_of, settlement_days, calendar)
         }
     }
@@ -696,6 +696,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (2.0, (-rate * 2.0_f64).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new().insert(curve);

@@ -536,42 +536,44 @@ pub fn chi_squared_quantile(p: f64, df: f64) -> crate::Result<f64> {
     }
     let lower_tail = p <= 0.5;
     let log_probability = if lower_tail { p.ln() } else { (-p).ln_1p() };
-    let residual = |log_x: f64| {
+    let residual = |log_x: f64| -> crate::Result<f64> {
         let value = if lower_tail {
-            chi_squared_log_cdf(shape, log_x, log_gamma_next) - log_probability
+            chi_squared_log_cdf(shape, log_x, log_gamma_next)? - log_probability
         } else {
             let gamma_x = (log_x - std::f64::consts::LN_2).exp();
             let survival = if gamma_x <= 1.0 {
                 // expm1 retains the complement when the log-CDF is near zero.
-                -chi_squared_log_cdf(shape, log_x, log_gamma_next).exp_m1()
+                -chi_squared_log_cdf(shape, log_x, log_gamma_next)?.exp_m1()
             } else {
-                checked_gamma_ur(shape, gamma_x).unwrap_or(f64::NAN)
+                checked_gamma_ur(shape, gamma_x).map_err(|error| {
+                    crate::Error::Validation(format!(
+                        "Chi-squared upper incomplete gamma failed: {error}"
+                    ))
+                })?
             };
             log_probability - survival.ln()
         };
         // Tail probabilities may underflow at a remote bracket endpoint.
         // Keep their sign without giving Brent an infinite residual.
-        value.clamp(-1_000.0, 1_000.0)
+        Ok(value.clamp(-1_000.0, 1_000.0))
     };
 
     let log_min = f64::from_bits(1).ln() - std::f64::consts::LN_2;
-    if residual(log_min) >= 0.0 {
+    if residual(log_min)? >= 0.0 {
         return Ok(0.0);
     }
     // This conservative upper bound exceeds the largest quantile requested
     // by a representable p < 1, including very small degrees of freedom.
     let log_max = (df + 64.0 * df.sqrt() + 128.0).ln();
-    let log_quantile = BrentSolver::new()
-        .with_tolerance(1e-13)
-        .with_max_iterations(256)
-        .solve_in_bracket(|x| Ok(residual(x)), log_min, log_max)
+    let log_quantile = BrentSolver::new(1e-13, 256)?
+        .solve_in_bracket(residual, log_min, log_max)
         .map_err(|error| {
             crate::Error::Validation(format!(
                 "Chi-squared quantile inversion failed for p={p}, df={df}: {error}"
             ))
         })?;
     let quantile = log_quantile.exp();
-    let final_residual = residual(log_quantile);
+    let final_residual = residual(log_quantile)?;
     if !quantile.is_finite() || !final_residual.is_finite() || final_residual.abs() > 1e-8 {
         return Err(crate::Error::Validation(format!(
             "Chi-squared quantile did not resolve the requested tail for p={p}, df={df}"
@@ -581,7 +583,7 @@ pub fn chi_squared_quantile(p: f64, df: f64) -> crate::Result<f64> {
 }
 
 /// Log CDF evaluated without statrs' near-zero input cutoff.
-fn chi_squared_log_cdf(shape: f64, log_x: f64, log_gamma_next: f64) -> f64 {
+fn chi_squared_log_cdf(shape: f64, log_x: f64, log_gamma_next: f64) -> crate::Result<f64> {
     use statrs::function::gamma::checked_gamma_lr;
 
     let log_gamma_x = log_x - std::f64::consts::LN_2;
@@ -594,17 +596,21 @@ fn chi_squared_log_cdf(shape: f64, log_x: f64, log_gamma_next: f64) -> f64 {
     let shifted = if gamma_x == 0.0 {
         0.0
     } else {
-        checked_gamma_lr(shape + 1.0, gamma_x).unwrap_or(f64::NAN)
+        checked_gamma_lr(shape + 1.0, gamma_x).map_err(|error| {
+            crate::Error::Validation(format!(
+                "Chi-squared lower incomplete gamma failed: {error}"
+            ))
+        })?
     };
     if log_term.is_nan() || !shifted.is_finite() {
-        return f64::NAN;
+        return Ok(f64::NAN);
     }
     if shifted == 0.0 {
-        return log_term.min(0.0);
+        return Ok(log_term.min(0.0));
     }
     let log_shifted = shifted.ln();
     let largest = log_term.max(log_shifted);
-    (largest + ((log_term - largest).exp() + (log_shifted - largest).exp()).ln()).min(0.0)
+    Ok((largest + ((log_term - largest).exp() + (log_shifted - largest).exp()).ln()).min(0.0))
 }
 
 #[cfg(test)]

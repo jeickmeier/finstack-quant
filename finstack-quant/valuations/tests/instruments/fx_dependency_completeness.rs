@@ -30,6 +30,8 @@ fn build_discount_curve(id: &str, rate: f64) -> DiscountCurve {
             (5.0f64, (-rate * 5.0).exp()),
             (10.0f64, (-rate * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("Discount curve construction should succeed")
 }

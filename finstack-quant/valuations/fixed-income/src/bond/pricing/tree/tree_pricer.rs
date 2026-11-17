@@ -717,6 +717,8 @@ mod tests {
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let market = MarketContext::new().insert(discount);

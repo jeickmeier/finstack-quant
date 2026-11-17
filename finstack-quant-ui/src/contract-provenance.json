@@ -68,7 +68,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/composite/composite.schema.json",
-          "sha256": "1f627ef78b8bbbe4472ba87201ea7e25d4e51d2ce1e494e8e3ea6d8760ae2951",
+          "sha256": "8052071d99ed211b86cc75baa7b79e433a44ece990e16b5f4d3e83b9cdf14c70",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -222,7 +222,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/exotics/basket.schema.json",
-          "sha256": "05cb301d5e78d8bf8d6447bf7e64e5b88c8a291c7c5f2898561498d381ed9ff8",
+          "sha256": "dee4846ca210aa05bb3527de0cc077cc4337f9a3ef588c0f8780e4599e503e88",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -320,7 +320,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/inflation_linked_bond.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/fixed_income/inflation_linked_bond.schema.json",
-          "sha256": "10ae27766ed15dceceb309310abd8644d9c2dec3a85e0179ffd6cef7ba0abd8a",
+          "sha256": "dc7b6019be10a8335f08763c389ad746755bb347567623f9c417598f11ca9270",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -460,21 +460,21 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_option.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/cms_option.schema.json",
-          "sha256": "17374f46dc7ebf49e51bb2f3c590ddc0574ba1fc3be030aea1e99579e21ef180",
+          "sha256": "d5a5c27cc47364a1a5510b66b4e098124c2d75f4e464ab781f6af311eea8875b",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_spread_option.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/cms_spread_option.schema.json",
-          "sha256": "03ba7976f0126e056928d858574bd675e8f7d893803af8ac100cc2e69c0ea639",
+          "sha256": "2de450d4d23005600a509dbd801ba79daa21533ccad3d3b1f20d26c62012b91f",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/cms_swap.schema.json",
-          "sha256": "3bfbac26895de2492a97c63c9bc4d689afc261c29269470ff19900d57dd79e8f",
+          "sha256": "7b9d45a075b663b49d38ade4d58ebeafcb25c2afc0f01eb708ff2053a32adc3a",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -495,14 +495,14 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/inflation_cap_floor.schema.json",
-          "sha256": "fcc242d7d30133f54b453f924221517ef074c3a1c2336a936ef222e542c664c2",
+          "sha256": "29c597bbef758987f3661c66f70699ca252f18c4f3dbb7429267a96c5a89b0b9",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/inflation_swap.schema.json",
-          "sha256": "c7353e8a7e7752dfd5a8d415f932dcc5cf4e5fa7f3d8f198081d51aeb612199c",
+          "sha256": "98d45ee4a43e560e3aeaafb9194ccec64c8ccaa929f31460448cd7cd512e485e",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         },
         {
@@ -551,7 +551,7 @@
           "uri": "https://finstack_quant.dev/schemas/instrument/1/rates/yoy_inflation_swap.schema.json",
           "pointer": "#",
           "source": "finstack-quant/valuations/schemas/instruments/1/rates/yoy_inflation_swap.schema.json",
-          "sha256": "41536cc67b135b13d014c5a6b7ceb4dcf1bcb68d9a4c5fd2e0ffe1e675c111eb",
+          "sha256": "838b7e48863eaf50a0b83ad42f03f005dea62c20ef79d784ebec3a133e02ebff",
           "description": "Canonical single-instrument v1 envelope generated from its serde type."
         }
       ]
@@ -565,7 +565,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "5cc11461c7a20458cf1a2b65c81e4ab867c3ed847a5e4b0182d0a28c27a7a0f0",
+          "sha256": "6767df1076d076b52df67f59b625515f80bf9b08d13c5742a669732ea412f84b",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
@@ -579,7 +579,7 @@
           "uri": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
           "pointer": "#",
           "source": "finstack-quant/calibration/schemas/calibration/1/calibration.schema.json",
-          "sha256": "b2a18a18eb96eb1ac51284849622e22fb6b8e6a77a2773bc618ee44890f00910",
+          "sha256": "759ba7e182cdcd64546cd933d6745d8d6a5cf0c7068e93da6583e403652d7f42",
           "description": "Canonical typed calibration request and result envelope."
         }
       ]
@@ -1033,7 +1033,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#/$defs/CurveState",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "bd6df250d6505213354b52c167c7dc385508911b4d7538771e2b0151a1200463",
+          "sha256": "acc1b5a31ef1809d8ce2c95ab0fcea0b2299d917222a059dc1c32246a49b539b",
           "description": "Serializable state representation for any curve type.\n\nProduced when persisting market data snapshots through serde."
         }
       ]
@@ -1270,7 +1270,7 @@
     {
       "id": "fx-strike-grid",
       "route": "returned-surface",
-      "convention": "Returned VolSurface JSON (expiry by strike, Rust quote type and interpolation metadata); spot domestic per unit of foreign and continuously compounded decimal rates are explicit caller input, never defaulted or looked up.",
+      "convention": "Returned VolSurface JSON (expiry by strike, Rust quote type and interpolation metadata); qualified delivery forwards aligned with surface.expiries (quote per base) are explicit caller input, never defaulted or looked up.",
       "api": {
         "name": "models.volatility.materializeFxDeltaSurface",
         "source": "finstack-quant-wasm/pkg/finstack_quant_wasm.d.ts",
@@ -1283,30 +1283,20 @@
             "optional": false
           },
           {
-            "name": "spot",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "domesticRate",
-            "type": "number",
-            "optional": false
-          },
-          {
-            "name": "foreignRate",
-            "type": "number",
+            "name": "deliveryForwards",
+            "type": "NumericArray",
             "optional": false
           }
         ],
         "returns": "VolSurface",
-        "declaration": "/**\n * Materialize an FX delta-quoted surface as an expiry by strike volatility surface.\n * @param surface - `core.FxDeltaVolSurface` handle.\n * @param spot - FX spot rate (domestic per unit of foreign); positive.\n * @param domesticRate - Continuously compounded domestic rate, as a decimal.\n * @param foreignRate - Continuously compounded foreign rate, as a decimal.\n * @returns The strike-space `core.VolSurface` handle.\n *\n * # Errors\n *\n * Throws a `validation` error if an input is non-finite or out of range or a\n * delta-to-strike conversion fails.\n */\nexport function materializeFxDeltaSurface(surface: FxDeltaVolSurface, spot: number, domesticRate: number, foreignRate: number): VolSurface;",
-        "sha256": "da3b4f03fa0c5840ee861acdacfd0a751ad9baa87e009372e7e03f7f69660106"
+        "declaration": "/**\n * Materialize an FX delta-quoted surface as an expiry by strike volatility surface.\n *\n * # Arguments\n *\n * * `surface` - Structurally validated `core.FxDeltaVolSurface` handle.\n * * `delivery_forwards` - Outright FX delivery forwards in quote units per base unit, one positive finite value per surface expiry.\n *\n * # Errors\n *\n * Throws a `TypeError` for mistyped arguments or a `validation` error if\n * `delivery_forwards` length mismatches `surface.expiries`, any forward is\n * non-finite or non-positive, or delta-to-strike conversion fails.\n * @param surface - `core.FxDeltaVolSurface` handle.\n * @param deliveryForwards - Outright FX delivery forwards (quote per unit of base), one positive value per expiry.\n * @returns The strike-space `core.VolSurface` handle.\n * @throws Error - Throws `invalid_type` for mistyped arguments or `validation` when forwards mismatch length, are non-positive, or wing conversion fails.\n */\nexport function materializeFxDeltaSurface(surface: FxDeltaVolSurface, deliveryForwards: NumericArray): VolSurface;",
+        "sha256": "456ae997d4fa9dd7af19e3d1bdb42179aa0c5d859f585461a64c8098fb8aeb97"
       }
     },
     {
       "id": "fx-delta-pillars",
       "route": "typed-array",
-      "convention": "Float64Array: ATM, 25-delta put, 25-delta call annualized decimal vols.",
+      "convention": "Float64Array: ATM, 25-delta put, 25-delta call annualized decimal vols, plus 10-delta put and 10-delta call when 10-delta wings are present.",
       "api": {
         "name": "models.volatility.getFxDeltaPillarVols",
         "source": "finstack-quant-wasm/pkg/finstack_quant_wasm.d.ts",
@@ -1325,8 +1315,8 @@
           }
         ],
         "returns": "Float64Array",
-        "declaration": "/**\n * Return ATM, 25-delta put, and 25-delta call vols at a stored FX expiry.\n *\n * # Arguments\n *\n * * `surface` - Structurally validated data-only FX delta surface.\n * * `expiry_index` - Zero-based stored expiry index.\n *\n * # Errors\n *\n * Throws a JavaScript exception when `expiry_index` is non-finite, fractional,\n * negative, exceeds the wasm32 integer range, or is outside the surface.\n * @param surface - Structurally validated data-only FX delta surface.\n * @param expiryIndex - Zero-based stored expiry index.\n * @returns Three annualized decimal volatilities in ATM, put, call order.\n */\nexport function getFxDeltaPillarVols(surface: FxDeltaVolSurface, expiryIndex: number): Float64Array;",
-        "sha256": "6c90ae1886ed860af0980c7d8519c3f80ce859be27eb6322470b7116a524ef02"
+        "declaration": "/**\n * Return ATM, 25-delta put/call, and optional 10-delta put/call vols at a stored FX expiry.\n *\n * # Arguments\n *\n * * `surface` - Structurally validated data-only FX delta surface.\n * * `expiry_index` - Zero-based stored expiry index.\n *\n * # Errors\n *\n * Throws a JavaScript exception when `expiry_index` is non-finite, fractional,\n * negative, exceeds the wasm32 integer range, or is outside the surface.\n * @param surface - Structurally validated data-only FX delta surface.\n * @param expiryIndex - Zero-based stored expiry index.\n * @returns Three `[atm, put25d, call25d]` annualized decimal volatilities, or five `[atm, put25d, call25d, put10d, call10d]` values when 10-delta wings are present.\n * @throws Error - Throws `invalid_type` for a non-integer `expiryIndex` or `validation` if out of range.\n */\nexport function getFxDeltaPillarVols(surface: FxDeltaVolSurface, expiryIndex: number): Float64Array;",
+        "sha256": "339499a85df9a47bed5369986f890eb0e9d6f2b5b11ebb3dc362aea7205d5177"
       }
     },
     {
@@ -1352,7 +1342,7 @@
           "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
           "pointer": "#",
           "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-          "sha256": "5cc11461c7a20458cf1a2b65c81e4ab867c3ed847a5e4b0182d0a28c27a7a0f0",
+          "sha256": "6767df1076d076b52df67f59b625515f80bf9b08d13c5742a669732ea412f84b",
           "description": "Canonical v1 persisted snapshot of a complete market-data context."
         }
       ]
@@ -1419,7 +1409,7 @@
           "uri": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json",
           "pointer": "#",
           "source": "finstack-quant/scenarios/schemas/scenarios/1/scenario_spec.schema.json",
-          "sha256": "8910dad1e9e75d4a6e179d8f3d19ec3e4af59aef06876e06de16a95340509812",
+          "sha256": "10eaed9e3a3c4ca7fa453eb4b5847da5015bf95ca958f0210ab35f33adbc3e9c",
           "description": "Bare scenario specification: the ordered operations the scenario engine applies."
         }
       ]
@@ -2152,7 +2142,7 @@
           "uri": "https://finstack_quant.dev/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
           "pointer": "#",
           "source": "finstack-quant/portfolio/schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
-          "sha256": "78c88e9e9ad7bdcd7018439b4466a46972d73bb14ab92641f50a9319ecb8bf23",
+          "sha256": "566249d2173268b4896d8c332ab015c0adb12e5e63e446849576f3adadc69210",
           "description": "One scenario's P&L with its provenance, from `scenario_pnl` or `scenario_pnl_batch`."
         }
       ]
@@ -2830,8 +2820,8 @@
     {
       "name": "FxDeltaVolSurface",
       "source": "finstack-quant-wasm/pkg/finstack_quant_wasm.d.ts",
-      "declaration": "/**\n * FX vol surface quoted in **delta space** (ATM, 25-delta RR/BF, optional\n * 10-delta wings).\n *\n * Stores market-standard FX delta quotes (Wystup 2006, Clark 2011). Use\n * `models.volatility` (`getFxDeltaVol`, `getFxDeltaPillarVols`) for\n * evaluation; this type does not convert quotes to strikes itself.\n * The delta convention is **forward delta (premium-unadjusted)**.\n *\n * @example\n * ```typescript\n * import init, { core } from \"finstack-quant-wasm\";\n * await init();\n * const surface = new core.FxDeltaVolSurface(\n *   \"EURUSD-VOL\",\n *   [1],\n *   [0.12],\n *   [0.01],\n *   [0.002]\n * );\n * console.log(surface.id, surface.expiries.length);\n * surface.free();\n * ```\n */\nexport class FxDeltaVolSurface {\n    free(): void;\n    [Symbol.dispose](): void;\n    /**\n     * Deserialize canonical FX delta quotes without reconstructing positional arrays.\n     *\n     * # Arguments\n     *\n     * * `json` - Canonical FxDeltaVolSurface JSON with expiries in years and\n     *   annualized decimal ATM, risk-reversal, and butterfly quotes. Optional\n     *   10-delta wings must occur together; unknown fields are rejected.\n     * @returns A validated FxDeltaVolSurface handle owned by the caller; release it with free().\n     * @throws Error - Throws when JSON is malformed, fields are unknown, or native expiry, quote, or wing validation fails.\n     * @param json - Canonical FxDeltaVolSurface JSON with expiries in years and annualized decimal ATM, risk-reversal, and butterfly quotes. Optional 10-delta wings must occur together; unknown fields are rejected.\n     *\n     * @example\n     * ```typescript\n     * import init, { core } from \"finstack-quant-wasm\";\n     * await init();\n     * const surface = core.FxDeltaVolSurface.fromJson(\n     *   JSON.stringify({\n     *     id: \"EURUSD\",\n     *     expiries: [1],\n     *     atm_vols: [0.12],\n     *     rr_25d: [0.01],\n     *     bf_25d: [0.002],\n     *     rr_10d: null,\n     *     bf_10d: null,\n     *   })\n     * );\n     * console.log(surface.id);\n     * surface.free();\n     * ```\n     */\n    static fromJson(json: JsonInput): FxDeltaVolSurface;\n    /**\n     * Construct an FX delta-quoted vol surface with 25-delta wings.\n     *\n     * Optional `rr10d` / `bf10d` add 10-delta wings for richer wing\n     * interpolation. Omit both (`undefined`/`null`) for a three-point smile;\n     * the Rust constructor rejects one without the other.\n     *\n     * # Arguments\n     * * `id`        - Stable surface identifier.\n     * * `expiries`  - Strictly increasing positive expiry times (years).\n     * * `atm_vols`  - ATM delta-neutral straddle vols per expiry.\n     * * `rr25d`     - 25-delta risk reversal per expiry (call vol − put vol).\n     * * `bf25d`     - 25-delta butterfly per expiry (wing avg − ATM).\n     * * `rr10d`     - Optional 10-delta risk reversal per expiry.\n     * * `bf10d`     - Optional 10-delta butterfly per expiry.\n     *\n     * # Errors\n     *\n     * Throws a JavaScript exception if `rr10d` and `bf10d` are not both present\n     * or both absent; quote arrays are empty or have mismatched lengths;\n     * expiries are not finite, positive, and strictly increasing; ATM vols are\n     * not finite and positive; or any risk reversal or butterfly is non-finite.\n     * @param id - Stable surface identifier.\n     * @param expiries - Strictly increasing positive expiry times (years).\n     * @param atmVols - ATM delta-neutral straddle vols per expiry.\n     * @param rr25d - 25-delta risk reversal per expiry (call vol − put vol).\n     * @param bf25d - 25-delta butterfly per expiry (wing avg − ATM).\n     * @param rr10d - Optional 10-delta risk reversal per expiry.\n     * @param bf10d - Optional 10-delta butterfly per expiry.\n     */\n    constructor(id: string, expiries: NumericArray, atmVols: NumericArray, rr25d: NumericArray, bf25d: NumericArray, rr10d?: NumericArray, bf10d?: NumericArray);\n    /**\n     * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.\n     *\n     * @returns Compact JSON text.\n     * @throws If serialization fails (not expected for a valid surface).\n     */\n    toJson(): string;\n    /**\n     * ATM delta-neutral straddle vols per expiry (decimals).\n     */\n    readonly atmVols: Float64Array;\n    /**\n     * 10-delta butterflies per expiry, or `undefined` without 10-delta wings.\n     */\n    readonly bf10d: Float64Array | undefined;\n    /**\n     * 25-delta butterflies per expiry (wing average minus ATM, decimals).\n     */\n    readonly bf25d: Float64Array;\n    /**\n     * Expiry axis in years.\n     */\n    readonly expiries: Float64Array;\n    /**\n     * Surface identifier.\n     */\n    readonly id: string;\n    /**\n     * 10-delta risk reversals per expiry, or `undefined` without 10-delta wings.\n     */\n    readonly rr10d: Float64Array | undefined;\n    /**\n     * 25-delta risk reversals per expiry (call vol minus put vol, decimals).\n     */\n    readonly rr25d: Float64Array;\n}",
-      "sha256": "3e6c9e00355de0f08c0f2c6b534350e3510f0248e2ceedd77c5f78f92377f650"
+      "declaration": "/**\n * FX vol surface quoted in **delta space** (ATM, 25-delta RR/BF, optional\n * 10-delta wings).\n *\n * Stores market-standard FX delta quotes (Wystup 2006, Clark 2011) on an\n * explicit `BASE/QUOTE` currency pair under the closed profile\n * (`forward_unadjusted`, `delta_neutral_straddle`, `smile`). Use\n * `models.volatility` (`getFxDeltaVol`, `getFxDeltaPillarVols`,\n * `materializeFxDeltaSurface`) for evaluation; this type does not convert\n * quotes to strikes itself.\n *\n * @example\n * ```typescript\n * import init, { core } from \"finstack-quant-wasm\";\n * await init();\n * const surface = new core.FxDeltaVolSurface(\n *   \"EURUSD-VOL\",\n *   \"EUR/USD\",\n *   [1],\n *   [0.12],\n *   [0.01],\n *   [0.002]\n * );\n * console.log(surface.id, surface.pair, surface.quoteType, surface.expiries.length);\n * surface.free();\n * ```\n */\nexport class FxDeltaVolSurface {\n    free(): void;\n    [Symbol.dispose](): void;\n    /**\n     * Deserialize canonical FX delta quotes without reconstructing positional arrays.\n     *\n     * # Arguments\n     *\n     * * `json` - Canonical FxDeltaVolSurface JSON with `pair`, conventions,\n     *   expiries in years, and annualized decimal ATM, risk-reversal, and\n     *   butterfly quotes. Optional 10-delta wings must occur together; unknown\n     *   fields are rejected.\n     * @returns A validated FxDeltaVolSurface handle owned by the caller; release it with free().\n     * @throws Error - Throws when JSON is malformed, fields are unknown, or native expiry, quote, or wing validation fails.\n     * @param json - Canonical FxDeltaVolSurface JSON with `pair`, conventions, expiries in years, and annualized decimal ATM, risk-reversal, and butterfly quotes. Optional 10-delta wings must occur together; unknown fields are rejected.\n     *\n     * @example\n     * ```typescript\n     * import init, { core } from \"finstack-quant-wasm\";\n     * await init();\n     * const surface = core.FxDeltaVolSurface.fromJson(\n     *   JSON.stringify({\n     *     id: \"EURUSD\",\n     *     pair: { base: \"EUR\", quote: \"USD\" },\n     *     delta_convention: \"forward_unadjusted\",\n     *     atm_convention: \"delta_neutral_straddle\",\n     *     butterfly_convention: \"smile\",\n     *     expiries: [1],\n     *     atm_vols: [0.12],\n     *     rr_25d: [0.01],\n     *     bf_25d: [0.002],\n     *     rr_10d: null,\n     *     bf_10d: null,\n     *     expiry_clock: null,\n     *   })\n     * );\n     * console.log(surface.id, surface.pair);\n     * surface.free();\n     * ```\n     */\n    static fromJson(json: JsonInput): FxDeltaVolSurface;\n    /**\n     * Construct an FX delta-quoted vol surface with 25-delta wings and\n     * explicit pair and convention options (Rust `FxDeltaVolSurface::from_params`).\n     *\n     * Optional `options` supplies 10-delta wings (`rr10d`/`bf10d`, which must\n     * appear together), explicit closed-profile convention labels, or an\n     * optional `expiryClock`. Unknown option keys are rejected.\n     *\n     * # Arguments\n     * * `id`       - Non-empty stable surface identifier.\n     * * `pair`     - Currency pair `BASE/QUOTE` (string such as `\"EUR/USD\"`, `[base, quote]` pair, or `{ base, quote }` object; `base != quote`).\n     * * `expiries` - Strictly increasing positive expiry times (years).\n     * * `atm_vols` - Positive ATM delta-neutral straddle vols per expiry (decimal).\n     * * `rr25d`    - 25-delta risk reversal per expiry (call vol − put vol, decimal).\n     * * `bf25d`    - 25-delta butterfly per expiry (wing avg − ATM, decimal).\n     * * `options`  - Optional `FxDeltaVolSurfaceOptions` bag (`rr10d`, `bf10d`, `deltaConvention`, `atmConvention`, `butterflyConvention`, `expiryClock`).\n     *\n     * # Errors\n     *\n     * Throws a `TypeError` for mistyped arguments or a `FinstackError` (kind\n     * `validation`) if `id` is empty, `pair` has identical currencies or an\n     * invalid ISO code, `options` contains unknown keys or unpaired\n     * `rr10d`/`bf10d`, expiry/quote lengths mismatch, or any value violates\n     * domain constraints.\n     * @param id - Non-empty stable surface identifier.\n     * @param pair - Ordered currency pair (`\"EUR/USD\"`, `[base, quote]`, or `CurrencyPair`).\n     * @param expiries - Strictly increasing positive expiry times (years).\n     * @param atmVols - ATM delta-neutral straddle vols per expiry (decimal).\n     * @param rr25d - 25-delta risk reversal per expiry (call vol − put vol, decimal).\n     * @param bf25d - 25-delta butterfly per expiry (wing avg − ATM, decimal).\n     * @param options - Optional 10-delta wings, closed conventions, and expiry clock.\n     */\n    constructor(id: string, pair: CurrencyPairInput, expiries: NumericArray, atmVols: NumericArray, rr25d: NumericArray, bf25d: NumericArray, options?: FxDeltaVolSurfaceOptions | null);\n    /**\n     * Serialize to the canonical JSON wire form accepted by `fromJson` and Python.\n     *\n     * @returns Compact JSON text.\n     * @throws If serialization fails (not expected for a valid surface).\n     */\n    toJson(): string;\n    /**\n     * ATM strike convention (`\"delta_neutral_straddle\"`).\n     */\n    readonly atmConvention: string;\n    /**\n     * ATM delta-neutral straddle vols per expiry (decimals).\n     */\n    readonly atmVols: Float64Array;\n    /**\n     * 10-delta butterflies per expiry, or `undefined` without 10-delta wings.\n     */\n    readonly bf10d: Float64Array | undefined;\n    /**\n     * 25-delta butterflies per expiry (wing average minus ATM, decimals).\n     */\n    readonly bf25d: Float64Array;\n    /**\n     * Butterfly quote convention (`\"smile\"`).\n     */\n    readonly butterflyConvention: string;\n    /**\n     * Forward delta convention (`\"forward_unadjusted\"`).\n     */\n    readonly deltaConvention: string;\n    /**\n     * Expiry axis in years.\n     */\n    readonly expiries: Float64Array;\n    /**\n     * Optional volatility expiry clock, or `undefined` when not configured.\n     */\n    readonly expiryClock: VolatilityClock | undefined;\n    /**\n     * Surface identifier.\n     */\n    readonly id: string;\n    /**\n     * Ordered currency pair (`\"BASE/QUOTE\"`).\n     */\n    readonly pair: string;\n    /**\n     * Output volatility quote type (`\"black_lognormal\"`).\n     */\n    readonly quoteType: string;\n    /**\n     * 10-delta risk reversals per expiry, or `undefined` without 10-delta wings.\n     */\n    readonly rr10d: Float64Array | undefined;\n    /**\n     * 25-delta risk reversals per expiry (call vol minus put vol, decimals).\n     */\n    readonly rr25d: Float64Array;\n}",
+      "sha256": "344ae6202e70892438dbb7acccf43bd8bd3ad7a66d4d5c507db896f7b04896f2"
     },
     {
       "name": "SabrSmile",

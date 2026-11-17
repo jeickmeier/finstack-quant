@@ -60,7 +60,8 @@ fn test_black76_futures_based_pricing() {
     let market = MarketContext::new()
         .insert_price(
             "CL-SPOT",
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
+                .expect("valid scalar"),
         )
         .insert(discount_curve)
         .insert(price_curve)
@@ -121,7 +122,8 @@ fn test_flat_forward_spot_american_close_to_european() {
     let market = MarketContext::new()
         .insert_price(
             "CL-SPOT",
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
+                .expect("valid scalar"),
         )
         .insert(discount_curve)
         .insert(price_curve)
@@ -182,7 +184,8 @@ fn test_spot_bermudan_prices_between_european_and_american() {
     let market = MarketContext::new()
         .insert_price(
             "CL-SPOT",
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
+                .expect("valid scalar"),
         )
         .insert(discount_curve)
         .insert(price_curve)
@@ -256,12 +259,16 @@ fn test_spot_based_american_put_above_european() {
     let market = MarketContext::new()
         .insert_price(
             "CL-SPOT",
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
+                .expect("valid scalar"),
         )
         .insert(discount_curve)
         .insert(price_curve)
         .insert_surface(vol_surface)
-        .insert_price("CL-SPOT", MarketScalar::Unitless(90.0));
+        .insert_price(
+            "CL-SPOT",
+            MarketScalar::unitless(90.0).expect("valid scalar"),
+        );
 
     let build = |style| {
         CommoditySpotOption::builder()
@@ -312,7 +319,8 @@ fn test_post_expiry_returns_zero() {
     let market = MarketContext::new()
         .insert_price(
             "CL-SPOT",
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
+                .expect("valid scalar"),
         )
         .insert(discount_curve)
         .insert(price_curve)
@@ -420,7 +428,8 @@ fn test_at_expiry_returns_intrinsic() {
     let market = MarketContext::new()
         .insert_price(
             "CL-SPOT",
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
+                .expect("valid scalar"),
         )
         .insert(discount_curve)
         .insert(price_curve)
@@ -519,7 +528,8 @@ fn test_put_call_parity_european() {
     let market = MarketContext::new()
         .insert_price(
             "CL-SPOT",
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
+                .expect("valid scalar"),
         )
         .insert(discount_curve)
         .insert(price_curve)
@@ -598,7 +608,9 @@ fn test_put_call_parity_european() {
 /// high strikes should be priced with lower vol than ATM calls.
 #[test]
 fn test_non_flat_vol_surface_skew() {
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
 
     let as_of = date(2025, 1, 1);
     let expiry = date(2025, 7, 1);
@@ -610,8 +622,11 @@ fn test_non_flat_vol_surface_skew() {
     let skew_row = [0.35, 0.30, 0.25, 0.22, 0.20];
 
     let skewed_surface = VolSurface::builder("CL-VOL")
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&expiries)
-        .strikes(&strikes)
+        .secondary_values(&strikes)
         .row(&skew_row)
         .row(&skew_row)
         .row(&skew_row)
@@ -623,7 +638,8 @@ fn test_non_flat_vol_surface_skew() {
     let skewed_market = MarketContext::new()
         .insert_price(
             "CL-SPOT",
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
+                .expect("valid scalar"),
         )
         .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
         .insert(flat_price_curve("CL-FWD", as_of, 80.0, 1.0))
@@ -632,7 +648,8 @@ fn test_non_flat_vol_surface_skew() {
     let flat_market = MarketContext::new()
         .insert_price(
             "CL-SPOT",
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
+                .expect("valid scalar"),
         )
         .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
         .insert(flat_price_curve("CL-FWD", as_of, 80.0, 1.0))

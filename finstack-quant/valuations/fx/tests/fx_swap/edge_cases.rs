@@ -86,6 +86,8 @@ fn test_missing_fx_matrix() {
             .base_date(as_of)
             .knots([(0.0, 1.0), (10.0, 0.9)])
             .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
@@ -94,6 +96,8 @@ fn test_missing_fx_matrix() {
             .base_date(as_of)
             .knots([(0.0, 1.0), (10.0, 0.95)])
             .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
@@ -126,6 +130,8 @@ fn test_missing_fx_matrix_with_contract_rates() {
             .base_date(as_of)
             .knots([(0.0, 1.0), (10.0, 0.9)])
             .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
@@ -134,6 +140,8 @@ fn test_missing_fx_matrix_with_contract_rates() {
             .base_date(as_of)
             .knots([(0.0, 1.0), (10.0, 0.95)])
             .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 

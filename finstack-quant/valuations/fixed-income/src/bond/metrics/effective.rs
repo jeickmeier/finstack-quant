@@ -17,7 +17,7 @@
 
 use crate::bond::Bond;
 use finstack_quant_core::Result;
-use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_core::metrics::{MetricContext, MetricId};
 
@@ -54,14 +54,13 @@ pub(crate) fn effective_duration_convexity(
     }
 
     let curve_id = option_risk_curve_id(&risk_bond);
-    let market_up = context.curves.bump([MarketBump::Curve {
-        id: curve_id.clone(),
-        spec: BumpSpec::parallel_bp(shock_bp),
-    }])?;
-    let market_down = context.curves.bump([MarketBump::Curve {
-        id: curve_id,
-        spec: BumpSpec::parallel_bp(-shock_bp),
-    }])?;
+    let target = context.curves.curve_target(&curve_id)?;
+    let market_up = context
+        .curves
+        .bump([target.clone().into_bump(BumpSpec::parallel_bp(shock_bp))])?;
+    let market_down = context
+        .curves
+        .bump([target.into_bump(BumpSpec::parallel_bp(-shock_bp))])?;
 
     let price_up = context.reprice_instrument_raw(&risk_bond, &market_up, context.as_of)?;
     let price_down = context.reprice_instrument_raw(&risk_bond, &market_down, context.as_of)?;
@@ -130,6 +129,7 @@ mod tests {
     use crate::bond::{Bond, CallPut, CallPutSchedule, CashflowSpec};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};
+    use finstack_quant_core::market_data::bumps::MarketBump;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
     use finstack_quant_core::market_data::traits::Discounting;
@@ -162,6 +162,8 @@ mod tests {
                 (10.0, 0.65),
             ])
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid curve");
         MarketContext::new().insert(disc)
@@ -358,13 +360,13 @@ mod tests {
         let (risk_bond, _) = option_risk_bond_and_base_price(&bond, &context).expect("risk bond");
         let curve_id = option_risk_curve_id(&risk_bond);
         let market_up = market
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::DiscountCurve {
                 id: curve_id.clone(),
                 spec: BumpSpec::parallel_bp(shock_bp),
             }])
             .expect("bump up");
         let market_down = market
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::DiscountCurve {
                 id: curve_id,
                 spec: BumpSpec::parallel_bp(-shock_bp),
             }])
@@ -452,13 +454,13 @@ mod tests {
         let (risk_bond, _) = option_risk_bond_and_base_price(&bond, &context).expect("risk bond");
         let curve_id = option_risk_curve_id(&risk_bond);
         let market_up = market
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::DiscountCurve {
                 id: curve_id.clone(),
                 spec: BumpSpec::parallel_bp(shock_bp),
             }])
             .expect("bump up");
         let market_down = market
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::DiscountCurve {
                 id: curve_id,
                 spec: BumpSpec::parallel_bp(-shock_bp),
             }])
@@ -522,8 +524,10 @@ mod tests {
             }],
             puts: Vec::new(),
         });
-        let market = test_market(as_of)
-            .insert(HazardCurve::flat("ACME-HZD", as_of, 0.02, 0.4).expect("hazard curve"));
+        let market = test_market(as_of).insert(
+            HazardCurve::flat("ACME-HZD", as_of, 0.02, 0.4, DayCount::Act365F)
+                .expect("hazard curve"),
+        );
 
         let context = test_context(&bond, &market, as_of);
         let (risk_bond, base) = option_risk_bond_and_base_price(&bond, &context)

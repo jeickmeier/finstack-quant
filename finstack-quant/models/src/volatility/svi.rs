@@ -425,9 +425,8 @@ pub fn calibrate_svi(
     forward: f64,
     expiry: f64,
 ) -> finstack_quant_core::Result<SviParams> {
-    let solver = finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver::new()
-        .with_tolerance(1e-12)
-        .with_max_iterations(300);
+    let solver =
+        finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver::new(1e-12, 1e-12, 300)?;
     calibrate_svi_with_solver(strikes, vols, forward, expiry, &solver).map(|(params, _)| params)
 }
 
@@ -541,6 +540,7 @@ pub fn calibrate_svi_with_solver(
             let w_model = params.total_variance(k);
             resid[i] = w_model - w_mkt;
         }
+        Ok(())
     };
 
     let x0 = [
@@ -551,17 +551,29 @@ pub fn calibrate_svi_with_solver(
         sigma_init.ln(),
     ];
 
-    let result = solver.solve_least_squares(residuals, &x0, n_points);
-
-    let sol = result.map_err(|e| {
-        finstack_quant_core::Error::Validation(format!("SVI calibration failed: {e}"))
-    })?;
+    let sol = solver
+        .solve_least_squares(residuals, &x0, n_points)
+        .map_err(|e| {
+            finstack_quant_core::Error::Validation(format!("SVI calibration failed: {e}"))
+        })?;
 
     let a = sol.params[0];
     let b = sol.params[1].exp();
     let rho = sol.params[2].tanh();
     let m = sol.params[3];
     let sigma = sol.params[4].exp();
+
+    if !a.is_finite()
+        || !b.is_finite()
+        || !rho.is_finite()
+        || !m.is_finite()
+        || !sigma.is_finite()
+        || sigma <= 0.0
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "SVI calibration produced non-finite or degenerate transformed parameters".to_string(),
+        ));
+    }
 
     let params = SviParams {
         a,
@@ -591,7 +603,7 @@ pub fn calibrate_svi_with_solver(
         rmse_w
     };
 
-    if rmse_vol_approx > MAX_VOL_RMSE {
+    if !rmse_vol_approx.is_finite() || rmse_vol_approx > MAX_VOL_RMSE {
         return Err(finstack_quant_core::Error::Validation(format!(
             "SVI calibration RMSE too high: {rmse_vol_approx:.4} (>{:.2}%)",
             MAX_VOL_RMSE * 100.0
@@ -764,16 +776,17 @@ mod tests {
             })
             .collect();
 
-        let solver = finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver::new()
-            .with_tolerance(1e-12)
-            .with_max_iterations(300);
+        let solver = finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver::new(
+            1e-12, 1e-12, 300,
+        )
+        .expect("valid solver");
         let (calibrated, iterations) =
             calibrate_svi_with_solver(&strikes, &vols, forward, expiry, &solver)
                 .expect("calibration should succeed");
         assert!(iterations > 1 && iterations <= 300);
-        let limited = finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver::new()
-            .with_tolerance(1e-12)
-            .with_max_iterations(1);
+        let limited =
+            finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver::new(1e-12, 1e-12, 1)
+                .expect("valid solver");
         assert!(calibrate_svi_with_solver(&strikes, &vols, forward, expiry, &limited).is_err());
 
         for (&k, &mkt_vol) in strikes.iter().zip(vols.iter()) {

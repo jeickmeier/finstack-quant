@@ -1,31 +1,19 @@
 //! Inflation curve bindings.
 
-use finstack_quant_core::market_data::term_structures::InflationCurve;
-
 use std::sync::Arc;
 
-use finstack_quant_core::math::interp::ExtrapolationPolicy;
-use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::market_data::term_structures::InflationCurve;
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use pyo3::prelude::*;
 
 use super::helpers::{TimePoint, columns_to_dataframe, extract_time_point};
 use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
+use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 
-/// CPI inflation curve for inflation-linked pricing and breakeven analysis.
-///
-/// Stores ``(t, cpi_level)`` knots in years from ``base_date`` as absolute
-/// index levels (e.g. ``300.0``). ``cpi`` accepts a year fraction or a date
-/// (converted with the curve day count by Rust).
-///
-/// Example
-/// -------
-/// >>> from finstack_quant.core.market_data import InflationCurve
-/// >>> curve = InflationCurve("US-CPI", "2025-01-01", 300.0, [(0.0, 300.0), (1.0, 306.0), (2.0, 312.0)])
-/// >>> round(curve.inflation_rate(0.0, 1.0), 4)
-/// 0.02
+#[doc = pydoc!("finstack_quant.core.market_data._curves.inflation", "InflationCurve")]
 #[pyclass(
     name = "InflationCurve",
     module = "finstack_quant.core.market_data",
@@ -34,12 +22,10 @@ use crate::errors::core_to_py;
 )]
 #[derive(Clone)]
 pub struct PyInflationCurve {
-    /// Shared Rust curve.
     pub(crate) inner: Arc<InflationCurve>,
 }
 
 impl PyInflationCurve {
-    /// Build from an existing `Arc<InflationCurve>`.
     pub(crate) fn from_inner(inner: Arc<InflationCurve>) -> Self {
         Self { inner }
     }
@@ -47,175 +33,48 @@ impl PyInflationCurve {
 
 #[pymethods]
 impl PyInflationCurve {
-    /// Construct an inflation curve from CPI knot points.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique curve identifier (e.g. ``"US-CPI"``).
-    /// base_date : datetime.date | str
-    ///     Valuation date anchoring ``t = 0``.
-    /// base_cpi : float
-    ///     Reference CPI level at ``t = 0`` used by ``index_ratio``.
-    ///     Inserted as the zero-time knot if absent; must match any supplied
-    ///     zero-time knot.
-    /// knots : list[tuple[float, float]]
-    ///     ``(time_years, cpi_level)`` pairs; levels must be positive.
-    /// day_count : DayCount | str, optional
-    ///     Day-count convention; default ``"act_365f"``.
-    /// indexation_lag_months : int, optional
-    ///     Indexation lag in months applied by ``cpi_with_lag``; default ``3``.
-    /// interp : str, optional
-    ///     Interpolation style; default ``"log_linear"``.
-    /// extrapolation : str, optional
-    ///     Extrapolation policy; default ``"flat_zero"``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If no knots are given, a knot is non-finite, duplicated or
-    ///     non-positive, base CPI differs from a zero-time knot, or a label is unknown.
-    ///
-    /// Example
-    /// -------
-    /// >>> from finstack_quant.core.market_data import InflationCurve
-    /// >>> curve = InflationCurve("US-CPI", "2025-01-01", 300.0, [(0.0, 300.0), (1.0, 306.0)], indexation_lag_months=2)
-    /// >>> curve.indexation_lag_months
-    /// 2
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.inflation", "InflationCurve.__init__")]
     #[new]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "keyword-only curve options mirror the Rust builder setters"
-    )]
-    #[pyo3(signature = (id, base_date, base_cpi, knots, *, day_count=None, indexation_lag_months=None, interp=None, extrapolation=None))]
+    #[pyo3(signature = (id, base_date, knots, *, day_count, interp, extrapolation, calendar_id=None))]
     fn new(
         id: &str,
         base_date: &Bound<'_, PyAny>,
-        base_cpi: f64,
         knots: Vec<(f64, f64)>,
-        day_count: Option<&Bound<'_, PyAny>>,
-        indexation_lag_months: Option<u32>,
-        interp: Option<&str>,
-        extrapolation: Option<&str>,
+        day_count: &Bound<'_, PyAny>,
+        interp: &str,
+        extrapolation: &str,
+        calendar_id: Option<String>,
     ) -> PyResult<Self> {
-        let mut builder = InflationCurve::builder(id)
+        InflationCurve::builder(id)
             .base_date(py_to_date(base_date)?)
-            .base_cpi(base_cpi)
-            .knots(knots);
-        if let Some(day_count) = day_count {
-            builder = builder.day_count(extract_day_count(day_count)?);
-        }
-        if let Some(months) = indexation_lag_months {
-            builder = builder.indexation_lag_months(months);
-        }
-        if let Some(interp) = interp {
-            builder = builder.interp(interp.parse::<InterpStyle>().map_err(core_to_py)?);
-        }
-        if let Some(extrapolation) = extrapolation {
-            builder = builder.extrapolation(
+            .day_count(extract_day_count(day_count)?)
+            .calendar_id_opt(calendar_id)
+            .knots(knots)
+            .interp(interp.parse::<InterpStyle>().map_err(core_to_py)?)
+            .extrapolation(
                 extrapolation
                     .parse::<ExtrapolationPolicy>()
                     .map_err(core_to_py)?,
-            );
-        }
-        builder
+            )
             .build()
-            .map(|curve| Self {
-                inner: Arc::new(curve),
-            })
+            .map(|curve| Self::from_inner(Arc::new(curve)))
             .map_err(core_to_py)
     }
 
-    /// CPI level at a year fraction or date, without indexation lag.
-    ///
-    /// Parameters
-    /// ----------
-    /// t : float | datetime.date | str
-    ///     Year fraction from ``base_date``, or a date converted with the curve day count.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Absolute CPI index level.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a date precedes ``base_date``.
-    #[pyo3(text_signature = "(self, t)")]
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.inflation", "InflationCurve.cpi")]
     fn cpi(&self, t: &Bound<'_, PyAny>) -> PyResult<f64> {
         match extract_time_point(t)? {
-            TimePoint::Years(t) => Ok(self.inner.cpi(t)),
+            TimePoint::Years(t) => self.inner.cpi(t).map_err(core_to_py),
             TimePoint::Date(d) => self.inner.cpi_on_date(d).map_err(core_to_py),
         }
     }
 
-    /// CPI level at year fraction ``t`` with the configured indexation lag applied.
-    ///
-    /// Parameters
-    /// ----------
-    /// t : float
-    ///     Year fraction from ``base_date``.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    #[pyo3(text_signature = "(self, t)")]
-    fn cpi_with_lag(&self, t: f64) -> f64 {
-        self.inner.cpi_with_lag(t)
-    }
-
-    /// Principal indexation ratio ``cpi_with_lag(t) / base_cpi`` at year fraction ``t``.
-    ///
-    /// No deflation floor is applied.
-    ///
-    /// Parameters
-    /// ----------
-    /// t : float
-    ///     Year fraction from ``base_date``.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``base_cpi`` is not strictly positive.
-    #[pyo3(text_signature = "(self, t)")]
-    fn index_ratio(&self, t: f64) -> PyResult<f64> {
-        self.inner.index_ratio(t).map_err(core_to_py)
-    }
-
-    /// Annualized inflation rate (decimal, CAGR) between ``t1`` and ``t2``.
-    ///
-    /// Parameters
-    /// ----------
-    /// t1 : float
-    ///     Start year fraction.
-    /// t2 : float
-    ///     End year fraction.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Annualized CPI growth as a decimal rate.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If times are non-finite or not increasing, CPI levels are invalid,
-    ///     or the annualized rate is non-finite.
-    #[pyo3(text_signature = "(self, t1, t2)")]
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.inflation", "InflationCurve.inflation_rate")]
     fn inflation_rate(&self, t1: f64, t2: f64) -> PyResult<f64> {
         self.inner.inflation_rate(t1, t2).map_err(core_to_py)
     }
 
-    /// Export knots as a pandas ``DataFrame`` with columns ``t`` (years) and ``cpi``.
-    ///
-    /// Returns
-    /// -------
-    /// pandas.DataFrame
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.inflation", "InflationCurve.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         columns_to_dataframe(
             py,
@@ -226,55 +85,55 @@ impl PyInflationCurve {
         )
     }
 
-    /// Curve identifier string.
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.inflation", "InflationCurve.id")]
     #[getter]
     fn id(&self) -> &str {
         self.inner.id().as_str()
     }
 
-    /// Valuation base date (``datetime.date``).
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.inflation", "InflationCurve.base_date")]
     #[getter]
     fn base_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.base_date())
     }
 
-    /// Day-count convention label (e.g. ``"act_365f"``).
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.inflation", "InflationCurve.day_count")]
     #[getter]
     fn day_count(&self) -> String {
         self.inner.day_count().to_string()
     }
 
-    /// Indexation lag in months.
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.inflation", "InflationCurve.calendar_id")]
     #[getter]
-    fn indexation_lag_months(&self) -> u32 {
-        self.inner.indexation_lag_months()
+    fn calendar_id(&self) -> Option<&str> {
+        self.inner.calendar_id()
     }
 
-    /// Base CPI level at ``t = 0``.
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.inflation", "InflationCurve.base_cpi")]
     #[getter]
     fn base_cpi(&self) -> f64 {
         self.inner.base_cpi()
     }
 
-    /// Knot times in years from ``base_date``, ascending.
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.inflation", "InflationCurve.knots")]
     #[getter]
     fn knots(&self) -> Vec<f64> {
         self.inner.knots().to_vec()
     }
 
-    /// CPI index levels at each knot.
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.inflation", "InflationCurve.cpi_levels")]
     #[getter]
     fn cpi_levels(&self) -> Vec<f64> {
         self.inner.cpi_levels().to_vec()
     }
 
-    /// Interpolation style label (e.g. ``"log_linear"``).
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.inflation", "InflationCurve.interp_style")]
     #[getter]
     fn interp_style(&self) -> String {
         self.inner.interp_style().to_string()
     }
 
-    /// Extrapolation policy label (e.g. ``"flat_forward"``).
+    #[doc = pydoc!("finstack_quant.core.market_data._curves.inflation", "InflationCurve.extrapolation")]
     #[getter]
     fn extrapolation(&self) -> String {
         self.inner.extrapolation().to_string()
@@ -282,15 +141,20 @@ impl PyInflationCurve {
 
     fn __repr__(&self) -> String {
         format!(
-            "InflationCurve(id='{}', base_date='{}', base_cpi={}, knots={}, indexation_lag_months={})",
+            "InflationCurve(id='{}', base_date='{}', base_cpi={}, knots={})",
             self.inner.id().as_str(),
             self.inner.base_date(),
             self.inner.base_cpi(),
             self.inner.knots().len(),
-            self.inner.indexation_lag_months()
         )
     }
 }
 
-wire_methods!(PyInflationCurve, InflationCurve, "InflationCurve", arc);
+wire_methods!(
+    PyInflationCurve,
+    InflationCurve,
+    "InflationCurve",
+    module = "finstack_quant.core.market_data._curves.inflation",
+    arc
+);
 impl_repr_html_via_dataframe!(PyInflationCurve);

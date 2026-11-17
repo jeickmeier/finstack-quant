@@ -183,6 +183,7 @@ mod tests {
                     .base_date(as_of)
                     .recovery_rate(cds.protection_leg.recovery_rate)
                     .knots([(1.0, 0.02), (10.0, 0.03)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
                     .build()
                     .expect("hazard"),
             );

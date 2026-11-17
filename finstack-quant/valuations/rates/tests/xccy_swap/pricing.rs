@@ -464,7 +464,6 @@ fn receive_vs_pay_legs_have_opposite_signs() {
 fn estr_overnight_versus_euribor_float_leg_prices() {
     use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
-    use finstack_quant_core::math::interp::InterpStyle;
 
     let base = d(2025, 1, 2);
     let maturity = d(2026, 1, 2);
@@ -478,12 +477,13 @@ fn estr_overnight_versus_euribor_float_leg_prices() {
         Currency::USD,
     );
 
-    let estr = ForwardCurve::builder("EUR-ESTR-OIS", 1.0 / 365.0)
-        .base_date(base)
-        .knots(vec![(0.0, 0.015), (2.0, 0.015)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap();
+    let estr = ForwardCurve::flat(
+        "EUR-ESTR-OIS",
+        base,
+        0.015,
+        finstack_quant_core::dates::DayCount::Act365F,
+    )
+    .unwrap();
     let market = market_with_fx().insert(estr);
     let pv = swap.value(&market, base).expect("estr xccy pv");
     assert_eq!(pv.currency(), Currency::USD);
@@ -495,7 +495,6 @@ fn mtm_reset_still_emits_notional_rebals_with_overnight_leg() {
     use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
-    use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_valuations_core::instruments::ResettingSide;
 
     let base = d(2025, 1, 2);
@@ -513,12 +512,13 @@ fn mtm_reset_still_emits_notional_rebals_with_overnight_leg() {
         resetting_side: ResettingSide::Leg2,
     });
 
-    let estr = ForwardCurve::builder("EUR-ESTR-OIS", 1.0 / 365.0)
-        .base_date(base)
-        .knots(vec![(0.0, 0.015), (2.0, 0.015)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap();
+    let estr = ForwardCurve::flat(
+        "EUR-ESTR-OIS",
+        base,
+        0.015,
+        finstack_quant_core::dates::DayCount::Act365F,
+    )
+    .unwrap();
     let market = market_with_fx().insert(estr);
     let pv = swap.value(&market, base).expect("mtm overnight pv");
     assert!(pv.amount().is_finite());

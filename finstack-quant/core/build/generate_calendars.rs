@@ -15,12 +15,24 @@ struct CalendarDef {
     id: String,
     name: String,
     ignore_weekends: bool,
+    #[serde(default)]
+    supported_years: Option<SupportedYearsDef>,
     notes: Option<String>,
     comment: Option<String>,
     /// Pinned primary sources for the dated data (record CORE-CONVENTIONS-005).
     #[serde(default)]
     sources: Vec<SourceDef>,
     rules: Vec<RuleDef>,
+}
+
+/// Optional inclusive `(from_year, to_year)` calendar coverage bounds.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SupportedYearsDef {
+    #[serde(default)]
+    from_year: Option<i32>,
+    #[serde(default)]
+    to_year: Option<i32>,
 }
 
 /// One pinned primary source: where it is, which edition, when it was
@@ -235,6 +247,26 @@ impl<'de> Deserialize<'de> for ObservedName {
 }
 
 impl MonthName {
+    fn max_days(self, leap_year: bool) -> u8 {
+        match self {
+            Self::January
+            | Self::March
+            | Self::May
+            | Self::July
+            | Self::August
+            | Self::October
+            | Self::December => 31,
+            Self::April | Self::June | Self::September | Self::November => 30,
+            Self::February => {
+                if leap_year {
+                    29
+                } else {
+                    28
+                }
+            }
+        }
+    }
+
     fn to_rust_code(self) -> &'static str {
         match self {
             Self::January => "Month::January",
@@ -431,6 +463,159 @@ impl RuleDef {
     }
 }
 
+fn is_gregorian_leap_year(year: i32) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+}
+
+fn validate_year_bounds(
+    from_year: Option<i32>,
+    to_year: Option<i32>,
+    context: &str,
+) -> io::Result<()> {
+    if let (Some(from), Some(to)) = (from_year, to_year)
+        && from > to
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("{context}: inverted year bounds from_year={from} > to_year={to}"),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_rule(rule: &RuleDef, context: &str) -> io::Result<()> {
+    match rule {
+        RuleDef::ExactDate {
+            year, month, day, ..
+        } => {
+            let max_day = month.max_days(is_gregorian_leap_year(*year));
+            if !(1..=max_day).contains(day) {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("{context}: invalid exact_date {year}-{month:?}-{day}"),
+                ));
+            }
+        }
+        RuleDef::Fixed {
+            month,
+            day,
+            from_year,
+            to_year,
+            ..
+        } => {
+            let max_day = month.max_days(true);
+            if !(1..=max_day).contains(day) {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("{context}: impossible fixed month/day {month:?}-{day}"),
+                ));
+            }
+            validate_year_bounds(*from_year, *to_year, context)?;
+        }
+        RuleDef::EasterOffset {
+            from_year, to_year, ..
+        } => {
+            validate_year_bounds(*from_year, *to_year, context)?;
+        }
+        RuleDef::NthWeekday {
+            n,
+            from_year,
+            to_year,
+            ..
+        } => {
+            if !((-5..=-1).contains(n) || (1..=5).contains(n)) {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!(
+                        "{context}: invalid nth_weekday ordinal {n} (expected -5..=-1 or 1..=5)"
+                    ),
+                ));
+            }
+            validate_year_bounds(*from_year, *to_year, context)?;
+        }
+        RuleDef::WeekdayShift { month, day, .. } => {
+            let max_day = month.max_days(true);
+            if !(1..=max_day).contains(day) {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("{context}: impossible weekday_shift month/day {month:?}-{day}"),
+                ));
+            }
+        }
+        RuleDef::Span {
+            start,
+            len,
+            from_year,
+            to_year,
+            ..
+        } => {
+            if *len == 0 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("{context}: span rule len must be >= 1"),
+                ));
+            }
+            validate_year_bounds(*from_year, *to_year, context)?;
+            validate_rule(start, context)?;
+        }
+        RuleDef::ChinaBridge {
+            festival,
+            from_year,
+            to_year,
+            ..
+        } => {
+            validate_year_bounds(*from_year, *to_year, context)?;
+            if matches!(
+                festival.as_ref(),
+                RuleDef::Span { .. }
+                    | RuleDef::ChinaBridge { .. }
+                    | RuleDef::HongKongPublicHolidays { .. }
+                    | RuleDef::JapanPublicHolidays { .. }
+            ) {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("{context}: china_bridge festival must be a single-occurrence rule"),
+                ));
+            }
+            validate_rule(festival, context)?;
+        }
+        RuleDef::ChineseNewYear {}
+        | RuleDef::QingMing {}
+        | RuleDef::DragonBoat {}
+        | RuleDef::MidAutumn {}
+        | RuleDef::HongKongPublicHolidays { .. }
+        | RuleDef::JapanPublicHolidays { .. } => {}
+    }
+    Ok(())
+}
+
+fn validate_calendar_def(cal: &CalendarDef, path: &Path) -> io::Result<()> {
+    let context = format!("{} (calendar '{}')", path.display(), cal.id);
+    if cal.name.trim().is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("{context}: calendar name cannot be empty"),
+        ));
+    }
+    if let Some(sy) = cal.supported_years {
+        if sy.from_year.is_none() && sy.to_year.is_none() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("{context}: supported_years must specify from_year and/or to_year"),
+            ));
+        }
+        validate_year_bounds(
+            sy.from_year,
+            sy.to_year,
+            &format!("{context}.supported_years"),
+        )?;
+    }
+    for (idx, rule) in cal.rules.iter().enumerate() {
+        validate_rule(rule, &format!("{context}.rules[{idx}]"))?;
+    }
+    Ok(())
+}
+
 pub(crate) fn generate() -> io::Result<()> {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
     let calendar_dir = Path::new(&manifest_dir).join("data").join("calendars");
@@ -467,6 +652,7 @@ pub(crate) fn generate() -> io::Result<()> {
                     ),
                 ));
             }
+            validate_calendar_def(&cal, &path)?;
             if let Some(previous_path) = calendar_sources.get(&cal.id) {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
@@ -534,14 +720,19 @@ pub(crate) fn generate() -> io::Result<()> {
         } else {
             "pub(crate)"
         };
+        let supported_years_code = match cal.supported_years {
+            Some(sy) => format!("Some(({:?}, {:?}))", sy.from_year, sy.to_year),
+            None => "None".to_string(),
+        };
         output.push_str(&format!(
-            "{} static {}: Calendar = Calendar::new(\n    \"{}\",\n    \"{}\",\n    {},\n    {}_RULES,\n);\n\n",
+            "{} static {}: Calendar = Calendar::new(\n    \"{}\",\n    \"{}\",\n    {},\n    {}_RULES,\n    {},\n);\n\n",
             visibility,
             const_name,
             id,
             cal.name,
             cal.ignore_weekends,
-            const_name
+            const_name,
+            supported_years_code
         ));
     }
 

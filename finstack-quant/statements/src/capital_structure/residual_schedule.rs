@@ -173,13 +173,15 @@ pub(crate) fn rebuild_residual_interest(
                                 original.get_date(),
                                 schedule.get_day_count(),
                                 None,
-                                finstack_quant_core::dates::DayCountContextState {
-                                    calendar_id: None,
-                                    coupon_period: None,
-                                    end_is_termination_date: Some(false),
-                                    frequency: None,
-                                    bus_basis: None,
-                                },
+                                finstack_quant_core::dates::DayCountContextState::try_new(
+                                    None,
+                                    None,
+                                    None,
+                                    (schedule.get_day_count()
+                                        == finstack_quant_core::dates::DayCount::Act365L)
+                                        .then_some((start, original.get_date())),
+                                    Some(false),
+                                )?,
                             )
                         })
                         .transpose()?
@@ -252,7 +254,7 @@ pub(crate) fn rebuild_residual_interest(
                     DayCountContext {
                         end_is_termination_date: accrual
                             .get_context()
-                            .end_is_termination_date
+                            .get_end_is_termination_date()
                             .map(|termination| termination && bounds[1] == accrual.get_end()),
                         ..context
                     },
@@ -275,18 +277,21 @@ pub(crate) fn rebuild_residual_interest(
                 // unsplit rate from a zero principal denominator.
                 flow.rate = Some(rate);
                 flow.accrual_factor = factor;
+                let accrual_ctx = accrual.get_context();
                 flow.accrual = Some(CashFlowAccrual::new(
                     bounds[0],
                     bounds[1],
                     accrual.get_day_count(),
                     accrual.get_projected_index_rate(),
-                    finstack_quant_core::dates::DayCountContextState {
-                        end_is_termination_date: accrual
-                            .get_context()
-                            .end_is_termination_date
+                    finstack_quant_core::dates::DayCountContextState::try_new(
+                        accrual_ctx.get_calendar_id().map(str::to_owned),
+                        accrual_ctx.get_frequency(),
+                        accrual_ctx.get_bus_basis(),
+                        accrual_ctx.get_coupon_period(),
+                        accrual_ctx
+                            .get_end_is_termination_date()
                             .map(|termination| termination && bounds[1] == accrual.get_end()),
-                        ..accrual.get_context().clone()
-                    },
+                    )?,
                 )?);
                 // A PIK row capitalizes exactly its reprojected interest; any
                 // other explicit delta splits with the reprojected cash.

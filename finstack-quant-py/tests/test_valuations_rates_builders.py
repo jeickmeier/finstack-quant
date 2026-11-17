@@ -22,7 +22,6 @@ from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, StubKind, Tenor
 from finstack_quant.core.market_data import (
     DiscountCurve,
-    ForwardCurve,
     HazardCurve,
     MarketContext,
 )
@@ -48,6 +47,7 @@ from finstack_quant.valuations.instruments import (
     list_models_grouped,
     price_instrument,
 )
+from tests.tests_typed_helpers import projection_curve
 
 AS_OF = datetime.date(2025, 1, 15)
 END = datetime.date(2030, 1, 15)
@@ -56,10 +56,10 @@ END = datetime.date(2030, 1, 15)
 def _market() -> MarketContext:
     knots = [(0.0, 0.04), (10.0, 0.045)]
     mc = MarketContext()
-    mc.insert(DiscountCurve.flat("USD-OIS", AS_OF, 0.04))
-    mc.insert(ForwardCurve("USD-SOFR-3M", 0.25, AS_OF, knots))
-    mc.insert(ForwardCurve("USD-SOFR", 1.0 / 360.0, AS_OF, knots))
-    mc.insert(HazardCurve("ACME-HZD", AS_OF, [(0.0, 0.02), (5.0, 0.025)], recovery_rate=0.4))
+    mc.insert(DiscountCurve.flat("USD-OIS", AS_OF, 0.04, "act_365f"))
+    mc.insert(projection_curve("USD-SOFR-3M", AS_OF, knots))
+    mc.insert(projection_curve("USD-SOFR", AS_OF, knots, index_tenor="1D"))
+    mc.insert(HazardCurve("ACME-HZD", AS_OF, [(1.0, 0.02), (5.0, 0.025)], recovery_rate=0.4, day_count="act_365f"))
     return mc
 
 
@@ -777,7 +777,7 @@ def test_bond_builder_quoted_price_drives_ytm_like_the_wire_field() -> None:
     """VALA-001: a quoted clean price set on the builder reaches pricing and the getter."""
     spec = Bond.example().to_dict()
     market = _market()
-    market.insert(DiscountCurve.flat(spec["discount_curve_id"], AS_OF, 0.04))
+    market.insert(DiscountCurve.flat(spec["discount_curve_id"], AS_OF, 0.04, "act_365f"))
     quote = {"market_quotes": {"quoted_clean_price_pct": 99.0}}
 
     def builder() -> BondBuilder:

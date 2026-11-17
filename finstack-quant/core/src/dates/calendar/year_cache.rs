@@ -153,10 +153,12 @@ pub(super) fn count_business_days_cached(
     end: Date,
 ) -> crate::Result<i32> {
     reject_reversed(start, end)?;
+    cal.check_supported_year(start.year())?;
     if start == end {
         return Ok(0);
     }
     let last = end - Duration::days(1);
+    cal.check_supported_year(last.year())?;
     if start.year() < BASE_YEAR || last.year() > END_YEAR {
         return count_business_days_by_scan(cal, start, end);
     }
@@ -235,8 +237,13 @@ mod tests {
 
     #[test]
     fn year_bits_match_rule_scan_for_high_rule_calendars() {
-        for cal in [&SSE, &BSE, &NYSE, &TARGET2] {
-            for year in [2024, 2025, 2028] {
+        for (cal, years) in [
+            (&SSE, [2024, 2025, 2028]),
+            (&BSE, [2024, 2025, 2026]),
+            (&NYSE, [2024, 2025, 2028]),
+            (&TARGET2, [2024, 2025, 2028]),
+        ] {
+            for year in years {
                 for ordinal in 1_u16..=366 {
                     let Some(d) = Date::from_ordinal_date(year, ordinal).ok() else {
                         break;
@@ -268,6 +275,9 @@ mod tests {
                 }
             }
         }
+        let d_out = date(2028, Month::January, 26);
+        assert!(BSE.is_holiday(d_out).is_err());
+        assert!(BSE.is_business_day(d_out).is_err());
     }
 
     #[test]
@@ -310,8 +320,8 @@ mod tests {
         static RULES_JAN1: [Rule; 1] = [Rule::fixed(Month::January, 1)];
         static RULES_JULY4: [Rule; 1] = [Rule::fixed(Month::July, 4)];
 
-        let cal_jan1 = Calendar::new("dup_id", "Jan 1 only", false, &RULES_JAN1);
-        let cal_july4 = Calendar::new("dup_id", "July 4 only", false, &RULES_JULY4);
+        let cal_jan1 = Calendar::new("dup_id", "Jan 1 only", false, &RULES_JAN1, None);
+        let cal_july4 = Calendar::new("dup_id", "July 4 only", false, &RULES_JULY4, None);
 
         let jan1 = date(2025, Month::January, 1);
         let july4 = date(2025, Month::July, 4);

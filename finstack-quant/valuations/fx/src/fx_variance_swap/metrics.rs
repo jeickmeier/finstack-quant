@@ -135,7 +135,9 @@ mod expected_variance_tests {
     use finstack_quant_core::dates::{DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::stats::RealizedVarMethod;
     use finstack_quant_core::money::Money;
@@ -159,11 +161,17 @@ mod expected_variance_tests {
         let usd = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("usd curve");
         let eur = DiscountCurve::builder("EUR-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, (-0.01_f64).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("eur curve");
         let provider = SimpleFxProvider::new();
@@ -208,10 +216,20 @@ mod expected_variance_tests {
             .enumerate()
             .map(|(i, &d)| (d, 1.10 * (1.0 + 0.002 * (i as f64 % 3.0 - 1.0))))
             .collect();
-        let series = ScalarTimeSeries::new("EURUSD", obs, None).expect("series");
+        let series = ScalarTimeSeries::new(
+            "EURUSD",
+            obs,
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("series");
         let surface = VolSurface::builder("EURUSD-VOL")
             .expiries(&[1.0])
-            .strikes(&[0.9, 1.1, 1.3])
+            .secondary_values(&[0.9, 1.1, 1.3])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.12, 0.10, 0.12])
             .build()
             .expect("surface");

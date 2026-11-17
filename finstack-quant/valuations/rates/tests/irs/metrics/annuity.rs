@@ -15,7 +15,7 @@ use finstack_quant_valuations_rates::irs::InterestRateSwap;
 use time::macros::date;
 
 fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve {
-    let mut builder = DiscountCurve::builder(curve_id)
+    let builder = DiscountCurve::builder(curve_id)
         .base_date(base_date)
         .day_count(DayCount::Act360)
         .knots([
@@ -23,17 +23,9 @@ fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> Disc
             (1.0, (-rate).exp()),
             (5.0, (-rate * 5.0).exp()),
             (10.0, (-rate * 10.0).exp()),
-        ]);
-
-    // For zero or negative rates, DFs may be flat or increasing
-    if rate.abs() < 1e-10 || rate < 0.0 {
-        builder = builder.validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        );
-    }
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend);
 
     builder.build().unwrap()
 }
@@ -41,12 +33,8 @@ fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> Disc
 fn build_market(rate: f64, base_date: Date) -> MarketContext {
     let disc_curve = build_flat_discount_curve(rate, base_date, "USD_OIS");
     let fwd_rate = if rate.abs() < 1e-10 { 1.0e-8 } else { rate };
-    let fwd_curve = ForwardCurve::builder("USD_LIBOR_3M", 0.25)
-        .base_date(base_date)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, fwd_rate), (10.0, fwd_rate)])
-        .build()
-        .unwrap();
+    let fwd_curve =
+        ForwardCurve::flat("USD_LIBOR_3M", base_date, fwd_rate, DayCount::Act360).unwrap();
 
     MarketContext::new().insert(disc_curve).insert(fwd_curve)
 }

@@ -474,7 +474,6 @@
             "entity": "CDX.NA.IG.46",
             "method": "bootstrap",
             "notional": 1.0,
-            "par_interp": "linear",
             "recovery_rate": 0.4,
             "seniority": "senior"
           },
@@ -610,29 +609,6 @@
             0.025312484500345366
           ]
         ],
-        "par_interp": "linear",
-        "par_points": [
-          [
-            1.1333333333333333,
-            50.0
-          ],
-          [
-            3.1638888888888888,
-            75.0
-          ],
-          [
-            5.191666666666666,
-            100.0
-          ],
-          [
-            7.222222222222222,
-            110.0
-          ],
-          [
-            10.266666666666667,
-            120.0
-          ]
-        ],
         "recovery_rate": 0.4,
         "seniority": "senior",
         "type": "hazard"
@@ -656,10 +632,9 @@
         "type": "base_correlation"
       },
       {
-        "allow_non_monotonic": false,
         "base": "2026-05-08",
         "day_count": "act_365f",
-        "extrapolation": "flat_forward",
+        "extrapolation": "extend",
         "fx_policy": null,
         "id": "USD-OIS",
         "interp_style": "linear",
@@ -693,8 +668,6 @@
             0.6677728466654677
           ]
         ],
-        "min_forward_rate": -0.005,
-        "min_forward_tenor": 1e-06,
         "rate_calibration": {
           "currency": "USD",
           "curve_day_count": "act_365f",

@@ -32,6 +32,7 @@ fn flat_discount_curve(
         .day_count(DayCount::Act365F)
         .knots(knots)
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("flat discount curve")
 }
@@ -511,7 +512,8 @@ fn test_iterative_zspread_rejected_for_credit_curve_instrument() {
     let hazard = HazardCurve::builder("USD-CREDIT")
         .base_date(as_of)
         .recovery_rate(0.4)
-        .knots([(0.0, 0.02), (5.0, 0.02)])
+        .knots([(5.0, 0.02)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("hazard curve");
     let market = MarketContext::new()

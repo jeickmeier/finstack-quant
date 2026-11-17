@@ -2449,24 +2449,9 @@ export type IndexationMethod = "canadian" | "tips" | "uk" | "french" | "japanese
 /**
  * Contractual observation lag for inflation index reference dates.
  *
- * Inflation indices are published with a delay (typically 2-4 weeks). Securities
- * using these indices incorporate an observation lag to ensure the reference
- * index is published by settlement. This lag does not specify the actual
- * publication date; use [`InflationIndex::with_publication_dates`] for that.
- *
- * # Standard Lags by Market
- *
- * - **US TIPS**: 3-month lag (reference index from 3 months prior)
- * - **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)
- * - **French OATi**: 3-month lag
- * - **German index-linked**: 3-month lag
- *
- * # Rationale
- *
- * The lag ensures:
- * 1. Reference index is published before settlement
- * 2. Index value is known at coupon payment date
- * 3. No estimation or forecasting required for payment calculation
+ * Specifies how far before a contractual reference date the historical or
+ * projected CPI anchor is sampled. Publication and knowledge cutoffs are
+ * tracked separately on [`InflationIndex`].
  */
 export type InflationLag =
   | {
@@ -10105,13 +10090,11 @@ export interface InflationSwap {
    */
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
-   * Contractual monthly reference-index interpolation; takes precedence over index metadata;
-   * without either source the default is monthly step interpolation.
+   * Explicit contractual monthly reference-index interpolation; no source default is used.
    */
   interpolation?: SeriesInterpolation | null;
   /**
-   * Contractual CPI observation lag; when `None` the index lag, then the
-   * curve's indexation lag, applies.
+   * Explicit contractual CPI observation lag; missing terms fail reference resolution.
    */
   lag?: InflationLag | null;
   /**
@@ -10191,13 +10174,11 @@ export interface YoYInflationSwap {
    */
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
-   * Contractual monthly reference-index interpolation; takes precedence over index metadata;
-   * without either source the default is monthly step interpolation.
+   * Explicit contractual monthly reference-index interpolation; no source default is used.
    */
   interpolation?: SeriesInterpolation | null;
   /**
-   * Contractual CPI observation lag; when `None` the index lag, then the
-   * curve's indexation lag, applies.
+   * Explicit contractual CPI observation lag; missing terms fail reference resolution.
    */
   lag?: InflationLag | null;
   /**
@@ -10266,13 +10247,12 @@ export interface InflationCapFloor {
    */
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
-   * Contractual monthly CPI interpolation; takes precedence over index metadata.
+   * Explicit contractual monthly CPI interpolation; no source default is used.
    * Defaults to monthly step interpolation when neither source supplies it.
    */
   interpolation?: SeriesInterpolation | null;
   /**
-   * Contractual CPI observation lag; when `None` the index lag, then the
-   * curve's indexation lag, applies.
+   * Explicit contractual CPI observation lag; missing terms fail reference resolution.
    */
   lag?: InflationLag | null;
   /**
@@ -11138,6 +11118,11 @@ export interface CmsSwap {
    */
   cms_cap?: number | null;
   /**
+   * Explicit CMS benchmark fixing identifier used for historical fixings
+   * (`FIXING:<cms_fixing_index_id>`), distinct from `forward_curve_id` and `index_id`.
+   */
+  cms_fixing_index_id?: Id | null;
+  /**
    * Optional floor on the CMS rate (decimal).
    */
   cms_floor?: number | null;
@@ -11260,6 +11245,11 @@ export interface CmsOption {
    * Attributes for scenario selection and grouping
    */
   attributes?: Attributes;
+  /**
+   * Explicit CMS benchmark fixing identifier used for historical fixings
+   * (`FIXING:<cms_fixing_index_id>`), distinct from `forward_curve_id` and `index_id`.
+   */
+  cms_fixing_index_id?: Id | null;
   /**
    * Tenor of the CMS reference swap (e.g. 10Y); must be month- or year-based.
    */
@@ -15533,6 +15523,12 @@ export interface CmsSpreadOption {
    */
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
+   * Explicit CMS benchmark fixing identifier for the long-tenor leg
+   * (`FIXING:<long_cms_fixing_index_id>`), distinct from `forward_curve_id`,
+   * `index_id`, and `short_cms_fixing_index_id`.
+   */
+  long_cms_fixing_index_id?: Id | null;
+  /**
    * Long CMS tenor (e.g., 10Y).
    */
   long_cms_tenor: Tenor;
@@ -15562,6 +15558,12 @@ export interface CmsSpreadOption {
    * Scenario-only pricing adjustments.
    */
   scenario_pricing_overrides?: ScenarioPricingOverrides;
+  /**
+   * Explicit CMS benchmark fixing identifier for the short-tenor leg
+   * (`FIXING:<short_cms_fixing_index_id>`), distinct from `forward_curve_id`,
+   * `index_id`, and `long_cms_fixing_index_id`.
+   */
+  short_cms_fixing_index_id?: Id | null;
   /**
    * Short CMS tenor (e.g., 2Y).
    */
@@ -18326,6 +18328,10 @@ export interface CdsTrancheParams {
  * Schedule, CMS terms, funding leg, notional and curves of a CMS swap built from its schedule.
  */
 export interface CmsSwapScheduleParams {
+  /**
+   * Optional explicit CMS benchmark fixing identifier used for historical fixings.
+   */
+  cms_fixing_index_id?: Id | null;
   /**
    * Payment and fixing frequency of both the CMS and funding schedules.
    */

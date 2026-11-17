@@ -181,7 +181,7 @@ def test_zero_rate_bond_risk_can_cross_into_negative_rates() -> None:
     payload["instrument"]["spec"]["settlement_days"] = 0
     payload["instrument"]["spec"]["cashflow_spec"]["fixed"]["business_day_convention"] = "unadjusted"
     bond = Bond.from_json(json.dumps(payload))
-    market = MarketContext().insert(DiscountCurve.flat("FLAT", as_of, 0.0))
+    market = MarketContext().insert(DiscountCurve.flat("FLAT", as_of, 0.0, "act_365f"))
     result = bond.price(market, as_of, metrics=["dv01"])
     assert result.get_metric("dv01") == pytest.approx(-100.0 * math.sinh(0.0001), abs=1e-9)
 
@@ -285,7 +285,7 @@ def test_hull_white_quote_budget_controls_fit_and_survives_pickle() -> None:
         calibrate_hull_white_to_cap_floors,
     )
 
-    curve = DiscountCurve.flat("HW", date(2025, 1, 1), 0.03)
+    curve = DiscountCurve.flat("HW", date(2025, 1, 1), 0.03, "act_365f")
     strike = math.expm1(0.03 * 0.25) / 0.25
     quotes = [CapFloorQuote(5.0, strike, vol, True, True) for vol in [0.009, 0.010, 0.011]]
     results = []
@@ -302,13 +302,19 @@ def test_hull_white_quote_budget_controls_fit_and_survives_pickle() -> None:
 
 def test_inflation_reference_months_compounding_and_registry_contracts() -> None:
     from finstack_quant.core.dates import DayCount
-    from finstack_quant.core.market_data import InflationIndex
+    from finstack_quant.core.market_data import InflationIndex, InflationObservation
     from finstack_quant.valuations.market import ConventionRegistry
 
     index = InflationIndex(
-        "US-CPI", [(date(2024, 10, 31), 300.0), (date(2024, 11, 30), 303.0)], "USD", interpolation="linear", lag="3M"
+        "US-CPI",
+        [
+            InflationObservation("2024-10-01", 300.0, "2024-11-13"),
+            InflationObservation("2024-11-01", 303.0, "2024-12-11"),
+        ],
+        "USD",
+        "2025-01-16",
     )
-    assert index.value_on(date(2025, 1, 16)) == pytest.approx(300 + 3 * 15 / 31, abs=1e-12)
+    assert index.qualified_monthly_observation(2024, 10, "2025-01-16") == 300.0
     assert DayCount.ONE_ONE.year_fraction(date(2024, 1, 1), date(2029, 1, 1)) == 1.0
     registry = ConventionRegistry()
     assert registry.require_inflation_swap("USD-CPI").day_count == "one_one"
@@ -329,7 +335,7 @@ def test_inflation_reference_months_compounding_and_registry_contracts() -> None
     expected = 1_000_000 * (0.10 - (1.02**5 - 1))
     assert price().value.amount == pytest.approx(expected, abs=1e-7)
     del fixture["instrument"]["instrument"]["spec"]["base_cpi"]
-    with pytest.raises((KeyError, RuntimeError), match="US-CPI"):
+    with pytest.raises(ValueError, match="US-CPI"):
         price()
 
 

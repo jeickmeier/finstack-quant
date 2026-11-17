@@ -60,25 +60,25 @@ pub fn rating_level_try_new(
 /// # Arguments
 ///
 /// * `scale_name` - Scale name, outer whitespace trimmed; must be nonblank.
-/// * `description` - Optional description; pass `null` or `undefined` for none.
 /// * `ratings` - Nonempty array (or its JSON text) of `RatingLevel` objects
 ///   ordered best to worst: labels unique after trim and ASCII case folding,
 ///   score and minimum strictly descending, the worst minimum `0`, and each
 ///   representative score below the preceding band's minimum.
+/// * `description` - Optional description; pass `null` or `undefined` for none.
 ///
 /// @returns A `ScorecardScale` plain object preserving the supplied band order.
 /// @throws `TypeError` (kind `invalid_type`) for mistyped string arguments;
 /// `FinstackError` (kind `validation`) for a blank name or bands that are
 /// empty, colliding, out of order, leave a gap below the worst band, or hold
-/// a representative outside its band. Description precedes ratings as in Rust.
+/// a representative outside its band.
 /// @param scaleName - Scale name, outer whitespace trimmed; must be nonblank.
-/// @param description - Optional description; pass `null` or `undefined` for none.
 /// @param ratings - Nonempty array (or its JSON text) of `RatingLevel` objects ordered best to worst: labels unique after trim and ASCII case folding, score and minimum strictly descending, the worst minimum `0`, and each representative score below the preceding band's minimum.
+/// @param description - Optional description; pass `null` or `undefined` for none.
 /// @example
 /// ```typescript
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
-/// const scale = core.scorecardScaleTryNew("custom", undefined, [
+/// const scale = core.scorecardScaleTryNew("custom", [
 ///   core.ratingLevelTryNew("A", 90, 80),
 ///   core.ratingLevelTryNew("B", 70, 0),
 /// ]);
@@ -87,14 +87,14 @@ pub fn rating_level_try_new(
 #[wasm_bindgen(js_name = scorecardScaleTryNew, unchecked_return_type = "ScorecardScale")]
 pub fn scorecard_scale_try_new(
     #[wasm_bindgen(js_name = "scaleName", unchecked_param_type = "string")] scale_name: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "string | null | undefined")] description: JsValue,
     #[wasm_bindgen(unchecked_param_type = "ReadonlyArray<RatingLevel> | string")] ratings: JsValue,
+    #[wasm_bindgen(unchecked_optional_param_type = "string | null")] description: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     to_js_value(
         &ScorecardScale::try_new(
             js_string(&scale_name, "scaleName")?,
-            js_opt_string(Some(&description), "description")?,
             from_js_json::<Vec<RatingLevel>>(&ratings, "ratings")?,
+            js_opt_string(description.as_ref(), "description")?,
         )
         .map_err(to_js_err)?,
     )
@@ -118,7 +118,7 @@ pub fn scorecard_scale_try_new(
 /// ```typescript
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
-/// const scale = core.scorecardScaleTryNew("custom", undefined, [
+/// const scale = core.scorecardScaleTryNew("custom", [
 ///   core.ratingLevelTryNew("A", 90, 80),
 ///   core.ratingLevelTryNew("B", 70, 0),
 /// ]);
@@ -200,7 +200,7 @@ pub fn rating_scale_entry_try_new(
 /// ```typescript
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
-/// const scale = core.scorecardScaleTryNew("Internal", undefined, [
+/// const scale = core.scorecardScaleTryNew("Internal", [
 ///   core.ratingLevelTryNew("A", 90, 80),
 ///   core.ratingLevelTryNew("B", 70, 0),
 /// ]);

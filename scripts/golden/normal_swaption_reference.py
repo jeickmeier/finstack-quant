@@ -19,7 +19,7 @@ from pathlib import Path
 
 from finstack_quant.calibration import calibrate
 from finstack_quant.core.market_data import MarketContext
-from finstack_quant.models.volatility import get_cube_normal_vol_clamped
+from finstack_quant.models.volatility import get_cube_vol_clamped
 from finstack_quant.valuations.instruments import Swaption, price_instrument
 
 root = Path(__file__).resolve().parents[2]
@@ -69,7 +69,7 @@ def payment(d):
 
 
 periods = [(date(y - 1, 5, 5), date(y, 5, 5), payment(date(y, 5, 5))) for y in range(2028, 2033)]
-sigma = get_cube_normal_vol_clamped(market.get_vol_cube(spec["vol_surface_id"]), t, 5, strike)
+sigma = get_cube_vol_clamped(market.get_vol_cube(spec["vol_surface_id"]), t, 5, strike, "normal")
 
 
 def value(m):
@@ -88,35 +88,50 @@ def value(m):
 base = value(market)
 
 
-def bumped(bp):
-    """Apply a continuous zero-rate shock and an additive forward-rate shock.
+CURVE_CLOCKS = {"discount": ("act_365f", 365), "forward": ("act_360", 360)}
 
-    The discount curve uses linear DF interpolation. Rebuilding interpolation
-    through shocked pillars would change the shock between pillars. Retain the
-    original interpolation and multiply its value by exp(-bp * 1e-4 * t).
+
+def bumped(bp):
+    """Apply a continuous shock exp(-bp * 1e-4 * t) to every curve's factors.
+
+    Each curve keeps its own clock (ACT/365F discount, ACT/360 projection) and
+    its own interpolation. Rebuilding interpolation through shocked pillars
+    would change the shock between pillars, so the original interpolation is
+    retained and its value multiplied by exp(-bp * 1e-4 * t).
     """
     s = copy.deepcopy(snapshot)
     for c in s["curves"]:
-        if c["type"] == "discount":
-            if c["base"] != as_of.isoformat() or c["day_count"] != "act_365f" or c.get("transform"):
-                raise ValueError("reference requires an untransformed ACT/365F discount curve based on as_of")
-            c["transform"] = {
-                "source_points": copy.deepcopy(c["knot_points"]),
-                "offset": 0.0,
-                "adjustment": {"initial_value": -bp * 1e-4, "segments": []},
-            }
-            c["knot_points"] = [[t, df * math.exp(-bp * 1e-4 * t)] for t, df in c["knot_points"]]
-        elif c["type"] == "forward":
-            c["knot_points"] = [[t, r + bp * 1e-4] for t, r in c["knot_points"]]
+        day_count, _ = CURVE_CLOCKS[c["type"]]
+        if c["base"] != as_of.isoformat() or c["day_count"] != day_count or c.get("transform"):
+            raise ValueError(f"reference requires an untransformed {day_count} {c['type']} curve based on as_of")
+        c["transform"] = {
+            "source_base_date": c["base"],
+            "source_points": copy.deepcopy(c["knot_points"]),
+            "adjustment": {"initial_value": -bp * 1e-4, "segments": []},
+        }
+        c["knot_points"] = [[t, p * math.exp(-bp * 1e-4 * t)] for t, p in c["knot_points"]]
     shifted_market = MarketContext.from_json(json.dumps(s))
-    original = market.get_discount("USD-OIS")
-    shifted = shifted_market.get_discount("USD-OIS")
     # Off-pillar checks guard against accidentally restoring pillar-only shocks.
-    for _, _, pay in periods:
-        years = (pay - as_of).days / 365
-        expected_df = original.df_between_dates(as_of, pay) * math.exp(-bp * 1e-4 * years)
-        if abs(shifted.df_between_dates(as_of, pay) - expected_df) > 1e-14:
-            raise AssertionError("discount shock must equal DF(t) * exp(-bp * 1e-4 * t) between pillars")
+    checks = [
+        (
+            "discount",
+            market.get_discount("USD-OIS"),
+            shifted_market.get_discount("USD-OIS"),
+            [p for _, _, p in periods],
+        ),
+        (
+            "forward",
+            market.get_forward("USD-SOFR-3M"),
+            shifted_market.get_forward("USD-SOFR-3M"),
+            [d for start, end, _ in periods for d in (start, end)],
+        ),
+    ]
+    for kind, original, shifted, dates in checks:
+        basis = CURVE_CLOCKS[kind][1]
+        for d in dates:
+            expected = original.df_between_dates(as_of, d) * math.exp(-bp * 1e-4 * (d - as_of).days / basis)
+            if abs(shifted.df_between_dates(as_of, d) - expected) > 1e-14:
+                raise AssertionError(f"{kind} shock must equal P(t) * exp(-bp * 1e-4 * t) between pillars")
     return shifted_market
 
 
@@ -139,20 +154,24 @@ if parser.parse_args().write:
             "the original market envelope and takes its forward and normal cube quote as inputs. It independently "
             "sums contractual ACT/360 annual fixed accruals times payment-date discount factors, computes receiver "
             "Bachelier N*A*((K-F)*Phi(-d)+sigmaN*sqrt(T)*phi(d)) with Python math.erfc, computes vega per 0.01 "
-            "normal-vol change, and centrally reprices +/-1bp continuous discount-zero-rate and additive forward-rate "
-            "shocks using that same independent formula. Discount shocks preserve the source interpolation and "
-            "multiply DF(t) by exp(-dr*t); off-pillar identities are checked during regeneration. Formula reference: "
+            "normal-vol change, and centrally reprices +/-1bp continuous factor shocks of both curves using that same "
+            "independent formula. Each shock preserves the curve's source interpolation and multiplies its factor "
+            "P(t) by exp(-dr*t) on the curve's own clock (ACT/365F discount, ACT/360 projection); off-pillar "
+            "identities are checked during regeneration. Formula reference: "
             "https://github.com/lballabio/QuantLib/blob/master/ql/pricingengines/blackformula.cpp "
             f"(bachelierBlackFormula). Inputs: F={base[2]}, K={strike}, sigmaN={sigma} decimal rate/sqrt(year), "
             f"T={t} ACT/365F, A={base[3]} years, N={notional:.0f} USD. Reference NPV={base[0]} USD, "
             f"vega={base[1]} USD per 100bp normal vol, signed DV01={dv01} USD per 1bp. "
             "This reference isolates option quote-unit/pricing/risk correctness; its calibration and underlying "
-            "forward are not an independent external curve benchmark. This recapture follows the 2026-10-23 "
-            "forward-calibration extrapolation change (c69d13e5a4): calibrated forward curves now hold the last "
-            "forward rate constant past the final reset (FlatZero) instead of extending the last segment's slope "
-            "(FlatForward). The fixture's FRA quotes end at t=1.02y while the underlying swap runs 2027-2032, so "
-            "its forward is extrapolation-dominated: F moved from 0.05849967094365875 to the value above and the "
-            "SABR normal vol refitted at the lower forward, while the discount curve and annuity are unchanged. "
+            "forward are not an independent external curve benchmark. This recapture follows the factor-native "
+            "ForwardCurve change: the projection curve stores positive factors P(t) instead of rate knots. The "
+            "forward step's rate-space 'linear' interpolation became 'log_linear' factors with 'extend' "
+            "extrapolation, i.e. piecewise-flat forwards and a flat-forward tail, preserving the flat tail the "
+            "previous FlatZero rate curve held. The fixture's FRA quotes end at t=1.02y while the underlying swap "
+            "runs 2027-2032, so its forward is extrapolation-dominated: F moved from 0.05339268554469429 to the "
+            "value above and the SABR normal vol refitted, while the discount curve and annuity are unchanged. "
+            "DV01 now shifts projection factors rather than adding to forward rates, so the simple 3M forward "
+            "moves by (1+F*tau) bp per bp. "
             "Contract terms, market quotes, and tolerances are unchanged. "
             "Old self-captured million-dollar price used a lognormal-equivalent vol as a normal quote."
         ),

@@ -544,8 +544,21 @@ mod tests {
         )
         .expect("valid deterministic credit bond");
         bond.credit_curve_id = Some("ACME-HZD".into());
-        let discount = DiscountCurve::flat("USD-OIS", as_of, 0.03).expect("discount curve");
-        let hazard = HazardCurve::flat("ACME-HZD", as_of, 0.02, 0.4).expect("hazard curve");
+        let discount = DiscountCurve::flat(
+            "USD-OIS",
+            as_of,
+            0.03,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("discount curve");
+        let hazard = HazardCurve::flat(
+            "ACME-HZD",
+            as_of,
+            0.02,
+            0.4,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("hazard curve");
         (
             bond,
             MarketContext::new().insert(discount).insert(hazard),

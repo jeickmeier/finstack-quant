@@ -326,16 +326,10 @@ pub fn goal_seek(model: &FinancialModelSpec, spec: &GoalSeekSpec) -> Result<Goal
     };
     let eval_cell = RefCell::new((evaluator, model.clone()));
 
-    // Records the most recent objective-evaluation failure. The solver only
-    // sees `NaN` for a failed probe; capturing the cause here lets a
-    // non-convergence error explain *why* probes failed (DSL error, missing
-    // target node, etc.) instead of reporting an opaque "no solution".
-    let last_error: RefCell<Option<String>> = RefCell::new(None);
-
     // Counts every model evaluation, reported as `GoalSeekResult::evaluations`.
     let evaluations = Cell::new(0_usize);
 
-    let objective = |driver_value: f64| -> f64 {
+    let objective = |driver_value: f64| -> finstack_quant_core::Result<f64> {
         evaluations.set(evaluations.get() + 1);
         let mut borrow = eval_cell.borrow_mut();
         let (ref mut eval, ref mut temp_model) = *borrow;
@@ -345,39 +339,27 @@ pub fn goal_seek(model: &FinancialModelSpec, spec: &GoalSeekSpec) -> Result<Goal
             // `values` map here would copy every period on every solver
             // iteration; Brent's method probes the objective many times, so a
             // per-iteration map clone is pure overhead.
-            let Ok(amount) = amount_for_node(node, driver_value) else {
-                return f64::NAN;
-            };
+            let amount = amount_for_node(node, driver_value).map_err(|e| {
+                finstack_quant_core::Error::Validation(format!(
+                    "driver conversion failed at {driver_value}: {e}"
+                ))
+            })?;
             node.values
                 .get_or_insert_with(Default::default)
                 .insert(driver_period, amount);
         }
 
-        match eval.evaluate_prepared(temp_model, &prepared) {
-            Ok(results) => match results.get(target_node, &target_period) {
-                Some(actual_value) => actual_value - target_value,
-                None => {
-                    *last_error.borrow_mut() = Some(format!(
-                        "target node '{target_node}' produced no value for period \
-                         {target_period} at driver value {driver_value}"
-                    ));
-                    f64::NAN
-                }
-            },
-            Err(e) => {
-                *last_error.borrow_mut() = Some(format!(
-                    "evaluation failed at driver value {driver_value}: {e}"
-                ));
-                f64::NAN
-            }
-        }
-    };
-
-    // Enrich a solver failure with the last captured objective error.
-    let describe_failure = |base: String| -> Error {
-        match last_error.borrow().as_ref() {
-            Some(cause) => Error::eval(format!("{base} Last objective failure: {cause}")),
-            None => Error::eval(base),
+        let results = eval.evaluate_prepared(temp_model, &prepared).map_err(|e| {
+            finstack_quant_core::Error::Validation(format!(
+                "evaluation failed at driver value {driver_value}: {e}"
+            ))
+        })?;
+        match results.get(target_node, &target_period) {
+            Some(actual_value) => Ok(actual_value - target_value),
+            None => Err(finstack_quant_core::Error::Validation(format!(
+                "target node '{target_node}' produced no value for period \
+                 {target_period} at driver value {driver_value}"
+            ))),
         }
     };
 
@@ -396,7 +378,7 @@ pub fn goal_seek(model: &FinancialModelSpec, spec: &GoalSeekSpec) -> Result<Goal
 
     if let Some((lower, upper)) = bounds {
         let solution = solve_with_bounds(&objective, lower, upper).map_err(|e| {
-            describe_failure(format!(
+            Error::eval(format!(
                 "Goal seek failed to find solution within bounds [{lower}, {upper}]: \
                  target_node='{target_node}', target_value={target_value}, \
                  driver_node='{driver_node}'. {e}"
@@ -405,38 +387,62 @@ pub fn goal_seek(model: &FinancialModelSpec, spec: &GoalSeekSpec) -> Result<Goal
         return finish(solution);
     }
 
-    // Pick an initial bracket size scaled to the guess magnitude, then let
-    // Brent's own bracket-expansion search widen as needed. The solver's
-    // default `bracket_min`/`bracket_max` (±1e6) define the outer limits,
-    // which we tighten on one side to honour the sign of the initial guess:
-    // if the guess is strictly positive, the root is almost certainly also
-    // positive (revenue, leverage ratio, hazard-rate intensity, etc.) and
-    // the evaluator may produce NaN for non-positive inputs — same logic
-    // applies symmetrically for strictly negative guesses. A zero guess
-    // carries no sign information so we leave both sides at the default.
-    let abs_guess = initial_guess.abs().max(1.0);
-    let mut solver = BrentSolver::new().with_initial_bracket_size(Some(abs_guess));
-    if initial_guess > 0.0 {
-        solver.bracket_min = 0.0;
-    } else if initial_guess < 0.0 {
-        solver.bracket_max = 0.0;
+    if !initial_guess.is_finite() {
+        return Err(Error::invalid_input(format!(
+            "Goal seek initial guess must be finite, got {initial_guess}"
+        )));
     }
 
-    let solution = match solver.solve(objective, initial_guess) {
+    // Pick an initial bracket size scaled to the guess magnitude, then let
+    // Brent's own bracket-expansion search widen as needed inside signed
+    // bounds: if the guess is strictly positive, the root is almost certainly
+    // also positive (revenue, leverage ratio, hazard-rate intensity, etc.) and
+    // the evaluator may fail for non-positive inputs — same logic applies
+    // symmetrically for strictly negative guesses. A zero guess carries no
+    // sign information so both sides start symmetric.
+    let abs_guess = initial_guess.abs().max(1.0);
+    let outer = 1e6_f64.max(abs_guess * 1e3);
+    let half_width = (0.5 * abs_guess).max(1e-4);
+    let solver = BrentSolver::new(1e-12, 100).map_err(|e| Error::eval(e.to_string()))?;
+    let (min_bound, max_bound) = if initial_guess > 0.0 {
+        (0.0, outer)
+    } else if initial_guess < 0.0 {
+        (-outer, 0.0)
+    } else {
+        (-outer, outer)
+    };
+
+    let solution = match solver.solve(
+        objective,
+        initial_guess,
+        min_bound,
+        max_bound,
+        half_width,
+        20,
+    ) {
         Ok(solution) => solution,
-        Err(first_error) if initial_guess != 0.0 => BrentSolver::new()
-            .with_initial_bracket_size(Some(abs_guess))
-            .solve(objective, initial_guess)
-            .map_err(|second_error| {
-                describe_failure(format!(
-                    "Goal seek failed to find solution: target_node='{target_node}', \
-                     target_value={target_value}, driver_node='{driver_node}'. \
-                     Sign-constrained attempt failed with: {first_error}. \
-                     Widened attempt failed with: {second_error}"
-                ))
-            })?,
+        Err(first_error)
+            if initial_guess != 0.0
+                && matches!(
+                    first_error,
+                    finstack_quant_core::Error::Input(
+                        finstack_quant_core::InputError::SolverConvergenceFailed { .. }
+                    )
+                ) =>
+        {
+            solver
+                .solve(objective, initial_guess, -outer, outer, half_width, 20)
+                .map_err(|second_error| {
+                    Error::eval(format!(
+                        "Goal seek failed to find solution: target_node='{target_node}', \
+                         target_value={target_value}, driver_node='{driver_node}'. \
+                         Sign-constrained attempt failed with: {first_error}. \
+                         Widened attempt failed with: {second_error}"
+                    ))
+                })?
+        }
         Err(e) => {
-            return Err(describe_failure(format!(
+            return Err(Error::eval(format!(
                 "Goal seek failed to find solution: target_node='{target_node}', \
                  target_value={target_value}, driver_node='{driver_node}'. {e}"
             )));
@@ -449,11 +455,11 @@ pub fn goal_seek(model: &FinancialModelSpec, spec: &GoalSeekSpec) -> Result<Goal
 /// Evaluate the objective at `solution` and return `(residual, tolerance)`,
 /// or an error when the residual is not within tolerance.
 fn validate_target_residual(
-    objective: &impl Fn(f64) -> f64,
+    objective: &impl Fn(f64) -> finstack_quant_core::Result<f64>,
     solution: f64,
     target: f64,
 ) -> Result<(f64, f64)> {
-    let residual = objective(solution);
+    let residual = objective(solution).map_err(|e| Error::eval(e.to_string()))?;
     let tolerance = 1e-9 * target.abs().max(1.0);
     if !solution.is_finite() || !residual.is_finite() || residual.abs() > tolerance {
         return Err(Error::eval(format!(
@@ -494,7 +500,7 @@ fn solved_model(
 
 fn solve_with_bounds<F>(f: &F, lower: f64, upper: f64) -> Result<f64>
 where
-    F: Fn(f64) -> f64,
+    F: Fn(f64) -> finstack_quant_core::Result<f64>,
 {
     const TOLERANCE: f64 = 1e-9;
 
@@ -510,8 +516,8 @@ where
         ));
     }
 
-    let flo = f(lower);
-    let fhi = f(upper);
+    let flo = f(lower).map_err(|e| Error::eval(e.to_string()))?;
+    let fhi = f(upper).map_err(|e| Error::eval(e.to_string()))?;
 
     if !flo.is_finite() || !fhi.is_finite() {
         return Err(Error::eval(
@@ -536,10 +542,9 @@ where
     // Use Brent's method inside the user-supplied bracket; inverse quadratic
     // interpolation with safeguarded bisection converges super-linearly on
     // smooth objectives while retaining the robustness of bisection.
-    let solver = BrentSolver::new().with_tolerance(TOLERANCE);
-    solver
-        .solve_in_bracket(|x| Ok(f(x)), lower, upper)
-        .map_err(|e| Error::eval(format!("Goal seek failed within bounds: {}", e)))
+    BrentSolver::new(TOLERANCE, 100)
+        .and_then(|solver| solver.solve_in_bracket(f, lower, upper))
+        .map_err(|e| Error::eval(format!("Goal seek failed within bounds: {e}")))
 }
 
 #[cfg(test)]
@@ -579,11 +584,11 @@ mod tests {
     fn solve_with_bounds_accepts_endpoint_within_tolerance() {
         let solution = solve_with_bounds(
             &|x| {
-                if (x - 1.0).abs() < f64::EPSILON {
+                Ok(if (x - 1.0).abs() < f64::EPSILON {
                     5e-10
                 } else {
                     1.0
-                }
+                })
             },
             1.0,
             2.0,

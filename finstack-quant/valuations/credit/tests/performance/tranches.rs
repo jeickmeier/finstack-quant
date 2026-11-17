@@ -799,6 +799,10 @@ fn tranche_check_exact_reference() {
         );
     }
     assert_eq!(reference["schema_version"], json!(1));
+    eprintln!(
+        "TMP_HASHES {}",
+        json!({"input_hash": actual["input_hash"], "fixture_hashes": array(&actual["cases"]).iter().map(|c| json!([c["id"], c["fixture_hash"]])).collect::<Vec<_>>()})
+    );
     assert_eq!(actual["input_hash"], reference["input_hash"]);
     assert_eq!(
         array(&actual["cases"]).len(),

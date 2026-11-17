@@ -142,7 +142,9 @@ export type D_948Cdc4Db846A21357A4 = "hull_white" | "black_derman_toy" | "black_
  *
  * # Examples
  * ```rust
- * use finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};
+ * use finstack_quant_core::market_data::scalars::{
+ *     ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+ * };
  * use finstack_quant_core::dates::Date;
  * use time::Month;
  *
@@ -153,44 +155,33 @@ export type D_948Cdc4Db846A21357A4 = "hull_white" | "black_derman_toy" | "black_
  *         (Date::from_calendar_date(2024, Month::February, 1).expect("Valid date"), 105.0),
  *     ],
  *     None,
+ *     SeriesInterpolation::Step,
+ *     SeriesExtrapolation::Error,
  * )
  * .expect("Series creation should succeed");
- * let stepped = series.clone().with_interpolation(SeriesInterpolation::Step);
  * let mid_date = Date::from_calendar_date(2024, Month::January, 15).expect("Valid date");
- * assert_eq!(stepped.value_on(mid_date).expect("Value lookup should succeed"), 100.0);
+ * assert_eq!(series.get_value(mid_date).expect("Value lookup should succeed"), 100.0);
  * ```
  */
 export type D_51B337737D55F08F74B6 = "step" | "linear";
 /**
  * Contractual observation lag for inflation index reference dates.
  *
- * Inflation indices are published with a delay (typically 2-4 weeks). Securities
- * using these indices incorporate an observation lag to ensure the reference
- * index is published by settlement. This lag does not specify the actual
- * publication date; use [`InflationIndex::with_publication_dates`] for that.
- *
- * # Standard Lags by Market
- *
- * - **US TIPS**: 3-month lag (reference index from 3 months prior)
- * - **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)
- * - **French OATi**: 3-month lag
- * - **German index-linked**: 3-month lag
- *
- * # Rationale
- *
- * The lag ensures:
- * 1. Reference index is published before settlement
- * 2. Index value is known at coupon payment date
- * 3. No estimation or forecasting required for payment calculation
+ * Specifies how far before a contractual reference date the historical or
+ * projected CPI anchor is sampled. Publication and knowledge cutoffs are
+ * tracked separately on [`InflationIndex`].
  *
  * # Examples
  *
  * ```rust
  * use finstack_quant_core::market_data::scalars::InflationLag;
  *
- * let tips_lag = InflationLag::Months(3);  // US TIPS standard
- * let gilt_lag = InflationLag::Months(3);  // UK modern gilts
- * let no_lag = InflationLag::None;         // Inflation swaps (forecast-based)
+ * let tips_lag = InflationLag::months(3);
+ * let day_lag = InflationLag::days(90);
+ * let no_lag = InflationLag::None;
+ * assert_eq!(tips_lag.to_string(), "3M");
+ * assert_eq!(day_lag.to_string(), "90D");
+ * assert_eq!(no_lag.to_string(), "none");
  * ```
  */
 export type DAf2460F03219A318A4C9 =
@@ -426,13 +417,11 @@ export interface D_6C7Cf0810B445D318Ec1 {
   inflation_index_id: Id3;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
-   * Contractual monthly reference-index interpolation; takes precedence over index metadata;
-   * without either source the default is monthly step interpolation.
+   * Explicit contractual monthly reference-index interpolation; no source default is used.
    */
   interpolation?: D_51B337737D55F08F74B6 | null;
   /**
-   * Contractual CPI observation lag; when `None` the index lag, then the
-   * curve's indexation lag, applies.
+   * Explicit contractual CPI observation lag; missing terms fail reference resolution.
    */
   lag?: DAf2460F03219A318A4C9 | null;
   maturity: Date;

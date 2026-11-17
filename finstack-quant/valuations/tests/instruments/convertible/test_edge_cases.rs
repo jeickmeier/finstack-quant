@@ -30,6 +30,8 @@ fn test_currency_safety_mismatch() {
         .base_date(base_date)
         .knots([(0.0, 1.0), (10.0, 0.741)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -37,10 +39,16 @@ fn test_currency_safety_mismatch() {
         .insert(discount_curve)
         .insert_price(
             "AAPL",
-            MarketScalar::Price(Money::new(150.0, Currency::EUR).expect("valid money fixture")),
+            MarketScalar::price(Money::new(150.0, Currency::EUR).expect("valid money fixture")),
         ) // EUR mismatch!
-        .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
-        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
+        .insert_price(
+            "AAPL-VOL",
+            MarketScalar::unitless(0.25).expect("valid scalar"),
+        )
+        .insert_price(
+            "AAPL-DIVYIELD",
+            MarketScalar::unitless(0.02).expect("valid scalar"),
+        );
 
     // Should detect currency mismatch and fail
     let result = price_convertible_bond(&with_tree_steps(&bond, 20), &market, dates::base_date());
@@ -436,15 +444,20 @@ fn test_missing_volatility_data() {
         .base_date(base_date)
         .knots([(0.0, 1.0), (10.0, 0.741)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     // Market without volatility
     let market = finstack_quant_core::market_data::context::MarketContext::new()
         .insert(discount_curve)
-        .insert_price("AAPL", MarketScalar::Unitless(150.0))
+        .insert_price("AAPL", MarketScalar::unitless(150.0).expect("valid scalar"))
         // Missing volatility
-        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
+        .insert_price(
+            "AAPL-DIVYIELD",
+            MarketScalar::unitless(0.02).expect("valid scalar"),
+        );
 
     // Should fail due to missing volatility
     let result = price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date());
@@ -457,9 +470,15 @@ fn test_missing_discount_curve() {
 
     // Market without discount curve
     let market = finstack_quant_core::market_data::context::MarketContext::new()
-        .insert_price("AAPL", MarketScalar::Unitless(150.0))
-        .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
-        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
+        .insert_price("AAPL", MarketScalar::unitless(150.0).expect("valid scalar"))
+        .insert_price(
+            "AAPL-VOL",
+            MarketScalar::unitless(0.25).expect("valid scalar"),
+        )
+        .insert_price(
+            "AAPL-DIVYIELD",
+            MarketScalar::unitless(0.02).expect("valid scalar"),
+        );
 
     // Should fail due to missing discount curve
     let result = price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date());

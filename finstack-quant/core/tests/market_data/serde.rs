@@ -9,7 +9,7 @@
 
 use finstack_quant_core::contract::{ContractError, LoadLimits};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::context::MarketContextState;
 use finstack_quant_core::market_data::dividends::DividendSchedule;
@@ -34,11 +34,14 @@ fn dividend_schedule_restoration_uses_validated_builder() {
     wire["events"][0]["kind"]["cash"]["amount"] = serde_json::json!("-0.25");
     assert!(serde_json::from_value::<DividendSchedule>(wire).is_err());
 }
+use finstack_quant_core::market_data::bumps::MarketDataTarget;
 use finstack_quant_core::market_data::hierarchy::MarketDataHierarchy;
-use finstack_quant_core::market_data::scalars::{InflationIndex, InflationLag};
-use finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};
+use finstack_quant_core::market_data::scalars::InflationIndex;
+use finstack_quant_core::market_data::scalars::{
+    ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+};
 use finstack_quant_core::market_data::surfaces::SabrParameterData;
-use finstack_quant_core::market_data::surfaces::{FxDeltaVolSurface, VolCube, VolSurface};
+use finstack_quant_core::market_data::surfaces::{VolCube, VolSurface};
 use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -113,9 +116,15 @@ fn market_context_snapshot_propagates_unstable_fx_revision_errors() {
 
 #[test]
 fn vol_surface_roundtrip() {
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
+    };
     let surface = VolSurface::builder("EQ-VOL")
         .expiries(&[1.0, 2.0])
-        .strikes(&[90.0, 100.0, 110.0])
+        .secondary_values(&[90.0, 100.0, 110.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[0.2, 0.21, 0.22])
         .row(&[0.19, 0.2, 0.21])
         .build()
@@ -126,7 +135,7 @@ fn vol_surface_roundtrip() {
 
     assert_eq!(deserialized.id(), surface.id());
     assert_eq!(deserialized.expiries(), surface.expiries());
-    assert_eq!(deserialized.strikes(), surface.strikes());
+    assert_eq!(deserialized.secondary_values(), surface.secondary_values());
     assert_eq!(deserialized.grid_shape(), surface.grid_shape());
 }
 
@@ -137,9 +146,14 @@ fn scalar_time_series_roundtrip() {
     let d1 = Date::from_calendar_date(2024, Month::January, 31).unwrap();
     let d2 = Date::from_calendar_date(2024, Month::February, 29).unwrap();
 
-    let series = ScalarTimeSeries::new("VOL-TS", vec![(d1, 0.2), (d2, 0.25)], None)
-        .unwrap()
-        .with_interpolation(SeriesInterpolation::Linear);
+    let series = ScalarTimeSeries::new(
+        "VOL-TS",
+        vec![(d1, 0.2), (d2, 0.25)],
+        None,
+        SeriesInterpolation::Linear,
+        SeriesExtrapolation::Error,
+    )
+    .unwrap();
 
     let json = serde_json::to_string_pretty(&series).unwrap();
     let deserialized: ScalarTimeSeries = serde_json::from_str(&json).unwrap();
@@ -152,21 +166,51 @@ fn scalar_time_series_roundtrip() {
 
 #[test]
 fn inflation_index_roundtrip() {
-    let d1 = Date::from_calendar_date(2024, Month::January, 31).unwrap();
-    let d2 = Date::from_calendar_date(2024, Month::February, 29).unwrap();
+    use finstack_quant_core::market_data::scalars::{
+        InflationExpectedRelease, InflationObservation,
+    };
 
-    let index = InflationIndex::new("US-CPI", vec![(d1, 300.0), (d2, 301.5)], Currency::USD)
-        .unwrap()
-        .with_interpolation(SeriesInterpolation::Linear)
-        .with_lag(InflationLag::Months(3));
+    let d1 = Date::from_calendar_date(2024, Month::January, 1).unwrap();
+    let d2 = Date::from_calendar_date(2024, Month::February, 1).unwrap();
+    let d3 = Date::from_calendar_date(2024, Month::March, 1).unwrap();
+    let cutoff = Date::from_calendar_date(2024, Month::March, 15).unwrap();
+
+    let index = InflationIndex::new(
+        "US-CPI",
+        vec![
+            InflationObservation {
+                reference_month: d1,
+                value: 300.0,
+                available_on: Date::from_calendar_date(2024, Month::February, 13).unwrap(),
+            },
+            InflationObservation {
+                reference_month: d2,
+                value: 301.5,
+                available_on: Date::from_calendar_date(2024, Month::March, 12).unwrap(),
+            },
+        ],
+        Currency::USD,
+        cutoff,
+    )
+    .unwrap()
+    .with_expected_releases(vec![InflationExpectedRelease {
+        reference_month: d3,
+        expected_release: Date::from_calendar_date(2024, Month::April, 10).unwrap(),
+        known_on: cutoff,
+    }])
+    .unwrap();
 
     let json = serde_json::to_string_pretty(&index).unwrap();
     let deserialized: InflationIndex = serde_json::from_str(&json).unwrap();
 
     assert_eq!(deserialized.id(), index.id());
     assert_eq!(deserialized.currency(), index.currency());
-    assert_eq!(deserialized.interpolation(), index.interpolation());
-    assert_eq!(deserialized.lag(), index.lag());
+    assert_eq!(deserialized.knowledge_date(), index.knowledge_date());
+    assert_eq!(deserialized.observations(), index.observations());
+    assert_eq!(
+        deserialized.get_expected_releases(),
+        index.get_expected_releases()
+    );
 }
 
 // MarketContext Tests
@@ -176,22 +220,36 @@ fn market_context_roundtrip() {
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(test_date())
         .knots([(0.0, 1.0), (5.0, 0.9)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let forward = ForwardCurve::builder("USD-SOFR", 0.25)
+    let forward = ForwardCurve::builder("USD-SOFR")
         .base_date(test_date())
-        .knots([(0.0, 0.03), (5.0, 0.04)])
+        .day_count(finstack_quant_core::dates::DayCount::Act360)
+        .knots([(0.0, 1.0), (5.0, 0.84)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let surface = VolSurface::builder("VOL")
-        .expiries(&[1.0, 2.0])
-        .strikes(&[90.0, 100.0])
-        .row(&[0.2, 0.2])
-        .row(&[0.2, 0.2])
-        .build()
-        .unwrap();
+    let surface = {
+        use finstack_quant_core::market_data::surfaces::{
+            VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
+        };
+        VolSurface::builder("VOL")
+            .expiries(&[1.0, 2.0])
+            .secondary_values(&[90.0, 100.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
+            .row(&[0.2, 0.2])
+            .row(&[0.2, 0.2])
+            .build()
+            .unwrap()
+    };
 
     let dividends = DividendSchedule::builder("AAPL-DIVS")
         .cash(
@@ -234,14 +292,17 @@ fn market_context_roundtrip_preserves_hierarchy() {
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(test_date())
         .knots([(0.0, 1.0), (5.0, 0.9)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     let hierarchy = MarketDataHierarchy::builder()
         .add_node("Rates/USD/OIS")
-        .curve_ids(&["USD-OIS"])
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("USD-OIS")))
         .add_node("Rates/EUR/ESTR")
-        .curve_ids(&["EUR-ESTR"])
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("EUR-ESTR")))
         .build()
         .unwrap();
 
@@ -256,8 +317,8 @@ fn market_context_roundtrip_preserves_hierarchy() {
         .expect("hierarchy should survive MarketContext serde round-trip");
     let path: Vec<String> = vec!["Rates".into(), "EUR".into(), "ESTR".into()];
     assert_eq!(
-        hierarchy.get_node(&path).expect("EUR node").curve_ids(),
-        &[CurveId::from("EUR-ESTR")]
+        hierarchy.get_node(&path).expect("EUR node").targets(),
+        &[MarketDataTarget::DiscountCurve(CurveId::from("EUR-ESTR"))]
     );
 }
 
@@ -266,6 +327,9 @@ fn market_context_requires_hierarchy_key_and_accepts_explicit_null() {
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(test_date())
         .knots([(0.0, 1.0), (5.0, 0.9)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -421,28 +485,57 @@ fn semantic_restore_fixture() -> MarketContextState {
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(test_date())
         .knots([(0.0, 1.0), (1.0, 0.97)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
     let hazard = HazardCurve::builder("CDX-HAZARD")
         .base_date(test_date())
         .knots([(1.0, 0.01), (5.0, 0.02)])
         .recovery_rate(0.40)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("hazard curve");
     let base_correlation = BaseCorrelationCurve::builder("CDX-CORRELATION")
         .knots([(3.0, 0.25), (7.0, 0.4)])
         .build()
         .expect("base correlation curve");
-    let surface = VolSurface::builder("EQ-VOL")
-        .expiries(&[1.0])
-        .strikes(&[100.0])
-        .row(&[0.2])
-        .build()
-        .expect("vol surface");
-    let series =
-        ScalarTimeSeries::new("SERIES", vec![(test_date(), 1.0)], None).expect("time series");
-    let inflation_index = InflationIndex::new("US-CPI", vec![(test_date(), 300.0)], Currency::USD)
-        .expect("inflation index");
+    let surface = {
+        use finstack_quant_core::market_data::surfaces::{
+            VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
+        };
+        VolSurface::builder("EQ-VOL")
+            .expiries(&[1.0])
+            .secondary_values(&[100.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
+            .row(&[0.2])
+            .build()
+            .expect("vol surface")
+    };
+    let series = ScalarTimeSeries::new(
+        "SERIES",
+        vec![(test_date(), 1.0)],
+        None,
+        SeriesInterpolation::Step,
+        SeriesExtrapolation::Error,
+    )
+    .expect("time series");
+    let inflation_index = InflationIndex::new(
+        "US-CPI",
+        vec![
+            finstack_quant_core::market_data::scalars::InflationObservation {
+                reference_month: Date::from_calendar_date(2025, Month::January, 1).unwrap(),
+                value: 300.0,
+                available_on: Date::from_calendar_date(2025, Month::February, 12).unwrap(),
+            },
+        ],
+        Currency::USD,
+        Date::from_calendar_date(2025, Month::February, 15).unwrap(),
+    )
+    .expect("inflation index");
     let dividends = DividendSchedule::builder("EQ-DIVIDENDS")
         .cash(
             test_date(),
@@ -450,16 +543,25 @@ fn semantic_restore_fixture() -> MarketContextState {
         )
         .build()
         .expect("valid dividend schedule");
-    let fx_delta_vol = FxDeltaVolSurface::new(
-        "EURUSD-DELTA-VOL",
-        vec![1.0],
-        vec![0.08],
-        vec![0.01],
-        vec![0.005],
-        None,
-        None,
-    )
-    .expect("FX delta vol surface");
+    let fx_delta_vol = {
+        use finstack_quant_core::market_data::surfaces::{
+            FxAtmConvention, FxButterflyConvention, FxDeltaConvention, FxDeltaVolSurface,
+        };
+        use finstack_quant_core::money::fx::CurrencyPair;
+        FxDeltaVolSurface::builder(
+            "EURUSD-DELTA-VOL",
+            CurrencyPair::try_new(Currency::EUR, Currency::USD).expect("valid currency pair"),
+        )
+        .delta_convention(FxDeltaConvention::ForwardUnadjusted)
+        .atm_convention(FxAtmConvention::DeltaNeutralStraddle)
+        .butterfly_convention(FxButterflyConvention::Smile)
+        .expiries(&[1.0])
+        .atm_vols(&[0.08])
+        .rr_25d(&[0.01])
+        .bf_25d(&[0.005])
+        .build()
+        .expect("FX delta vol surface")
+    };
     let vol_cube = VolCube::from_grid(
         "USD-SWAPTION",
         &[1.0],
@@ -632,17 +734,24 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
     let discount_b = DiscountCurve::builder("B-DISC")
         .base_date(d)
         .knots([(0.0, 1.0), (5.0, 0.9)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let discount_a = DiscountCurve::builder("A-DISC")
         .base_date(d)
         .knots([(0.0, 1.0), (5.0, 0.92)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let hazard = HazardCurve::builder("CDX-HAZ")
         .base_date(d)
         .knots([(1.0, 0.01), (5.0, 0.02)])
         .recovery_rate(0.40)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
     let base_corr = BaseCorrelationCurve::builder("CDX-BC")
@@ -657,6 +766,7 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
         .base_date(d)
         .knots([(1.0, 0.02), (5.0, 0.03)])
         .recovery_rate(0.40)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
     issuer_curves.insert(
@@ -680,17 +790,30 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
         .build()
         .unwrap();
 
-    let series = ScalarTimeSeries::new("TS", vec![(d, 1.0)], None)
-        .unwrap()
-        .with_interpolation(SeriesInterpolation::Linear);
+    let series = ScalarTimeSeries::new(
+        "TS",
+        vec![(d, 1.0)],
+        None,
+        SeriesInterpolation::Linear,
+        SeriesExtrapolation::Error,
+    )
+    .unwrap();
 
-    let surface = VolSurface::builder("VOL")
-        .expiries(&[1.0, 2.0])
-        .strikes(&[90.0, 100.0])
-        .row(&[0.2, 0.2])
-        .row(&[0.2, 0.2])
-        .build()
-        .unwrap();
+    let surface = {
+        use finstack_quant_core::market_data::surfaces::{
+            VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
+        };
+        VolSurface::builder("VOL")
+            .expiries(&[1.0, 2.0])
+            .secondary_values(&[90.0, 100.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
+            .row(&[0.2, 0.2])
+            .row(&[0.2, 0.2])
+            .build()
+            .unwrap()
+    };
 
     let ctx = MarketContext::new()
         .insert(discount_b)
@@ -704,7 +827,7 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
         .insert_surface(surface)
         .insert_price(
             "EQ-SPOT",
-            MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
         );
 
     let state = MarketContextState::try_from(&ctx).expect("coherent market snapshot");
@@ -774,9 +897,6 @@ fn market_context_state_is_deterministically_sorted_and_roundtrips_full_snapshot
                 bc.id().to_string()
             }
             finstack_quant_core::market_data::context::CurveState::Price(pc) => pc.id().to_string(),
-            finstack_quant_core::market_data::context::CurveState::BasisSpread(bs) => {
-                bs.id().to_string()
-            }
             finstack_quant_core::market_data::context::CurveState::Parametric(pc) => {
                 pc.id().to_string()
             }
@@ -810,6 +930,9 @@ fn curve_storage_roundtrip_and_market_context_state_error_branch() {
         DiscountCurve::builder("X")
             .base_date(test_date())
             .knots([(0.0, 1.0), (1.0, 0.99)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap(),
     );
@@ -857,23 +980,32 @@ fn curve_state_and_storage_roundtrip_all_variants() {
     let disc = DiscountCurve::builder("DISC")
         .base_date(d)
         .knots([(0.0, 1.0), (1.0, 0.99)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let fwd = ForwardCurve::builder("FWD", 0.25)
+    let fwd = ForwardCurve::builder("FWD")
         .base_date(d)
-        .knots([(0.0, 0.02), (1.0, 0.03)])
+        .day_count(finstack_quant_core::dates::DayCount::Act360)
+        .knots([(0.0, 1.0), (1.0, 0.97)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let haz = HazardCurve::builder("HAZ")
         .base_date(d)
         .knots([(1.0, 0.01), (5.0, 0.02)])
         .recovery_rate(0.40)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
     let inf = InflationCurve::builder("INF")
-        .base_cpi(100.0)
         .base_date(d)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots([(0.0, 100.0), (1.0, 101.0)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .build()
         .unwrap();
     let bc = BaseCorrelationCurve::builder("BC")
@@ -910,29 +1042,39 @@ fn market_context_state_roundtrip_hits_more_state_serde_lines() {
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(d)
         .knots([(0.0, 1.0), (5.0, 0.9)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let fwd = ForwardCurve::builder("USD-SOFR", 0.25)
+    let fwd = ForwardCurve::builder("USD-SOFR")
         .base_date(d)
-        .knots([(0.0, 0.03), (5.0, 0.04)])
+        .day_count(finstack_quant_core::dates::DayCount::Act360)
+        .knots([(0.0, 1.0), (5.0, 0.84)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let haz = HazardCurve::builder("CDX-HAZ")
         .base_date(d)
         .knots([(1.0, 0.01), (5.0, 0.02)])
         .recovery_rate(0.40)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
     let issuer_haz = HazardCurve::builder("ISSUER-HAZ")
         .base_date(d)
         .knots([(1.0, 0.02), (5.0, 0.03)])
         .recovery_rate(0.40)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
     let inf = InflationCurve::builder("US-CPI-CURVE")
-        .base_cpi(100.0)
         .base_date(d)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots([(0.0, 100.0), (1.0, 101.0)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .build()
         .unwrap();
     let bc = BaseCorrelationCurve::builder("CDX-BC")
@@ -953,21 +1095,44 @@ fn market_context_state_roundtrip_hits_more_state_serde_lines() {
         .unwrap();
 
     // Inflation index (separate from inflation curve)
-    let idx = InflationIndex::new("US-CPI", vec![(d, 300.0)], Currency::USD)
-        .unwrap()
-        .with_interpolation(SeriesInterpolation::Linear);
+    let idx = InflationIndex::new(
+        "US-CPI",
+        vec![
+            finstack_quant_core::market_data::scalars::InflationObservation {
+                reference_month: Date::from_calendar_date(d.year(), d.month(), 1).unwrap(),
+                value: 300.0,
+                available_on: d.add_months(1).unwrap(),
+            },
+        ],
+        Currency::USD,
+        d.add_months(2).unwrap(),
+    )
+    .unwrap();
 
-    let series = ScalarTimeSeries::new("TS", vec![(d, 1.0)], None)
-        .unwrap()
-        .with_interpolation(SeriesInterpolation::Linear);
+    let series = ScalarTimeSeries::new(
+        "TS",
+        vec![(d, 1.0)],
+        None,
+        SeriesInterpolation::Linear,
+        SeriesExtrapolation::Error,
+    )
+    .unwrap();
 
-    let surface = VolSurface::builder("VOL")
-        .expiries(&[1.0, 2.0])
-        .strikes(&[90.0, 100.0])
-        .row(&[0.2, 0.2])
-        .row(&[0.2, 0.2])
-        .build()
-        .unwrap();
+    let surface = {
+        use finstack_quant_core::market_data::surfaces::{
+            VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
+        };
+        VolSurface::builder("VOL")
+            .expiries(&[1.0, 2.0])
+            .secondary_values(&[90.0, 100.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
+            .row(&[0.2, 0.2])
+            .row(&[0.2, 0.2])
+            .build()
+            .unwrap()
+    };
 
     let ctx = MarketContext::new()
         .insert(disc)
@@ -983,7 +1148,7 @@ fn market_context_state_roundtrip_hits_more_state_serde_lines() {
         .insert_surface(surface)
         .insert_price(
             "EQ-SPOT",
-            MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
         );
 
     // Roundtrip via MarketContextState explicitly
@@ -1035,6 +1200,9 @@ fn discount_curve_rejects_unknown_fields() {
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(test_date())
         .knots([(0.0, 1.0), (5.0, 0.9)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     assert_strict_inbound(&curve);
@@ -1042,9 +1210,12 @@ fn discount_curve_rejects_unknown_fields() {
 
 #[test]
 fn forward_curve_rejects_unknown_fields() {
-    let curve = ForwardCurve::builder("USD-SOFR", 0.25)
+    let curve = ForwardCurve::builder("USD-SOFR")
         .base_date(test_date())
-        .knots([(0.0, 0.03), (5.0, 0.04)])
+        .day_count(finstack_quant_core::dates::DayCount::Act360)
+        .knots([(0.0, 1.0), (5.0, 0.84)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     assert_strict_inbound(&curve);
@@ -1056,6 +1227,7 @@ fn hazard_curve_rejects_unknown_fields() {
         .base_date(test_date())
         .knots([(1.0, 0.01), (5.0, 0.02)])
         .recovery_rate(0.40)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
     assert_strict_inbound(&curve);
@@ -1065,9 +1237,11 @@ fn hazard_curve_rejects_unknown_fields() {
 fn inflation_curve_rejects_unknown_fields() {
     use finstack_quant_core::market_data::term_structures::InflationCurve;
     let curve = InflationCurve::builder("US-CPI-CURVE")
-        .base_cpi(100.0)
         .base_date(test_date())
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots([(0.0, 100.0), (1.0, 101.0)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .build()
         .unwrap();
     assert_strict_inbound(&curve);
@@ -1136,17 +1310,6 @@ fn volatility_index_kind_is_carried_by_price_curve_snapshot() {
 }
 
 #[test]
-fn basis_spread_curve_rejects_unknown_fields() {
-    use finstack_quant_core::market_data::term_structures::BasisSpreadCurve;
-    let curve = BasisSpreadCurve::builder("EURUSD-XCCY")
-        .base_date(test_date())
-        .knots([(0.0, -0.001), (5.0, -0.002)])
-        .build()
-        .unwrap();
-    assert_strict_inbound(&curve);
-}
-
-#[test]
 fn forward_variance_curve_rejects_unknown_fields() {
     use finstack_quant_core::market_data::term_structures::ForwardVarianceCurve;
     let curve = ForwardVarianceCurve::from_points(&[(0.0, 0.04), (1.0, 0.05)]).unwrap();
@@ -1165,35 +1328,36 @@ fn forward_variance_curve_rejects_invalid_values_on_deserialize() {
     assert!(serde_json::from_value::<ForwardVarianceCurve>(json).is_err());
 }
 
+fn sample_fx_delta_surface() -> finstack_quant_core::market_data::surfaces::FxDeltaVolSurface {
+    use finstack_quant_core::market_data::surfaces::{
+        FxAtmConvention, FxButterflyConvention, FxDeltaConvention, FxDeltaVolSurface,
+    };
+    use finstack_quant_core::money::fx::CurrencyPair;
+    FxDeltaVolSurface::builder(
+        "EURUSD-DELTA-VOL",
+        CurrencyPair::try_new(Currency::EUR, Currency::USD).unwrap(),
+    )
+    .delta_convention(FxDeltaConvention::ForwardUnadjusted)
+    .atm_convention(FxAtmConvention::DeltaNeutralStraddle)
+    .butterfly_convention(FxButterflyConvention::Smile)
+    .expiries(&[0.25, 0.5, 1.0])
+    .atm_vols(&[0.08, 0.085, 0.09])
+    .rr_25d(&[0.01, 0.012, 0.015])
+    .bf_25d(&[0.005, 0.006, 0.007])
+    .build()
+    .unwrap()
+}
+
 #[test]
 fn fx_delta_vol_surface_rejects_unknown_fields() {
-    use finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;
-    let surface = FxDeltaVolSurface::new(
-        "EURUSD-DELTA-VOL",
-        vec![0.25, 0.5, 1.0],
-        vec![0.08, 0.085, 0.09],
-        vec![0.01, 0.012, 0.015],
-        vec![0.005, 0.006, 0.007],
-        None,
-        None,
-    )
-    .unwrap();
+    let surface = sample_fx_delta_surface();
     assert_strict_inbound(&surface);
 }
 
 #[test]
 fn fx_delta_vol_surface_rejects_invalid_data_on_deserialize() {
     use finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;
-    let surface = FxDeltaVolSurface::new(
-        "EURUSD-DELTA-VOL",
-        vec![0.25, 0.5, 1.0],
-        vec![0.08, 0.085, 0.09],
-        vec![0.01, 0.012, 0.015],
-        vec![0.005, 0.006, 0.007],
-        None,
-        None,
-    )
-    .unwrap();
+    let surface = sample_fx_delta_surface();
     let mut json = serde_json::to_value(&surface).unwrap();
     // Structurally valid but semantically invalid: non-monotonic expiries.
     json.as_object_mut()
@@ -1204,16 +1368,24 @@ fn fx_delta_vol_surface_rejects_invalid_data_on_deserialize() {
 
 #[test]
 fn fx_delta_vol_surface_requires_paired_wings_on_deserialize() {
-    use finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;
-    let surface = FxDeltaVolSurface::new(
+    use finstack_quant_core::market_data::surfaces::{
+        FxAtmConvention, FxButterflyConvention, FxDeltaConvention, FxDeltaVolSurface,
+    };
+    use finstack_quant_core::money::fx::CurrencyPair;
+    let surface = FxDeltaVolSurface::builder(
         "EURUSD",
-        vec![1.0],
-        vec![0.1],
-        vec![0.01],
-        vec![0.005],
-        Some(vec![0.02]),
-        Some(vec![0.01]),
+        CurrencyPair::try_new(Currency::EUR, Currency::USD).unwrap(),
     )
+    .delta_convention(FxDeltaConvention::ForwardUnadjusted)
+    .atm_convention(FxAtmConvention::DeltaNeutralStraddle)
+    .butterfly_convention(FxButterflyConvention::Smile)
+    .expiries(&[1.0])
+    .atm_vols(&[0.1])
+    .rr_25d(&[0.01])
+    .bf_25d(&[0.005])
+    .rr_10d(&[0.02])
+    .bf_10d(&[0.01])
+    .build()
     .unwrap();
     let json = serde_json::to_value(&surface).unwrap();
     assert!(serde_json::from_value::<FxDeltaVolSurface>(json.clone()).is_ok());
@@ -1229,17 +1401,27 @@ fn fx_delta_vol_surface_requires_paired_wings_on_deserialize() {
 
 #[test]
 fn fx_delta_vol_surface_constructor_owns_wing_pairing() {
-    use finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        FxAtmConvention, FxButterflyConvention, FxDeltaConvention, FxDeltaVolSurface,
+        FxDeltaVolSurfaceParams,
+    };
+    use finstack_quant_core::money::fx::CurrencyPair;
+    use finstack_quant_core::types::CurveId;
     let build = |rr: Option<Vec<f64>>, bf: Option<Vec<f64>>| {
-        FxDeltaVolSurface::new(
-            "EURUSD",
-            vec![1.0],
-            vec![0.1],
-            vec![0.01],
-            vec![0.005],
-            rr,
-            bf,
-        )
+        FxDeltaVolSurface::from_params(FxDeltaVolSurfaceParams {
+            id: CurveId::new("EURUSD"),
+            pair: CurrencyPair::try_new(Currency::EUR, Currency::USD).unwrap(),
+            delta_convention: FxDeltaConvention::ForwardUnadjusted,
+            atm_convention: FxAtmConvention::DeltaNeutralStraddle,
+            butterfly_convention: FxButterflyConvention::Smile,
+            expiries: vec![1.0],
+            atm_vols: vec![0.1],
+            rr_25d: vec![0.01],
+            bf_25d: vec![0.005],
+            rr_10d: rr,
+            bf_10d: bf,
+            expiry_clock: None,
+        })
     };
     for (rr, bf) in [(Some(vec![0.02]), None), (None, Some(vec![0.01]))] {
         let err = build(rr, bf).expect_err("unpaired 10-delta wings");
@@ -1251,4 +1433,57 @@ fn fx_delta_vol_surface_constructor_owns_wing_pairing() {
         );
     }
     assert!(build(None, None).expect("no wings").rr_10d().is_none());
+}
+
+#[test]
+fn fx_delta_vol_surface_requires_pair_and_conventions_and_roundtrips_clock() {
+    use finstack_quant_core::dates::{DayCount, DayCountContextState, VolatilityClock};
+    use finstack_quant_core::market_data::surfaces::{
+        FxAtmConvention, FxButterflyConvention, FxDeltaConvention, FxDeltaVolSurface,
+    };
+    use finstack_quant_core::money::fx::CurrencyPair;
+
+    let surface = sample_fx_delta_surface();
+    let json = serde_json::to_value(&surface).unwrap();
+    for field in [
+        "pair",
+        "delta_convention",
+        "atm_convention",
+        "butterfly_convention",
+    ] {
+        let mut missing = json.clone();
+        missing.as_object_mut().unwrap().remove(field);
+        assert!(
+            serde_json::from_value::<FxDeltaVolSurface>(missing).is_err(),
+            "missing required field {field} must fail"
+        );
+    }
+
+    let mut bad_pair = json;
+    bad_pair["pair"] = serde_json::json!({"base": "EUR", "quote": "EUR"});
+    assert!(serde_json::from_value::<FxDeltaVolSurface>(bad_pair).is_err());
+
+    let clock = VolatilityClock::try_new(
+        test_date(),
+        DayCount::Act365F,
+        DayCountContextState::default(),
+    )
+    .unwrap();
+    let with_clock = FxDeltaVolSurface::builder(
+        "EURUSD-CLOCK",
+        CurrencyPair::try_new(Currency::EUR, Currency::USD).unwrap(),
+    )
+    .delta_convention(FxDeltaConvention::ForwardUnadjusted)
+    .atm_convention(FxAtmConvention::DeltaNeutralStraddle)
+    .butterfly_convention(FxButterflyConvention::Smile)
+    .expiries(&[1.0])
+    .atm_vols(&[0.09])
+    .rr_25d(&[0.01])
+    .bf_25d(&[0.005])
+    .expiry_clock(clock.clone())
+    .build()
+    .unwrap();
+    let encoded = serde_json::to_value(&with_clock).unwrap();
+    let decoded: FxDeltaVolSurface = serde_json::from_value(encoded).unwrap();
+    assert_eq!(decoded.expiry_clock(), Some(&clock));
 }

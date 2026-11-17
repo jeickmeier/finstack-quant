@@ -31,8 +31,15 @@ def test_price_quote_at_zero_must_agree_with_spot() -> None:
         PriceCurve("SPOT", "2025-01-01", [(0.0, 80.0), (1.0, 100.0)], spot_price=75.0)
 
 
-def test_future_cpi_quotes_interpolate_from_base_cpi() -> None:
-    curve = InflationCurve("CPI", "2025-01-01", 300.0, [(1.0, 330.0), (2.0, 345.0)])
+def test_future_cpi_quotes_interpolate_from_explicit_origin() -> None:
+    curve = InflationCurve(
+        "CPI",
+        "2025-01-01",
+        [(0.0, 300.0), (1.0, 330.0), (2.0, 345.0)],
+        day_count="act_365f",
+        interp="log_linear",
+        extrapolation="error",
+    )
     for reconstructed in (curve, InflationCurve.from_json(curve.to_json())):
         assert reconstructed.cpi(0.0) == 300.0
         assert reconstructed.cpi(0.5) == pytest.approx(math.sqrt(300.0 * 330.0))
@@ -40,12 +47,48 @@ def test_future_cpi_quotes_interpolate_from_base_cpi() -> None:
         assert reconstructed.cpi(1.0) == pytest.approx(330.0)
 
 
+@pytest.mark.parametrize("t", [-0.1, math.nan, math.inf, 3.0])
+def test_inflation_queries_reject_invalid_coordinates(t: float) -> None:
+    curve = InflationCurve(
+        "CPI",
+        "2025-01-01",
+        [(0.0, 300.0), (1.0, 330.0)],
+        day_count="act_365f",
+        interp="log_linear",
+        extrapolation="error",
+    )
+    with pytest.raises(ValueError, match=r"non-negative|exceeds maximum knot"):
+        curve.cpi(t)
+
+
+def test_inflation_curve_requires_explicit_source_conventions_and_origin() -> None:
+    with pytest.raises(TypeError):
+        InflationCurve("CPI", "2025-01-01", [(0.0, 300.0), (1.0, 330.0)])  # type: ignore[call-arg]
+    with pytest.raises(ValueError, match="origin"):
+        InflationCurve(
+            "CPI",
+            "2025-01-01",
+            [(1.0, 330.0), (2.0, 345.0)],
+            day_count="act_365f",
+            interp="log_linear",
+            extrapolation="error",
+        )
+
+
 def test_monotone_convex_flat_first_strip_stays_flat() -> None:
     curve = DiscountCurve(
-        "USD-OIS", "2025-01-01", [(0.0, 1.0), (1.0, 1.0), (2.0, math.exp(-0.005)), (3.0, math.exp(-0.035))]
+        "USD-OIS",
+        "2025-01-01",
+        [(0.0, 1.0), (1.0, 1.0), (2.0, math.exp(-0.005)), (3.0, math.exp(-0.035))],
+        interp="monotone_convex",
+        extrapolation="extend",
+        day_count="act_365f",
     )
+    assert curve.df(0.0) == 1.0
+    assert curve.df(1.0) == 1.0
     for t in (0.1, 1 / 3, 0.5, 0.9):
-        assert curve.df(t) == pytest.approx(1.0, abs=1e-14)
+        expected = math.exp(0.00125 * t * (1.0 - t) * (1.0 + t))
+        assert curve.df(t) == pytest.approx(expected, abs=1e-14)
 
 
 @pytest.mark.parametrize("code", ["hkex", "hkhk"])

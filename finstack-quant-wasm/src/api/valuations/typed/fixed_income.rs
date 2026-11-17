@@ -43,7 +43,7 @@ instrument_class!(
     ///   "USD-OIS"
     /// );
     /// const market = new core.MarketContext();
-    /// market.insert(core.DiscountCurve.flat("USD-OIS", "2024-06-30", 0.03));
+    /// market.insert(core.DiscountCurve.flat("USD-OIS", "2024-06-30", 0.03, "act_365f"));
     /// const result = valuations.instruments.priceInstrument(bond.toJson(), market.toJson(), "2024-06-30", "default");
     /// console.log(result.value.amount, result.value.currency);
     /// ```
@@ -346,7 +346,7 @@ instrument_class!(
     /// await init();
     /// const loan = valuations.instruments.TermLoan.example();
     /// const market = new core.MarketContext();
-    /// market.insert(core.DiscountCurve.flat("USD-OIS", "2024-06-30", 0.03));
+    /// market.insert(core.DiscountCurve.flat("USD-OIS", "2024-06-30", 0.03, "act_365f"));
     /// const result = valuations.instruments.priceInstrument(loan.toJson(), market.toJson(), "2024-06-30", "default");
     /// console.log(result.value.amount, result.value.currency);
     /// ```
@@ -382,7 +382,7 @@ instrument_class!(
     /// const facility = valuations.instruments.AssetBackedFacility.example();
     /// const base = facility.borrowingBase();
     /// const market = new core.MarketContext();
-    /// market.insert(core.DiscountCurve.flat("USD-OIS", "2024-01-15", 0.03));
+    /// market.insert(core.DiscountCurve.flat("USD-OIS", "2024-01-15", 0.03, "act_365f"));
     /// const result = valuations.instruments.priceInstrument(facility.toJson(), market.toJson(), "2024-01-15", "default");
     /// console.log(base.borrowing_base.amount, result.value.amount);
     /// ```
@@ -480,8 +480,8 @@ instrument_class!(
     /// // that, so it is valued before the commitment date: a later date needs the
     /// // `FIXING:USD-SOFR-3M` history, and one past a draw event is rejected.
     /// const market = new core.MarketContext();
-    /// market.insert(core.DiscountCurve.flat("USD-OIS", "2023-12-15", 0.03));
-    /// market.insert(core.ForwardCurve.flat("USD-SOFR-3M", 0.25, "2023-12-15", 0.03));
+    /// market.insert(core.DiscountCurve.flat("USD-OIS", "2023-12-15", 0.03, "act_365f"));
+    /// market.insert(core.ForwardCurve.flat("USD-SOFR-3M", "2023-12-15", 0.03, "act_360"));
     /// const result = valuations.instruments.priceInstrument(facility.toJson(), market.toJson(), "2023-12-15", "default");
     /// console.log(result.value.amount, result.value.currency);
     /// ```

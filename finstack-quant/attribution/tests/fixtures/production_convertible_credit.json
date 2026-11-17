@@ -70,10 +70,7 @@
           ]
         ],
         "interp_style": "log_linear",
-        "extrapolation": "flat_forward",
-        "min_forward_rate": null,
-        "allow_non_monotonic": false,
-        "min_forward_tenor": 1e-06,
+        "extrapolation": "extend",
         "rate_calibration": null,
         "fx_policy": null
       },
@@ -108,29 +105,6 @@
         "seniority": "senior",
         "currency": "USD",
         "day_count": "act_360",
-        "par_points": [
-          [
-            0.9805555555555555,
-            150.0
-          ],
-          [
-            3.0083333333333333,
-            150.0
-          ],
-          [
-            5.038888888888889,
-            150.0
-          ],
-          [
-            7.066666666666666,
-            150.0
-          ],
-          [
-            10.11111111111111,
-            150.0
-          ]
-        ],
-        "par_interp": "linear",
         "hazard_calibration": {
           "hazard_params": {
             "base_date": "2025-01-01",
@@ -140,7 +114,6 @@
             "entity": "Issuer-A",
             "method": "bootstrap",
             "notional": 1.0,
-            "par_interp": "linear",
             "recovery_rate": 0.0,
             "seniority": "senior"
           },
@@ -473,10 +446,7 @@
           ]
         ],
         "interp_style": "log_linear",
-        "extrapolation": "flat_forward",
-        "min_forward_rate": null,
-        "allow_non_monotonic": false,
-        "min_forward_tenor": 1e-06,
+        "extrapolation": "extend",
         "rate_calibration": null,
         "fx_policy": null
       },
@@ -511,29 +481,6 @@
         "seniority": "senior",
         "currency": "USD",
         "day_count": "act_360",
-        "par_points": [
-          [
-            0.9805555555555555,
-            300.0
-          ],
-          [
-            3.0083333333333333,
-            300.0
-          ],
-          [
-            5.038888888888889,
-            300.0
-          ],
-          [
-            7.066666666666666,
-            300.0
-          ],
-          [
-            10.11111111111111,
-            300.0
-          ]
-        ],
-        "par_interp": "linear",
         "hazard_calibration": {
           "hazard_params": {
             "base_date": "2025-01-01",
@@ -543,7 +490,6 @@
             "entity": "Issuer-A",
             "method": "bootstrap",
             "notional": 1.0,
-            "par_interp": "linear",
             "recovery_rate": 0.0,
             "seniority": "senior"
           },

@@ -29,7 +29,7 @@ fn bump_surface_vol_absolute(
     vol_surface_id: &str,
     bump_abs: f64,
 ) -> finstack_quant_core::Result<MarketContext> {
-    context.bump([MarketBump::Curve {
+    context.bump([MarketBump::VolSurface {
         id: CurveId::from(vol_surface_id),
         spec: BumpSpec {
             mode: BumpMode::Additive,
@@ -52,7 +52,10 @@ fn vanna_is_reported_per_vol_point() -> finstack_quant_core::Result<()> {
         .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
         .insert(flat_discount_with_tenor("EUR-OIS", as_of, 0.01, 5.0))
         .insert_surface(flat_vol_surface("EURUSD-VOL", &expiries, &strikes, 0.15))
-        .insert_price("EURUSD-SPOT", MarketScalar::Unitless(spot));
+        .insert_price(
+            "EURUSD-SPOT",
+            MarketScalar::unitless(spot).expect("valid scalar"),
+        );
 
     // Barrier far from spot so the price surface is smooth around the bumps.
     let option = FxBarrierOption::builder()
@@ -104,11 +107,11 @@ fn vanna_is_reported_per_vol_point() -> finstack_quant_core::Result<()> {
         let vol_market = bump_surface_vol_absolute(&market, "EURUSD-VOL", vol_bump)?;
         let up = vol_market.clone().insert_price(
             "EURUSD-SPOT",
-            MarketScalar::Unitless(spot * (1.0 + spot_bump_decimal)),
+            MarketScalar::unitless(spot * (1.0 + spot_bump_decimal)).expect("valid scalar"),
         );
         let dn = vol_market.insert_price(
             "EURUSD-SPOT",
-            MarketScalar::Unitless(spot * (1.0 - spot_bump_decimal)),
+            MarketScalar::unitless(spot * (1.0 - spot_bump_decimal)).expect("valid scalar"),
         );
         let pv_up = option.value(&up, as_of)?.amount();
         let pv_dn = option.value(&dn, as_of)?.amount();

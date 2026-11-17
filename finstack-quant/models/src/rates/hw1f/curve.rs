@@ -73,7 +73,7 @@ fn rebased_discount_fn<'a>(
     as_of: Date,
 ) -> Result<impl Fn(f64) -> f64 + 'a> {
     let model_curve = crate::rates::clock::ModelDiscountCurve::new(curve, as_of)?;
-    Ok(move |t| model_curve.df(t))
+    Ok(move |t| model_curve.df(t).unwrap_or(f64::NAN))
 }
 
 /// Prepare time-dependent HW1F parameters θ(t) from a discount curve.
@@ -301,7 +301,7 @@ impl<'a> Hw1fTermForward<'a> {
         let big_t = t + tau.max(0.0);
         let b = hw_b(self.kappa, t, big_t);
         let ln_a = hw_ln_a(self.kappa, self.sigma, t, big_t, &|time| {
-            self.discount_curve.df(time)
+            self.discount_curve.df(time).unwrap_or(f64::NAN)
         })?;
         Ok(PeriodForwardCoeffs {
             b,
@@ -363,6 +363,8 @@ mod tests {
         DiscountCurve::builder("FLAT")
             .base_date(as_of)
             .day_count(DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .knots([
                 (0.0, 1.0),
                 (1.0, (-rate).exp()),
@@ -387,12 +389,19 @@ mod tests {
         fn base_date(&self) -> Date {
             self.as_of
         }
-        fn df(&self, time: f64) -> f64 {
-            if time <= self.valid_until {
+        fn df(&self, time: f64) -> finstack_quant_core::Result<f64> {
+            Ok(if time <= self.valid_until {
                 (-0.03 * time).exp()
             } else {
                 self.invalid
-            }
+            })
+        }
+        fn instantaneous_forward(&self, time: f64) -> finstack_quant_core::Result<f64> {
+            Ok(if time <= self.valid_until {
+                0.03
+            } else {
+                self.invalid
+            })
         }
     }
 

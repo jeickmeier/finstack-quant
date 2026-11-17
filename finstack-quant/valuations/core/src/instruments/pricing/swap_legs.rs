@@ -91,6 +91,9 @@ mod tests {
         DiscountCurve::builder(CurveId::new("TEST-DISC"))
             .base_date(base_date)
             .knots(vec![(0.0, 1.0), (0.5, 0.975), (1.0, 0.95), (5.0, 0.80)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("test curve should build")
     }
@@ -117,6 +120,8 @@ mod tests {
             .base_date(base_date)
             .day_count(DayCount::Act365F)
             .knots(vec![(0.0, 1.0), (1.0, 1e-12), (2.0, 1e-15)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve should build");
 
@@ -202,6 +207,9 @@ mod tests {
                 (30.0, 0.20),
                 (50.0, 0.08),
             ])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve should build");
 

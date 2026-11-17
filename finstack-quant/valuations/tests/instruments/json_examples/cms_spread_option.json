@@ -9,6 +9,7 @@
       "forward_curve_id": "USD-SOFR-3M",
       "id": "CMS-SPREAD-10Y2Y",
       "index_id": "USD-SOFR-OIS",
+      "long_cms_fixing_index_id": "USD-SOFR-CMS-10Y",
       "long_cms_tenor": {
         "count": 10,
         "unit": "years"
@@ -20,6 +21,7 @@
       },
       "option_type": "call",
       "payment_date": "2027-03-31",
+      "short_cms_fixing_index_id": "USD-SOFR-CMS-2Y",
       "short_cms_tenor": {
         "count": 2,
         "unit": "years"

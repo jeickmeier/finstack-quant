@@ -1064,7 +1064,7 @@ pub fn get_cube_vol_clamped(
     ))
 }
 
-/// Return ATM, 25-delta put, and 25-delta call vols at a stored FX expiry.
+/// Return ATM, 25-delta put/call, and optional 10-delta put/call vols at a stored FX expiry.
 ///
 /// # Arguments
 ///
@@ -1077,7 +1077,8 @@ pub fn get_cube_vol_clamped(
 /// negative, exceeds the wasm32 integer range, or is outside the surface.
 /// @param surface - Structurally validated data-only FX delta surface.
 /// @param expiryIndex - Zero-based stored expiry index.
-/// @returns Three annualized decimal volatilities in ATM, put, call order.
+/// @returns Three `[atm, put25d, call25d]` annualized decimal volatilities, or five `[atm, put25d, call25d, put10d, call10d]` values when 10-delta wings are present.
+/// @throws Error - Throws `invalid_type` for a non-integer `expiryIndex` or `validation` if out of range.
 #[wasm_bindgen(js_name = getFxDeltaPillarVols)]
 pub fn get_fx_delta_pillar_vols(
     surface: &JsFxDeltaVolSurface,
@@ -1085,7 +1086,7 @@ pub fn get_fx_delta_pillar_vols(
 ) -> Result<Box<[f64]>, JsValue> {
     let expiry_index: usize = js_uint(&expiry_index, "expiryIndex")?;
     vol::get_fx_delta_pillar_vols(&surface.inner, expiry_index)
-        .map(|(atm, put, call)| Box::new([atm, put, call]) as Box<[f64]>)
+        .map(Vec::into_boxed_slice)
         .map_err(to_js_err)
 }
 
@@ -1120,58 +1121,78 @@ pub fn get_fx_delta_vol(
     vol::get_fx_delta_vol(&surface.inner, expiry, strike, forward).map_err(to_js_err)
 }
 
-/// Convert premium-unadjusted forward delta to strike.
+/// Convert premium-unadjusted forward delta magnitude to strike.
 ///
 /// # Arguments
 ///
-/// * `delta` - Forward call delta as a decimal probability in `(0, 1)`.
-/// * `forward` - Positive forward in the same units as the returned strike.
+/// * `is_call` - `true` for a call option, `false` for a put option.
+/// * `delta_abs` - Forward delta magnitude as a decimal probability in `(0, 1)`.
+/// * `forward` - Positive outright forward in quote units per base unit.
 /// * `vol` - Positive annualized Black volatility as a decimal.
 /// * `expiry` - Positive option expiry in years.
-/// @param delta - Forward call delta as a decimal probability in `(0, 1)`.
+///
+/// # Errors
+///
+/// Throws a `TypeError` for mistyped arguments or a `FinstackError` (kind `validation`)
+/// when `delta_abs` is outside `(0, 1)` or `forward`, `vol`, or `expiry` is not finite and positive.
+/// @param isCall - `true` for a call option, `false` for a put option.
+/// @param deltaAbs - Forward delta magnitude as a decimal probability strictly in `(0, 1)`.
 /// @param forward - Positive forward in the same units as the returned strike.
 /// @param vol - Positive annualized Black volatility as a decimal.
 /// @param expiry - Positive option expiry in years.
 /// @returns Strike in the same units as `forward`.
+/// @throws Error - Throws `invalid_type` for mistyped arguments or `validation` when an input is out of domain.
 #[wasm_bindgen(js_name = deltaToStrike)]
 pub fn delta_to_strike(
-    #[wasm_bindgen(unchecked_param_type = "number")] delta: JsValue,
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
+    #[wasm_bindgen(js_name = "deltaAbs", unchecked_param_type = "number")] delta_abs: JsValue,
     #[wasm_bindgen(unchecked_param_type = "number")] forward: JsValue,
     #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
     #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
 ) -> Result<f64, JsValue> {
-    let delta = js_f64(&delta, "delta")?;
+    let is_call = js_bool(&is_call, "isCall")?;
+    let delta_abs = js_f64(&delta_abs, "deltaAbs")?;
     let forward = js_f64(&forward, "forward")?;
     let vol = js_f64(&vol, "vol")?;
     let expiry = js_f64(&expiry, "expiry")?;
-    Ok(vol::delta_to_strike(delta, forward, vol, expiry))
+    vol::delta_to_strike(is_call, delta_abs, forward, vol, expiry).map_err(to_js_err)
 }
 
-/// Convert strike to premium-unadjusted forward call delta.
+/// Convert strike to premium-unadjusted forward delta magnitude.
 ///
 /// # Arguments
 ///
+/// * `is_call` - `true` for a call option, `false` for a put option.
 /// * `strike` - Positive strike in the same units as `forward`.
 /// * `forward` - Positive forward in the same units as `strike`.
 /// * `vol` - Positive annualized Black volatility as a decimal.
 /// * `expiry` - Positive option expiry in years.
+///
+/// # Errors
+///
+/// Throws a `TypeError` for mistyped arguments or a `FinstackError` (kind `validation`)
+/// when any numeric input is non-finite or non-positive.
+/// @param isCall - `true` for a call option, `false` for a put option.
 /// @param strike - Positive strike in the same units as `forward`.
 /// @param forward - Positive forward in the same units as `strike`.
 /// @param vol - Positive annualized Black volatility as a decimal.
 /// @param expiry - Positive option expiry in years.
-/// @returns Forward call delta as a decimal probability.
+/// @returns Unsigned forward delta magnitude in `(0, 1)`.
+/// @throws Error - Throws `invalid_type` for mistyped arguments or `validation` when an input is non-finite or non-positive.
 #[wasm_bindgen(js_name = strikeToDelta)]
 pub fn strike_to_delta(
+    #[wasm_bindgen(js_name = "isCall", unchecked_param_type = "boolean")] is_call: JsValue,
     #[wasm_bindgen(unchecked_param_type = "number")] strike: JsValue,
     #[wasm_bindgen(unchecked_param_type = "number")] forward: JsValue,
     #[wasm_bindgen(unchecked_param_type = "number")] vol: JsValue,
     #[wasm_bindgen(unchecked_param_type = "number")] expiry: JsValue,
 ) -> Result<f64, JsValue> {
+    let is_call = js_bool(&is_call, "isCall")?;
     let strike = js_f64(&strike, "strike")?;
     let forward = js_f64(&forward, "forward")?;
     let vol = js_f64(&vol, "vol")?;
     let expiry = js_f64(&expiry, "expiry")?;
-    Ok(vol::strike_to_delta(strike, forward, vol, expiry))
+    vol::strike_to_delta(is_call, strike, forward, vol, expiry).map_err(to_js_err)
 }
 
 /// SVI total implied variance `w(k)` at a log-moneyness.
@@ -1231,6 +1252,7 @@ pub fn svi_durrleman_g(
 ///   [0.5, 1.0],
 ///   [90, 100, 110],
 ///   [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+///   { secondaryAxis: "strike", quoteType: "black_lognormal", interpolationMode: "vol" },
 /// );
 /// const local = models.volatility.localVolFromImpliedVol(implied, [100, 100]);
 /// console.log(local.expiries, local.strikes); // [0.5, 1] [90, 100, 110]
@@ -1274,6 +1296,7 @@ pub fn local_vol_from_implied_vol(
 ///   [0.5, 1.0],
 ///   [90, 100, 110],
 ///   [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+///   { secondaryAxis: "strike", quoteType: "black_lognormal", interpolationMode: "vol" },
 /// );
 /// const local = models.volatility.localVolFromImpliedVolSmoothed(implied, [100, 100], 5.0);
 /// console.log(local.local_vols.length); // 6
@@ -1642,31 +1665,30 @@ pub fn get_cube_expiry_slice_vol_clamped(
 }
 
 /// Materialize an FX delta-quoted surface as an expiry by strike volatility surface.
-/// @param surface - `core.FxDeltaVolSurface` handle.
-/// @param spot - FX spot rate (domestic per unit of foreign); positive.
-/// @param domesticRate - Continuously compounded domestic rate, as a decimal.
-/// @param foreignRate - Continuously compounded foreign rate, as a decimal.
-/// @returns The strike-space `core.VolSurface` handle.
+///
+/// # Arguments
+///
+/// * `surface` - Structurally validated `core.FxDeltaVolSurface` handle.
+/// * `delivery_forwards` - Outright FX delivery forwards in quote units per base unit, one positive finite value per surface expiry.
 ///
 /// # Errors
 ///
-/// Throws a `validation` error if an input is non-finite or out of range or a
-/// delta-to-strike conversion fails.
+/// Throws a `TypeError` for mistyped arguments or a `validation` error if
+/// `delivery_forwards` length mismatches `surface.expiries`, any forward is
+/// non-finite or non-positive, or delta-to-strike conversion fails.
+/// @param surface - `core.FxDeltaVolSurface` handle.
+/// @param deliveryForwards - Outright FX delivery forwards (quote per unit of base), one positive value per expiry.
+/// @returns The strike-space `core.VolSurface` handle.
+/// @throws Error - Throws `invalid_type` for mistyped arguments or `validation` when forwards mismatch length, are non-positive, or wing conversion fails.
 #[wasm_bindgen(js_name = materializeFxDeltaSurface)]
 pub fn materialize_fx_delta_surface(
     surface: &JsFxDeltaVolSurface,
-    #[wasm_bindgen(unchecked_param_type = "number")] spot: JsValue,
-    #[wasm_bindgen(js_name = "domesticRate", unchecked_param_type = "number")]
-    domestic_rate: JsValue,
-    #[wasm_bindgen(js_name = "foreignRate", unchecked_param_type = "number")] foreign_rate: JsValue,
+    #[wasm_bindgen(js_name = "deliveryForwards", unchecked_param_type = "NumericArray")]
+    delivery_forwards: JsValue,
 ) -> Result<JsVolSurface, JsValue> {
-    let materialized = vol::materialize_fx_delta_surface(
-        &surface.inner,
-        js_f64(&spot, "spot")?,
-        js_f64(&domestic_rate, "domesticRate")?,
-        js_f64(&foreign_rate, "foreignRate")?,
-    )
-    .map_err(to_js_err)?;
+    let delivery_forwards = js_f64_seq(&delivery_forwards, "deliveryForwards")?;
+    let materialized =
+        vol::materialize_fx_delta_surface(&surface.inner, &delivery_forwards).map_err(to_js_err)?;
     Ok(JsVolSurface::from_inner(Arc::new(materialized)))
 }
 

@@ -434,7 +434,15 @@ def clo_deal(*, one_period: bool = False, oc_trigger: float | None = None) -> di
             .build()
         )
     deal = StructuredCredit.new_standard(
-        "clo", StandardDealParams(id="ANALYST-CLO", pool=pool, tranches=TrancheStructure(notes), closing_date=AS_OF, maturity=maturity, discount_curve_id="USD-OIS")
+        "clo",
+        StandardDealParams(
+            id="ANALYST-CLO",
+            pool=pool,
+            tranches=TrancheStructure(notes),
+            closing_date=AS_OF,
+            maturity=maturity,
+            discount_curve_id="USD-OIS",
+        ),
     )
     payload = json.loads(deal.to_json())
     spec = payload["instrument"]["spec"]
@@ -961,6 +969,9 @@ def build_market(stage: str, as_of: date = AS_OF, *, core_stage: str | None = No
                 [0.25, 0.5, 1.0, 2.0],
                 [0.0025, 0.01, 0.03],
                 [[0.40] * 3] * 4,
+                secondary_axis="strike",
+                quote_type="black_lognormal",
+                interpolation_mode="vol",
             )
         )
         # Issuer hazard curve for the analyst convertible: flat 2.5% intensity,
@@ -997,6 +1008,8 @@ def build_market(stage: str, as_of: date = AS_OF, *, core_stage: str | None = No
                 as_of,
                 [(t, math.exp(-0.04 * t)) for t in (0.0, 1.0, 5.0, 10.0)],
                 day_count="act_365f",
+                interp="monotone_convex",
+                extrapolation="extend",
             )
         )
         for underlying in ("CONVERT", "CONVERT-LIMIT"):
@@ -1008,7 +1021,12 @@ def build_market(stage: str, as_of: date = AS_OF, *, core_stage: str | None = No
         for iid, rate in (("USD-TREASURY", 0.04), ("USD-REPO", 0.042)):
             market.insert(
                 DiscountCurve(
-                    iid, as_of, [(t, math.exp(-rate * t)) for t in (0.0, 1.0, 5.0, 10.0, 20.0)], day_count="act_365f"
+                    iid,
+                    as_of,
+                    [(t, math.exp(-rate * t)) for t in (0.0, 1.0, 5.0, 10.0, 20.0)],
+                    day_count="act_365f",
+                    interp="monotone_convex",
+                    extrapolation="extend",
                 )
             )
         market.insert(PriceCurve("VIX", as_of, [(0.0, 20.0), (0.25, 22.0), (0.5, 23.0), (1.0, 24.0)], kind="vol_index"))
@@ -1019,13 +1037,33 @@ def build_market(stage: str, as_of: date = AS_OF, *, core_stage: str | None = No
         ):
             market.insert(PriceCurve(f"{ticker}-FORWARD", as_of, list(zip((0.0, 0.5, 1.0, 2.0), prices, strict=True))))
             strikes = [1.0, 3.0, 6.0] if ticker == "NG" else [20.0, 75.0, 150.0]
-            market.insert(VolSurface(f"{ticker}-VOL", [0.25, 0.5, 1.0, 2.0], strikes, [[sigma] * 3] * 4))
+            market.insert(
+                VolSurface(
+                    f"{ticker}-VOL",
+                    [0.25, 0.5, 1.0, 2.0],
+                    strikes,
+                    [[sigma] * 3] * 4,
+                    secondary_axis="strike",
+                    quote_type="black_lognormal",
+                    interpolation_mode="vol",
+                )
+            )
         # Explicit synthetic observed spot for spot-option simulation.
         market.insert_price("WTI-SPOT", 75.0, "USD")
         market.insert_price("SPX", 5200.0, "USD")
         market.insert_price("SPX-DIVYIELD", 0.015)
         strikes = [5200.0 * math.exp(-3.0 + i * 0.05) for i in range(121)]
-        market.insert(VolSurface("SPX_VOL", [0.25, 0.5, 1.0, 2.0], strikes, [[0.20] * len(strikes)] * 4))
+        market.insert(
+            VolSurface(
+                "SPX_VOL",
+                [0.25, 0.5, 1.0, 2.0],
+                strikes,
+                [[0.20] * len(strikes)] * 4,
+                secondary_axis="strike",
+                quote_type="black_lognormal",
+                interpolation_mode="vol",
+            )
+        )
         for iid, observations in ohlc_observations().items():
-            market.insert_series(ScalarTimeSeries(iid, observations))
+            market.insert_series(ScalarTimeSeries(iid, observations, "step", "error"))
     return market

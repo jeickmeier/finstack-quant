@@ -1760,11 +1760,26 @@ mod paired_tests {
 
     fn components(moments: &OnlineCovariance) -> [f64; 5] {
         [
-            moments.mean_x(),
-            moments.mean_y(),
-            moments.variance_x(),
-            moments.variance_y(),
-            moments.covariance(),
+            moments
+                .get_mean_x()
+                .expect("finite mean_x")
+                .expect("non-empty mean_x"),
+            moments
+                .get_mean_y()
+                .expect("finite mean_y")
+                .expect("non-empty mean_y"),
+            moments
+                .get_variance_x()
+                .expect("finite variance_x")
+                .expect("at least 2 samples for variance_x"),
+            moments
+                .get_variance_y()
+                .expect("finite variance_y")
+                .expect("at least 2 samples for variance_y"),
+            moments
+                .get_covariance()
+                .expect("finite covariance")
+                .expect("at least 2 samples for covariance"),
         ]
     }
 
@@ -1891,7 +1906,9 @@ mod paired_tests {
                     target.final_value.to_bits(),
                     control.final_value.to_bits(),
                 ));
-                reference.update(target.final_value, control.final_value);
+                reference
+                    .update(target.final_value, control.final_value)
+                    .expect("finite paired payoffs");
             }
             reference_traces.sort();
             let traced = TracedAsian {
@@ -1927,7 +1944,7 @@ mod paired_tests {
                         },
                     )
                     .expect("paired moments");
-                assert_eq!(moments.count(), num_paths);
+                assert_eq!(moments.get_count(), num_paths);
                 assert_eq!(steps.load(Ordering::Relaxed), num_paths * 12);
                 let mut actual_traces = traces.into_inner().expect("trace lock");
                 actual_traces.sort();
@@ -1984,7 +2001,7 @@ mod paired_tests {
                         .build()
                         .expect("test pool");
                     let parallel = pool.install(|| price(true));
-                    assert_eq!(parallel.count(), num_paths);
+                    assert_eq!(parallel.get_count(), num_paths);
                     assert_eq!(
                         components(&serial).map(f64::to_bits),
                         components(&parallel).map(f64::to_bits),
@@ -2051,9 +2068,11 @@ mod paired_tests {
             .expect("sequential paired moments");
         let mut reference = OnlineCovariance::new();
         for path in &captured.paths {
-            reference.update(path.final_value, path.final_value * path.final_value);
+            reference
+                .update(path.final_value, path.final_value * path.final_value)
+                .expect("finite paired values");
         }
-        assert_eq!(actual.count(), 11);
+        assert_eq!(actual.get_count(), 11);
         assert_eq!(
             observed.into_inner().expect("value lock"),
             captured
@@ -2088,7 +2107,7 @@ mod paired_tests {
             let zero = engine
                 .paired_moments(inputs, |_, currency| Money::new(0.0, currency))
                 .expect("zero control is valid");
-            assert_eq!(zero.count(), 11);
+            assert_eq!(zero.get_count(), 11);
             assert_eq!(components(&zero), [90.0, 0.0, 0.0, 0.0, 0.0]);
 
             let err = engine

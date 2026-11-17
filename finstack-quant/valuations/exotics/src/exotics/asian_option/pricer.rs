@@ -88,7 +88,7 @@ pub(super) fn map_fixings_to_steps(
 fn paired_moments(xs: &[f64], ys: &[f64]) -> OnlineCovariance {
     let mut moments = OnlineCovariance::new();
     for (&x, &y) in xs.iter().zip(ys) {
-        moments.update(x, y);
+        moments.update(x, y).expect("finite paired payoff");
     }
     moments
 }
@@ -179,7 +179,7 @@ fn seasoned_geometric_asian_control(
     future_times: &[f64],
     drift_schedule: Option<&finstack_quant_models::monte_carlo::process::gbm::DriftSchedule>,
     fixing_multipliers: Option<&[f64]>,
-) -> f64 {
+) -> finstack_quant_core::Result<f64> {
     let &OptionMarketParams {
         spot,
         strike,
@@ -193,7 +193,7 @@ fn seasoned_geometric_asian_control(
     let k = future_times.len();
     let n_total = hist_count + k;
     if n_total == 0 {
-        return 0.0;
+        return Ok(0.0);
     }
     let n = n_total as f64;
     let ln_spot = spot.ln();
@@ -204,25 +204,25 @@ fn seasoned_geometric_asian_control(
     // M(t) is the schedule's cumulative log-drift — identical to what the MC
     // engine applies step by step.
     let mut mean_acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
-    mean_acc.add(hist_prod_log);
+    mean_acc.add(hist_prod_log)?;
     for (index, &t_i) in future_times.iter().enumerate() {
         let drift_to_t = match drift_schedule {
             Some(schedule) => schedule.cumulative(t_i) - 0.5 * sigma * sigma * t_i,
             None => constant_drift * t_i,
         };
         let log_multiplier = fixing_multipliers.map_or(0.0, |scales| scales[index].ln());
-        mean_acc.add(ln_spot + drift_to_t + log_multiplier);
+        mean_acc.add(ln_spot + drift_to_t + log_multiplier)?;
     }
-    let mu = mean_acc.total() / n;
+    let mu = mean_acc.get_total()? / n;
 
     // Variance of ln(G): σ² ΣᵢΣⱼ min(t_i,t_j) / N².
     let mut cov_acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     for &t_i in future_times {
         for &t_j in future_times {
-            cov_acc.add(t_i.min(t_j));
+            cov_acc.add(t_i.min(t_j))?;
         }
     }
-    let var_ln_g = sigma * sigma * cov_acc.total() / (n * n);
+    let var_ln_g = sigma * sigma * cov_acc.get_total()? / (n * n);
 
     // Degenerate (no future fixings or zero vol): G is deterministic.
     if var_ln_g <= 0.0 || k == 0 {
@@ -232,7 +232,7 @@ fn seasoned_geometric_asian_control(
         } else {
             (strike - g).max(0.0)
         };
-        return df * intrinsic;
+        return Ok(df * intrinsic);
     }
 
     let std = var_ln_g.sqrt();
@@ -245,7 +245,7 @@ fn seasoned_geometric_asian_control(
     } else {
         strike * norm_cdf(-d2) - expected_g * norm_cdf(-d1)
     };
-    df * price.max(0.0)
+    Ok(df * price.max(0.0))
 }
 
 /// Asian option Monte Carlo pricer.
@@ -377,10 +377,16 @@ impl AsianOptionMcPricer {
                 discount_factor,
             )?;
 
-            let n = moments.count();
-            let (mean_x, mean_y) = (moments.mean_x(), moments.mean_y());
-            let (var_x, var_y) = (moments.variance_x(), moments.variance_y());
-            let cov_xy = moments.covariance();
+            let n = moments.get_count();
+            let (mean_x, mean_y) = (
+                moments.get_mean_x()?.unwrap_or(0.0),
+                moments.get_mean_y()?.unwrap_or(0.0),
+            );
+            let (var_x, var_y) = (
+                moments.get_variance_x()?.unwrap_or(0.0),
+                moments.get_variance_y()?.unwrap_or(0.0),
+            );
+            let cov_xy = moments.get_covariance()?.unwrap_or(0.0);
 
             // Analytical value of geometric Asian (control).
             //
@@ -416,7 +422,7 @@ impl AsianOptionMcPricer {
                     &future_fixing_times,
                     Some(drift_schedule.as_ref()),
                     Some(&fixing_multipliers),
-                );
+                )?;
             let adj =
                 apply_control_variate(mean_x, var_x, mean_y, var_y, cov_xy, control_analytical, n);
             MoneyEstimate::from_estimate(adj, inst.currency)?.mean
@@ -490,13 +496,60 @@ pub(super) fn expired_value(
     hist_prod_log: f64,
     hist_count: usize,
 ) -> finstack_quant_core::Result<Money> {
-    let average = match realized_average(inst.averaging_method, hist_sum, hist_prod_log, hist_count)
-    {
+    expired_value_for_method(
+        inst,
+        curves,
+        inst.averaging_method,
+        hist_sum,
+        hist_prod_log,
+        hist_count,
+    )
+}
+
+fn expired_value_for_method(
+    inst: &AsianOption,
+    curves: &MarketContext,
+    method: AveragingMethod,
+    hist_sum: f64,
+    hist_prod_log: f64,
+    hist_count: usize,
+) -> finstack_quant_core::Result<Money> {
+    let average = match realized_average(method, hist_sum, hist_prod_log, hist_count) {
         Some(average) => average,
         None => resolve_spot(inst, curves)?,
     };
     let intrinsic = average_intrinsic(inst.option_type, average, inst.strike);
     Money::new(intrinsic * inst.quantity, inst.currency)
+}
+
+fn expired_valuation(
+    asian: &AsianOption,
+    market: &MarketContext,
+    as_of: Date,
+    method: AveragingMethod,
+    hist_sum: f64,
+    hist_prod_log: f64,
+    hist_count: usize,
+) -> std::result::Result<ValuationResult, PricingError> {
+    let money =
+        expired_value_for_method(asian, market, method, hist_sum, hist_prod_log, hist_count)
+            .map_err(|error| {
+                PricingError::from_core(error, PricingErrorContext::from_instrument(asian))
+            })?;
+    Ok(ValuationResult::stamped(asian.id(), as_of, money))
+}
+
+fn expiry_year_fraction_or_zero(
+    asian: &AsianOption,
+    as_of: Date,
+) -> finstack_quant_core::Result<f64> {
+    if as_of >= asian.expiry {
+        Ok(0.0)
+    } else {
+        asian
+            .day_count
+            .year_fraction(as_of, asian.expiry, DayCountContext::default())
+    }
 }
 
 /// Underlying spot from `spot_id`, in the option currency when quoted as a price.
@@ -568,6 +621,19 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
         let asian = expect_inst::<AsianOption>(instrument, InstrumentType::AsianOption)?;
         asian.validate_past_fixings(as_of)?;
 
+        let (sum, log_prod, count) = asian.accumulated_state(as_of);
+        if expiry_year_fraction_or_zero(asian, as_of)? <= 0.0 {
+            return expired_valuation(
+                asian,
+                market,
+                as_of,
+                asian.averaging_method,
+                sum,
+                log_prod,
+                count,
+            );
+        }
+
         let inputs = analytic_inputs(asian, market, as_of)?;
         let (spot, r, q, sigma, t) = (
             inputs.spot,
@@ -576,24 +642,6 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
             inputs.sigma,
             inputs.t,
         );
-
-        let (sum, log_prod, count) = asian.accumulated_state(as_of);
-
-        if t <= 0.0 {
-            let average =
-                realized_average(asian.averaging_method, sum, log_prod, count).unwrap_or(spot);
-            let intrinsic = average_intrinsic(asian.option_type, average, asian.strike);
-            return Ok(ValuationResult::stamped(
-                asian.id(),
-                as_of,
-                Money::new(intrinsic * asian.quantity, asian.currency).map_err(|error| {
-                    finstack_quant_valuations_core::pricer::PricingError::from_core(
-                        error,
-                        finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(asian),
-                    )
-                })?,
-            ));
-        }
 
         // Price on the actual fixing schedule. Falling back to the
         // equal-spacing formula would misprice contracts whose fixings are
@@ -621,7 +669,10 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
             &fixing_times,
             Some(&drift),
             Some(&multipliers),
-        );
+        )
+        .map_err(|error| {
+            PricingError::from_core(error, PricingErrorContext::from_instrument(asian))
+        })?;
 
         let pv = Money::new(price * asian.quantity, asian.currency).map_err(|error| {
             finstack_quant_valuations_core::pricer::PricingError::from_core(
@@ -669,6 +720,22 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
         let asian = expect_inst::<AsianOption>(instrument, InstrumentType::AsianOption)?;
         asian.validate_past_fixings(as_of)?;
 
+        let (sum, _, count) = asian.accumulated_state(as_of);
+        let total_fixings = asian.fixing_dates.len();
+
+        if expiry_year_fraction_or_zero(asian, as_of)? <= 0.0 {
+            // Turnbull-Wakeman prices the arithmetic average.
+            return expired_valuation(
+                asian,
+                market,
+                as_of,
+                AveragingMethod::Arithmetic,
+                sum,
+                0.0,
+                count,
+            );
+        }
+
         // Date-based DF for time-consistent discounting
         let bs_inputs = analytic_inputs(asian, market, as_of)?;
 
@@ -677,26 +744,6 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
         let q = bs_inputs.q;
         let sigma = bs_inputs.sigma;
         let t = bs_inputs.t;
-
-        let (sum, _, count) = asian.accumulated_state(as_of);
-        let total_fixings = asian.fixing_dates.len();
-
-        if t <= 0.0 {
-            // Turnbull-Wakeman prices the arithmetic average.
-            let average =
-                realized_average(AveragingMethod::Arithmetic, sum, 0.0, count).unwrap_or(spot);
-            let intrinsic = average_intrinsic(asian.option_type, average, asian.strike);
-            return Ok(ValuationResult::stamped(
-                asian.id(),
-                as_of,
-                Money::new(intrinsic * asian.quantity, asian.currency).map_err(|error| {
-                    finstack_quant_valuations_core::pricer::PricingError::from_core(
-                        error,
-                        finstack_quant_valuations_core::pricer::PricingErrorContext::from_instrument(asian),
-                    )
-                })?,
-            ));
-        }
 
         let future_fixings = total_fixings.saturating_sub(count);
         if future_fixings == 0 {
@@ -783,7 +830,9 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
@@ -803,12 +852,16 @@ mod tests {
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (5.0, (-rate * 5.0).exp())])
             .interp(InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 
         let vol_surface = VolSurface::builder("SPX-VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
+            .secondary_values(&[80.0, 90.0, 100.0, 110.0, 120.0])
             .row(&[vol, vol, vol, vol, vol])
             .row(&[vol, vol, vol, vol, vol])
             .row(&[vol, vol, vol, vol, vol])
@@ -819,8 +872,14 @@ mod tests {
         MarketContext::new()
             .insert(discount)
             .insert_surface(vol_surface)
-            .insert_price("SPX-SPOT", MarketScalar::Unitless(spot))
-            .insert_price("SPX-DIV", MarketScalar::Unitless(div_yield))
+            .insert_price(
+                "SPX-SPOT",
+                MarketScalar::unitless(spot).expect("valid scalar"),
+            )
+            .insert_price(
+                "SPX-DIV",
+                MarketScalar::unitless(div_yield).expect("valid scalar"),
+            )
     }
 
     fn market_without_vol(as_of: Date, spot: f64, rate: f64, div_yield: f64) -> MarketContext {
@@ -829,13 +888,20 @@ mod tests {
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (5.0, (-rate * 5.0).exp())])
             .interp(InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 
         MarketContext::new()
             .insert(discount)
-            .insert_price("SPX-SPOT", MarketScalar::Unitless(spot))
-            .insert_price("SPX-DIV", MarketScalar::Unitless(div_yield))
+            .insert_price(
+                "SPX-SPOT",
+                MarketScalar::unitless(spot).expect("valid scalar"),
+            )
+            .insert_price(
+                "SPX-DIV",
+                MarketScalar::unitless(div_yield).expect("valid scalar"),
+            )
     }
 
     fn asian_option(
@@ -1129,10 +1195,14 @@ mod tests {
             .sum::<f64>()
             / fixing_dates.len() as f64;
         let payoff = (average - 100.0).max(0.0);
-        let df = market.get_discount("USD-OIS").expect("discount").df(option
-            .day_count
-            .year_fraction(as_of, expiry, DayCountContext::default())
-            .expect("year fraction"));
+        let df = market
+            .get_discount("USD-OIS")
+            .expect("discount")
+            .df(option
+                .day_count
+                .year_fraction(as_of, expiry, DayCountContext::default())
+                .expect("year fraction"))
+            .expect("df");
         let expected_money = Money::new(payoff * df, Currency::USD)
             .expect("valid money fixture")
             .amount();
@@ -1340,10 +1410,14 @@ mod tests {
         let average =
             [92.0, 95.0, 97.0, 96.0, 94.0, 98.0].iter().sum::<f64>() / fixing_dates.len() as f64;
         let payoff = (100.0 - average).max(0.0);
-        let df = market.get_discount("USD-OIS").expect("discount").df(option
-            .day_count
-            .year_fraction(as_of, expiry, DayCountContext::default())
-            .expect("year fraction"));
+        let df = market
+            .get_discount("USD-OIS")
+            .expect("discount")
+            .df(option
+                .day_count
+                .year_fraction(as_of, expiry, DayCountContext::default())
+                .expect("year fraction"))
+            .expect("df");
         let expected = Money::new(payoff * df, Currency::USD)
             .expect("valid money fixture")
             .amount();
@@ -1390,10 +1464,12 @@ mod tests {
             .amount();
 
         let disc_curve = market.get_discount("USD-OIS").expect("discount");
-        let df_expiry = disc_curve.df(option
-            .day_count
-            .year_fraction(as_of, expiry, DayCountContext::default())
-            .expect("year fraction"));
+        let df_expiry = disc_curve
+            .df(option
+                .day_count
+                .year_fraction(as_of, expiry, DayCountContext::default())
+                .expect("year fraction"))
+            .expect("df");
         let spot = 100.0;
         let q = 0.01;
         let sum_past = [250.0, 240.0, 260.0, 255.0].iter().sum::<f64>();
@@ -1473,7 +1549,7 @@ mod tests {
 
         let market = market(as_of, 80.0, 0.20, 0.05, 0.0).insert_price(
             "SPX-SPOT",
-            MarketScalar::Price(Money::from((125_i64, Currency::USD))),
+            MarketScalar::price(Money::from((125_i64, Currency::USD))),
         );
 
         let err = AsianOptionMcPricer::new()
@@ -1567,8 +1643,14 @@ mod tests {
         let ys: Vec<f64> = (0..10_000).map(|i| offset + (i % 5) as f64).collect();
 
         let moments = paired_moments(&xs, &ys);
-        let var_x = moments.variance_x();
-        let cov = moments.covariance();
+        let var_x = moments
+            .get_variance_x()
+            .expect("finite variance_x")
+            .expect("at least two observations");
+        let cov = moments
+            .get_covariance()
+            .expect("finite covariance")
+            .expect("at least two observations");
 
         // Reference variance of the repeating pattern 0..7 (independent of the
         // offset). Compute it directly on the de-offset values.
@@ -1619,7 +1701,8 @@ mod tests {
             &future_times,
             None,
             None,
-        );
+        )
+        .expect("finite seasoned geometric call");
         let kv_call = geometric_asian_price(
             &OptionMarketParams {
                 spot,
@@ -1654,7 +1737,8 @@ mod tests {
             &future_times,
             None,
             None,
-        );
+        )
+        .expect("finite seasoned geometric put");
         let kv_put = geometric_asian_price(
             &OptionMarketParams {
                 spot,
@@ -1708,7 +1792,8 @@ mod tests {
             &future_times,
             None,
             None,
-        );
+        )
+        .expect("finite seasoned call");
         let call_high = seasoned_geometric_asian_control(
             &OptionMarketParams {
                 spot,
@@ -1725,7 +1810,8 @@ mod tests {
             &future_times,
             None,
             None,
-        );
+        )
+        .expect("finite seasoned call");
 
         assert!(call_low.is_finite() && call_low >= 0.0);
         assert!(call_high.is_finite() && call_high >= 0.0);
@@ -1836,6 +1922,8 @@ mod tests {
                 .base_date(as_of)
                 .day_count(DayCount::Act365F)
                 .knots([(0.0, 1.0), (0.5, 1.0), (1.0, terminal_df), (2.0, 0.7)])
+                .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve");
             let curves = market(as_of, 100.0, 0.0, 0.0, 0.0).insert(curve);
@@ -1920,11 +2008,26 @@ mod tests {
         let expiry = date(2025, 1, 31);
         let earlier = date(2025, 1, 30);
         let curves = market(as_of, 100.0, 0.0, 0.05, 0.0)
-            .insert_price("HESTON_KAPPA", MarketScalar::Unitless(2.0))
-            .insert_price("HESTON_THETA", MarketScalar::Unitless(1e-20))
-            .insert_price("HESTON_SIGMA_V", MarketScalar::Unitless(1e-12))
-            .insert_price("HESTON_RHO", MarketScalar::Unitless(0.0))
-            .insert_price("HESTON_V0", MarketScalar::Unitless(1e-20));
+            .insert_price(
+                "HESTON_KAPPA",
+                MarketScalar::unitless(2.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "HESTON_THETA",
+                MarketScalar::unitless(1e-20).expect("valid scalar"),
+            )
+            .insert_price(
+                "HESTON_SIGMA_V",
+                MarketScalar::unitless(1e-12).expect("valid scalar"),
+            )
+            .insert_price(
+                "HESTON_RHO",
+                MarketScalar::unitless(0.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "HESTON_V0",
+                MarketScalar::unitless(1e-20).expect("valid scalar"),
+            );
         let discount = curves.get_discount("USD-OIS").expect("curve");
         let first = 100.0 / discount.df_between_dates(as_of, earlier).expect("first DF");
         let second = 100.0 / discount.df_between_dates(as_of, expiry).expect("second DF");
@@ -2017,7 +2120,8 @@ mod tests {
             &times,
             Some(&drift),
             Some(&multipliers),
-        );
+        )
+        .expect("finite seasoned control");
         assert!(
             (control - expected).abs() < 1e-12,
             "control={control}, oracle={expected}"
@@ -2070,6 +2174,7 @@ mod tests {
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (t1, 0.99), (t2, 0.90), (1.0, 0.85)])
             .interp(InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let curves = market(as_of, 100.0, sigma, 0.0, q).insert(curve);
@@ -2160,7 +2265,7 @@ mod tests {
         let as_of = date(2025, 1, 2);
         let eur_spot = market(as_of, 100.0, 0.20, 0.05, 0.0).insert_price(
             "SPX-SPOT",
-            MarketScalar::Price(Money::new(100.0, Currency::EUR).expect("money")),
+            MarketScalar::price(Money::new(100.0, Currency::EUR).expect("money")),
         );
         let arithmetic = quarterly_asian(AveragingMethod::Arithmetic);
         let geometric = quarterly_asian(AveragingMethod::Geometric);

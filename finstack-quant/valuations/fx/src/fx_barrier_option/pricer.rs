@@ -500,7 +500,9 @@ mod tests {
     use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::math::interp::InterpStyle;
@@ -576,14 +578,18 @@ mod tests {
         inst.instrument_pricing_overrides
             .market_quotes
             .implied_volatility = Some(0.15);
-        let mut market =
-            MarketContext::new().insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.20));
+        let mut market = MarketContext::new().insert_price(
+            "EURUSD-SPOT",
+            MarketScalar::unitless(1.20).expect("valid scalar"),
+        );
         for id in ["USD-OIS", "EUR-OIS"] {
             market = market.insert(
                 DiscountCurve::builder(id)
                     .base_date(as_of)
                     .day_count(finstack_quant_core::dates::DayCount::Act365F)
                     .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("flat curve"),
             );
@@ -662,13 +668,18 @@ mod tests {
             .implied_volatility = Some(0.15);
         let before = inst.expiry - time::Duration::days(1);
         let after = inst.expiry + time::Duration::days(1);
-        let mut market =
-            MarketContext::new().insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.25));
+        let mut market = MarketContext::new().insert_price(
+            "EURUSD-SPOT",
+            MarketScalar::unitless(1.25).expect("valid scalar"),
+        );
         for id in ["USD-OIS", "EUR-OIS"] {
             market = market.insert(
                 DiscountCurve::builder(id)
                     .base_date(before)
                     .knots([(0.0, 1.0), (1.0, 1.0)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("curve"),
             );
@@ -787,7 +798,10 @@ mod tests {
         option.rebate_timing = Some(PayoutTiming::AtExpiry);
         option.observed_barrier_breached = Some(false);
 
-        let market = MarketContext::new().insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.25));
+        let market = MarketContext::new().insert_price(
+            "EURUSD-SPOT",
+            MarketScalar::unitless(1.25).expect("valid scalar"),
+        );
 
         let pv = option
             .value(&market, as_of)
@@ -832,6 +846,9 @@ mod tests {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 1.0)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("dom curve"),
             )
@@ -839,20 +856,29 @@ mod tests {
                 DiscountCurve::builder("EUR-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 1.0)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("for curve"),
             )
             .insert_surface(
                 VolSurface::builder("EURUSD-VOL")
                     .expiries(&[0.25, 0.5, 1.0])
-                    .strikes(&[1.0, 1.1, 1.2])
+                    .secondary_values(&[1.0, 1.1, 1.2])
+                    .secondary_axis(VolSurfaceAxis::Strike)
+                    .quote_type(VolQuoteType::BlackLognormal)
+                    .interpolation_mode(VolInterpolationMode::Vol)
                     .row(&[0.0, 0.0, 0.0])
                     .row(&[0.0, 0.0, 0.0])
                     .row(&[0.0, 0.0, 0.0])
                     .build()
                     .expect("vol surface"),
             )
-            .insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.10));
+            .insert_price(
+                "EURUSD-SPOT",
+                MarketScalar::unitless(1.10).expect("valid scalar"),
+            );
 
         let pv = option.value(&market, as_of).expect("fx barrier pv");
         assert!(
@@ -909,6 +935,7 @@ mod tests {
                     .day_count(DayCount::Act365F)
                     .knots([(0.0, 1.0), (5.0, (-domestic_rate * 5.0).exp())])
                     .interp(InterpStyle::LogLinear)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("domestic curve"),
             )
@@ -918,20 +945,27 @@ mod tests {
                     .day_count(DayCount::Act365F)
                     .knots([(0.0, 1.0), (5.0, (-foreign_rate * 5.0).exp())])
                     .interp(InterpStyle::LogLinear)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("foreign curve"),
             )
             .insert_surface(
                 VolSurface::builder("EURUSD-VOL")
                     .expiries(&[0.5, 1.0, 2.0])
-                    .strikes(&[1.0, 1.1, 1.2])
+                    .secondary_values(&[1.0, 1.1, 1.2])
+                    .secondary_axis(VolSurfaceAxis::Strike)
+                    .quote_type(VolQuoteType::BlackLognormal)
+                    .interpolation_mode(VolInterpolationMode::Vol)
                     .row(&[volatility, volatility, volatility])
                     .row(&[volatility, volatility, volatility])
                     .row(&[volatility, volatility, volatility])
                     .build()
                     .expect("vol surface"),
             )
-            .insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.10));
+            .insert_price(
+                "EURUSD-SPOT",
+                MarketScalar::unitless(1.10).expect("valid scalar"),
+            );
 
         let base_pv = base_option
             .value(&market, as_of)
@@ -1059,13 +1093,15 @@ mod tests {
         price_scalar.fx_spot_id = Some("EURUSD-SPOT".into());
         let price_market = MarketContext::new().insert_price(
             "EURUSD-SPOT",
-            MarketScalar::Price(Money::new(1.10, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(1.10, Currency::USD).expect("valid money fixture")),
         );
         let spot = resolve_fx_spot(&price_scalar, &price_market, as_of).expect("price scalar spot");
         assert!((spot - 1.10).abs() < 1e-12);
 
-        let bad_market =
-            MarketContext::new().insert_price("EURUSD-SPOT", MarketScalar::Unitless(0.0));
+        let bad_market = MarketContext::new().insert_price(
+            "EURUSD-SPOT",
+            MarketScalar::unitless(0.0).expect("valid scalar"),
+        );
         let err = resolve_fx_spot(&price_scalar, &bad_market, as_of).expect_err("bad scalar");
         assert!(err.to_string().contains("spot must be finite and > 0"));
     }
@@ -1138,6 +1174,9 @@ mod tests {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 0.97)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("dom curve"),
             )
@@ -1145,20 +1184,29 @@ mod tests {
                 DiscountCurve::builder("EUR-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 0.98)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("for curve"),
             )
             .insert_surface(
                 VolSurface::builder("EURUSD-VOL")
                     .expiries(&[0.25, 0.5, 1.0])
-                    .strikes(&[0.9, 1.1, 1.3])
+                    .secondary_values(&[0.9, 1.1, 1.3])
+                    .secondary_axis(VolSurfaceAxis::Strike)
+                    .quote_type(VolQuoteType::BlackLognormal)
+                    .interpolation_mode(VolInterpolationMode::Vol)
                     .row(&[0.10, 0.10, 0.10])
                     .row(&[0.10, 0.10, 0.10])
                     .row(&[0.10, 0.10, 0.10])
                     .build()
                     .expect("vol surface"),
             )
-            .insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.10));
+            .insert_price(
+                "EURUSD-SPOT",
+                MarketScalar::unitless(1.10).expect("valid scalar"),
+            );
 
         use finstack_quant_valuations_core::instruments::Instrument;
 
@@ -1258,6 +1306,9 @@ mod tests {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (2.0, domestic_df_at_two_years)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("dom curve"),
             )
@@ -1265,18 +1316,27 @@ mod tests {
                 DiscountCurve::builder("EUR-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (2.0, (-0.01_f64 * 2.0).exp())])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("for curve"),
             )
             .insert_surface(
                 VolSurface::builder("EURUSD-VOL")
                     .expiries(&[2.0])
-                    .strikes(&[1.10])
+                    .secondary_values(&[1.10])
+                    .secondary_axis(VolSurfaceAxis::Strike)
+                    .quote_type(VolQuoteType::BlackLognormal)
+                    .interpolation_mode(VolInterpolationMode::Vol)
                     .row(&[0.12])
                     .build()
                     .expect("vol surface"),
             )
-            .insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.10));
+            .insert_price(
+                "EURUSD-SPOT",
+                MarketScalar::unitless(1.10).expect("valid scalar"),
+            );
 
         let expected_domestic_df = market
             .get_discount("USD-OIS")

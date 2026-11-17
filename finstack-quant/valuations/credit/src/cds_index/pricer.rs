@@ -622,7 +622,7 @@ fn project_cds_flows(
             as_of,
             finstack_quant_core::dates::DayCountContext::default(),
         )?;
-        survival.sp(t)
+        survival.sp(t)?
     };
     let conditioning_survival = prev_survival.max(f64::EPSILON);
     let mut projected_flows = Vec::with_capacity(schedule.get_flows().len() * 2);
@@ -635,7 +635,7 @@ fn project_cds_flows(
                 flow.get_date(),
                 finstack_quant_core::dates::DayCountContext::default(),
             )?;
-            let current_survival = survival.sp(t);
+            let current_survival = survival.sp(t)?;
             let delta_default = (prev_survival - current_survival).max(0.0);
             let conditional_default = delta_default / conditioning_survival;
             let conditional_survival = current_survival / conditioning_survival;
@@ -737,7 +737,8 @@ mod tests {
             .base_date(as_of)
             .currency(Currency::USD)
             .recovery_rate(0.40)
-            .knots([(0.0, 0.02), (5.0, 0.02)])
+            .knots([(5.0, 0.02)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard curve should build");
 
@@ -923,7 +924,8 @@ mod tests {
                 .base_date(as_of)
                 .currency(Currency::USD)
                 .recovery_rate(0.40)
-                .knots([(0.0, 0.02), (5.0, 0.02)])
+                .knots([(5.0, 0.02)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .expect("hazard A"),
         );
@@ -932,7 +934,8 @@ mod tests {
                 .base_date(as_of)
                 .currency(Currency::USD)
                 .recovery_rate(0.40)
-                .knots([(0.0, 0.02), (5.0, 0.02)])
+                .knots([(5.0, 0.02)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .expect("hazard B"),
         );

@@ -16,13 +16,11 @@ use finstack_quant_core::FxHashMap;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationLag, SeriesInterpolation,
-};
+use finstack_quant_core::market_data::scalars::InflationIndex;
 use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_core::market_data::term_structures::{HazardCurve, ParInterp};
+use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_valuations_core::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use finstack_quant_valuations_test_support::fixtures;
 use std::sync::Arc;
@@ -97,7 +95,6 @@ fn hazard_preflight_rejects_entity_mismatch() {
             notional: 1.0,
             method: Default::default(),
 
-            par_interp: ParInterp::Linear,
             doc_clause: None,
             cds_valuation_convention: None,
         }),
@@ -137,6 +134,11 @@ fn inflation_preflight_rejects_invalid_observation_lag() {
             index: "USA-CPI-U".to_string(),
             observation_lag: "3Q".to_string(),
             base_cpi: 100.0,
+            source_base_date: base_date,
+            source_base_cpi: 100.0,
+            day_count: finstack_quant_core::dates::DayCount::Act365F,
+            calendar_id: None,
+            extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::Flat,
             notional: 1.0,
             method: Default::default(),
             interpolation: Default::default(),
@@ -180,6 +182,11 @@ fn inflation_preflight_rejects_day_based_observation_lag() {
             index: "USA-CPI-U".to_string(),
             observation_lag: "90D".to_string(),
             base_cpi: 100.0,
+            source_base_date: base_date,
+            source_base_cpi: 100.0,
+            day_count: finstack_quant_core::dates::DayCount::Act365F,
+            calendar_id: None,
+            extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::Flat,
             notional: 1.0,
             method: Default::default(),
             interpolation: Default::default(),
@@ -266,6 +273,7 @@ fn base_correlation_preflight_rejects_invalid_attachment_detachment() {
             .base_date(base_date)
             .knots(vec![(1.0, 0.01), (5.0, 0.02)])
             .recovery_rate(0.40)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard curve"),
     );
@@ -395,6 +403,7 @@ fn base_correlation_preflight_rejects_non_monotone_tranche_points() {
             .base_date(base_date)
             .knots(vec![(1.0, 0.01), (5.0, 0.02)])
             .recovery_rate(0.40)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard curve"),
     );
@@ -465,23 +474,11 @@ fn base_correlation_preflight_rejects_non_monotone_tranche_points() {
 }
 
 #[test]
-fn inflation_preflight_rejects_lag_mismatch_with_index() {
+fn inflation_preflight_requires_release_facts_for_unobserved_anchors() {
     let base_date = base_date();
     let discount = usd_discount_curve(base_date);
-    let observations = vec![
-        (
-            Date::from_calendar_date(2025, Month::January, 2).expect("obs date"),
-            100.0,
-        ),
-        (
-            Date::from_calendar_date(2025, Month::February, 2).expect("obs date"),
-            101.0,
-        ),
-    ];
-    let index = InflationIndex::new("USD-CPI", observations, Currency::USD)
-        .expect("index")
-        .with_interpolation(SeriesInterpolation::Linear)
-        .with_lag(InflationLag::Months(3));
+    let index = InflationIndex::new("USD-CPI", vec![], Currency::USD, base_date)
+        .expect("empty explicitly selected snapshot");
 
     let source_market = MarketContext::new()
         .insert(discount)
@@ -507,8 +504,13 @@ fn inflation_preflight_rejects_lag_mismatch_with_index() {
             base_date,
             discount_curve_id: "USD-OIS".into(),
             index: "USD-CPI".to_string(),
-            observation_lag: "1M".to_string(), // mismatch vs index lag (3M)
+            observation_lag: "1M".to_string(),
             base_cpi: 100.0,
+            source_base_date: base_date,
+            source_base_cpi: 100.0,
+            day_count: finstack_quant_core::dates::DayCount::Act365F,
+            calendar_id: None,
+            extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::Flat,
             notional: 1.0,
             method: Default::default(),
             interpolation: Default::default(),
@@ -516,9 +518,9 @@ fn inflation_preflight_rejects_lag_mismatch_with_index() {
     };
 
     let envelope = envelope_for_step(step, vec![quote], source_market);
-    let err = engine::calibrate(&envelope).expect_err("lag mismatch should fail");
+    let err = engine::calibrate(&envelope).expect_err("missing expected releases should fail");
     let msg = err.to_string();
-    assert!(msg.contains("lag mismatch"), "unexpected error: {msg}");
+    assert!(msg.contains("release"), "unexpected error: {msg}");
 }
 
 #[test]
@@ -534,10 +536,11 @@ fn forward_preflight_requires_quotes() {
             curve_id: "USD-FWD".into(),
             currency: Currency::USD,
             base_date,
-            tenor_years: 5.0,
+            index_tenor: Some(finstack_quant_core::dates::Tenor::quarterly()),
             discount_curve_id: "USD-OIS".into(),
             method: Default::default(),
             interpolation: Default::default(),
+            extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
             conventions: Default::default(),
         }),
     };

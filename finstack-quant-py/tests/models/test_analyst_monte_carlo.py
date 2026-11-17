@@ -114,7 +114,7 @@ def test_structured_note_redemption_profiles_through_supported_json_route() -> N
     envelope = json.loads(example.read_text())
     spec = envelope["instrument"]["spec"]
     as_of = datetime.date(2026, 1, 1)
-    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.0))
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.0, "act_365f"))
     market.insert_price("SPX-SPOT", Money(100.0, "USD"))
     spec.update(
         observation_dates=["2025-12-30", "2025-12-31"],

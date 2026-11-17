@@ -93,6 +93,10 @@ pub struct CmsSwap {
     /// Required for USD CMS; legacy contracts must name their legacy index explicitly.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_id: Option<IndexId>,
+    /// Explicit CMS benchmark fixing identifier used for historical fixings
+    /// (`FIXING:<cms_fixing_index_id>`), distinct from `forward_curve_id` and `index_id`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cms_fixing_index_id: Option<IndexId>,
     /// Fixed leg frequency of the underlying swap (overrides convention).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub swap_fixed_frequency: Option<Tenor>,
@@ -281,6 +285,9 @@ pub struct CmsSwapScheduleParams {
     /// Rate-index convention-registry key (e.g. `USD-SOFR-OIS`) supplying the
     /// calendar and reset lag; stored as the reference-swap index.
     pub index_id: IndexId,
+    /// Optional explicit CMS benchmark fixing identifier used for historical fixings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cms_fixing_index_id: Option<IndexId>,
     /// `pay` or `receive` the CMS leg.
     pub side: finstack_quant_valuations_core::instruments::PayReceive,
     /// Discount curve for present values.
@@ -373,6 +380,14 @@ impl CmsSwap {
                 )));
             }
         }
+        if let Some(fixing_id) = &self.cms_fixing_index_id {
+            crate::cms_common::validate_cms_fixing_index_id(
+                fixing_id,
+                &self.forward_curve_id,
+                self.index_id.as_ref(),
+                "CmsSwap cms_fixing_index_id",
+            )?;
+        }
 
         Ok(())
     }
@@ -404,6 +419,7 @@ impl CmsSwap {
             notional,
             day_count,
             index_id,
+            cms_fixing_index_id,
             side,
             discount_curve_id,
             forward_curve_id,
@@ -513,6 +529,7 @@ impl CmsSwap {
             .day_count(day_count)
             .cms_spread_bp(cms_spread_bp)
             .index_id_opt(Some(index_id))
+            .cms_fixing_index_id_opt(cms_fixing_index_id)
             .funding_leg(funding_leg)
             .discount_curve_id(discount_curve_id)
             .forward_curve_id(forward_curve_id)
@@ -552,6 +569,7 @@ impl CmsSwap {
             .accrual_fractions(accrual_fractions.clone())
             .day_count(DayCount::Act365F)
             .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
+            .cms_fixing_index_id_opt(Some(IndexId::new("USD-CMS-10Y")))
             .swap_float_day_count_opt(Some(DayCount::Act360))
             .funding_leg(FundingLeg::Fixed {
                 rate: Decimal::new(3, 2),
@@ -623,13 +641,13 @@ impl CmsSwap {
                     payment_date,
                     self.day_count,
                     None,
-                    finstack_quant_core::dates::DayCountContextState {
-                        calendar_id: None,
-                        coupon_period: None,
-                        end_is_termination_date: Some(false),
-                        frequency: None,
-                        bus_basis: None,
-                    },
+                    finstack_quant_core::dates::DayCountContextState::try_new(
+                        None,
+                        None,
+                        None,
+                        None,
+                        Some(false),
+                    )?,
                 )?)
                 .build()?,
             );
@@ -669,14 +687,14 @@ impl CmsSwap {
                 } => {
                     let fwd_curve = market.get_forward(forward_curve_id.as_ref())?;
                     let index_rate = if period.reset_date < as_of {
-                        let series_id = finstack_quant_core::market_data::fixings::fixing_series_id(
+                        let series = finstack_quant_core::market_data::fixings::get_fixing_series(
+                            market,
                             forward_curve_id.as_str(),
-                        );
+                        )?;
                         finstack_quant_core::market_data::fixings::require_fixing_value_exact(
-                            market.get_series(&series_id).ok(),
+                            Some(series),
                             forward_curve_id.as_str(),
                             period.reset_date,
-                            as_of,
                         )?
                     } else {
                         fwd_curve.as_ref().rate_between_dates(
@@ -712,13 +730,13 @@ impl CmsSwap {
                     period.accrual_end,
                     day_count,
                     index_rate,
-                    finstack_quant_core::dates::DayCountContextState {
-                        calendar_id: None,
-                        coupon_period: None,
-                        end_is_termination_date: Some(false),
-                        frequency: None,
-                        bus_basis: None,
-                    },
+                    finstack_quant_core::dates::DayCountContextState::try_new(
+                        None,
+                        None,
+                        None,
+                        None,
+                        Some(false),
+                    )?,
                 )?)
                 .build()?,
             );
@@ -815,6 +833,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsSwap {
         &self,
     ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
     {
+        self.validate()?;
         let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_forward_curve(self.forward_curve_id.clone());
@@ -835,12 +854,11 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsSwap {
                 ),
             );
         }
-        deps.add_series_id(
-            finstack_quant_core::market_data::fixings::cms_fixing_series_id(
-                self.forward_curve_id.as_str(),
-                self.cms_tenor.to_years_approx(),
-            ),
-        );
+        if let Some(fixing_id) = &self.cms_fixing_index_id {
+            deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+                fixing_id.as_str(),
+            ));
+        }
         if let FundingLeg::Floating {
             forward_curve_id, ..
         } = &self.funding_leg
@@ -868,18 +886,19 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         self.validate()?;
         let mut projected_fixings = Vec::new();
-        for &fixing_date in &self.fixing_dates {
-            if fixing_date > as_of {
-                projected_fixings.push(finstack_quant_cashflows::fixings::ProjectedFixing {
-                    series_id: finstack_quant_core::market_data::fixings::cms_fixing_series_id(
-                        self.forward_curve_id.as_str(),
-                        self.cms_tenor.to_years_approx(),
-                    ),
-                    date: fixing_date,
-                    value: Some(
-                        super::pricer::cms_forward_and_ttf(self, market, as_of, fixing_date)?.0,
-                    ),
-                });
+        if let Some(fixing_id) = &self.cms_fixing_index_id {
+            for &fixing_date in &self.fixing_dates {
+                if fixing_date > as_of {
+                    projected_fixings.push(finstack_quant_cashflows::fixings::ProjectedFixing {
+                        series_id: finstack_quant_core::market_data::fixings::fixing_series_id(
+                            fixing_id.as_str(),
+                        ),
+                        date: fixing_date,
+                        value: Some(
+                            super::pricer::cms_forward_and_ttf(self, market, as_of, fixing_date)?.0,
+                        ),
+                    });
+                }
             }
         }
         let funding_flows = self.funding_leg_flows(market, as_of, true)?;
@@ -947,8 +966,10 @@ mod tests {
     use discount_forward_curve_support::{flat_discount_with_tenor, flat_forward_with_tenor};
     use finstack_quant_cashflows::CashflowProvider;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::market_data::fixings::{cms_fixing_series_id, fixing_series_id};
-    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+    use finstack_quant_core::market_data::fixings::fixing_series_id;
+    use finstack_quant_core::market_data::scalars::{
+        ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+    };
     use volatility_support::flat_vol_surface;
 
     #[test]
@@ -1034,14 +1055,19 @@ mod tests {
     /// Build a shared market context for reconciliation tests: flat 3% OIS,
     /// flat 3% forward curve, flat 25% vol surface with enough knots.
     fn recon_market(as_of: Date) -> finstack_quant_core::market_data::context::MarketContext {
-        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::market_data::surfaces::{
+            VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+        };
         use finstack_quant_core::types::CurveId;
 
         let strikes = vec![0.005, 0.02, 0.03, 0.04, 0.06, 0.10];
         let expiries = vec![0.25, 1.0, 2.0, 5.0, 15.0];
         let mut builder = VolSurface::builder(CurveId::new("USD-CMS10Y-VOL"))
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&expiries)
-            .strikes(&strikes);
+            .secondary_values(&strikes);
         for _ in &expiries {
             builder = builder.row(&vec![0.25_f64; strikes.len()]);
         }
@@ -1095,15 +1121,17 @@ mod tests {
         use finstack_quant_valuations_core::metrics::MetricId;
         let as_of = date(2025, 1, 1);
         let swap = one_period_cms_swap(None, None);
-        let forward = ForwardCurve::builder("USD-LIBOR-3M", 0.25)
-            .base_date(as_of)
-            .knots(
-                (0..=30)
-                    .map(|year| (f64::from(year), 0.03))
-                    .collect::<Vec<_>>(),
-            )
-            .build()
-            .expect("dense forward");
+        let forward_pts: Vec<(f64, f64)> = (0..=30).map(|year| (f64::from(year), 0.03)).collect();
+        let forward = ForwardCurve::from_zero_rates(
+            "USD-LIBOR-3M",
+            as_of,
+            &forward_pts,
+            finstack_quant_core::math::Compounding::Continuous,
+            DayCount::Act365F,
+            finstack_quant_core::math::interp::InterpStyle::LogLinear,
+            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+        )
+        .expect("dense forward");
         let market = recon_market(as_of).insert(forward);
         let result = swap
             .price_with_metrics(
@@ -1238,6 +1266,7 @@ mod tests {
             .accrual_fractions(vec![0.25])
             .day_count(DayCount::Act365F)
             .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
+            .cms_fixing_index_id_opt(Some(IndexId::new("USD-CMS-10Y")))
             .funding_leg(FundingLeg::Fixed {
                 rate: Decimal::ZERO,
                 periods: vec![funding_period(fixing, pay, 0.25)],
@@ -1254,15 +1283,17 @@ mod tests {
             .cms_leg_flows(&market, as_of)
             .expect_err("seasoned flow without fixing should error");
         assert!(
-            err.to_string().contains("FIXING:CMS-10Y:USD-LIBOR-3M"),
+            err.to_string().contains("FIXING:USD-CMS-10Y"),
             "error must identify missing CMS fixing series: {err}"
         );
 
         let observed = 0.0412;
         let series = ScalarTimeSeries::new(
-            cms_fixing_series_id("USD-LIBOR-3M", 10.0),
+            fixing_series_id("USD-CMS-10Y"),
             vec![(fixing, observed)],
             None,
+            SeriesInterpolation::Step,
+            SeriesExtrapolation::Error,
         )
         .expect("fixing series");
         let market = market.insert_series(series);
@@ -1320,6 +1351,8 @@ mod tests {
             fixing_series_id("USD-LIBOR-3M"),
             vec![(reset, observed)],
             None,
+            SeriesInterpolation::Step,
+            SeriesExtrapolation::Error,
         )
         .expect("funding fixing");
         let flows = swap

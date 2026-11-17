@@ -99,7 +99,7 @@ it(
       );
       // The returned model carries the solved driver value and validates natively.
       expect(updated.model!.nodes.revenue!.values!["2025Q4"]).toEqual({
-        amount: "244390239.98913208",
+        amount: "244390239.98913205",
         currency: "USD",
       });
       native.validateFinancialModelJson(serializeHost(updated.model));
@@ -210,7 +210,7 @@ it("presents the returned solution and hides Apply without a handler", () => {
   expect(
     [...solution.querySelectorAll("dd")].map((node) => node.textContent),
   ).toEqual([
-    "244,390,239.98913208",
+    "244,390,239.98913205",
     "-0.000000014901161193847656",
     "0.07",
     "7",

@@ -2,13 +2,18 @@
 
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_valuations::metrics::sensitivities::cross_factor::make_vol_bumper;
 
 fn flat_surface(id: &str, vol: f64) -> VolSurface {
     VolSurface::builder(id)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[1.0])
-        .strikes(&[100.0])
+        .secondary_values(&[100.0])
         .row(&[vol])
         .build()
         .expect("surface")

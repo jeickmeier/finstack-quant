@@ -864,24 +864,37 @@ impl PortfolioAttribution {
     ///   for one-cent precision).
     pub fn reconciliation_check(&self, tolerance: f64) -> ReconciliationReport {
         let mut acc = NeumaierAccumulator::new();
-        acc.add(self.carry.amount());
-        acc.add(self.rates_curves_pnl.amount());
-        acc.add(self.credit_curves_pnl.amount());
-        acc.add(self.inflation_curves_pnl.amount());
-        acc.add(self.correlations_pnl.amount());
-        acc.add(self.fx_pnl.amount());
-        acc.add(self.cross_factor_pnl.amount());
-        acc.add(self.vol_pnl.amount());
-        acc.add(self.model_params_pnl.amount());
-        acc.add(self.market_scalars_pnl.amount());
-        acc.add(self.residual.amount());
-        acc.add(self.fx_translation_pnl.amount());
+        let mut valid = true;
+        for term in [
+            self.carry.amount(),
+            self.rates_curves_pnl.amount(),
+            self.credit_curves_pnl.amount(),
+            self.inflation_curves_pnl.amount(),
+            self.correlations_pnl.amount(),
+            self.fx_pnl.amount(),
+            self.cross_factor_pnl.amount(),
+            self.vol_pnl.amount(),
+            self.model_params_pnl.amount(),
+            self.market_scalars_pnl.amount(),
+            self.residual.amount(),
+            self.fx_translation_pnl.amount(),
+        ] {
+            if acc.add(term).is_err() {
+                valid = false;
+            }
+        }
 
-        let total_residual = self.total_pnl.amount() - acc.total();
+        let explained = if valid {
+            acc.get_total().unwrap_or(f64::NAN)
+        } else {
+            f64::NAN
+        };
+        let total_residual = self.total_pnl.amount() - explained;
         // A portfolio aggregated from an invalid constituent cannot be trusted
         // to reconcile, even if the (equally corrupted) buckets happen to net
         // to within tolerance — never report `is_reconciled` in that case.
-        let is_reconciled = !self.result_invalid && total_residual.abs() <= tolerance;
+        let is_reconciled =
+            !self.result_invalid && total_residual.is_finite() && total_residual.abs() <= tolerance;
 
         ReconciliationReport {
             total_residual,
@@ -965,11 +978,11 @@ mod tests {
             .position(position)
             .build()?;
         let market_t0 = MarketContext::new()
-            .insert_price("A", MarketScalar::Unitless(100.0))
-            .insert_price("B", MarketScalar::Unitless(90.0));
+            .insert_price("A", MarketScalar::unitless(100.0).expect("valid scalar"))
+            .insert_price("B", MarketScalar::unitless(90.0).expect("valid scalar"));
         let market_t1 = MarketContext::new()
-            .insert_price("A", MarketScalar::Unitless(110.0))
-            .insert_price("B", MarketScalar::Unitless(95.0));
+            .insert_price("A", MarketScalar::unitless(110.0).expect("valid scalar"))
+            .insert_price("B", MarketScalar::unitless(95.0).expect("valid scalar"));
 
         let attribution = attribute_portfolio_pnl(
             &portfolio,
@@ -1068,8 +1081,8 @@ mod tests {
             let provider = Arc::new(SimpleFxProvider::new());
             provider.set_quotes(&[(Currency::EUR, Currency::USD, eur_usd)])?;
             Ok(MarketContext::new()
-                .insert_price("E", MarketScalar::Unitless(spot))
-                .insert_price("U", MarketScalar::Unitless(50.0))
+                .insert_price("E", MarketScalar::unitless(spot).expect("valid scalar"))
+                .insert_price("U", MarketScalar::unitless(50.0).expect("valid scalar"))
                 .insert_fx(FxMatrix::new(provider, None)))
         };
 
@@ -1127,6 +1140,9 @@ mod tests {
             let curve = DiscountCurve::builder("USD-OIS")
                 .base_date(base)
                 .knots([(0.0, 1.0), (10.0, (-rate * 10.0_f64).exp())])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()?;
             Ok(MarketContext::new().insert(curve))
         };

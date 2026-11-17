@@ -92,6 +92,7 @@ mod tests {
             .base_date(date!(1900 - 01 - 01))
             .knots([(100.0, 7.0), (101.0, rate)])
             .recovery_rate(0.4)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard")
     }

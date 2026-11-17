@@ -31,13 +31,19 @@
 ///
 /// # Arguments
 ///
-/// * `iter` - Iterator yielding `f64` values to sum. **All values must be finite.**
-///   NaN or infinity in the input silently corrupts the compensation term,
-///   producing an incorrect result even after the non-finite value has passed.
+/// * `iter` - Iterator yielding `f64` values to sum. All values must be finite.
 ///
 /// # Returns
 ///
-/// The sum of all values with reduced floating-point error.
+/// The finite sum of all values with reduced floating-point error (or `+0.0`
+/// for an empty iterator).
+///
+/// # Errors
+///
+/// - Returns [`crate::Error::Input`] with [`crate::InputError::NonFiniteValue`]
+///   when any input element is `NaN` or infinite.
+/// - Returns [`crate::Error::Internal`] when intermediate compensation or
+///   running sum arithmetic overflows to a non-finite value.
 ///
 /// # Complexity
 ///
@@ -62,23 +68,36 @@
 ///
 /// // Summing many small values where naive summation loses precision
 /// let values: Vec<f64> = (0..1_000_000).map(|_| 0.1).collect();
-/// let sum = kahan_sum(values.iter().copied());
+/// let sum = kahan_sum(values.iter().copied())?;
 /// assert!((sum - 100_000.0).abs() < 0.01);
+/// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 #[inline]
-pub fn kahan_sum<I>(iter: I) -> f64
+pub fn kahan_sum<I>(iter: I) -> crate::Result<f64>
 where
     I: IntoIterator<Item = f64>,
 {
     let mut sum: f64 = 0.0;
     let mut c: f64 = 0.0; // compensation
     for x in iter {
+        if !x.is_finite() {
+            return Err(crate::InputError::NonFiniteValue {
+                kind: crate::NonFiniteKind::classify(x),
+            }
+            .into());
+        }
         let y = x - c;
         let t = sum + y;
-        c = (t - sum) - y;
+        let next_c = (t - sum) - y;
+        if !(y.is_finite() && t.is_finite() && next_c.is_finite()) {
+            return Err(crate::Error::Internal(
+                "kahan_sum overflowed to non-finite value".to_string(),
+            ));
+        }
+        c = next_c;
         sum = t;
     }
-    sum
+    Ok(if sum == 0.0 { 0.0 } else { sum })
 }
 
 /// Neumaier compensated summation – handles both positive and negative values better than Kahan.
@@ -89,13 +108,19 @@ where
 ///
 /// # Arguments
 ///
-/// * `iter` - Iterator yielding `f64` values to sum. **All values must be finite.**
-///   NaN or infinity in the input silently corrupts the compensation term,
-///   producing an incorrect result even after the non-finite value has passed.
+/// * `iter` - Iterator yielding `f64` values to sum. All values must be finite.
 ///
 /// # Returns
 ///
-/// The sum of all values with reduced floating-point error.
+/// The finite sum of all values with reduced floating-point error (or `+0.0`
+/// for an empty iterator).
+///
+/// # Errors
+///
+/// - Returns [`crate::Error::Input`] with [`crate::InputError::NonFiniteValue`]
+///   when any input element is `NaN` or infinite.
+/// - Returns [`crate::Error::Internal`] when running accumulation or the final
+///   compensated total overflows to a non-finite value.
 ///
 /// # Complexity
 ///
@@ -123,8 +148,9 @@ where
 ///
 /// // Mixed-sign values where naive summation loses precision
 /// let values = [1e16, 1.0, -1e16];
-/// let sum = neumaier_sum(values.iter().copied());
+/// let sum = neumaier_sum(values.iter().copied())?;
 /// assert!((sum - 1.0).abs() < 1e-10);
+/// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 ///
 /// # References
@@ -132,15 +158,15 @@ where
 /// - Neumaier, A. (1974). "Rundungsfehleranalyse einiger Verfahren zur Summation
 ///   endlicher Summen." *Zeitschrift für Angewandte Mathematik und Mechanik*, 54(1), 39-51.
 #[inline]
-pub fn neumaier_sum<I>(iter: I) -> f64
+pub fn neumaier_sum<I>(iter: I) -> crate::Result<f64>
 where
     I: IntoIterator<Item = f64>,
 {
     let mut acc = NeumaierAccumulator::new();
     for x in iter {
-        acc.add(x);
+        acc.add(x)?;
     }
-    acc.total()
+    acc.get_total()
 }
 
 /// Incremental Neumaier compensated summation.
@@ -149,6 +175,9 @@ where
 /// `Vec<f64>` of terms (e.g., PV loops over cashflows). Handles both same-sign
 /// and mixed-sign values correctly.
 ///
+/// Updates via [`Self::add`] are atomic: if an input is non-finite or causes
+/// intermediate overflow, the accumulator state is left unchanged.
+///
 /// # Example
 ///
 /// ```rust
@@ -156,10 +185,11 @@ where
 ///
 /// let mut acc = NeumaierAccumulator::new();
 /// for x in [1e16, 1.0, -1e16] {
-///     acc.add(x);
+///     acc.add(x)?;
 /// }
 /// // Result is more accurate than naive summation
-/// assert!((acc.total() - 1.0).abs() < 1e-10);
+/// assert!((acc.get_total()? - 1.0).abs() < 1e-10);
+/// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NeumaierAccumulator {
@@ -174,42 +204,20 @@ impl NeumaierAccumulator {
         Self { sum: 0.0, c: 0.0 }
     }
 
-    /// Add a value to the running total.
+    /// Add a finite value to the running total atomically.
+    ///
+    /// On error, the running state (`sum` and compensation) is unchanged.
     ///
     /// # Arguments
     ///
-    /// * `x` - Value to add, in the accumulator's own units; must be finite,
-    ///   since NaN or infinity corrupts the compensation term.
-    #[inline]
-    pub fn add(&mut self, x: f64) {
-        let t = self.sum + x;
-        self.c += if self.sum.abs() >= x.abs() {
-            (self.sum - t) + x
-        } else {
-            (x - t) + self.sum
-        };
-        self.sum = t;
-    }
-
-    /// Return the compensated total.
-    #[inline]
-    pub fn total(self) -> f64 {
-        self.sum + self.c
-    }
-
-    /// Add a value, rejecting a non-finite input or running state.
-    ///
-    /// The checked counterpart of [`Self::add`]: on error the accumulator is
-    /// left unusable for further checked use and the caller should propagate.
-    ///
-    /// # Arguments
-    ///
-    /// * `x` - Finite value to accumulate.
+    /// * `x` - Finite value to add in the accumulator's units.
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::Validation`] when `x`, the running sum or the
-    /// compensation term is not finite.
+    /// - Returns [`crate::Error::Input`] with [`crate::InputError::NonFiniteValue`]
+    ///   when `x` is `NaN` or infinite.
+    /// - Returns [`crate::Error::Internal`] when the updated running sum or
+    ///   compensation term overflows to a non-finite value.
     ///
     /// # Examples
     ///
@@ -217,42 +225,60 @@ impl NeumaierAccumulator {
     /// use finstack_quant_core::math::summation::NeumaierAccumulator;
     ///
     /// let mut acc = NeumaierAccumulator::new();
-    /// acc.checked_add(1e16)?;
-    /// acc.checked_add(1.0)?;
-    /// acc.checked_add(-1e16)?;
-    /// assert_eq!(acc.checked_total()?, 1.0);
-    /// assert!(acc.checked_add(f64::MAX).and_then(|()| acc.checked_add(f64::MAX)).is_err());
+    /// acc.add(1e16)?;
+    /// acc.add(1.0)?;
+    /// acc.add(-1e16)?;
+    /// assert_eq!(acc.get_total()?, 1.0);
+    /// assert!(acc.add(f64::MAX).and_then(|()| acc.add(f64::MAX)).is_err());
+    /// assert_eq!(acc.get_total()?, f64::MAX);
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
     #[inline]
-    pub fn checked_add(&mut self, x: f64) -> crate::Result<()> {
+    pub fn add(&mut self, x: f64) -> crate::Result<()> {
         if !x.is_finite() {
-            return Err(crate::Error::Validation(format!(
-                "compensated sum input must be finite, got {x}"
-            )));
+            return Err(crate::InputError::NonFiniteValue {
+                kind: crate::NonFiniteKind::classify(x),
+            }
+            .into());
         }
-        self.add(x);
-        if !(self.sum.is_finite() && self.c.is_finite()) {
-            return Err(crate::Error::Validation(
+        let t = self.sum + x;
+        let delta_c = if self.sum.abs() >= x.abs() {
+            (self.sum - t) + x
+        } else {
+            (x - t) + self.sum
+        };
+        let next_c = self.c + delta_c;
+        if !(t.is_finite() && next_c.is_finite()) {
+            return Err(crate::Error::Internal(
                 "compensated sum overflowed".to_string(),
             ));
         }
+        self.sum = t;
+        self.c = next_c;
         Ok(())
     }
 
-    /// Return the compensated total, rejecting a non-finite result.
+    #[inline]
+    pub(crate) fn sum_and_compensation(&self) -> (f64, f64) {
+        (self.sum, self.c)
+    }
+
+    /// Return the finite compensated total without consuming the accumulator.
+    ///
+    /// Returns `+0.0` for an empty or zero-sum accumulator.
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::Validation`] when the total is not finite.
+    /// Returns [`crate::Error::Internal`] if `sum + c` overflows to a
+    /// non-finite value.
     #[inline]
-    pub fn checked_total(self) -> crate::Result<f64> {
-        let total = self.total();
+    pub fn get_total(&self) -> crate::Result<f64> {
+        let total = self.sum + self.c;
         if !total.is_finite() {
-            return Err(crate::Error::Validation(
+            return Err(crate::Error::Internal(
                 "compensated sum total is not finite".to_string(),
             ));
         }
-        Ok(total)
+        Ok(if total == 0.0 { 0.0 } else { total })
     }
 }

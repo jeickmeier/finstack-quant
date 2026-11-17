@@ -47,7 +47,7 @@ impl ShortRateTree {
         // comp.tree_df(r0, T1) = P(0, T1) under the configured convention.
         // `calibrate` guarantees steps >= 1 and a positive horizon, so T1 > 0.
         let t1 = self.time_steps[1];
-        let r0 = comp.tree_rate_from_df(discount_curve.df(t1), t1);
+        let r0 = comp.tree_rate_from_df(discount_curve.df(t1)?, t1);
 
         rates[0] = vec![r0];
 
@@ -99,7 +99,7 @@ impl ShortRateTree {
             // so θ is root-found with that closed form as the initial
             // guess.
             let theta = if next_next_time > 0.0 {
-                let p_target = discount_curve.df(next_next_time);
+                let p_target = discount_curve.df(next_next_time)?;
                 let mut p_model_base = 0.0;
                 let mut p_model_base_cont = 0.0;
                 for (j, &q_next) in next_state_prices.iter().enumerate() {
@@ -126,7 +126,18 @@ impl ShortRateTree {
                             }
                             p_model - p_target
                         };
-                        match BrentSolver::new().solve(objective, theta_cont) {
+                        let bound = 10.0_f64.max(theta_cont.abs() * 10.0);
+                        let half_width = (0.1 * theta_cont.abs()).max(0.01);
+                        match BrentSolver::new(1e-12, 100).and_then(|solver| {
+                            solver.solve(
+                                |t| Ok(objective(t)),
+                                theta_cont,
+                                -bound,
+                                bound,
+                                half_width,
+                                20,
+                            )
+                        }) {
                             Ok(t) => t,
                             Err(e) => {
                                 return Err(Error::Validation(format!(
@@ -176,7 +187,7 @@ impl ShortRateTree {
                 }
                 let model_df: f64 = next_q[..next_nodes].iter().sum();
                 let t_next = self.time_steps[step + 1];
-                let target_df = discount_curve.df(t_next);
+                let target_df = discount_curve.df(t_next)?;
                 let err = ((model_df - target_df) / target_df).abs() * 10_000.0;
                 if !err.is_finite() {
                     return Err(Error::Validation(format!(

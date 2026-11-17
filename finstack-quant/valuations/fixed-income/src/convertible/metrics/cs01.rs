@@ -86,7 +86,7 @@ fn cs01_setup(bond: &ConvertibleBond, market: &MarketContext) -> Result<Cs01Setu
 impl Cs01Setup {
     /// Reprice after shocking the hazard curve with `spec`.
     fn pv_with(&self, spec: BumpSpec, as_of: Date) -> Result<f64> {
-        let bumped = self.market.bump([MarketBump::Curve {
+        let bumped = self.market.bump([MarketBump::HazardCurve {
             id: self.curve_id.clone(),
             spec,
         }])?;
@@ -264,6 +264,8 @@ mod tests {
             .base_date(as_of)
             .knots([(0.0, 1.0), (10.0, 0.90)])
             .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid curve");
 
@@ -271,9 +273,15 @@ mod tests {
         // the cash component dominates, so the z-spread CS01 must be material.
         let market = finstack_quant_core::market_data::context::MarketContext::new()
             .insert(discount_curve)
-            .insert_price("AAPL", MarketScalar::Unitless(50.0))
-            .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
-            .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.0));
+            .insert_price("AAPL", MarketScalar::unitless(50.0).expect("valid scalar"))
+            .insert_price(
+                "AAPL-VOL",
+                MarketScalar::unitless(0.25).expect("valid scalar"),
+            )
+            .insert_price(
+                "AAPL-DIVYIELD",
+                MarketScalar::unitless(0.0).expect("valid scalar"),
+            );
 
         let instrument: Arc<dyn Instrument> = Arc::new(bond);
         let base_value = instrument.value(&market, as_of).expect("base value");

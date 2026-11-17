@@ -27,7 +27,15 @@ def validate_surface(surface: VolSurface, config: ValidationConfig, forwards: li
     --------
     >>> from finstack_quant.calibration import ValidationConfig, validate_surface
     >>> from finstack_quant.core.market_data import VolSurface
-    >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]])
+    >>> surface = VolSurface(
+    ...     "EQ-VOL",
+    ...     [1.0, 2.0],
+    ...     [90.0, 100.0, 110.0],
+    ...     [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]],
+    ...     secondary_axis="strike",
+    ...     quote_type="black_lognormal",
+    ...     interpolation_mode="vol",
+    ... )
     >>> validate_surface(surface, ValidationConfig(), [100.0, 100.0])
 
     """
@@ -56,7 +64,15 @@ def validate_calendar_spread(surface: VolSurface, config: ValidationConfig, forw
     --------
     >>> from finstack_quant.calibration import ValidationConfig, validate_calendar_spread
     >>> from finstack_quant.core.market_data import VolSurface
-    >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]])
+    >>> surface = VolSurface(
+    ...     "EQ-VOL",
+    ...     [1.0, 2.0],
+    ...     [90.0, 100.0, 110.0],
+    ...     [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]],
+    ...     secondary_axis="strike",
+    ...     quote_type="black_lognormal",
+    ...     interpolation_mode="vol",
+    ... )
     >>> validate_calendar_spread(surface, ValidationConfig(), [100.0, 100.0])
 
     """
@@ -88,7 +104,15 @@ def validate_butterfly_spread(surface: VolSurface, config: ValidationConfig, for
     --------
     >>> from finstack_quant.calibration import ValidationConfig, validate_butterfly_spread
     >>> from finstack_quant.core.market_data import VolSurface
-    >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]])
+    >>> surface = VolSurface(
+    ...     "EQ-VOL",
+    ...     [1.0, 2.0],
+    ...     [90.0, 100.0, 110.0],
+    ...     [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]],
+    ...     secondary_axis="strike",
+    ...     quote_type="black_lognormal",
+    ...     interpolation_mode="vol",
+    ... )
     >>> validate_butterfly_spread(surface, ValidationConfig(), [100.0, 100.0])
 
     """
@@ -112,7 +136,15 @@ def validate_vol_bounds(surface: VolSurface, config: ValidationConfig) -> None:
     --------
     >>> from finstack_quant.calibration import ValidationConfig, validate_vol_bounds
     >>> from finstack_quant.core.market_data import VolSurface
-    >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]])
+    >>> surface = VolSurface(
+    ...     "EQ-VOL",
+    ...     [1.0, 2.0],
+    ...     [90.0, 100.0, 110.0],
+    ...     [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]],
+    ...     secondary_axis="strike",
+    ...     quote_type="black_lognormal",
+    ...     interpolation_mode="vol",
+    ... )
     >>> validate_vol_bounds(surface, ValidationConfig())
 
     """

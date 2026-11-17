@@ -196,7 +196,7 @@ impl Default for TreePricerConfig {
             tree_model: TreeModelChoice::default(),
             tree_discount_curve_id: None,
             oas_quote_compounding: Compounding::Continuous,
-            tree_compounding: Compounding::default(),
+            tree_compounding: Compounding::Continuous,
         }
     }
 }
@@ -407,7 +407,9 @@ fn tree_config_with_model(bond: &Bond, tree_model: TreeModelChoice) -> TreePrice
         TreeModelChoice::BlackDermanToy { .. } | TreeModelChoice::BlackKarasinski { .. } => {
             Compounding::Simple
         }
-        TreeModelChoice::HoLee { .. } | TreeModelChoice::HullWhite { .. } => Compounding::default(),
+        TreeModelChoice::HoLee { .. } | TreeModelChoice::HullWhite { .. } => {
+            Compounding::Continuous
+        }
     };
     TreePricerConfig {
         tree_steps: model.tree_steps.unwrap_or(100),

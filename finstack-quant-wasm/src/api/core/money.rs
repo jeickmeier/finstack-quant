@@ -1,5 +1,6 @@
 //! WASM bindings for [`finstack_quant_core::money::Money`].
 
+use crate::api::core::config::js_opt_finstack_config;
 use crate::api::core::currency::JsCurrency;
 use crate::utils::input::{
     from_js_json, js_f64, js_opt_bool, js_opt_string, js_opt_uint, js_string, js_uint,
@@ -35,17 +36,25 @@ pub struct JsMoney {
 
 #[wasm_bindgen(js_class = Money)]
 impl JsMoney {
-    /// Creates a new money value without implicit currency-minor-unit rounding.
+    /// Creates a new money value, optionally scaling to the ingest scale in `config`.
     ///
     /// WASM accepts a JavaScript `number` only. Its finite numeric value is
-    /// converted to Rust `Decimal` and stored without currency-minor-unit
-    /// rounding; precision already absent from the input `number` cannot be
-    /// recovered. Formatting does not mutate the stored amount.
+    /// converted to Rust `Decimal`. When `config` is omitted or `null`, no
+    /// currency-minor-unit rounding occurs; when `config` supplies a
+    /// currency ingest scale (and rounding mode), `Money::new_with_config`
+    /// applies it on construction without consuming `config`.
+    ///
+    /// # Arguments
+    ///
+    /// * `amount` - Numeric amount in major units (must be finite).
+    /// * `currency` - ISO-4217 `Currency` object that tags the amount and controls arithmetic compatibility.
+    /// * `config` - Optional `FinstackConfig` handle supplying currency ingest scale and rounding mode.
     ///
     /// @param amount - Numeric amount in major units (must be finite).
     /// @param currency - ISO-4217 Currency object that tags the amount and controls arithmetic compatibility.
+    /// @param config - Optional `FinstackConfig` handle supplying currency ingest scale and rounding mode.
     /// @returns The constructed `Money`.
-    /// @throws If `amount` is non-finite (NaN, ±∞) or cannot be represented as a `Decimal`.
+    /// @throws `TypeError` (kind `invalid_type`) if `amount` is not a number or `config` is neither `null`/`undefined` nor a `FinstackConfig` instance; `FinstackError` (kind `validation`) if `amount` is non-finite or cannot be represented, or if `config` ingest rounding is misconfigured.
     ///
     /// @example
     /// ```javascript
@@ -58,11 +67,18 @@ impl JsMoney {
     pub fn new(
         #[wasm_bindgen(unchecked_param_type = "number")] amount: JsValue,
         currency: &JsCurrency,
+        #[wasm_bindgen(unchecked_optional_param_type = "FinstackConfig | null")] config: Option<
+            JsValue,
+        >,
     ) -> Result<JsMoney, JsValue> {
         let amount = js_f64(&amount, "amount")?;
-        RustMoney::new(amount, currency.inner)
-            .map(|inner| JsMoney { inner })
-            .map_err(to_js_err)
+        let config = js_opt_finstack_config(config.as_ref(), "config")?;
+        let inner = match config.as_ref() {
+            Some(cfg) => RustMoney::new_with_config(amount, currency.inner, cfg),
+            None => RustMoney::new(amount, currency.inner),
+        }
+        .map_err(to_js_err)?;
+        Ok(JsMoney { inner })
     }
 
     /// Numeric amount in major units as `f64`.
@@ -272,6 +288,57 @@ impl JsMoney {
         }
     }
 
+    /// Return the non-negative absolute monetary amount (Rust `Money::abs`).
+    ///
+    /// Keeps the exact `Decimal` magnitude and currency; zero carries no sign.
+    ///
+    /// @returns Non-negative `Money` in the same currency.
+    #[wasm_bindgen(js_name = abs)]
+    pub fn abs(&self) -> JsMoney {
+        JsMoney {
+            inner: self.inner.abs(),
+        }
+    }
+
+    /// Compute the dimensionless ratio `self / other` (Rust `Money::ratio`).
+    ///
+    /// Refuses mixed currencies and division by zero.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - Non-zero `Money` denominator in the same currency.
+    ///
+    /// @param other - Non-zero `Money` denominator in the same currency.
+    /// @returns Dimensionless floating-point ratio `this / other`.
+    /// @throws `FinstackError` (kind `validation`) if currencies differ, `other` is zero, or division overflows.
+    #[wasm_bindgen(js_name = ratio)]
+    pub fn ratio(&self, other: &JsMoney) -> Result<f64, JsValue> {
+        self.inner.ratio(other.inner).map_err(to_js_err)
+    }
+
+    /// Compare two same-currency monetary amounts (Rust `Money::checked_cmp`).
+    ///
+    /// Refuses mixed currencies rather than inventing an order across FX pairs.
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - `Money` value in the same currency to compare against.
+    ///
+    /// @param other - `Money` value in the same currency to compare against.
+    /// @returns `-1` when `this < other`, `0` when equal, or `1` when `this > other`.
+    /// @throws `FinstackError` (kind `validation`) when the currencies differ.
+    #[wasm_bindgen(js_name = checkedCmp, unchecked_return_type = "-1 | 0 | 1")]
+    pub fn checked_cmp(&self, other: &JsMoney) -> Result<i32, JsValue> {
+        self.inner
+            .checked_cmp(other.inner)
+            .map(|ord| match ord {
+                core::cmp::Ordering::Less => -1,
+                core::cmp::Ordering::Equal => 0,
+                core::cmp::Ordering::Greater => 1,
+            })
+            .map_err(to_js_err)
+    }
+
     /// Financially round to an explicit scale and mode (Rust `Money::round`).
     ///
     /// Neither argument has a default. An explicit round may produce zero
@@ -425,11 +492,13 @@ impl JsMoney {
     /// * `amount` - Exact fixed-point or scientific decimal text in major currency units.
     /// * `currency` - ISO-4217 `Currency` object that tags the amount, as for
     ///   the `Money` constructor (build one with `new Currency(code)`).
+    /// * `config` - Optional `FinstackConfig` handle supplying currency ingest scale and rounding mode.
     ///
     /// @returns The constructed `Money`.
-    /// @throws If `amount` is malformed, non-finite, needs more precision than `Decimal` can hold, or underflows its supported scale; or if `currency` is not a `Currency` object.
+    /// @throws `TypeError` (kind `invalid_type`) if `amount` is not a string or `config` is neither `null`/`undefined` nor a `FinstackConfig` instance; `FinstackError` (kind `validation`) if `amount` is malformed, non-finite, needs more precision than `Decimal` can hold, underflows its supported scale, or if `config` ingest rounding is misconfigured.
     /// @param amount - Exact fixed-point or scientific decimal text in major currency units.
     /// @param currency - ISO-4217 `Currency` object that tags the amount, as for the `Money` constructor (build one with `new Currency(code)`).
+    /// @param config - Optional `FinstackConfig` handle supplying currency ingest scale and rounding mode.
     ///
     /// @example
     /// ```javascript
@@ -446,11 +515,18 @@ impl JsMoney {
     pub fn from_decimal_str(
         #[wasm_bindgen(unchecked_param_type = "string")] amount: JsValue,
         currency: &JsCurrency,
+        #[wasm_bindgen(unchecked_optional_param_type = "FinstackConfig | null")] config: Option<
+            JsValue,
+        >,
     ) -> Result<JsMoney, JsValue> {
         let amount: &str = &js_string(&amount, "amount")?;
-        RustMoney::from_decimal_str(amount, currency.inner)
-            .map(|inner| JsMoney { inner })
-            .map_err(to_js_err)
+        let config = js_opt_finstack_config(config.as_ref(), "config")?;
+        let inner = match config.as_ref() {
+            Some(cfg) => RustMoney::from_decimal_str_with_config(amount, currency.inner, cfg),
+            None => RustMoney::from_decimal_str(amount, currency.inner),
+        }
+        .map_err(to_js_err)?;
+        Ok(JsMoney { inner })
     }
 
     /// An exact zero amount in a currency (Rust `Money::zero`).

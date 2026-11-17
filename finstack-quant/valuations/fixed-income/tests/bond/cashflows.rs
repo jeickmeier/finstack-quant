@@ -27,12 +27,35 @@ fn create_test_curves(base_date: Date) -> MarketContext {
         .base_date(base_date)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let fwd = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(base_date)
-        .knots([(0.0, 0.05), (5.0, 0.055)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (0.3125, 0.984448367063912),
+            (0.625, 0.969043949595689),
+            (0.9375, 0.953787428992179),
+            (1.25, 0.938679432969625),
+            (1.5625, 0.923720536165525),
+            (1.875, 0.908911260756709),
+            (2.1875, 0.894252077092993),
+            (2.5, 0.879743404345819),
+            (2.8125, 0.865385611171243),
+            (3.125, 0.851179016386663),
+            (3.4375, 0.837123889660674),
+            (3.75, 0.823220452215424),
+            (4.0625, 0.809468877540873),
+            (4.375, 0.795869292120328),
+            (4.6875, 0.782421776166658),
+            (5.0, 0.769126364368571),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 

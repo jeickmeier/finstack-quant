@@ -58,15 +58,15 @@ fn rate_greek(
     curve_id: &finstack_quant_core::types::CurveId,
     second: bool,
 ) -> Result<f64> {
-    use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+    use finstack_quant_core::market_data::bumps::BumpSpec;
     let config = super::config::resolve(context)?;
     let bump_bp = config.rate_bump_bp;
     let h = bump_bp * 1e-4;
+    let target = context.curves.curve_target(curve_id)?;
     let price = |direction: f64| {
-        let market = context.curves.bump([MarketBump::Curve {
-            id: curve_id.clone(),
-            spec: BumpSpec::parallel_bp(bump_bp * direction),
-        }])?;
+        let market = context.curves.bump([target
+            .clone()
+            .into_bump(BumpSpec::parallel_bp(bump_bp * direction))])?;
         context.reprice_raw(&market, context.as_of)
     };
     let up = price(1.0)?;

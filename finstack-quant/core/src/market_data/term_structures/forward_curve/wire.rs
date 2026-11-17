@@ -1,38 +1,37 @@
-//! Validated serialization adapters.
+//! Validated serialization adapters for [`ForwardCurve`].
 
 use super::*;
+use crate::math::interp::exact_f64_eq;
 
-/// Raw serializable state of ForwardCurve
+/// Raw canonical serializable state of [`ForwardCurve`].
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub(super) struct RawForwardCurve {
-    /// Curve identifier
+    /// Curve identifier.
     pub id: String,
-    /// Base date
+    /// Base date.
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub base: Date,
-    /// Reset lag in business days
-    pub reset_lag: i32,
-    /// Day count convention
+    /// Day-count convention for projection factor time basis.
     pub day_count: DayCount,
-    /// Index tenor in years
-    pub tenor: f64,
-    /// Time/value pairs used to construct the curve
+    /// Registered holiday calendar id of the business-day time axis.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub calendar_id: Option<String>,
+    /// Optional index accrual tenor metadata.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index_tenor: Option<Tenor>,
+    /// Time/factor pairs stored on the curve (must already contain origin `(0.0, 1.0)`).
     pub knot_points: Vec<(f64, f64)>,
-    /// Optional contractual reset/end-date boundaries.
-    ///
-    /// `None` selects fixed numeric-tenor discount-factor stepping.
-    pub projection_grid: Option<Vec<f64>>,
-    /// Interpolation style
+    /// Interpolation style.
     pub interp_style: InterpStyle,
-    /// Extrapolation policy
+    /// Extrapolation policy.
     pub extrapolation: ExtrapolationPolicy,
     /// Exact typed calibration replay recipe.
     pub rate_calibration: Option<crate::market_data::term_structures::RateCalibrationRecipe>,
-    /// Opaque FX policy stamp; see [`crate::market_data::term_structures::DiscountCurve::fx_policy`].
+    /// Opaque FX policy stamp; see [`ForwardCurve::fx_policy`].
     pub fx_policy: Option<String>,
-    /// Canonical source interpolation and cumulative continuous transformations.
+    /// Canonical source interpolation and accumulated continuous transformations.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transform: Option<super::evaluation::CurveTransform>,
 }
@@ -42,18 +41,17 @@ impl From<ForwardCurve> for RawForwardCurve {
         let knot_points: Vec<(f64, f64)> = curve
             .knots
             .iter()
-            .zip(curve.forwards.iter())
-            .map(|(&t, &fwd)| (t, fwd))
+            .zip(curve.factors.iter())
+            .map(|(&t, &factor)| (t, factor))
             .collect();
 
         RawForwardCurve {
             id: curve.id.to_string(),
             base: curve.base,
-            reset_lag: curve.reset_lag,
             day_count: curve.day_count,
-            tenor: curve.tenor,
+            calendar_id: curve.calendar.map(|calendar| calendar.id),
+            index_tenor: curve.index_tenor,
             knot_points,
-            projection_grid: curve.projection_grid.map(Vec::from),
             interp_style: curve.interp.style(),
             extrapolation: curve.interp.extrapolation(),
             rate_calibration: curve.rate_calibration,
@@ -67,12 +65,38 @@ impl TryFrom<RawForwardCurve> for ForwardCurve {
     type Error = crate::Error;
 
     fn try_from(state: RawForwardCurve) -> crate::Result<Self> {
-        let mut builder = ForwardCurve::builder(state.id, state.tenor)
+        let first = state
+            .knot_points
+            .first()
+            .ok_or(crate::InputError::TooFewPoints)?;
+        if !exact_f64_eq(first.0, 0.0) || !exact_f64_eq(first.1, 1.0) {
+            return Err(crate::Error::Validation(
+                "canonical ForwardCurve state must already start at (0.0, 1.0)".to_string(),
+            ));
+        }
+        if let Some(ref tr) = state.transform {
+            let src_first = tr
+                .source_points()
+                .first()
+                .ok_or(crate::InputError::TooFewPoints)?;
+            if !exact_f64_eq(src_first.0, 0.0)
+                || !exact_f64_eq(src_first.1, 1.0)
+                || tr.source_points().len() < 2
+            {
+                return Err(crate::Error::Validation(
+                    "canonical ForwardCurve transform source_points must contain origin (0.0, 1.0) and at least one positive pillar".to_string(),
+                ));
+            }
+        } else if state.knot_points.len() < 2 {
+            return Err(crate::InputError::TooFewPoints.into());
+        }
+
+        let mut builder = ForwardCurve::builder(state.id)
             .base_date(state.base)
-            .reset_lag(state.reset_lag)
             .day_count(state.day_count)
+            .calendar_id_opt(state.calendar_id)
+            .index_tenor_opt(state.index_tenor)
             .knots(state.knot_points)
-            .projection_grid_opt(state.projection_grid)
             .interp(state.interp_style)
             .extrapolation(state.extrapolation)
             .rate_calibration_opt(state.rate_calibration)

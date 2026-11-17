@@ -32,6 +32,7 @@ from finstack_quant.core.dates._sifma import (
 from finstack_quant.core.dates._daycount import (
     DayCount as DayCount,
     DayCountContext as DayCountContext,
+    VolatilityClock as VolatilityClock,
 )
 from finstack_quant.core.dates._tenor import Tenor as Tenor, TenorUnit as TenorUnit
 from finstack_quant.core.dates._periods import (
@@ -84,6 +85,7 @@ __all__ = [
     # day-count
     "DayCount",
     "DayCountContext",
+    "VolatilityClock",
     # tenor
     "TenorUnit",
     "Tenor",

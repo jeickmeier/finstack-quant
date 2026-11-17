@@ -640,6 +640,9 @@ const flatCurveKnots = (id) =>
     id,
     baseDate: '2024-01-01',
     knots: [0.0, 1.0, 0.25, 0.99004983, 0.5, 0.98019867, 1.25, 0.95122942, 1.5, 0.94176453],
+    interp: 'monotone_convex',
+    extrapolation: 'extend',
+    dayCount: 'act_365f',
   });
 
 test('portfolio.cellReturnsFromCurves reproduces the flat-curve pure-carry golden', () => {
@@ -665,11 +668,17 @@ test('portfolio.cellReturnsFromCurves distinguishes start and end curves under r
     id: 'UST',
     baseDate: '2024-01-01',
     knots: [0.0, 1.0, 0.5, 0.98019867, 1.5, 0.94176453],
+    interp: 'monotone_convex',
+    extrapolation: 'extend',
+    dayCount: 'act_365f',
   });
   const end = new core.DiscountCurve({
     id: 'UST',
     baseDate: '2024-01-01',
     knots: [0.0, 1.0, 0.25, 0.9875778, 1.25, 0.93941306],
+    interp: 'monotone_convex',
+    extrapolation: 'extend',
+    dayCount: 'act_365f',
   });
   const table = portfolio.cellReturnsFromCurves(
     start,
@@ -685,8 +694,22 @@ test('portfolio.cellReturnsFromCurves distinguishes start and end curves under r
 
 test('portfolio.cellReturnsFromCurves fails closed when a cell matures inside the holding period', () => {
   const knots = [0.0, 1.0, 0.25, 0.99004983, 0.5, 0.98019867];
-  const start = new core.DiscountCurve({ id: 'UST', baseDate: '2024-01-01', knots });
-  const end = new core.DiscountCurve({ id: 'UST', baseDate: '2024-01-01', knots });
+  const start = new core.DiscountCurve({
+    id: 'UST',
+    baseDate: '2024-01-01',
+    knots,
+    interp: 'monotone_convex',
+    extrapolation: 'extend',
+    dayCount: 'act_365f',
+  });
+  const end = new core.DiscountCurve({
+    id: 'UST',
+    baseDate: '2024-01-01',
+    knots,
+    interp: 'monotone_convex',
+    extrapolation: 'extend',
+    dayCount: 'act_365f',
+  });
   assert.throws(() =>
     portfolio.cellReturnsFromCurves(start, end, 0.25, 0.5, 'UST', JSON.stringify({ width: 0.25 }))
   );

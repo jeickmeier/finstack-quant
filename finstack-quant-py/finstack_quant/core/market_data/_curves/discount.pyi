@@ -7,7 +7,6 @@ from typing import Any, Optional, Sequence, Union
 import pandas as pd
 from finstack_quant.core.dates import DayCount
 from finstack_quant.core.market_data import DateLike, TimeOrDate
-from finstack_quant.core.market_data._curves.forward import ForwardCurve
 
 # Curves
 
@@ -23,7 +22,14 @@ class DiscountCurve:
     --------
     >>> import datetime
     >>> from finstack_quant.core.market_data import DiscountCurve
-    >>> curve = DiscountCurve("USD-OIS", datetime.date(2025, 1, 1), [(0.0, 1.0), (1.0, 0.95), (5.0, 0.80)])
+    >>> curve = DiscountCurve(
+    ...     "USD-OIS",
+    ...     datetime.date(2025, 1, 1),
+    ...     [(0.0, 1.0), (1.0, 0.95), (5.0, 0.80)],
+    ...     interp="monotone_convex",
+    ...     extrapolation="extend",
+    ...     day_count="act_365f",
+    ... )
     >>> round(curve.df(1.0), 4)
     0.95
     >>> round(curve.df("2026-01-01"), 4)
@@ -39,12 +45,10 @@ class DiscountCurve:
         base_date: DateLike,
         knots: Sequence[tuple[float, float]],
         *,
-        interp: Optional[str] = None,
-        extrapolation: Optional[str] = None,
-        day_count: Optional[Union[DayCount, str]] = None,
+        interp: str,
+        extrapolation: str,
+        day_count: Union[DayCount, str],
         calendar_id: Optional[str] = None,
-        validation_mode: Optional[str] = None,
-        forward_floor: Optional[float] = None,
     ) -> None:
         """
         Construct a discount curve from ``(time_years, discount_factor)`` knots.
@@ -57,39 +61,31 @@ class DiscountCurve:
             Valuation date anchoring ``t = 0``.
         knots : Sequence[tuple[float, float]]
             ``(time_years, discount_factor)`` pairs; discount factors are
-            unitless and positive. A ``(0.0, 1.0)`` anchor is conventional.
-        interp : str, optional
+            unitless and strictly positive. A ``(0.0, 1.0)`` anchor is
+            conventional.
+        interp : str
             Interpolation style (``"monotone_convex"``, ``"linear"``,
             ``"log_linear"``, ``"cubic_hermite"``,
-            ``"piecewise_quadratic_forward"``). Default ``"monotone_convex"``.
-        extrapolation : str, optional
-            Extrapolation policy (``"flat_forward"``, ``"flat_zero"``, or
-            ``"none"``, which returns NaN outside the pillar range). Default
-            ``"flat_forward"``.
-        day_count : DayCount | str, optional
-            Day-count label used to convert query dates to curve time. The
-            default is fixed at ``"act_365f"`` (it is not inferred from ``id``).
+            ``"piecewise_quadratic_forward"``). Keyword-only and required.
+        extrapolation : str
+            Extrapolation policy (``"extend"``, ``"flat"``, or
+            ``"error"``, which raises outside the pillar range). Keyword-only
+            and required.
+        day_count : DayCount | str
+            Day-count label used to convert query dates to curve time
+            (never inferred from ``id``). Keyword-only and required.
         calendar_id : str, optional
             Registered holiday calendar of the curve's time axis (for example
             ``"brbd"``), or a ``+``-joined union. Required with
             ``day_count="bus_252"``: every date-based query, including
             ``df_between_dates``, counts business days on this calendar.
             ``None`` (default) suits every calendar-free day count.
-        validation_mode : str, optional
-            ``"market_standard"`` (monotonic DFs and a -50bp implied forward
-            floor) or ``"negative_rate_friendly"``. ``None`` selects the Rust
-            ``ValidationMode::from_preset`` default, ``"market_standard"``.
-        forward_floor : float, optional
-            Minimum implied forward (decimal) required by
-            ``"negative_rate_friendly"``; rejected with any other preset,
-            including the defaulted one.
 
         Raises
         ------
         ValueError
-            If a knot is non-finite or duplicated, discount factors violate
-            the validation mode, a label is unknown, or a ``"bus_252"`` curve
-            has no ``calendar_id``.
+            If a knot is non-finite, non-positive, or duplicated, a label is
+            unknown, or a ``"bus_252"`` curve has no ``calendar_id``.
         KeyError
             If ``calendar_id`` names no registered calendar.
         TypeError
@@ -99,16 +95,24 @@ class DiscountCurve:
         --------
         >>> import datetime
         >>> from finstack_quant.core.market_data import DiscountCurve
-        >>> curve = DiscountCurve("USD-OIS", datetime.date(2025, 1, 1), [(0.0, 1.0), (1.0, 0.95)], day_count="act_360")
+        >>> curve = DiscountCurve(
+        ...     "USD-OIS",
+        ...     datetime.date(2025, 1, 1),
+        ...     [(0.0, 1.0), (1.0, 0.95)],
+        ...     interp="monotone_convex",
+        ...     extrapolation="extend",
+        ...     day_count="act_360",
+        ... )
         >>> curve.day_count
         'act_360'
         >>> cdi = DiscountCurve(
         ...     "BRL-CDI",
         ...     "2025-01-06",
         ...     [(0.0, 1.0), (1.0, 0.9)],
+        ...     interp="log_linear",
+        ...     extrapolation="extend",
         ...     day_count="bus_252",
         ...     calendar_id="brbd",
-        ...     interp="log_linear",
         ... )
         >>> cdi.calendar_id
         'brbd'
@@ -117,7 +121,12 @@ class DiscountCurve:
         ...
 
     @staticmethod
-    def flat(id: str, base_date: DateLike, continuous_rate: float) -> DiscountCurve:
+    def flat(
+        id: str,
+        base_date: DateLike,
+        continuous_rate: float,
+        day_count: Union[DayCount, str],
+    ) -> DiscountCurve:
         """
         Construct a flat continuously-compounded discount curve.
 
@@ -129,6 +138,8 @@ class DiscountCurve:
             Valuation date anchoring ``t = 0``.
         continuous_rate : float
             Continuously-compounded zero rate as a decimal (``0.05`` is 5%).
+        day_count : DayCount | str
+            Explicit supported day-count convention label or object.
 
         Returns
         -------
@@ -138,13 +149,13 @@ class DiscountCurve:
         Raises
         ------
         ValueError
-            If the rate is non-finite or has magnitude greater than ``1.0``
-            (a percentage passed where a decimal was expected).
+            If the rate is non-finite or has magnitude greater than ``1.0``,
+            or ``day_count`` is invalid or requires an absent calendar.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import DiscountCurve
-        >>> round(DiscountCurve.flat("USD-OIS", "2025-01-01", 0.05).df(2.0), 6)
+        >>> round(DiscountCurve.flat("USD-OIS", "2025-01-01", 0.05, "act_365f").df(2.0), 6)
         0.904837
 
         """
@@ -155,7 +166,10 @@ class DiscountCurve:
         id: str,
         base_date: DateLike,
         points: Sequence[tuple[float, float]],
-        compounding: str = "continuous",
+        compounding: str,
+        day_count: Union[DayCount, str],
+        interp: str,
+        extrapolation: str,
     ) -> DiscountCurve:
         """
         Construct a discount curve from zero-rate pillars.
@@ -170,27 +184,39 @@ class DiscountCurve:
             ``(time_years, zero_rate)`` pillars with rates as decimals. A
             ``(0, 1.0)`` discount-factor anchor is added when no ``t = 0``
             pillar is given.
-        compounding : str, optional
-            ``"continuous"`` (default), ``"simple"``, ``"periodic(1)"``,
+        compounding : str
+            ``"continuous"``, ``"simple"``, ``"periodic(1)"``,
             ``"semi_annual"``, ``"quarterly"`` or ``"monthly"``.
+        day_count : DayCount | str
+            Explicit curve day-count convention.
+        interp : str
+            Explicit interpolation style.
+        extrapolation : str
+            Explicit tail extrapolation policy (``"flat"``, ``"extend"``, or
+            ``"error"``).
 
         Returns
         -------
         DiscountCurve
-            Curve with builder defaults (``act_365f``, monotone-convex,
-            flat-forward extrapolation, market-standard validation).
+            Curve built with the specified explicit conventions.
 
         Raises
         ------
         ValueError
-            If ``points`` is empty, a pillar is non-finite, the label is
-            unknown, or the implied discount factors fail validation.
+            If ``points`` is empty, a pillar is non-finite, a label is
+            unknown, or construction fails.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import DiscountCurve
         >>> curve = DiscountCurve.from_zero_rates(
-        ...     "USD-OIS", "2025-01-01", [(1.0, 0.05), (2.0, 0.05)], compounding="periodic(1)"
+        ...     "USD-OIS",
+        ...     "2025-01-01",
+        ...     [(1.0, 0.05), (2.0, 0.05)],
+        ...     "periodic(1)",
+        ...     "act_365f",
+        ...     "monotone_convex",
+        ...     "extend",
         ... )
         >>> round(curve.df(2.0), 6)
         0.907029
@@ -203,7 +229,9 @@ class DiscountCurve:
         id: str,
         base_date: DateLike,
         points: Sequence[tuple[DateLike, float]],
-        day_count: Optional[Union[DayCount, str]] = None,
+        day_count: Union[DayCount, str],
+        interp: str,
+        extrapolation: str,
     ) -> DiscountCurve:
         """
         Construct a discount curve from dated discount-factor pillars.
@@ -216,8 +244,13 @@ class DiscountCurve:
             Valuation date anchoring ``t = 0``.
         points : Sequence[tuple[datetime.date or str, float]]
             ``(date, discount_factor)`` pillars on or after ``base_date``.
-        day_count : DayCount | str, optional
-            Day count used to convert pillar dates to years; default ``"act_365f"``.
+        day_count : DayCount | str
+            Explicit day count used to convert pillar dates to years.
+        interp : str
+            Explicit interpolation style.
+        extrapolation : str
+            Explicit tail extrapolation policy (``"flat"``, ``"extend"``, or
+            ``"error"``).
 
         Returns
         -------
@@ -227,13 +260,20 @@ class DiscountCurve:
         Raises
         ------
         ValueError
-            If ``points`` is empty, a pillar precedes ``base_date``, or the
-            discount factors fail validation.
+            If ``points`` is empty, a pillar precedes ``base_date``, or an
+            enum label or discount factor is invalid.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import DiscountCurve
-        >>> curve = DiscountCurve.from_dates("USD-OIS", "2025-01-01", [("2026-01-01", 0.95)])
+        >>> curve = DiscountCurve.from_dates(
+        ...     "USD-OIS",
+        ...     "2025-01-01",
+        ...     [("2026-01-01", 0.95)],
+        ...     "act_365f",
+        ...     "monotone_convex",
+        ...     "extend",
+        ... )
         >>> round(curve.df("2026-01-01"), 4)
         0.95
 
@@ -263,7 +303,7 @@ class DiscountCurve:
         Examples
         --------
         >>> from finstack_quant.core.market_data import DiscountCurve
-        >>> curve = DiscountCurve.flat("USD-OIS", "2025-01-01", 0.05)
+        >>> curve = DiscountCurve.flat("USD-OIS", "2025-01-01", 0.05, "act_365f")
         >>> DiscountCurve.from_json(curve.to_json()) == curve
         True
 
@@ -293,8 +333,8 @@ class DiscountCurve:
         Parameters
         ----------
         t : float, datetime.date or str
-            Year fraction from ``base_date``, or a date converted with the
-            curve day count.
+            Non-negative year fraction from ``base_date``, or a date on or
+            after ``base_date`` converted with the curve day count.
 
         Returns
         -------
@@ -304,23 +344,24 @@ class DiscountCurve:
         Raises
         ------
         ValueError
-            If a date precedes ``base_date`` or is not a valid ISO date.
+            If ``t < 0``, a date precedes ``base_date`` or is not a valid ISO
+            date, or an ``"error"`` tail rejects out-of-range queries.
         TypeError
             If ``t`` is neither a number nor date-like.
         """
         ...
 
-    def zero_rate(self, t: TimeOrDate, compounding: str = "continuous") -> float:
+    def zero_rate(self, t: TimeOrDate, compounding: str) -> float:
         """
         Zero rate at a year fraction or date under an explicit compounding convention.
 
         Parameters
         ----------
         t : float, datetime.date or str
-            Year fraction from ``base_date``, or a date converted with the
-            curve day count.
-        compounding : str, optional
-            ``"continuous"`` (default), ``"simple"``, ``"periodic(1)"``,
+            Strictly positive year fraction from ``base_date``, or a date
+            strictly after ``base_date`` converted with the curve day count.
+        compounding : str
+            ``"continuous"``, ``"simple"``, ``"periodic(1)"``,
             ``"semi_annual"``, ``"quarterly"`` or ``"monthly"``.
 
         Returns
@@ -331,8 +372,8 @@ class DiscountCurve:
         Raises
         ------
         ValueError
-            If ``t`` is a date preceding ``base_date`` or ``compounding`` is
-            not a recognised label.
+            If ``t <= 0``, ``t`` is a date on or before ``base_date``, or
+            ``compounding`` is not a recognised label.
         """
         ...
 
@@ -382,32 +423,6 @@ class DiscountCurve:
         ------
         ValueError
             If the interval is empty, reversed or non-finite.
-        """
-        ...
-
-    def to_forward_curve(self, forward_id: str, tenor: float, interp: Optional[str] = None) -> ForwardCurve:
-        """
-        Derive a simple forward-rate curve for a fixed tenor from this curve.
-
-        Parameters
-        ----------
-        forward_id : str
-            Identifier for the resulting forward curve.
-        tenor : float
-            Forward tenor in years (``0.25`` for 3M); must be positive.
-        interp : str, optional
-            Interpolation style of the forward curve; default ``"linear"``.
-
-        Returns
-        -------
-        ForwardCurve
-            Curve with one simple forward per discount knot.
-
-        Raises
-        ------
-        ValueError
-            If ``tenor`` is non-positive, the curve has fewer than two knots,
-            or a derived forward is non-finite.
         """
         ...
 
@@ -548,7 +563,7 @@ class DiscountCurve:
         Returns
         -------
         str
-            Policy label such as ``"flat_forward"``, ``"flat_zero"`` or ``"none"``; it governs queries outside the knot range.
+            Policy label such as ``"extend"``, ``"flat"`` or ``"error"``; it governs queries outside the knot range.
 
         Notes
         -----

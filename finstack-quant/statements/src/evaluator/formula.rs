@@ -660,8 +660,10 @@ mod tests {
         let mut values = vec![1e16];
         values.extend(std::iter::repeat_n(1.0, 256));
 
-        let precise = finstack_quant_core::math::stats::mean_or_nan(&values);
-        let reference = kahan_sum(values.iter().copied()) / values.len() as f64;
+        let precise = finstack_quant_core::math::stats::mean(&values)
+            .unwrap()
+            .unwrap();
+        let reference = kahan_sum(values.iter().copied()).unwrap() / values.len() as f64;
         let naive = values.iter().sum::<f64>() / values.len() as f64;
 
         assert!((precise - reference).abs() < 1e-12);
@@ -1147,7 +1149,7 @@ mod tests {
         ];
         let sum_value = evaluate_function(&Function::Sum, &args, &mut context, Some("sum_test"))
             .expect("sum evaluation should succeed");
-        let reference = kahan_sum([1e16, 1.0, -1e16]);
+        let reference = kahan_sum([1e16, 1.0, -1e16]).unwrap();
         assert!(
             (sum_value - reference).abs() < 1e-12,
             "sum_value={sum_value}, reference={reference}"

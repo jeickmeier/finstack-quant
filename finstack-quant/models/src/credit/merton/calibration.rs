@@ -427,13 +427,7 @@ impl MertonModel {
         match brackets.len() {
             1 => {
                 let (bracket_lo, bracket_hi) = brackets[0];
-                BrentSolver::new()
-                    .with_tolerance(1e-10)
-                    .with_bracket_bounds(bracket_lo, bracket_hi)
-                    .solve(
-                        |sigma| objective(sigma).unwrap_or(f64::NAN),
-                        0.5 * (bracket_lo + bracket_hi),
-                    )
+                BrentSolver::new(1e-10, 100)?.solve_in_bracket(objective, bracket_lo, bracket_hi)
             }
             0 => Err(Error::Validation(format!(
                 "from_cds_spread: no asset volatility in [{lo}, {hi}] reproduces a \

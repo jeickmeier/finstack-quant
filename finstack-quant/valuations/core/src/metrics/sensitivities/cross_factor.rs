@@ -70,14 +70,15 @@ impl FactorBumper for ParallelCurveBumper {
         _as_of: Date,
         direction: f64,
     ) -> Result<MarketContext> {
-        let bumps: Vec<MarketBump> = self
+        let bumps = self
             .curve_ids
             .iter()
-            .map(|id| MarketBump::Curve {
-                id: id.clone(),
-                spec: BumpSpec::parallel_bp(self.bump_bp * direction),
+            .map(|id| {
+                market
+                    .curve_target(id)
+                    .map(|target| target.into_bump(BumpSpec::parallel_bp(self.bump_bp * direction)))
             })
-            .collect();
+            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
         market.bump(bumps)
     }
 
@@ -177,7 +178,7 @@ impl FactorBumper for VolParallelBumper {
                 self.vol_surface_ids
                     .iter()
                     .cloned()
-                    .map(|id| MarketBump::Curve {
+                    .map(|id| MarketBump::VolSurface {
                         id,
                         spec: BumpSpec {
                             mode: finstack_quant_core::market_data::bumps::BumpMode::Additive,
@@ -188,7 +189,7 @@ impl FactorBumper for VolParallelBumper {
                     }),
             )?;
         for id in &self.vol_scalar_ids {
-            let MarketScalar::Unitless(volatility) = market.get_price(id)? else {
+            let Some(volatility) = market.get_price(id)?.get_unitless() else {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "volatility quote '{id}' must be a unitless scalar"
                 )));
@@ -199,7 +200,7 @@ impl FactorBumper for VolParallelBumper {
                     "bumped volatility quote '{id}' must be finite and nonnegative"
                 )));
             }
-            bumped.insert_price_mut(id, MarketScalar::Unitless(value));
+            bumped.insert_price_mut(id, MarketScalar::unitless(value)?);
         }
         Ok(bumped)
     }
@@ -214,10 +215,11 @@ impl FactorBumper for VolParallelBumper {
                 .vol_surface_ids
                 .iter()
                 .all(|vol_surface_id| market.get_surface(vol_surface_id.as_str()).is_ok())
-                && self
-                    .vol_scalar_ids
-                    .iter()
-                    .all(|id| matches!(market.get_price(id), Ok(MarketScalar::Unitless(_)))))
+                && self.vol_scalar_ids.iter().all(|id| {
+                    market
+                        .get_price(id)
+                        .is_ok_and(|scalar| scalar.is_unitless())
+                }))
     }
 
     fn bump_instrument(
@@ -382,7 +384,10 @@ pub fn make_vol_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorB
     if override_volatility.is_none() {
         for dependency in &deps.volatility_dependencies {
             let id = dependency.vol_surface_id.as_str();
-            if matches!(context.curves.get_price(id), Ok(MarketScalar::Unitless(_)))
+            if context
+                .curves
+                .get_price(id)
+                .is_ok_and(|scalar| scalar.is_unitless())
                 && !vol_scalar_ids.iter().any(|existing| existing == id)
             {
                 vol_scalar_ids.push(id.to_string());
@@ -402,8 +407,8 @@ pub fn make_vol_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorB
         })?);
     }
     for id in &vol_scalar_ids {
-        if let MarketScalar::Unitless(vol) = context.curves.get_price(id)? {
-            minimum = minimum.min(*vol);
+        if let Some(vol) = context.curves.get_price(id)?.get_unitless() {
+            minimum = minimum.min(vol);
         }
     }
     if !minimum.is_finite() || minimum < 0.0 {
@@ -522,10 +527,10 @@ impl MetricCalculator for CrossFactorCalculator {
                             direction_a,
                             direction_b,
                         )?,
-                );
+                )?;
             }
         }
-        Ok(value.total() / (h_abs * k_abs))
+        Ok(value.get_total()? / (h_abs * k_abs))
     }
 
     fn dependencies(&self) -> &[MetricId] {
@@ -576,7 +581,9 @@ mod tests {
     use crate::metrics::MetricId;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::types::CurveId;
 
     use super::{FactorBumper, VolParallelBumper};
@@ -585,7 +592,10 @@ mod tests {
     fn flat_surface(id: &str, vol: f64) -> VolSurface {
         VolSurface::builder(id)
             .expiries(&[1.0])
-            .strikes(&[100.0])
+            .secondary_values(&[100.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[vol])
             .build()
             .expect("surface")

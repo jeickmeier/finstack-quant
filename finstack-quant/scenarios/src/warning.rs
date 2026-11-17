@@ -17,14 +17,6 @@ use finstack_quant_valuations::pricer::InstrumentType;
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Warning {
-    /// Par-spread shocks used the approximation delta hazard = delta spread / (1 - recovery).
-    HazardSpreadFirstOrder {
-        /// Hazard curve affected by the approximate spread shock.
-        curve_id: String,
-        /// Decimal recovery fraction used in the loss-given-default conversion.
-        recovery_rate: f64,
-    },
-
     /// A discount curve was resolved heuristically (currency-prefix or single-
     /// curve fallback) instead of via an explicit `discount_curve_id`.
     DiscountCurveHeuristic {
@@ -176,6 +168,12 @@ pub enum Warning {
         detail: String,
     },
 
+    /// Vol-surface bucket shock selected zero grid points (no-op).
+    VolSurfaceBucketEmptySelection {
+        /// Volatility-surface identifier.
+        vol_surface_id: String,
+    },
+
     /// Vol-surface negative bucket shock that may produce non-positive vols.
     VolSurfaceLargeNegativeShock {
         /// Volatility-surface identifier.
@@ -184,28 +182,6 @@ pub enum Warning {
         pct: f64,
         /// Whether this was a parallel (`false`) or bucket (`true`) shock.
         bucket: bool,
-    },
-
-    /// A hierarchy-targeted operation expanded to zero curves. This is almost
-    /// always a configuration mistake — the target path exists but has no
-    /// curves attached to it, or the tag filter excluded everything.
-    HierarchyNoMatch {
-        /// Hierarchy path the operation targeted, joined with `/`.
-        target_path: String,
-        /// Operation `kind` tag (e.g., `"hierarchy_curve_parallel_bp"`).
-        op_kind: String,
-    },
-
-    /// A hierarchy-resolved identifier was skipped because it does not exist
-    /// in the market collection targeted by the operation kind (e.g. a
-    /// `HierarchyCurveParallelBp { curve_kind: Discount }` matched an id that
-    /// is an equity price or vol surface, not a discount curve). The remaining
-    /// resolved identifiers are still applied.
-    HierarchyResolvedIdSkipped {
-        /// The resolved identifier that was skipped.
-        curve_id: String,
-        /// Operation `kind` tag (e.g., `"hierarchy_curve_parallel_bp"`).
-        op_kind: String,
     },
 
     /// An instrument's valuation failed while computing carry during a
@@ -222,8 +198,6 @@ pub enum Warning {
 impl fmt::Display for Warning {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::HazardSpreadFirstOrder { curve_id, recovery_rate } => write!(f,
-                "First-order par-spread shock for '{curve_id}' uses delta hazard = delta spread / (1 - {recovery_rate}); quotes are not rebootstrap-reconciled"),
             Warning::DiscountCurveHeuristic { reason, .. } => f.write_str(reason),
             Warning::CommodityShockOutsideRange { detail, .. }
             | Warning::FxTriangulationInconsistent { detail }
@@ -283,6 +257,10 @@ impl fmt::Display for Warning {
                 f,
                 "Vol surface '{vol_surface_id}' post-shock arbitrage warning: {detail}"
             ),
+            Warning::VolSurfaceBucketEmptySelection { vol_surface_id } => write!(
+                f,
+                "Vol surface '{vol_surface_id}': bucket shock matched zero grid points (empty selector)"
+            ),
             Warning::VolSurfaceLargeNegativeShock {
                 vol_surface_id,
                 pct,
@@ -293,20 +271,6 @@ impl fmt::Display for Warning {
                  non-positive vols or calendar spread arbitrage. Consider using check_arbitrage() \
                  to validate post-shock surface.",
                 kind = if *bucket { "bucket " } else { "" },
-            ),
-            Warning::HierarchyNoMatch {
-                target_path,
-                op_kind,
-            } => write!(
-                f,
-                "Hierarchy operation '{op_kind}' targeting '{target_path}' matched no curves; \
-                 the target path may exist but be empty, or its tag filter excluded everything."
-            ),
-            Warning::HierarchyResolvedIdSkipped { curve_id, op_kind } => write!(
-                f,
-                "Hierarchy operation '{op_kind}' resolved id '{curve_id}', which does not exist \
-                 in the market collection that operation targets; skipped. Check that the \
-                 hierarchy node groups only identifiers of the targeted kind."
             ),
             Warning::TimeRollInstrumentFailed {
                 instrument_id,

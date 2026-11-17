@@ -470,34 +470,27 @@ impl PyMoney {
             .map_err(core_to_py)
     }
 
-    /// Right-add; supports ``Money + Money`` and ``0 + money``.
-    fn __radd__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
+    /// Right-add; supports ``Money + Money`` and ``0 + money`` (exact int ``0`` only).
+    fn __radd__<'py>(
+        &self,
+        py: Python<'py>,
+        other: &Bound<'py, PyAny>,
+    ) -> PyResult<Bound<'py, PyAny>> {
         if let Ok(rhs) = other.extract::<PyRef<'_, PyMoney>>() {
             return rhs
                 .inner
                 .checked_add(self.inner)
                 .map(Self::from_inner)
-                .map_err(core_to_py);
+                .map_err(core_to_py)?
+                .into_bound_py_any(py);
         }
-        let scalar: f64 = other.extract()?;
-        if scalar == 0.0 {
-            Ok(self.clone())
-        } else {
-            Err(PyTypeError::new_err(
-                "unsupported right operand for Money addition (expected Money or 0)",
-            ))
+        if !other.is_instance_of::<pyo3::types::PyBool>()
+            && other.is_instance_of::<PyInt>()
+            && other.extract::<i64>().ok() == Some(0)
+        {
+            return self.clone().into_bound_py_any(py);
         }
-    }
-
-    /// Right-subtract; supports ``0 - money`` for Python sum-style identities.
-    fn __rsub__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let scalar: f64 = other.extract()?;
-        if scalar != 0.0 {
-            return Err(PyTypeError::new_err(
-                "unsupported right operand for Money subtraction (expected 0)",
-            ));
-        }
-        Ok(Self::from_inner(self.inner.checked_neg()))
+        Ok(py.NotImplemented().into_bound(py))
     }
 
     /// Right-multiply by an exact or ``float`` scalar.

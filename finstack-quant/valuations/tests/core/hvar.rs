@@ -28,6 +28,8 @@ fn usd_ois_curve(as_of: Date) -> Result<DiscountCurve> {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots(vec![(0.0, 1.0), (5.0, 0.85), (10.0, 0.70)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
 }
 

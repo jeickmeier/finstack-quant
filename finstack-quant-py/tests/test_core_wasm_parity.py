@@ -17,7 +17,6 @@ from __future__ import annotations
 from collections.abc import Callable
 import datetime
 import json
-import math
 import os
 from pathlib import Path
 from typing import Any
@@ -29,10 +28,13 @@ from finstack_quant.core.market_data import (
     BaseCorrelationCurve,
     CreditIndexData,
     DiscountCurve,
+    ForwardCurve,
     FxMatrix,
     HazardCurve,
     InflationCurve,
+    InflationExpectedRelease,
     InflationIndex,
+    InflationObservation,
     MarketContext,
     PriceCurve,
     SabrParameterData,
@@ -57,12 +59,25 @@ def _isos(values: list[datetime.date]) -> list[str]:
 
 def _discount() -> DiscountCurve:
     return DiscountCurve.from_zero_rates(
-        "USD-OIS", "2025-01-02", [(0.5, 0.04), (1.0, 0.042), (5.0, 0.045)], compounding="semi_annual"
+        "USD-OIS",
+        "2025-01-02",
+        [(0.5, 0.04), (1.0, 0.042), (5.0, 0.045)],
+        "semi_annual",
+        "act_365f",
+        "monotone_convex",
+        "extend",
     )
 
 
 def _inflation() -> InflationCurve:
-    return InflationCurve("US-CPI", "2025-01-02", 300.0, [(0.0, 300.0), (5.0, 331.2)], indexation_lag_months=3)
+    return InflationCurve(
+        "US-CPI",
+        "2025-01-02",
+        [(0.0, 300.0), (5.0, 331.2)],
+        day_count="act_365f",
+        interp="log_linear",
+        extrapolation="flat",
+    )
 
 
 def _price() -> PriceCurve:
@@ -74,11 +89,28 @@ def _base_correlation() -> BaseCorrelationCurve:
 
 
 def _surface() -> VolSurface:
-    return VolSurface("SPX-VOL", [0.5, 1.0], [90.0, 100.0, 110.0], [0.24, 0.2, 0.22, 0.23, 0.21, 0.22])
+    return VolSurface(
+        "SPX-VOL",
+        [0.5, 1.0],
+        [90.0, 100.0, 110.0],
+        [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
+        secondary_axis="strike",
+        quote_type="black_lognormal",
+        interpolation_mode="vol",
+    )
 
 
 def _shifted_surface() -> VolSurface:
-    return _surface().with_displacements([0.01, 0.015])
+    return VolSurface(
+        "SPX-VOL",
+        [0.5, 1.0],
+        [90.0, 100.0, 110.0],
+        [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
+        secondary_axis="strike",
+        quote_type="shifted_black_lognormal",
+        interpolation_mode="vol",
+        displacements=[0.01, 0.015],
+    )
 
 
 def _expiry_slice(quote_type: str = "black_lognormal", displacements: list[float] | None = None) -> VolCubeExpirySlice:
@@ -93,20 +125,31 @@ def _expiry_slice(quote_type: str = "black_lognormal", displacements: list[float
     )
 
 
-PUBLICATION_DATES = [("2024-10-01", "2024-11-13"), ("2024-11-01", "2024-12-11")]
+EXPECTED_RELEASES = [
+    InflationExpectedRelease("2024-10-01", "2024-11-13", "2024-10-01"),
+    InflationExpectedRelease("2024-11-01", "2024-12-11", "2024-11-01"),
+]
 
 
 def _series() -> ScalarTimeSeries:
-    return ScalarTimeSeries("SOFR-FIXINGS", [("2025-01-02", 0.0431), ("2025-01-06", 0.0433)], interpolation="linear")
+    return ScalarTimeSeries(
+        "SOFR-FIXINGS",
+        [("2025-01-02", 0.0431), ("2025-01-06", 0.0433)],
+        interpolation="linear",
+        extrapolation="flat",
+    )
 
 
-def _index(lag: str = "3M") -> InflationIndex:
+def _index() -> InflationIndex:
     return InflationIndex(
         "US-CPI-U",
-        [("2024-10-01", 315.664), ("2024-11-01", 315.493), ("2024-12-01", 315.605)],
+        [
+            InflationObservation("2024-10-01", 315.664, "2024-11-13"),
+            InflationObservation("2024-11-01", 315.493, "2024-12-11"),
+            InflationObservation("2024-12-01", 315.605, "2025-01-15"),
+        ],
         "USD",
-        interpolation="linear",
-        lag=lag,
+        "2025-01-15",
     )
 
 
@@ -116,7 +159,7 @@ def _fx() -> FxMatrix:
 
 def _market() -> MarketContext:
     market = MarketContext()
-    market.insert(DiscountCurve.flat("USD-OIS", "2025-01-02", 0.04))
+    market.insert(DiscountCurve.flat("USD-OIS", "2025-01-02", 0.04, "act_365f"))
     market.insert(_inflation())
     market.insert(_price())
     market.insert(_base_correlation())
@@ -127,7 +170,7 @@ def _market() -> MarketContext:
     market.insert_series(_series())
     market.insert_inflation_index(_index())
     # A credit index is persisted by reference, so its curves are stored too.
-    hazard = HazardCurve.flat("CDX-IG-HZD", "2025-01-02", 0.01, 0.4)
+    hazard = HazardCurve.flat("CDX-IG-HZD", "2025-01-02", 0.01, 0.4, "act_365f")
     market.insert(hazard)
     market.insert_credit_index("CDX-IG-43", CreditIndexData(125, 0.4, hazard, _base_correlation()))
     return market
@@ -272,19 +315,21 @@ CASES: dict[str, Callable[[], Any]] = {
     "symmetric_eigen": _eigen,
     "ledoit_wolf_shrinkage": _ledoit_wolf,
     "mean_var": lambda: list(stats.mean_var(SERIES)),
-    "stats_or_nan": lambda: [
-        stats.mean_or_nan(SERIES),
-        stats.sample_variance_or_nan(SERIES),
-        stats.sample_std_or_nan(SERIES),
-        stats.median_or_nan(SERIES),
+    "stats_summary": lambda: [
+        stats.mean(SERIES),
+        stats.variance(SERIES),
+        stats.std_dev(SERIES),
+        stats.median(SERIES),
         stats.quantile(SERIES, 0.3),
-        stats.finite_min_or_nan(SERIES),
-        stats.finite_max_or_nan(SERIES),
+        stats.finite_min(SERIES),
+        stats.finite_max(SERIES),
     ],
-    "stats_empty_is_nan": lambda: [
-        math.isnan(stats.mean_or_nan([])),
-        math.isnan(stats.sample_variance_or_nan([1.0])),
-        math.isnan(stats.finite_min_or_nan([float("nan")])),
+    "stats_missing_is_none": lambda: [
+        stats.mean([]) is None,
+        stats.variance([1.0]) is None,
+        stats.std_dev([1.0]) is None,
+        stats.median([]) is None,
+        stats.finite_min([float("nan")]) is None,
     ],
     "finite_count": lambda: stats.finite_count([1.0, float("nan"), float("inf"), 2.0]),
     "log_returns": lambda: stats.log_returns(SERIES),
@@ -342,13 +387,13 @@ CASES: dict[str, Callable[[], Any]] = {
     # --- market data ------------------------------------------------------------------
     "discount_curve": lambda: json.loads(_discount().to_json()),
     "discount_curve_queries": lambda: [
-        _discount().zero_rate(2.0),
+        _discount().zero_rate(2.0, "continuous"),
         _discount().zero_rate(2.0, "periodic(1)"),
         _discount().zero_rate(2.0, "semi_annual"),
         _discount().zero_rate("2027-01-02", "quarterly"),
         _discount().df("2027-01-02"),
         _discount().df_between_dates("2026-01-02", "2027-01-02"),
-        _discount().to_forward_curve("USD-FWD", 0.25).rate(1.0),
+        ForwardCurve.from_discount_curve("USD-FWD", _discount(), "3M").rate_between(1.0, 1.25, 0.25),
         _discount().day_count,
         _discount().interp_style,
         _discount().extrapolation,
@@ -356,16 +401,20 @@ CASES: dict[str, Callable[[], Any]] = {
         list(_discount().dfs),
     ],
     "discount_curve_from_dates": lambda: json.loads(
-        DiscountCurve.from_dates("USD-OIS", "2025-01-02", [("2026-01-02", 0.96), ("2030-01-02", 0.8)]).to_json()
+        DiscountCurve.from_dates(
+            "USD-OIS",
+            "2025-01-02",
+            [("2026-01-02", 0.96), ("2030-01-02", 0.8)],
+            "act_365f",
+            "monotone_convex",
+            "extend",
+        ).to_json()
     ),
     "inflation_curve": lambda: json.loads(_inflation().to_json()),
     "inflation_curve_queries": lambda: [
         _inflation().cpi(2.5),
         _inflation().cpi("2027-07-02"),
-        _inflation().cpi_with_lag(2.5),
-        _inflation().index_ratio(2.5),
         _inflation().inflation_rate(0.0, 5.0),
-        _inflation().indexation_lag_months,
     ],
     "price_curve": lambda: json.loads(_price().to_json()),
     "price_curve_queries": lambda: [_price().price(0.5), _price().price("2025-07-02"), _price().kind],
@@ -374,10 +423,12 @@ CASES: dict[str, Callable[[], Any]] = {
     "vol_surface": lambda: json.loads(_surface().to_json()),
     "vol_surface_queries": lambda: [
         volatility.get_surface_vol(_surface(), 0.75, 100.0),
+        _surface().secondary_values,
         list(_surface().grid_shape),
         _surface().secondary_axis,
         _surface().quote_type,
         _surface().interpolation_mode,
+        _surface().expiry_clock,
     ],
     "vol_surface_displacements": lambda: [
         _surface().displacements,
@@ -389,7 +440,9 @@ CASES: dict[str, Callable[[], Any]] = {
             [0.5, 1.0],
             [90.0, 100.0, 110.0],
             [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
+            secondary_axis="strike",
             quote_type="shifted_black_lognormal",
+            interpolation_mode="vol",
             displacements=[0.01, 0.015],
         ).to_json()
         == _shifted_surface().to_json(),
@@ -410,29 +463,22 @@ CASES: dict[str, Callable[[], Any]] = {
     ],
     "scalar_time_series": lambda: json.loads(_series().to_json()),
     "scalar_time_series_queries": lambda: [
-        _series().value_on("2025-01-04"),
-        _series().value_on_exact("2025-01-06"),
+        _series().get_value("2025-01-04"),
+        _series().get_value_exact("2025-01-06"),
         _iso(_series().first_date),
         _iso(_series().last_date),
     ],
     "inflation_index": lambda: json.loads(_index().to_json()),
     "inflation_index_queries": lambda: [
-        _index("none").ratio("2024-10-01", "2024-12-01"),
-        _index("none").value_on("2024-11-16"),
-        _index().ref_cpi_months_lag("2025-02-15", 3),
-        _isos(list(_index().date_range())),
-        _index().lag,
+        _index().get_observation("2024-10-01").value,
+        _index().qualified_monthly_observation(2024, 11, "2024-12-11"),
+        _isos(list(_index().date_range() or ())),
+        _iso(_index().knowledge_date),
     ],
-    "inflation_index_publication_dates": lambda: [
-        _index().get_publication_dates(),
-        _index().get_publication_date("2024-10-20"),
-        [
-            list(_isos(list(pair)))
-            for pair in _index().with_publication_dates(PUBLICATION_DATES).get_publication_dates()
-        ],
-        _iso(_index().with_publication_dates(PUBLICATION_DATES).get_publication_date("2024-10-20")),
-        _index().with_publication_dates(PUBLICATION_DATES).get_publication_date("2024-12-05"),
-        json.loads(_index().with_publication_dates(PUBLICATION_DATES).to_json()),
+    "inflation_index_expected_releases": lambda: [
+        _index().get_expected_releases(),
+        _index().get_expected_release("2024-10-01"),
+        json.loads(_index().with_expected_releases(EXPECTED_RELEASES).to_json()),
     ],
     "fx_matrix": lambda: [
         _fx().rate("EUR", "USD", "2025-01-02", "cashflow_date").rate,
@@ -446,18 +492,18 @@ CASES: dict[str, Callable[[], Any]] = {
         "is_empty": [_market().is_empty(), MarketContext().is_empty()],
         "df": _market().get_discount("USD-OIS").df(1.0),
         "vol": volatility.get_surface_vol(_market().get_surface("SPX-VOL"), 0.75, 100.0),
-        "series": _market().get_series("SOFR-FIXINGS").value_on("2025-01-06"),
-        "index_lag": _market().get_inflation_index("US-CPI-U").lag,
+        "series": _market().get_series("SOFR-FIXINGS").get_value("2025-01-06"),
+        "index_knowledge_date": _iso(_market().get_inflation_index("US-CPI-U").knowledge_date),
         "credit_index": _market().get_credit_index("CDX-IG-43").num_constituents,
         "fx_rate": _market().fx_required().rate("EUR", "USD", "2025-01-02", "cashflow_date").rate,
         "converted": [
-            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").amount.amount,
-            str(_market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").amount.currency),
-            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").rate.rate,
-            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02").rate.triangulated,
-            _market().convert_money(Money(100.0, "USD"), "USD", "2025-01-02").rate is None,
+            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02", "cashflow_date").amount.amount,
+            str(_market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02", "cashflow_date").amount.currency),
+            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02", "cashflow_date").rate.rate,
+            _market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02", "cashflow_date").rate.triangulated,
+            _market().convert_money(Money(100.0, "USD"), "USD", "2025-01-02", "cashflow_date").rate is None,
         ],
-        "rolled_base_date": _iso(_market().roll_forward(30).get_discount("USD-OIS").base_date),
+        "rolled_base_date": _iso(_market().condition("2025-02-01").get_discount("USD-OIS").base_date),
         "round_trip": json.loads(MarketContext.from_json(_market().to_json()).to_json())
         == json.loads(_market().to_json()),
     },

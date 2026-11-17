@@ -8,7 +8,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::dividends::DividendSchedule;
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationLag, ScalarTimeSeries, SeriesInterpolation,
+    InflationIndex, InflationLag, InflationObservation, ScalarTimeSeries, SeriesInterpolation,
 };
 use finstack_quant_core::money::Money;
 use time::Month;
@@ -17,13 +17,13 @@ use time::Month;
 fn inflation_lag_display_round_trips_with_from_str() {
     for lag in [
         InflationLag::None,
-        InflationLag::Months(3),
-        InflationLag::Days(90),
+        InflationLag::months(3),
+        InflationLag::days(90),
     ] {
         let parsed: InflationLag = lag.to_string().parse().expect("display form parses");
         assert_eq!(parsed, lag);
     }
-    assert_eq!(InflationLag::Months(3).to_string(), "3M");
+    assert_eq!(InflationLag::months(3).to_string(), "3M");
     assert_eq!(InflationLag::None.to_string(), "none");
 }
 
@@ -82,10 +82,16 @@ fn dividend_schedule_validate_rejects_negative_cash() {
 
 #[test]
 fn scalar_time_series_rejects_pre_history_lookups() {
-    let series =
-        ScalarTimeSeries::new("TEST-SERIES", vec![(jan(10), 10.0), (jan(20), 20.0)], None).unwrap();
+    let series = ScalarTimeSeries::new(
+        "TEST-SERIES",
+        vec![(jan(10), 10.0), (jan(20), 20.0)],
+        None,
+        SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+    )
+    .unwrap();
 
-    let result = series.value_on(jan(5));
+    let result = series.get_value(jan(5));
     assert!(
         result.is_err(),
         "queries before the first observation should error instead of leaking the first value"
@@ -95,26 +101,44 @@ fn scalar_time_series_rejects_pre_history_lookups() {
 #[test]
 fn scalar_time_series_rejects_non_finite_observations() {
     for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-        let error = ScalarTimeSeries::new("INVALID", vec![(jan(10), value)], None)
-            .expect_err("non-finite observations must be rejected");
+        let error = ScalarTimeSeries::new(
+            "INVALID",
+            vec![(jan(10), value)],
+            None,
+            SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect_err("non-finite observations must be rejected");
         assert!(error.to_string().contains("finite"));
     }
 }
 
 #[test]
-fn inflation_index_rejects_pre_history_lookups() {
+fn inflation_index_rejects_pre_history_and_non_canonical_lookups() {
+    let feb = Date::from_calendar_date(2025, Month::February, 1).unwrap();
+    let mar = Date::from_calendar_date(2025, Month::March, 1).unwrap();
+    let cutoff = Date::from_calendar_date(2025, Month::April, 15).unwrap();
     let index = InflationIndex::new(
         "US-CPI",
-        vec![(jan(10), 100.0), (jan(20), 101.0)],
+        vec![
+            InflationObservation {
+                reference_month: feb,
+                value: 100.0,
+                available_on: mar,
+            },
+            InflationObservation {
+                reference_month: mar,
+                value: 101.0,
+                available_on: cutoff,
+            },
+        ],
         Currency::USD,
+        cutoff,
     )
     .unwrap();
 
-    let result = index.value_on(jan(5));
-    assert!(
-        result.is_err(),
-        "inflation index lookups before history starts should error"
-    );
+    assert!(index.get_observation(jan(1)).is_err());
+    assert!(index.get_observation(jan(5)).is_err());
 }
 
 // Moved from phase2_strictness.rs: finite-value deserialization.

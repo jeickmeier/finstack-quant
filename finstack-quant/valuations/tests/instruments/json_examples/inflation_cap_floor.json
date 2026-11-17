@@ -12,7 +12,7 @@
       },
       "id": "INFLCAP-USD-5Y",
       "inflation_index_id": "US-CPI",
-      "interpolation": null,
+      "interpolation": "linear",
       "lag": {
         "months": 3
       },

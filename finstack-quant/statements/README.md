@@ -207,12 +207,16 @@ schedules and the actual model periods, including fiscal dates. Runtime state
 and allocation machinery are private; Rust, Python, and WASM callers use the
 canonical evaluator.
 
+The default waterfall pays fees, interest, scheduled principal, and equity in
+that order. Each prepayment requires an explicit payment priority and its
+matching sizing rule. A waterfall with any prepayment priority supports
+capital structures composed solely of term loans and revolvers.
+
 Known limits (also stated in the module rustdoc): waterfall allocation is
 pro-rata inside each payment class, walking class rank (empty
 `payment_classes` is one implicit class); loan residual schedules rebuild
-interest after outstanding changes, and Bond / ConvertibleBond plus a sweep
-is rejected; `available_cash_node` is the pre-waterfall cash pool and must
-not deduct `cs` debt-service tokens; omitted `fx_policy` converts
+interest after outstanding changes; `available_cash_node` is the pre-waterfall
+cash pool and must not deduct `cs` debt-service tokens; omitted `fx_policy` converts
 period-aggregated reporting totals on the inclusive period-end date
 (`PeriodEnd`); prepayment penalties, call premiums, and OID accretion are
 not modeled.

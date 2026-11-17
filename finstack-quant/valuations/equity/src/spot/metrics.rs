@@ -54,9 +54,10 @@ impl MetricCalculator for ForwardPricePerShareCalculator {
         let t = context
             .curves
             .get_price(&key)
-            .map(|s| match s {
-                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-                finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
+            .ok()
+            .and_then(|s| {
+                s.get_unitless()
+                    .or_else(|| s.get_price().map(|m| m.amount()))
             })
             .unwrap_or(0.0);
         let money = equity.forward_price_per_share(&context.curves, context.as_of, t)?;

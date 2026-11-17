@@ -32,6 +32,8 @@ fn flat_curve(as_of: Date, rate: f64) -> DiscountCurve {
         .base_date(as_of)
         .knots(knots)
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("flat curve should build")
 }

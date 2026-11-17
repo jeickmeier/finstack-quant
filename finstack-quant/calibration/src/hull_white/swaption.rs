@@ -618,10 +618,15 @@ pub(super) fn hw1f_swaption_price_prepared(
         let half_width = (5.0 * sigma * t0.sqrt()).max(0.5);
         let bracket_lo = f0t0 - half_width;
         let bracket_hi = f0t0 + half_width;
-        let brent = BrentSolver::new()
-            .with_tolerance(1e-12)
-            .with_bracket_bounds(bracket_lo, bracket_hi);
-        r_star = brent.solve(g, f0t0)?;
+        let brent = BrentSolver::new(1e-12, 100)?;
+        r_star = brent.solve(
+            |r| Ok(g(r)),
+            f0t0,
+            bracket_lo,
+            bracket_hi,
+            (0.25 * half_width).max(0.05),
+            20,
+        )?;
     }
     if !r_star.is_finite() {
         return Err(finstack_quant_core::Error::Internal(

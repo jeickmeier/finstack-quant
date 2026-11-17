@@ -28,21 +28,32 @@ const KNOTS: [f64; 5] = [0.0, 1.0, 3.0, 5.0, 10.0];
 fn hazard_market(spot: f64) -> MarketContext {
     let rf = DiscountCurve::builder("USD-OIS")
         .base_date(dates::base_date())
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots(KNOTS.map(|t| (t, (-RF * t).exp())))
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     MarketContext::new()
         .insert(rf)
-        .insert(HazardCurve::flat("USD-CREDIT", dates::base_date(), LAMBDA, 0.0).unwrap())
-        .insert_price("AAPL", MarketScalar::Unitless(spot))
+        .insert(
+            HazardCurve::flat(
+                "USD-CREDIT",
+                dates::base_date(),
+                LAMBDA,
+                0.0,
+                finstack_quant_core::dates::DayCount::Act365F,
+            )
+            .unwrap(),
+        )
+        .insert_price("AAPL", MarketScalar::unitless(spot).expect("valid scalar"))
         .insert_price(
             "AAPL-VOL",
-            MarketScalar::Unitless(market_params::VOL_STANDARD),
+            MarketScalar::unitless(market_params::VOL_STANDARD).expect("valid scalar"),
         )
         .insert_price(
             "AAPL-DIVYIELD",
-            MarketScalar::Unitless(market_params::DIV_YIELD),
+            MarketScalar::unitless(market_params::DIV_YIELD).expect("valid scalar"),
         )
 }
 
@@ -141,21 +152,28 @@ fn quantlib_hazard_market(as_of: Date) -> MarketContext {
         .day_count(DayCount::Thirty360)
         .knots([(0.0, 1.0), (30.0, 0.30119421191220214)])
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let hazard = HazardCurve::builder("USD-CREDIT")
         .base_date(as_of)
         .day_count(DayCount::Act365F)
-        .knots([(0.0, 0.02), (30.0, 0.02)])
+        .knots([(30.0, 0.02)])
         .recovery_rate(0.0)
         .build()
         .unwrap();
     MarketContext::new()
         .insert(ois)
         .insert(hazard)
-        .insert_price("AAPL", MarketScalar::Unitless(1.0))
-        .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
-        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.0))
+        .insert_price("AAPL", MarketScalar::unitless(1.0).expect("valid scalar"))
+        .insert_price(
+            "AAPL-VOL",
+            MarketScalar::unitless(0.25).expect("valid scalar"),
+        )
+        .insert_price(
+            "AAPL-DIVYIELD",
+            MarketScalar::unitless(0.0).expect("valid scalar"),
+        )
 }
 
 #[test]

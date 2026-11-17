@@ -232,8 +232,8 @@ fn volatility_weighting_uses_one_unit_total_pnl() -> Result<()> {
         .map(|(offset, (a, b))| {
             let date = date!(2025 - 01 - 01) + time::Duration::days(offset as i64);
             let market = MarketContext::new()
-                .insert_price("A", MarketScalar::Unitless(a))
-                .insert_price("B", MarketScalar::Unitless(b));
+                .insert_price("A", MarketScalar::unitless(a).expect("valid scalar"))
+                .insert_price("B", MarketScalar::unitless(b).expect("valid scalar"));
             CompositeMarketObservation::new(date, &market)
         })
         .collect::<Result<Vec<_>>>()?;
@@ -471,6 +471,9 @@ fn deposit_pair_composite(
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, (-0.04_f64).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
     let market = MarketContext::new().insert(curve);
     let mut own = crate::instruments::rates::deposit::Deposit::example()?;
@@ -653,8 +656,8 @@ fn price_history(prices: &[f64]) -> Vec<CompositeMarketObservation> {
         .map(|(offset, price)| {
             let date = date!(2025 - 01 - 01) + time::Duration::days(offset as i64);
             let market = MarketContext::new()
-                .insert_price("A", MarketScalar::Unitless(*price))
-                .insert_price("B", MarketScalar::Unitless(*price));
+                .insert_price("A", MarketScalar::unitless(*price).expect("valid scalar"))
+                .insert_price("B", MarketScalar::unitless(*price).expect("valid scalar"));
             CompositeMarketObservation::new(date, &market).expect("coherent market snapshot")
         })
         .collect()

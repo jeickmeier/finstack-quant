@@ -62,13 +62,45 @@ def test_shifted_surface_constructor_keeps_metadata_and_validates_shape() -> Non
             [1.0],
             [-0.01, 0.01],
             vols,
+            secondary_axis="strike",
             quote_type="shifted_black_lognormal",
+            interpolation_mode="vol",
             displacements=[0.03],
         )
         assert surface.displacements == [0.03]
         assert surface.quote_type == "shifted_black_lognormal"
     with pytest.raises(ValueError, match="displacement"):
-        VolSurface("SHIFT", [1.0], [-0.01, 0.01], [0.2, 0.21], quote_type="shifted_black_lognormal")
+        VolSurface(
+            "SHIFT",
+            [1.0],
+            [-0.01, 0.01],
+            [0.2, 0.21],
+            secondary_axis="strike",
+            quote_type="shifted_black_lognormal",
+            interpolation_mode="vol",
+        )
+    with pytest.raises(TypeError, match="missing required keyword-only argument: 'interpolation_mode'"):
+        VolSurface(  # type: ignore[call-arg]
+            "SHIFT",
+            [1.0],
+            [-0.01, 0.01],
+            [0.2, 0.21],
+            secondary_axis="strike",
+            quote_type="black_lognormal",
+        )
+    with pytest.raises(TypeError, match="unexpected keyword argument"):
+        VolSurface(  # type: ignore[call-arg]
+            "SHIFT",
+            [1.0],
+            [-0.01, 0.01],
+            [0.2, 0.21],
+            secondary_axis="strike",
+            quote_type="black_lognormal",
+            interpolation_mode="vol",
+            bogus=1,
+        )
+    with pytest.raises(TypeError, match="quote_type"):
+        VolCubeExpirySlice("SHIFT", 1.0, [5.0, 10.0], [0.01], [0.2, 0.2])  # type: ignore[call-arg]
     with pytest.raises(ValueError, match="displacement"):
         VolCubeExpirySlice(
             "SHIFT", 1.0, [5.0, 10.0], [0.01], [0.2, 0.2], quote_type="shifted_black_lognormal", displacements=[0.03]

@@ -32,6 +32,9 @@ fn test_duration_zero_coupon() {
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.70)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
     let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
@@ -82,6 +85,9 @@ fn test_yield_duration_convexity_act_act_isma() {
     let curve = DiscountCurve::builder("GBP-OIS")
         .base_date(as_of)
         .knots([(0.0, 1.0), (10.0, (-(0.045_f64 * 10.0_f64)).exp())])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
@@ -127,6 +133,8 @@ fn test_modified_duration_matches_macaulay_over_yield() {
         .base_date(as_of)
         .day_count(DayCount::Act360)
         .knots([(0.0, 1.0), (10.0, (-(0.05_f64 * 10.0_f64)).exp())])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
@@ -169,6 +177,9 @@ fn test_convexity_matches_numerical_second_derivative() {
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots([(0.0, 1.0), (10.0, 0.6)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
@@ -253,6 +264,9 @@ fn callable_risk_market(
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots([(0.0, 1.0), (7.0, 0.78)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     finstack_quant_core::market_data::context::MarketContext::new().insert(curve)

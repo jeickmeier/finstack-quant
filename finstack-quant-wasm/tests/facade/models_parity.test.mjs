@@ -313,7 +313,7 @@ const LV_SMILE = [0.24, 0.22, 0.2, 0.19, 0.185];
 const LV_IMPLIED = {
   id: 'SKEW',
   expiries: [0.25, 0.5, 1.0, 2.0],
-  strikes: STRIKES,
+  secondary_values: STRIKES,
   vols_row_major: [...LV_SMILE, ...LV_SMILE, ...LV_SMILE, ...LV_SMILE],
   secondary_axis: 'strike',
   interpolation_mode: 'vol',
@@ -366,6 +366,8 @@ const discountCurve = (rate) =>
     id: 'USD-OIS',
     baseDate: '2025-01-15',
     knots: [0.0, 0.5, 1.0, 2.0].flatMap((t) => [t, Math.exp(-rate * t)]),
+    interp: 'monotone_convex',
+    extrapolation: 'extend',
     dayCount: 'act_365f',
   });
 
@@ -882,7 +884,8 @@ const CASES = {
       1.0,
       [2.0, 5.0],
       [0.02, 0.03, 0.04],
-      [0.3, 0.25, 0.27, 0.28, 0.24, 0.26]
+      [0.3, 0.25, 0.27, 0.28, 0.24, 0.26],
+      'black_lognormal'
     );
     return [
       json(expirySlice),
@@ -898,14 +901,13 @@ const CASES = {
       volatility.materializeFxDeltaSurface(
         new core.FxDeltaVolSurface(
           'EURUSD',
+          'EUR/USD',
           [0.5, 1.0],
           [0.1, 0.11],
           [0.01, 0.012],
           [0.002, 0.003]
         ),
-        1.1,
-        0.03,
-        0.02
+        [1.1 * Math.exp(0.01 * 0.5), 1.1 * Math.exp(0.01 * 1.0)]
       )
     ),
   'volatility.sabr_smile': () => {

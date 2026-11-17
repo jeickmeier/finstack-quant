@@ -8,8 +8,8 @@
 
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{
-    BaseCorrelationCurve, BasisSpreadCurve, DiscountCurve, ForwardCurve, HazardCurve,
-    InflationCurve, ParametricCurve, PriceCurve,
+    BaseCorrelationCurve, DiscountCurve, ForwardCurve, HazardCurve, InflationCurve,
+    ParametricCurve, PriceCurve,
 };
 use serde::{Deserialize, Serialize};
 
@@ -32,8 +32,6 @@ pub enum PriorMarketObject {
     InflationCurve(InflationCurve),
     /// Pre-built CDS-index base-correlation curve.
     BaseCorrelationCurve(BaseCorrelationCurve),
-    /// Pre-built tenor-basis spread curve.
-    BasisSpreadCurve(BasisSpreadCurve),
     /// Pre-built parametric (e.g. Nelson-Siegel) curve.
     ParametricCurve(ParametricCurve),
     /// Pre-built spot / forward price curve.
@@ -53,7 +51,6 @@ impl PriorMarketObject {
             PriorMarketObject::HazardCurve(c) => c.id().as_str(),
             PriorMarketObject::InflationCurve(c) => c.id().as_str(),
             PriorMarketObject::BaseCorrelationCurve(c) => c.id().as_str(),
-            PriorMarketObject::BasisSpreadCurve(c) => c.id().as_str(),
             PriorMarketObject::ParametricCurve(c) => c.id().as_str(),
             PriorMarketObject::PriceCurve(c) | PriorMarketObject::VolatilityIndexCurve(c) => {
                 c.id().as_str()
@@ -70,7 +67,6 @@ impl PriorMarketObject {
             PriorMarketObject::HazardCurve(_) => "hazard_curve",
             PriorMarketObject::InflationCurve(_) => "inflation_curve",
             PriorMarketObject::BaseCorrelationCurve(_) => "base_correlation_curve",
-            PriorMarketObject::BasisSpreadCurve(_) => "basis_spread_curve",
             PriorMarketObject::ParametricCurve(_) => "parametric_curve",
             PriorMarketObject::PriceCurve(_) => "price_curve",
             PriorMarketObject::VolatilityIndexCurve(_) => "volatility_index_curve",
@@ -91,6 +87,8 @@ mod tests {
             .base_date(Date::from_calendar_date(2025, Month::January, 1).expect("valid date"))
             .knots([(0.0, 1.0), (5.0, 0.9)])
             .interp(InterpStyle::MonotoneConvex)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("DiscountCurve builder should succeed")
     }

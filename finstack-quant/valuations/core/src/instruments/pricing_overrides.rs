@@ -75,6 +75,10 @@ pub enum VolSurfaceExtrapolation {
 const OAS_QUOTE_COMPOUNDING_PATH: &str =
     "instrument_pricing_overrides.model_config.oas_quote_compounding";
 
+const fn default_oas_quote_compounding() -> Compounding {
+    Compounding::Continuous
+}
+
 /// Reject OAS quote bases other than continuous and semiannual.
 fn validate_oas_quote_compounding(compounding: Compounding) -> finstack_quant_core::Result<()> {
     if compounding == Compounding::Continuous || compounding == Compounding::SEMI_ANNUAL {
@@ -446,7 +450,7 @@ impl BumpConfig {
 pub struct MertonMcOverride(pub crate::instruments::MertonMcConfig);
 
 /// Model selection and tree pricing parameters.
-#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
 pub struct ModelConfig {
@@ -636,7 +640,7 @@ pub struct ModelConfig {
     /// The OAS is added to each short rate on this basis: a semiannual
     /// (`{"periodic": 2}`) OAS discounts at `1 + (z + oas) / 2` per half
     /// year, the bond-equivalent convention of the Bloomberg OAS screen.
-    #[serde(default)]
+    #[serde(default = "default_oas_quote_compounding")]
     pub oas_quote_compounding: Compounding,
     /// Optional independent-estimator count for Monte Carlo pricers.
     ///
@@ -681,6 +685,37 @@ pub struct ModelConfig {
     /// models and by non-structured-credit instruments.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub structured_credit_pool_granularity: Option<PoolGranularity>,
+}
+
+impl Default for ModelConfig {
+    fn default() -> Self {
+        Self {
+            vol_surface_extrapolation: VolSurfaceExtrapolation::default(),
+            tree_model: None,
+            tree_steps: None,
+            merton_mc_config: None,
+            call_friction_cents: None,
+            hw1f_sigma: None,
+            hw1f_sigma_schedule: None,
+            hw1f_mean_reversion: None,
+            bdt_sigma: None,
+            bk_sigma: None,
+            bk_mean_reversion: None,
+            lmm_base_vol: None,
+            hazard_sigma: None,
+            hazard_mean_reversion: None,
+            rate_credit_correlation: None,
+            tree_discount_curve_id: None,
+            asw_forward_curve_id: None,
+            government_curve_id: None,
+            oas_quote_compounding: default_oas_quote_compounding(),
+            mc_paths: None,
+            mc_antithetic: None,
+            mc_seed_scenario: None,
+            mc_target_ci_half_width: None,
+            structured_credit_pool_granularity: None,
+        }
+    }
 }
 
 impl ModelConfig {

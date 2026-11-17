@@ -170,27 +170,26 @@ pub(super) fn fixture(case: Case, as_of: Date) -> Fixture {
     }
     history.reverse();
     history.extend(required_history.iter().copied());
-    let tenor = if case.leg == Leg::Term {
-        0.25
-    } else {
-        1.0 / 360.0
-    };
-    let forward = ForwardCurve::builder(case.leg.index(), tenor)
-        .base_date(curve_base())
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.03), (40.0, 0.05)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap();
+    let forward = ForwardCurve::from_zero_rates(
+        case.leg.index(),
+        curve_base(),
+        &[(0.0, 0.03), (40.0, 0.05)],
+        finstack_quant_core::math::Compounding::Continuous,
+        DayCount::Act360,
+        InterpStyle::LogLinear,
+        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+    )
+    .unwrap();
     let mut market = MarketContext::new().insert(forward);
     if !history.is_empty() {
         let series = ScalarTimeSeries::new(
             format!("FIXING:{}", case.leg.index()),
             history.clone(),
             Some(Currency::USD),
+            SeriesInterpolation::Linear,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
-        .unwrap()
-        .with_interpolation(SeriesInterpolation::Linear);
+        .unwrap();
         market = market.insert_series(series);
     }
     let spec = FloatingCouponSpec {
@@ -258,17 +257,36 @@ pub(super) fn fixture(case: Case, as_of: Date) -> Fixture {
     }
 }
 
-fn expected_raw(fixture: &Fixture, date: Date) -> f64 {
+fn expected_period_raw(
+    fixture: &Fixture,
+    start: Date,
+    end: Date,
+    accrual_factor: f64,
+    reset: Date,
+) -> f64 {
+    if reset < fixture.as_of {
+        historical_rate(reset)
+    } else {
+        fixture
+            .market
+            .get_forward(fixture.case.leg.index())
+            .expect("forward curve")
+            .rate_between_dates(start, end, accrual_factor)
+            .expect("projected term rate")
+    }
+}
+
+fn expected_overnight_raw(fixture: &Fixture, date: Date) -> f64 {
     if date < fixture.as_of {
         historical_rate(date)
     } else {
-        let time = (date - curve_base()).whole_days() as f64 / 360.0;
-        if fixture.case.leg == Leg::Term {
-            0.03 + 0.0005 * time
-        } else {
-            // Exact average of the globally linear one-day forward curve.
-            0.03 + 0.0005 * (time + 0.5 / 360.0)
-        }
+        let obs_end = date + time::Duration::days(1);
+        fixture
+            .market
+            .get_forward(fixture.case.leg.index())
+            .expect("forward curve")
+            .rate_between_dates(date, obs_end, 1.0 / 360.0)
+            .expect("projected overnight rate")
     }
 }
 
@@ -327,13 +345,13 @@ pub(super) fn check(fixture: &Fixture, schedule: &CashFlowSchedule) -> Reference
             start
         };
         let index_rate = if fixture.case.leg == Leg::Term {
-            let raw = expected_raw(fixture, reset);
+            let raw = expected_period_raw(fixture, start, end, accrual_factor, reset);
             reference.raw_fixings.insert(reset, raw);
             raw
         } else {
             let mut product = 1.0;
             for (date, weight) in slices(start, end) {
-                let raw = expected_raw(fixture, date);
+                let raw = expected_overnight_raw(fixture, date);
                 reference.raw_fixings.insert(date, raw);
                 product *= 1.0 + raw * weight as f64 / 360.0;
             }
@@ -348,11 +366,11 @@ pub(super) fn check(fixture: &Fixture, schedule: &CashFlowSchedule) -> Reference
         assert_eq!((accrual.get_start(), accrual.get_end()), (start, end));
         assert_eq!(accrual.get_day_count(), DayCount::Act360);
         assert_eq!(
-            accrual.get_context().calendar_id.as_deref(),
+            accrual.get_context().get_calendar_id(),
             Some("weekends_only")
         );
         assert_eq!(
-            accrual.get_context().end_is_termination_date,
+            accrual.get_context().get_end_is_termination_date(),
             Some(quarter + 1 == COUPONS)
         );
         assert_eq!(flow.get_date(), payment(end));

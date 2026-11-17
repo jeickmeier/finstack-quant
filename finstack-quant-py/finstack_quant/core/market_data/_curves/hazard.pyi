@@ -13,16 +13,18 @@ class HazardCurve:
     """
     Credit hazard-rate curve for default-probability modelling.
 
-    Stores piecewise-constant hazard rates ``(t, lambda)`` in years from
-    ``base_date`` with ``lambda`` as an annual default intensity (decimal).
-    Each ``lambda`` applies to the segment *ending* at its knot, so
-    ``sp(t) = exp(-integral of lambda)``. Query methods accept a year fraction
-    or a date (converted with the curve day count by Rust).
+    Stores piecewise-constant hazard rates ``(t, lambda)`` at strictly positive
+    ending times ``t`` in years from ``base_date`` with ``lambda`` as an annual
+    default intensity (decimal). Each ``lambda`` applies to the segment *ending*
+    at its knot, so ``sp(t) = exp(-integral of lambda)``. Query methods accept a
+    year fraction or a date (converted with the curve day count by Rust).
 
     Examples
     --------
     >>> from finstack_quant.core.market_data import HazardCurve
-    >>> curve = HazardCurve("ACME-HZD", "2025-01-01", [(1.0, 0.02), (5.0, 0.03)], recovery_rate=0.4)
+    >>> curve = HazardCurve(
+    ...     "ACME-HZD", "2025-01-01", [(1.0, 0.02), (5.0, 0.03)], recovery_rate=0.4, day_count="act_365f"
+    ... )
     >>> round(curve.sp(1.0), 6)
     0.980199
     >>> round(curve.conditional_default_prob("2025-01-01", "2026-01-01"), 6)
@@ -39,13 +41,11 @@ class HazardCurve:
         knots: Sequence[tuple[float, float]],
         *,
         recovery_rate: float,
-        day_count: Optional[Union[DayCount, str]] = None,
-        par_spreads: Optional[Sequence[tuple[float, float]]] = None,
-        par_interp: Optional[str] = None,
+        day_count: Union[DayCount, str],
+        calendar_id: Optional[str] = None,
         issuer: Optional[str] = None,
         seniority: Optional[str] = None,
         currency: Optional[Union[Currency, str]] = None,
-        max_hazard_rate: Optional[float] = None,
     ) -> None:
         """
         Construct a hazard curve from ``(time_years, hazard_rate)`` knots.
@@ -57,39 +57,38 @@ class HazardCurve:
         base_date : datetime.date or str
             Valuation date anchoring ``t = 0``.
         knots : Sequence[tuple[float, float]]
-            ``(time_years, hazard_rate)`` pairs; hazard rates are annual
-            default intensities as decimals (``0.02`` is 2% per year).
+            ``(time_years, hazard_rate)`` pairs with strictly positive
+            increasing ending times ``t > 0``; hazard rates are annual default
+            intensities as decimals (``0.02`` is 2% per year).
         recovery_rate : float
             Recovery on default as a decimal fraction in ``[0, 1]`` (keyword-only).
-        day_count : DayCount | str, optional
-            Day-count label; default ``"act_365f"``.
-        par_spreads : Sequence[tuple[float, float]], optional
-            ``(time_years, par_spread_bp)`` market quotes in **basis points**
-            kept for reporting and re-bootstrap risk.
-        par_interp : str, optional
-            Par-spread readout interpolation: ``"linear"`` (default) or ``"log_linear"``.
+        day_count : DayCount | str
+            Explicit day-count label or object (keyword-only and required).
+        calendar_id : str, optional
+            Registered holiday calendar of the curve's time axis (required with
+            ``day_count="bus_252"``).
         issuer : str, optional
             Issuer name metadata.
         seniority : str, optional
             ``"senior_secured"``, ``"senior"``, ``"subordinated"`` or ``"junior"``.
         currency : Currency or str, optional
             Currency of the protection leg (metadata).
-        max_hazard_rate : float, optional
-            Sanity ceiling on any hazard rate; default ``10.0``.
 
         Raises
         ------
         ValueError
-            If a knot is non-finite, negative, duplicated or above
-            ``max_hazard_rate``, ``recovery_rate`` is outside ``[0, 1]``,
-            or a label is unknown.
+            If a knot has non-positive/non-increasing time or negative/non-finite
+            hazard rate, ``recovery_rate`` is outside ``[0, 1]``, ``day_count``
+            is invalid or lacks a required calendar, or a label is unknown.
         TypeError
-            If ``recovery_rate`` is omitted.
+            If ``recovery_rate`` or ``day_count`` is omitted.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import HazardCurve
-        >>> curve = HazardCurve("ACME-HZD", "2025-01-01", [(1.0, 0.02)], recovery_rate=0.4, seniority="senior")
+        >>> curve = HazardCurve(
+        ...     "ACME-HZD", "2025-01-01", [(1.0, 0.02)], recovery_rate=0.4, day_count="act_365f", seniority="senior"
+        ... )
         >>> curve.seniority
         'senior'
 
@@ -97,7 +96,13 @@ class HazardCurve:
         ...
 
     @staticmethod
-    def flat(id: str, base_date: DateLike, hazard_rate: float, recovery_rate: float) -> HazardCurve:
+    def flat(
+        id: str,
+        base_date: DateLike,
+        hazard_rate: float,
+        recovery_rate: float,
+        day_count: Union[DayCount, str],
+    ) -> HazardCurve:
         """
         Construct a flat (constant-intensity) hazard curve.
 
@@ -111,6 +116,8 @@ class HazardCurve:
             Constant annual default intensity as a decimal (``0.02`` is 2%).
         recovery_rate : float
             Recovery on default as a decimal fraction in ``[0, 1]``.
+        day_count : DayCount | str
+            Explicit supported curve day-count convention.
 
         Returns
         -------
@@ -120,13 +127,14 @@ class HazardCurve:
         Raises
         ------
         ValueError
-            If ``hazard_rate`` is non-finite or negative, or ``recovery_rate``
-            is outside ``[0, 1]``.
+            If ``hazard_rate`` is non-finite or negative, ``recovery_rate``
+            is outside ``[0, 1]``, or ``day_count`` is invalid or requires an
+            absent calendar.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import HazardCurve
-        >>> round(HazardCurve.flat("ACME", "2025-01-01", 0.02, 0.4).sp(5.0), 6)
+        >>> round(HazardCurve.flat("ACME", "2025-01-01", 0.02, 0.4, "act_365f").sp(5.0), 6)
         0.904837
 
         """
@@ -138,6 +146,7 @@ class HazardCurve:
         base_date: DateLike,
         points: Sequence[tuple[float, float]],
         recovery_rate: float,
+        day_count: Union[DayCount, str],
     ) -> HazardCurve:
         """
         Construct a hazard curve from survival-probability pillars.
@@ -150,10 +159,12 @@ class HazardCurve:
             Valuation date anchoring ``t = 0``.
         points : Sequence[tuple[float, float]]
             ``(time_years, survival_probability)`` pillars with probabilities
-            in ``(0, 1]`` and non-increasing in time. A ``t = 0`` pillar must
-            be ``1.0``.
+            in ``(0, 1]`` and non-increasing in time. An optional ``t = 0``
+            pillar must be ``1.0``; at least one ``t > 0`` pillar is required.
         recovery_rate : float
             Recovery on default as a decimal fraction in ``[0, 1]``.
+        day_count : DayCount | str
+            Explicit supported curve day-count convention.
 
         Returns
         -------
@@ -163,13 +174,14 @@ class HazardCurve:
         Raises
         ------
         ValueError
-            If ``points`` is empty, a probability is outside ``(0, 1]`` or
-            increases with time, or ``recovery_rate`` is outside ``[0, 1]``.
+            If ``points`` is empty or lacks a positive time, a probability is
+            outside ``(0, 1]`` or increases with time, ``recovery_rate`` is
+            outside ``[0, 1]``, or ``day_count`` is invalid.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import HazardCurve
-        >>> curve = HazardCurve.from_survival_probs("ACME", "2025-01-01", [(1.0, 0.98), (5.0, 0.90)], 0.4)
+        >>> curve = HazardCurve.from_survival_probs("ACME", "2025-01-01", [(1.0, 0.98), (5.0, 0.90)], 0.4, "act_365f")
         >>> round(curve.sp(5.0), 6)
         0.9
 
@@ -199,7 +211,7 @@ class HazardCurve:
         Examples
         --------
         >>> from finstack_quant.core.market_data import HazardCurve
-        >>> curve = HazardCurve.flat("ACME", "2025-01-01", 0.02, 0.4)
+        >>> curve = HazardCurve.flat("ACME", "2025-01-01", 0.02, 0.4, "act_365f")
         >>> HazardCurve.from_json(curve.to_json()) == curve
         True
 
@@ -229,18 +241,18 @@ class HazardCurve:
         Parameters
         ----------
         t : float, datetime.date or str
-            Year fraction from ``base_date``, or a date converted with the
-            curve day count.
+            Non-negative year fraction from ``base_date``, or a date on or
+            after ``base_date`` converted with the curve day count.
 
         Returns
         -------
         float
-            Probability in ``(0, 1]``; ``1.0`` at or before ``t = 0``.
+            Probability in ``[0, 1]``; ``1.0`` at ``t = 0``.
 
         Raises
         ------
         ValueError
-            If a date precedes ``base_date``.
+            If ``t < 0``, ``t`` is non-finite, or a date precedes ``base_date``.
         """
         ...
 
@@ -251,8 +263,8 @@ class HazardCurve:
         Parameters
         ----------
         t : float, datetime.date or str
-            Year fraction from ``base_date``, or a date converted with the
-            curve day count.
+            Non-negative year fraction from ``base_date``, or a date on or
+            after ``base_date`` converted with the curve day count.
 
         Returns
         -------
@@ -262,7 +274,7 @@ class HazardCurve:
         Raises
         ------
         ValueError
-            If a date precedes ``base_date``.
+            If ``t < 0``, ``t`` is non-finite, or a date precedes ``base_date``.
         """
         ...
 
@@ -339,32 +351,6 @@ class HazardCurve:
             day count cannot compute either date's year fraction.
         TypeError
             If either argument is not a supported date or ISO date string.
-        """
-        ...
-
-    def cds_quote_bp(self, t: float, method: Optional[str] = None) -> float:
-        """
-        Interpolated par CDS spread in **basis points** at year fraction ``t``.
-
-        Uses the stored ``par_spreads`` quotes; with fewer than two quotes it
-        falls back to a hazard-based approximation.
-
-        Parameters
-        ----------
-        t : float
-            Year fraction from ``base_date``.
-        method : str, optional
-            ``"linear"`` or ``"log_linear"``; defaults to :attr:`par_interp`.
-
-        Returns
-        -------
-        float
-            Spread in basis points.
-
-        Raises
-        ------
-        ValueError
-            If ``method`` is not a recognised label.
         """
         ...
 
@@ -472,22 +458,6 @@ class HazardCurve:
         ...
 
     @property
-    def par_spread_points(self) -> list[tuple[float, float]]:
-        """
-        Market CDS quotes the curve was bootstrapped from.
-
-        Returns
-        -------
-        list[tuple[float, float]]
-            ``(time_years, par_spread_bp)`` pairs with spreads in basis points; empty when the curve was built directly from hazard rates.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
     def day_count(self) -> str:
         """
         Day-count convention converting calendar dates to curve time.
@@ -496,6 +466,23 @@ class HazardCurve:
         -------
         str
             Lower-case ISDA day-count label such as ``"act_365f"`` or ``"act_360"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def calendar_id(self) -> Optional[str]:
+        """
+        Registered holiday calendar of the curve's time axis.
+
+        Returns
+        -------
+        str or None
+            Canonical calendar id (for example ``"brbd"`` on a ``"bus_252"``
+            curve), or ``None`` when the day count needs no calendar.
 
         Notes
         -----
@@ -544,22 +531,6 @@ class HazardCurve:
         -------
         Optional[str]
             One of ``"senior_secured"``, ``"senior"``, ``"subordinated"`` or ``"junior"``, or ``None`` when unset; it typically drives the recovery assumption.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def par_interp(self) -> str:
-        """
-        Interpolation applied when reading par spreads off the quotes.
-
-        Returns
-        -------
-        str
-            Either ``"linear"`` or ``"log_linear"``, controlling interpolation between the stored par-spread pillars.
 
         Notes
         -----

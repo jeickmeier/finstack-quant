@@ -20,19 +20,21 @@
 //! ```
 //! use finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver;
 //!
-//! let solver = LevenbergMarquardtSolver::new().with_tolerance(1e-8);
+//! # fn main() -> finstack_quant_core::Result<()> {
+//! let solver = LevenbergMarquardtSolver::new(1e-8, 1e-12, 100)?;
 //!
 //! // Solve the residual system x + y = 5, x - y = 1.
 //! let residuals = |params: &[f64], resid: &mut [f64]| {
 //!     resid[0] = params[0] + params[1] - 5.0;
 //!     resid[1] = params[0] - params[1] - 1.0;
+//!     Ok(())
 //! };
 //!
-//! let solution = solver
-//!     .solve_system(residuals, &[0.0, 0.0], 2)
-//!     .expect("system solve should succeed");
+//! let solution = solver.solve_least_squares(residuals, &[0.0, 0.0], 2)?;
 //! assert!((solution.params[0] - 3.0).abs() < 1e-6);
 //! assert!((solution.params[1] - 2.0).abs() < 1e-6);
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! # References
@@ -50,6 +52,17 @@
 //!   (SABR calibration techniques) `docs/REFERENCES.md#hagan-2002-sabr`
 use crate::Result;
 
+fn try_vec_filled(len: usize, value: f64) -> Result<Vec<f64>> {
+    let mut vec = Vec::new();
+    vec.try_reserve_exact(len).map_err(|err| {
+        crate::Error::Validation(format!(
+            "LM workspace allocation for {len} floats failed: {err}"
+        ))
+    })?;
+    vec.resize(len, value);
+    Ok(vec)
+}
+
 /// Pre-allocated scratch buffers for finite-difference Jacobian computation.
 struct JacobianScratch {
     params_plus: Vec<f64>,
@@ -59,13 +72,13 @@ struct JacobianScratch {
 }
 
 impl JacobianScratch {
-    fn new(n_params: usize, n_residuals: usize) -> Self {
-        Self {
-            params_plus: vec![0.0; n_params],
-            params_minus: vec![0.0; n_params],
-            r_plus: vec![0.0; n_residuals],
-            r_minus: vec![0.0; n_residuals],
-        }
+    fn try_new(n_params: usize, n_residuals: usize) -> Result<Self> {
+        Ok(Self {
+            params_plus: try_vec_filled(n_params, 0.0)?,
+            params_minus: try_vec_filled(n_params, 0.0)?,
+            r_plus: try_vec_filled(n_residuals, 0.0)?,
+            r_minus: try_vec_filled(n_residuals, 0.0)?,
+        })
     }
 }
 
@@ -78,14 +91,21 @@ struct QrStepWorkspace {
 }
 
 impl QrStepWorkspace {
-    fn new(n_residuals: usize, n_params: usize) -> Self {
-        let aug_rows = n_residuals + n_params;
-        Self {
-            aug: nalgebra::DMatrix::zeros(aug_rows, n_params),
-            rhs: nalgebra::DVector::zeros(aug_rows),
-            col_norms: vec![0.0; n_params],
-            step: vec![0.0; n_params],
-        }
+    fn try_new(n_residuals: usize, n_params: usize) -> Result<Self> {
+        let aug_rows = n_residuals.checked_add(n_params).ok_or_else(|| {
+            invalid_lm("Levenberg-Marquardt augmented QR row count overflows usize")
+        })?;
+        let aug_len = aug_rows.checked_mul(n_params).ok_or_else(|| {
+            invalid_lm("Levenberg-Marquardt augmented QR dimensions overflow usize")
+        })?;
+        let aug_data = try_vec_filled(aug_len, 0.0)?;
+        let rhs_data = try_vec_filled(aug_rows, 0.0)?;
+        Ok(Self {
+            aug: nalgebra::DMatrix::from_vec(aug_rows, n_params, aug_data),
+            rhs: nalgebra::DVector::from_vec(rhs_data),
+            col_norms: try_vec_filled(n_params, 0.0)?,
+            step: try_vec_filled(n_params, 0.0)?,
+        })
     }
 }
 
@@ -134,34 +154,14 @@ fn scaled_column_norm(matrix: &[f64], m: usize, n: usize, col: usize) -> f64 {
     scale * sum_sq.sqrt()
 }
 
-/// Trait for functions that can provide analytical derivatives.
-///
-/// This trait allows optimization algorithms to use exact derivatives
-/// when available, significantly improving convergence speed and accuracy.
-pub trait AnalyticalDerivatives {
-    /// Compute the Jacobian matrix for a system of equations.
-    ///
-    /// # Arguments
-    /// * `params` - Current parameter values
-    /// * `jacobian` - Output buffer for Jacobian matrix (rows = equations, cols = params)
-    ///
-    /// Default implementation returns None, indicating Jacobian is not available.
-    fn jacobian(&self, _params: &[f64], _jacobian: &mut [Vec<f64>]) -> Option<()> {
-        None
-    }
-
-    /// Number of residual equations the Jacobian has rows for.
-    fn residual_count(&self) -> usize;
-}
-
 /// Termination reason for the Levenberg-Marquardt solver.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LmTerminationReason {
-    /// Residual norm fell below the configured tolerance.
+    /// Residual norm fell strictly below the configured residual tolerance.
     ConvergedResidualNorm,
-    /// Parameter update step norm fell below the solver's minimum step (`1e-12`).
+    /// Parameter update step norm fell strictly below the configured step tolerance.
     StepTooSmall,
-    /// Solver exhausted the iteration budget.
+    /// Solver exhausted the configured damped-step attempt budget.
     MaxIterations,
     /// Damping parameter reached `LAMBDA_MAX` without reducing the residual norm.
     DampingLimit,
@@ -170,20 +170,22 @@ pub enum LmTerminationReason {
 /// Solver statistics for diagnostics and monitoring.
 #[derive(Clone, Debug)]
 pub struct LmStats {
-    /// Number of accepted LM iterations.
+    /// Total attempted damped LM steps (`0` if the initial residual already meets tolerance).
     pub iterations: usize,
-    /// Total residual evaluations performed (including Jacobian probes).
+    /// Number of accepted damped steps that strictly decreased the residual norm.
+    pub accepted_steps: usize,
+    /// Total residual evaluations performed (including initial, Jacobian probe, and trial calls).
     pub residual_evals: usize,
-    /// Total Jacobian evaluations performed.
+    /// Total Jacobian evaluations or finite-difference assemblies performed.
     pub jacobian_evals: usize,
     /// Reason why the solver terminated.
     pub termination_reason: LmTerminationReason,
-    /// Final residual norm when termination occurred.
+    /// Euclidean residual 2-norm corresponding to the returned accepted parameters.
     pub final_residual_norm: f64,
-    /// Norm of the final accepted (or attempted) step.
-    pub final_step_norm: f64,
-    /// Final damping parameter (lambda) at termination.
-    pub lambda_final: f64,
+    /// Effective step 2-norm of the last attempted step, or `None` when no step was attempted.
+    pub last_step_norm: Option<f64>,
+    /// Damping parameter `lambda` used in the last attempted step, or `None` when no step was attempted.
+    pub last_lambda: Option<f64>,
 }
 
 /// Solution vector plus solver statistics.
@@ -195,12 +197,8 @@ pub struct LmSolution {
     pub stats: LmStats,
 }
 
-/// Minimum bound for damping parameter λ (`√λ_min = 1e-12` in augmented QR).
-///
-/// Lambda values below this threshold are clamped to prevent numerical instability
-/// from overly aggressive Gauss-Newton steps while allowing augmented QR to resolve
-/// singular values down to `~1e-10` (well beyond normal-equations `f64` breakdown).
-const LAMBDA_MIN: f64 = 1e-24;
+/// Minimum bound for damping parameter λ (`1e-15` per CORE-NUMERICS-06).
+const LAMBDA_MIN: f64 = 1e-15;
 
 /// Maximum bound for damping parameter λ.
 ///
@@ -219,39 +217,47 @@ const MARQUARDT_DIAG_FLOOR_REL: f64 = 1e-12;
 
 /// Levenberg-Marquardt solver for non-linear least squares.
 ///
-/// Combines Gauss-Newton and gradient descent methods using a damping parameter
-/// λ that adapts based on progress. Particularly effective for sum-of-squares
-/// objectives arising in curve calibration and parameter fitting.
+/// Minimizes the sum of squared residuals `||r(p)||_2^2` using an adaptive
+/// trust-region damping parameter `λ` interpolated between Gauss-Newton and
+/// diagonally scaled gradient descent. Particularly effective for curve
+/// calibration, volatility surface fitting, and parameter estimation.
 ///
 /// # Algorithm
 ///
-/// At each iteration, solves:
+/// At each iteration, solves the damped linear least-squares subproblem via
+/// Householder QR factorization with column pivoting on the augmented matrix:
 /// ```text
-/// (J^T J + λ·diag(J^T J)) δ = -J^T r
+/// min_δ || [ J(p); sqrt(λ) · D ] δ - [ -r(p); 0 ] ||_2
 ///
 /// where:
-///   J = Jacobian matrix
-///   r = residual vector
-///   λ = damping parameter (adaptive)
-///   δ = parameter update
+///   J(p) = Jacobian matrix (n_residuals x n_params)
+///   r(p) = residual vector (n_residuals)
+///   D    = positive diagonal scaling matrix from column norms of J(p)
+///   λ    = adaptive damping parameter
+///   δ    = candidate parameter update
 /// ```
 ///
-/// The damping uses Marquardt's diagonal scaling `λ·diag(JᵀJ)` (with a small
-/// relative floor, see `MARQUARDT_DIAG_FLOOR_REL`) rather than the unscaled
-/// Levenberg `+λI`, so steps are invariant to per-parameter rescaling.
+/// Both adaptive finite-difference perturbations and diagonal scaling are
+/// coordinate-dependent (with a small relative column floor
+/// `MARQUARDT_DIAG_FLOOR_REL`), so numerical behavior can vary if parameters
+/// are rescaled by many orders of magnitude without normalization.
 ///
-/// - **λ → 0**: Gauss-Newton (fast near solution)
-/// - **λ → ∞**: Gradient descent (robust far from solution)
+/// - **λ → 0**: Approaches Gauss-Newton steps
+/// - **λ → ∞**: Approaches short diagonally scaled steepest-descent steps
 ///
 /// # Damping Parameter Bounds
 ///
-/// The damping parameter λ is bounded to `LAMBDA_MIN` and `LAMBDA_MAX` to ensure
-/// numerical stability.
+/// The damping parameter λ is bounded between `LAMBDA_MIN` and `LAMBDA_MAX` to
+/// ensure numerical stability.
 ///
-/// # Convergence
+/// # Convergence and Termination
 ///
-/// Typically achieves quadratic convergence near the solution, switching to
-/// linear convergence when far from optimum. More robust than pure Gauss-Newton.
+/// Callers must inspect `LmSolution::stats.termination_reason` rather than
+/// assuming `Ok(...)` guarantees a small residual. Depending on the starting
+/// point and problem conditioning, `solve_least_squares` and
+/// `solve_least_squares_with_jacobian` return diagnostics for
+/// `ConvergedResidualNorm`, `StepTooSmall`, `MaxIterations`, or
+/// `DampingLimit`.
 ///
 /// # Use Cases
 ///
@@ -266,58 +272,84 @@ const MARQUARDT_DIAG_FLOOR_REL: f64 = 1e-12;
 ///   in Least Squares." *Quarterly of Applied Mathematics*, 2(2), 164-168.
 /// - Marquardt, D. W. (1963). "An Algorithm for Least-Squares Estimation of Nonlinear
 ///   Parameters." *SIAM Journal*, 11(2), 431-441.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct LevenbergMarquardtSolver {
-    /// Convergence tolerance on the residual norm
-    pub tolerance: f64,
-    /// Maximum iterations
-    pub max_iterations: usize,
+    residual_tolerance: f64,
+    step_tolerance: f64,
+    max_iterations: usize,
 }
 
 /// Initial damping parameter (lambda).
 const LM_LAMBDA_INIT: f64 = 1e-3;
 /// Factor for adjusting lambda (increase on failure, decrease on success).
 const LM_LAMBDA_FACTOR: f64 = 10.0;
-/// Minimum allowed parameter step norm (for numerical stability).
-const LM_MIN_STEP_SIZE: f64 = 1e-12;
-
-impl Default for LevenbergMarquardtSolver {
-    fn default() -> Self {
-        Self {
-            tolerance: 1e-8,
-            max_iterations: 100,
-        }
-    }
-}
 
 #[inline]
-fn invalid_lm(reason: &'static str) -> crate::Error {
-    crate::Error::Validation(reason.to_string())
+fn invalid_lm(reason: impl Into<String>) -> crate::Error {
+    crate::Error::Validation(reason.into())
 }
 
 impl LevenbergMarquardtSolver {
-    /// Create a new Levenberg-Marquardt solver with default settings.
-    pub fn new() -> Self {
-        Self::default()
+    /// Create a validated Levenberg-Marquardt solver with explicit stopping tolerances and step budget.
+    ///
+    /// # Arguments
+    ///
+    /// * `residual_tolerance` - Strictly positive finite residual 2-norm convergence target `||r||_2 < residual_tolerance`.
+    /// * `step_tolerance` - Strictly positive finite effective step 2-norm threshold (`||p_trial - p||_2 < step_tolerance`).
+    /// * `max_iterations` - Maximum number of damped step attempts (`>= 1`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if either tolerance is non-finite or `<= 0.0`,
+    /// or if `max_iterations == 0`.
+    pub fn new(
+        residual_tolerance: f64,
+        step_tolerance: f64,
+        max_iterations: usize,
+    ) -> Result<Self> {
+        if !residual_tolerance.is_finite() || residual_tolerance <= 0.0 {
+            return Err(invalid_lm(format!(
+                "LM residual_tolerance must be finite and positive, got {residual_tolerance}"
+            )));
+        }
+        if !step_tolerance.is_finite() || step_tolerance <= 0.0 {
+            return Err(invalid_lm(format!(
+                "LM step_tolerance must be finite and positive, got {step_tolerance}"
+            )));
+        }
+        if max_iterations == 0 {
+            return Err(invalid_lm("LM max_iterations must be at least 1"));
+        }
+        Ok(Self {
+            residual_tolerance,
+            step_tolerance,
+            max_iterations,
+        })
     }
 
-    /// Set convergence tolerance.
-    pub fn with_tolerance(mut self, tolerance: f64) -> Self {
-        self.tolerance = tolerance;
-        self
+    /// Return the configured residual 2-norm tolerance.
+    #[must_use]
+    pub fn get_residual_tolerance(&self) -> f64 {
+        self.residual_tolerance
     }
 
-    /// Set maximum iterations.
-    pub fn with_max_iterations(mut self, max_iterations: usize) -> Self {
-        self.max_iterations = max_iterations;
-        self
+    /// Return the configured effective step 2-norm tolerance.
+    #[must_use]
+    pub fn get_step_tolerance(&self) -> f64 {
+        self.step_tolerance
+    }
+
+    /// Return the configured maximum number of damped step attempts.
+    #[must_use]
+    pub fn get_max_iterations(&self) -> usize {
+        self.max_iterations
     }
 
     /// Compute Jacobian for a system of residuals into a pre-allocated buffer.
     ///
     /// Writes a flat row-major Jacobian into `out`: `J[i * n_params + j]`.
     fn compute_jacobian_system_into<Res>(
-        residuals: &Res,
+        residuals: &mut Res,
         params: &[f64],
         base_resid: &[f64],
         n_residuals: usize,
@@ -326,7 +358,7 @@ impl LevenbergMarquardtSolver {
         out: &mut [f64],
     ) -> Result<()>
     where
-        Res: Fn(&[f64], &mut [f64]),
+        Res: FnMut(&[f64], &mut [f64]) -> Result<()>,
     {
         let n_params = params.len();
         // ε^(1/3): optimal base step for central differences, balancing O(h²)
@@ -342,14 +374,14 @@ impl LevenbergMarquardtSolver {
             let p_plus = p_j + h;
             let p_minus = p_j - h;
             if !p_plus.is_finite() || !p_minus.is_finite() || !(p_plus > p_j && p_j > p_minus) {
-                return Err(invalid_lm(
-                    "LM finite-difference parameter probe overflowed or collapsed",
-                ));
+                return Err(invalid_lm(format!(
+                    "LM finite-difference parameter probe overflowed or collapsed at coordinate {j}"
+                )));
             }
 
             let step_plus = p_plus - p_j;
             let step_minus = p_j - p_minus;
-            let total_span = p_plus - p_minus;
+            let total_span = step_plus + step_minus;
             if !step_plus.is_finite()
                 || !step_minus.is_finite()
                 || !total_span.is_finite()
@@ -357,27 +389,43 @@ impl LevenbergMarquardtSolver {
                 || step_minus <= 0.0
                 || total_span <= 0.0
             {
-                return Err(invalid_lm("LM finite-difference step span is invalid"));
+                return Err(invalid_lm(format!(
+                    "LM finite-difference step span is invalid at coordinate {j}"
+                )));
             }
 
             scratch.params_plus[j] = p_plus;
             scratch.r_plus.fill(f64::NAN);
-            residuals(&scratch.params_plus, &mut scratch.r_plus);
-            *residual_eval_counter += 1;
-            if scratch.r_plus.iter().any(|value| !value.is_finite()) {
-                return Err(invalid_lm(
-                    "LM forward finite-difference residual contains NaN or infinity",
-                ));
+            residuals(&scratch.params_plus, &mut scratch.r_plus)?;
+            *residual_eval_counter = residual_eval_counter
+                .checked_add(1)
+                .ok_or_else(|| invalid_lm("LM residual evaluation counter overflowed usize"))?;
+            if let Some((i, &val)) = scratch
+                .r_plus
+                .iter()
+                .enumerate()
+                .find(|(_, v)| !v.is_finite())
+            {
+                return Err(invalid_lm(format!(
+                    "LM forward finite-difference residual component {i} for parameter {j} is non-finite or unwritten: {val}"
+                )));
             }
 
             scratch.params_minus[j] = p_minus;
             scratch.r_minus.fill(f64::NAN);
-            residuals(&scratch.params_minus, &mut scratch.r_minus);
-            *residual_eval_counter += 1;
-            if scratch.r_minus.iter().any(|value| !value.is_finite()) {
-                return Err(invalid_lm(
-                    "LM backward finite-difference residual contains NaN or infinity",
-                ));
+            residuals(&scratch.params_minus, &mut scratch.r_minus)?;
+            *residual_eval_counter = residual_eval_counter
+                .checked_add(1)
+                .ok_or_else(|| invalid_lm("LM residual evaluation counter overflowed usize"))?;
+            if let Some((i, &val)) = scratch
+                .r_minus
+                .iter()
+                .enumerate()
+                .find(|(_, v)| !v.is_finite())
+            {
+                return Err(invalid_lm(format!(
+                    "LM backward finite-difference residual component {i} for parameter {j} is non-finite or unwritten: {val}"
+                )));
             }
 
             let w_plus = step_minus / total_span;
@@ -387,9 +435,9 @@ impl LevenbergMarquardtSolver {
                 let slope_minus = (base_resid[i] - scratch.r_minus[i]) / step_minus;
                 let deriv = w_plus * slope_plus + w_minus * slope_minus;
                 if !deriv.is_finite() {
-                    return Err(invalid_lm(
-                        "LM finite-difference Jacobian entry is non-finite",
-                    ));
+                    return Err(invalid_lm(format!(
+                        "LM finite-difference Jacobian entry ({i}, {j}) is non-finite"
+                    )));
                 }
                 out[i * n_params + j] = deriv;
             }
@@ -533,61 +581,59 @@ impl LevenbergMarquardtSolver {
     fn solve_lm_core_with_stats<Res, Jac>(
         &self,
         mut params: Vec<f64>,
-        residuals_func: &Res,
+        mut residuals_func: Res,
         mut jacobian_func: Jac,
         n_residuals: usize,
-        require_residual_convergence: bool,
+        numerical_jacobian: bool,
     ) -> Result<LmSolution>
     where
-        Res: Fn(&[f64], &mut [f64]),
-        Jac: FnMut(&[f64], &[f64], &mut usize, &mut [f64]) -> Result<()>,
+        Res: FnMut(&[f64], &mut [f64]) -> Result<()>,
+        Jac: FnMut(&mut Res, &[f64], &[f64], &mut usize, &mut [f64]) -> Result<()>,
     {
-        if !self.tolerance.is_finite() || self.tolerance <= 0.0 || self.max_iterations == 0 {
-            return Err(invalid_lm(
-                "Levenberg-Marquardt requires positive finite tolerance and max_iterations > 0",
-            ));
-        }
         if params.is_empty() || n_residuals == 0 {
             return Err(invalid_lm(
                 "Levenberg-Marquardt requires non-empty parameters and positive residual count",
             ));
         }
-        if params.iter().any(|value| !value.is_finite()) {
-            return Err(invalid_lm(
-                "Levenberg-Marquardt initial parameters must be finite",
-            ));
+        if let Some((idx, &val)) = params.iter().enumerate().find(|(_, v)| !v.is_finite()) {
+            return Err(invalid_lm(format!(
+                "Levenberg-Marquardt initial parameter {idx} must be finite, got {val}"
+            )));
         }
 
         let n_params = params.len();
-        let Some(jac_len) = n_residuals.checked_mul(n_params) else {
-            return Err(invalid_lm(
-                "Levenberg-Marquardt Jacobian dimensions overflow usize",
-            ));
+        let jac_len = n_residuals
+            .checked_mul(n_params)
+            .ok_or_else(|| invalid_lm("Levenberg-Marquardt Jacobian dimensions overflow usize"))?;
+        let worst_case_resids = if numerical_jacobian {
+            2usize
+                .checked_mul(n_params)
+                .and_then(|probes| probes.checked_add(1))
+                .and_then(|per_attempt| self.max_iterations.checked_mul(per_attempt))
+                .and_then(|total| total.checked_add(1))
+        } else {
+            self.max_iterations.checked_add(1)
         };
-        if n_residuals
-            .checked_add(n_params)
-            .and_then(|rows| rows.checked_mul(n_params))
-            .is_none()
-        {
+        if worst_case_resids.is_none() {
             return Err(invalid_lm(
-                "Levenberg-Marquardt augmented QR dimensions overflow usize",
+                "Levenberg-Marquardt work-count bound overflows usize",
             ));
         }
 
+        let mut qr_ws = QrStepWorkspace::try_new(n_residuals, n_params)?;
+        let mut resid_vec = try_vec_filled(n_residuals, f64::NAN)?;
+        let mut new_resid = try_vec_filled(n_residuals, f64::NAN)?;
+        let mut new_params = try_vec_filled(n_params, 0.0)?;
+        let mut step_diff = try_vec_filled(n_params, 0.0)?;
+        let mut jacobian = try_vec_filled(jac_len, f64::NAN)?;
+
         let mut lambda = LM_LAMBDA_INIT;
 
-        let mut resid_vec = vec![f64::NAN; n_residuals];
-        let mut new_resid = vec![f64::NAN; n_residuals];
-        let mut new_params = vec![0.0; n_params];
-        let mut step_diff = vec![0.0; n_params];
-        let mut jacobian = vec![f64::NAN; jac_len];
-        let mut qr_ws = QrStepWorkspace::new(n_residuals, n_params);
-
-        residuals_func(&params, &mut resid_vec);
-        if resid_vec.iter().any(|value| !value.is_finite()) {
-            return Err(invalid_lm(
-                "LM initial residual vector contains NaN or infinity",
-            ));
+        residuals_func(&params, &mut resid_vec)?;
+        if let Some((idx, &val)) = resid_vec.iter().enumerate().find(|(_, v)| !v.is_finite()) {
+            return Err(invalid_lm(format!(
+                "LM initial residual component {idx} is non-finite or unwritten: {val}"
+            )));
         }
         let mut resid_norm = scaled_norm(&resid_vec);
         if !resid_norm.is_finite() {
@@ -596,7 +642,9 @@ impl LevenbergMarquardtSolver {
         let mut residual_evals = 1usize;
         let mut jacobian_evals = 0usize;
         let mut iterations = 0usize;
-        let mut last_step_norm = 0.0_f64;
+        let mut accepted_steps = 0usize;
+        let mut last_step_norm = None;
+        let mut last_lambda = None;
 
         tracing::debug!(
             n_params,
@@ -606,67 +654,66 @@ impl LevenbergMarquardtSolver {
             "lm: start"
         );
 
-        let finalize = |params: Vec<f64>,
-                        reason: LmTerminationReason,
-                        iterations: usize,
-                        residual_evals: usize,
-                        jacobian_evals: usize,
-                        resid_norm: f64,
-                        last_step_norm: f64,
-                        lambda: f64|
-         -> Result<LmSolution> {
-            if require_residual_convergence && resid_norm > self.tolerance {
-                let last_x = params.first().copied().unwrap_or(f64::NAN);
-                return Err(crate::InputError::SolverConvergenceFailed {
-                    iterations,
-                    residual: resid_norm,
-                    last_x,
-                    reason: format!(
-                        "Levenberg-Marquardt terminated with {reason:?}: residual norm {resid_norm:.6e} exceeds tolerance {:.6e}",
-                        self.tolerance
-                    ),
-                }
-                .into());
-            }
-            Ok(LmSolution {
+        let build_solution = |params: Vec<f64>,
+                              reason: LmTerminationReason,
+                              iterations: usize,
+                              accepted_steps: usize,
+                              residual_evals: usize,
+                              jacobian_evals: usize,
+                              resid_norm: f64,
+                              last_step_norm: Option<f64>,
+                              last_lambda: Option<f64>| {
+            LmSolution {
                 params,
                 stats: LmStats {
                     iterations,
+                    accepted_steps,
                     residual_evals,
                     jacobian_evals,
                     termination_reason: reason,
                     final_residual_norm: resid_norm,
-                    final_step_norm: last_step_norm,
-                    lambda_final: lambda,
+                    last_step_norm,
+                    last_lambda,
                 },
-            })
+            }
         };
 
-        let raise = |lambda: f64| (lambda * LM_LAMBDA_FACTOR).min(LAMBDA_MAX);
+        if resid_norm < self.residual_tolerance {
+            let reason = LmTerminationReason::ConvergedResidualNorm;
+            tracing::debug!(iterations, resid_norm, ?reason, "lm: converged initially");
+            return Ok(build_solution(
+                params,
+                reason,
+                iterations,
+                accepted_steps,
+                residual_evals,
+                jacobian_evals,
+                resid_norm,
+                last_step_norm,
+                last_lambda,
+            ));
+        }
+
         let mut jacobian_valid = false;
 
-        for _iter in 0..self.max_iterations {
-            if resid_norm < self.tolerance {
-                let reason = LmTerminationReason::ConvergedResidualNorm;
-                tracing::debug!(iterations, resid_norm, ?reason, "lm: converged");
-                return finalize(
-                    params,
-                    reason,
-                    iterations,
-                    residual_evals,
-                    jacobian_evals,
-                    resid_norm,
-                    last_step_norm,
-                    lambda,
-                );
-            }
-
+        for _attempt in 0..self.max_iterations {
             if !jacobian_valid {
                 jacobian_evals += 1;
                 jacobian.fill(f64::NAN);
-                jacobian_func(&params, &resid_vec, &mut residual_evals, &mut jacobian)?;
-                if jacobian.iter().any(|value| !value.is_finite()) {
-                    return Err(invalid_lm("LM Jacobian contains NaN or infinity"));
+                jacobian_func(
+                    &mut residuals_func,
+                    &params,
+                    &resid_vec,
+                    &mut residual_evals,
+                    &mut jacobian,
+                )?;
+                if let Some((idx, &val)) = jacobian.iter().enumerate().find(|(_, v)| !v.is_finite())
+                {
+                    let row = idx / n_params;
+                    let col = idx % n_params;
+                    return Err(invalid_lm(format!(
+                        "LM Jacobian entry ({row}, {col}) is non-finite or unwritten: {val}"
+                    )));
                 }
                 jacobian_valid = true;
             }
@@ -684,9 +731,9 @@ impl LevenbergMarquardtSolver {
             for (i, &s) in qr_ws.step.iter().enumerate() {
                 let candidate = new_params[i] + s;
                 if !candidate.is_finite() {
-                    return Err(crate::Error::Validation(
-                        "LM candidate parameter overflowed finite f64 range".to_string(),
-                    ));
+                    return Err(invalid_lm(format!(
+                        "LM candidate parameter {i} overflowed finite f64 range"
+                    )));
                 }
                 new_params[i] = candidate;
                 step_diff[i] = candidate - params[i];
@@ -694,31 +741,33 @@ impl LevenbergMarquardtSolver {
 
             let effective_step_norm = scaled_norm(&step_diff);
             if !effective_step_norm.is_finite() {
-                return Err(crate::Error::Validation(
-                    "LM step norm overflowed finite f64 range".to_string(),
-                ));
+                return Err(invalid_lm("LM step norm overflowed finite f64 range"));
             }
-            last_step_norm = effective_step_norm;
-            if effective_step_norm < LM_MIN_STEP_SIZE {
-                return finalize(
+            iterations += 1;
+            last_step_norm = Some(effective_step_norm);
+            last_lambda = Some(lambda);
+
+            if effective_step_norm < self.step_tolerance {
+                return Ok(build_solution(
                     params,
                     LmTerminationReason::StepTooSmall,
                     iterations,
+                    accepted_steps,
                     residual_evals,
                     jacobian_evals,
                     resid_norm,
                     last_step_norm,
-                    lambda,
-                );
+                    last_lambda,
+                ));
             }
 
             new_resid.fill(f64::NAN);
-            residuals_func(&new_params, &mut new_resid);
+            residuals_func(&new_params, &mut new_resid)?;
             residual_evals += 1;
-            if new_resid.iter().any(|value| !value.is_finite()) {
-                return Err(invalid_lm(
-                    "LM trial residual vector contains NaN or infinity",
-                ));
+            if let Some((idx, &val)) = new_resid.iter().enumerate().find(|(_, v)| !v.is_finite()) {
+                return Err(invalid_lm(format!(
+                    "LM trial residual component {idx} is non-finite or unwritten: {val}"
+                )));
             }
             let new_norm = scaled_norm(&new_resid);
             if !new_norm.is_finite() {
@@ -729,239 +778,92 @@ impl LevenbergMarquardtSolver {
                 params.copy_from_slice(&new_params);
                 resid_vec.copy_from_slice(&new_resid);
                 resid_norm = new_norm;
-                iterations += 1;
+                accepted_steps += 1;
                 jacobian_valid = false;
 
-                if resid_norm < self.tolerance {
+                if resid_norm < self.residual_tolerance {
                     let reason = LmTerminationReason::ConvergedResidualNorm;
-                    tracing::debug!(iterations, resid_norm, ?reason, "lm: converged");
-                    return finalize(
+                    tracing::debug!(
+                        iterations,
+                        accepted_steps,
+                        resid_norm,
+                        ?reason,
+                        "lm: converged"
+                    );
+                    return Ok(build_solution(
                         params,
                         reason,
                         iterations,
+                        accepted_steps,
                         residual_evals,
                         jacobian_evals,
                         resid_norm,
                         last_step_norm,
-                        lambda,
-                    );
+                        last_lambda,
+                    ));
                 }
 
                 lambda = (lambda / LM_LAMBDA_FACTOR).max(LAMBDA_MIN);
             } else if lambda >= LAMBDA_MAX {
-                return finalize(
+                return Ok(build_solution(
                     params,
                     LmTerminationReason::DampingLimit,
                     iterations,
+                    accepted_steps,
                     residual_evals,
                     jacobian_evals,
                     resid_norm,
                     last_step_norm,
-                    lambda,
-                );
+                    last_lambda,
+                ));
             } else {
-                lambda = raise(lambda);
+                lambda = (lambda * LM_LAMBDA_FACTOR).min(LAMBDA_MAX);
             }
         }
 
-        tracing::warn!(
+        tracing::debug!(
             algorithm = "levenberg_marquardt",
             iterations,
+            accepted_steps,
             max_iterations = self.max_iterations,
             final_residual_norm = resid_norm,
-            final_step_norm = last_step_norm,
-            lambda_final = lambda,
+            ?last_step_norm,
+            ?last_lambda,
             n_params,
             n_residuals,
             category = "max_iterations_exceeded",
-            "lm: bailout — max iterations reached without convergence"
+            "lm: reached attempt budget without residual convergence"
         );
-        finalize(
+        Ok(build_solution(
             params,
             LmTerminationReason::MaxIterations,
             iterations,
+            accepted_steps,
             residual_evals,
             jacobian_evals,
             resid_norm,
             last_step_norm,
-            lambda,
-        )
+            last_lambda,
+        ))
     }
 
-    fn run_with_fd_jacobian<Res>(
-        &self,
-        residuals: Res,
-        initial: &[f64],
-        n_residuals: usize,
-        require_residual_convergence: bool,
-    ) -> Result<LmSolution>
-    where
-        Res: Fn(&[f64], &mut [f64]),
-    {
-        let n_params = initial.len();
-        let mut jac_scratch = JacobianScratch::new(n_params, n_residuals);
-
-        let jacobian_func =
-            |p: &[f64], base_r: &[f64], eval_counter: &mut usize, out: &mut [f64]| {
-                Self::compute_jacobian_system_into(
-                    &residuals,
-                    p,
-                    base_r,
-                    n_residuals,
-                    eval_counter,
-                    &mut jac_scratch,
-                    out,
-                )
-            };
-
-        self.solve_lm_core_with_stats(
-            initial.to_vec(),
-            &residuals,
-            jacobian_func,
-            n_residuals,
-            require_residual_convergence,
-        )
-    }
-
-    fn run_with_analytical_jacobian<Res, D>(
-        &self,
-        residuals: Res,
-        derivatives: &D,
-        initial: &[f64],
-        require_residual_convergence: bool,
-    ) -> Result<LmSolution>
-    where
-        Res: Fn(&[f64], &mut [f64]),
-        D: AnalyticalDerivatives,
-    {
-        if initial.is_empty() {
-            return Err(invalid_lm(
-                "Levenberg-Marquardt initial parameters must not be empty",
-            ));
-        }
-        let n_residuals = derivatives.residual_count();
-        if n_residuals == 0 {
-            return Err(invalid_lm(
-                "Levenberg-Marquardt residual_count must be positive",
-            ));
-        }
-
-        let n_params = initial.len();
-        let mut jac_scratch = JacobianScratch::new(n_params, n_residuals);
-        let mut jac_2d = vec![vec![f64::NAN; n_params]; n_residuals];
-
-        let jacobian_func =
-            |p: &[f64], base_r: &[f64], eval_counter: &mut usize, out: &mut [f64]| {
-                for row in jac_2d.iter_mut() {
-                    row.fill(f64::NAN);
-                }
-                if derivatives.jacobian(p, &mut jac_2d).is_some() {
-                    for (i, row) in jac_2d.iter().enumerate() {
-                        for (j, &v) in row.iter().enumerate() {
-                            if !v.is_finite() {
-                                return Err(invalid_lm(
-                                    "LM analytical Jacobian contains NaN or infinity",
-                                ));
-                            }
-                            out[i * p.len() + j] = v;
-                        }
-                    }
-                    return Ok(());
-                }
-                Self::compute_jacobian_system_into(
-                    &residuals,
-                    p,
-                    base_r,
-                    n_residuals,
-                    eval_counter,
-                    &mut jac_scratch,
-                    out,
-                )
-            };
-
-        self.solve_lm_core_with_stats(
-            initial.to_vec(),
-            &residuals,
-            jacobian_func,
-            n_residuals,
-            require_residual_convergence,
-        )
-    }
-
-    /// Solve a nonlinear system of equations `r(x) = 0`, requiring the final
-    /// residual 2-norm not to exceed `self.tolerance`.
+    /// Minimize `||r(x)||_2` via damped least squares using checked 3-point finite-difference Jacobians.
+    ///
+    /// Returns [`LmSolution`] carrying [`LmTerminationReason`] separately from consumer acceptance;
+    /// callers should inspect `solution.stats.termination_reason` and any domain/repricing error
+    /// gates before accepting parameters.
     ///
     /// # Arguments
     ///
-    /// * `residuals` - Callback populating `n_residuals` finite residual slots
-    ///   for a candidate parameter slice of length `initial.len()`.
-    /// * `initial` - Non-empty finite initial parameter vector.
-    /// * `n_residuals` - Positive number of residual equations written by `residuals`.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::Error::Validation`] if solver controls, dimensions,
-    /// initial parameters, residuals, or finite-difference Jacobian entries are
-    /// invalid or non-finite, and [`crate::InputError::SolverConvergenceFailed`]
-    /// if the solver terminates with `||r||_2 > self.tolerance`.
-    pub fn solve_system<Res>(
-        &self,
-        residuals: Res,
-        initial: &[f64],
-        n_residuals: usize,
-    ) -> Result<LmSolution>
-    where
-        Res: Fn(&[f64], &mut [f64]),
-    {
-        self.run_with_fd_jacobian(residuals, initial, n_residuals, true)
-    }
-
-    /// Solve a nonlinear system of equations `r(x) = 0` with an optional
-    /// analytical Jacobian, requiring `||r||_2 <= self.tolerance`.
-    ///
-    /// # Arguments
-    ///
-    /// * `residuals` - Callback populating `derivatives.residual_count()` finite
-    ///   residual slots for a candidate parameter slice.
-    /// * `derivatives` - Analytical Jacobian provider (falls back to checked
-    ///   central differences when `jacobian` returns `None`).
-    /// * `initial` - Non-empty finite initial parameter vector.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::Error::Validation`] if controls, dimensions, initial
-    /// parameters, residuals, or Jacobian entries are invalid or non-finite,
-    /// and [`crate::InputError::SolverConvergenceFailed`] if termination leaves
-    /// `||r||_2 > self.tolerance`.
-    pub fn solve_system_with_jacobian<Res, D>(
-        &self,
-        residuals: Res,
-        derivatives: &D,
-        initial: &[f64],
-    ) -> Result<LmSolution>
-    where
-        Res: Fn(&[f64], &mut [f64]),
-        D: AnalyticalDerivatives,
-    {
-        self.run_with_analytical_jacobian(residuals, derivatives, initial, true)
-    }
-
-    /// Minimize `||r(x)||_2` via damped least squares using finite-difference
-    /// Jacobians, returning the terminal [`LmSolution`] and [`LmTerminationReason`]
-    /// even when the nonzero-residual optimum exceeds `self.tolerance`.
-    ///
-    /// # Arguments
-    ///
-    /// * `residuals` - Callback populating `n_residuals` finite residual slots
-    ///   for a candidate parameter slice of length `initial.len()`.
-    /// * `initial` - Non-empty finite initial parameter vector.
+    /// * `residuals` - Fallible callback populating `n_residuals` finite slots for a parameter slice.
+    /// * `initial` - Non-empty finite initial parameter slice.
     /// * `n_residuals` - Positive number of residual terms written by `residuals`.
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::Validation`] if solver controls, dimensions,
-    /// initial parameters, residuals, or finite-difference Jacobian entries are
-    /// invalid or non-finite.
+    /// Propagates the first callback error unchanged, or returns [`crate::Error::Validation`] if
+    /// dimensions/counts overflow, buffers fail to reserve, any callback leaves slots non-finite/unwritten,
+    /// finite-difference probes collapse/overflow, or QR/candidate arithmetic fails.
     pub fn solve_least_squares<Res>(
         &self,
         residuals: Res,
@@ -969,38 +871,89 @@ impl LevenbergMarquardtSolver {
         n_residuals: usize,
     ) -> Result<LmSolution>
     where
-        Res: Fn(&[f64], &mut [f64]),
+        Res: FnMut(&[f64], &mut [f64]) -> Result<()>,
     {
-        self.run_with_fd_jacobian(residuals, initial, n_residuals, false)
+        if initial.is_empty() || n_residuals == 0 {
+            return Err(invalid_lm(
+                "Levenberg-Marquardt requires non-empty parameters and positive residual count",
+            ));
+        }
+        let n_params = initial.len();
+        let mut initial_copy = Vec::new();
+        initial_copy
+            .try_reserve_exact(n_params)
+            .map_err(|err| invalid_lm(format!("LM initial vector allocation failed: {err}")))?;
+        initial_copy.extend_from_slice(initial);
+
+        let mut jac_scratch = JacobianScratch::try_new(n_params, n_residuals)?;
+        let jacobian_func = |res_fn: &mut Res,
+                             p: &[f64],
+                             base_r: &[f64],
+                             eval_counter: &mut usize,
+                             out: &mut [f64]| {
+            Self::compute_jacobian_system_into(
+                res_fn,
+                p,
+                base_r,
+                n_residuals,
+                eval_counter,
+                &mut jac_scratch,
+                out,
+            )
+        };
+
+        self.solve_lm_core_with_stats(initial_copy, residuals, jacobian_func, n_residuals, true)
     }
 
-    /// Minimize `||r(x)||_2` via damped least squares with an analytical
-    /// Jacobian, returning the terminal [`LmSolution`] and [`LmTerminationReason`]
-    /// even when the nonzero-residual optimum exceeds `self.tolerance`.
+    /// Minimize `||r(x)||_2` via damped least squares with a caller-supplied flat row-major Jacobian.
+    ///
+    /// Returns [`LmSolution`] carrying [`LmTerminationReason`] separately from consumer acceptance;
+    /// callers should inspect `solution.stats.termination_reason` and any domain/repricing error
+    /// gates before accepting parameters.
     ///
     /// # Arguments
     ///
-    /// * `residuals` - Callback populating `derivatives.residual_count()` finite
-    ///   residual slots for a candidate parameter slice.
-    /// * `derivatives` - Analytical Jacobian provider (falls back to checked
-    ///   central differences when `jacobian` returns `None`).
-    /// * `initial` - Non-empty finite initial parameter vector.
+    /// * `residuals` - Fallible callback populating `n_residuals` finite slots for a parameter slice.
+    /// * `jacobian` - Fallible callback populating `n_residuals * initial.len()` flat row-major slots
+    ///   `J[i * n_params + j] = dr_i / dp_j`.
+    /// * `initial` - Non-empty finite initial parameter slice.
+    /// * `n_residuals` - Positive number of residual terms written by `residuals`.
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::Validation`] if solver controls, dimensions,
-    /// initial parameters, residuals, or Jacobian entries are invalid or non-finite.
-    pub fn solve_least_squares_with_jacobian<Res, D>(
+    /// Propagates the first residual or Jacobian callback error unchanged, or returns
+    /// [`crate::Error::Validation`] if dimensions/counts overflow, buffers fail to reserve,
+    /// any callback leaves slots non-finite/unwritten, or QR/candidate arithmetic fails.
+    pub fn solve_least_squares_with_jacobian<Res, Jac>(
         &self,
         residuals: Res,
-        derivatives: &D,
+        mut jacobian: Jac,
         initial: &[f64],
+        n_residuals: usize,
     ) -> Result<LmSolution>
     where
-        Res: Fn(&[f64], &mut [f64]),
-        D: AnalyticalDerivatives,
+        Res: FnMut(&[f64], &mut [f64]) -> Result<()>,
+        Jac: FnMut(&[f64], &mut [f64]) -> Result<()>,
     {
-        self.run_with_analytical_jacobian(residuals, derivatives, initial, false)
+        if initial.is_empty() || n_residuals == 0 {
+            return Err(invalid_lm(
+                "Levenberg-Marquardt requires non-empty parameters and positive residual count",
+            ));
+        }
+        let n_params = initial.len();
+        let mut initial_copy = Vec::new();
+        initial_copy
+            .try_reserve_exact(n_params)
+            .map_err(|err| invalid_lm(format!("LM initial vector allocation failed: {err}")))?;
+        initial_copy.extend_from_slice(initial);
+
+        let jacobian_func = |_res_fn: &mut Res,
+                             p: &[f64],
+                             _base_r: &[f64],
+                             _eval_counter: &mut usize,
+                             out: &mut [f64]| { jacobian(p, out) };
+
+        self.solve_lm_core_with_stats(initial_copy, residuals, jacobian_func, n_residuals, false)
     }
 }
 
@@ -1011,10 +964,13 @@ mod tests {
     #[test]
     fn test_lm_solution_is_invariant_to_uniform_residual_scale() {
         for scale in [1e-12, 1.0, 1e12] {
-            let solution = LevenbergMarquardtSolver::new()
-                .with_tolerance(scale * 1e-10)
-                .solve_system(
-                    |p, residuals| residuals[0] = scale * (p[0] - 2.0),
+            let solution = LevenbergMarquardtSolver::new(scale * 1e-10, 1e-12, 100)
+                .expect("valid tolerances")
+                .solve_least_squares(
+                    |p, residuals| {
+                        residuals[0] = scale * (p[0] - 2.0);
+                        Ok(())
+                    },
                     &[0.0],
                     1,
                 )
@@ -1029,45 +985,40 @@ mod tests {
 
     #[test]
     fn test_lm_stats_reports_convergence_reason() {
-        let solver = LevenbergMarquardtSolver::new().with_tolerance(1e-12);
+        let solver = LevenbergMarquardtSolver::new(1e-12, 1e-12, 100).expect("valid solver config");
 
         let residuals = |params: &[f64], resid: &mut [f64]| {
             resid[0] = params[0] + params[1] - 5.0;
             resid[1] = params[0] - params[1] - 1.0;
+            Ok(())
         };
 
         let initial = vec![0.0, 0.0];
         let solution = solver
-            .solve_system(residuals, &initial, 2)
+            .solve_least_squares(residuals, &initial, 2)
             .expect("stats solve should succeed");
 
         assert_eq!(
             solution.stats.termination_reason,
             LmTerminationReason::ConvergedResidualNorm
         );
+        assert!(solution.stats.accepted_steps >= 1);
         assert!(solution.stats.residual_evals >= 1);
         assert!(solution.stats.jacobian_evals >= 1);
+        assert!(solution.stats.last_step_norm.is_some());
+        assert!(solution.stats.last_lambda.is_some());
     }
 
     #[test]
-    fn test_lm_stats_reports_max_iterations() {
-        let solver = LevenbergMarquardtSolver::new()
-            .with_tolerance(1e-12)
-            .with_max_iterations(1);
+    fn test_lm_stats_reports_max_iterations_and_validates_config() {
+        let solver = LevenbergMarquardtSolver::new(1e-12, 1e-12, 1).expect("valid solver config");
 
         let residuals = |params: &[f64], resid: &mut [f64]| {
             resid[0] = params[0] * params[0] - 2.0;
+            Ok(())
         };
 
         let initial = vec![10.0];
-        let err = solver
-            .solve_system(residuals, &initial, 1)
-            .expect_err("solve_system must fail closed when max_iterations leaves residual > tol");
-        assert!(matches!(
-            err,
-            crate::Error::Input(crate::InputError::SolverConvergenceFailed { iterations: 1, .. })
-        ));
-
         let solution = solver
             .solve_least_squares(residuals, &initial, 1)
             .expect("solve_least_squares returns diagnostics at max_iterations");
@@ -1076,65 +1027,81 @@ mod tests {
             LmTerminationReason::MaxIterations
         );
         assert_eq!(solution.stats.iterations, 1);
+        assert_eq!(solution.stats.accepted_steps, 1);
+        assert!(solution.stats.last_step_norm.is_some());
+        assert!(solution.stats.last_lambda.is_some());
 
-        let zero_iter_err = LevenbergMarquardtSolver::new()
-            .with_max_iterations(0)
-            .solve_system(residuals, &initial, 1)
-            .expect_err("max_iterations == 0 must be rejected");
-        assert!(matches!(zero_iter_err, crate::Error::Validation(_)));
+        assert!(matches!(
+            LevenbergMarquardtSolver::new(1e-12, 1e-12, 0),
+            Err(crate::Error::Validation(_))
+        ));
+        assert!(matches!(
+            LevenbergMarquardtSolver::new(0.0, 1e-12, 10),
+            Err(crate::Error::Validation(_))
+        ));
+        assert!(matches!(
+            LevenbergMarquardtSolver::new(-1e-8, 1e-12, 10),
+            Err(crate::Error::Validation(_))
+        ));
+        assert!(matches!(
+            LevenbergMarquardtSolver::new(f64::NAN, 1e-12, 10),
+            Err(crate::Error::Validation(_))
+        ));
+        assert!(matches!(
+            LevenbergMarquardtSolver::new(1e-12, 0.0, 10),
+            Err(crate::Error::Validation(_))
+        ));
+        assert!(matches!(
+            LevenbergMarquardtSolver::new(1e-12, f64::INFINITY, 10),
+            Err(crate::Error::Validation(_))
+        ));
+        assert_eq!(solver.get_residual_tolerance(), 1e-12);
+        assert_eq!(solver.get_step_tolerance(), 1e-12);
+        assert_eq!(solver.get_max_iterations(), 1);
     }
 
     #[test]
     fn test_jacobian_system() {
         // System: x^2 + y^2 = 4, x - y = 0
-        struct CircleLineJacobian;
-
-        impl AnalyticalDerivatives for CircleLineJacobian {
-            fn jacobian(&self, params: &[f64], jacobian: &mut [Vec<f64>]) -> Option<()> {
-                let x = params[0];
-                let y = params[1];
-
-                jacobian[0][0] = 2.0 * x; // df1/dx
-                jacobian[0][1] = 2.0 * y; // df1/dy
-                jacobian[1][0] = 1.0; // df2/dx
-                jacobian[1][1] = -1.0; // df2/dy
-
-                Some(())
-            }
-
-            fn residual_count(&self) -> usize {
-                2
-            }
-        }
-
-        let solver = LevenbergMarquardtSolver::new().with_tolerance(1e-10);
+        let solver = LevenbergMarquardtSolver::new(1e-10, 1e-12, 100).expect("valid solver config");
 
         let residuals = |params: &[f64], resid: &mut [f64]| {
             resid[0] = params[0] * params[0] + params[1] * params[1] - 4.0;
             resid[1] = params[0] - params[1];
+            Ok(())
         };
 
-        let derivatives = CircleLineJacobian;
+        let jacobian = |params: &[f64], jac: &mut [f64]| {
+            let x = params[0];
+            let y = params[1];
+            jac[0] = 2.0 * x; // df1/dx
+            jac[1] = 2.0 * y; // df1/dy
+            jac[2] = 1.0; // df2/dx
+            jac[3] = -1.0; // df2/dy
+            Ok(())
+        };
+
         let initial = vec![1.0, 0.0];
 
-        let result = solver
-            .solve_system_with_jacobian(residuals, &derivatives, &initial)
-            .expect("Minimization should succeed in test")
-            .params;
+        let solution = solver
+            .solve_least_squares_with_jacobian(residuals, jacobian, &initial, 2)
+            .expect("Minimization should succeed in test");
 
+        assert_eq!(
+            solution.stats.termination_reason,
+            LmTerminationReason::ConvergedResidualNorm
+        );
         let expected = 2.0_f64.sqrt();
-        assert!((result[0] - expected).abs() < 1e-8);
-        assert!((result[1] - expected).abs() < 1e-8);
+        assert!((solution.params[0] - expected).abs() < 1e-8);
+        assert!((solution.params[1] - expected).abs() < 1e-8);
     }
 
     #[test]
-    fn test_solve_system_with_dim_overdetermined() {
+    fn test_solve_least_squares_overdetermined() {
         // Overdetermined system: 5 equations, 2 parameters
         // The least-squares solution for x + y = 5, x - y = 1 should still be (3, 2)
-        // even with redundant/noisy constraints
-        let solver = LevenbergMarquardtSolver::new()
-            .with_tolerance(1e-8)
-            .with_max_iterations(200);
+        // even with redundant constraints
+        let solver = LevenbergMarquardtSolver::new(1e-8, 1e-12, 200).expect("valid solver config");
 
         let residuals = |params: &[f64], resid: &mut [f64]| {
             let x = params[0];
@@ -1144,14 +1111,19 @@ mod tests {
             resid[2] = 2.0 * x - 6.0; // 2x = 6  (consistent: x=3)
             resid[3] = 2.0 * y - 4.0; // 2y = 4  (consistent: y=2)
             resid[4] = x + 2.0 * y - 7.0; // x + 2y = 7 (consistent)
+            Ok(())
         };
 
         let initial = vec![0.0, 0.0];
-        let result = solver
-            .solve_system(residuals, &initial, 5)
-            .expect("solve_system should succeed")
-            .params;
+        let solution = solver
+            .solve_least_squares(residuals, &initial, 5)
+            .expect("solve_least_squares should succeed");
 
+        assert_eq!(
+            solution.stats.termination_reason,
+            LmTerminationReason::ConvergedResidualNorm
+        );
+        let result = &solution.params;
         assert!(
             (result[0] - 3.0).abs() < 1e-4,
             "x = {}, expected 3.0",
@@ -1165,12 +1137,10 @@ mod tests {
     }
 
     #[test]
-    fn test_solve_system_with_dim_highly_overdetermined() {
+    fn test_solve_least_squares_highly_overdetermined() {
         // Highly overdetermined: 20 residuals, 2 parameters
         // This tests that we don't panic even with n_residuals >> n_params
-        let solver = LevenbergMarquardtSolver::new()
-            .with_tolerance(1e-6)
-            .with_max_iterations(200);
+        let solver = LevenbergMarquardtSolver::new(1e-6, 1e-12, 200).expect("valid solver config");
 
         let residuals = |params: &[f64], resid: &mut [f64]| {
             let x = params[0];
@@ -1182,15 +1152,19 @@ mod tests {
                 // a*x + b*y = 3a + 2b = 3a + 2(1-a) = a + 2
                 *r = a * x + b * y - (a + 2.0);
             }
+            Ok(())
         };
 
         let initial = vec![0.0, 0.0];
-        let result = solver
-            .solve_system(residuals, &initial, 20)
-            .expect("solve_system should not panic with 20 residuals")
-            .params;
+        let solution = solver
+            .solve_least_squares(residuals, &initial, 20)
+            .expect("solve_least_squares should not panic with 20 residuals");
 
-        // Solution should be approximately x=3, y=2
+        assert_eq!(
+            solution.stats.termination_reason,
+            LmTerminationReason::ConvergedResidualNorm
+        );
+        let result = &solution.params;
         assert!(
             (result[0] - 3.0).abs() < 0.1,
             "x = {}, expected ~3.0",
@@ -1204,18 +1178,19 @@ mod tests {
     }
 
     #[test]
-    fn test_solve_system_with_dim_returns_correct_length() {
-        let solver = LevenbergMarquardtSolver::new().with_tolerance(1e-8);
+    fn test_solve_least_squares_returns_correct_length() {
+        let solver = LevenbergMarquardtSolver::new(1e-8, 1e-12, 100).expect("valid solver config");
 
         let residuals = |params: &[f64], resid: &mut [f64]| {
             resid[0] = params[0] - 1.0;
             resid[1] = params[1] - 2.0;
             resid[2] = params[2] - 3.0;
+            Ok(())
         };
 
         let initial = vec![0.0, 0.0, 0.0];
         let result = solver
-            .solve_system(residuals, &initial, 3)
+            .solve_least_squares(residuals, &initial, 3)
             .expect("solve should succeed")
             .params;
 
@@ -1223,93 +1198,99 @@ mod tests {
     }
 
     #[test]
-    fn test_jacobian_system_uses_explicit_residual_count() {
-        struct TallJacobian;
-
-        impl AnalyticalDerivatives for TallJacobian {
-            fn jacobian(&self, _params: &[f64], jacobian: &mut [Vec<f64>]) -> Option<()> {
-                for row in jacobian.iter_mut() {
-                    row[0] = 1.0;
-                }
-                Some(())
-            }
-
-            fn residual_count(&self) -> usize {
-                5
-            }
-        }
-
-        let solver = LevenbergMarquardtSolver::new()
-            .with_tolerance(1e-8)
-            .with_max_iterations(50);
+    fn test_jacobian_system_nonzero_residual_minimum() {
+        let solver = LevenbergMarquardtSolver::new(1e-8, 1e-12, 50).expect("valid solver config");
         let residuals = |params: &[f64], resid: &mut [f64]| {
             for (i, out) in resid.iter_mut().enumerate() {
                 *out = params[0] - (i as f64 + 1.0);
             }
+            Ok(())
+        };
+        let jacobian = |_params: &[f64], jac: &mut [f64]| {
+            jac.fill(1.0);
+            Ok(())
         };
         let initial = vec![0.0];
 
         let solution = solver
-            .solve_least_squares_with_jacobian(residuals, &TallJacobian, &initial)
-            .expect("explicit residual count should avoid probe truncation");
+            .solve_least_squares_with_jacobian(residuals, jacobian, &initial, 5)
+            .expect("nonzero-residual optimum should return diagnostics");
 
         assert_eq!(solution.params.len(), 1);
         assert!((solution.params[0] - 3.0).abs() < 1e-8);
-        assert!(
-            solver
-                .solve_system_with_jacobian(residuals, &TallJacobian, &initial)
-                .is_err(),
-            "inconsistent system must fail solve_system_with_jacobian when residual > tol"
+        assert_eq!(
+            solution.stats.termination_reason,
+            LmTerminationReason::StepTooSmall
         );
+        assert!(solution.stats.final_residual_norm > 1.0);
     }
 
     #[test]
     fn test_lm_rejects_nan_and_inf_residuals_and_jacobian() {
-        let solver = LevenbergMarquardtSolver::new().with_tolerance(1e-8);
+        let solver = LevenbergMarquardtSolver::new(1e-8, 1e-12, 100).expect("valid solver config");
         for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             let err = solver
-                .solve_system(|_p, r| r[0] = bad, &[0.0], 1)
+                .solve_least_squares(
+                    |_p, r| {
+                        r[0] = bad;
+                        Ok(())
+                    },
+                    &[0.0],
+                    1,
+                )
                 .expect_err("non-finite initial residual must fail");
             assert!(matches!(err, crate::Error::Validation(_)));
 
             let err_probe = solver
-                .solve_system(|p, r| r[0] = if p[0] == 0.0 { 1.0 } else { bad }, &[0.0], 1)
+                .solve_least_squares(
+                    |p, r| {
+                        r[0] = if p[0] == 0.0 { 1.0 } else { bad };
+                        Ok(())
+                    },
+                    &[0.0],
+                    1,
+                )
                 .expect_err("non-finite Jacobian probe must fail");
             assert!(matches!(err_probe, crate::Error::Validation(_)));
         }
 
-        struct BadJacobian;
-        impl AnalyticalDerivatives for BadJacobian {
-            fn jacobian(&self, _params: &[f64], jacobian: &mut [Vec<f64>]) -> Option<()> {
-                jacobian[0][0] = f64::NAN;
-                Some(())
-            }
-            fn residual_count(&self) -> usize {
-                1
-            }
-        }
         let err_jac = solver
-            .solve_system_with_jacobian(|p, r| r[0] = p[0] - 1.0, &BadJacobian, &[0.0])
+            .solve_least_squares_with_jacobian(
+                |p, r| {
+                    r[0] = p[0] - 1.0;
+                    Ok(())
+                },
+                |_p, j| {
+                    j[0] = f64::NAN;
+                    Ok(())
+                },
+                &[0.0],
+                1,
+            )
             .expect_err("NaN analytical Jacobian must fail");
         assert!(matches!(err_jac, crate::Error::Validation(_)));
     }
 
     #[test]
     fn test_lm_qr_solves_ill_conditioned_and_asymmetric_column_system() {
-        // J = [[1, 1], [0, 1e-8]]: κ(J) ≈ 2e8 so JᵀJ is singular in f64 (κ(J)² ≈ 4e16),
-        // whereas augmented Householder ColPivQR solves it cleanly.
-        let eps = 1e-8_f64;
+        // J = [[1, 100], [1e-7, 0]]: κ(J) ≈ 1e9 so JᵀJ loses double precision
+        // (κ(J)² ≈ 1e18 >> 1/eps), whereas augmented Householder ColPivQR solves it cleanly.
+        let eps = 1e-7_f64;
         let residuals = |params: &[f64], resid: &mut [f64]| {
             let x = params[0];
             let y = params[1];
             resid[0] = (x - 1.0) + 100.0 * (y - 2.0);
             resid[1] = eps * (x - 1.0);
+            Ok(())
         };
-        let solution = LevenbergMarquardtSolver::new()
-            .with_tolerance(1e-14)
-            .with_max_iterations(100)
-            .solve_system(residuals, &[0.0, 0.0], 2)
+        let solution = LevenbergMarquardtSolver::new(1e-14, 1e-14, 100)
+            .expect("valid solver config")
+            .solve_least_squares(residuals, &[0.0, 0.0], 2)
             .expect("augmented QR must solve ill-conditioned asymmetric system");
+        assert_eq!(
+            solution.stats.termination_reason,
+            LmTerminationReason::ConvergedResidualNorm
+        );
         assert!(
             (solution.params[0] - 1.0).abs() < 1e-6,
             "x={}",
@@ -1324,19 +1305,188 @@ mod tests {
 
     #[test]
     fn test_lm_converges_on_final_accepted_step() {
-        let solver = LevenbergMarquardtSolver::new()
-            .with_tolerance(1e-2)
-            .with_max_iterations(1);
+        let solver = LevenbergMarquardtSolver::new(1e-2, 1e-12, 1).expect("valid solver config");
         let residuals = |params: &[f64], resid: &mut [f64]| {
             resid[0] = params[0] - 2.0;
+            Ok(())
         };
         let solution = solver
-            .solve_system(residuals, &[0.0], 1)
+            .solve_least_squares(residuals, &[0.0], 1)
             .expect("one damped linear step should reach 1e-2 tolerance");
         assert_eq!(
             solution.stats.termination_reason,
             LmTerminationReason::ConvergedResidualNorm
         );
         assert!((solution.params[0] - 2.0).abs() < 1e-2);
+    }
+
+    #[test]
+    fn test_lm_core_numerics_06_boundary_cases() {
+        // 1. Initial residual already below residual_tolerance -> no step taken, Option fields None.
+        let solver = LevenbergMarquardtSolver::new(1e-3, 1e-12, 20).expect("valid solver config");
+        let sol0 = solver
+            .solve_least_squares(
+                |p, r| {
+                    r[0] = p[0] - 1.0;
+                    Ok(())
+                },
+                &[1.0 + 1e-5],
+                1,
+            )
+            .expect("initial satisfied residual succeeds");
+        assert_eq!(
+            sol0.stats.termination_reason,
+            LmTerminationReason::ConvergedResidualNorm
+        );
+        assert_eq!(sol0.stats.iterations, 0);
+        assert_eq!(sol0.stats.accepted_steps, 0);
+        assert_eq!(sol0.stats.residual_evals, 1);
+        assert_eq!(sol0.stats.jacobian_evals, 0);
+        assert_eq!(sol0.stats.last_step_norm, None);
+        assert_eq!(sol0.stats.last_lambda, None);
+
+        // 2. Poisoned unwritten slots are rejected (callbacks that omit writing fail validation).
+        let err_unwritten_res = solver
+            .solve_least_squares(|_p, _r| Ok(()), &[0.0], 1)
+            .expect_err("unwritten residual buffer must fail NaN poisoning check");
+        assert!(matches!(err_unwritten_res, crate::Error::Validation(_)));
+
+        let err_unwritten_jac = solver
+            .solve_least_squares_with_jacobian(
+                |p, r| {
+                    r[0] = p[0] - 1.0;
+                    Ok(())
+                },
+                |_p, _j| Ok(()),
+                &[0.0],
+                1,
+            )
+            .expect_err("unwritten jacobian buffer must fail NaN poisoning check");
+        assert!(matches!(err_unwritten_jac, crate::Error::Validation(_)));
+
+        // 3. Finite-difference plus-probe error aborts immediately without evaluating minus probe.
+        let mut minus_called = false;
+        let err_probe = solver
+            .solve_least_squares(
+                |p, r| {
+                    if (p[0] - 0.0).abs() < 1e-15 {
+                        r[0] = 1.0;
+                        Ok(())
+                    } else if p[0] > 0.0 {
+                        Err(crate::Error::Internal("probe sentinel".to_string()))
+                    } else {
+                        minus_called = true;
+                        r[0] = 1.0;
+                        Ok(())
+                    }
+                },
+                &[0.0],
+                1,
+            )
+            .expect_err("plus-probe failure must propagate");
+        assert!(matches!(
+            err_probe,
+            crate::Error::Internal(ref msg) if msg == "probe sentinel"
+        ));
+        assert!(
+            !minus_called,
+            "minus probe must not execute after plus-probe Err"
+        );
+
+        // 4. Rounded unequal FD step at p = 1.0 uses exact 3-point Lagrange slope on p^2 - 1
+        // and uses cached r0 (4 evals total in 1 iteration: init r0, plus, minus, trial).
+        let mut evals = 0usize;
+        let sol_fd = LevenbergMarquardtSolver::new(1e-12, 1e-15, 1)
+            .expect("valid solver")
+            .solve_least_squares(
+                |p, r| {
+                    evals += 1;
+                    r[0] = p[0] * p[0] - 1.0;
+                    Ok(())
+                },
+                &[1.0 + 1e-4],
+                1,
+            )
+            .expect("quadratic 1-step FD succeeds");
+        assert_eq!(evals, 4);
+        assert_eq!(sol_fd.stats.residual_evals, 4);
+
+        // 5. Extreme scale r ~ 1e200 and J = [1e200], r = [-2e200] takes damped step ~ 2 / 1.001.
+        let sol_extreme = LevenbergMarquardtSolver::new(1.0, 1e-12, 1)
+            .expect("valid solver")
+            .solve_least_squares_with_jacobian(
+                |p, r| {
+                    r[0] = 1e200 * (p[0] - 2.0);
+                    Ok(())
+                },
+                |_p, j| {
+                    j[0] = 1e200;
+                    Ok(())
+                },
+                &[0.0],
+                1,
+            )
+            .expect("extreme residual/jacobian scale must not overflow");
+        assert!(
+            (sol_extreme.params[0] - 2.0 / 1.001).abs() < 1e-10,
+            "expected ~{}, got {}",
+            2.0 / 1.001,
+            sol_extreme.params[0]
+        );
+
+        // 6. Underdetermined rank-deficient J = [1, 1], r = [-2] uses damped minimum-norm step.
+        let sol_underdet = LevenbergMarquardtSolver::new(1e-12, 1e-12, 1)
+            .expect("valid solver")
+            .solve_least_squares_with_jacobian(
+                |p, r| {
+                    r[0] = (p[0] + p[1]) - 2.0;
+                    Ok(())
+                },
+                |_p, j| {
+                    j[0] = 1.0;
+                    j[1] = 1.0;
+                    Ok(())
+                },
+                &[0.0, 0.0],
+                1,
+            )
+            .expect("underdetermined step must succeed");
+        let expected_step = 2.0 / 2.001;
+        assert!(
+            (sol_underdet.params[0] - expected_step).abs() < 1e-10
+                && (sol_underdet.params[1] - expected_step).abs() < 1e-10,
+            "expected [{expected_step}, {expected_step}], got {:?}",
+            sol_underdet.params
+        );
+
+        // 7. Inconsistent descent direction hits DampingLimit without extra saturated trial.
+        let sol_damping = LevenbergMarquardtSolver::new(1e-12, 1e-15, 200)
+            .expect("valid solver")
+            .solve_least_squares_with_jacobian(
+                |p, r| {
+                    r[0] = 1e6 + p[0];
+                    Ok(())
+                },
+                |_p, j| {
+                    j[0] = -1.0;
+                    Ok(())
+                },
+                &[0.0],
+                1,
+            )
+            .expect("damping limit returns diagnostics");
+        assert_eq!(
+            sol_damping.stats.termination_reason,
+            LmTerminationReason::DampingLimit
+        );
+        assert!(sol_damping.stats.iterations >= 1);
+        assert_eq!(sol_damping.stats.accepted_steps, 0);
+        assert!(
+            sol_damping
+                .stats
+                .last_step_norm
+                .is_some_and(|s| s.is_finite() && s > 0.0)
+        );
+        assert_eq!(sol_damping.stats.last_lambda, Some(LAMBDA_MAX));
     }
 }

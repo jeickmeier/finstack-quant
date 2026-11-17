@@ -40,6 +40,33 @@ where
     }
 }
 
+fn build_validated_vol_map<V>(
+    kind: &'static str,
+    entries: impl IntoIterator<Item = (CurveId, Arc<V>)>,
+    id_of: impl Fn(&V) -> &CurveId,
+) -> crate::Result<FxHashMap<CurveId, Arc<V>>> {
+    let mut map = FxHashMap::default();
+    for (key, value) in entries {
+        if key.as_str().trim().is_empty() {
+            return Err(crate::Error::Validation(format!(
+                "Cannot replace {kind}: entry key cannot be empty or blank"
+            )));
+        }
+        let embedded = id_of(&value);
+        if key.as_str() != embedded.as_str() {
+            return Err(crate::Error::Validation(format!(
+                "Cannot replace {kind}: key '{key}' does not match embedded id '{embedded}'"
+            )));
+        }
+        if map.insert(key.clone(), value).is_some() {
+            return Err(crate::Error::Validation(format!(
+                "Cannot replace {kind}: duplicate key '{key}'"
+            )));
+        }
+    }
+    Ok(map)
+}
+
 impl MarketContext {
     // Introspection and statistics
 
@@ -111,10 +138,11 @@ impl MarketContext {
     /// use finstack_quant_core::market_data::context::MarketContext;
     /// use finstack_quant_core::market_data::scalars::MarketScalar;
     ///
-    /// let ctx = MarketContext::new().insert_price("USD-RATE", MarketScalar::Unitless(0.05));
+    /// let ctx = MarketContext::new().insert_price("USD-RATE", MarketScalar::unitless(0.05)?);
     /// assert_eq!(ctx.len(), 1);
     /// assert!(!ctx.is_empty());
     /// assert_eq!(MarketContext::new().len(), 0);
+    /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
     pub fn len(&self) -> usize {
         usize::from(self.fx.is_some())
@@ -160,7 +188,7 @@ impl MarketContext {
     /// use finstack_quant_core::currency::Currency;
     ///
     /// let ctx = MarketContext::new()
-    ///     .insert_price("AAPL", MarketScalar::Price(Money::from((180_i64, Currency::USD))));
+    ///     .insert_price("AAPL", MarketScalar::price(Money::from((180_i64, Currency::USD))));
     ///
     /// for (id, scalar) in ctx.prices_iter() {
     ///     println!("{}: {:?}", id, scalar);
@@ -196,43 +224,54 @@ impl MarketContext {
         self.surfaces.iter()
     }
 
-    /// Replace all volatility surfaces (mutable).
+    /// Replace all volatility surfaces atomically (mutable).
     ///
-    /// This is intended for snapshot restore workflows.
-    pub fn replace_surfaces_mut<I>(&mut self, surfaces: I) -> &mut Self
+    /// # Arguments
+    ///
+    /// * `surfaces` - Sequence of `(key, surface)` pairs whose keys must be nonblank,
+    ///   unique, and equal to each surface's embedded id.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if any key is empty/blank, mismatches its
+    /// surface's embedded id, or appears more than once; leaves `self` unchanged on error.
+    pub fn replace_surfaces_mut<I>(&mut self, surfaces: I) -> crate::Result<&mut Self>
     where
         I: IntoIterator<Item = (CurveId, Arc<VolSurface>)>,
     {
-        let map: crate::FxHashMap<CurveId, Arc<VolSurface>> = surfaces.into_iter().collect();
-        for id in map.keys() {
-            self.evict_conflicting_vol_registries(id.as_str(), super::VolRegistry::Surfaces);
-        }
+        let map = build_validated_vol_map("surfaces", surfaces, |s| s.id())?;
         self.surfaces = Arc::new(map);
-        self
+        self.invalidate_scratch_tokens();
+        Ok(self)
     }
 
-    /// Retain only the curves for which `pred` returns `true` (mutable).
+    /// Retain only the curves for which `pred` returns `true` atomically (mutable).
     ///
-    /// Credit indices whose dependencies are removed are dropped immediately
-    /// and reported in the returned mutation information. For snapshot
-    /// replacement, insert replacement curves before removing obsolete IDs so
-    /// dependent indices remain present throughout the operation.
+    /// Any registered credit index whose referenced curves are affected must still
+    /// rebind validly after retention; otherwise the curve map is restored and an
+    /// error is returned.
     ///
     /// # Arguments
     ///
     /// * `pred` - Predicate called once per curve; `true` retains that ID and
     ///   `false` removes it. No iteration order is guaranteed.
     ///
-    /// Returns the sorted identifiers of credit indices dropped because a
-    /// curve they depend on was removed.
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if retaining removes or breaks a curve
+    /// referenced by any registered [`CreditIndexData`](crate::market_data::term_structures::CreditIndexData).
     pub fn retain_curves_mut(
         &mut self,
         mut pred: impl FnMut(&CurveId, &CurveStorage) -> bool,
-    ) -> Vec<CurveId> {
+    ) -> crate::Result<&mut Self> {
+        let prior_curves = Arc::clone(&self.curves);
         Arc::make_mut(&mut self.curves).retain(|id, curve| pred(id, curve));
-        let mut invalidated = self.prune_invalidated_credit_indices();
-        invalidated.sort();
-        invalidated
+        if let Err(err) = self.rebind_all_credit_indices() {
+            self.curves = prior_curves;
+            return Err(err);
+        }
+        self.invalidate_scratch_tokens();
+        Ok(self)
     }
 
     /// Iterate over the SABR volatility cubes.
@@ -247,64 +286,91 @@ impl MarketContext {
         self.fx_delta_vol_surfaces.iter()
     }
 
-    /// Replace all SABR volatility cubes (mutable).
+    /// Replace all SABR volatility cubes atomically (mutable).
     ///
-    /// This is intended for snapshot restore workflows.
-    pub fn replace_vol_cubes_mut<I>(&mut self, cubes: I) -> &mut Self
+    /// # Arguments
+    ///
+    /// * `cubes` - Sequence of `(key, cube)` pairs whose keys must be nonblank,
+    ///   unique, and equal to each cube's embedded id.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if any key is empty/blank, mismatches its
+    /// cube's embedded id, or appears more than once; leaves `self` unchanged on error.
+    pub fn replace_vol_cubes_mut<I>(&mut self, cubes: I) -> crate::Result<&mut Self>
     where
         I: IntoIterator<Item = (CurveId, Arc<VolCube>)>,
     {
-        let map: crate::FxHashMap<CurveId, Arc<VolCube>> = cubes.into_iter().collect();
-        for id in map.keys() {
-            self.evict_conflicting_vol_registries(id.as_str(), super::VolRegistry::VolCubes);
-        }
+        let map = build_validated_vol_map("vol_cubes", cubes, |c| c.id())?;
         self.vol_cubes = Arc::new(map);
-        self
+        self.invalidate_scratch_tokens();
+        Ok(self)
     }
 
-    /// Replace all FX delta-quoted volatility surfaces (mutable).
+    /// Replace all FX delta-quoted volatility surfaces atomically (mutable).
     ///
-    /// This is intended for snapshot restore workflows.
-    pub fn replace_fx_delta_vol_surfaces_mut<I>(&mut self, surfaces: I) -> &mut Self
+    /// # Arguments
+    ///
+    /// * `surfaces` - Sequence of `(key, surface)` pairs whose keys must be nonblank,
+    ///   unique, and equal to each surface's embedded id.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if any key is empty/blank, mismatches its
+    /// surface's embedded id, or appears more than once; leaves `self` unchanged on error.
+    pub fn replace_fx_delta_vol_surfaces_mut<I>(&mut self, surfaces: I) -> crate::Result<&mut Self>
     where
         I: IntoIterator<Item = (CurveId, Arc<FxDeltaVolSurface>)>,
     {
-        let map: crate::FxHashMap<CurveId, Arc<FxDeltaVolSurface>> = surfaces.into_iter().collect();
-        for id in map.keys() {
-            self.evict_conflicting_vol_registries(
-                id.as_str(),
-                super::VolRegistry::FxDeltaVolSurfaces,
-            );
-        }
+        let map = build_validated_vol_map("fx_delta_vol_surfaces", surfaces, |s| s.id())?;
         self.fx_delta_vol_surfaces = Arc::new(map);
-        self
+        self.invalidate_scratch_tokens();
+        Ok(self)
     }
 
     /// Retain only the scalar time series for which `pred` returns `true`
     /// (mutable).
     ///
-    /// Intended for snapshot-restore workflows that partition the series
-    /// store by convention (e.g. `FIXING:`-prefixed rate fixings belong to
-    /// the rates family, everything else to market scalars).
+    /// # Arguments
+    ///
+    /// * `pred` - Predicate called once per series; `true` keeps the series and `false` removes it.
     pub fn retain_series_mut(
         &mut self,
         mut pred: impl FnMut(&CurveId, &ScalarTimeSeries) -> bool,
     ) -> &mut Self {
         Arc::make_mut(&mut self.series).retain(|id, series| pred(id, series));
+        self.invalidate_scratch_tokens();
         self
     }
 
-    /// Clear all market scalars — prices, time series, inflation indices and
-    /// dividend schedules (mutable).
+    /// Clear all stored scalar prices and unitless scalars (mutable).
     ///
-    /// Intended for snapshot restore workflows with drop-and-replace scalar
-    /// semantics: a scalar present in the current market but absent from the
-    /// snapshot must not survive the restore.
-    pub fn clear_market_scalars_mut(&mut self) -> &mut Self {
+    /// Does not remove time series, `FIXING:*` observations, inflation indices, or
+    /// dividend schedules.
+    pub fn clear_prices_mut(&mut self) -> &mut Self {
         self.prices = Arc::new(FxHashMap::default());
+        self.invalidate_scratch_tokens();
+        self
+    }
+
+    /// Clear all stored scalar time series, including any `FIXING:*` series (mutable).
+    pub fn clear_series_mut(&mut self) -> &mut Self {
         self.series = Arc::new(FxHashMap::default());
+        self.invalidate_scratch_tokens();
+        self
+    }
+
+    /// Clear all stored inflation indices (mutable).
+    pub fn clear_inflation_indices_mut(&mut self) -> &mut Self {
         self.inflation_indices = Arc::new(FxHashMap::default());
+        self.invalidate_scratch_tokens();
+        self
+    }
+
+    /// Clear all stored dividend schedules (mutable).
+    pub fn clear_dividends_mut(&mut self) -> &mut Self {
         self.dividends = Arc::new(FxHashMap::default());
+        self.invalidate_scratch_tokens();
         self
     }
 }

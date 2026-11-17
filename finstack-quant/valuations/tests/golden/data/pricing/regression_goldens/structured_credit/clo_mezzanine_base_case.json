@@ -6,7 +6,7 @@
     "description": "Synthetic CLO mezzanine structured credit base-case fixture. Two-step calibration: USD-SOFR-DISC bootstrapped from synthetic SOFR OIS quotes, SOFR-3M bootstrapped from synthetic 3M-Term-SOFR IRS quotes against the calibrated discount curve. SOFR-1M auxiliary forward curve preserved in prior_market. Self-test contract: re-running calibration + waterfall pricing must reproduce the recorded values within solver tolerance.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "2026-09-09 pricing reference: the synthetic dirty quote is USD 10,952,985.036977235, constructed as sum(CF * DF * exp(-0.10 * t)) with Act365F t from 2026-04-30. The previous USD 5m quote implied 5,799.49bp, outside the supported spread range, and has been replaced rather than changing production limits. The reference test independently checks the 1,000bp spread and forward-difference CS01, while direct +/-1bp curve repricing checks DV01. Current outputs after input reconciliation and valuation-date-aware coverage projection are NPV USD 13,607,846.71744143, future expected loss USD 934,624.078306567, DV01 USD -246.7844843501225 per bp, and CS01 USD -2,271.8577877022326 per bp. Existing metric tolerances are unchanged. 2026-09-09 input reconciliation: BOND1 is explicitly assumed to default on 2026-04-01 with USD 8m defaulted par and a USD 1m unreceived recovery claim. The effective nine-month lag makes the claim due 2027-01-01, paid on the next eligible contractual payment date. Cumulative defaults are USD 8m and received recoveries are zero. The USD 7m historical loss is already reflected in current tranche balances: equity zero and senior USD 43m; it must not be written down again. The non-revolving senior note has no target balance. These are synthetic assumptions, not external benchmark observations. Earlier captures below predate this input reconciliation. Finstack Quant canonical credit pricing calculation on deterministic synthetic market inputs. Uses calibrated USD-SOFR-DISC and SOFR-3M curves with two-step calibration (POC #4 pattern, plan \u00a716). SOFR-1M preserved as auxiliary. Expected outputs recaptured from Finstack. Re-blessed 2026-05-17 (cash-conservation remediation): the CLO/ABS simulation-engine cash-conservation fixes (audit items 1-13 \u2014 reinvestment principal recycling, loss-allocation cap by current balance, mid-period default interest accrual) move tranche cashflows, shifting npv/dv01/cs01 by ~0.03-0.11%. Library-self-calculated regression golden, re-blessed per golden-test policy. Old: npv=14458410.460818833, dv01=-3047.708901843056, cs01=-1902.2833933271468. New: npv=14449223.85764518, dv01=-3046.929275150411, cs01=-1900.175536161289. expected_loss unchanged (writedown total stable). Re-blessed 2026-06-16: expected outputs recaptured from the current canonical Python golden runner for this formula self-test after deterministic pricing output drift; no external benchmark source is asserted by this fixture. Re-baselined 2026-07-11 after seasoned-deal simulation began anchoring current balances at the last contractual boundary and resolving reset-lag fixings explicitly. Added the required SOFR-3M fixing observations. Future waterfall periods are arbitrary dates, so their rate is analytically F=(DF_proj(t1)/DF_proj(t2)-1)/(t2-t1), with t1 and t2 now explicitly measured on the step's Act365F axis instead of inferred Act360. Repricing those cashflows gives NPV=12,407,273.205310879 and expected loss=725,139.371099923. Re-baselined 2026-07-15 after canonical dependency discovery changed DV01 from a discount-only bump to a simultaneous parallel bump of the declared discount and projection curves; direct +/-1bp repricing gives DV01=-207.779270004481. NPV, expected loss, and CS01=-3,043.407994883135 are unchanged. Re-baselined 2026-07-21 after the structured-credit follow-up fixes changed waterfall cash conservation, metric time bases, and the default stochastic engine. The fixture now supplies an explicit synthetic quoted price of 25.0 percent of original balance for quote-dependent Z-spread/CS01. Current canonical results are NPV=12,504,142.5835819, DV01=-158.220006350428, CS01=-819.516465414315, and expected loss=725,139.371099923. Input ownership updated 2026-09-09: the former 25% quote used 20m collateral as its denominator. The identical 5m USD dirty settlement target is now explicit in market_quotes. Expected values and tolerances are unchanged. Re-blessed 2026-09-17 (structured-credit vertical coverage, Phases A-B): under the par-preserving loss policy CLO/ABS notes carry par and realize unpaid principal once, as a write-down on the final settlement date, so expected_loss now includes the shortfall the impaired notes never recover instead of only the projected new defaults. The inert hedge swap (calendar 'USD', no SOFR-3M projection curve; previously an NPV overlay that never reached these metrics) was removed from the instrument now that swaps flow through the waterfall. Old: expected_loss=934624.078306567. New: expected_loss=37127779.72011075. npv, dv01, cs01 and z_spread are unchanged. 2026-09-17: the behavior_overrides.abs_speed override (0.012) was retired with the ABS prepayment curve; cpr_annual is now its annual equivalent 1 \u2212 (1 \u2212 0.012)^12 = 0.13486609002406202, so the effective constant-SMM prepayment model and every expected value are unchanged. 2026-09-24 (naming slice A7): the behavior_overrides channel was retired and its effective values moved onto credit_model: prepayment_spec is constant CPR 0.13486609002406202 (cpr_annual took precedence over psa_speed_multiplier), default_spec is constant CDR 0.025 (cdr_annual took precedence over sda_speed_multiplier), recovery_spec is rate 0.42 with a nine-month lag, and stochastic_prepay_spec/stochastic_default_spec were dropped because the overrides cleared them. reinvestment_price 101.0 was removed; re-running the fixture with it null reproduced every expected value to 0 abs diff before the removal. The payload-only asset_type industry (null) was dropped. Expected values and tolerances are unchanged. Re-blessed 2026-10-01: expected outputs re-captured from the canonical Python golden runner after master commits 03aec31fe/998ac2a88 (rate-calculation and interpolation changes) moved the library's deterministic outputs; the moves were reviewed and approved, inputs and tolerances are unchanged, and metrics not listed here still pass and were not retargeted. Old: npv=13607846.71744143, expected_loss=37127779.72011075, dv01=-246.7844843501225, cs01=-2271.8577877022326, z_spread=0.1. New: npv=13607848.73571474, expected_loss=37127777.41602765, dv01=-285.6266649449244, cs01=-2271.8575491309166, z_spread=0.10000007529862727. The z_spread pin is now self-captured drift rather than the independently specified 0.10: the quoted_dirty_price_currency input was constructed from the pre-change discount factors and was deliberately not re-derived in this re-pin. The synthetic dirty quote was re-derived on 2026-10-01 from the moved discount factors (10952985.036977235 -> 10952986.747911649) so the solved z-spread is again exactly 0.10; cs01 is the matching reference -2271.85806276485, superseding any z_spread/cs01 values quoted in the re-bless note above. 2026-10-11 valuation-remediation reference: refreshed the synthetic quote from the corrected contractual cashflows using sum(CF*DF*exp(-0.10*t)), t=Act365F, giving USD 10952092.791475201. Its independently summed forward-difference CS01 is -2271.980176911365; z_spread remains exactly 0.10. Direct +/-1bp discount/projection revaluation gives combined DV01 -286.8194704251364. Internal NPV and future-loss pins follow corrected cashflow/recovery timing; published external targets and all tolerances remain unchanged. Re-blessed 2026-10-24: expected_loss recaptured from the canonical pricing runner after 22db73d798 (fix(models): unify conditional and sampled recovery laws) changed the stochastic pricer's sampled-recovery draws; the deterministic metrics (npv, dv01, cs01, z_spread) still pass unchanged at their existing tolerances, and inputs and tolerances are unchanged. Old: expected_loss=37120944.17303668. New: expected_loss=37119303.59307.",
+    "source_detail": "2026-09-09 pricing reference: the synthetic dirty quote is USD 10,952,985.036977235, constructed as sum(CF * DF * exp(-0.10 * t)) with Act365F t from 2026-04-30. The previous USD 5m quote implied 5,799.49bp, outside the supported spread range, and has been replaced rather than changing production limits. The reference test independently checks the 1,000bp spread and forward-difference CS01, while direct +/-1bp curve repricing checks DV01. Current outputs after input reconciliation and valuation-date-aware coverage projection are NPV USD 13,607,846.71744143, future expected loss USD 934,624.078306567, DV01 USD -246.7844843501225 per bp, and CS01 USD -2,271.8577877022326 per bp. Existing metric tolerances are unchanged. 2026-09-09 input reconciliation: BOND1 is explicitly assumed to default on 2026-04-01 with USD 8m defaulted par and a USD 1m unreceived recovery claim. The effective nine-month lag makes the claim due 2027-01-01, paid on the next eligible contractual payment date. Cumulative defaults are USD 8m and received recoveries are zero. The USD 7m historical loss is already reflected in current tranche balances: equity zero and senior USD 43m; it must not be written down again. The non-revolving senior note has no target balance. These are synthetic assumptions, not external benchmark observations. Earlier captures below predate this input reconciliation. Finstack Quant canonical credit pricing calculation on deterministic synthetic market inputs. Uses calibrated USD-SOFR-DISC and SOFR-3M curves with two-step calibration (POC #4 pattern, plan \u00a716). SOFR-1M preserved as auxiliary. Expected outputs recaptured from Finstack. Re-blessed 2026-05-17 (cash-conservation remediation): the CLO/ABS simulation-engine cash-conservation fixes (audit items 1-13 \u2014 reinvestment principal recycling, loss-allocation cap by current balance, mid-period default interest accrual) move tranche cashflows, shifting npv/dv01/cs01 by ~0.03-0.11%. Library-self-calculated regression golden, re-blessed per golden-test policy. Old: npv=14458410.460818833, dv01=-3047.708901843056, cs01=-1902.2833933271468. New: npv=14449223.85764518, dv01=-3046.929275150411, cs01=-1900.175536161289. expected_loss unchanged (writedown total stable). Re-blessed 2026-06-16: expected outputs recaptured from the current canonical Python golden runner for this formula self-test after deterministic pricing output drift; no external benchmark source is asserted by this fixture. Re-baselined 2026-07-11 after seasoned-deal simulation began anchoring current balances at the last contractual boundary and resolving reset-lag fixings explicitly. Added the required SOFR-3M fixing observations. Future waterfall periods are arbitrary dates, so their rate is analytically F=(DF_proj(t1)/DF_proj(t2)-1)/(t2-t1), with t1 and t2 now explicitly measured on the step's Act365F axis instead of inferred Act360. Repricing those cashflows gives NPV=12,407,273.205310879 and expected loss=725,139.371099923. Re-baselined 2026-07-15 after canonical dependency discovery changed DV01 from a discount-only bump to a simultaneous parallel bump of the declared discount and projection curves; direct +/-1bp repricing gives DV01=-207.779270004481. NPV, expected loss, and CS01=-3,043.407994883135 are unchanged. Re-baselined 2026-07-21 after the structured-credit follow-up fixes changed waterfall cash conservation, metric time bases, and the default stochastic engine. The fixture now supplies an explicit synthetic quoted price of 25.0 percent of original balance for quote-dependent Z-spread/CS01. Current canonical results are NPV=12,504,142.5835819, DV01=-158.220006350428, CS01=-819.516465414315, and expected loss=725,139.371099923. Input ownership updated 2026-09-09: the former 25% quote used 20m collateral as its denominator. The identical 5m USD dirty settlement target is now explicit in market_quotes. Expected values and tolerances are unchanged. Re-blessed 2026-09-17 (structured-credit vertical coverage, Phases A-B): under the par-preserving loss policy CLO/ABS notes carry par and realize unpaid principal once, as a write-down on the final settlement date, so expected_loss now includes the shortfall the impaired notes never recover instead of only the projected new defaults. The inert hedge swap (calendar 'USD', no SOFR-3M projection curve; previously an NPV overlay that never reached these metrics) was removed from the instrument now that swaps flow through the waterfall. Old: expected_loss=934624.078306567. New: expected_loss=37127779.72011075. npv, dv01, cs01 and z_spread are unchanged. 2026-09-17: the behavior_overrides.abs_speed override (0.012) was retired with the ABS prepayment curve; cpr_annual is now its annual equivalent 1 \u2212 (1 \u2212 0.012)^12 = 0.13486609002406202, so the effective constant-SMM prepayment model and every expected value are unchanged. 2026-09-24 (naming slice A7): the behavior_overrides channel was retired and its effective values moved onto credit_model: prepayment_spec is constant CPR 0.13486609002406202 (cpr_annual took precedence over psa_speed_multiplier), default_spec is constant CDR 0.025 (cdr_annual took precedence over sda_speed_multiplier), recovery_spec is rate 0.42 with a nine-month lag, and stochastic_prepay_spec/stochastic_default_spec were dropped because the overrides cleared them. reinvestment_price 101.0 was removed; re-running the fixture with it null reproduced every expected value to 0 abs diff before the removal. The payload-only asset_type industry (null) was dropped. Expected values and tolerances are unchanged. Re-blessed 2026-10-01: expected outputs re-captured from the canonical Python golden runner after master commits 03aec31fe/998ac2a88 (rate-calculation and interpolation changes) moved the library's deterministic outputs; the moves were reviewed and approved, inputs and tolerances are unchanged, and metrics not listed here still pass and were not retargeted. Old: npv=13607846.71744143, expected_loss=37127779.72011075, dv01=-246.7844843501225, cs01=-2271.8577877022326, z_spread=0.1. New: npv=13607848.73571474, expected_loss=37127777.41602765, dv01=-285.6266649449244, cs01=-2271.8575491309166, z_spread=0.10000007529862727. The z_spread pin is now self-captured drift rather than the independently specified 0.10: the quoted_dirty_price_currency input was constructed from the pre-change discount factors and was deliberately not re-derived in this re-pin. The synthetic dirty quote was re-derived on 2026-10-01 from the moved discount factors (10952985.036977235 -> 10952986.747911649) so the solved z-spread is again exactly 0.10; cs01 is the matching reference -2271.85806276485, superseding any z_spread/cs01 values quoted in the re-bless note above. 2026-10-11 valuation-remediation reference: refreshed the synthetic quote from the corrected contractual cashflows using sum(CF*DF*exp(-0.10*t)), t=Act365F, giving USD 10952092.791475201. Its independently summed forward-difference CS01 is -2271.980176911365; z_spread remains exactly 0.10. Direct +/-1bp discount/projection revaluation gives combined DV01 -286.8194704251364. Internal NPV and future-loss pins follow corrected cashflow/recovery timing; published external targets and all tolerances remain unchanged. Re-blessed 2026-10-24: expected_loss recaptured from the canonical pricing runner after 22db73d798 (fix(models): unify conditional and sampled recovery laws) changed the stochastic pricer's sampled-recovery draws; the deterministic metrics (npv, dv01, cs01, z_spread) still pass unchanged at their existing tolerances, and inputs and tolerances are unchanged. Old: expected_loss=37120944.17303668. New: expected_loss=37119303.59307. Re-blessed 2026-11-16: expected outputs re-captured from the canonical Python golden runner because the forward-curve refactor made the SOFR-3M projection curve factor-native: its calibration step interpolates log-linearly on projection discount factors instead of linearly on simple forward rates, the curve carries an index tenor instead of tenor_years/reset_lag, and parallel DV01 bumps shift its factors in continuously compounded zero space, so a projected 3M fixing moves by P(t1)/P(t2) * tau(Act365F)/alpha(Act360) basis points per 1bp bump rather than exactly one. Tolerances are unchanged; z_spread still pass and were not retargeted. Old: npv=13607106.197050659, expected_loss=37119303.59307, dv01=-286.8194704251364, cs01=-2271.980176911365. New: npv=13606356.133032635, expected_loss=37073578.69604329, dv01=-257.2165982667357, cs01=-2271.6216614820764. The synthetic dirty quote was re-derived from the moved cashflows and discount factors as sum(CF*DF*exp(-0.10*t)), t=Act365F (10952092.791475201 -> 10951774.467868539), so the solved z-spread is again exactly 0.10; cs01 is the matching independently summed forward-difference reference.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
     "last_reviewed_by": "claude",
@@ -59,7 +59,7 @@
             "base_date": "2026-04-30",
             "method": "bootstrap",
             "interpolation": "log_linear",
-            "extrapolation": "flat_forward",
+            "extrapolation": "extend",
             "pricing_discount_id": null,
             "pricing_forward_id": null,
             "conventions": {
@@ -78,14 +78,17 @@
             "curve_id": "SOFR-3M",
             "currency": "USD",
             "base_date": "2026-04-30",
-            "tenor_years": 0.25,
+            "index_tenor": {
+              "count": 3,
+              "unit": "months"
+            },
             "discount_curve_id": "USD-SOFR-DISC",
             "method": {
               "global_solve": {
                 "use_analytical_jacobian": false
               }
             },
-            "interpolation": "linear",
+            "interpolation": "log_linear",
             "conventions": {
               "curve_day_count": "act_365f"
             }
@@ -109,11 +112,16 @@
               0.0405
             ],
             [
+              "2026-04-01",
+              0.0405
+            ],
+            [
               "2026-04-29",
               0.0405
             ]
           ],
-          "interpolation": "step"
+          "interpolation": "step",
+          "extrapolation": "flat"
         },
         {
           "kind": "rate_quote",
@@ -381,41 +389,503 @@
           "kind": "forward_curve",
           "id": "SOFR-1M",
           "base": "2026-04-30",
-          "reset_lag": 2,
           "day_count": "act_360",
-          "tenor": 0.08333333333333333,
+          "index_tenor": {
+            "count": 1,
+            "unit": "months"
+          },
           "knot_points": [
             [
               0.0,
-              0.042
+              1.0
+            ],
+            [
+              0.08333333333333333,
+              0.9965122072745392
+            ],
+            [
+              0.16666666666666666,
+              0.993009091867119
             ],
             [
               0.25,
-              0.043
+              0.9894909019933648
             ],
             [
-              0.5,
-              0.044
+              0.3333333333333333,
+              0.9859578862343583
+            ],
+            [
+              0.41666666666666663,
+              0.9824102935078024
+            ],
+            [
+              0.49999999999999994,
+              0.978848373039243
+            ],
+            [
+              0.5833333333333333,
+              0.975272374333354
+            ],
+            [
+              0.6666666666666666,
+              0.9716959932470973
+            ],
+            [
+              0.75,
+              0.9681193301662054
+            ],
+            [
+              0.8333333333333334,
+              0.9645424851172291
+            ],
+            [
+              0.9166666666666667,
+              0.9609655577633323
             ],
             [
               1.0,
-              0.045
+              0.957388647400129
             ],
             [
-              2.0,
-              0.046
+              1.0833333333333333,
+              0.9538118529515607
             ],
             [
-              5.0,
-              0.047
+              1.1666666666666665,
+              0.9502418471231328
             ],
             [
-              10.0,
-              0.048
+              1.2499999999999998,
+              0.9466786538565338
+            ],
+            [
+              1.333333333333333,
+              0.9431222968621162
+            ],
+            [
+              1.4166666666666663,
+              0.9395727996191108
+            ],
+            [
+              1.4999999999999996,
+              0.936030185375848
+            ],
+            [
+              1.5833333333333328,
+              0.9324944771499877
+            ],
+            [
+              1.666666666666666,
+              0.9289656977287541
+            ],
+            [
+              1.7499999999999993,
+              0.9254438696691797
+            ],
+            [
+              1.8333333333333326,
+              0.9219290152983547
+            ],
+            [
+              1.9166666666666659,
+              0.9184211567136844
+            ],
+            [
+              1.9999999999999991,
+              0.914920315783153
+            ],
+            [
+              2.0833333333333326,
+              0.911426514145595
+            ],
+            [
+              2.166666666666666,
+              0.9079439605745947
+            ],
+            [
+              2.2499999999999996,
+              0.9044726281268302
+            ],
+            [
+              2.333333333333333,
+              0.9010124898844267
+            ],
+            [
+              2.4166666666666665,
+              0.8975635189551086
+            ],
+            [
+              2.5,
+              0.894125688472348
+            ],
+            [
+              2.5833333333333335,
+              0.8906989715955151
+            ],
+            [
+              2.666666666666667,
+              0.8872833415100264
+            ],
+            [
+              2.7500000000000004,
+              0.8838787714274908
+            ],
+            [
+              2.833333333333334,
+              0.8804852345858578
+            ],
+            [
+              2.9166666666666674,
+              0.877102704249562
+            ],
+            [
+              3.000000000000001,
+              0.8737311537096685
+            ],
+            [
+              3.0833333333333344,
+              0.8703705562840164
+            ],
+            [
+              3.166666666666668,
+              0.867020885317362
+            ],
+            [
+              3.2500000000000013,
+              0.8636821141815214
+            ],
+            [
+              3.333333333333335,
+              0.8603542162755112
+            ],
+            [
+              3.4166666666666683,
+              0.8570371650256896
+            ],
+            [
+              3.5000000000000018,
+              0.8537309338858954
+            ],
+            [
+              3.5833333333333353,
+              0.8504354963375872
+            ],
+            [
+              3.6666666666666687,
+              0.8471508258899814
+            ],
+            [
+              3.750000000000002,
+              0.8438768960801888
+            ],
+            [
+              3.8333333333333357,
+              0.8406136804733513
+            ],
+            [
+              3.916666666666669,
+              0.8373611526627769
+            ],
+            [
+              4.000000000000003,
+              0.8341192862700745
+            ],
+            [
+              4.083333333333336,
+              0.8308880549452872
+            ],
+            [
+              4.166666666666669,
+              0.8276674323670257
+            ],
+            [
+              4.250000000000002,
+              0.8244573922425996
+            ],
+            [
+              4.333333333333335,
+              0.8212579083081492
+            ],
+            [
+              4.416666666666668,
+              0.8180689543287749
+            ],
+            [
+              4.500000000000001,
+              0.8148905040986679
+            ],
+            [
+              4.583333333333334,
+              0.8117225314412375
+            ],
+            [
+              4.666666666666667,
+              0.8085650102092399
+            ],
+            [
+              4.75,
+              0.8054179142849044
+            ],
+            [
+              4.833333333333333,
+              0.8022812175800601
+            ],
+            [
+              4.916666666666666,
+              0.7991548940362608
+            ],
+            [
+              4.999999999999999,
+              0.7960389176249096
+            ],
+            [
+              5.083333333333332,
+              0.7929332623473824
+            ],
+            [
+              5.166666666666665,
+              0.7898386307123275
+            ],
+            [
+              5.249999999999998,
+              0.7867549882445136
+            ],
+            [
+              5.333333333333331,
+              0.7836823005577435
+            ],
+            [
+              5.416666666666664,
+              0.7806205333546967
+            ],
+            [
+              5.499999999999997,
+              0.7775696524267723
+            ],
+            [
+              5.58333333333333,
+              0.7745296236539306
+            ],
+            [
+              5.666666666666663,
+              0.7715004130045364
+            ],
+            [
+              5.7499999999999964,
+              0.768481986535201
+            ],
+            [
+              5.8333333333333295,
+              0.7654743103906244
+            ],
+            [
+              5.9166666666666625,
+              0.7624773508034387
+            ],
+            [
+              5.999999999999996,
+              0.7594910740940495
+            ],
+            [
+              6.083333333333329,
+              0.7565154466704789
+            ],
+            [
+              6.166666666666662,
+              0.7535504350282082
+            ],
+            [
+              6.249999999999995,
+              0.75059600575002
+            ],
+            [
+              6.333333333333328,
+              0.7476521255058407
+            ],
+            [
+              6.416666666666661,
+              0.7447187610525835
+            ],
+            [
+              6.499999999999994,
+              0.7417958792339907
+            ],
+            [
+              6.583333333333327,
+              0.738883446980476
+            ],
+            [
+              6.66666666666666,
+              0.7359814313089674
+            ],
+            [
+              6.749999999999993,
+              0.7330897993227499
+            ],
+            [
+              6.833333333333326,
+              0.7302085182113078
+            ],
+            [
+              6.916666666666659,
+              0.7273375552501675
+            ],
+            [
+              6.999999999999992,
+              0.7244768778007404
+            ],
+            [
+              7.083333333333325,
+              0.7216264533101653
+            ],
+            [
+              7.166666666666658,
+              0.7187862493111511
+            ],
+            [
+              7.249999999999991,
+              0.7159562334218199
+            ],
+            [
+              7.333333333333324,
+              0.7131363733455494
+            ],
+            [
+              7.416666666666657,
+              0.7103266368708159
+            ],
+            [
+              7.49999999999999,
+              0.7075269918710373
+            ],
+            [
+              7.583333333333323,
+              0.7047374063044156
+            ],
+            [
+              7.666666666666656,
+              0.7019578482137803
+            ],
+            [
+              7.749999999999989,
+              0.6991882857264305
+            ],
+            [
+              7.833333333333322,
+              0.6964286870539792
+            ],
+            [
+              7.916666666666655,
+              0.6936790204921949
+            ],
+            [
+              7.9999999999999885,
+              0.6909392544208456
+            ],
+            [
+              8.083333333333321,
+              0.6882093573035415
+            ],
+            [
+              8.166666666666655,
+              0.6854892976875785
+            ],
+            [
+              8.24999999999999,
+              0.6827790442037807
+            ],
+            [
+              8.333333333333323,
+              0.6800785655663443
+            ],
+            [
+              8.416666666666657,
+              0.6773878305726806
+            ],
+            [
+              8.499999999999991,
+              0.6747068081032591
+            ],
+            [
+              8.583333333333325,
+              0.6720354671214513
+            ],
+            [
+              8.666666666666659,
+              0.6693737766733738
+            ],
+            [
+              8.749999999999993,
+              0.6667217058877315
+            ],
+            [
+              8.833333333333327,
+              0.6640792239756617
+            ],
+            [
+              8.91666666666666,
+              0.6614463002305772
+            ],
+            [
+              8.999999999999995,
+              0.65882290402801
+            ],
+            [
+              9.083333333333329,
+              0.6562090048254553
+            ],
+            [
+              9.166666666666663,
+              0.6536045721622146
+            ],
+            [
+              9.249999999999996,
+              0.6510095756592396
+            ],
+            [
+              9.33333333333333,
+              0.6484239850189764
+            ],
+            [
+              9.416666666666664,
+              0.6458477700252091
+            ],
+            [
+              9.499999999999998,
+              0.6432809005429039
+            ],
+            [
+              9.583333333333332,
+              0.6407233465180526
+            ],
+            [
+              9.666666666666666,
+              0.6381750779775174
+            ],
+            [
+              9.75,
+              0.6356360650288743
+            ],
+            [
+              9.833333333333334,
+              0.6331062778602577
+            ],
+            [
+              9.916666666666668,
+              0.6305856867402045
+            ],
+            [
+              10.000000000000002,
+              0.6280742620174984
+            ],
+            [
+              10.083333333333336,
+              0.6255719741210144
             ]
           ],
-          "interp_style": "linear",
-          "extrapolation": "flat_forward",
+          "interp_style": "log_linear",
+          "extrapolation": "extend",
           "rate_calibration": null
         }
       ]
@@ -684,17 +1154,17 @@
         "business_day_convention": "modified_following",
         "instrument_pricing_overrides": {
           "market_quotes": {
-            "quoted_dirty_price_currency": 10952092.791475201
+            "quoted_dirty_price_currency": 10951774.467868539
           }
         }
       }
     }
   },
   "expected": {
-    "npv": 13607106.197050659,
-    "expected_loss": 37119303.59307,
-    "dv01": -286.8194704251364,
-    "cs01": -2271.980176911365,
+    "npv": 13606356.133032635,
+    "expected_loss": 37073578.69604329,
+    "dv01": -257.2165982667357,
+    "cs01": -2271.6216614820764,
     "z_spread": 0.1
   },
   "tolerances": {

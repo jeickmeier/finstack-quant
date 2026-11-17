@@ -28,7 +28,7 @@ impl ResolvedVarianceCalendar {
                 Ok(Self(finstack_quant_core::dates::calendar_by_id_strict(id)?))
             }
             VarianceCalendar::Joint { base, quote } => {
-                Ok(Self(resolve_joint_calendar(Some(base), Some(quote))?))
+                Ok(Self(resolve_joint_calendar(base, quote)?))
             }
         }
     }

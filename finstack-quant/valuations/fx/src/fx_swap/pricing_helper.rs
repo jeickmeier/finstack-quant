@@ -234,6 +234,9 @@ mod tests {
                 (1.0, (-0.05_f64).exp()),
                 (2.0, (-0.10_f64).exp()),
             ])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("USD curve");
         let eur = DiscountCurve::builder("EUR-OIS")
@@ -243,6 +246,9 @@ mod tests {
                 (1.0, (-0.02_f64).exp()),
                 (2.0, (-0.04_f64).exp()),
             ])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("EUR curve");
         let near_forward = 1.1 * eur.df_between_dates(as_of, near).expect("near EUR DF")
@@ -361,11 +367,17 @@ mod tests {
         let usd = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (0.5, 0.9760), (1.0, 0.9520)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("usd curve");
         let eur = DiscountCurve::builder("EUR-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (0.5, 0.9900), (1.0, 0.9810)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("eur curve");
         let provider = SimpleFxProvider::new();

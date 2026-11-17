@@ -63,7 +63,7 @@ def compose_scenarios(specs: list[ScenarioSpec]) -> ScenarioSpec:
 
     Specs are stably sorted by ascending ``priority`` (equal priorities keep
     input order) and their operations concatenated in that order. Every input
-    must use the same ``hazard_bump_mode``.
+    must use the same ``resolution_mode``.
 
     The composed spec takes its ``id`` and ``name`` from the inputs joined
     with ``+`` / ``" + "``, its ``description`` from the present input

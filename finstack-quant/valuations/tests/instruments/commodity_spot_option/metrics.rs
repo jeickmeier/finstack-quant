@@ -36,7 +36,10 @@ fn test_commodity_spot_option_core_greeks_registered() -> finstack_quant_core::R
         .insert(discount_curve)
         .insert(forward_curve)
         .insert_surface(vol_surface)
-        .insert_price("CL-SPOT", MarketScalar::Unitless(100.0));
+        .insert_price(
+            "CL-SPOT",
+            MarketScalar::unitless(100.0).expect("valid scalar"),
+        );
 
     let option = CommoditySpotOption::builder()
         .id(InstrumentId::new("CL-CALL-GREeks"))
@@ -108,7 +111,7 @@ fn commodity_spot_option_volga_is_per_vol_point_squared() -> finstack_quant_core
 
     let bump = 0.01;
     let vol_surface_id = CurveId::new("CL-VOL");
-    let make_bump = |value| MarketBump::Curve {
+    let make_bump = |value| MarketBump::VolSurface {
         id: vol_surface_id.clone(),
         spec: BumpSpec {
             bump_type: BumpType::Parallel,
@@ -151,7 +154,10 @@ fn test_forward_based_greeks_with_both_spot_and_price_curve() -> finstack_quant_
         .insert(discount_curve)
         .insert(price_curve)
         .insert_surface(vol_surface)
-        .insert_price("CL-SPOT", MarketScalar::Unitless(95.0)); // Spot different from forward
+        .insert_price(
+            "CL-SPOT",
+            MarketScalar::unitless(95.0).expect("valid scalar"),
+        ); // Spot different from forward
 
     let option = CommoditySpotOption::builder()
         .id(InstrumentId::new("CL-CALL-FWD-GREEKS"))
@@ -210,7 +216,7 @@ fn test_forward_based_greeks_with_both_spot_and_price_curve() -> finstack_quant_
 
     // Reference gamma: bump PriceCurve up/down and use central FD
     let forward_curve_id = CurveId::new("CL-FWD");
-    let bump_up = MarketBump::Curve {
+    let bump_up = MarketBump::PriceCurve {
         id: forward_curve_id.clone(),
         spec: BumpSpec {
             bump_type: BumpType::Parallel,
@@ -219,7 +225,7 @@ fn test_forward_based_greeks_with_both_spot_and_price_curve() -> finstack_quant_
             value: bump_pct * 100.0,
         },
     };
-    let bump_down = MarketBump::Curve {
+    let bump_down = MarketBump::PriceCurve {
         id: forward_curve_id,
         spec: BumpSpec {
             bump_type: BumpType::Parallel,
@@ -241,7 +247,7 @@ fn test_forward_based_greeks_with_both_spot_and_price_curve() -> finstack_quant_
     // Reference vanna: mixed FD bumping PriceCurve and vol
     // Use direct bump API for vol surface (additive absolute bump)
     let vol_surface_id = CurveId::new("CL-VOL");
-    let vol_bump_up = MarketBump::Curve {
+    let vol_bump_up = MarketBump::VolSurface {
         id: vol_surface_id.clone(),
         spec: BumpSpec {
             bump_type: BumpType::Parallel,
@@ -250,7 +256,7 @@ fn test_forward_based_greeks_with_both_spot_and_price_curve() -> finstack_quant_
             value: vol_bump,
         },
     };
-    let vol_bump_down = MarketBump::Curve {
+    let vol_bump_down = MarketBump::VolSurface {
         id: vol_surface_id,
         spec: BumpSpec {
             bump_type: BumpType::Parallel,
@@ -316,7 +322,10 @@ fn atm_commodity_spot_option(
         .insert(discount_curve)
         .insert(forward_curve)
         .insert_surface(vol_surface)
-        .insert_price("CL-SPOT", MarketScalar::Unitless(100.0));
+        .insert_price(
+            "CL-SPOT",
+            MarketScalar::unitless(100.0).expect("valid scalar"),
+        );
 
     let option = CommoditySpotOption::builder()
         .id(InstrumentId::new("CL-OPT-METRICS"))

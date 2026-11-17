@@ -156,6 +156,8 @@ mod tests {
                 (30.0, 0.30),
             ])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid curve");
         let market = MarketContext::new().insert(disc);
@@ -187,16 +189,20 @@ mod tests {
 
         // Reference values computed directly.
         let target = quote / 100.0 * mbs.current_face.amount();
-        let static_zspread = BrentSolver::new()
-            .with_tolerance(1e-8)
-            .with_max_iterations(100)
-            .with_bracket_bounds(-0.10, 0.20)
-            .with_initial_bracket_size(Some(0.05))
+        let static_zspread = BrentSolver::new(1e-8, 100)
+            .expect("valid solver")
             .solve(
                 |spread| {
-                    price_with_spread(&mbs, &market, as_of, spread).expect("static price") - target
+                    Ok(
+                        price_with_spread(&mbs, &market, as_of, spread).expect("static price")
+                            - target,
+                    )
                 },
                 0.0,
+                -0.10,
+                0.20,
+                0.05,
+                10,
             )
             .expect("static z-spread");
         let config = McOasConfig {
@@ -245,6 +251,8 @@ mod tests {
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (30.0, 0.30)])
                 .interp(InterpStyle::LogLinear)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("valid curve"),
         );

@@ -37,14 +37,18 @@ fn base_date() -> Date {
 }
 
 fn flat_curve(rate: f64) -> DiscountCurve {
-    DiscountCurve::flat("BENCH-FLAT", base_date(), rate).expect("valid bench curve")
+    DiscountCurve::flat("BENCH-FLAT", base_date(), rate, DayCount::Act365F)
+        .expect("valid bench curve")
 }
 
 fn shaped_curve() -> DiscountCurve {
+    use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
     let base = base_date();
     DiscountCurve::builder("USD-OIS")
         .base_date(base)
         .day_count(DayCount::Act365F)
+        .interp(InterpStyle::MonotoneConvex)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .knots(SHAPED_KNOTS)
         .build()
         .expect("valid bench curve")
@@ -67,7 +71,7 @@ fn checked_npv(curve: &DiscountCurve, flows: &[(Date, Money)], continuous_rate: 
     let base = base_date();
     assert_eq!(flows.len(), 60);
     assert_eq!(curve.day_count(), DayCount::Act365F);
-    assert_eq!(curve.df(0.0), 1.0);
+    assert_eq!(curve.df(0.0).expect("df(0)"), 1.0);
     let mut expected = 0.0;
     for (index, &(date, amount)) in flows.iter().enumerate() {
         assert_eq!(date, base + time::Duration::days((index as i64 + 1) * 91));
@@ -78,7 +82,10 @@ fn checked_npv(curve: &DiscountCurve, flows: &[(Date, Money)], continuous_rate: 
         // The shaped reference retains the curve's monotone-convex query, but
         // maps dates and accumulates scalar amounts independently of npv and
         // Money arithmetic. The flat case also has an analytic DF reference.
-        let df = continuous_rate.map_or_else(|| curve.df(years), |rate| (-rate * years).exp());
+        let df = continuous_rate.map_or_else(
+            || curve.df(years).expect("df(years)"),
+            |rate| (-rate * years).exp(),
+        );
         assert!(df.is_finite() && df > 0.0);
         expected += amount.amount() * df;
     }
@@ -122,7 +129,7 @@ fn bench_npv_shaped_curve(c: &mut Criterion) {
             let curve = shaped_curve();
             let flows = money_flows(size);
             for (years, expected_df) in SHAPED_KNOTS {
-                let actual_df = curve.df(years);
+                let actual_df = curve.df(years).expect("knot df");
                 assert!(actual_df.is_finite());
                 assert!((actual_df - expected_df).abs() <= 1e-12);
             }

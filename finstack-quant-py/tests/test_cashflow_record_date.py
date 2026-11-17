@@ -42,6 +42,7 @@ def test_json_accrual_excludes_coupon_starting_on_ex_date() -> None:
                     "day_count": "act_act_isma",
                     "context": {
                         "coupon_period": ["2025-01-01", "2025-07-01"],
+                        "frequency": {"count": 6, "unit": "months"},
                         "end_is_termination_date": False,
                     },
                 },

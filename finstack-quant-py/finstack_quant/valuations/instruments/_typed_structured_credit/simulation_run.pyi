@@ -17,7 +17,7 @@ class SimulationRun:
     >>> from finstack_quant.valuations.instruments import StructuredCredit
     >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
     >>> as_of = datetime.date(2024, 1, 1)
-    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.03))
+    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.03, "act_365f"))
     >>> run = StructuredCredit.example().run_simulation(market, as_of)
     >>> bool(run.tranches)
     True

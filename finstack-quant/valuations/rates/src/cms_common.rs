@@ -18,7 +18,6 @@ use finstack_quant_core::dates::{
     Date, DateExt, DayCount, DayCountContext, StubKind, Tenor, calendar_by_id_strict,
 };
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::fixings::cms_fixing_series_id;
 use finstack_quant_core::types::{CurveId, IndexId};
 
 /// Whole months of a CMS reference-swap tenor.
@@ -373,74 +372,204 @@ pub(crate) fn annuity_weight(rate: f64, tenor: f64, m: f64, delay: f64) -> (f64,
 // Mirrors the cap/floor seasoned-fixing pattern: a coupon whose fixing date
 // lies before the valuation date must be valued off the recorded fixing, not
 // re-projected from the live curve (which produces phantom P&L every time
-// the curve moves). CMS fixings are par swap rates, so the series is keyed
-// by reference tenor as well as the projection curve — see
-// [`finstack_quant_core::market_data::fixings::cms_fixing_series_id`].
+// the curve moves). CMS fixings are resolved exclusively through the explicitly
+// configured benchmark `cms_fixing_index_id`.
 
-/// Look up the recorded CMS (par swap) rate fixed on `fixing_date`.
+/// Validate that a CMS fixing index identifier is well-formed and distinct
+/// from the instrument's forward projection curve and underlying rate index.
+///
+/// # Arguments
+///
+/// * `cms_fixing_index_id` - Explicit benchmark CMS fixing identifier (without `FIXING:`).
+/// * `forward_curve_id` - Projection curve ID used for forward swap estimation.
+/// * `index_id` - Optional underlying rate-index convention identifier.
+/// * `field_label` - Field name reported in validation errors.
 ///
 /// # Errors
 ///
-/// Returns a validation error when the fixing series
-/// `FIXING:CMS-{tenor}:{forward_curve_id}` is absent from the market context
-/// or has no observation on the exact fixing date. Seasoned CMS coupons must
-/// never silently fall back to live-curve projection.
+/// Returns a validation error when `cms_fixing_index_id` is blank, has leading
+/// or trailing whitespace, includes the `"FIXING:"` prefix, or matches
+/// `forward_curve_id` or `index_id`.
+pub(crate) fn validate_cms_fixing_index_id(
+    cms_fixing_index_id: &IndexId,
+    forward_curve_id: &CurveId,
+    index_id: Option<&IndexId>,
+    field_label: &str,
+) -> Result<()> {
+    let raw = cms_fixing_index_id.as_str();
+    if raw.is_empty() || raw.trim() != raw {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{field_label} must be nonempty and without leading or trailing whitespace, got {raw:?}"
+        )));
+    }
+    if raw.starts_with("FIXING:") {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{field_label} must name a CMS benchmark index without the 'FIXING:' prefix, got {raw:?}"
+        )));
+    }
+    if raw == forward_curve_id.as_str() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{field_label} ({raw}) must be distinct from forward_curve_id ({})",
+            forward_curve_id.as_str()
+        )));
+    }
+    if let Some(rate_index_id) = index_id
+        && raw == rate_index_id.as_str()
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{field_label} ({raw}) must be distinct from index_id ({})",
+            rate_index_id.as_str()
+        )));
+    }
+    Ok(())
+}
+
+/// Look up the recorded CMS (par swap) rate fixed on `fixing_date`.
+///
+/// # Arguments
+///
+/// * `curves` - Market context supplying the historical fixing series.
+/// * `cms_fixing_index_id` - Explicit CMS benchmark fixing identifier.
+/// * `forward_curve_id` - Projection curve identifier for distinctness checking.
+/// * `index_id` - Optional underlying rate-index identifier for distinctness checking.
+/// * `fixing_date` - Historical fixing observation date.
+///
+/// # Errors
+///
+/// Returns a validation error when `cms_fixing_index_id` is omitted or invalid,
+/// or when `FIXING:<cms_fixing_index_id>` is absent from `curves` or lacks an
+/// exact observation on `fixing_date`. Seasoned CMS coupons must never silently
+/// fall back to live-curve projection.
 pub(crate) fn historical_cms_fixing(
     curves: &MarketContext,
+    cms_fixing_index_id: Option<&IndexId>,
     forward_curve_id: &CurveId,
-    cms_tenor_years: f64,
+    index_id: Option<&IndexId>,
     fixing_date: Date,
 ) -> Result<f64> {
-    let fixings_id = cms_fixing_series_id(forward_curve_id.as_str(), cms_tenor_years);
-    let series = curves.get_series(&fixings_id).map_err(|_| {
-        finstack_quant_core::Error::Validation(format!(
-            "Seasoned CMS coupon requires historical fixing series '{}' for fixing date {}. \
-             Fixed-but-unpaid CMS coupons must be valued off observed swap-rate fixings, \
-             not the live forward curve.",
-            fixings_id, fixing_date
-        ))
-    })?;
-    series.value_on_exact(fixing_date).map_err(|e| {
-        finstack_quant_core::Error::Validation(format!(
-            "Missing CMS fixing in series '{}' on {}: {e}",
-            fixings_id, fixing_date
-        ))
-    })
+    let Some(fixing_id) = cms_fixing_index_id else {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Seasoned CMS coupon requires explicit cms_fixing_index_id for fixing date {}. \
+             Fixed-but-unpaid CMS coupons must be valued off an explicit benchmark fixing series \
+             FIXING:<cms_fixing_index_id>, not the live forward curve.",
+            fixing_date
+        )));
+    };
+    validate_cms_fixing_index_id(fixing_id, forward_curve_id, index_id, "cms_fixing_index_id")?;
+    let series =
+        finstack_quant_core::market_data::fixings::get_fixing_series(curves, fixing_id.as_str())?;
+    finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+        Some(series),
+        fixing_id.as_str(),
+        fixing_date,
+    )
 }
 
 #[cfg(test)]
 mod cms_fixings_tests {
     use super::*;
-    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+    use finstack_quant_core::market_data::scalars::{
+        ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+    };
     use time::macros::date;
+
+    #[test]
+    fn missing_fixing_index_id_is_a_hard_error() {
+        let ctx = MarketContext::new();
+        let err = historical_cms_fixing(
+            &ctx,
+            None,
+            &CurveId::new("USD-SOFR"),
+            None,
+            date!(2025 - 01 - 02),
+        )
+        .expect_err("omitted cms_fixing_index_id must error");
+        assert!(err.to_string().contains("cms_fixing_index_id"), "{err}");
+    }
+
+    #[test]
+    fn colliding_or_prefixed_fixing_index_id_errors() {
+        let ctx = MarketContext::new();
+        let err_fwd = historical_cms_fixing(
+            &ctx,
+            Some(&IndexId::new("USD-SOFR")),
+            &CurveId::new("USD-SOFR"),
+            Some(&IndexId::new("USD-SOFR-OIS")),
+            date!(2025 - 01 - 02),
+        )
+        .expect_err("colliding with forward_curve_id must error");
+        assert!(
+            err_fwd.to_string().contains("forward_curve_id"),
+            "{err_fwd}"
+        );
+
+        let err_idx = historical_cms_fixing(
+            &ctx,
+            Some(&IndexId::new("USD-SOFR-OIS")),
+            &CurveId::new("USD-SOFR"),
+            Some(&IndexId::new("USD-SOFR-OIS")),
+            date!(2025 - 01 - 02),
+        )
+        .expect_err("colliding with index_id must error");
+        assert!(err_idx.to_string().contains("index_id"), "{err_idx}");
+
+        let err_prefix = historical_cms_fixing(
+            &ctx,
+            Some(&IndexId::new("FIXING:USD-SOFR-CMS-10Y")),
+            &CurveId::new("USD-SOFR"),
+            None,
+            date!(2025 - 01 - 02),
+        )
+        .expect_err("FIXING:-prefixed ID must error");
+        assert!(err_prefix.to_string().contains("FIXING:"), "{err_prefix}");
+    }
 
     #[test]
     fn missing_series_is_a_hard_error() {
         let ctx = MarketContext::new();
-        let err =
-            historical_cms_fixing(&ctx, &CurveId::new("USD-SOFR"), 10.0, date!(2025 - 01 - 02))
-                .expect_err("missing series must error");
+        let fixing_id = IndexId::new("USD-SOFR-CMS-10Y");
+        let err = historical_cms_fixing(
+            &ctx,
+            Some(&fixing_id),
+            &CurveId::new("USD-SOFR"),
+            Some(&IndexId::new("USD-SOFR-OIS")),
+            date!(2025 - 01 - 02),
+        )
+        .expect_err("missing series must error");
         let msg = err.to_string();
-        assert!(msg.contains("FIXING:CMS-10Y:USD-SOFR"), "{msg}");
+        assert!(msg.contains("FIXING:USD-SOFR-CMS-10Y"), "{msg}");
     }
 
     #[test]
     fn exact_date_lookup_returns_recorded_rate() {
         let series = ScalarTimeSeries::new(
-            "FIXING:CMS-10Y:USD-SOFR",
+            "FIXING:USD-SOFR-CMS-10Y",
             vec![(date!(2025 - 01 - 02), 0.0412)],
             None,
+            SeriesInterpolation::Step,
+            SeriesExtrapolation::Error,
         )
         .expect("series");
         let ctx = MarketContext::new().insert_series(series);
-        let rate =
-            historical_cms_fixing(&ctx, &CurveId::new("USD-SOFR"), 10.0, date!(2025 - 01 - 02))
-                .expect("fixing");
+        let fixing_id = IndexId::new("USD-SOFR-CMS-10Y");
+        let rate = historical_cms_fixing(
+            &ctx,
+            Some(&fixing_id),
+            &CurveId::new("USD-SOFR"),
+            Some(&IndexId::new("USD-SOFR-OIS")),
+            date!(2025 - 01 - 02),
+        )
+        .expect("fixing");
         assert!((rate - 0.0412).abs() < 1e-12);
 
-        let err =
-            historical_cms_fixing(&ctx, &CurveId::new("USD-SOFR"), 10.0, date!(2025 - 01 - 03))
-                .expect_err("unobserved date must error");
+        let err = historical_cms_fixing(
+            &ctx,
+            Some(&fixing_id),
+            &CurveId::new("USD-SOFR"),
+            Some(&IndexId::new("USD-SOFR-OIS")),
+            date!(2025 - 01 - 03),
+        )
+        .expect_err("unobserved date must error");
         assert!(err.to_string().contains("2025-01-03"));
     }
 }

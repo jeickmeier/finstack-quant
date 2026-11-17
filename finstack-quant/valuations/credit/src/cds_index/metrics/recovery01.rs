@@ -6,13 +6,12 @@
 //! ## Hazard Curve Recalibration
 //!
 //! Mirrors the single-name CDS Recovery01 methodology: when a hazard curve
-//! carries the par-spread quotes it was bootstrapped from
-//! (`par_spread_points` non-empty), the bumped recovery is propagated through
-//! a full re-bootstrap of the survival curve so the observed spreads remain
+//! carries a stored `hazard_calibration` recipe, the bumped recovery is propagated
+//! through a full re-bootstrap of the survival curve so the observed spreads remain
 //! consistent. This captures the indirect `h ≈ S/(1-R)` effect that dominates
 //! the recovery sensitivity.
 //!
-//! When a curve has no stored par spreads (e.g. a hand-built knot curve), the
+//! When a curve has no `hazard_calibration` recipe (e.g. a hand-built knot curve), the
 //! calculator falls back to a "frozen-curve" bump: the recovery is bumped on
 //! the instrument and the curve's recovery metadata is realigned, but the λ
 //! knots are reused unchanged. That partial sensitivity typically understates

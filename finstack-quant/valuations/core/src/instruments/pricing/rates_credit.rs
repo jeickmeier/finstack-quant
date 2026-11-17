@@ -237,8 +237,21 @@ mod tests {
         let curve_base = date!(2024 - 01 - 01);
         let origin = date!(2025 - 01 - 01);
         let end = date!(2026 - 01 - 01);
-        let discount = DiscountCurve::flat("USD-OIS", curve_base, 0.04).expect("discount curve");
-        let hazard = HazardCurve::flat("ACME-HZD", curve_base, 0.03, 0.4).expect("hazard curve");
+        let discount = DiscountCurve::flat(
+            "USD-OIS",
+            curve_base,
+            0.04,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("discount curve");
+        let hazard = HazardCurve::flat(
+            "ACME-HZD",
+            curve_base,
+            0.03,
+            0.4,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("hazard curve");
 
         let targets =
             build_rates_credit_targets(&discount, &hazard, origin, end, 1.0, 4).expect("targets");
@@ -261,8 +274,21 @@ mod tests {
     fn bond_grid_contains_every_calendar_day_and_rounds_resolution_up() {
         let origin = date!(2024 - 02 - 28);
         let end = date!(2024 - 03 - 02);
-        let discount = DiscountCurve::flat("USD-OIS", origin, 0.04).expect("discount curve");
-        let hazard = HazardCurve::flat("ACME-HZD", origin, 0.03, 0.4).expect("hazard curve");
+        let discount = DiscountCurve::flat(
+            "USD-OIS",
+            origin,
+            0.04,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("discount curve");
+        let hazard = HazardCurve::flat(
+            "ACME-HZD",
+            origin,
+            0.03,
+            0.4,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("hazard curve");
 
         let daily = build_daily_bond_rates_credit_targets(&discount, &hazard, origin, end, 2)
             .expect("daily targets");

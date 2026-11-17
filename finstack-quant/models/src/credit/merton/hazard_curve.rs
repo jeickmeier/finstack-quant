@@ -172,7 +172,7 @@ mod tests {
             )
             .expect("hc");
         // Survival at 5Y should match 1 - PD(5)
-        let sp5 = hc.sp(5.0);
+        let sp5 = hc.sp(5.0).expect("valid sp");
         let pd5 = m.default_probability(5.0);
         assert!(
             (sp5 - (1.0 - pd5)).abs() < 0.02,
@@ -192,7 +192,7 @@ mod tests {
             .expect("hc");
         // All hazard rates should be positive for a risky firm
         for t in [0.5, 1.0, 2.0, 3.0, 4.0, 5.0] {
-            let hr = hc.hazard_rate(t);
+            let hr = hc.hazard_rate(t).expect("valid hazard rate");
             assert!(
                 hr > 0.0,
                 "Hazard rate at t={t} should be positive, got {hr}"
@@ -214,7 +214,7 @@ mod tests {
             .to_hazard_curve("RISKY", base, &[1.0, 5.0, 10.0], 0.40, DayCount::Act365F)
             .expect("hc");
         assert!(
-            hc_risky.hazard_rate(3.0) > hc_safe.hazard_rate(3.0),
+            hc_risky.hazard_rate(3.0).expect("hr") > hc_safe.hazard_rate(3.0).expect("hr"),
             "Riskier firm should have higher hazard rate"
         );
     }

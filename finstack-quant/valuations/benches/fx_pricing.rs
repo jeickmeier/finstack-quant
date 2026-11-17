@@ -6,7 +6,9 @@ use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
@@ -40,6 +42,8 @@ fn create_market() -> MarketContext {
         .base_date(base)
         .knots([(0.0, 1.0), (10.0, 0.9)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -47,6 +51,8 @@ fn create_market() -> MarketContext {
         .base_date(base)
         .knots([(0.0, 1.0), (10.0, 0.95)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -64,7 +70,11 @@ fn create_market() -> MarketContext {
         &[0.25, 0.5, 1.0, 2.0],
         &[0.8, 0.9, 1.0, 1.1, 1.2],
         &[0.10; 20],
-        Default::default(),
+        VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
+            interpolation_mode: VolInterpolationMode::Vol,
+        },
         None,
     )
     .unwrap();

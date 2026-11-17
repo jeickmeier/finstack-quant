@@ -6,11 +6,11 @@
     "description": "Independent Bachelier reference for a 10MM USD out-of-the-money 1Y-into-5Y receiver swaption on the three-step calibrated rates/normal-SABR market. Contractual strike 3.766225%; projected forward 5.339268554469429%. The original ATM description was incorrect.",
     "valuation_date": "2026-05-08",
     "source": "formula",
-    "source_detail": "Independent formula recapture 2026-10-24: scripts/golden/normal_swaption_reference.py calibrates the original market envelope and takes its forward and normal cube quote as inputs. It independently sums contractual ACT/360 annual fixed accruals times payment-date discount factors, computes receiver Bachelier N*A*((K-F)*Phi(-d)+sigmaN*sqrt(T)*phi(d)) with Python math.erfc, computes vega per 0.01 normal-vol change, and centrally reprices +/-1bp continuous discount-zero-rate and additive forward-rate shocks using that same independent formula. Discount shocks preserve the source interpolation and multiply DF(t) by exp(-dr*t); off-pillar identities are checked during regeneration. Formula reference: https://github.com/lballabio/QuantLib/blob/master/ql/pricingengines/blackformula.cpp (bachelierBlackFormula). Inputs: F=0.05339268554469429, K=0.03766225, sigmaN=0.008171634700681399 decimal rate/sqrt(year), T=0.9917808219178083 ACT/365F, A=4.252728930362284 years, N=10000000 USD. Reference NPV=3510.2262230781007 USD, vega=26088.365724369185 USD per 100bp normal vol, signed DV01=-120.72083723376954 USD per 1bp. This reference isolates option quote-unit/pricing/risk correctness; its calibration and underlying forward are not an independent external curve benchmark. This recapture follows the 2026-10-23 forward-calibration extrapolation change (c69d13e5a4): calibrated forward curves now hold the last forward rate constant past the final reset (FlatZero) instead of extending the last segment's slope (FlatForward). The fixture's FRA quotes end at t=1.02y while the underlying swap runs 2027-2032, so its forward is extrapolation-dominated: F moved from 0.05849967094365875 to the value above and the SABR normal vol refitted at the lower forward, while the discount curve and annuity are unchanged. Contract terms, market quotes, and tolerances are unchanged. Old self-captured million-dollar price used a lognormal-equivalent vol as a normal quote.",
+    "source_detail": "Independent formula recapture 2026-11-16: scripts/golden/normal_swaption_reference.py calibrates the original market envelope and takes its forward and normal cube quote as inputs. It independently sums contractual ACT/360 annual fixed accruals times payment-date discount factors, computes receiver Bachelier N*A*((K-F)*Phi(-d)+sigmaN*sqrt(T)*phi(d)) with Python math.erfc, computes vega per 0.01 normal-vol change, and centrally reprices +/-1bp continuous factor shocks of both curves using that same independent formula. Each shock preserves the curve's source interpolation and multiplies its factor P(t) by exp(-dr*t) on the curve's own clock (ACT/365F discount, ACT/360 projection); off-pillar identities are checked during regeneration. Formula reference: https://github.com/lballabio/QuantLib/blob/master/ql/pricingengines/blackformula.cpp (bachelierBlackFormula). Inputs: F=0.052692056269454876, K=0.03766225, sigmaN=0.00815337436681816 decimal rate/sqrt(year), T=0.9917808219178083 ACT/365F, A=4.252728930364575 years, N=10000000 USD. Reference NPV=4331.082877156692 USD, vega=30464.188119535513 USD per 100bp normal vol, signed DV01=-145.48133093662318 USD per 1bp. This reference isolates option quote-unit/pricing/risk correctness; its calibration and underlying forward are not an independent external curve benchmark. This recapture follows the factor-native ForwardCurve change: the projection curve stores positive factors P(t) instead of rate knots. The forward step's rate-space 'linear' interpolation became 'log_linear' factors with 'extend' extrapolation, i.e. piecewise-flat forwards and a flat-forward tail, preserving the flat tail the previous FlatZero rate curve held. The fixture's FRA quotes end at t=1.02y while the underlying swap runs 2027-2032, so its forward is extrapolation-dominated: F moved from 0.05339268554469429 to the value above and the SABR normal vol refitted, while the discount curve and annuity are unchanged. DV01 now shifts projection factors rather than adding to forward rates, so the simple 3M forward moves by (1+F*tau) bp per bp. Contract terms, market quotes, and tolerances are unchanged. Old self-captured million-dollar price used a lognormal-equivalent vol as a normal quote.",
     "captured_by": "Codex independent formula verification",
-    "captured_on": "2026-10-24",
+    "captured_on": "2026-11-16",
     "last_reviewed_by": "Codex",
-    "last_reviewed_on": "2026-10-24",
+    "last_reviewed_on": "2026-11-16",
     "review_interval_months": 12,
     "regen_command": "uv run --no-sync python scripts/golden/normal_swaption_reference.py --write",
     "screenshots": []
@@ -81,7 +81,7 @@
             "base_date": "2026-05-08",
             "method": "bootstrap",
             "interpolation": "linear",
-            "extrapolation": "flat_forward",
+            "extrapolation": "extend",
             "pricing_discount_id": null,
             "pricing_forward_id": null,
             "conventions": {
@@ -95,14 +95,17 @@
             "curve_id": "USD-SOFR-3M",
             "currency": "USD",
             "base_date": "2026-05-08",
-            "tenor_years": 0.25,
+            "index_tenor": {
+              "count": 3,
+              "unit": "months"
+            },
             "discount_curve_id": "USD-OIS",
             "method": {
               "global_solve": {
                 "use_analytical_jacobian": false
               }
             },
-            "interpolation": "linear",
+            "interpolation": "log_linear",
             "conventions": {}
           },
           {
@@ -678,9 +681,9 @@
     }
   },
   "expected": {
-    "npv": 3510.2262230781007,
-    "vega": 26088.365724369185,
-    "dv01": -120.72083723376954
+    "npv": 4331.082877156692,
+    "vega": 30464.188119535513,
+    "dv01": -145.48133093662318
   },
   "tolerances": {
     "npv": {

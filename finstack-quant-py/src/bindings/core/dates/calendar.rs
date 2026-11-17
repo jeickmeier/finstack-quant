@@ -131,6 +131,12 @@ impl PyCalendarMetadata {
         self.inner.ignore_weekends
     }
 
+    /// Optional inclusive ``(from_year, to_year)`` bounds of declared coverage.
+    #[getter]
+    fn supported_years(&self) -> Option<(Option<i32>, Option<i32>)> {
+        self.inner.supported_years
+    }
+
     fn __repr__(&self) -> String {
         format!(
             "CalendarMetadata(id='{}', name='{}')",

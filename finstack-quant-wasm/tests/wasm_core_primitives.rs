@@ -110,7 +110,7 @@ fn usd() -> JsCurrency {
 
 #[wasm_bindgen_test]
 fn json_roundtrip_binding() {
-    let m = JsMoney::new(JsValue::from(1234.56), &usd()).expect("valid");
+    let m = JsMoney::new(JsValue::from(1234.56), &usd(), None).expect("valid");
     let json = m.to_json().expect("serialize");
     let back = JsMoney::from_json(JsValue::from(&json)).expect("deserialize");
     assert_eq!(back.amount_decimal(), m.amount_decimal());
@@ -119,30 +119,30 @@ fn json_roundtrip_binding() {
 
 #[wasm_bindgen_test]
 fn construct_and_getters() {
-    let m = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
+    let m = JsMoney::new(JsValue::from(10.0), &usd(), None).expect("valid");
     assert!((m.amount() - 10.0).abs() < 1e-10);
     assert_eq!(m.currency().to_string(), "USD");
 }
 
 #[wasm_bindgen_test]
 fn add_same_currency() {
-    let a = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
-    let b = JsMoney::new(JsValue::from(5.0), &usd()).expect("valid");
+    let a = JsMoney::new(JsValue::from(10.0), &usd(), None).expect("valid");
+    let b = JsMoney::new(JsValue::from(5.0), &usd(), None).expect("valid");
     let c = a.checked_add(&b).expect("add");
     assert!((c.amount() - 15.0).abs() < 1e-10);
 }
 
 #[wasm_bindgen_test]
 fn sub_same_currency() {
-    let a = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
-    let b = JsMoney::new(JsValue::from(3.0), &usd()).expect("valid");
+    let a = JsMoney::new(JsValue::from(10.0), &usd(), None).expect("valid");
+    let b = JsMoney::new(JsValue::from(3.0), &usd(), None).expect("valid");
     let c = a.checked_sub(&b).expect("sub");
     assert!((c.amount() - 7.0).abs() < 1e-10);
 }
 
 #[wasm_bindgen_test]
 fn checked_mul_f64() {
-    let m = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
+    let m = JsMoney::new(JsValue::from(10.0), &usd(), None).expect("valid");
     let scaled = m
         .checked_mul_f64(JsValue::from(2.5))
         .expect("finite factor");
@@ -151,21 +151,21 @@ fn checked_mul_f64() {
 
 #[wasm_bindgen_test]
 fn checked_div_f64() {
-    let m = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
+    let m = JsMoney::new(JsValue::from(10.0), &usd(), None).expect("valid");
     let half = m.checked_div_f64(JsValue::from(2.0)).expect("div");
     assert!((half.amount() - 5.0).abs() < 1e-10);
 }
 
 #[wasm_bindgen_test]
 fn checked_neg() {
-    let m = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
+    let m = JsMoney::new(JsValue::from(10.0), &usd(), None).expect("valid");
     let neg = m.checked_neg();
     assert!((neg.amount() + 10.0).abs() < 1e-10);
 }
 
 #[wasm_bindgen_test]
 fn to_string_format() {
-    let m = JsMoney::new(JsValue::from(10.0), &usd()).expect("valid");
+    let m = JsMoney::new(JsValue::from(10.0), &usd(), None).expect("valid");
     let s = m.to_string();
     assert!(s.contains("USD"), "expected USD in: {s}");
     assert!(s.contains("10"), "expected 10 in: {s}");

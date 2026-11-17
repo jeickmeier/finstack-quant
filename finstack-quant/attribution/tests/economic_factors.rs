@@ -9,7 +9,7 @@ use finstack_quant_core::{
     dates::{DayCount, StubKind, Tenor, TenorUnit},
     market_data::{
         context::MarketContext,
-        scalars::{InflationIndex, MarketScalar, SeriesInterpolation},
+        scalars::{InflationIndex, MarketScalar},
         term_structures::DiscountCurve,
     },
     money::Money,
@@ -32,6 +32,8 @@ fn discount(as_of: finstack_quant_core::dates::Date) -> DiscountCurve {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots([0.0_f64, 0.5, 1.0, 2.0, 5.0, 10.0].map(|t| (t, (-0.04 * t).exp())))
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -57,9 +59,22 @@ fn cpi_index(latest: f64) -> InflationIndex {
             observations.push((date, value));
         }
     }
-    InflationIndex::new("US-CPI", observations, Currency::USD)
-        .unwrap()
-        .with_interpolation(SeriesInterpolation::Linear)
+    InflationIndex::new(
+        "US-CPI",
+        observations
+            .into_iter()
+            .map(|(reference_month, value)| {
+                finstack_quant_core::market_data::scalars::InflationObservation {
+                    reference_month,
+                    value,
+                    available_on: date!(2025 - 07 - 14),
+                }
+            })
+            .collect(),
+        Currency::USD,
+        date!(2025 - 07 - 14),
+    )
+    .unwrap()
 }
 
 #[test]
@@ -154,9 +169,9 @@ fn scalar_convertible_vol_must_be_volatility_pnl() {
     let market = |spot, vol| {
         MarketContext::new()
             .insert(discount(as_of))
-            .insert_price("TECH", MarketScalar::Unitless(spot))
-            .insert_price("TECH-VOL", MarketScalar::Unitless(vol))
-            .insert_price("TECH-DIVYIELD", MarketScalar::Unitless(0.0))
+            .insert_price("TECH", MarketScalar::unitless(spot).unwrap())
+            .insert_price("TECH-VOL", MarketScalar::unitless(vol).unwrap())
+            .insert_price("TECH-DIVYIELD", MarketScalar::unitless(0.0).unwrap())
     };
     let m0 = market(80.0, 0.25);
     let m1 = market(80.0, 0.26);

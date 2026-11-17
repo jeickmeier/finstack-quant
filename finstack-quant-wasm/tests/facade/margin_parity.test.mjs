@@ -497,8 +497,8 @@ test('imProfileFromSimm and computeMva match Python', () => {
   );
   close(profile, golden.mva.profile, 'profile');
 
-  const discount = core.DiscountCurve.flat('USD-OIS', '2025-01-01', 0.03);
-  const hazard = core.HazardCurve.flat('BANK', '2025-01-01', 0.02, 0.4);
+  const discount = core.DiscountCurve.flat('USD-OIS', '2025-01-01', 0.03, 'act_365f');
+  const hazard = core.HazardCurve.flat('BANK', '2025-01-01', 0.02, 0.4, 'act_365f');
   const spreads = [
     [0.0, 50.0],
     [5.0, 80.0],

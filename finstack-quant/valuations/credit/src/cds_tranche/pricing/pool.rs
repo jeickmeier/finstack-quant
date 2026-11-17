@@ -68,7 +68,7 @@ impl PreparedPool {
                 maturity,
                 DayCountContext::default(),
             )?;
-            probabilities.push((1.0 - curve.sp(time)).clamp(0.0, 1.0));
+            probabilities.push((1.0 - curve.sp(time)?).clamp(0.0, 1.0));
             recoveries.push(index_data.get_issuer_recovery(id));
             weights.push(weight);
         }

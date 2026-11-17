@@ -43,12 +43,11 @@ it("shows the returned counters, shocks, time roll and carry as returned", () =>
   expect(JSON.parse(json.querySelector("code")!.textContent!)).toEqual(roll);
 });
 it("lists every warning variant generically by kind and returned fields", () => {
-  render(<MarketScenarioReport report={report("hz-par-cds-25bp")} />);
+  render(<MarketScenarioReport report={report("missing-equity-10pct")} />);
   const warnings = screen.getByRole("table", { name: "Warnings" });
   const row = within(warnings).getAllByRole("row")[1]!;
-  expect(row.textContent).toContain("hazard_spread_first_order");
-  expect(row.textContent).toContain("curve_id HZ");
-  expect(row.textContent).toContain("recovery_rate 0.4");
+  expect(row.textContent).toContain("equity_not_found");
+  expect(row.textContent).toContain("id ACME");
   expect(screen.queryByRole("region", { name: "Time roll" })).toBeNull();
 });
 it("shows the empty, loading and native-error states", () => {

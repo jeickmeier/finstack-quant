@@ -49,11 +49,30 @@ test('models.volatility evaluates core data artifacts', () => {
   assert.ok(Number.isFinite(vol));
   assert.ok(vol > 0);
 
-  const surface = new facade.core.FxDeltaVolSurface('EURUSD-VOL', [1], [0.12], [0.01], [0.002]);
+  const surface = new facade.core.FxDeltaVolSurface(
+    'EURUSD-VOL',
+    'EUR/USD',
+    [1],
+    [0.12],
+    [0.01],
+    [0.002]
+  );
   const pillars = facade.models.volatility.getFxDeltaPillarVols(surface, 0);
   assert.deepEqual(
     Array.from(pillars).map((value) => Number(value.toFixed(6))),
     [0.12, 0.117, 0.127]
+  );
+
+  const callStrike = facade.models.volatility.deltaToStrike(true, 0.25, 1.1, 0.12, 1.0);
+  const putStrike = facade.models.volatility.deltaToStrike(false, 0.25, 1.1, 0.12, 1.0);
+  assert.ok(callStrike > 1.1 && putStrike < 1.1);
+  assert.ok(
+    Math.abs(facade.models.volatility.strikeToDelta(true, callStrike, 1.1, 0.12, 1.0) - 0.25) <
+      1e-12
+  );
+  assert.ok(
+    Math.abs(facade.models.volatility.strikeToDelta(false, putStrike, 1.1, 0.12, 1.0) - 0.25) <
+      1e-12
   );
 
   surface.free();
@@ -191,29 +210,38 @@ test('canonical volatility state constructors preserve named parameters and opti
   );
   const s = {
     id: 'FX-STATE',
+    pair: { base: 'EUR', quote: 'USD' },
+    delta_convention: 'forward_unadjusted',
+    atm_convention: 'delta_neutral_straddle',
+    butterfly_convention: 'smile',
     expiries: [1],
     atm_vols: [0.12],
     rr_25d: [0.01],
     bf_25d: [0.002],
     rr_10d: null,
     bf_10d: null,
+    expiry_clock: null,
   };
   for (const wings of [false, true]) {
     const state = { ...s, rr_10d: wings ? [0.02] : null, bf_10d: wings ? [0.004] : null };
     const fromJson = facade.core.FxDeltaVolSurface.fromJson(JSON.stringify(state));
     const positional = new facade.core.FxDeltaVolSurface(
       'FX-STATE',
+      'EUR/USD',
       [1],
       [0.12],
       [0.01],
       [0.002],
-      wings ? [0.02] : undefined,
-      wings ? [0.004] : undefined
+      wings ? { rr10d: [0.02], bf10d: [0.004] } : null
     );
     try {
       assert.equal(
         facade.models.volatility.getFxDeltaVol(fromJson, 1, 1.12, 1.1),
         facade.models.volatility.getFxDeltaVol(positional, 1, 1.12, 1.1)
+      );
+      assert.equal(
+        facade.models.volatility.getFxDeltaPillarVols(positional, 0).length,
+        wings ? 5 : 3
       );
     } finally {
       fromJson.free();

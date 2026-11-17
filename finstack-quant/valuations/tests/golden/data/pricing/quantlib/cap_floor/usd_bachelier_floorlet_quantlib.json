@@ -1,8 +1,8 @@
 {
   "expected": {
-    "dv01": -148.012067795034,
-    "npv": 6453.938424811914,
-    "vega": 4977.040715027826
+    "dv01": -145.9144985306075,
+    "npv": 6453.938424811272,
+    "vega": 4977.040715027913
   },
   "instrument": {
     "instrument": {
@@ -44,10 +44,9 @@
       "credit_indices": [],
       "curves": [
         {
-          "allow_non_monotonic": false,
           "base": "2026-04-30",
           "day_count": "act_365f",
-          "extrapolation": "flat_forward",
+          "extrapolation": "extend",
           "id": "USD-OIS",
           "interp_style": "log_linear",
           "knot_points": [
@@ -60,36 +59,34 @@
               0.8607079764250578
             ]
           ],
-          "min_forward_rate": null,
-          "min_forward_tenor": 1e-06,
           "rate_calibration": null,
           "type": "discount"
         },
         {
           "base": "2026-04-30",
-          "day_count": "act_360",
-          "extrapolation": "flat_forward",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
           "id": "USD-TERM-3M",
-          "interp_style": "linear",
+          "index_tenor": {
+            "count": 3,
+            "unit": "months"
+          },
+          "interp_style": "log_linear",
           "knot_points": [
             [
               0.0,
-              -0.002
+              1.0
             ],
             [
-              30.0,
-              -0.002
+              0.2493150684931507,
+              1.0005058112712537
+            ],
+            [
+              0.5013698630136987,
+              1.0010174424084848
             ]
           ],
-          "projection_grid": [
-            0.0,
-            0.25277777777777777,
-            0.5083333333333333,
-            30.0
-          ],
           "rate_calibration": null,
-          "reset_lag": 2,
-          "tenor": 0.25,
           "type": "forward"
         }
       ],
@@ -112,7 +109,7 @@
           "interpolation_mode": "vol",
           "quote_type": "normal",
           "secondary_axis": "strike",
-          "strikes": [
+          "secondary_values": [
             -0.01,
             -0.001,
             0.1

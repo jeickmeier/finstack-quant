@@ -30,7 +30,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve, HazardCurve};
-use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::money::Money;
 pub use finstack_quant_test_utils::assert::approx_eq;
 use time::macros::date;
@@ -105,8 +105,8 @@ pub fn scaled_tolerance(base_tol: f64, value: f64, min_abs: f64) -> f64 {
 
 /// Create a flat discount curve with custom rate and base date.
 ///
-/// Uses ACT/360 day count by default. Handles negative and zero rates
-/// by switching to linear interpolation and allowing non-monotonic DFs.
+/// Uses ACT/360 day count by default; see
+/// [`flat_discount_curve_with_day_count`] for the curve representation.
 ///
 /// # Arguments
 ///
@@ -125,10 +125,10 @@ pub fn flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> Discou
 
 /// Create a flat discount curve with custom day count convention.
 ///
-/// This is the most flexible discount curve builder for tests. Handles:
-/// - Negative rates (uses linear interpolation, allows non-monotonic DFs)
-/// - Zero rates (uses linear interpolation, allows non-monotonic DFs)
-/// - Standard knot points: 0, 1, 5, 10, 30 years
+/// This is the most flexible discount curve builder for tests. Knots at 0, 1,
+/// 5, 10 and 30 years hold `exp(-rate * t)`; log-linear interpolation with
+/// [`ExtrapolationPolicy::Extend`] reproduces that flat continuous rate at
+/// every time, including zero and negative rates (increasing DFs).
 ///
 /// # Arguments
 ///
@@ -152,7 +152,7 @@ pub fn flat_discount_curve_with_day_count(
     curve_id: &str,
     day_count: DayCount,
 ) -> DiscountCurve {
-    let mut builder = DiscountCurve::builder(curve_id)
+    DiscountCurve::builder(curve_id)
         .base_date(base_date)
         .day_count(day_count)
         .knots([
@@ -161,20 +161,11 @@ pub fn flat_discount_curve_with_day_count(
             (5.0, (-rate * 5.0).exp()),
             (10.0, (-rate * 10.0).exp()),
             (30.0, (-rate * 30.0).exp()),
-        ]);
-
-    // For negative or zero rates, DFs may be flat or increasing
-    // Use linear interpolation and allow non-monotonic for robustness
-    if rate.abs() < 1e-10 || rate < 0.0 {
-        builder = builder.interp(InterpStyle::Linear).validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        );
-    }
-
-    builder.build().unwrap()
+        ])
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
+        .build()
+        .unwrap()
 }
 
 // Curve Builders - Forward Curves
@@ -224,11 +215,32 @@ pub fn flat_forward_curve_with_tenor(
     tenor: f64,
     day_count: DayCount,
 ) -> ForwardCurve {
-    ForwardCurve::builder(curve_id, tenor)
+    use finstack_quant_core::dates::Tenor;
+    let index_tenor = if (tenor - 0.25).abs() < 1e-6 {
+        Some(Tenor::quarterly())
+    } else if (tenor - 0.5).abs() < 1e-6 {
+        Some(Tenor::semi_annual())
+    } else if (tenor - 1.0).abs() < 1e-6 {
+        Some(Tenor::annual())
+    } else if (tenor - 1.0 / 12.0).abs() < 1e-6 {
+        Some(Tenor::monthly())
+    } else {
+        None
+    };
+    let cont_rate = if tenor > 0.0 && rate * tenor > -1.0 {
+        (rate * tenor).ln_1p() / tenor
+    } else {
+        rate
+    };
+    let far = 30.0_f64;
+    let df_far = (-cont_rate * far).exp();
+    ForwardCurve::builder(curve_id)
         .base_date(base_date)
         .day_count(day_count)
-        .knots([(0.0, rate), (10.0, rate), (30.0, rate)])
-        .interp(InterpStyle::Linear)
+        .index_tenor_opt(index_tenor)
+        .knots([(0.0, 1.0), (far, df_far)])
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -430,18 +442,21 @@ mod tests {
         assert_eq!(curve.base_date(), dates::TODAY);
 
         // DF at t=0 should be 1.0
-        assert!((curve.df(0.0) - 1.0).abs() < 1e-10);
+        assert!((curve.df(0.0).unwrap() - 1.0).abs() < 1e-10);
 
         // DF at t=1 should be approximately exp(-0.05)
         let expected_df_1y = (-0.05_f64).exp();
-        assert!((curve.df(1.0) - expected_df_1y).abs() < 1e-6);
+        assert!((curve.df(1.0).unwrap() - expected_df_1y).abs() < 1e-6);
     }
 
     #[test]
     fn test_flat_discount_curve_negative_rate() {
         // Should handle negative rates without panicking
         let curve = flat_discount_curve(-0.01, dates::TODAY, "NEG-RATE");
-        assert!(curve.df(1.0) > 1.0, "DF should be > 1 for negative rates");
+        assert!(
+            curve.df(1.0).unwrap() > 1.0,
+            "DF should be > 1 for negative rates"
+        );
     }
 
     #[test]
@@ -450,9 +465,9 @@ mod tests {
         assert_eq!(curve.id().as_str(), "USD-SOFR-3M");
         assert_eq!(curve.base_date(), dates::TODAY);
 
-        // Forward rate should be 5% everywhere
-        assert!((curve.rate(1.0) - 0.05).abs() < 1e-10);
-        assert!((curve.rate(5.0) - 0.05).abs() < 1e-10);
+        // Forward rate should match simple 3M rate 5% over 0.25Y
+        assert!((curve.rate_between(0.75, 1.0, 0.25).unwrap() - 0.05).abs() < 1e-10);
+        assert!((curve.rate_between(4.75, 5.0, 0.25).unwrap() - 0.05).abs() < 1e-10);
     }
 
     #[test]
@@ -462,8 +477,8 @@ mod tests {
         assert!((curve.recovery_rate() - 0.40).abs() < 1e-10);
 
         // Hazard rate should be 1% everywhere
-        assert!((curve.hazard_rate(1.0) - 0.01).abs() < 1e-6);
-        assert!((curve.hazard_rate(5.0) - 0.01).abs() < 1e-6);
+        assert!((curve.hazard_rate(1.0).unwrap() - 0.01).abs() < 1e-6);
+        assert!((curve.hazard_rate(5.0).unwrap() - 0.01).abs() < 1e-6);
     }
 
     // Market Context Tests
@@ -484,11 +499,11 @@ mod tests {
         let fwd = market.get_forward("USD-SOFR-3M").unwrap();
 
         // Discount curve rate ≈ 5%
-        let df_1y = disc.df(1.0);
+        let df_1y = disc.df(1.0).unwrap();
         assert!(((-df_1y.ln()) - 0.05).abs() < 1e-4);
 
-        // Forward curve rate = 6%
-        assert!((fwd.rate(1.0) - 0.06).abs() < 1e-6);
+        // Forward curve simple 3M rate = 6%
+        assert!((fwd.rate_between(0.75, 1.0, 0.25).unwrap() - 0.06).abs() < 1e-6);
     }
 
     #[test]

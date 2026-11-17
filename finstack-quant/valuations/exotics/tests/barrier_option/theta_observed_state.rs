@@ -33,9 +33,7 @@ fn theta(option: &BarrierOption, market: &MarketContext, as_of: Date) -> f64 {
 /// Theta over `days` days (capped at expiry) when there is no period cash.
 fn reprice(option: &BarrierOption, observed: &BarrierOption, as_of: Date, rolled: Date) -> f64 {
     let base = market(as_of);
-    let rolled_market = base
-        .roll_forward((rolled - as_of).whole_days())
-        .expect("roll market");
+    let rolled_market = base.condition(rolled).expect("condition market");
     observed
         .value(&rolled_market, rolled)
         .expect("rolled reprice")
@@ -69,7 +67,7 @@ fn discrete_barrier_theta_observes_the_held_spot_on_dates_inside_the_roll() {
         let rolled = as_of + time::Duration::days(1);
         assert!(
             option
-                .value(&market(as_of).roll_forward(1).expect("roll"), rolled)
+                .value(&market(as_of).condition(rolled).expect("condition"), rolled)
                 .is_err(),
             "{barrier_type:?}: ordinary pricing past an observation date still requires observed_barrier_breached"
         );

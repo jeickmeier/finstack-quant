@@ -105,8 +105,9 @@ impl CmsOptionPricer {
             if fixing_date < as_of {
                 let observed = crate::cms_common::historical_cms_fixing(
                     curves,
+                    inst.cms_fixing_index_id.as_ref(),
                     &inst.forward_curve_id,
-                    inst.cms_tenor.to_years_approx(),
+                    inst.index_id.as_ref(),
                     fixing_date,
                 )?;
                 let option_val = match inst.option_type {
@@ -330,7 +331,9 @@ pub fn convexity_adjustment_with_frequency(
 mod tests {
     use super::*;
     use crate::cms_option::replication_pricer::{CmsOptionletInputs, replicated_cms_optionlet};
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_models::types::OptionType;
 
     #[test]
@@ -359,8 +362,11 @@ mod tests {
                 .into_iter()
                 .map(|vol| {
                     let surface = VolSurface::builder("CMS-CONVERGENCE")
+                        .secondary_axis(VolSurfaceAxis::Strike)
+                        .quote_type(VolQuoteType::BlackLognormal)
+                        .interpolation_mode(VolInterpolationMode::Vol)
                         .expiries(&[1.0, 2.0])
-                        .strikes(&[0.01, 0.08])
+                        .secondary_values(&[0.01, 0.08])
                         .row(&[vol, vol])
                         .row(&[vol, vol])
                         .build()
@@ -405,8 +411,11 @@ mod tests {
         for (vol, expiry) in [(0.2_f64, 1.0_f64), (0.6, 5.0), (0.8, 10.0)] {
             for (tenor, delay) in [(2.0_f64, 0.25_f64), (30.0, 5.0)] {
                 let surface = VolSurface::builder("DENSITY-REFERENCE")
+                    .secondary_axis(VolSurfaceAxis::Strike)
+                    .quote_type(VolQuoteType::BlackLognormal)
+                    .interpolation_mode(VolInterpolationMode::Vol)
                     .expiries(&[expiry])
-                    .strikes(&[0.001, 1.0])
+                    .secondary_values(&[0.001, 1.0])
                     .row(&[vol, vol])
                     .build()
                     .unwrap();

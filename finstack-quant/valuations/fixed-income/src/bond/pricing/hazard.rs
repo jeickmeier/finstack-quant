@@ -204,7 +204,7 @@ pub(crate) fn price_raw_with_oas(
             cash * targets.discount_factors[step]
                 * targets.survival_probabilities[step]
                 * oas_discount,
-        );
+        )?;
         if step == steps {
             break;
         }
@@ -235,11 +235,11 @@ pub(crate) fn price_raw_with_oas(
                     * recovery
                     * outstanding
                     * default_weight,
-            );
+            )?;
         }
     }
 
-    Ok(pv.total())
+    pv.get_total()
 }
 
 #[cfg(test)]
@@ -287,6 +287,8 @@ mod tests {
             .base_date(issue)
             .knots([(0.0, 1.0), (10.0, 0.8)])
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("DiscountCurve builder should succeed in hazard engine test")
     }
@@ -295,7 +297,8 @@ mod tests {
         HazardCurve::builder(id)
             .base_date(issue)
             .recovery_rate(recovery)
-            .knots([(0.0, lambda), (10.0, lambda)])
+            .knots([(10.0, lambda)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("HazardCurve builder should succeed in hazard engine test")
     }
@@ -477,11 +480,13 @@ mod tests {
             .insert(build_flat_discount(issue))
             .insert_price(
                 kappa_key.as_str(),
-                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(0.03),
+                finstack_quant_core::market_data::scalars::MarketScalar::unitless(0.03)
+                    .expect("valid scalar"),
             )
             .insert_price(
                 sigma_key.as_str(),
-                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(0.01),
+                finstack_quant_core::market_data::scalars::MarketScalar::unitless(0.01)
+                    .expect("valid scalar"),
             );
         let credit_market = MarketContext::new()
             .insert(build_flat_discount(issue))
@@ -1034,6 +1039,8 @@ mod tests {
             .base_date(issue)
             .knots([(0.0, 1.0), (100.0, 0.01)])
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("DiscountCurve builder should succeed");
         // lambda = 10/year, FlatForward extrapolation. S(80y) = exp(-800) = 0.

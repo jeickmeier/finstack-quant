@@ -147,7 +147,7 @@ def _book() -> dict:
 
 
 def test_rebalance_from_spec_works_on_a_result_rebuilt_from_json() -> None:
-    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 15), 0.04))
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 15), 0.04, "act_365f"))
     spec = (
         PortfolioOptimizationSpec
         .new(
@@ -172,7 +172,7 @@ def test_portfolio_input_errors_keep_their_rust_kind() -> None:
     """Constraint and replay-timeline validation raise ``PortfolioError``, as Rust's kind says."""
     from finstack_quant.portfolio import Portfolio, PositionFilter, replay_portfolio
 
-    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 15), 0.04))
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 15), 0.04, "act_365f"))
     objective = Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.constant(1.0)))
     # Plain constraint variants are validated by the optimizer, for typed and
     # JSON-built constraints alike.
@@ -209,7 +209,7 @@ def test_infeasible_rebalance_raises_portfolio_error() -> None:
     """``rebalance_from_spec`` raises the Rust-owned ``PortfolioError`` for an infeasible result."""
     from finstack_quant.portfolio import PositionFilter
 
-    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 15), 0.04))
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 15), 0.04, "act_365f"))
     spec = (
         PortfolioOptimizationSpec
         .new(
@@ -228,7 +228,7 @@ def test_infeasible_rebalance_raises_portfolio_error() -> None:
 
 def test_rebalanced_portfolio_is_identical_after_result_reconstruction() -> None:
     """Rebalancing uses the matching spec for both live and reconstructed results."""
-    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 15), 0.04))
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 15), 0.04, "act_365f"))
     spec = (
         PortfolioOptimizationSpec
         .new(

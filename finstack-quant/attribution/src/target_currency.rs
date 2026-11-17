@@ -103,17 +103,32 @@ pub fn translate_to_target_currency(
     // Convert val_t0 with BOTH the T0 and T1 FX matrices so we can extract the
     // FX move applied to the opening position.
     let val_t0_at_t0 = market_t0
-        .convert_money(val_t0, target_currency, as_of_t0)?
+        .convert_money(
+            val_t0,
+            target_currency,
+            as_of_t0,
+            FxConversionPolicy::CashflowDate,
+        )?
         .amount;
     let val_t0_at_t1 = market_t1
-        .convert_money(val_t0, target_currency, as_of_t1)?
+        .convert_money(
+            val_t0,
+            target_currency,
+            as_of_t1,
+            FxConversionPolicy::CashflowDate,
+        )?
         .amount;
     let fx_translation = val_t0_at_t1.checked_sub(val_t0_at_t0)?;
 
     // Translate every per-factor amount to target_currency at T1 FX.
     let translate = |m: Money| -> Result<Money> {
         Ok(market_t1
-            .convert_money(m, target_currency, as_of_t1)?
+            .convert_money(
+                m,
+                target_currency,
+                as_of_t1,
+                FxConversionPolicy::CashflowDate,
+            )?
             .amount)
     };
 
@@ -133,7 +148,12 @@ pub fn translate_to_target_currency(
 
     let val_t1_native = val_t0.checked_add(native_mtm)?;
     let val_t1_at_t1 = market_t1
-        .convert_money(val_t1_native, target_currency, as_of_t1)?
+        .convert_money(
+            val_t1_native,
+            target_currency,
+            as_of_t1,
+            FxConversionPolicy::CashflowDate,
+        )?
         .amount;
     let translated_mtm = val_t1_at_t1.checked_sub(val_t0_at_t0)?;
     translated.total_pnl = translated_mtm.checked_add(translate(cash_addback_native)?)?;

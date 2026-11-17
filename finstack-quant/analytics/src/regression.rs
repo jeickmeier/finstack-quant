@@ -107,7 +107,7 @@ impl Scaled {
     }
 }
 
-fn scaled_sum(values: impl IntoIterator<Item = Scaled>) -> Scaled {
+fn scaled_sum(values: impl IntoIterator<Item = Scaled>) -> finstack_quant_core::Result<Scaled> {
     let values: Vec<Scaled> = values
         .into_iter()
         .filter(|v| v.significand.abs() > 0.0)
@@ -122,7 +122,7 @@ fn scaled_sum(values: impl IntoIterator<Item = Scaled>) -> Scaled {
         } else {
             Some(normalized)
         }
-    }));
+    }))?;
     let result = Scaled::normalize(sum, exponent);
     // Preserve terms below the current floating-point range when larger
     // terms cancel. Rebase those terms after cancellation, rather than
@@ -131,19 +131,19 @@ fn scaled_sum(values: impl IntoIterator<Item = Scaled>) -> Scaled {
         lower.push(result);
         return scaled_sum(lower);
     }
-    result
+    Ok(result)
 }
 
-fn scaled_dot(lhs: &[f64], rhs: &[Scaled]) -> Scaled {
+fn scaled_dot(lhs: &[f64], rhs: &[Scaled]) -> finstack_quant_core::Result<Scaled> {
     scaled_sum(lhs.iter().zip(rhs).map(|(&a, &b)| Scaled::new(a).mul(b)))
 }
 
-fn norm(values: &[f64]) -> f64 {
+fn norm(values: &[f64]) -> finstack_quant_core::Result<f64> {
     let scale = values.iter().map(|v| v.abs()).fold(0.0, f64::max);
     if scale <= 0.0 {
-        return 0.0;
+        return Ok(0.0);
     }
-    scale * neumaier_sum(values.iter().map(|v| (v / scale).powi(2))).sqrt()
+    Ok(scale * neumaier_sum(values.iter().map(|v| (v / scale).powi(2)))?.sqrt())
 }
 
 fn common_values(groups: &[&[Scaled]]) -> Vec<Vec<f64>> {
@@ -198,7 +198,7 @@ impl NormalizedSvd {
             } else {
                 maximum
             };
-            let column_norm = neumaier_sum(column.iter().map(|v| (v / scale).powi(2))).sqrt();
+            let column_norm = neumaier_sum(column.iter().map(|v| (v / scale).powi(2)))?.sqrt();
             // Retain both factors for subnormal norms too: rounding the
             // combined norm first can substantially change the unit column.
             scales.push((scale, column_norm));
@@ -246,14 +246,20 @@ impl NormalizedSvd {
         })
     }
 
-    fn projection_coordinates(&self, target: &[Scaled]) -> Vec<Scaled> {
+    fn projection_coordinates(
+        &self,
+        target: &[Scaled],
+    ) -> finstack_quant_core::Result<Vec<Scaled>> {
         self.u
             .column_iter()
             .map(|column| scaled_dot(column.as_slice(), target))
             .collect()
     }
 
-    fn resolved_projection_coordinates(&self, target: &[Scaled]) -> Vec<Scaled> {
+    fn resolved_projection_coordinates(
+        &self,
+        target: &[Scaled],
+    ) -> finstack_quant_core::Result<Vec<Scaled>> {
         // Reconstruct U' target from Z and the same SVD. This retains a
         // small held-row projection that may have only absolute (rather
         // than relative) accuracy in the stored left singular vectors.
@@ -262,20 +268,22 @@ impl NormalizedSvd {
             .column_iter()
             .enumerate()
             .map(|(j, column)| {
-                scaled_dot(column.as_slice(), target)
+                Ok(scaled_dot(column.as_slice(), target)?
                     .div(Scaled::new(self.scales[j].0))
-                    .div(Scaled::new(self.scales[j].1))
+                    .div(Scaled::new(self.scales[j].1)))
             })
-            .collect();
+            .collect::<finstack_quant_core::Result<_>>()?;
         (0..self.vt.nrows())
             .map(|i| {
-                scaled_sum((0..self.vt.ncols()).map(|j| Scaled::new(self.vt[(i, j)]).mul(cross[j])))
-                    .div(Scaled::new(self.singular_values[i]))
+                Ok(scaled_sum(
+                    (0..self.vt.ncols()).map(|j| Scaled::new(self.vt[(i, j)]).mul(cross[j])),
+                )?
+                .div(Scaled::new(self.singular_values[i])))
             })
             .collect()
     }
 
-    fn projected_values(&self, coordinates: &[Scaled]) -> Vec<Scaled> {
+    fn projected_values(&self, coordinates: &[Scaled]) -> finstack_quant_core::Result<Vec<Scaled>> {
         let normalized: Vec<Scaled> = (0..self.vt.ncols())
             .map(|i| {
                 scaled_sum((0..self.vt.nrows()).map(|j| {
@@ -284,7 +292,7 @@ impl NormalizedSvd {
                         .div(Scaled::new(self.singular_values[j]))
                 }))
             })
-            .collect();
+            .collect::<finstack_quant_core::Result<_>>()?;
         (0..self.design.nrows())
             .map(|i| {
                 scaled_sum(
@@ -295,26 +303,26 @@ impl NormalizedSvd {
             .collect()
     }
 
-    fn refined_coordinates(&self, target: &[Scaled]) -> Vec<Scaled> {
-        let mut coordinates = self.projection_coordinates(target);
+    fn refined_coordinates(&self, target: &[Scaled]) -> finstack_quant_core::Result<Vec<Scaled>> {
+        let mut coordinates = self.projection_coordinates(target)?;
         // Rebuild residuals from the design, then refine through the same
         // bounded SVD. This recovers small components obscured by absolute
         // roundoff in stored singular vectors without changing the model.
         for _ in 0..2 {
-            let fitted = self.projected_values(&coordinates);
+            let fitted = self.projected_values(&coordinates)?;
             let residual: Vec<Scaled> = target
                 .iter()
                 .zip(fitted)
                 .map(|(&r, y)| scaled_sum([r, y.neg()]))
-                .collect();
-            let correction = self.projection_coordinates(&residual);
+                .collect::<finstack_quant_core::Result<_>>()?;
+            let correction = self.projection_coordinates(&residual)?;
             coordinates = coordinates
                 .into_iter()
                 .zip(correction)
                 .map(|(a, b)| scaled_sum([a, b]))
-                .collect();
+                .collect::<finstack_quant_core::Result<_>>()?;
         }
-        coordinates
+        Ok(coordinates)
     }
 
     fn coefficients(
@@ -328,7 +336,7 @@ impl NormalizedSvd {
                     Scaled::new(self.vt[(j, i)])
                         .mul(coordinates[j])
                         .div(Scaled::new(self.singular_values[j]))
-                }));
+                }))?;
                 let requested = value
                     .div(Scaled::new(self.scales[i].0))
                     .div(Scaled::new(self.scales[i].1));
@@ -347,32 +355,32 @@ impl NormalizedSvd {
         constraint: Option<&ConstraintStep<'_>>,
     ) -> finstack_quant_core::Result<Vec<f64>> {
         for _ in 0..2 {
-            let fitted = self.fitted(&coefficients);
+            let fitted = self.fitted(&coefficients)?;
             let residual: Vec<Scaled> = target
                 .iter()
                 .zip(fitted)
                 .map(|(&r, y)| scaled_sum([r, y.neg()]))
-                .collect();
+                .collect::<finstack_quant_core::Result<_>>()?;
             if residual.iter().all(|v| v.significand.abs() <= 0.0) {
                 break;
             }
-            let mut coordinates = self.refined_coordinates(&residual);
+            let mut coordinates = self.refined_coordinates(&residual)?;
             if let Some(step) = constraint {
-                let step_y0 = self.projected_values(&coordinates);
-                let (_, step_delta) = equality(step.weights, &residual, &step_y0);
+                let step_y0 = self.projected_values(&coordinates)?;
+                let (_, step_delta) = equality(step.weights, &residual, &step_y0)?;
                 let step_mag = step_delta.div(step.h_norm);
                 coordinates = coordinates
                     .iter()
                     .zip(step.unit)
                     .map(|(&a, &u)| scaled_sum([a, Scaled::new(u).mul(step_mag)]))
-                    .collect();
+                    .collect::<finstack_quant_core::Result<_>>()?;
             }
             let (correction, _) = self.coefficients(&coordinates)?;
             if correction.iter().all(|&c| c.abs() <= 0.0) {
                 break;
             }
             for (value, change) in coefficients.iter_mut().zip(correction) {
-                *value = scaled_sum([Scaled::new(*value), Scaled::new(change)]).value()?;
+                *value = scaled_sum([Scaled::new(*value), Scaled::new(change)])?.value()?;
             }
         }
         Ok(coefficients)
@@ -397,7 +405,7 @@ impl NormalizedSvd {
             .iter()
             .zip(fitted)
             .map(|(&r, &y)| scaled_sum([Scaled::new(r), y.neg()]))
-            .collect();
+            .collect::<finstack_quant_core::Result<_>>()?;
         if residual.iter().all(|v| v.significand.abs() <= 0.0) {
             return Ok(());
         }
@@ -408,13 +416,13 @@ impl NormalizedSvd {
             let column = self.original_design.column(j);
             let s = Scaled::new(self.scales[j].0);
             let v = Scaled::new(self.scales[j].1);
-            grad.push(scaled_dot(column.as_slice(), &residual).div(s).div(v));
+            grad.push(scaled_dot(column.as_slice(), &residual)?.div(s).div(v));
             let gross = scaled_sum(
                 column
                     .iter()
                     .zip(fitted)
                     .map(|(&x, &y)| Scaled::new(x.abs()).mul(y.abs())),
-            );
+            )?;
             fit_scale.push(gross.div(s).div(v));
         }
         let stationarity: Vec<(Scaled, Scaled)> = if let Some(weights) = active_weights {
@@ -422,28 +430,28 @@ impl NormalizedSvd {
             let b: Vec<Scaled> = (0..p)
                 .map(|j| {
                     let column = self.original_design.column(j);
-                    scaled_dot(column.as_slice(), &holdings)
+                    Ok(scaled_dot(column.as_slice(), &holdings)?
                         .div(Scaled::new(self.scales[j].0))
-                        .div(Scaled::new(self.scales[j].1))
+                        .div(Scaled::new(self.scales[j].1)))
                 })
-                .collect();
-            let b_norm_sq = scaled_sum(b.iter().map(|&v| v.mul(v)));
+                .collect::<finstack_quant_core::Result<_>>()?;
+            let b_norm_sq = scaled_sum(b.iter().map(|&v| v.mul(v)))?;
             if b_norm_sq.significand.abs() <= 0.0 {
                 return Err(calculation("nonzero holdings projection is unresolved"));
             }
-            let b_dot_grad = scaled_sum(b.iter().zip(&grad).map(|(&bj, &gj)| bj.mul(gj)));
+            let b_dot_grad = scaled_sum(b.iter().zip(&grad).map(|(&bj, &gj)| bj.mul(gj)))?;
             let lambda = b_dot_grad.div(b_norm_sq);
             grad.into_iter()
                 .zip(fit_scale)
                 .zip(b)
                 .map(|((gj, sj), bj)| {
                     let lagrange = lambda.mul(bj);
-                    (
-                        scaled_sum([gj, lagrange.neg()]),
-                        scaled_sum([sj, lagrange.abs()]),
-                    )
+                    Ok((
+                        scaled_sum([gj, lagrange.neg()])?,
+                        scaled_sum([sj, lagrange.abs()])?,
+                    ))
                 })
-                .collect()
+                .collect::<finstack_quant_core::Result<_>>()?
         } else {
             grad.into_iter().zip(fit_scale).collect()
         };
@@ -531,7 +539,7 @@ impl NormalizedSvd {
         Ok(true)
     }
 
-    fn fitted(&self, coefficients: &[f64]) -> Vec<Scaled> {
+    fn fitted(&self, coefficients: &[f64]) -> finstack_quant_core::Result<Vec<Scaled>> {
         (0..self.original_design.nrows())
             .map(|i| {
                 scaled_sum((0..self.original_design.ncols()).map(|j| {
@@ -549,11 +557,11 @@ impl NormalizedSvd {
             .map(|(&r, &y)| Scaled::new(r - y))
             .collect();
         let projected: Vec<f64> = self
-            .projection_coordinates(&residual)
+            .projection_coordinates(&residual)?
             .into_iter()
             .map(Scaled::value)
             .collect::<finstack_quant_core::Result<_>>()?;
-        if norm(&projected) > ACCEPTANCE_TOLERANCE * (norm(&values[0]) + norm(&values[1])) {
+        if norm(&projected)? > ACCEPTANCE_TOLERANCE * (norm(&values[0])? + norm(&values[1])?) {
             return Err(calculation(
                 "final OLS coefficients fail projection optimality",
             ));
@@ -588,14 +596,14 @@ pub(crate) fn normalized_svd_fit(
     for j in 0..targets.ncols() {
         let column = targets.column(j);
         let target: Vec<Scaled> = column.iter().copied().map(Scaled::new).collect();
-        let coordinates = model.refined_coordinates(&target);
+        let coordinates = model.refined_coordinates(&target)?;
         let (solution, underflowed) = model.coefficients(&coordinates)?;
         let solution = if underflowed {
             model.refine_rounded_coefficients(&target, solution, None)?
         } else {
             solution
         };
-        let actual_fitted = model.fitted(&solution);
+        let actual_fitted = model.fitted(&solution)?;
         model.check_underflow(
             underflowed,
             column.as_slice(),
@@ -621,7 +629,11 @@ pub(crate) fn normalized_svd_fit(
     })
 }
 
-fn equality(weights: &[f64], target: &[Scaled], fitted: &[Scaled]) -> (bool, Scaled) {
+fn equality(
+    weights: &[f64],
+    target: &[Scaled],
+    fitted: &[Scaled],
+) -> finstack_quant_core::Result<(bool, Scaled)> {
     let realized: Vec<Scaled> = weights
         .iter()
         .zip(target)
@@ -633,19 +645,19 @@ fn equality(weights: &[f64], target: &[Scaled], fitted: &[Scaled]) -> (bool, Sca
         .map(|(&w, &y)| Scaled::new(w).mul(y))
         .collect();
     let common = common_values(&[&realized, &predicted]);
-    let mismatch = neumaier_sum(common[0].iter().zip(&common[1]).map(|(&r, &y)| r - y));
+    let mismatch = neumaier_sum(common[0].iter().zip(&common[1]).map(|(&r, &y)| r - y))?;
     let gross = neumaier_sum(
         common[0]
             .iter()
             .zip(&common[1])
             .map(|(&r, &y)| r.abs() + y.abs()),
-    );
+    )?;
     let delta = scaled_sum(
         realized
             .into_iter()
             .chain(predicted.into_iter().map(Scaled::neg)),
-    );
-    (mismatch.abs() <= ACCEPTANCE_TOLERANCE * gross, delta)
+    )?;
+    Ok((mismatch.abs() <= ACCEPTANCE_TOLERANCE * gross, delta))
 }
 
 /// Fit unweighted residual least squares subject to `weights' X f = weights' returns`.
@@ -700,23 +712,26 @@ pub fn constrained_least_squares(
     ensure_finite(weights)?;
     let model = NormalizedSvd::new(DMatrix::from_row_slice(n, n_factors, exposures))?;
     let target: Vec<Scaled> = returns.iter().copied().map(Scaled::new).collect();
-    let coordinates = model.refined_coordinates(&target);
-    let y0 = model.projected_values(&coordinates);
+    let coordinates = model.refined_coordinates(&target)?;
+    let y0 = model.projected_values(&coordinates)?;
     model.check_ols(&target, &y0)?;
-    let (satisfied, delta) = equality(weights, &target, &y0);
+    let (satisfied, delta) = equality(weights, &target, &y0)?;
     let holdings: Vec<Scaled> = weights.iter().copied().map(Scaled::new).collect();
-    let direction = model.resolved_projection_coordinates(&holdings);
+    let direction = model.resolved_projection_coordinates(&holdings)?;
     let normalized = common_values(&[&direction]);
-    let direction_norm = norm(&normalized[0]);
+    let direction_norm = norm(&normalized[0])?;
     let mut corrected = coordinates.clone();
     let mut active_constraint: Option<(Vec<f64>, Scaled)> = None;
     if !satisfied {
         // Exact compensated X'w detects a genuinely orthogonal holdings
         // vector without turning a merely small projection into infeasibility.
-        let orthogonal = model
-            .original_design
-            .column_iter()
-            .all(|column| scaled_dot(column.as_slice(), &holdings).significand.abs() <= 0.0);
+        let mut orthogonal = true;
+        for column in model.original_design.column_iter() {
+            if scaled_dot(column.as_slice(), &holdings)?.significand.abs() > 0.0 {
+                orthogonal = false;
+                break;
+            }
+        }
         if orthogonal {
             return Err(InputError::ConstraintUnreachable { denominator: 0.0 }.into());
         }
@@ -736,7 +751,7 @@ pub fn constrained_least_squares(
             .iter()
             .zip(&unit)
             .map(|(&a, &u)| scaled_sum([a, Scaled::new(u).mul(magnitude)]))
-            .collect();
+            .collect::<finstack_quant_core::Result<_>>()?;
         active_constraint = Some((unit, h_norm));
     }
     let (coefficients, underflowed) = model.coefficients(&corrected)?;
@@ -752,10 +767,10 @@ pub fn constrained_least_squares(
     } else {
         coefficients
     };
-    let fitted = model.fitted(&coefficients);
+    let fitted = model.fitted(&coefficients)?;
     let active_weights = active_constraint.as_ref().map(|_| weights);
     model.check_underflow(underflowed, returns, &coefficients, &fitted, active_weights)?;
-    if !equality(weights, &target, &fitted).0 {
+    if !equality(weights, &target, &fitted)?.0 {
         return Err(calculation(
             "final coefficients fail weighted-gross equality",
         ));
@@ -768,19 +783,19 @@ pub fn constrained_least_squares(
         .collect();
     let check = if let Some((unit, _)) = active_constraint {
         let change_scaled: Vec<Scaled> = change.iter().copied().map(Scaled::new).collect();
-        let coordinates = model.projection_coordinates(&change_scaled);
+        let coordinates = model.projection_coordinates(&change_scaled)?;
         let coordinates: Vec<f64> = coordinates
             .into_iter()
             .map(Scaled::value)
             .collect::<finstack_quant_core::Result<_>>()?;
-        let along = neumaier_sum(unit.iter().zip(&coordinates).map(|(&a, &b)| a * b));
+        let along = neumaier_sum(unit.iter().zip(&coordinates).map(|(&a, &b)| a * b))?;
         let projected: Vec<f64> = model
             .projected_values(
                 &unit
                     .iter()
                     .map(|&u| Scaled::new(u * along))
                     .collect::<Vec<_>>(),
-            )
+            )?
             .into_iter()
             .map(Scaled::value)
             .collect::<finstack_quant_core::Result<_>>()?;
@@ -790,12 +805,12 @@ pub fn constrained_least_squares(
                 .zip(&projected)
                 .map(|(&v, &p)| v - p)
                 .collect::<Vec<_>>(),
-        )
+        )?
     } else {
         model.check_ols(&target, &fitted)?;
-        norm(&change)
+        norm(&change)?
     };
-    let bound = ACCEPTANCE_TOLERANCE * (norm(&common[0]) + norm(&common[1]) + norm(&common[2]));
+    let bound = ACCEPTANCE_TOLERANCE * (norm(&common[0])? + norm(&common[1])? + norm(&common[2])?);
     if check > bound {
         return Err(calculation(
             "final constrained coefficients fail projection optimality",
@@ -945,6 +960,7 @@ mod tests {
     #[test]
     fn lower_exponent_terms_survive_large_cancellation() {
         let value = super::scaled_sum([1e308, -1e308, 1e-320].into_iter().map(super::Scaled::new))
+            .unwrap()
             .value()
             .unwrap();
         assert_eq!(value, 1e-320);

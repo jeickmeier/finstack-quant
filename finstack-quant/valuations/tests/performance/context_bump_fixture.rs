@@ -4,7 +4,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
@@ -66,6 +68,8 @@ pub fn market(unrelated_curves: usize) -> MarketContext {
             .base_date(as_of())
             .knots(knots.clone())
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid CCM curve")
     };
@@ -79,14 +83,18 @@ pub fn market(unrelated_curves: usize) -> MarketContext {
             &[0.25, 1.0, 2.0],
             &[80.0, 100.0, 120.0],
             &[0.20; 9],
-            Default::default(),
+            VolGridOpts {
+                secondary_axis: VolSurfaceAxis::Strike,
+                quote_type: VolQuoteType::BlackLognormal,
+                interpolation_mode: VolInterpolationMode::Vol,
+            },
             None,
         )
         .expect("valid CCM volatility surface"),
     );
     market.insert_price_mut(
         "SPX-SPOT",
-        MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid spot")),
+        MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid spot")),
     );
     market.insert_price_mut(
         "CCM-DIV",

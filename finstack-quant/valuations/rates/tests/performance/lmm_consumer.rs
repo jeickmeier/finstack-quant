@@ -84,6 +84,7 @@ fn fixture(two_exercises: bool, seed: u64) -> Fixture {
         .day_count(DayCount::Act365F)
         .knots([0.0_f64, 1.0, 3.0, 7.0, 12.0].map(|t| (t, (-0.03 * t).exp())))
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("single-curve market");
     let market = MarketContext::new().insert(curve);
@@ -356,26 +357,44 @@ fn check_case(two_exercises: bool, seed: u64) -> Value {
         }
         let before = f.swap.discount_factor_terminal * (0.5 * before[0] + 0.5 * before[1]);
         let now = f.swap.discount_factor_terminal * (0.5 * now[0] + 0.5 * now[1]);
-        reference_stats.update(before);
-        current_stats.update(now);
-        differences.update(now - before);
+        reference_stats.update(before).expect("finite before");
+        current_stats.update(now).expect("finite now");
+        differences.update(now - before).expect("finite diff");
     }
-    assert!(differences.mean().abs() / NOTIONAL <= MEAN_PV_PER_NOTIONAL);
-    assert!(differences.stderr() / NOTIONAL <= STDERR_PV_PER_NOTIONAL);
-    assert!(
-        (differences.mean().abs() + 4.0 * differences.stderr()) / NOTIONAL
-            <= PAIRED_ENVELOPE_PER_NOTIONAL
-    );
-    if reference_stats.stderr() > 0.0 {
-        assert!(differences.mean().abs() <= 0.01 * reference_stats.stderr());
+    let diff_mean = differences
+        .get_mean()
+        .expect("finite diff mean")
+        .expect("non-empty diffs");
+    let diff_stderr = differences
+        .get_stderr()
+        .expect("finite diff stderr")
+        .expect("at least 2 diffs");
+    let ref_mean = reference_stats
+        .get_mean()
+        .expect("finite ref mean")
+        .expect("non-empty ref");
+    let cur_mean = current_stats
+        .get_mean()
+        .expect("finite cur mean")
+        .expect("non-empty cur");
+    let ref_stderr = reference_stats
+        .get_stderr()
+        .expect("finite ref stderr")
+        .expect("at least 2 ref");
+    let cur_stderr = current_stats
+        .get_stderr()
+        .expect("finite cur stderr")
+        .expect("at least 2 cur");
+    assert!(diff_mean.abs() / NOTIONAL <= MEAN_PV_PER_NOTIONAL);
+    assert!(diff_stderr / NOTIONAL <= STDERR_PV_PER_NOTIONAL);
+    assert!((diff_mean.abs() + 4.0 * diff_stderr) / NOTIONAL <= PAIRED_ENVELOPE_PER_NOTIONAL);
+    if ref_stderr > 0.0 {
+        assert!(diff_mean.abs() <= 0.01 * ref_stderr);
     } else {
-        assert_eq!(differences.mean(), 0.0);
-        assert_eq!(differences.stderr(), 0.0);
+        assert_eq!(diff_mean, 0.0);
+        assert_eq!(diff_stderr, 0.0);
         assert_eq!(maximum_path_difference, 0.0);
-        assert_eq!(
-            current_stats.mean().to_bits(),
-            reference_stats.mean().to_bits()
-        );
+        assert_eq!(cur_mean.to_bits(), ref_mean.to_bits());
     }
     let mut ratio_error = 0.0_f64;
     if !two_exercises {
@@ -393,8 +412,8 @@ fn check_case(two_exercises: bool, seed: u64) -> Value {
     assert_eq!(engine.ci_95.1.currency(), Currency::USD);
     assert_eq!(engine.num_paths, 2_048);
     assert_eq!(engine.num_simulated_paths, 4_096);
-    assert!((engine.mean.amount() - current_stats.mean()).abs() / NOTIONAL <= MEAN_PV_PER_NOTIONAL);
-    assert!((engine.stderr - current_stats.stderr()).abs() / NOTIONAL <= STDERR_PV_PER_NOTIONAL);
+    assert!((engine.mean.amount() - cur_mean).abs() / NOTIONAL <= MEAN_PV_PER_NOTIONAL);
+    assert!((engine.stderr - cur_stderr).abs() / NOTIONAL <= STDERR_PV_PER_NOTIONAL);
     let public = BermudanSwaptionLmmPricer::with_config(f.config)
         .price_dyn(&f.option, &f.market, f.as_of)
         .expect("complete public consumer");
@@ -423,11 +442,11 @@ fn check_case(two_exercises: bool, seed: u64) -> Value {
         "rms_path_error":paths.path_rms_error,
         "worst_path_step_forward":paths.worst,
         "max_path_pv_difference":maximum_path_difference,
-        "paired_mean_difference":differences.mean(),
-        "paired_stderr_difference":differences.stderr(),
+        "paired_mean_difference":diff_mean,
+        "paired_stderr_difference":diff_stderr,
         "independent_numeraire_max_pv_error":ratio_error,
-        "reference_mean":reference_stats.mean(),
-        "reference_stderr":reference_stats.stderr(),
+        "reference_mean":ref_mean,
+        "reference_stderr":ref_stderr,
         "engine":engine,
         "public_value_bits":public.value.amount().to_bits(),
     })

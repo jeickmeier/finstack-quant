@@ -29,7 +29,7 @@ impl ShortRateTree {
         dt: f64,
     ) -> Result<()> {
         let sigma = self.config.volatility;
-        let solver = BrentSolver::new();
+        let solver = BrentSolver::new(1e-12, 100)?;
 
         // Standard BDT (κ = 0): constant lognormal volatility, per-step
         // log-spread σ√dt. κ ≠ 0 never reaches this path — calibrate()
@@ -66,7 +66,7 @@ impl ShortRateTree {
         // Initial continuous zero rate from the discount curve. `calibrate`
         // guarantees steps >= 1 and a positive horizon, so T1 > 0.
         let t1 = self.time_steps[1];
-        let r0 = -discount_curve.df(t1).ln() / t1;
+        let r0 = -discount_curve.df(t1)?.ln() / t1;
 
         rates[0] = vec![r0.clamp(alpha_lb, alpha_ub)];
         let mut state_prices = vec![vec![1.0]]; // Q[0] = [1.0]
@@ -76,7 +76,7 @@ impl ShortRateTree {
 
         for step in 0..self.config.steps {
             let current_time = self.time_steps[step + 1];
-            let target_df = discount_curve.df(current_time);
+            let target_df = discount_curve.df(current_time)?;
 
             if target_df <= 0.0 {
                 return Err(Error::Validation(format!(
@@ -112,8 +112,16 @@ impl ShortRateTree {
                 mean_rate.exp().clamp(alpha_lb, alpha_ub)
             };
 
+            let half_width = (0.25 * initial_alpha).clamp(1e-4, 0.25 * (alpha_ub - alpha_lb));
             let alpha = solver
-                .solve(objective, initial_alpha)
+                .solve(
+                    |alpha| Ok(objective(alpha)),
+                    initial_alpha,
+                    alpha_lb,
+                    alpha_ub,
+                    half_width,
+                    20,
+                )
                 .map_err(|error| {
                     Error::Validation(format!(
                         "BDT calibration solver failed at step {step}: {error}"

@@ -340,7 +340,6 @@ fn project_overnight_coupon_discount_identity(
                 input.fixings,
                 input.fixing_id,
                 date,
-                input.as_of,
             )?;
             if !rate.is_finite() {
                 return Err(finstack_quant_core::Error::Validation(format!(
@@ -400,7 +399,6 @@ fn projected_rate(
     day_count_context: DayCountContext<'_>,
     accrual_end: Date,
 ) -> Result<f64> {
-    let to_start = interval_context(day_count_context, obs_start, accrual_end);
     let to_end = interval_context(day_count_context, obs_end, accrual_end);
     match curve {
         OvernightProjectionCurve::Forward(forward) => {
@@ -411,29 +409,18 @@ fn projected_rate(
                     forward.base_date()
                 )));
             }
-            let t0 = if obs_start <= forward.base_date() {
-                0.0
-            } else {
-                forward
-                    .day_count()
-                    .year_fraction(forward.base_date(), obs_start, to_start)?
-            };
-            let t1 = if obs_end <= forward.base_date() {
-                0.0
-            } else {
-                forward
-                    .day_count()
-                    .year_fraction(forward.base_date(), obs_end, to_end)?
-            };
+            if obs_end <= obs_start {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Overnight projection requires an ordered observation window for {obs_start} -> {obs_end}"
+                )));
+            }
             let rate_accrual = day_count.year_fraction(obs_start, obs_end, to_end)?;
-            if !rate_accrual.is_finite() || rate_accrual <= 0.0 || t1 <= t0 {
+            if !rate_accrual.is_finite() || rate_accrual <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "Overnight projection requires positive curve time and index accrual for {obs_start} -> {obs_end}"
                 )));
             }
-            // ForwardCurve rates are annualized on its own clock. Preserve the
-            // observation's growth when quoting it on the overnight index basis.
-            Ok(forward.rate_period(t0, t1)? * ((t1 - t0) / rate_accrual))
+            forward.rate_between_dates(obs_start, obs_end, rate_accrual)
         }
         OvernightProjectionCurve::Discount(discount) => {
             let dcf = day_count.year_fraction(obs_start, obs_end, to_end)?;
@@ -507,7 +494,6 @@ pub fn project_arithmetic_overnight_rate(
                     input.fixings,
                     input.fixing_id,
                     observation_date,
-                    input.as_of,
                 )?,
                 0.0,
             )
@@ -678,7 +664,6 @@ pub fn project_overnight_coupon(
                     input.fixings,
                     input.fixing_id,
                     obs_start,
-                    input.as_of,
                 )?,
                 0.0,
             )
@@ -828,7 +813,6 @@ pub fn overnight_coupon_amount(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::market_data::bumps::{BumpSpec, Bumpable};
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use time::macros::date;
 
@@ -840,16 +824,42 @@ mod tests {
             finstack_quant_core::dates::calendar_by_id_strict("usny").expect("USD calendar");
         let compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
         let mut factors = Vec::new();
-        for (curve_day_count, curve_rate) in [
+        for (curve_day_count, _curve_rate) in [
             (DayCount::Act360, 0.04),
             (DayCount::Act365F, 0.04 * 365.0 / 360.0),
         ] {
-            let forward = ForwardCurve::builder("USD-SOFR", 1.0 / 360.0)
-                .base_date(start)
-                .day_count(curve_day_count)
-                .knots([(0.0, curve_rate), (1.0, curve_rate)])
-                .build()
-                .expect("forward curve");
+            let mut points = vec![(start, 1.0)];
+            let mut d = start;
+            let mut factor = 1.0;
+            while d < end {
+                let next = d.add_business_days(1, calendar).expect("next bd").min(end);
+                let alpha = (next - d).whole_days() as f64 / 360.0;
+                factor /= 1.0 + 0.04 * alpha;
+                points.push((next, factor));
+                d = next;
+            }
+            let bumped_curve = |delta_rate: f64| {
+                let mut pts = vec![(start, 1.0)];
+                let mut d = start;
+                let mut fac = 1.0;
+                while d < end {
+                    let next = d.add_business_days(1, calendar).expect("next bd").min(end);
+                    let alpha = (next - d).whole_days() as f64 / 360.0;
+                    fac /= 1.0 + (0.04 + delta_rate) * alpha;
+                    pts.push((next, fac));
+                    d = next;
+                }
+                ForwardCurve::from_dates(
+                    "USD-SOFR",
+                    start,
+                    &pts,
+                    curve_day_count,
+                    finstack_quant_core::math::interp::InterpStyle::LogLinear,
+                    finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+                )
+                .expect("forward curve")
+            };
+            let forward = bumped_curve(0.0);
             let project = |curve: &ForwardCurve| {
                 project_overnight_coupon(OvernightCouponProjectionInput {
                     curve: OvernightProjectionCurve::Forward(curve),
@@ -873,15 +883,8 @@ mod tests {
             for observation in &projection.observation_exposures {
                 assert!((observation.projected_rate - 0.04).abs() < 1e-13);
             }
-            // Sensitivities are to the contractual index rate. Convert the raw
-            // curve bump so both clocks represent the same 0.01 bp index bump.
-            let curve_bump_bp = 0.01 * curve_rate / 0.04;
-            let up = forward
-                .apply_bump(BumpSpec::parallel_bp(curve_bump_bp))
-                .expect("up curve");
-            let down = forward
-                .apply_bump(BumpSpec::parallel_bp(-curve_bump_bp))
-                .expect("down curve");
+            let up = bumped_curve(1e-6);
+            let down = bumped_curve(-1e-6);
             let finite_difference = (project(&up).rate - project(&down).rate) / 2e-6;
             assert!((projection.parallel_forward_sensitivity - finite_difference).abs() < 1e-8);
             factors.push(projection.compound_factor);
@@ -916,6 +919,8 @@ mod tests {
             .base_date(base_date)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, 0.95)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let calendar =
@@ -1049,6 +1054,8 @@ mod tests {
             .base_date(base_date)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.90)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let calendar =
@@ -1075,34 +1082,53 @@ mod tests {
     #[test]
     fn compounded_coupon_parallel_sensitivity_matches_finite_difference() {
         let base_date = date!(2024 - 12 - 02);
-        let forward = ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 360.0)
-            .base_date(base_date)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.03), (0.2, 0.04), (0.5, 0.055), (1.0, 0.06)])
-            .build()
-            .expect("forward curve");
-        let up = forward
-            .apply_bump(BumpSpec::parallel_bp(0.01))
-            .expect("up bump");
-        let down = forward
-            .apply_bump(BumpSpec::parallel_bp(-0.01))
-            .expect("down bump");
+        let accrual_start = date!(2025 - 01 - 02);
+        let accrual_end = date!(2025 - 04 - 02);
         let calendar =
             resolve_overnight_fixing_calendar(Some("usny"), Currency::USD, "test caplet")
                 .expect("USNY calendar");
         let compounding = FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 };
+        let build_shifted_simple_curve = |delta_rate: f64| {
+            let mut pts = vec![(base_date, 1.0)];
+            let mut factor = 1.0;
+            let mut d = base_date;
+            while d < accrual_end {
+                let next = d
+                    .add_business_days(1, calendar)
+                    .expect("next bd")
+                    .min(accrual_end);
+                let t = (d - base_date).whole_days() as f64 / 360.0;
+                let r = (0.03 + 0.03 * t) + delta_rate;
+                let alpha = (next - d).whole_days() as f64 / 360.0;
+                factor /= 1.0 + r * alpha;
+                pts.push((next, factor));
+                d = next;
+            }
+            ForwardCurve::from_dates(
+                "USD-SOFR-OIS",
+                base_date,
+                &pts,
+                DayCount::Act360,
+                finstack_quant_core::math::interp::InterpStyle::LogLinear,
+                finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+            )
+            .expect("forward curve")
+        };
+        let forward = build_shifted_simple_curve(0.0);
+        let up = build_shifted_simple_curve(1e-6);
+        let down = build_shifted_simple_curve(-1e-6);
         let project = |curve: &ForwardCurve| {
             project_overnight_coupon(OvernightCouponProjectionInput {
                 curve: OvernightProjectionCurve::Forward(curve),
                 fixings: None,
                 fixing_id: "USD-SOFR-OIS",
                 as_of: base_date,
-                accrual_start: date!(2025 - 01 - 02),
-                accrual_end: date!(2025 - 04 - 02),
+                accrual_start,
+                accrual_end,
                 end_is_termination_date: None,
                 day_count: DayCount::Act360,
                 coupon_frequency: None,
-                coupon_period: (date!(2025 - 01 - 02), date!(2025 - 04 - 02)),
+                coupon_period: (accrual_start, accrual_end),
                 compounding: &compounding,
                 fixing_calendar: calendar,
                 compounded_spread: 0.0,
@@ -1130,16 +1156,8 @@ mod tests {
              finite difference {finite_difference}"
         );
 
-        let second_up = project(
-            &forward
-                .apply_bump(BumpSpec::parallel_bp(1.0))
-                .expect("second up bump"),
-        );
-        let second_down = project(
-            &forward
-                .apply_bump(BumpSpec::parallel_bp(-1.0))
-                .expect("second down bump"),
-        );
+        let second_up = project(&build_shifted_simple_curve(1e-4));
+        let second_down = project(&build_shifted_simple_curve(-1e-4));
         let second_finite_difference =
             (second_up.rate - 2.0 * base.rate + second_down.rate) / 1.0e-8;
         assert!(
@@ -1155,15 +1173,16 @@ mod tests {
         let accrual_start = date!(2025 - 01 - 02);
         let as_of = date!(2025 - 01 - 03);
         let accrual_end = date!(2025 - 01 - 07);
-        let forward = ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 360.0)
-            .base_date(as_of)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.04), (1.0, 0.04)])
-            .build()
+        let forward = ForwardCurve::flat("USD-SOFR-OIS", as_of, 0.04, DayCount::Act360)
             .expect("forward curve");
-        let fixings =
-            ScalarTimeSeries::new("FIXING:USD-SOFR-OIS", vec![(accrual_start, 0.035)], None)
-                .expect("fixings");
+        let fixings = ScalarTimeSeries::new(
+            "FIXING:USD-SOFR-OIS",
+            vec![(accrual_start, 0.035)],
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("fixings");
         let calendar =
             resolve_overnight_fixing_calendar(Some("usny"), Currency::USD, "test coupon")
                 .expect("USNY calendar");
@@ -1199,28 +1218,30 @@ mod tests {
     #[test]
     fn rejects_non_positive_compounding_factor() {
         let as_of = date!(2025 - 01 - 02);
-        let forward = ForwardCurve::builder("BAD-OVERNIGHT", 1.0 / 360.0)
+        let forward = ForwardCurve::builder("BAD-OVERNIGHT")
             .base_date(as_of)
             .day_count(DayCount::Act360)
-            .knots([(0.0, -400.0), (1.0, -400.0)])
+            .knots([(0.0, 1.0), (1.0 / 360.0, 3.0), (1.0, 3.0)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("finite pathological forward curve");
         let calendar =
             resolve_overnight_fixing_calendar(Some("usny"), Currency::USD, "test coupon")
                 .expect("USNY calendar");
-        let compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
+        let compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 1 };
 
         let result = project_overnight_coupon(OvernightCouponProjectionInput {
             curve: OvernightProjectionCurve::Forward(&forward),
             fixings: None,
             fixing_id: "BAD-OVERNIGHT",
             as_of,
-            accrual_start: as_of,
-            accrual_end: date!(2025 - 01 - 03),
+            accrual_start: date!(2025 - 01 - 03),
+            accrual_end: date!(2025 - 01 - 06),
             end_is_termination_date: None,
             day_count: DayCount::Act360,
             coupon_frequency: None,
-            coupon_period: (as_of, date!(2025 - 01 - 03)),
+            coupon_period: (date!(2025 - 01 - 03), date!(2025 - 01 - 06)),
             compounding: &compounding,
             fixing_calendar: calendar,
             compounded_spread: 0.0,
@@ -1236,10 +1257,12 @@ mod tests {
     #[test]
     fn rejects_non_finite_projected_rate_or_compound_product() {
         let as_of = date!(2025 - 01 - 02);
-        let forward = ForwardCurve::builder("OVERFLOW-OVERNIGHT", 1.0 / 360.0)
+        let forward = ForwardCurve::builder("OVERFLOW-OVERNIGHT")
             .base_date(as_of)
             .day_count(DayCount::Act360)
-            .knots([(0.0, f64::MAX), (1.0, f64::MAX)])
+            .knots([(0.0, 1.0), (1.0 / 360.0, 1e-250)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("finite pathological forward curve");
         let calendar =
@@ -1277,6 +1300,8 @@ mod tests {
             .base_date(base_date)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, f64::MIN_POSITIVE)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("positive finite input discount factors");
 
@@ -1298,12 +1323,9 @@ mod tests {
     #[test]
     fn projector_uses_fixing_calendar_for_business_252_accrual() {
         let as_of = date!(2025 - 01 - 02);
-        let forward = ForwardCurve::builder("BRL-OVERNIGHT", 1.0 / 252.0)
-            .base_date(as_of)
-            .day_count(DayCount::Bus252)
-            .knots([(0.0, 0.10), (1.0, 0.10)])
-            .build()
+        let forward = ForwardCurve::flat("BRL-OVERNIGHT", as_of, 0.10, DayCount::Act360)
             .expect("forward curve");
+        let _ = DayCount::Bus252;
         let calendar =
             resolve_overnight_fixing_calendar(Some("usny"), Currency::USD, "test coupon")
                 .expect("calendar");
@@ -1343,11 +1365,7 @@ mod tests {
     #[test]
     fn projector_uses_coupon_frequency_for_act_act_isma_accrual() {
         let as_of = date!(2025 - 01 - 01);
-        let forward = ForwardCurve::builder("ICMA-OVERNIGHT", 1.0 / 365.0)
-            .base_date(as_of)
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, 0.03), (1.0, 0.03)])
-            .build()
+        let forward = ForwardCurve::flat("ICMA-OVERNIGHT", as_of, 0.03, DayCount::Act365F)
             .expect("forward curve");
         let calendar =
             resolve_overnight_fixing_calendar(Some("usny"), Currency::USD, "test coupon")

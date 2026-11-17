@@ -70,7 +70,7 @@
 use crate::InputError;
 use crate::Result;
 use crate::market_data::bumps::{BumpSpec, Bumpable};
-use crate::math::interp::{ExtrapolationPolicy, Interp, InterpStyle, ValidationPolicy};
+use crate::math::interp::{ExtrapolationPolicy, Interp, InterpStyle};
 use crate::types::CurveId;
 
 /// Absolute detachment tolerance for bucket shocks.
@@ -254,7 +254,7 @@ impl BaseCorrelationCurve {
     /// * `detachment_pct` - Tranche detachment in percent of portfolio notional;
     ///   finite out-of-grid coordinates use the nearest boundary correlation.
     pub fn correlation(&self, detachment_pct: f64) -> f64 {
-        self.interp.interp(detachment_pct)
+        self.interp.interp(detachment_pct).unwrap_or(f64::NAN)
     }
 
     /// Raw detachment points (percent) used to build the curve.
@@ -505,8 +505,7 @@ impl BaseCorrelationCurveBuilder {
         let interp = InterpStyle::Linear.build_enum(
             kvec.clone().into_boxed_slice(),
             cvec.clone().into_boxed_slice(),
-            ExtrapolationPolicy::FlatZero,
-            ValidationPolicy::AllowNegative,
+            ExtrapolationPolicy::Flat,
         )?;
 
         let curve = BaseCorrelationCurve {

@@ -15,12 +15,10 @@ use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::diff::{
-    TenorSamplingMethod, measure_credit_curve_shift, measure_inflation_curve_shift,
-    measure_inflation_index_shift,
-};
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface};
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
@@ -581,7 +579,9 @@ fn inflation_attribution_uses_only_declared_market_dependencies() {
     let curve = |id: &str, end_cpi: f64| {
         InflationCurve::builder(id)
             .base_date(as_of_t0)
-            .base_cpi(100.0)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .knots([(0.0, 100.0), (10.0, end_cpi)])
             .build()
             .expect("inflation curve")
@@ -610,7 +610,7 @@ fn inflation_attribution_uses_only_declared_market_dependencies() {
         meta,
     );
 
-    let expected_shift = measure_inflation_curve_shift("US-CPI", &market_t0, &market_t1)
+    let expected_shift = measure_inflation_curve_shift_bp("US-CPI", &market_t0, &market_t1)
         .expect("US inflation shift");
     let attribution = attribute_pnl_metrics_based(
         &instrument,
@@ -627,7 +627,7 @@ fn inflation_attribution_uses_only_declared_market_dependencies() {
 }
 
 #[test]
-fn inflation_attribution_supports_index_only_sources() {
+fn inflation_attribution_rejects_index_only_substitute_for_inflation01() {
     use finstack_quant_core::market_data::scalars::InflationIndex;
 
     let as_of_t0 = date!(2025 - 12 - 15);
@@ -647,7 +647,27 @@ fn inflation_attribution_supports_index_only_sources() {
         if include_new_print {
             observations.push((date!(2026 - 01 - 01), 112.0));
         }
-        InflationIndex::new("US-CPI", observations, Currency::USD).expect("inflation index")
+        let knowledge_date = if include_new_print {
+            as_of_t1
+        } else {
+            as_of_t0
+        };
+        InflationIndex::new(
+            "US-CPI",
+            observations
+                .into_iter()
+                .map(|(reference_month, value)| {
+                    finstack_quant_core::market_data::scalars::InflationObservation {
+                        reference_month,
+                        value,
+                        available_on: knowledge_date,
+                    }
+                })
+                .collect(),
+            Currency::USD,
+            knowledge_date,
+        )
+        .expect("inflation index")
     };
     let market_t0 = MarketContext::new().insert_inflation_index(index(false));
     let market_t1 = MarketContext::new().insert_inflation_index(index(true));
@@ -669,8 +689,6 @@ fn inflation_attribution_supports_index_only_sources() {
         meta,
     );
 
-    let expected_shift =
-        measure_inflation_index_shift("US-CPI", &market_t0, &market_t1).expect("index shift");
     let attribution = attribute_pnl_metrics_based(
         &instrument,
         &market_t0,
@@ -680,10 +698,20 @@ fn inflation_attribution_supports_index_only_sources() {
         as_of_t0,
         as_of_t1,
     )
-    .expect("index-only inflation attribution");
+    .expect("index-only inflation attribution should record invalid diagnostic");
 
-    assert!((attribution.inflation_curves_pnl.amount() - 100.0 * expected_shift).abs() < 1e-9);
-    assert!(attribution.inflation_curves_pnl.amount() > 0.0);
+    assert!(attribution.result_invalid);
+    assert_eq!(attribution.inflation_curves_pnl.amount(), 0.0);
+    assert!(
+        attribution
+            .meta
+            .notes
+            .iter()
+            .any(|note| note.contains("US-CPI")
+                && note.contains("could not measure declared source")),
+        "expected diagnostic note explaining unmeasurable inflation curve: {:?}",
+        attribution.meta.notes
+    );
 }
 
 #[test]
@@ -745,24 +773,54 @@ fn keyrates_reject_unknown_and_duplicate_coordinates() {
 
 #[test]
 fn credit_nonstandard_buckets_all_contribute_to_public_attribution() {
+    use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::HazardCurve;
-    let date = date!(2025 - 01 - 15);
+    let base = date!(2025 - 01 - 15);
+    let p1 = date!(2026 - 01 - 15);
+    let p4 = date!(2029 - 01 - 15);
+    let p9 = date!(2034 - 01 - 15);
     let instrument: Arc<dyn Instrument> = Arc::new(CreditCurvesTestInstrument::new(
         "NONSTANDARD-CREDIT",
         Money::from((100_000_i64, Currency::USD)),
         &["HZ"],
     ));
-    let hazard = |spread| {
-        HazardCurve::builder("HZ")
-            .base_date(date)
-            .recovery_rate(0.4)
-            .knots([(1.0, 0.02), (4.0, 0.02), (9.0, 0.02)])
-            .par_spreads([(1.0, spread), (4.0, spread), (9.0, spread)])
-            .build()
-            .expect("hazard fixture")
-    };
-    let opening = MarketContext::new().insert(hazard(100.0));
-    let closing = MarketContext::new().insert(hazard(110.0));
+    let opening = MarketContext::new().insert(exact_credit_recipe_curve(
+        base,
+        &[
+            (p1, "CDS-1Y", 100.0),
+            (p4, "CDS-4Y", 100.0),
+            (p9, "CDS-9Y", 100.0),
+        ],
+    ));
+    let closing = MarketContext::new().insert(exact_credit_recipe_curve(
+        base,
+        &[
+            (p1, "CDS-1Y", 110.0),
+            (p4, "CDS-4Y", 110.0),
+            (p9, "CDS-9Y", 110.0),
+        ],
+    ));
+    // Verify exact intensity-diff / Hazard01 also works cleanly without fabricated par spreads
+    let intensity_only = HazardCurve::builder("HZ-DIRECT")
+        .base_date(base)
+        .day_count(DayCount::Act365F)
+        .recovery_rate(0.4)
+        .knots([(1.0, 0.02)])
+        .build()
+        .expect("hazard");
+    let intensity_bumped = intensity_only
+        .with_parallel_hazard_rate_bump_bp(10.0)
+        .expect("direct intensity bump");
+    assert!(
+        measure_credit_curve_shift_bp(
+            "HZ-DIRECT",
+            &MarketContext::new().insert(intensity_only),
+            &MarketContext::new().insert(intensity_bumped),
+        )
+        .is_err(),
+        "uncalibrated HazardCurve must not report fabricated par-spread shifts"
+    );
+
     let measures = IndexMap::from([
         (MetricId::custom("bucketed_cs01::HZ::1y"), -1.0),
         (MetricId::custom("bucketed_cs01::HZ::4y"), -40.0),
@@ -771,13 +829,13 @@ fn credit_nonstandard_buckets_all_contribute_to_public_attribution() {
     ]);
     let val_t0 = ValuationResult::stamped(
         instrument.id(),
-        date,
+        base,
         Money::from((100_000_i64, Currency::USD)),
     )
     .with_measures(measures);
     let val_t1 = ValuationResult::stamped(
         instrument.id(),
-        date,
+        base,
         Money::from((98_690_i64, Currency::USD)),
     );
     let result = attribute_pnl_metrics_based(
@@ -786,8 +844,8 @@ fn credit_nonstandard_buckets_all_contribute_to_public_attribution() {
         &closing,
         &val_t0,
         &val_t1,
-        date,
-        date,
+        base,
+        base,
     )
     .expect("all three supplied credit coordinates are measurable");
     assert!((result.credit_curves_pnl.amount() + 1_310.0).abs() < 1e-8);
@@ -799,12 +857,21 @@ fn exact_credit_recipe_curve(
     base: Date,
     quotes: &[(Date, &str, f64)],
 ) -> finstack_quant_core::market_data::term_structures::HazardCurve {
+    exact_credit_recipe_curve_for_id("HZ", base, 0.02, quotes)
+}
+
+fn exact_credit_recipe_curve_for_id(
+    curve_id: &str,
+    base: Date,
+    hazard_rate: f64,
+    quotes: &[(Date, &str, f64)],
+) -> finstack_quant_core::market_data::term_structures::HazardCurve {
     use finstack_quant_calibration::CalibrationMethod;
     use finstack_quant_calibration::api::schema::HazardCurveParams;
     use finstack_quant_calibration::quotes::{CdsQuote, Pillar, QuoteId};
     use finstack_quant_core::dates::DayCountContext;
     use finstack_quant_core::market_data::term_structures::{
-        HazardCalibrationInput, HazardCalibrationRecipe, HazardCurve, ParInterp, Seniority,
+        HazardCalibrationInput, HazardCalibrationRecipe, HazardCurve, Seniority,
     };
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
@@ -839,7 +906,7 @@ fn exact_credit_recipe_curve(
         })
         .collect();
     let params = HazardCurveParams {
-        curve_id: CurveId::new("HZ"),
+        curve_id: CurveId::new(curve_id),
         entity: "ENTITY".into(),
         seniority: Seniority::Senior,
         currency: Currency::USD,
@@ -848,8 +915,6 @@ fn exact_credit_recipe_curve(
         recovery_rate: 0.4,
         notional: 1.0,
         method: CalibrationMethod::Bootstrap,
-
-        par_interp: ParInterp::Linear,
         doc_clause: Some("isda_na".into()),
         cds_valuation_convention: None,
     };
@@ -861,11 +926,11 @@ fn exact_credit_recipe_curve(
             .expect("policy"),
     )
     .expect("complete replay contract");
-    HazardCurve::builder("HZ")
+    HazardCurve::builder(curve_id)
         .base_date(base)
         .day_count(day_count)
         .recovery_rate(0.4)
-        .knots(inputs.iter().map(|input| (input.pillar_time, 0.02)))
+        .knots(inputs.iter().map(|input| (input.pillar_time, hazard_rate)))
         .hazard_calibration(recipe)
         .build()
         .expect("recipe fixture")
@@ -1069,22 +1134,34 @@ fn test_vanna_alone_does_not_produce_spot_vol_cross_pnl() {
 
     let surface_t0 = VolSurface::builder("TEST-VOL")
         .expiries(&[1.0])
-        .strikes(&[100.0])
+        .secondary_values(&[100.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[0.20])
         .build()
         .expect("test vol surface should build");
     let surface_t1 = VolSurface::builder("TEST-VOL")
         .expiries(&[1.0])
-        .strikes(&[100.0])
+        .secondary_values(&[100.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[0.21])
         .build()
         .expect("test vol surface should build");
 
     let market_t0 = MarketContext::new()
-        .insert_price("TEST-SPOT", MarketScalar::Unitless(100.0))
+        .insert_price(
+            "TEST-SPOT",
+            MarketScalar::unitless(100.0).expect("valid scalar"),
+        )
         .insert_surface(surface_t0);
     let market_t1 = MarketContext::new()
-        .insert_price("TEST-SPOT", MarketScalar::Unitless(110.0))
+        .insert_price(
+            "TEST-SPOT",
+            MarketScalar::unitless(110.0).expect("valid scalar"),
+        )
         .insert_surface(surface_t1);
 
     // Only Vanna is present — NO CrossGammaSpotVol.
@@ -1174,18 +1251,18 @@ fn hw1f_cap_surface_shock_does_not_affect_explicit_parameter_pricing() {
         .base_date(as_of_t0)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (10.0, (-0.05_f64 * 10.0).exp())])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount");
-    let forward = ForwardCurve::builder("USD-LIBOR-3M", 0.25)
-        .base_date(as_of_t0)
-        .day_count(DayCount::Act365F)
-        .knots([(0.0, 0.05), (10.0, 0.05)])
-        .build()
-        .expect("forward");
+    let forward =
+        ForwardCurve::flat("USD-LIBOR-3M", as_of_t0, 0.05, DayCount::Act365F).expect("forward");
     let surface = VolSurface::builder("USD-CAP-VOL")
         .expiries(&[0.25, 1.0, 5.0, 10.0])
-        .strikes(&[0.05])
+        .secondary_values(&[0.05])
+        .secondary_axis(VolSurfaceAxis::Strike)
         .quote_type(VolQuoteType::Normal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[0.010])
         .row(&[0.010])
         .row(&[0.010])
@@ -1197,7 +1274,7 @@ fn hw1f_cap_surface_shock_does_not_affect_explicit_parameter_pricing() {
         .insert(forward)
         .insert_surface(surface);
     let market_t1 = market_t0
-        .bump([MarketBump::Curve {
+        .bump([MarketBump::VolSurface {
             id: CurveId::from("USD-CAP-VOL"),
             spec: BumpSpec {
                 mode: BumpMode::Multiplicative,
@@ -1264,22 +1341,34 @@ fn test_cross_gamma_spot_vol_uses_pct_spot_move() {
 
     let surface_t0 = VolSurface::builder("TEST-VOL")
         .expiries(&[1.0])
-        .strikes(&[100.0])
+        .secondary_values(&[100.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[0.20])
         .build()
         .expect("test vol surface should build");
     let surface_t1 = VolSurface::builder("TEST-VOL")
         .expiries(&[1.0])
-        .strikes(&[100.0])
+        .secondary_values(&[100.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[0.21])
         .build()
         .expect("test vol surface should build");
 
     let market_t0 = MarketContext::new()
-        .insert_price("TEST-SPOT", MarketScalar::Unitless(100.0))
+        .insert_price(
+            "TEST-SPOT",
+            MarketScalar::unitless(100.0).expect("valid scalar"),
+        )
         .insert_surface(surface_t0);
     let market_t1 = MarketContext::new()
-        .insert_price("TEST-SPOT", MarketScalar::Unitless(110.0))
+        .insert_price(
+            "TEST-SPOT",
+            MarketScalar::unitless(110.0).expect("valid scalar"),
+        )
         .insert_surface(surface_t1);
 
     // CrossGammaSpotVol is explicitly present (pct-spot × vol-point units).
@@ -1437,8 +1526,6 @@ impl Instrument for CreditVolTestInstrument {
 ///   CrossGammaCreditVol = 0.005 ($ per bp-credit per vol-pt)
 #[test]
 fn test_cross_gamma_credit_vol_pairs_bp_and_vol_points() {
-    use finstack_quant_core::market_data::term_structures::HazardCurve;
-
     let as_of_t0 = date!(2025 - 01 - 15);
     let as_of_t1 = date!(2025 - 01 - 16);
     let meta = finstack_quant_core::config::results_meta(&FinstackConfig::default());
@@ -1448,19 +1535,22 @@ fn test_cross_gamma_credit_vol_pairs_bp_and_vol_points() {
         Money::from((100_i64, Currency::USD)),
     ));
 
+    let pillar_5y = date!(2030 - 01 - 15);
     let hazard = |as_of: Date, h: f64| {
-        HazardCurve::builder("ACME-HAZ")
-            .base_date(as_of)
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .recovery_rate(0.4)
-            .knots([(0.0, h), (5.0, h)])
-            .build()
-            .expect("hazard curve should build")
+        exact_credit_recipe_curve_for_id(
+            "ACME-HAZ",
+            as_of,
+            h,
+            &[(pillar_5y, "ACME-5Y", h * 0.6 * 1e4)],
+        )
     };
     let surface = |vol: f64| {
         VolSurface::builder("TEST-VOL")
             .expiries(&[1.0])
-            .strikes(&[100.0])
+            .secondary_values(&[100.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[vol])
             .build()
             .expect("test vol surface should build")
@@ -1474,13 +1564,8 @@ fn test_cross_gamma_credit_vol_pairs_bp_and_vol_points() {
         .insert_surface(surface(0.21));
 
     // The same signed par-spread move the attribution preamble measures.
-    let credit_shift_bp = measure_credit_curve_shift(
-        "ACME-HAZ",
-        &market_t0,
-        &market_t1,
-        TenorSamplingMethod::Standard,
-    )
-    .expect("credit curve shift should be measurable");
+    let credit_shift_bp = measure_credit_curve_shift_bp("ACME-HAZ", &market_t0, &market_t1)
+        .expect("credit curve shift should be measurable");
     assert!(
         credit_shift_bp > 0.0,
         "hazard widening must produce a positive par-spread move"
@@ -1627,8 +1712,6 @@ impl Instrument for CreditCurvesTestInstrument {
 /// aggregate CS01 on a different subset of the declared credit curves.
 #[test]
 fn credit_rejects_unmeasurable_supplied_keyrate_curves() {
-    use finstack_quant_core::market_data::term_structures::HazardCurve;
-
     let as_of_t0 = date!(2025 - 01 - 15);
     let as_of_t1 = date!(2025 - 01 - 16);
     let meta = finstack_quant_core::config::results_meta(&FinstackConfig::default());
@@ -1639,14 +1722,14 @@ fn credit_rejects_unmeasurable_supplied_keyrate_curves() {
         &["MISSING-HAZ", "ACME-HAZ"],
     ));
 
+    let pillar_5y = date!(2030 - 01 - 15);
     let hazard = |as_of: Date, h: f64| {
-        HazardCurve::builder("ACME-HAZ")
-            .base_date(as_of)
-            .day_count(finstack_quant_core::dates::DayCount::Act365F)
-            .recovery_rate(0.4)
-            .knots([(0.0, h), (5.0, h)])
-            .build()
-            .expect("hazard curve should build")
+        exact_credit_recipe_curve_for_id(
+            "ACME-HAZ",
+            as_of,
+            h,
+            &[(pillar_5y, "ACME-5Y", h * 0.6 * 1e4)],
+        )
     };
     // MISSING-HAZ is deliberately absent from both markets: its per-tenor
     // shift is unmeasurable, so the key-rate loop skips it.
@@ -1782,11 +1865,23 @@ fn test_primary_spot_driver_matches_sensitivity_producer() {
     // FLAT-SPOT is declared FIRST and is measurable but unmoved (50 → 50);
     // REAL-SPOT is a different dependency (100 → 110).
     let market_t0 = MarketContext::new()
-        .insert_price("FLAT-SPOT", MarketScalar::Unitless(50.0))
-        .insert_price("REAL-SPOT", MarketScalar::Unitless(100.0));
+        .insert_price(
+            "FLAT-SPOT",
+            MarketScalar::unitless(50.0).expect("valid scalar"),
+        )
+        .insert_price(
+            "REAL-SPOT",
+            MarketScalar::unitless(100.0).expect("valid scalar"),
+        );
     let market_t1 = MarketContext::new()
-        .insert_price("FLAT-SPOT", MarketScalar::Unitless(50.0))
-        .insert_price("REAL-SPOT", MarketScalar::Unitless(110.0));
+        .insert_price(
+            "FLAT-SPOT",
+            MarketScalar::unitless(50.0).expect("valid scalar"),
+        )
+        .insert_price(
+            "REAL-SPOT",
+            MarketScalar::unitless(110.0).expect("valid scalar"),
+        );
 
     let mut measures_t0 = IndexMap::new();
     measures_t0.insert(MetricId::Delta, 1_000.0);
@@ -1827,24 +1922,26 @@ fn test_primary_spot_driver_matches_sensitivity_producer() {
 fn make_flat_curve(id: &str, base_date: Date, rate: f64) -> DiscountCurve {
     let mut knots = Vec::new();
     knots.push((0.0, 1.0));
-    for tenor in finstack_quant_core::market_data::diff::STANDARD_TENORS {
+    for tenor in DIAGNOSTIC_RATE_TENORS_YEARS {
         let discount = (-rate * tenor).exp();
-        knots.push((*tenor, discount));
+        knots.push((tenor, discount));
     }
 
     DiscountCurve::builder(id)
         .base_date(base_date)
         .knots(knots)
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("flat curve construction should succeed")
 }
 
 /// Build a discount curve whose zero rate at each standard tenor is taken
-/// from `rates_by_tenor` (parallel to `STANDARD_TENORS`).
+/// from `rates_by_tenor` (parallel to `DIAGNOSTIC_RATE_TENORS_YEARS`).
 fn make_curve_from_zero_rates(id: &str, base_date: Date, rates_by_tenor: &[f64]) -> DiscountCurve {
     let mut knots = vec![(0.0, 1.0)];
-    for (tenor, &rate) in finstack_quant_core::market_data::diff::STANDARD_TENORS
+    for (tenor, &rate) in DIAGNOSTIC_RATE_TENORS_YEARS
         .iter()
         .zip(rates_by_tenor.iter())
     {
@@ -1854,6 +1951,8 @@ fn make_curve_from_zero_rates(id: &str, base_date: Date, rates_by_tenor: &[f64])
         .base_date(base_date)
         .knots(knots)
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("per-tenor curve construction should succeed")
 }
@@ -2335,7 +2434,10 @@ fn aggregate_vega_rejects_twist_without_reference_point() {
     let surface = |front, back| {
         VolSurface::builder("TEST-VOL")
             .expiries(&[0.5, 5.0])
-            .strikes(&[90.0, 110.0])
+            .secondary_values(&[90.0, 110.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[front, front])
             .row(&[back, back])
             .build()
@@ -2345,7 +2447,10 @@ fn aggregate_vega_rejects_twist_without_reference_point() {
     // The new closing knot moves while all opening grid points stay flat.
     let closing_surface = VolSurface::builder("TEST-VOL")
         .expiries(&[0.5, 2.0, 5.0])
-        .strikes(&[90.0, 110.0])
+        .secondary_values(&[90.0, 110.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[0.2, 0.2])
         .row(&[0.3, 0.3])
         .row(&[0.2, 0.2])

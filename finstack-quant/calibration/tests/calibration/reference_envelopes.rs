@@ -134,13 +134,13 @@ fn example_01_usd_discount_builds_queryable_curve() {
     // Discount factor at the curve base date is 1.0 by construction; a
     // forward date should produce a strictly positive DF less than 1 as a
     // sanity check that the bootstrap actually populated knot points.
-    let df_today = curve.df(0.0);
+    let df_today = curve.df(0.0).expect("valid");
     assert!(
         (df_today - 1.0).abs() < 1e-9,
         "df at t=0 should be 1.0, got {df_today}"
     );
 
-    let df_one_year = curve.df(1.0);
+    let df_one_year = curve.df(1.0).expect("valid");
     assert!(
         df_one_year > 0.0 && df_one_year < 1.0,
         "df at t=1y should be in (0, 1), got {df_one_year}"
@@ -163,7 +163,7 @@ fn example_03_single_name_hazard_composes_on_initial_market() {
         .expect("hazard curve present after single-name CDS calibration");
 
     // Survival probability must be in (0, 1) for any positive horizon.
-    let survival_one_year = hazard.sp(1.0);
+    let survival_one_year = hazard.sp(1.0).expect("valid");
     assert!(
         survival_one_year > 0.0 && survival_one_year < 1.0,
         "sp(1y) should be in (0, 1), got {survival_one_year}"
@@ -258,7 +258,7 @@ fn example_02_usd_3m_forward_builds_queryable_curve() {
         .expect("forward curve present after forward step");
 
     // Forward rate at t=1y should be a sane positive rate.
-    let rate_one_year = forward.rate(1.0);
+    let rate_one_year = forward.instantaneous_forward(1.0).expect("forward rate");
     assert!(
         rate_one_year > 0.0 && rate_one_year < 0.20,
         "forward rate at t=1y should be in (0, 0.20), got {rate_one_year}"
@@ -278,7 +278,7 @@ fn example_04_cdx_ig_hazard_builds_queryable_curve() {
         .get_hazard("CDX-NA-IG-46")
         .expect("CDX hazard curve present after calibration");
 
-    let survival_5y = hazard.sp(5.0);
+    let survival_5y = hazard.sp(5.0).expect("valid");
     assert!(
         survival_5y > 0.0 && survival_5y < 1.0,
         "5y survival should be in (0, 1), got {survival_5y}"
@@ -375,8 +375,6 @@ fn example_07_swaption_vol_surface_builds_queryable_surface() {
 
 #[test]
 fn example_08_equity_vol_surface_builds_queryable_surface() {
-    use finstack_quant_core::market_data::scalars::MarketScalar;
-
     let envelope = load_envelope("08_equity_vol_surface.json");
     let market = execute(&envelope);
 
@@ -388,10 +386,11 @@ fn example_08_equity_vol_surface_builds_queryable_surface() {
     let scalar = market
         .get_price("AAPL")
         .expect("AAPL spot price present in source_market.prices");
-    let spot = match scalar {
-        MarketScalar::Price(m) => m.amount(),
-        MarketScalar::Unitless(v) => *v,
-    };
+    let spot = scalar
+        .get_price()
+        .map(|m| m.amount())
+        .or_else(|| scalar.get_unitless())
+        .expect("numeric scalar");
     assert!(spot > 0.0, "AAPL spot should be positive, got {spot}");
 
     // Equity vol surface produced by the calibration step. The vol_surface
@@ -461,8 +460,6 @@ fn example_08_equity_vol_surface_reports_fitted_sabr_slices() {
 
 #[test]
 fn example_10_bond_prices_supports_lookup() {
-    use finstack_quant_core::market_data::scalars::MarketScalar;
-
     let envelope = load_envelope("10_bond_prices.json");
     let market = execute(&envelope);
 
@@ -470,18 +467,20 @@ fn example_10_bond_prices_supports_lookup() {
     let scalar1 = market
         .get_price("US-TREASURY-10Y-2026-05-08")
         .expect("US 10Y treasury price present in source_market.prices");
-    let p1 = match scalar1 {
-        MarketScalar::Price(m) => m.amount(),
-        MarketScalar::Unitless(v) => *v,
-    };
+    let p1 = scalar1
+        .get_price()
+        .map(|m| m.amount())
+        .or_else(|| scalar1.get_unitless())
+        .expect("numeric scalar");
 
     let scalar2 = market
         .get_price("IBM-7YR-2033")
         .expect("IBM corporate bond price present");
-    let p2 = match scalar2 {
-        MarketScalar::Price(m) => m.amount(),
-        MarketScalar::Unitless(v) => *v,
-    };
+    let p2 = scalar2
+        .get_price()
+        .map(|m| m.amount())
+        .or_else(|| scalar2.get_unitless())
+        .expect("numeric scalar");
 
     assert!(p1 > 0.0, "treasury price should be positive, got {p1}");
     assert!(p2 > 0.0, "IBM bond price should be positive, got {p2}");
@@ -489,25 +488,25 @@ fn example_10_bond_prices_supports_lookup() {
 
 #[test]
 fn example_11_equity_spots_and_dividends_support_lookup() {
-    use finstack_quant_core::market_data::scalars::MarketScalar;
-
     let envelope = load_envelope("11_equity_spots_dividends.json");
     let market = execute(&envelope);
 
     let scalar_aapl = market
         .get_price("AAPL")
         .expect("AAPL spot present in source_market.prices");
-    let aapl_spot = match scalar_aapl {
-        MarketScalar::Price(m) => m.amount(),
-        MarketScalar::Unitless(v) => *v,
-    };
+    let aapl_spot = scalar_aapl
+        .get_price()
+        .map(|m| m.amount())
+        .or_else(|| scalar_aapl.get_unitless())
+        .expect("numeric scalar");
     assert!(aapl_spot > 0.0, "AAPL spot should be positive");
 
     let scalar_msft = market.get_price("MSFT").expect("MSFT spot present");
-    let msft_spot = match scalar_msft {
-        MarketScalar::Price(m) => m.amount(),
-        MarketScalar::Unitless(v) => *v,
-    };
+    let msft_spot = scalar_msft
+        .get_price()
+        .map(|m| m.amount())
+        .or_else(|| scalar_msft.get_unitless())
+        .expect("numeric scalar");
     assert!(msft_spot > 0.0, "MSFT spot should be positive");
 
     // Dividend schedule for AAPL must be retrievable by schedule ID.
@@ -548,7 +547,7 @@ fn example_12_full_credit_desk_market_chains_steps() {
     // plan.description for the rationale). Realistic IG hazards would give
     // SP(5y) ≈ 0.92 — the narrow band below locks the synthetic value so
     // that any unit-class regression in step 2 of the chain is caught here.
-    let sp_5y = hazard.sp(5.0);
+    let sp_5y = hazard.sp(5.0).expect("valid");
     assert!(
         (0.999..1.0).contains(&sp_5y),
         "5y SP should reflect synthetic sub-1bp spreads (~0.9997), got {sp_5y}"

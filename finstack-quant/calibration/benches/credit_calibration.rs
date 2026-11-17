@@ -57,7 +57,6 @@ fn prior_curve(curve: CurveState) -> PriorMarketObject {
         CurveState::Inflation(c) => PriorMarketObject::InflationCurve(c),
         CurveState::BaseCorrelation(c) => PriorMarketObject::BaseCorrelationCurve(c),
         CurveState::Price(c) => PriorMarketObject::PriceCurve(c),
-        CurveState::BasisSpread(c) => PriorMarketObject::BasisSpreadCurve(c),
         CurveState::Parametric(c) => PriorMarketObject::ParametricCurve(c),
     }
 }
@@ -439,6 +438,9 @@ fn bench_credit_vol(c: &mut Criterion) {
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("CREDIT-FLAT")
             .base_date(base)
             .knots([(0.0, 1.0), (10.0, 1.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("flat discount");
     json["prior_market"] =

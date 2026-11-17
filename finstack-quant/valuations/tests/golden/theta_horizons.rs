@@ -36,16 +36,6 @@ const HORIZONS: [(&str, &str); 3] = [
 const EXPECTED_FAILURES: &[(&str, &[&str], &str)] = &[
     // Market-held observations the rolled repricing does not yet receive.
     (
-        "registry/inflation_linked_bond",
-        &["6M"],
-        "the registry market deliberately has no CPI observations; the 6M roll crosses publication dates and theta does not synthesize published CPI history",
-    ),
-    (
-        "golden/regression_goldens/inflation_linked_bond/inflation_linked_bond_5y",
-        &["1D", "1M", "6M"],
-        "theta does not synthesize monthly CPI publications; the rolled linker requires observations beyond the fixture's published history",
-    ),
-    (
         "golden/bloomberg/cap_floor/usd_cap_5y_atm_black",
         &["1M", "6M"],
         CAP_FIXINGS,
@@ -99,8 +89,19 @@ const EXPECTED_FAILURES: &[(&str, &[&str], &str)] = &[
         &["6M"],
         "a scheduled draw/repay event falls before the rolled simulation anchor",
     ),
+    (
+        "golden/bloomberg/bond/bhccn_10_2032_callable_bloomberg",
+        &["1D"],
+        CURVE_DATED_AFTER_AS_OF,
+    ),
+    (
+        "golden/bloomberg/bond/ibm_eur_2034_callable_bloomberg",
+        &["1D"],
+        CURVE_DATED_AFTER_AS_OF,
+    ),
 ];
 
+const CURVE_DATED_AFTER_AS_OF: &str = "the Bloomberg screen curves are dated after the bond's valuation date, so the 1D roll date precedes their base date and the curves cannot be conditioned onto it";
 const CAP_FIXINGS: &str = "the CapFloor theta calculator reprices without the caplet fixings the horizon crosses; its schedule records no projected fixings";
 const SC_FIXINGS: &str = "the structured-credit schedule records no projected fixings, so the SOFR-3M resets the roll crosses are not materialized";
 const PRICE_SERIES: &str = "observed price series are not extended over the roll and variance swaps have no theta_observed_state";

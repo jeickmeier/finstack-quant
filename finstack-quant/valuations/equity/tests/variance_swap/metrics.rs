@@ -499,7 +499,7 @@ fn test_dv01_matches_bump_and_reprice() {
 
     let base_pv = swap.value(&ctx, as_of).unwrap().amount();
     let bumped_ctx = ctx
-        .bump([MarketBump::Curve {
+        .bump([MarketBump::DiscountCurve {
             id: swap.discount_curve_id.clone(),
             spec: BumpSpec::parallel_bp(1.0),
         }])

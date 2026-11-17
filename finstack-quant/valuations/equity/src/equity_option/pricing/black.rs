@@ -107,17 +107,15 @@ pub(crate) fn compute_greeks(
                     1.0
                 } else {
                     let q = if let Some(dividend_yield_id) = &inst.div_yield_id {
-                        match curves.get_price(dividend_yield_id.as_str())? {
-                            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(
-                                value,
-                            ) => *value,
-                            finstack_quant_core::market_data::scalars::MarketScalar::Price(_) => {
-                                return Err(finstack_quant_core::Error::Validation(format!(
+                        curves
+                            .get_price(dividend_yield_id.as_str())?
+                            .get_unitless()
+                            .ok_or_else(|| {
+                                finstack_quant_core::Error::Validation(format!(
                                     "Dividend yield '{}' must be unitless",
                                     dividend_yield_id
-                                )));
-                            }
-                        }
+                                ))
+                            })?
                     } else {
                         0.0
                     };

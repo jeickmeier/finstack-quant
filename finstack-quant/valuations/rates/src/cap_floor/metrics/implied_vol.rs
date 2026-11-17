@@ -125,18 +125,14 @@ impl MetricCalculator for ImpliedVolCalculator {
 
         let objective = |sigma: f64| {
             price_caplet_quote(base_inputs, ResolvedVolatility { sigma, ..quote })
-                .map_or(f64::NAN, |price| {
-                    (price.amount() - market_price) / option.notional.amount()
-                })
+                .map(|price| (price.amount() - market_price) / option.notional.amount())
         };
-        let solver = BrentSolver::new()
-            .with_tolerance(1e-12)
-            .with_max_iterations(100);
+        let solver = BrentSolver::new(1e-12, 100)?;
         let upper = match quote.convention {
             VolatilityConvention::Normal => 1.0,
             _ => 5.0,
         };
-        let implied_vol = solver.solve_in_bracket(|x| Ok(objective(x)), 0.0, upper)?;
+        let implied_vol = solver.solve_in_bracket(objective, 0.0, upper)?;
 
         // Sanity check result
         if implied_vol >= 0.0 && implied_vol <= upper {

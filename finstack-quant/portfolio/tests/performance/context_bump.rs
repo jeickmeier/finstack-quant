@@ -101,8 +101,14 @@ fn series_record() -> Value {
         })
         .collect();
     market.insert_series_mut(
-        ScalarTimeSeries::new("SPX-CLOSE", observations.clone(), Some(Currency::USD))
-            .expect("realized closes"),
+        ScalarTimeSeries::new(
+            "SPX-CLOSE",
+            observations.clone(),
+            Some(Currency::USD),
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("realized closes"),
     );
     assert!(market.get_price("SPX-CLOSE").is_err());
     assert!(market.curve("SPX-CLOSE").is_none());
@@ -135,7 +141,7 @@ fn series_record() -> Value {
     let mut endpoints = Vec::new();
     for multiplier in [1.01, 0.99] {
         let endpoint = market
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::Series {
                 id: CurveId::new("SPX-CLOSE"),
                 spec: BumpSpec::multiplier(multiplier),
             }])

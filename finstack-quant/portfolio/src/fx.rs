@@ -270,6 +270,8 @@ mod tests {
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, df_1y)])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("test discount curve should build")
     }

@@ -128,10 +128,15 @@ def test_simm_detail_is_absent_for_schedule_im() -> None:
 def test_xva_rows_sum_to_each_reported_leg() -> None:
     base = dt.date(2025, 1, 1)
     discount = DiscountCurve(
-        "USD-OIS", base, [(0.5 * i, math.exp(-0.04 * 0.5 * i)) for i in range(9)], interp="log_linear"
+        "USD-OIS",
+        base,
+        [(0.5 * i, math.exp(-0.04 * 0.5 * i)) for i in range(9)],
+        interp="log_linear",
+        extrapolation="extend",
+        day_count="act_365f",
     )
-    counterparty = HazardCurve("CPTY", base, [(0.0, 0.02), (30.0, 0.02)], recovery_rate=0.40)
-    own = HazardCurve("OWN", base, [(0.0, 0.03), (30.0, 0.03)], recovery_rate=0.40)
+    counterparty = HazardCurve("CPTY", base, [(1.0, 0.02), (30.0, 0.02)], recovery_rate=0.40, day_count="act_365f")
+    own = HazardCurve("OWN", base, [(1.0, 0.03), (30.0, 0.03)], recovery_rate=0.40, day_count="act_365f")
     times = [0.5, 1.0, 2.0, 3.0]
     profile = ExposureProfile(times, [5e5, 4e5, 3e5, 2e5], [8e5, 7e5, 6e5, 5e5], [3e5, 3e5, 3e5, 3e5])
 

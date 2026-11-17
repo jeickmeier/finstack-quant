@@ -669,7 +669,10 @@
                 "2025-07-15"
               ],
               "end_is_termination_date": false,
-              "frequency": null
+              "frequency": {
+                "count": 6,
+                "unit": "months"
+              }
             },
             "day_count": "act_act_isma",
             "end": "2025-07-15",
@@ -695,7 +698,10 @@
                 "2026-01-15"
               ],
               "end_is_termination_date": true,
-              "frequency": null
+              "frequency": {
+                "count": 6,
+                "unit": "months"
+              }
             },
             "day_count": "act_act_isma",
             "end": "2026-01-15",

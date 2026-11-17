@@ -58,7 +58,7 @@ def _bond(bond_id: str = "B1") -> Bond:
 
 
 def _market() -> MarketContext:
-    return MarketContext().insert(DiscountCurve.flat("USD-OIS", AS_OF, 0.04))
+    return MarketContext().insert(DiscountCurve.flat("USD-OIS", AS_OF, 0.04, "act_365f"))
 
 
 def _portfolio() -> Portfolio:

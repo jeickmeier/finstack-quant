@@ -43,6 +43,9 @@ fn build_market(as_of: finstack_quant_core::dates::Date) -> MarketContext {
             (3.0, 0.91),
             (5.0, 0.83),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve should build");
     let source = MarketContext::new().insert(disc);
@@ -302,7 +305,7 @@ fn cross_credit_rates_recalibrates_after_discount_shock_and_converges() {
         finstack_quant_calibration::recalibration::CachedRecalibrationProvider::default();
     let corner = |rate: f64, spread: f64| {
         let rate_market = market
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::DiscountCurve {
                 id: "USD-OIS".into(),
                 spec: BumpSpec::parallel_bp(rate),
             }])
@@ -343,7 +346,7 @@ fn cross_credit_rates_recalibrates_after_discount_shock_and_converges() {
             .unwrap();
         let credit_market = market.clone().insert(credit.as_ref().clone());
         let rate_market = credit_market
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::DiscountCurve {
                 id: "USD-OIS".into(),
                 spec: BumpSpec::parallel_bp(rate),
             }])

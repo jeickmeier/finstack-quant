@@ -399,18 +399,7 @@ fn fixed_schedule_npv_equals_sum_cashflows() {
 
     // Flat DF=1.0: NPV equals strictly-future cash; issue funding is already settled.
     // Flat knots are not monotonically decreasing, so allow_non_monotonic is required.
-    let curve = CoreDiscCurve::builder("USD-OIS")
-        .base_date(issue)
-        .knots([(0.0, 1.0), (5.0, 1.0)])
-        .interp(InterpStyle::Linear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        )
-        .build()
-        .unwrap();
+    let curve = CoreDiscCurve::flat("USD-OIS", issue, 0.0, DayCount::Act365F).unwrap();
 
     let pv = finstack_quant_core::cashflow::npv(
         &curve,
@@ -1222,12 +1211,14 @@ fn npv_decreases_with_higher_discount_rate() {
     let build_curve = |rate: f64| {
         CoreDiscCurve::builder("USD-OIS")
             .base_date(issue)
+            .day_count(DayCount::Act365F)
             .knots([
                 (0.0, 1.0),
                 (0.5, (-rate * 0.5).exp()),
                 (1.0, (-rate * 1.0).exp()),
             ])
             .interp(InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap()
     };

@@ -76,17 +76,15 @@ pub(crate) fn resolve_lifecycle_value(
                 .collect::<Vec<_>>();
             let prepaid_forward = if future_dividends.is_empty() {
                 let q = if let Some(dividend_yield_id) = &inst.div_yield_id {
-                    match market.get_price(dividend_yield_id.as_str())? {
-                        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(
-                            value,
-                        ) => *value,
-                        finstack_quant_core::market_data::scalars::MarketScalar::Price(_) => {
-                            return Err(finstack_quant_core::Error::Validation(format!(
+                    market
+                        .get_price(dividend_yield_id.as_str())?
+                        .get_unitless()
+                        .ok_or_else(|| {
+                            finstack_quant_core::Error::Validation(format!(
                                 "Dividend yield '{}' must be unitless",
                                 dividend_yield_id
-                            )));
-                        }
-                    }
+                            ))
+                        })?
                 } else {
                     0.0
                 };
@@ -95,9 +93,9 @@ pub(crate) fn resolve_lifecycle_value(
                 let mut dividend_pv =
                     finstack_quant_core::math::summation::NeumaierAccumulator::new();
                 for (date, amount) in future_dividends {
-                    dividend_pv.add(*amount * discount_curve.df_between_dates(as_of, *date)?);
+                    dividend_pv.add(*amount * discount_curve.df_between_dates(as_of, *date)?)?;
                 }
-                spot - dividend_pv.total()
+                spot - dividend_pv.get_total()?
             };
             match inst.option_type {
                 OptionType::Call => prepaid_forward - inst.strike * settlement_df,

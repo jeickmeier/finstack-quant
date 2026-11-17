@@ -221,7 +221,9 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -241,11 +243,16 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let surface = VolSurface::builder("SPX-VOL")
             .expiries(&[0.25, 1.0, 2.0])
-            .strikes(&[80.0, 100.0, 120.0])
+            .secondary_values(&[80.0, 100.0, 120.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.2, 0.2, 0.2])
             .row(&[0.2, 0.2, 0.2])
             .row(&[0.2, 0.2, 0.2])
@@ -254,7 +261,10 @@ mod tests {
         MarketContext::new()
             .insert(curve)
             .insert_surface(surface)
-            .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0))
+            .insert_price(
+                "SPX-SPOT",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            )
     }
 
     fn option(expiry: Date) -> EquityOption {

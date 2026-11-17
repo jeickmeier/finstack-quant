@@ -108,6 +108,8 @@ def test_merton_mc_config_typed_calibration_drives_registry_pricer() -> None:
             as_of,
             [(0.0, 1.0), (1.0, 0.96), (2.0, 0.92), (5.0, 0.80), (10.0, 0.65)],
             day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
         )
     )
     base = MertonMcConfig(MertonModel(100.0, 0.25, 60.0, 0.04), 0.40)

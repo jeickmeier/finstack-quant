@@ -158,7 +158,9 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolGridOpts, VolInterpolationMode, VolSurface,
+    };
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use finstack_quant_valuations_core::instruments::Instrument;
@@ -166,8 +168,11 @@ mod tests {
     /// Helper to build a flat vol surface at a given level.
     fn flat_vol_surface(id: &str, vol: f64) -> VolSurface {
         VolSurface::builder(id)
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.25, 1.0, 2.0, 5.0])
-            .strikes(&[50.0, 100.0, 150.0])
+            .secondary_values(&[50.0, 100.0, 150.0])
             .row(&[vol, vol, vol])
             .row(&[vol, vol, vol])
             .row(&[vol, vol, vol])
@@ -203,6 +208,9 @@ mod tests {
         DiscountCurve::builder(id)
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, df_1y), (2.0, df_2y), (5.0, df_5y)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("flat discount curve")
     }
@@ -283,20 +291,31 @@ mod tests {
                     "black_lognormal",
                 ),
                 (
-                    base.clone()
-                        .with_displacements(&[10.0; 4])
-                        .expect("shifted surface"),
+                    VolSurface::from_grid(
+                        base.id(),
+                        base.expiries(),
+                        base.secondary_values(),
+                        base.vols(),
+                        VolGridOpts {
+                            secondary_axis: base.secondary_axis(),
+                            quote_type: VolQuoteType::ShiftedBlackLognormal,
+                            interpolation_mode: base.interpolation_mode(),
+                        },
+                        Some(&[10.0; 4]),
+                    )
+                    .expect("shifted surface"),
                     "black_lognormal",
                 ),
                 (
-                    finstack_quant_core::market_data::surfaces::VolSurface::from_grid(
+                    VolSurface::from_grid(
                         base.id(),
                         base.expiries(),
-                        base.strikes(),
+                        base.secondary_values(),
                         base.vols(),
-                        finstack_quant_core::market_data::surfaces::VolGridOpts {
+                        VolGridOpts {
                             secondary_axis: VolSurfaceAxis::Tenor,
-                            ..finstack_quant_core::market_data::surfaces::VolGridOpts::default()
+                            quote_type: base.quote_type(),
+                            interpolation_mode: base.interpolation_mode(),
                         },
                         None,
                     )

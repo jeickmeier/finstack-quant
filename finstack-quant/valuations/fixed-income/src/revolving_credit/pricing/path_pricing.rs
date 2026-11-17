@@ -107,7 +107,7 @@ impl RevolvingCreditPricer {
                 as_of,
                 finstack_quant_core::dates::DayCountContext::default(),
             )?;
-            hazard.sp(t)
+            hazard.sp(t)?
         } else {
             1.0
         };

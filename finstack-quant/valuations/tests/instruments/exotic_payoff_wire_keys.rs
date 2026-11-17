@@ -15,7 +15,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
@@ -193,18 +195,26 @@ fn lookback_market(as_of: Date) -> MarketContext {
                 .base_date(as_of)
                 .day_count(DayCount::Act365F)
                 .knots([(0.0, 1.0), (10.0, (-rate * 10.0).exp())])
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("discount curve"),
         )
         .insert_price(
             "SPX-SPOT",
-            MarketScalar::Price(Money::new(100.0, Currency::USD).expect("spot")),
+            MarketScalar::price(Money::new(100.0, Currency::USD).expect("spot")),
         )
-        .insert_price("SPX-DIV", MarketScalar::Unitless(0.0))
+        .insert_price(
+            "SPX-DIV",
+            MarketScalar::unitless(0.0).expect("valid scalar"),
+        )
         .insert_surface(
             VolSurface::builder("SPX-VOL")
+                .secondary_axis(VolSurfaceAxis::Strike)
+                .quote_type(VolQuoteType::BlackLognormal)
+                .interpolation_mode(VolInterpolationMode::Vol)
                 .expiries(&[0.5, 1.0, 2.0])
-                .strikes(&[80.0, 100.0, 120.0])
+                .secondary_values(&[80.0, 100.0, 120.0])
                 .row(&[vol, vol, vol])
                 .row(&[vol, vol, vol])
                 .row(&[vol, vol, vol])

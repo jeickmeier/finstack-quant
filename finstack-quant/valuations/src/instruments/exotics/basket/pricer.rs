@@ -77,12 +77,16 @@ fn constituent_price(
         }
         ConstituentReference::MarketData { price_id, .. } => {
             let scalar = context.get_price(price_id.as_ref())?;
-            match scalar {
-                finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => Ok(*money),
-                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => {
-                    // For unitless scalars, use the basket currency by default
-                    Ok(Money::new(*v, basket.reporting_currency)?)
-                }
+            if let Some(money) = scalar.get_price() {
+                Ok(money)
+            } else {
+                let v = scalar.get_unitless().ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(
+                        "Unsupported MarketScalar variant".to_string(),
+                    )
+                })?;
+                // For unitless scalars, use the basket currency by default
+                Ok(Money::new(v, basket.reporting_currency)?)
             }
         }
     }

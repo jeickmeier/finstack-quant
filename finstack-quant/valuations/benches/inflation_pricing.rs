@@ -11,9 +11,11 @@ use finstack_quant_core::dates::{
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationLag, SeriesInterpolation,
+    InflationIndex, InflationLag, InflationObservation, SeriesInterpolation,
 };
-use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface, VolSurfaceAxis};
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::InflationCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
@@ -54,13 +56,11 @@ fn bench_flat_inflation_curve(
         (10.0, base_cpi * (1.0 + annual_inflation_rate).powf(10.0)),
         (30.0, base_cpi * (1.0 + annual_inflation_rate).powf(30.0)),
     ];
-    let knots: Vec<(f64, f64)> = knots
-        .into_iter()
-        .map(|(t, cpi)| (t, cpi.max(1e-10)))
-        .collect();
     InflationCurve::builder(id)
         .base_date(base)
-        .base_cpi(base_cpi.max(1e-10))
+        .day_count(DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .knots(knots)
         .build()
         .expect("inflation curve")
@@ -71,17 +71,30 @@ fn bench_inflation_index() -> InflationIndex {
     let start = Date::from_calendar_date(2019, Month::October, 1).unwrap();
     let start_value = 250.0_f64;
     let monthly_rate = 0.002_f64;
-    let observations: Vec<(Date, f64)> = (0..364)
+    let observations = (0..64)
         .map(|i| {
             let date = start.add_months(i).expect("valid date shift");
             let value = start_value * (1.0 + monthly_rate).powi(i);
-            (date, value)
+            InflationObservation {
+                reference_month: date,
+                value,
+                available_on: base_date(),
+            }
         })
         .collect();
-    InflationIndex::new("US-CPI-U", observations, Currency::USD)
+    InflationIndex::new("US-CPI-U", observations, Currency::USD, base_date())
         .expect("inflation index")
-        .with_interpolation(SeriesInterpolation::Linear)
-        .with_lag(InflationLag::Months(3))
+        .with_expected_releases(
+            finstack_quant_valuations_test_support::inflation::simple_index(
+                "US-CPI-U",
+                base_date(),
+                300.0,
+                Currency::USD,
+            )
+            .get_expected_releases()
+            .to_vec(),
+        )
+        .expect("explicit releases")
 }
 
 /// Nominal discount (USD-OIS), CPI curve, CPI index, and inflation vol surface.
@@ -104,24 +117,23 @@ fn create_inflation_market() -> MarketContext {
         .insert_surface(vol)
 }
 
-/// ILBs apply their own publication lag, so their market index must be lag-free.
+/// The linker owns its contractual lag, independently of the fixing snapshot.
 fn create_inflation_linked_bond_market() -> MarketContext {
     // The protected principal is an option on reference CPI / base CPI,
     // rather than on the annual inflation rate quoted by US-CPI-VOL.
     let floor_vol = VolSurface::builder("US-CPI-RATIO-FLOOR-VOL")
         .expiries(&[0.01, 1.0, 5.0, 10.0])
-        .strikes(&[0.5, 1.0, 1.5, 2.0])
+        .secondary_values(&[0.5, 1.0, 1.5, 2.0])
         .row(&[0.10; 4])
         .row(&[0.10; 4])
         .row(&[0.10; 4])
         .row(&[0.10; 4])
         .quote_type(VolQuoteType::BlackLognormal)
         .secondary_axis(VolSurfaceAxis::Strike)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .build()
         .expect("CPI-ratio deflation-floor volatility");
-    create_inflation_market()
-        .insert_inflation_index(bench_inflation_index().with_lag(InflationLag::None))
-        .insert_surface(floor_vol)
+    create_inflation_market().insert_surface(floor_vol)
 }
 
 fn standard_notional() -> Money {
@@ -139,6 +151,8 @@ fn inflation_swap(as_of: Date, maturity: Date, id: &str) -> InflationSwap {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .expect("inflation swap")
@@ -166,7 +180,8 @@ fn inflation_cap_floor(
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("US-CPI-VOL"))
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
-        .lag_opt(None)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .expect("inflation cap/floor")
@@ -184,7 +199,7 @@ fn tips_benchmark(id: &str, maturity: Date) -> InflationLinkedBond {
         .base_cpi(250.0)
         .base_date(Date::from_calendar_date(2019, Month::October, 1).unwrap())
         .indexation_method(IndexationMethod::Tips)
-        .lag(InflationLag::Months(3))
+        .lag(InflationLag::months(3))
         .deflation_protection(DeflationProtection::MaturityOnly)
         .floor_vol_surface_id(CurveId::new("US-CPI-RATIO-FLOOR-VOL"))
         .business_day_convention(BusinessDayConvention::Following)

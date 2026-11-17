@@ -3,7 +3,6 @@
 use crate::bond::Bond;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext};
-use std::cell::RefCell;
 
 /// Resolve the bond's OAS from any supported price-driving quote.
 ///
@@ -88,8 +87,7 @@ pub(crate) fn oas_decimal_from_quote_overrides(
         None => None,
     };
 
-    let pricing_error: RefCell<Option<finstack_quant_core::Error>> = RefCell::new(None);
-    let objective = |oas_bp: f64| -> f64 {
+    let objective = |oas_bp: f64| -> finstack_quant_core::Result<f64> {
         let priced = if let Some(prepared) = prepared.as_ref() {
             prepared.price(oas_bp).map(|outcome| outcome.amount)
         } else {
@@ -97,28 +95,16 @@ pub(crate) fn oas_decimal_from_quote_overrides(
             trial.instrument_pricing_overrides.market_quotes.quoted_oas = Some(oas_bp / 10_000.0);
             crate::bond::metrics::reprice_selected(context, &trial, model, quote_context.quote_date)
         };
-        match priced {
-            Ok(value) => value - dirty_at_quote,
-            Err(error) => {
-                let mut slot = pricing_error.borrow_mut();
-                if slot.is_none() {
-                    *slot = Some(error);
-                }
-                1.0e12
-            }
-        }
+        priced.map(|value| value - dirty_at_quote)
     };
-    let oas_bp = BrentSolver::new()
-        .with_tolerance(config.tolerance)
-        .with_max_iterations(config.max_iterations)
-        .with_initial_bracket_size(config.initial_bracket_size_bp)
-        .solve(objective, 0.0)
-        .map_err(|error| match pricing_error.borrow_mut().take() {
-            Some(pricing_error) => finstack_quant_core::Error::Validation(format!(
-                "OAS solve failed: {error}; first underlying pricing error: {pricing_error}"
-            )),
-            None => error,
-        })?;
+    let oas_bp = BrentSolver::new(config.tolerance, config.max_iterations)?.solve(
+        objective,
+        0.0,
+        -10_000.0,
+        20_000.0,
+        config.initial_bracket_size_bp.unwrap_or(1000.0),
+        20,
+    )?;
     let oas_decimal = oas_bp / 10_000.0;
 
     if let Some(target) = final_ci_target {
@@ -266,6 +252,9 @@ mod tests {
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (5.0, 0.82), (10.0, 0.65)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("discount curve should build"),
         );
@@ -321,8 +310,15 @@ mod tests {
             InstrumentPricingOverrides::default().with_quoted_clean_price_pct(98.0);
         assert_eq!(bond.default_pricing_model(), ModelKey::Discounting);
 
-        let market = MarketContext::new()
-            .insert(DiscountCurve::flat("USD-OIS", as_of, 0.04).expect("valid discount curve"));
+        let market = MarketContext::new().insert(
+            DiscountCurve::flat(
+                "USD-OIS",
+                as_of,
+                0.04,
+                finstack_quant_core::dates::DayCount::Act365F,
+            )
+            .expect("valid discount curve"),
+        );
         let calls = Arc::new(AtomicUsize::new(0));
         let mut registry = PricerRegistry::new();
         registry

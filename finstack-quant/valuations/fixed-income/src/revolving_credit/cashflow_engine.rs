@@ -166,6 +166,40 @@ impl<'a> CashflowEngine<'a> {
         }
     }
 
+    fn term_reset_window(
+        &self,
+        period: &SchedulePeriod,
+        reset_effective: Date,
+    ) -> Result<(Date, Date, f64)> {
+        let period_start = period.accrual_start;
+        let period_end = period.accrual_end;
+        let reset_end = self
+            .reset_dates
+            .as_ref()
+            .and_then(|grid| {
+                grid.iter()
+                    .copied()
+                    .find(|&d| d > reset_effective && d < period_end)
+            })
+            .unwrap_or(period_end);
+        if reset_effective == period_start && reset_end == period_end {
+            return Ok((period_start, period_end, period.accrual_year_fraction));
+        }
+        let accrual_ctx = if self.day_count == DayCount::Act365L {
+            finstack_quant_core::dates::DayCountContext {
+                frequency: Some(self.facility.frequency),
+                coupon_period: Some((period_start, period_end)),
+                ..Default::default()
+            }
+        } else {
+            finstack_quant_core::dates::DayCountContext::default()
+        };
+        let reset_accrual =
+            self.day_count
+                .year_fraction(reset_effective, reset_end, accrual_ctx)?;
+        Ok((reset_effective, reset_end, reset_accrual))
+    }
+
     /// Create a new cashflow engine.
     ///
     /// # Arguments
@@ -514,7 +548,6 @@ impl<'a> CashflowEngine<'a> {
                                     self.fixing_series,
                                     spec.forward_curve_id.as_ref(),
                                     fixing_date,
-                                    self.as_of,
                                 )?;
                             projected_fixings.push(
                                 finstack_quant_cashflows::fixings::ProjectedFixing {
@@ -533,12 +566,14 @@ impl<'a> CashflowEngine<'a> {
                                     "forward curve required for floating rate".into(),
                                 )
                             })?;
+                            let (obs_start, obs_end, obs_accrual) =
+                                self.term_reset_window(period, reset_effective)?;
                             let index_rate = finstack_quant_cashflows::builder::project_index_rate(
                                 reset_effective,
                                 fwd.as_ref(),
-                                period_start,
-                                period_end,
-                                period.accrual_year_fraction,
+                                obs_start,
+                                obs_end,
+                                obs_accrual,
                             )?;
                             projected_fixings.push(
                                 finstack_quant_cashflows::fixings::ProjectedFixing {
@@ -963,38 +998,46 @@ impl<'a> CashflowEngine<'a> {
                                     self.fixing_series,
                                     spec.forward_curve_id.as_ref(),
                                     fixing_date,
-                                    self.as_of,
                                 )?
                             } else {
                                 let simulated =
                                     path.short_rate_path[observation_index(reset_effective)?];
                                 match term_basis_curves.as_ref() {
                                     Some((fwd, disc)) => {
+                                        let (obs_start, obs_end, obs_accrual) =
+                                            self.term_reset_window(period, reset_effective)?;
                                         simulated
                                             + super::utils::index_basis_at(
                                                 reset_effective,
                                                 anchor,
                                                 fwd.as_ref(),
                                                 disc.as_ref(),
-                                                period_start,
-                                                period_end,
-                                                period.accrual_year_fraction,
+                                                obs_start,
+                                                obs_end,
+                                                obs_accrual,
                                             )?
                                     }
                                     None => match deterministic_fwd.as_ref() {
                                         Some(fwd) => {
-                                            let contractual_index = finstack_quant_cashflows::builder::project_index_rate(
+                                            let (obs_start, obs_end, obs_accrual) =
+                                                self.term_reset_window(period, reset_effective)?;
+                                            let contractual_index =
+                                                finstack_quant_cashflows::builder::project_index_rate(
+                                                    reset_effective,
+                                                    fwd.as_ref(),
+                                                    obs_start,
+                                                    obs_end,
+                                                    obs_accrual,
+                                                )?;
+                                            let reset_time = fwd.day_count().signed_year_fraction(
+                                                fwd.base_date(),
                                                 reset_effective,
-                                                fwd.as_ref(),
-                                                period_start,
-                                                period_end,
-                                                period.accrual_year_fraction,
+                                                fwd.day_count_context(),
                                             )?;
-                                            let reset_time =
-                                                fwd.as_ref().curve_time(reset_effective)?;
                                             // Replace the raw curve baseline while preserving
                                             // any additive contractual-rate shock on the path.
-                                            simulated + contractual_index - fwd.rate(reset_time)
+                                            simulated + contractual_index
+                                                - fwd.instantaneous_forward(reset_time.max(0.0))?
                                         }
                                         None => simulated,
                                     },
@@ -1372,23 +1415,26 @@ mod tests {
             .expect("facility");
         let market = MarketContext::new()
             .insert(
-                ForwardCurve::builder("TERM", 0.25)
-                    .base_date(start)
-                    .day_count(DayCount::Act365F)
-                    .knots([(0.0, 0.04), (1.0, 0.04)])
-                    .build()
-                    .expect("forward curve"),
+                ForwardCurve::flat("TERM", start, 0.04, DayCount::Act365F).expect("forward curve"),
             )
             .insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(start)
                     .day_count(DayCount::Act365F)
                     .knots([(0.0, 1.0), (1.0, (-0.04_f64).exp())])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount curve"),
             );
-        let fixings = ScalarTimeSeries::new("FIXING:TERM", vec![(start, 0.07)], None)
-            .expect("observed index");
+        let fixings = ScalarTimeSeries::new(
+            "FIXING:TERM",
+            vec![(start, 0.07)],
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("observed index");
         let total_accrual = (end - start).whole_days() as f64 / 360.0;
         let stepped_accrual = (end - step).whole_days() as f64 / 360.0;
         for observed in [false, true] {
@@ -1398,7 +1444,11 @@ mod tests {
                 start
             };
             let fixing_series = observed.then_some(&fixings);
-            let contractual_index = if observed { 0.07 } else { 0.04 * 360.0 / 365.0 };
+            let contractual_index = if observed {
+                0.07
+            } else {
+                (0.04 * (end - start).whole_days() as f64 / 365.0).exp_m1() / total_accrual
+            };
             let expected =
                 1_000_000.0 * (contractual_index * total_accrual + 0.01 * stepped_accrual);
             let schedule = CashflowEngine::new(&facility, Some(&market), as_of, fixing_series)
@@ -1546,24 +1596,27 @@ mod tests {
                     .recovery_rate(0.0)
                     .build()
                     .expect("facility");
-                let market = MarketContext::new().insert(
-                    ForwardCurve::builder("TERM", 1.0 / 12.0)
-                        .base_date(start)
-                        .day_count(DayCount::Act365F)
-                        // Represent a 5% contractual ACT/365L fixing on
-                        // the forward curve's ACT/365F clock.
-                        .knots([
-                            (0.0, 0.05 * 365.0 / denominator),
-                            (3.0, 0.05 * 365.0 / denominator),
-                        ])
-                        .build()
-                        .expect("flat term curve"),
-                );
-                let engine =
-                    CashflowEngine::new(&facility, Some(&market), start, None).expect("engine");
-                let deterministic = engine
-                    .generate_deterministic()
-                    .expect("deterministic schedule");
+                let mut reset_grid = crate::revolving_credit::utils::build_reset_dates(&facility)
+                    .expect("reset dates")
+                    .unwrap_or_else(|| vec![start]);
+                reset_grid.push(end);
+                let mut date_factors = Vec::with_capacity(reset_grid.len());
+                let mut factor = 1.0_f64;
+                date_factors.push((reset_grid[0], factor));
+                for pair in reset_grid.windows(2) {
+                    let seg_days = (pair[1] - pair[0]).whole_days() as f64;
+                    factor /= 1.0 + 0.05 * seg_days / denominator;
+                    date_factors.push((pair[1], factor));
+                }
+                let term_fwd = ForwardCurve::from_dates(
+                    "TERM",
+                    start,
+                    &date_factors,
+                    DayCount::Act365F,
+                    finstack_quant_core::math::interp::InterpStyle::LogLinear,
+                    finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+                )
+                .expect("flat term curve");
                 let observations =
                     crate::revolving_credit::utils::build_observation_dates(&facility)
                         .expect("observation dates");
@@ -1572,6 +1625,12 @@ mod tests {
                     .iter()
                     .map(|day| (*day - start).whole_days() as f64 / 365.0)
                     .collect();
+                let market = MarketContext::new().insert(term_fwd);
+                let engine =
+                    CashflowEngine::new(&facility, Some(&market), start, None).expect("engine");
+                let deterministic = engine
+                    .generate_deterministic()
+                    .expect("deterministic schedule");
                 let stochastic = engine
                     .generate_stochastic_path(ThreeFactorPathData {
                         utilization_path: vec![1.0; n],

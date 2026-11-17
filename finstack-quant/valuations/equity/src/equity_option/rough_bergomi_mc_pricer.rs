@@ -257,11 +257,22 @@ fn simulate_rbergomi<F: finstack_quant_models::monte_carlo::traits::Payoff>(
             finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
         })?;
 
-        stats.update(pv);
+        stats.update(pv).map_err(|e| {
+            finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
+        })?;
     }
 
-    let stderr = stats.stderr();
-    Ok((stats.mean(), if stderr.is_finite() { stderr } else { 0.0 }))
+    let stderr = stats
+        .get_stderr()
+        .map_err(|e| {
+            finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx.clone())
+        })?
+        .unwrap_or(f64::NAN);
+    let mean = stats
+        .get_mean()
+        .map_err(|e| finstack_quant_valuations_core::pricer::PricingError::from_core(e, err_ctx))?
+        .unwrap_or(f64::NAN);
+    Ok((mean, if stderr.is_finite() { stderr } else { 0.0 }))
 }
 
 impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
@@ -441,14 +452,19 @@ impl finstack_quant_valuations_core::pricer::Pricer for EquityOptionRoughBergomi
 #[cfg(test)]
 mod variance_strip_tests {
     use super::*;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolGridOpts, VolInterpolationMode, VolSurface,
+    };
 
     fn market_and_option() -> (MarketContext, EquityOption) {
         let option = EquityOption::example().expect("example");
         // Positive interval variances rise from .04 to .12, then fall to .02.
         let surface = VolSurface::builder(option.vol_surface_id.as_str())
             .expiries(&[0.25, 1.0, 1.5])
-            .strikes(&[80.0, 100.0, 120.0])
+            .secondary_values(&[80.0, 100.0, 120.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.2; 3])
             .row(&[0.1_f64.sqrt(); 3])
             .row(&[(0.11_f64 / 1.5).sqrt(); 3])
@@ -488,11 +504,19 @@ mod variance_strip_tests {
         let (market, option) = market_and_option();
         let surface = market.get_surface(option.vol_surface_id.as_str()).unwrap();
         for unsupported in [
-            surface
-                .as_ref()
-                .clone()
-                .with_displacements(&[20.0; 3])
-                .unwrap(),
+            finstack_quant_core::market_data::surfaces::VolSurface::from_grid(
+                surface.id(),
+                surface.expiries(),
+                surface.secondary_values(),
+                surface.vols(),
+                VolGridOpts {
+                    secondary_axis: surface.secondary_axis(),
+                    quote_type: VolQuoteType::ShiftedBlackLognormal,
+                    interpolation_mode: surface.interpolation_mode(),
+                },
+                Some(&[20.0; 3]),
+            )
+            .expect("shifted surface"),
             finstack_quant_valuations_test_support::volatility::relabel_quote_type(
                 surface.as_ref(),
                 VolQuoteType::Normal,
@@ -501,11 +525,12 @@ mod variance_strip_tests {
             finstack_quant_core::market_data::surfaces::VolSurface::from_grid(
                 surface.id(),
                 surface.expiries(),
-                surface.strikes(),
+                surface.secondary_values(),
                 surface.vols(),
-                finstack_quant_core::market_data::surfaces::VolGridOpts {
+                VolGridOpts {
                     secondary_axis: VolSurfaceAxis::Tenor,
-                    ..finstack_quant_core::market_data::surfaces::VolGridOpts::default()
+                    quote_type: surface.quote_type(),
+                    interpolation_mode: surface.interpolation_mode(),
                 },
                 None,
             )
@@ -573,15 +598,32 @@ mod variance_strip_tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (2.0, 1.0)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount");
         let market = market
             .insert(discount)
-            .insert_price("EQUITY-SPOT", MarketScalar::Unitless(100.0))
-            .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(0.0))
-            .insert_price("ROUGH_BERGOMI_ETA", MarketScalar::Unitless(1e-10))
-            .insert_price("ROUGH_BERGOMI_HURST", MarketScalar::Unitless(0.1))
-            .insert_price("ROUGH_BERGOMI_RHO", MarketScalar::Unitless(0.0));
+            .insert_price(
+                "EQUITY-SPOT",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "EQUITY-DIVYIELD",
+                MarketScalar::unitless(0.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "ROUGH_BERGOMI_ETA",
+                MarketScalar::unitless(1e-10).expect("valid scalar"),
+            )
+            .insert_price(
+                "ROUGH_BERGOMI_HURST",
+                MarketScalar::unitless(0.1).expect("valid scalar"),
+            )
+            .insert_price(
+                "ROUGH_BERGOMI_RHO",
+                MarketScalar::unitless(0.0).expect("valid scalar"),
+            );
         let curve =
             build_xi0_from_surface(&market, &option, 100.0, 0.0, 0.0, 1.0).expect("variance strip");
         let call_price = |variance: f64| {

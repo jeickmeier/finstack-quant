@@ -32,8 +32,10 @@ use wasm_bindgen::prelude::*;
 /// const curve = new core.InflationCurve({
 ///   id: "US-CPI",
 ///   baseDate: "2025-01-02",
-///   baseCpi: 300.0,
 ///   knots: [0.0, 300.0, 5.0, 331.2],
+///   dayCount: "act_365f",
+///   interp: "log_linear",
+///   extrapolation: "extend",
 /// });
 /// curve.cpi(2.5); // projected CPI level at 2.5y
 /// curve.inflationRate(0.0, 5.0); // annualised inflation over 5y
@@ -49,16 +51,11 @@ pub struct JsInflationCurve {
 struct InflationCurveOptions {
     id: String,
     base_date: String,
-    base_cpi: f64,
     knots: Vec<f64>,
-    #[serde(default)]
-    day_count: Option<String>,
-    #[serde(default)]
-    indexation_lag_months: Option<u32>,
-    #[serde(default)]
-    interp: Option<String>,
-    #[serde(default)]
-    extrapolation: Option<String>,
+    day_count: String,
+    interp: String,
+    extrapolation: String,
+    calendar_id: Option<String>,
 }
 
 impl JsInflationCurve {
@@ -67,27 +64,18 @@ impl JsInflationCurve {
     }
 
     fn build(options: InflationCurveOptions) -> Result<JsInflationCurve, JsValue> {
-        let mut builder = RustInflationCurve::builder(options.id)
+        RustInflationCurve::builder(options.id)
             .base_date(parse_iso_date(&options.base_date)?)
-            .base_cpi(options.base_cpi)
-            .knots(flat_pairs(&options.knots, "knots")?);
-        if let Some(day_count) = options.day_count.as_deref() {
-            builder = builder.day_count(day_count.parse::<DayCount>().map_err(to_js_err)?);
-        }
-        if let Some(months) = options.indexation_lag_months {
-            builder = builder.indexation_lag_months(months);
-        }
-        if let Some(interp) = options.interp.as_deref() {
-            builder = builder.interp(interp.parse::<InterpStyle>().map_err(to_js_err)?);
-        }
-        if let Some(extrapolation) = options.extrapolation.as_deref() {
-            builder = builder.extrapolation(
-                extrapolation
+            .day_count(options.day_count.parse::<DayCount>().map_err(to_js_err)?)
+            .calendar_id_opt(options.calendar_id)
+            .knots(flat_pairs(&options.knots, "knots")?)
+            .interp(options.interp.parse::<InterpStyle>().map_err(to_js_err)?)
+            .extrapolation(
+                options
+                    .extrapolation
                     .parse::<ExtrapolationPolicy>()
                     .map_err(to_js_err)?,
-            );
-        }
-        builder
+            )
             .build()
             .map(|curve| Self::from_inner(Arc::new(curve)))
             .map_err(to_js_err)
@@ -103,12 +91,9 @@ impl JsInflationCurve {
     /// * `options` - InflationCurveOptions object (or its JSON text) with:
     ///   `id` (curve identifier, the `MarketContext` lookup key); `baseDate`
     ///   (ISO-8601; knot times are year fractions from it under `dayCount`);
-    ///   `baseCpi` (strictly positive index level at the base date); `knots`
-    ///   (flat `[t0, cpi0, t1, cpi1, …]` array, `t` in years, `cpi` the
-    ///   projected index level); and the optional `dayCount`,
-    ///   `indexationLagMonths` (publication lag in whole months),
-    ///   `interp` and `extrapolation`. Omitted options use the Rust builder
-    ///   defaults. Unknown keys are rejected.
+    ///   `knots` (flat `[0, I0, t1, I1, …]` array, years and positive index levels);
+    ///   required `dayCount`, `interp` and `extrapolation`; optional `calendarId`
+    ///   (required for Bus/252). Unknown keys are rejected.
     ///
     /// @returns The constructed `InflationCurve`.
     /// @throws `TypeError` (kind `invalid_type`) if `options` is not a JSON
@@ -116,7 +101,7 @@ impl JsInflationCurve {
     /// unknown, missing or mistyped key, an odd-length `knots`, a malformed
     /// date, an unknown day-count/interpolation/extrapolation name, or CPI
     /// levels the curve builder rejects.
-    /// @param options - InflationCurveOptions object (or its JSON text) with: `id` (curve identifier, the `MarketContext` lookup key); `baseDate` (ISO-8601; knot times are year fractions from it under `dayCount`); `baseCpi` (strictly positive index level at the base date); `knots` (flat `[t0, cpi0, t1, cpi1, …]` array, `t` in years, `cpi` the projected index level); and the optional `dayCount`, `indexationLagMonths` (publication lag in whole months), `interp` and `extrapolation`. Omitted options use the Rust builder defaults. Unknown keys are rejected.
+    /// @param options - Explicit curve identifier, ISO base date, day count, interpolation and extrapolation, and flat knots beginning `[0, I0]` with at least one positive-time pillar. `calendarId` is required for Bus/252; no contractual lag is applied.
     #[wasm_bindgen(constructor)]
     pub fn new(
         #[wasm_bindgen(unchecked_param_type = "InflationCurveOptions | string")] options: JsValue,
@@ -164,7 +149,8 @@ impl JsInflationCurve {
     /// @returns The interpolated index level.
     /// @throws `TypeError` if `t` is neither a number nor a string;
     /// `FinstackError` (kind `validation`) for a malformed date or a year
-    /// fraction that cannot be computed.
+    /// fraction that cannot be computed, negative or non-finite time, a query
+    /// outside the knots under `"error"`, or non-positive interpolated CPI.
     /// @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
     #[wasm_bindgen(js_name = cpi)]
     pub fn cpi(
@@ -172,49 +158,9 @@ impl JsInflationCurve {
         #[wasm_bindgen(unchecked_param_type = "number | string")] t: JsValue,
     ) -> Result<f64, JsValue> {
         match js_time_point(&t, "t")? {
-            TimePoint::Years(t) => Ok(self.inner.cpi(t)),
+            TimePoint::Years(t) => self.inner.cpi(t).map_err(to_js_err),
             TimePoint::Date(d) => self.inner.cpi_on_date(d).map_err(to_js_err),
         }
-    }
-
-    /// CPI level at `t` shifted back by the indexation lag (Rust
-    /// `InflationCurve::cpi_with_lag`).
-    ///
-    /// # Arguments
-    ///
-    /// * `t` - Settlement time from the curve base date in years; the curve is
-    ///   evaluated at `t - indexationLagMonths / 12`.
-    ///
-    /// @returns The lagged index level (a continuous shift, with no
-    /// seasonality adjustment).
-    /// @throws `TypeError` if `t` is not a number.
-    /// @param t - Settlement time from the curve base date in years; the curve is evaluated at `t - indexationLagMonths / 12`.
-    #[wasm_bindgen(js_name = cpiWithLag)]
-    pub fn cpi_with_lag(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
-    ) -> Result<f64, JsValue> {
-        Ok(self.inner.cpi_with_lag(js_f64(&t, "t")?))
-    }
-
-    /// Principal indexation ratio `cpiWithLag(t) / baseCpi` (Rust
-    /// `InflationCurve::index_ratio`).
-    ///
-    /// # Arguments
-    ///
-    /// * `t` - Settlement time from the curve base date in years.
-    ///
-    /// @returns The uplift factor of an inflation-linked notional: `1.08` is
-    /// 108% of face; no deflation floor is applied.
-    /// @throws `TypeError` if `t` is not a number; `FinstackError` (kind
-    /// `validation`) if the ratio is not finite and positive.
-    /// @param t - Settlement time from the curve base date in years.
-    #[wasm_bindgen(js_name = indexRatio)]
-    pub fn index_ratio(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "number")] t: JsValue,
-    ) -> Result<f64, JsValue> {
-        self.inner.index_ratio(js_f64(&t, "t")?).map_err(to_js_err)
     }
 
     /// Annualised inflation rate between two times, by the CAGR formula
@@ -259,10 +205,10 @@ impl JsInflationCurve {
         self.inner.day_count().to_string()
     }
 
-    /// Indexation (publication) lag in whole months.
-    #[wasm_bindgen(getter, js_name = indexationLagMonths)]
-    pub fn indexation_lag_months(&self) -> u32 {
-        self.inner.indexation_lag_months()
+    /// Registered calendar identifier used by the source clock, or `undefined`.
+    #[wasm_bindgen(getter, js_name = calendarId)]
+    pub fn calendar_id(&self) -> Option<String> {
+        self.inner.calendar_id().map(str::to_owned)
     }
 
     /// CPI index level at the base date.
@@ -289,7 +235,7 @@ impl JsInflationCurve {
         self.inner.interp_style().to_string()
     }
 
-    /// Extrapolation policy beyond the pillar range, such as `"flat_forward"`.
+    /// Extrapolation policy beyond the pillar range, such as `"extend"`.
     #[wasm_bindgen(getter, js_name = extrapolation)]
     pub fn extrapolation(&self) -> String {
         self.inner.extrapolation().to_string()
@@ -504,7 +450,7 @@ impl JsPriceCurve {
         self.inner.interp_style().to_string()
     }
 
-    /// Extrapolation policy beyond the pillar range, such as `"flat_zero"`.
+    /// Extrapolation policy beyond the pillar range, such as `"flat"`.
     #[wasm_bindgen(getter, js_name = extrapolation)]
     pub fn extrapolation(&self) -> String {
         self.inner.extrapolation().to_string()
@@ -637,7 +583,7 @@ impl JsBaseCorrelationCurve {
         self.inner.interp_style().to_string()
     }
 
-    /// Extrapolation policy beyond the pillar range, such as `"flat_zero"`.
+    /// Extrapolation policy beyond the pillar range, such as `"flat"`.
     #[wasm_bindgen(getter, js_name = extrapolation)]
     pub fn extrapolation(&self) -> String {
         self.inner.extrapolation().to_string()
@@ -656,7 +602,7 @@ impl JsBaseCorrelationCurve {
 /// ```typescript
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
-/// const hazard = core.HazardCurve.flat("CDX-IG-HZD", "2025-01-02", 0.01, 0.4);
+/// const hazard = core.HazardCurve.flat("CDX-IG-HZD", "2025-01-02", 0.01, 0.4, "act_365f");
 /// const correlation = new core.BaseCorrelationCurve("CDX-IG", [3.0, 0.25, 7.0, 0.45]);
 /// const index = new core.CreditIndexData(125, 0.4, hazard, correlation);
 /// index.numConstituents; // 125

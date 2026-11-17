@@ -185,38 +185,6 @@ impl PyTenor {
             .map_err(core_to_py)
     }
 
-    /// Construct from a year fraction using a day-count convention.
-    ///
-    /// A year fraction that is (within a small epsilon) a whole number of
-    /// months gives a month-based tenor; anything else is converted to days
-    /// under ``day_count``.
-    ///
-    /// Parameters
-    /// ----------
-    /// years : float
-    ///     Positive, finite length in years (e.g. ``0.5`` gives ``6M``).
-    /// day_count : DayCount | str
-    ///     Convention used for the day conversion (``DayCount`` or a
-    ///     canonical name such as ``"act_365f"``).
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``years`` is non-positive, non-finite or exceeds 200 years, or
-    ///     ``day_count`` is not a recognized convention.
-    #[classmethod]
-    #[pyo3(text_signature = "(cls, years, day_count)")]
-    fn from_years(
-        _cls: &Bound<'_, PyType>,
-        years: f64,
-        day_count: &Bound<'_, PyAny>,
-    ) -> PyResult<Self> {
-        let day_count = crate::bindings::core::dates::daycount::extract_day_count(day_count)?;
-        Tenor::from_years(years, day_count)
-            .map(Self::from_inner)
-            .map_err(core_to_py)
-    }
-
     /// Positive integer multiplying this tenor's calendar unit.
     #[getter]
     fn count(&self) -> u32 {

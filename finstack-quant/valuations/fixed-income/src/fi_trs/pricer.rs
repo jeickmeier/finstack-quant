@@ -141,7 +141,7 @@ impl TrsReturnModel for FiIndexReturnModel<'_> {
         } = *inputs;
         let fixing = |date: Date| -> Result<f64> {
             let level = if let Some(id) = &self.trs.fixing_series_id {
-                context.get_series(id)?.value_on_exact(date)?
+                context.get_series(id)?.get_value_exact(date)?
             } else if date == self.trs.schedule.start {
                 self.trs.initial_level.ok_or_else(|| {
                     finstack_quant_core::Error::Validation(format!(

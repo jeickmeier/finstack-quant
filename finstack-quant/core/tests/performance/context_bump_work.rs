@@ -15,9 +15,11 @@
 
 use super::{MarketContext, MarketContextState};
 use crate::currency::Currency;
-use crate::dates::Date;
+use crate::dates::{Date, DayCount};
 use crate::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump};
-use crate::market_data::scalars::{MarketScalar, ScalarTimeSeries, SeriesInterpolation};
+use crate::market_data::scalars::{
+    MarketScalar, ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+};
 use crate::market_data::surfaces::VolSurface;
 use crate::market_data::term_structures::{
     BaseCorrelationCurve, CreditIndexData, DiscountCurve, HazardCurve,
@@ -131,6 +133,9 @@ fn curve(id: &str) -> DiscountCurve {
             let time = f64::from(i) * 0.5;
             (time, (-0.04 * time).exp())
         }))
+        .day_count(DayCount::Act365F)
+        .interp(crate::math::interp::InterpStyle::LogLinear)
+        .extrapolation(crate::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("frozen B3 curve")
 }
@@ -144,13 +149,20 @@ fn curve_fixture(count: usize) -> MarketContext {
 }
 
 fn mixed_fixture(count: usize) -> MarketContext {
+    use crate::market_data::surfaces::{
+        VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
+    };
     // Exact bounded stores from core/benches/context_bump.rs and the public panel.
     let surface = VolSurface::from_grid(
         "EQ-VOL",
         &[0.25, 1.0, 2.0],
         &[80.0, 100.0, 120.0],
         &[0.18, 0.19, 0.20, 0.20, 0.21, 0.22, 0.22, 0.23, 0.24],
-        Default::default(),
+        VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
+            interpolation_mode: VolInterpolationMode::Vol,
+        },
         None,
     )
     .expect("frozen B3 surface");
@@ -160,21 +172,24 @@ fn mixed_fixture(count: usize) -> MarketContext {
             .map(|i| (date() + Duration::days(i), 100.0 + 0.1 * i as f64))
             .collect(),
         Some(Currency::USD),
+        SeriesInterpolation::Step,
+        SeriesExtrapolation::Error,
     )
-    .expect("frozen B3 series")
-    .with_interpolation(SeriesInterpolation::Step);
+    .expect("frozen B3 series");
     curve_fixture(count)
         .insert_surface(surface)
         .insert_price(
             "SPX-SPOT",
-            MarketScalar::Price(Money::from((100_i64, Currency::USD))),
+            MarketScalar::price(Money::from((100_i64, Currency::USD))),
         )
         .insert_series(series)
 }
 
 fn credit_fixture() -> MarketContext {
-    let hazard = HazardCurve::flat("CDX-HZD", date(), 0.02, 0.4).expect("index hazard");
-    let issuer = HazardCurve::flat("ISSUER-HZD", date(), 0.03, 0.4).expect("issuer hazard");
+    let hazard =
+        HazardCurve::flat("CDX-HZD", date(), 0.02, 0.4, DayCount::Act365F).expect("index hazard");
+    let issuer = HazardCurve::flat("ISSUER-HZD", date(), 0.03, 0.4, DayCount::Act365F)
+        .expect("issuer hazard");
     let correlation = BaseCorrelationCurve::builder("CDX-BC")
         .knots([(3.0, 0.2), (7.0, 0.4), (10.0, 0.5)])
         .build()
@@ -195,8 +210,43 @@ fn credit_fixture() -> MarketContext {
         .expect("canonical credit index")
 }
 
-fn generic(id: &str, spec: BumpSpec) -> MarketBump {
-    MarketBump::Curve {
+fn discount_bump(id: &str, spec: BumpSpec) -> MarketBump {
+    MarketBump::DiscountCurve {
+        id: CurveId::new(id),
+        spec,
+    }
+}
+
+fn hazard_bump(id: &str, spec: BumpSpec) -> MarketBump {
+    MarketBump::HazardCurve {
+        id: CurveId::new(id),
+        spec,
+    }
+}
+
+fn base_corr_bump(id: &str, spec: BumpSpec) -> MarketBump {
+    MarketBump::BaseCorrelation {
+        id: CurveId::new(id),
+        spec,
+    }
+}
+
+fn surface_bump(id: &str, spec: BumpSpec) -> MarketBump {
+    MarketBump::VolSurface {
+        id: CurveId::new(id),
+        spec,
+    }
+}
+
+fn price_bump(id: &str, spec: BumpSpec) -> MarketBump {
+    MarketBump::PriceScalar {
+        id: CurveId::new(id),
+        spec,
+    }
+}
+
+fn series_bump(id: &str, spec: BumpSpec) -> MarketBump {
+    MarketBump::Series {
         id: CurveId::new(id),
         spec,
     }
@@ -218,7 +268,7 @@ fn cases() -> Vec<WorkCase> {
             id: format!("context_bump_mixed/money_multiplier/curves_{count}"),
             base: mixed_fixture(count),
             expected_curve_count: count,
-            bumps: vec![generic("SPX-SPOT", BumpSpec::multiplier(1.01))],
+            bumps: vec![price_bump("SPX-SPOT", BumpSpec::multiplier(1.01))],
             changed_stores: &["prices"],
             c0_targets: &["SPX-SPOT"],
             candidate_targets: &[],
@@ -230,7 +280,7 @@ fn cases() -> Vec<WorkCase> {
             id: "context_bump_mixed/surface_abs/curves_256".into(),
             base: mixed_fixture(256),
             expected_curve_count: 256,
-            bumps: vec![generic("EQ-VOL", additive(0.01))],
+            bumps: vec![surface_bump("EQ-VOL", additive(0.01))],
             changed_stores: &["surfaces"],
             c0_targets: &["EQ-VOL"],
             candidate_targets: &[],
@@ -240,7 +290,7 @@ fn cases() -> Vec<WorkCase> {
             id: "context_bump_mixed/series_multiplier/curves_256".into(),
             base: mixed_fixture(256),
             expected_curve_count: 256,
-            bumps: vec![generic("SPX-CLOSE", BumpSpec::multiplier(1.01))],
+            bumps: vec![series_bump("SPX-CLOSE", BumpSpec::multiplier(1.01))],
             changed_stores: &["series"],
             c0_targets: &["SPX-CLOSE"],
             candidate_targets: &[],
@@ -253,7 +303,7 @@ fn cases() -> Vec<WorkCase> {
             bumps: vec![MarketBump::VolBucketPct {
                 vol_surface_id: CurveId::new("EQ-VOL"),
                 expiries: None,
-                strikes: None,
+                secondary_values: None,
                 pct: 5.0,
             }],
             changed_stores: &["surfaces"],
@@ -265,7 +315,7 @@ fn cases() -> Vec<WorkCase> {
             id: "context_bump/256_curves".into(),
             base: curve_fixture(256),
             expected_curve_count: 256,
-            bumps: vec![generic("CURVE_0", BumpSpec::parallel_bp(1.0))],
+            bumps: vec![discount_bump("CURVE_0", BumpSpec::parallel_bp(1.0))],
             changed_stores: &["curves"],
             c0_targets: &["CURVE_0"],
             candidate_targets: &["CURVE_0"],
@@ -276,10 +326,10 @@ fn cases() -> Vec<WorkCase> {
             base: mixed_fixture(8),
             expected_curve_count: 8,
             bumps: vec![
-                generic("SPX-SPOT", additive(10.0)),
-                generic("EQ-VOL", additive(0.01)),
-                generic("SPX-CLOSE", BumpSpec::multiplier(1.01)),
-                generic("SPX-SPOT", BumpSpec::multiplier(1.1)),
+                price_bump("SPX-SPOT", additive(10.0)),
+                surface_bump("EQ-VOL", additive(0.01)),
+                series_bump("SPX-CLOSE", BumpSpec::multiplier(1.01)),
+                price_bump("SPX-SPOT", BumpSpec::multiplier(1.1)),
             ],
             changed_stores: &["prices", "surfaces", "series"],
             c0_targets: &["SPX-SPOT", "EQ-VOL", "SPX-CLOSE", "SPX-SPOT"],
@@ -291,8 +341,8 @@ fn cases() -> Vec<WorkCase> {
             base: mixed_fixture(8),
             expected_curve_count: 8,
             bumps: vec![
-                generic("CURVE_0", BumpSpec::parallel_bp(1.0)),
-                generic("CURVE_0", BumpSpec::parallel_bp(2.0)),
+                discount_bump("CURVE_0", BumpSpec::parallel_bp(1.0)),
+                discount_bump("CURVE_0", BumpSpec::parallel_bp(2.0)),
             ],
             changed_stores: &["curves"],
             c0_targets: &["CURVE_0", "CURVE_0"],
@@ -304,10 +354,10 @@ fn cases() -> Vec<WorkCase> {
             base: credit_fixture(),
             expected_curve_count: 11,
             bumps: vec![
-                generic("CDX-HZD", BumpSpec::parallel_bp(6.0)),
-                generic("ISSUER-HZD", BumpSpec::parallel_bp(12.0)),
-                generic("CDX-BC", additive(0.01)),
-                generic("CDX-HZD", BumpSpec::parallel_bp(3.0)),
+                hazard_bump("CDX-HZD", BumpSpec::parallel_bp(6.0)),
+                hazard_bump("ISSUER-HZD", BumpSpec::parallel_bp(12.0)),
+                base_corr_bump("CDX-BC", additive(0.01)),
+                hazard_bump("CDX-HZD", BumpSpec::parallel_bp(3.0)),
             ],
             changed_stores: &["curves", "credit_indices"],
             c0_targets: &["CDX-HZD", "ISSUER-HZD", "CDX-BC", "CDX-HZD"],
@@ -329,9 +379,9 @@ fn cases() -> Vec<WorkCase> {
             base: mixed_fixture(8),
             expected_curve_count: 8,
             bumps: vec![
-                generic("SPX-SPOT", BumpSpec::multiplier(1.01)),
-                generic("ZZ-MISSING", additive(0.01)),
-                generic("AA-MISSING", additive(0.01)),
+                price_bump("SPX-SPOT", BumpSpec::multiplier(1.01)),
+                discount_bump("ZZ-MISSING", additive(0.01)),
+                discount_bump("AA-MISSING", additive(0.01)),
             ],
             changed_stores: &[],
             c0_targets: &["SPX-SPOT", "ZZ-MISSING"],
@@ -423,29 +473,54 @@ fn bits(value: f64) -> String {
 }
 
 fn ordered_bumps(bumps: &[MarketBump]) -> Vec<Value> {
-    bumps.iter().enumerate().map(|(index, bump)| match bump {
-        MarketBump::Curve { id, spec } => json!({
-            "index": index, "kind": "generic_curve", "id": id.as_str(),
-            "mode": format!("{:?}", spec.mode), "units": format!("{:?}", spec.units),
-            "value_bits": bits(spec.value), "bump_type": format!("{:?}", spec.bump_type),
-        }),
-        MarketBump::VolBucketPct { vol_surface_id, expiries, strikes, pct } => json!({
-            "index": index, "kind": "typed_vol_bucket", "id": vol_surface_id.as_str(),
-            "expiries": expiries.as_ref().map(|values| values.iter().map(|v| bits(*v)).collect::<Vec<_>>()),
-            "strikes": strikes.as_ref().map(|values| values.iter().map(|v| bits(*v)).collect::<Vec<_>>()),
-            "pct_bits": bits(*pct),
-        }),
-        MarketBump::BaseCorrBucketPts { surface_id, detachments, points } => json!({
-            "index": index, "kind": "typed_base_correlation_bucket", "id": surface_id.as_str(),
-            "detachments": detachments.as_ref().map(|values| values.iter().map(|v| bits(*v)).collect::<Vec<_>>()),
-            "points_bits": bits(*points),
-        }),
-        MarketBump::FxPct { base, quote, pct, as_of, policy } => json!({
-            "index": index, "kind": "fx_percentage", "base": base.to_string(),
-            "quote": quote.to_string(), "pct_bits": bits(*pct), "as_of": as_of.to_string(),
-            "policy": policy.to_string(),
-        }),
-    }).collect()
+    bumps
+        .iter()
+        .enumerate()
+        .map(|(index, bump)| {
+            if let Some((target, spec)) = bump.target_and_spec() {
+                json!({
+                    "index": index, "kind": target.kind_name(), "id": target.id().as_str(),
+                    "mode": format!("{:?}", spec.mode), "units": format!("{:?}", spec.units),
+                    "value_bits": bits(spec.value), "bump_type": format!("{:?}", spec.bump_type),
+                })
+            } else {
+                match bump {
+                    MarketBump::VolBucketPct {
+                        vol_surface_id,
+                        expiries,
+                        secondary_values,
+                        pct,
+                    } => json!({
+                        "index": index, "kind": "typed_vol_bucket", "id": vol_surface_id.as_str(),
+                        "expiries": expiries.as_ref().map(|values| values.iter().map(|v| bits(*v)).collect::<Vec<_>>()),
+                        "secondary_values": secondary_values.as_ref().map(|values| values.iter().map(|v| bits(*v)).collect::<Vec<_>>()),
+                        "pct_bits": bits(*pct),
+                    }),
+                    MarketBump::BaseCorrBucketPts {
+                        surface_id,
+                        detachments,
+                        points,
+                    } => json!({
+                        "index": index, "kind": "typed_base_correlation_bucket", "id": surface_id.as_str(),
+                        "detachments": detachments.as_ref().map(|values| values.iter().map(|v| bits(*v)).collect::<Vec<_>>()),
+                        "points_bits": bits(*points),
+                    }),
+                    MarketBump::FxPct {
+                        base,
+                        quote,
+                        pct,
+                        as_of,
+                        policy,
+                    } => json!({
+                        "index": index, "kind": "fx_percentage", "base": base.to_string(),
+                        "quote": quote.to_string(), "pct_bits": bits(*pct), "as_of": as_of.to_string(),
+                        "policy": policy.to_string(),
+                    }),
+                    _ => panic!("unexpected typed target bump"),
+                }
+            }
+        })
+        .collect()
 }
 
 fn record(case: &WorkCase) -> Value {

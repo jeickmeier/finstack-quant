@@ -29,6 +29,8 @@ fn build_flat_discount_curve(
         .base_date(base_date)
         .day_count(DayCount::Act360)
         .knots([(0.0, 1.0), (1.0, (-rate).exp()), (5.0, (-rate * 5.0).exp())])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -40,10 +42,16 @@ fn build_flat_forward_curve(
     curve_id: &str,
     tenor_years: f64,
 ) -> ForwardCurve {
-    ForwardCurve::builder(curve_id, tenor_years)
-        .base_date(base_date)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, rate), (1.0, rate), (5.0, rate)])
+    ForwardCurve::flat(curve_id, base_date, rate, DayCount::Act360)
+        .unwrap()
+        .to_builder_with_id(curve_id)
+        .index_tenor(
+            Tenor::new(
+                (tenor_years * 12.0).round() as u32,
+                finstack_quant_core::dates::TenorUnit::Months,
+            )
+            .unwrap(),
+        )
         .build()
         .unwrap()
 }
@@ -122,6 +130,8 @@ fn test_seasoned_facility_uses_fixings_for_past_resets() {
             (date!(2025 - 01 - 01), 0.049),
         ],
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .unwrap();
 
@@ -265,6 +275,8 @@ fn test_fixings_respect_floor() {
             (date!(2025 - 01 - 01), 0.01), // 1% (below 3% floor)
         ],
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .unwrap();
 
@@ -319,6 +331,8 @@ fn test_non_seasoned_facility_ignores_fixings() {
         "FIXING:USD-SOFR-3M",
         vec![(date!(2025 - 01 - 15), 0.10)], // 10% fixing (very different from forward)
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .unwrap();
 
@@ -380,6 +394,8 @@ fn valuation_date_reset_uses_contractual_t_minus_two_fixing() {
         "FIXING:USD-SOFR-3M",
         vec![(date!(2025 - 01 - 13), 0.10)],
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .unwrap();
     let market = MarketContext::new()
@@ -429,6 +445,8 @@ fn test_pricer_integration_with_fixings() {
             (date!(2025 - 01 - 01), 0.049),
         ],
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .unwrap();
 
@@ -474,8 +492,14 @@ fn stochastic_cashflow_engine_uses_current_period_contractual_fixing() {
                 0.25,
             ))
             .insert_series(
-                ScalarTimeSeries::new("FIXING:USD-SOFR-3M", vec![(issue_date, fixing)], None)
-                    .expect("fixing series"),
+                ScalarTimeSeries::new(
+                    "FIXING:USD-SOFR-3M",
+                    vec![(issue_date, fixing)],
+                    None,
+                    finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                    finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+                )
+                .expect("fixing series"),
             );
         let fixings =
             finstack_quant_core::market_data::fixings::get_fixing_series(&market, "USD-SOFR-3M")

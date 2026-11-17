@@ -61,36 +61,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind"
   },
   {
-    "path": "#/$defs/d_13ceef63597b70bc1a71",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpRollState",
-    "description": "Serialized source grid and time origin of a rolled curve."
-  },
-  {
-    "path": "#/$defs/d_13ceef63597b70bc1a71/properties/offset",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpRollState/properties/offset",
-    "description": "Current origin in the source interpolation's year-fraction coordinates.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_13ceef63597b70bc1a71/properties/source_points",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpRollState/properties/source_points",
-    "description": "Source pillars `(time, value)` in the source curve's own coordinates."
-  },
-  {
-    "path": "#/$defs/d_13ceef63597b70bc1a71/properties/source_points/items",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpRollState/properties/source_points/items"
-  },
-  {
-    "path": "#/$defs/d_13ceef63597b70bc1a71/properties/source_points/items/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpRollState/properties/source_points/items/prefixItems/0",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_13ceef63597b70bc1a71/properties/source_points/items/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpRollState/properties/source_points/items/prefixItems/1",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_14c856f170a7fa5ec480",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpStyle",
     "description": "Enum of supported interpolation styles. The default is `Linear`."
@@ -111,13 +81,13 @@ export default [
     "path": "#/$defs/d_14c856f170a7fa5ec480/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpStyle/oneOf/2",
     "const": "monotone_convex",
-    "description": "Monotone‐convex interpolation of positive, non-increasing values."
+    "description": "Hagan‐West monotone‐convex interpolation of positive values."
   },
   {
     "path": "#/$defs/d_14c856f170a7fa5ec480/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpStyle/oneOf/3",
     "const": "cubic_hermite",
-    "description": "Cubic Hermite interpolation (monotone-preserving slopes)."
+    "description": "Cubic Hermite interpolation (Fritsch‐Butland / Moler PCHIP slopes)."
   },
   {
     "path": "#/$defs/d_14c856f170a7fa5ec480/oneOf/4",
@@ -373,19 +343,19 @@ export default [
     "path": "#/$defs/d_29287993dab35875106b/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolQuoteType/oneOf/0",
     "const": "black_lognormal",
-    "description": "Black (lognormal) implied volatility, relative units (the default)."
+    "description": "Black (lognormal) implied volatility in relative units per square-root source year."
   },
   {
     "path": "#/$defs/d_29287993dab35875106b/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolQuoteType/oneOf/1",
     "const": "shifted_black_lognormal",
-    "description": "Displaced Black volatility; per-expiry displacements accompany the grid."
+    "description": "Displaced Black volatility; one per-expiry displacement accompanies the grid."
   },
   {
     "path": "#/$defs/d_29287993dab35875106b/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolQuoteType/oneOf/2",
     "const": "normal",
-    "description": "Normal (Bachelier) implied volatility, absolute rate units."
+    "description": "Normal (Bachelier) implied volatility in underlying units per square-root source year."
   },
   {
     "path": "#/$defs/d_2a71f59be0c75aa6f427",
@@ -431,44 +401,61 @@ export default [
   {
     "path": "#/$defs/d_467e0d727ff2ae92c819",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNode",
-    "description": "A single node in the market data hierarchy tree.\n\nNodes form a tree: each is named by its key in the parent map, and carries\noptional key-value tags for cross-cutting queries, ordered children, and\nleaf `CurveId` references."
+    "description": "A single node within [`MarketDataHierarchy`].\n\nNodes can contain tags (key-value pairs for filtering), ordered child entries,\nand typed [`MarketDataTarget`] associations."
   },
   {
     "path": "#/$defs/d_467e0d727ff2ae92c819/properties/children",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNode/properties/children",
-    "description": "Child nodes, keyed by their name. The key becomes the child's `name`\nduring deserialization. Insertion order is preserved."
+    "description": "Ordered child entries at this level."
   },
   {
-    "path": "#/$defs/d_467e0d727ff2ae92c819/properties/children/additionalProperties",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNode/properties/children/additionalProperties",
-    "ref": "#/$defs/HierarchyNode",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNode"
-  },
-  {
-    "path": "#/$defs/d_467e0d727ff2ae92c819/properties/curves",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNode/properties/curves",
-    "description": "Curves attached directly to this node. Serialized as `curves`."
-  },
-  {
-    "path": "#/$defs/d_467e0d727ff2ae92c819/properties/curves/items",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNode/properties/curves/items",
-    "ref": "#/$defs/Id",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
+    "path": "#/$defs/d_467e0d727ff2ae92c819/properties/children/items",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNode/properties/children/items",
+    "ref": "#/$defs/HierarchyNodeEntry",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNodeEntry"
   },
   {
     "path": "#/$defs/d_467e0d727ff2ae92c819/properties/tags",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNode/properties/tags",
-    "description": "Free-form key/value labels on this node, used for selection and\nreporting. Insertion order is preserved."
+    "description": "Metadata tags for tag-filter selection."
   },
   {
     "path": "#/$defs/d_467e0d727ff2ae92c819/properties/tags/additionalProperties",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNode/properties/tags/additionalProperties"
   },
   {
+    "path": "#/$defs/d_467e0d727ff2ae92c819/properties/targets",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNode/properties/targets",
+    "description": "Typed market-data targets stored directly at this node in authored order."
+  },
+  {
+    "path": "#/$defs/d_467e0d727ff2ae92c819/properties/targets/items",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNode/properties/targets/items",
+    "ref": "#/$defs/MarketDataTarget",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget"
+  },
+  {
     "path": "#/$defs/d_48549691c341fd7f3116",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DecimalWire",
     "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
     "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$"
+  },
+  {
+    "path": "#/$defs/d_487340fb491e99067944",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNodeEntry",
+    "description": "Named child or root entry preserving authored sequence order at a hierarchy level."
+  },
+  {
+    "path": "#/$defs/d_487340fb491e99067944/properties/name",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNodeEntry/properties/name",
+    "description": "Exact node segment name at this hierarchy level."
+  },
+  {
+    "path": "#/$defs/d_487340fb491e99067944/properties/node",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNodeEntry/properties/node",
+    "description": "Node metadata tags, child entries, and typed market-data associations.",
+    "ref": "#/$defs/HierarchyNode",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNode"
   },
   {
     "path": "#/$defs/d_48766f6cb460f23a8724",
@@ -571,6 +558,31 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_5c1ce413ed4344df4437",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationObservation",
+    "description": "One published monthly CPI/RPI fixing record inside an [`InflationIndex`] snapshot."
+  },
+  {
+    "path": "#/$defs/d_5c1ce413ed4344df4437/properties/available_on",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationObservation/properties/available_on",
+    "description": "Inclusive end-of-day availability date for this selected observation version.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_5c1ce413ed4344df4437/properties/reference_month",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationObservation/properties/reference_month",
+    "description": "Canonical first calendar day of the reference inflation month (`day() == 1`).",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_5c1ce413ed4344df4437/properties/value",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationObservation/properties/value",
+    "description": "Published finite, strictly positive index level.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_683ec38b8d36db5534bc",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveAdjustmentSegment"
   },
@@ -652,26 +664,206 @@ export default [
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_7294ceac8716eaa72c7a",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ParInterp",
-    "description": "Interpolation method for reporting par spreads stored on the curve.\n\nApplies only to *par-spread* readouts (the spreads quoted at calibration\npillars), not to the underlying hazard rates. Hazard interpolation always\nfollows piecewise-constant survival. Use `LogLinear` when spreads span\nmultiple decades (e.g. high-yield issuers) so interpolation stays in\nlog-space; otherwise the default `Linear` is fine."
+    "path": "#/$defs/d_6e573f412d0be641b82f",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget",
+    "description": "Canonical family-typed identifier for an addressable entry in\n[`MarketContext`](crate::market_data::context::MarketContext).\n\nIdentifiers in `MarketContext` are namespace-local: the same `CurveId` may\ncoexist across distinct stores (for example a `VolSurface` and a\n`ScalarTimeSeries`). `MarketDataTarget` pairs an exact [`CurveId`] with the\nexact store and subkind to select without multi-store probing."
   },
   {
-    "path": "#/$defs/d_7294ceac8716eaa72c7a/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ParInterp/oneOf/0",
-    "const": "linear",
-    "description": "Linear interpolation in spread space"
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/0",
+    "description": "Discount curve stored in `curves`."
   },
   {
-    "path": "#/$defs/d_7294ceac8716eaa72c7a/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ParInterp/oneOf/1",
-    "const": "log_linear",
-    "description": "Log-linear interpolation when spreads are strictly positive"
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/0/properties/id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/0/properties/id",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/0/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/0/properties/kind",
+    "const": "discount_curve"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/1",
+    "description": "Forward curve stored in `curves`."
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/1/properties/id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/1/properties/id",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/1/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/1/properties/kind",
+    "const": "forward_curve"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/10",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/10",
+    "description": "Unitless scalar quote (`MarketScalar::Unitless`) stored in `prices`."
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/10/properties/id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/10/properties/id",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/10/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/10/properties/kind",
+    "const": "unitless_scalar"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/11",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/11",
+    "description": "Time series stored in `series`."
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/11/properties/id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/11/properties/id",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/11/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/11/properties/kind",
+    "const": "series"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/2",
+    "description": "Parametric yield curve stored in `curves`."
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/2/properties/id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/2/properties/id",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/2/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/2/properties/kind",
+    "const": "parametric_curve"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/3",
+    "description": "Hazard / survival curve stored in `curves`."
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/3/properties/id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/3/properties/id",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/3/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/3/properties/kind",
+    "const": "hazard_curve"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/4",
+    "description": "Inflation curve stored in `curves`."
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/4/properties/id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/4/properties/id",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/4/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/4/properties/kind",
+    "const": "inflation_curve"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/5",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/5",
+    "description": "Forward price curve (`PriceCurveKind::Price`) stored in `curves`."
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/5/properties/id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/5/properties/id",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/5/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/5/properties/kind",
+    "const": "price_curve"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/6",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/6",
+    "description": "Volatility index curve (`PriceCurveKind::VolIndex`) stored in `curves`."
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/6/properties/id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/6/properties/id",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/6/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/6/properties/kind",
+    "const": "vol_index_curve"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/7",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/7",
+    "description": "Base correlation curve stored in `curves`."
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/7/properties/id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/7/properties/id",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/7/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/7/properties/kind",
+    "const": "base_correlation"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/8",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/8",
+    "description": "Implied volatility surface stored in `surfaces`."
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/8/properties/id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/8/properties/id",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/8/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/8/properties/kind",
+    "const": "vol_surface"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/9",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/9",
+    "description": "Monetary scalar price (`MarketScalar::Price`) stored in `prices`."
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/9/properties/id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/9/properties/id",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_6e573f412d0be641b82f/oneOf/9/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataTarget/oneOf/9/properties/kind",
+    "const": "price_scalar"
   },
   {
     "path": "#/$defs/d_7631522c7759bd704ba6",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ScalarTimeSeries",
-    "description": "Date-indexed time series with flexible interpolation.\n\nProvides lightweight storage for historical or forecast data with step or\nlinear interpolation. Unlike full term structures, this is optimized for\nsparse, irregularly-spaced observations.\n\n# Storage\n\nUses columnar format with parallel arrays:\n- Dates stored as i32 (days since Unix epoch) for compact size\n- Values stored as f64\n- Binary search for O(log n) lookup\n\n# Interpolation\n\n- **Step**: Last observation carried forward (LOCF)\n- **Linear**: Linear interpolation between observations\n\n# Use Cases\n\n- **Economic indicators**: GDP, unemployment rate, PMI\n- **Credit metrics**: Historical credit spreads, CDS levels\n- **Commodity fundamentals**: Inventory levels, production data\n- **Any sparse time series**: Where full curve infrastructure is overkill\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"US-UNEMPLOYMENT\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 31).expect(\"Valid date\"), 3.7),\n        (Date::from_calendar_date(2024, Month::February, 29).expect(\"Valid date\"), 3.9),\n    ],\n    None,\n)\n.expect(\"Series creation should succeed\")\n.with_interpolation(SeriesInterpolation::Linear);\n\nlet mid = Date::from_calendar_date(2024, Month::February, 14).expect(\"Valid date\");\nlet interpolated = series.value_on(mid).expect(\"Value lookup should succeed\");\nassert!(interpolated > 3.7 && interpolated < 3.9);\n```"
+    "description": "Date-indexed time series with flexible interpolation.\n\nProvides lightweight storage for historical or forecast data with step or\nlinear interpolation. Unlike full term structures, this is optimized for\nsparse, irregularly-spaced observations.\n\n# Storage\n\nUses columnar format with parallel arrays:\n- Dates stored as i32 (days since Unix epoch) for compact size\n- Values stored as f64\n- Binary search for O(log n) lookup\n\n# Interpolation\n\n- **Step**: Last observation carried forward (LOCF)\n- **Linear**: Linear interpolation between observations\n\n# Use Cases\n\n- **Economic indicators**: GDP, unemployment rate, PMI\n- **Credit metrics**: Historical credit spreads, CDS levels\n- **Commodity fundamentals**: Inventory levels, production data\n- **Any sparse time series**: Where full curve infrastructure is overkill\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::{\n    ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,\n};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"US-UNEMPLOYMENT\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 31).expect(\"Valid date\"), 3.7),\n        (Date::from_calendar_date(2024, Month::February, 29).expect(\"Valid date\"), 3.9),\n    ],\n    None,\n    SeriesInterpolation::Linear,\n    SeriesExtrapolation::Error,\n)\n.expect(\"Series creation should succeed\");\n\nlet mid = Date::from_calendar_date(2024, Month::February, 14).expect(\"Valid date\");\nlet interpolated = series.get_value(mid).expect(\"Value lookup should succeed\");\nassert!(interpolated > 3.7 && interpolated < 3.9);\n```"
   },
   {
     "path": "#/$defs/d_7631522c7759bd704ba6/properties/currency",
@@ -687,6 +879,13 @@ export default [
   {
     "path": "#/$defs/d_7631522c7759bd704ba6/properties/currency/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ScalarTimeSeries/properties/currency/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_7631522c7759bd704ba6/properties/extrapolation",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ScalarTimeSeries/properties/extrapolation",
+    "description": "Right-tail extrapolation policy",
+    "ref": "#/$defs/SeriesExtrapolation",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SeriesExtrapolation"
   },
   {
     "path": "#/$defs/d_7631522c7759bd704ba6/properties/id",
@@ -897,15 +1096,16 @@ export default [
   {
     "path": "#/$defs/d_7bf68715545bd3d2b581/properties/adjustment",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DiscountCurveTransform/properties/adjustment",
-    "description": "Cumulative derivative of the additive log-discount adjustment.",
+    "description": "Cumulative derivative of the additive log-factor adjustment.",
     "ref": "#/$defs/PiecewiseLinearAdjustment",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/PiecewiseLinearAdjustment"
   },
   {
-    "path": "#/$defs/d_7bf68715545bd3d2b581/properties/offset",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DiscountCurveTransform/properties/offset",
-    "description": "Current origin in the source interpolation's year-fraction coordinates.",
-    "format": "double"
+    "path": "#/$defs/d_7bf68715545bd3d2b581/properties/source_base_date",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DiscountCurveTransform/properties/source_base_date",
+    "description": "Original, untransformed curve base date defining the source coordinate system.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
   },
   {
     "path": "#/$defs/d_7bf68715545bd3d2b581/properties/source_points",
@@ -1015,25 +1215,82 @@ export default [
   {
     "path": "#/$defs/d_86124daa1d76a07e8682",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ExtrapolationPolicy",
-    "description": "Extrapolation policy for evaluation outside the knot range.\n\nEvery interpolation strategy honours this policy at both ends of the knot\nrange. Choose based on what behaviour the downstream pricer expects:\n\n- `FlatZero` (default): hold the boundary value constant.\n- `FlatForward`: extend the boundary segment's slope, measured in the\n  space the interpolation style works in (table below).\n- `None`: refuse to extrapolate; return `NaN` and require the caller to\n  detect and handle out-of-range queries explicitly. Recommended for\n  production risk systems.\n\nWhat `FlatForward` extends depends on the [`InterpStyle`]:\n\n| Style | `FlatForward` extends | On a discount-factor curve | On a rate-valued curve |\n|---|---|---|---|\n| `Linear` | the value linearly | - | rates keep trending |\n| `CubicHermite` | the value linearly, with the end-knot slope | - | rates keep trending |\n| `LogLinear` | `ln(value)` linearly | flat forward rate | - |\n| `PiecewiseQuadraticForward` | `ln(value)` linearly | flat forward rate | - |\n| `MonotoneConvex` | the boundary instantaneous forward | flat forward rate | - |\n\nThe market-standard tail for a discount-factor curve is a flat forward\nrate (`FlatForward` with a log-space style). For a curve that stores\nrates, such as [`ForwardCurve`](crate::market_data::term_structures::ForwardCurve),\nthe market-standard tail holds the last rate flat, which is `FlatZero`.\n\n`#[non_exhaustive]` so that future policies (e.g. linear-zero,\nasymptotic) can be added without breaking downstream code."
+    "description": "Extrapolation policy for evaluation outside the knot range.\n\nEvery interpolation strategy honours this policy at both ends of the knot\nrange. Callers must choose an explicit policy:\n\n- `Flat`: hold the boundary ordinate constant outside the knot range\n  (and return derivative `0.0` strictly outside the knot range).\n- `Extend`: extend the boundary segment's slope in the interpolation style's\n  working space (table below).\n- `Error`: refuse to extrapolate; return an explicit error for queries\n  outside `[knots[0], knots[last]]`.\n\nWhat `Extend` extends depends on the [`InterpStyle`]:\n\n| Style | `Extend` extends | On a discount-factor curve | On a rate-valued curve |\n|---|---|---|---|\n| `Linear` | the value linearly | - | rates keep trending |\n| `CubicHermite` | the value linearly, with the end-knot slope | - | rates keep trending |\n| `LogLinear` | `ln(value)` linearly | flat forward rate | - |\n| `PiecewiseQuadraticForward` | `ln(value)` linearly | flat forward rate | - |\n| `MonotoneConvex` | the boundary instantaneous forward | flat forward rate | - |\n\nThe market-standard tail for a discount-factor curve is a flat forward\nrate (`Extend` with a log-space style). For a curve that stores rates or\nspreads, holding the last rate constant is `Flat`."
   },
   {
     "path": "#/$defs/d_86124daa1d76a07e8682/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ExtrapolationPolicy/oneOf/0",
-    "const": "flat_zero",
-    "description": "Hold the boundary value constant."
+    "const": "flat",
+    "description": "Hold the boundary value constant outside `[knots[0], knots[last]]`."
   },
   {
     "path": "#/$defs/d_86124daa1d76a07e8682/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ExtrapolationPolicy/oneOf/1",
-    "const": "flat_forward",
+    "const": "extend",
     "description": "Extend the boundary segment's slope in the interpolation style's\nworking space; see the table on [`ExtrapolationPolicy`]."
   },
   {
     "path": "#/$defs/d_86124daa1d76a07e8682/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ExtrapolationPolicy/oneOf/2",
-    "const": "none",
-    "description": "Return `NaN` for queries outside the knot range.\n\nUse this to prevent silent extrapolation in production risk systems\nwhere extrapolated values should be explicitly opted-in.\nCallers should check `.is_nan()` on the result and handle accordingly.\n\n# When to Use\n\n- Risk management systems where extrapolated values are unreliable\n- Validation pipelines where out-of-range queries indicate data errors\n- Any context where silent extrapolation could mask problems\n\n# Note\n\nSince interpolation returns `f64` (not `Result`), this policy returns\n`f64::NAN` rather than an error. This avoids changing the hot-path\nsignature while still making out-of-range queries detectable."
+    "const": "error",
+    "description": "Return an error for queries outside `[knots[0], knots[last]]`."
+  },
+  {
+    "path": "#/$defs/d_86847d022d6ee46c8364",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationExpectedRelease",
+    "description": "One expected-release schedule assumption for a monthly CPI/RPI reference period."
+  },
+  {
+    "path": "#/$defs/d_86847d022d6ee46c8364/properties/expected_release",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationExpectedRelease/properties/expected_release",
+    "description": "Scheduled or expected release date on or after `reference_month`.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_86847d022d6ee46c8364/properties/known_on",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationExpectedRelease/properties/known_on",
+    "description": "Inclusive date on or before the snapshot `knowledge_date` when this release assumption was known.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_86847d022d6ee46c8364/properties/reference_month",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationExpectedRelease/properties/reference_month",
+    "description": "Canonical first calendar day of the reference inflation month (`day() == 1`).",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_8c12e8f6a6ead66335d4",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HazardConditionSource",
+    "description": "Source coordinate anchor and original piecewise-constant hazard schedule\nretained across [`HazardCurve::condition`] transformations so dated survival\nintegrates directly on the retained source timeline."
+  },
+  {
+    "path": "#/$defs/d_8c12e8f6a6ead66335d4/properties/base_date",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HazardConditionSource/properties/base_date",
+    "description": "Original untransformed curve base date.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_8c12e8f6a6ead66335d4/properties/knot_points",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HazardConditionSource/properties/knot_points",
+    "description": "Original `(time_years, hazard_rate)` pillars from `base_date`."
+  },
+  {
+    "path": "#/$defs/d_8c12e8f6a6ead66335d4/properties/knot_points/items",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HazardConditionSource/properties/knot_points/items"
+  },
+  {
+    "path": "#/$defs/d_8c12e8f6a6ead66335d4/properties/knot_points/items/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HazardConditionSource/properties/knot_points/items/prefixItems/0",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_8c12e8f6a6ead66335d4/properties/knot_points/items/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HazardConditionSource/properties/knot_points/items/prefixItems/1",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_92582eaaa8147270716a",
@@ -1044,31 +1301,76 @@ export default [
     "path": "#/$defs/d_92582eaaa8147270716a/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolSurfaceAxis/oneOf/0",
     "const": "strike",
-    "description": "The secondary axis is strike/moneyness."
+    "description": "The secondary axis is literal absolute strike in underlying units."
   },
   {
     "path": "#/$defs/d_92582eaaa8147270716a/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolSurfaceAxis/oneOf/1",
     "const": "tenor",
-    "description": "The secondary axis is swap tenor or another maturity-style bucket."
+    "description": "The secondary axis is strictly positive swap or reference tenor in years."
   },
   {
-    "path": "#/$defs/d_952d2539685fe1adf99e",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationPublicationWire"
+    "path": "#/$defs/d_9592a71481f6c3bc92ea",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxAtmConvention",
+    "const": "delta_neutral_straddle",
+    "description": "At-the-money strike convention on [`FxDeltaVolSurface`]."
   },
   {
-    "path": "#/$defs/d_952d2539685fe1adf99e/properties/publication_date",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationPublicationWire/properties/publication_date",
-    "description": "Inclusive date on which the observation must be available.",
+    "path": "#/$defs/d_9b42f4252310211295f9",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCountContextState",
+    "description": "Serializable snapshot of [`DayCountContext`] state for persistence and interchange.\n\nThis struct captures the optional context parameters (calendar, frequency, business-day basis)\nneeded to reconstruct a [`DayCountContext`] at runtime using the built-in calendar lookup.\n`Default` is the empty context (no calendar, frequency, basis, coupon\nperiod or termination status), the snapshot of\n[`DayCountContext::default`]."
+  },
+  {
+    "path": "#/$defs/d_9b42f4252310211295f9/properties/bus_basis",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCountContextState/properties/bus_basis",
+    "description": "Optional custom business-day divisor (defaults to 252 when `None`).",
+    "format": "uint16",
+    "maximum": 65535,
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_9b42f4252310211295f9/properties/calendar_id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCountContextState/properties/calendar_id",
+    "description": "Optional calendar code (e.g. \"target2\")."
+  },
+  {
+    "path": "#/$defs/d_9b42f4252310211295f9/properties/coupon_period",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCountContextState/properties/coupon_period",
+    "default": null,
+    "description": "Optional unadjusted regular ICMA reference period or ACT/365L enclosing\ncoupon `(start, end)`, serialized as two ISO dates.\n\nRequired for exact ICMA accrual on round-trip. `None` selects the\nfrequency-only ICMA calculation path; ACT/365L requires these dates."
+  },
+  {
+    "path": "#/$defs/d_9b42f4252310211295f9/properties/coupon_period/prefixItems/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCountContextState/properties/coupon_period/prefixItems/0",
     "ref": "#/$defs/DateWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
   },
   {
-    "path": "#/$defs/d_952d2539685fe1adf99e/properties/reference_month",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationPublicationWire/properties/reference_month",
-    "description": "First calendar day of the reference month.",
+    "path": "#/$defs/d_9b42f4252310211295f9/properties/coupon_period/prefixItems/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCountContextState/properties/coupon_period/prefixItems/1",
     "ref": "#/$defs/DateWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_9b42f4252310211295f9/properties/end_is_termination_date",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCountContextState/properties/end_is_termination_date",
+    "default": null,
+    "description": "Whether the later accrual endpoint is the contractual termination\ndate; `None` (omitted or `null` on the wire) means unspecified, which\n30E/360 ISDA rejects."
+  },
+  {
+    "path": "#/$defs/d_9b42f4252310211295f9/properties/frequency",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCountContextState/properties/frequency",
+    "description": "Optional coupon frequency, required for ACT/ACT ISMA."
+  },
+  {
+    "path": "#/$defs/d_9b42f4252310211295f9/properties/frequency/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCountContextState/properties/frequency/anyOf/0",
+    "ref": "#/$defs/Tenor",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Tenor"
+  },
+  {
+    "path": "#/$defs/d_9b42f4252310211295f9/properties/frequency/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCountContextState/properties/frequency/anyOf/1"
   },
   {
     "path": "#/$defs/d_9ba58a59f23c169d3a67",
@@ -1079,7 +1381,7 @@ export default [
     "path": "#/$defs/d_9ba58a59f23c169d3a67/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolInterpolationMode/oneOf/0",
     "const": "vol",
-    "description": "Interpolate implied volatility directly (the default).\n\nThis is the most literal choice when market quotes are already given as\nimplied volatilities on the stored grid and you want local interpolation\nin quote space.\n\n# ⚠️ Not calendar-arbitrage-safe across expiry\n\nLinear-in-vol interpolation along the **expiry** axis does not preserve\nmonotonicity of total variance `σ²·t`, so an off-grid vol read between\ntwo expiry pillars can imply *decreasing* total variance with time —\ni.e. calendar arbitrage — even when the pillar grid is itself\narbitrage-free. For arbitrage-sensitive workflows (Dupire local vol,\nno-arb checks, term-structure interpolation) select\n[`TotalVariance`](Self::TotalVariance) via\n[`VolSurfaceBuilder::interpolation_mode`]. Use this default when\nquote-space fidelity at the pillars is the governing convention."
+    "description": "Interpolate implied volatility directly.\n\nThis is the literal choice when market quotes are given as implied\nvolatilities on the stored grid and you want local interpolation in\nquote space.\n\n# ⚠️ Not calendar-arbitrage-safe across expiry\n\nLinear-in-vol interpolation along the **expiry** axis does not preserve\nmonotonicity of total variance `σ²·t`, so an off-grid vol read between\ntwo expiry pillars can imply *decreasing* total variance with time —\ni.e. calendar arbitrage — even when the pillar grid is itself\narbitrage-free. For arbitrage-sensitive workflows (Dupire local vol,\nno-arb checks, term-structure interpolation) select\n[`TotalVariance`](Self::TotalVariance) via\n[`VolSurfaceBuilder::interpolation_mode`]."
   },
   {
     "path": "#/$defs/d_9ba58a59f23c169d3a67/oneOf/1",
@@ -1090,7 +1392,7 @@ export default [
   {
     "path": "#/$defs/d_9d04eee9f565b9c40882",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolSurface",
-    "description": "Volatility surface defined on expiry × strike grid.\n\nInternally stores volatilities in row-major order as a boxed slice."
+    "description": "Volatility surface defined on an expiry × secondary-coordinate grid.\n\nInternally stores annual volatilities in row-major order as a boxed slice."
   },
   {
     "path": "#/$defs/d_9d04eee9f565b9c40882/properties/displacements",
@@ -1105,7 +1407,7 @@ export default [
   {
     "path": "#/$defs/d_9d04eee9f565b9c40882/properties/expiries",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolSurface/properties/expiries",
-    "description": "Expiry times in years"
+    "description": "Strictly positive option expiry times in years."
   },
   {
     "path": "#/$defs/d_9d04eee9f565b9c40882/properties/expiries/items",
@@ -1113,9 +1415,24 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_9d04eee9f565b9c40882/properties/expiry_clock",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolSurface/properties/expiry_clock",
+    "description": "Optional calibration clock mapping calendar dates to source expiry year fractions."
+  },
+  {
+    "path": "#/$defs/d_9d04eee9f565b9c40882/properties/expiry_clock/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolSurface/properties/expiry_clock/anyOf/0",
+    "ref": "#/$defs/VolatilityClock",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolatilityClock"
+  },
+  {
+    "path": "#/$defs/d_9d04eee9f565b9c40882/properties/expiry_clock/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolSurface/properties/expiry_clock/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_9d04eee9f565b9c40882/properties/id",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolSurface/properties/id",
-    "description": "Surface identifier"
+    "description": "Surface identifier."
   },
   {
     "path": "#/$defs/d_9d04eee9f565b9c40882/properties/interpolation_mode",
@@ -1139,19 +1456,19 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolSurfaceAxis"
   },
   {
-    "path": "#/$defs/d_9d04eee9f565b9c40882/properties/strikes",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolSurface/properties/strikes",
-    "description": "Strike prices"
+    "path": "#/$defs/d_9d04eee9f565b9c40882/properties/secondary_values",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolSurface/properties/secondary_values",
+    "description": "Secondary-axis coordinates (absolute strikes or positive underlying tenors)."
   },
   {
-    "path": "#/$defs/d_9d04eee9f565b9c40882/properties/strikes/items",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolSurface/properties/strikes/items",
+    "path": "#/$defs/d_9d04eee9f565b9c40882/properties/secondary_values/items",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolSurface/properties/secondary_values/items",
     "format": "double"
   },
   {
     "path": "#/$defs/d_9d04eee9f565b9c40882/properties/vols_row_major",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolSurface/properties/vols_row_major",
-    "description": "Volatility values in row-major order"
+    "description": "Volatility values in row-major order."
   },
   {
     "path": "#/$defs/d_9d04eee9f565b9c40882/properties/vols_row_major/items",
@@ -1161,7 +1478,14 @@ export default [
   {
     "path": "#/$defs/d_a154a0f59b6758a0e791",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxDeltaVolSurface",
-    "description": "Delta-quoted FX volatility surface.\n\nStores market-standard FX vol quotes (ATM DNS, 25-delta risk-reversal,\n25-delta butterfly) across multiple expiries. Models-layer functions\nperform delta conversion and volatility evaluation.\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;\n\nlet surface = FxDeltaVolSurface::new(\n    \"EURUSD-DELTA-VOL\",\n    vec![0.25, 0.5, 1.0],\n    vec![0.08, 0.085, 0.09],\n    vec![0.01, 0.012, 0.015],\n    vec![0.005, 0.006, 0.007],\n    None,\n    None,\n).expect(\"surface should build\");\n\nassert_eq!(surface.expiries().len(), 3);\nassert!((surface.atm_vols()[0] - 0.08).abs() < 1e-12);\n```"
+    "description": "Delta-quoted FX volatility surface.\n\nStores market-standard FX vol quotes (ATM DNS, 25-delta risk-reversal,\n25-delta arithmetic smile butterfly, optional 10-delta wings) together with\nexplicit currency pair, quote profile conventions, and optional [`VolatilityClock`].\nModels-layer functions perform delta conversion and volatility evaluation.\n\n# Examples\n\n```rust\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::market_data::surfaces::{\n    FxAtmConvention, FxButterflyConvention, FxDeltaConvention, FxDeltaVolSurface,\n};\nuse finstack_quant_core::money::fx::CurrencyPair;\n\nlet pair = CurrencyPair::try_new(Currency::EUR, Currency::USD)?;\nlet surface = FxDeltaVolSurface::builder(\"EURUSD-DELTA-VOL\", pair)\n    .delta_convention(FxDeltaConvention::ForwardUnadjusted)\n    .atm_convention(FxAtmConvention::DeltaNeutralStraddle)\n    .butterfly_convention(FxButterflyConvention::Smile)\n    .expiries(&[0.25, 0.5, 1.0])\n    .atm_vols(&[0.08, 0.085, 0.09])\n    .rr_25d(&[0.01, 0.012, 0.015])\n    .bf_25d(&[0.005, 0.006, 0.007])\n    .build()?;\n\nassert_eq!(surface.expiries().len(), 3);\nassert!((surface.atm_vols()[0] - 0.08).abs() < 1e-12);\n# Ok::<(), finstack_quant_core::Error>(())\n```"
+  },
+  {
+    "path": "#/$defs/d_a154a0f59b6758a0e791/properties/atm_convention",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxDeltaVolSurface/properties/atm_convention",
+    "description": "At-the-money strike convention.",
+    "ref": "#/$defs/FxAtmConvention",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxAtmConvention"
   },
   {
     "path": "#/$defs/d_a154a0f59b6758a0e791/properties/atm_vols",
@@ -1176,7 +1500,7 @@ export default [
   {
     "path": "#/$defs/d_a154a0f59b6758a0e791/properties/bf_10d",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxDeltaVolSurface/properties/bf_10d",
-    "description": "Optional 10-delta butterfly per expiry."
+    "description": "Optional 10-delta arithmetic smile butterfly per expiry."
   },
   {
     "path": "#/$defs/d_a154a0f59b6758a0e791/properties/bf_10d/items",
@@ -1186,12 +1510,26 @@ export default [
   {
     "path": "#/$defs/d_a154a0f59b6758a0e791/properties/bf_25d",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxDeltaVolSurface/properties/bf_25d",
-    "description": "25-delta butterfly per expiry."
+    "description": "25-delta arithmetic smile butterfly per expiry."
   },
   {
     "path": "#/$defs/d_a154a0f59b6758a0e791/properties/bf_25d/items",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxDeltaVolSurface/properties/bf_25d/items",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_a154a0f59b6758a0e791/properties/butterfly_convention",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxDeltaVolSurface/properties/butterfly_convention",
+    "description": "Butterfly quote convention.",
+    "ref": "#/$defs/FxButterflyConvention",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxButterflyConvention"
+  },
+  {
+    "path": "#/$defs/d_a154a0f59b6758a0e791/properties/delta_convention",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxDeltaVolSurface/properties/delta_convention",
+    "description": "Delta convention governing wing delta-to-strike conversion.",
+    "ref": "#/$defs/FxSurfaceDeltaConvention",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxSurfaceDeltaConvention"
   },
   {
     "path": "#/$defs/d_a154a0f59b6758a0e791/properties/expiries",
@@ -1204,11 +1542,34 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_a154a0f59b6758a0e791/properties/expiry_clock",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxDeltaVolSurface/properties/expiry_clock",
+    "default": null,
+    "description": "Optional volatility clock translating calendar expiry dates to `expiries`."
+  },
+  {
+    "path": "#/$defs/d_a154a0f59b6758a0e791/properties/expiry_clock/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxDeltaVolSurface/properties/expiry_clock/anyOf/0",
+    "ref": "#/$defs/VolatilityClock",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolatilityClock"
+  },
+  {
+    "path": "#/$defs/d_a154a0f59b6758a0e791/properties/expiry_clock/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxDeltaVolSurface/properties/expiry_clock/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_a154a0f59b6758a0e791/properties/id",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxDeltaVolSurface/properties/id",
     "description": "Surface identifier.",
     "ref": "#/$defs/Id",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_a154a0f59b6758a0e791/properties/pair",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxDeltaVolSurface/properties/pair",
+    "description": "Currency pair (`base/quote`) matching quoted FX forward orientation.",
+    "ref": "#/$defs/CurrencyPair",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurrencyPair"
   },
   {
     "path": "#/$defs/d_a154a0f59b6758a0e791/properties/rr_10d",
@@ -1241,11 +1602,6 @@ export default [
     "description": "Discount curve state"
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/0/properties/allow_non_monotonic",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/0/properties/allow_non_monotonic",
-    "description": "Whether non-monotonic DFs are allowed (dangerous override)"
-  },
-  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/0/properties/base",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/0/properties/base",
     "description": "Base date",
@@ -1255,7 +1611,7 @@ export default [
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/0/properties/calendar_id",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/0/properties/calendar_id",
-    "description": "Registered holiday calendar id of the business-day time axis (for\nexample `\"brbd\"` for a Bus/252 curve). Omitted when the day count needs\nno calendar."
+    "description": "Registered holiday calendar id of the business-day time axis."
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/0/properties/day_count",
@@ -1291,7 +1647,7 @@ export default [
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/0/properties/knot_points",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/0/properties/knot_points",
-    "description": "Time/value pairs used to construct the curve"
+    "description": "Time/value pairs stored on the curve (must already contain origin `(0.0, 1.0)`)."
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/0/properties/knot_points/items",
@@ -1305,18 +1661,6 @@ export default [
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/0/properties/knot_points/items/prefixItems/1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/0/properties/knot_points/items/prefixItems/1",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/0/properties/min_forward_rate",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/0/properties/min_forward_rate",
-    "description": "Minimum forward rate floor (if set)",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/0/properties/min_forward_tenor",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/0/properties/min_forward_tenor",
-    "description": "Minimum tenor for forward rate calculations",
     "format": "double"
   },
   {
@@ -1362,45 +1706,65 @@ export default [
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/base",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/base",
-    "description": "Base date",
+    "description": "Base date.",
     "ref": "#/$defs/DateWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
   },
   {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/calendar_id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/calendar_id",
+    "description": "Registered holiday calendar id of the business-day time axis."
+  },
+  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/day_count",
-    "description": "Day count convention",
+    "description": "Day-count convention for projection factor time basis.",
     "ref": "#/$defs/DayCount",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCount"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/extrapolation",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/extrapolation",
-    "description": "Extrapolation policy",
+    "description": "Extrapolation policy.",
     "ref": "#/$defs/ExtrapolationPolicy",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ExtrapolationPolicy"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/fx_policy",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/fx_policy",
-    "description": "Opaque FX policy stamp; see [`crate::market_data::term_structures::DiscountCurve::fx_policy`]."
+    "description": "Opaque FX policy stamp; see [`ForwardCurve::fx_policy`]."
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/id",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/id",
-    "description": "Curve identifier"
+    "description": "Curve identifier."
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/index_tenor",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/index_tenor",
+    "description": "Optional index accrual tenor metadata."
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/index_tenor/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/index_tenor/anyOf/0",
+    "ref": "#/$defs/Tenor",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Tenor"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/index_tenor/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/index_tenor/anyOf/1"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/interp_style",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/interp_style",
-    "description": "Interpolation style",
+    "description": "Interpolation style.",
     "ref": "#/$defs/InterpStyle",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpStyle"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/knot_points",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/knot_points",
-    "description": "Time/value pairs used to construct the curve"
+    "description": "Time/factor pairs stored on the curve (must already contain origin `(0.0, 1.0)`)."
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/knot_points/items",
@@ -1414,16 +1778,6 @@ export default [
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/knot_points/items/prefixItems/1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/knot_points/items/prefixItems/1",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/projection_grid",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/projection_grid",
-    "description": "Optional contractual reset/end-date boundaries.\n\n`None` selects fixed numeric-tenor discount-factor stepping."
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/projection_grid/items",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/projection_grid/items",
     "format": "double"
   },
   {
@@ -1442,21 +1796,9 @@ export default [
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/rate_calibration/anyOf/1"
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/reset_lag",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/reset_lag",
-    "description": "Reset lag in business days",
-    "format": "int32"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/tenor",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/tenor",
-    "description": "Index tenor in years",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/transform",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/1/properties/transform",
-    "description": "Canonical source interpolation and cumulative continuous transformations."
+    "description": "Canonical source interpolation and accumulated continuous transformations."
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/1/properties/transform/anyOf/0",
@@ -1481,14 +1823,19 @@ export default [
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/base",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/base",
-    "description": "Base date",
+    "description": "Base date.",
     "ref": "#/$defs/DateWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
   },
   {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/calendar_id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/calendar_id",
+    "description": "Registered holiday calendar id of the business-day time axis."
+  },
+  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/currency",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/currency",
-    "description": "Currency"
+    "description": "Currency."
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/currency/anyOf/0",
@@ -1503,7 +1850,7 @@ export default [
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/day_count",
-    "description": "Day count convention",
+    "description": "Day count convention.",
     "ref": "#/$defs/DayCount",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCount"
   },
@@ -1532,17 +1879,17 @@ export default [
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/id",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/id",
-    "description": "Curve identifier"
+    "description": "Curve identifier."
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/issuer",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/issuer",
-    "description": "Optional issuer"
+    "description": "Optional issuer."
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/knot_points",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/knot_points",
-    "description": "Time/value pairs used to construct the curve"
+    "description": "Strictly positive ending `(time_years, hazard_rate)` pillars."
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/knot_points/items",
@@ -1559,48 +1906,15 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/max_hazard_rate",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/max_hazard_rate",
-    "description": "Hazard-rate cap the curve was built with, when it differs from the\ndefault of 10; absent for curves built with the default.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/par_interp",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/par_interp",
-    "default": "linear",
-    "description": "Par interpolation method",
-    "ref": "#/$defs/ParInterp",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ParInterp"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/par_points",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/par_points",
-    "description": "Par spread points for reporting"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/par_points/items",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/par_points/items"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/par_points/items/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/par_points/items/prefixItems/0",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/par_points/items/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/par_points/items/prefixItems/1",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/recovery_rate",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/recovery_rate",
-    "description": "Recovery rate",
+    "description": "Recovery rate in `[0, 1]`.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/seniority",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/seniority",
-    "description": "Seniority"
+    "description": "Seniority."
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/seniority/anyOf/0",
@@ -1613,6 +1927,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/seniority/anyOf/1"
   },
   {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/source",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/source",
+    "description": "Source coordinate anchor for conditioned curves."
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/source/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/source/anyOf/0",
+    "ref": "#/$defs/HazardConditionSource",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HazardConditionSource"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/source/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/source/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/type",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/type",
     "const": "hazard"
@@ -1623,57 +1952,47 @@ export default [
     "description": "Inflation curve state"
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/base_cpi",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/base_cpi",
-    "description": "Base CPI level at t=0",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/base_date",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/base_date",
-    "description": "Base date",
+    "description": "Anchor date represented by the `t = 0.0` CPI pillar.",
     "ref": "#/$defs/DateWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
   },
   {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/calendar_id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/calendar_id",
+    "description": "Optional registered holiday calendar identifier (`\"brbd\"`, `\"usny+target2\"`, etc.)."
+  },
+  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/day_count",
-    "default": "act_365f",
-    "description": "Day count convention",
+    "description": "Explicit day-count convention.",
     "ref": "#/$defs/DayCount",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCount"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/extrapolation",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/extrapolation",
-    "description": "Extrapolation policy",
+    "description": "Explicit extrapolation policy (`flat`, `extend`, or `error`).",
     "ref": "#/$defs/ExtrapolationPolicy",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ExtrapolationPolicy"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/id",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/id",
-    "description": "Curve identifier"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/indexation_lag_months",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/indexation_lag_months",
-    "default": 3,
-    "description": "Indexation lag in months",
-    "format": "uint32",
-    "minimum": 0
+    "description": "Curve identifier."
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/interp_style",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/interp_style",
-    "description": "Interpolation style",
+    "description": "Explicit scalar interpolation style (`linear`, `cubic_hermite`, or `log_linear`).",
     "ref": "#/$defs/InterpStyle",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpStyle"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/knot_points",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/knot_points",
-    "description": "Time/value pairs used to construct the curve"
+    "description": "Strictly increasing `(time_years, cpi_level)` pillars starting at `0.0`."
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/knot_points/items",
@@ -1688,21 +2007,6 @@ export default [
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/knot_points/items/prefixItems/1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/knot_points/items/prefixItems/1",
     "format": "double"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/roll_transform",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/roll_transform",
-    "description": "Source interpolation and accumulated time origin for a rolled curve."
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/roll_transform/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/roll_transform/anyOf/0",
-    "ref": "#/$defs/InterpRollState",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpRollState"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/roll_transform/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/roll_transform/anyOf/1"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/type",
@@ -1801,21 +2105,6 @@ export default [
     "format": "double"
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/roll_transform",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/5/properties/roll_transform",
-    "description": "Source interpolation and accumulated time origin for a rolled curve."
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/roll_transform/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/5/properties/roll_transform/anyOf/0",
-    "ref": "#/$defs/InterpRollState",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpRollState"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/roll_transform/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/5/properties/roll_transform/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/5/properties/spot_level",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/5/properties/spot_level",
     "description": "Spot index level (volatility index curves)",
@@ -1835,14 +2124,34 @@ export default [
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6",
-    "description": "BasisSpread curve state"
+    "description": "Parametric curve state"
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/base",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/base",
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/adjustment",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/adjustment",
+    "description": "Accumulated continuous-zero shock adjustment on the source clock."
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/adjustment/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/adjustment/anyOf/0",
+    "ref": "#/$defs/PiecewiseLinearAdjustment",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/PiecewiseLinearAdjustment"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/adjustment/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/adjustment/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/base_date",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/base_date",
     "description": "Base date.",
     "ref": "#/$defs/DateWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/calendar_id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/calendar_id",
+    "description": "Registered holiday calendar id for Bus/252."
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/day_count",
@@ -1852,104 +2161,35 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCount"
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/extrapolation",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/extrapolation",
-    "description": "Extrapolation policy.",
-    "ref": "#/$defs/ExtrapolationPolicy",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ExtrapolationPolicy"
-  },
-  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/id",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/id",
     "description": "Curve identifier."
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/interp_style",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/interp_style",
-    "description": "Interpolation style.",
-    "ref": "#/$defs/InterpStyle",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpStyle"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/knot_points",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/knot_points",
-    "description": "Time/value pairs used to construct the curve."
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/knot_points/items",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/knot_points/items"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/knot_points/items/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/knot_points/items/prefixItems/0",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/knot_points/items/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/knot_points/items/prefixItems/1",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/roll_transform",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/roll_transform",
-    "description": "Source interpolation and accumulated time origin for a rolled curve."
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/roll_transform/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/roll_transform/anyOf/0",
-    "ref": "#/$defs/InterpRollState",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpRollState"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/roll_transform/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/roll_transform/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/type",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/type",
-    "const": "basis_spread"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7",
-    "description": "Parametric curve state"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/base_date",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/base_date",
-    "description": "Base date.",
-    "ref": "#/$defs/DateWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/day_count",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/day_count",
-    "description": "Day count convention.",
-    "ref": "#/$defs/DayCount",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCount"
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/id",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/id",
-    "description": "Curve identifier."
-  },
-  {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/model",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/model",
-    "description": "Nelson-Siegel model parameters.",
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/model",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/model",
+    "description": "Validated Nelson-Siegel model parameters.",
     "ref": "#/$defs/NelsonSiegelModel",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/NelsonSiegelModel"
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/time_offset",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/time_offset",
-    "default": 0,
-    "description": "Current origin in the source model's year-fraction coordinates;\nomitted means `0.0` (a curve that has never been rolled).",
-    "format": "double"
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/source_base_date",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/source_base_date",
+    "description": "Original anchor date when the curve has been conditioned."
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/7/properties/type",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/7/properties/type",
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/source_base_date/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/source_base_date/anyOf/0",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/source_base_date/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/source_base_date/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/6/properties/type",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/6/properties/type",
     "const": "parametric"
   },
   {
@@ -1986,6 +2226,12 @@ export default [
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SabrParameterData/properties/shift",
     "description": "Optional finite displacement applied to forward and strike.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_a772bf5d4001c1d37975",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxSurfaceDeltaConvention",
+    "const": "forward_unadjusted",
+    "description": "Delta convention governing how [`FxDeltaVolSurface`] maps wing deltas onto strikes."
   },
   {
     "path": "#/$defs/d_a9791cac4c0854b02bbe",
@@ -2116,31 +2362,31 @@ export default [
   {
     "path": "#/$defs/d_b205675b4d5addcd52ba",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Seniority",
-    "description": "Seniority level for credit exposures.\n\nUsed to tag a hazard curve with the seniority of the issuer's debt\nobserved by the curve. Drives the recovery-rate prior in default\nmodelling and selects the right LGD prior in\n`finstack_quant_models::credit::lgd::seniority`.\n\nOrder is **not** total — `SeniorSecured` is strictly senior to `Senior`,\n`Subordinated`, and `Junior`, but the relative ordering of `Subordinated`\nvs. `Junior` is jurisdiction-dependent. Do not rely on `Ord` semantics."
+    "description": "Seniority level for credit exposures.\n\nOrder is **not** total — `SeniorSecured` is strictly senior to `Senior`,\n`Subordinated`, and `Junior`, but the relative ordering of `Subordinated`\nvs. `Junior` is jurisdiction-dependent. Do not rely on `Ord` semantics."
   },
   {
     "path": "#/$defs/d_b205675b4d5addcd52ba/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Seniority/oneOf/0",
     "const": "senior_secured",
-    "description": "Senior secured debt"
+    "description": "Senior secured debt."
   },
   {
     "path": "#/$defs/d_b205675b4d5addcd52ba/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Seniority/oneOf/1",
     "const": "senior",
-    "description": "Senior unsecured debt"
+    "description": "Senior unsecured debt."
   },
   {
     "path": "#/$defs/d_b205675b4d5addcd52ba/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Seniority/oneOf/2",
     "const": "subordinated",
-    "description": "Subordinated debt"
+    "description": "Subordinated debt."
   },
   {
     "path": "#/$defs/d_b205675b4d5addcd52ba/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Seniority/oneOf/3",
     "const": "junior",
-    "description": "Junior/mezzanine debt"
+    "description": "Junior/mezzanine debt."
   },
   {
     "path": "#/$defs/d_b6a74bd737ef1567b144",
@@ -3114,60 +3360,61 @@ export default [
     "description": "Naira (566)"
   },
   {
+    "path": "#/$defs/d_ba32ed4c85d38575ccef",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SeriesExtrapolation",
+    "description": "Right-tail extrapolation policy for [`ScalarTimeSeries`].\n\nApplies only to dates strictly after the latest observation; queries on an\nempty series or strictly before the earliest observation always fail."
+  },
+  {
+    "path": "#/$defs/d_ba32ed4c85d38575ccef/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SeriesExtrapolation/oneOf/0",
+    "const": "flat",
+    "description": "Hold the latest observed value flat after the final observation date."
+  },
+  {
+    "path": "#/$defs/d_ba32ed4c85d38575ccef/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SeriesExtrapolation/oneOf/1",
+    "const": "error",
+    "description": "Return an error when querying strictly after the final observation date."
+  },
+  {
     "path": "#/$defs/d_c190532de37b361cba38",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataHierarchy",
-    "description": "The top-level market data hierarchy containing root nodes.\n\nEach root represents a major asset class or category (e.g., \"Rates\", \"Credit\",\n\"FX\", \"Equity\", \"Volatility\"). The hierarchy is fully serializable and can be\nloaded from JSON configuration files."
+    "description": "Top-level market-data hierarchy containing ordered root entries.\n\nEach root represents a major organizational branch (such as `\"Rates\"`,\n`\"Credit\"`, `\"FX\"`, `\"Equity\"`, or `\"Volatility\"`). Roots and child levels\nuse explicit name/node entry arrays so numeric-looking names retain their\nauthored sequence across Rust, Python, and JavaScript."
   },
   {
     "path": "#/$defs/d_c190532de37b361cba38/properties/roots",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataHierarchy/properties/roots",
-    "description": "Top-level nodes, keyed by their name. The key becomes each node's\n`name` during deserialization. Insertion order is preserved."
+    "description": "Top-level ordered `(name, node)` entries."
   },
   {
-    "path": "#/$defs/d_c190532de37b361cba38/properties/roots/additionalProperties",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataHierarchy/properties/roots/additionalProperties",
-    "ref": "#/$defs/HierarchyNode",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNode"
+    "path": "#/$defs/d_c190532de37b361cba38/properties/roots/items",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketDataHierarchy/properties/roots/items",
+    "ref": "#/$defs/HierarchyNodeEntry",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/HierarchyNodeEntry"
   },
   {
-    "path": "#/$defs/d_c4332f1bbc1cebe4fd90",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationLag",
-    "description": "Contractual observation lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate an observation lag to ensure the reference\nindex is published by settlement. This lag does not specify the actual\npublication date; use [`InflationIndex::with_publication_dates`] for that.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```"
+    "path": "#/$defs/d_c537fd5e895ccf0af66d",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurrencyPair",
+    "description": "An ordered `base/quote` currency pair parsed from host text.\n\n[`FromStr`](std::str::FromStr) accepts the slash form `\"EUR/USD\"` and the\nsix-letter compact form `\"EURUSD\"`. Each half parses with [`Currency`]'s\ncase-insensitive, non-trimming parser, so a bad half reports the code it\nrejected. Orientation is kept: a quote on the pair means\n`1 base = rate quote`.\n\n# Examples\n```\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::fx::CurrencyPair;\n\nlet pair: CurrencyPair = \"eur/usd\".parse().expect(\"slash form\");\nassert_eq!((pair.base, pair.quote), (Currency::EUR, Currency::USD));\nassert_eq!(\"GBPJPY\".parse::<CurrencyPair>().expect(\"compact form\").quote, Currency::JPY);\nassert!(\"EURUS\".parse::<CurrencyPair>().is_err());\n```"
   },
   {
-    "path": "#/$defs/d_c4332f1bbc1cebe4fd90/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationLag/oneOf/0",
-    "description": "Lag by specified number of months.\n\nStandard: 3 months for TIPS and most inflation-linked bonds."
+    "path": "#/$defs/d_c537fd5e895ccf0af66d/properties/base",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurrencyPair/properties/base",
+    "description": "Base (from) currency: one unit of it is worth `rate` quote units.",
+    "ref": "#/$defs/Currency",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Currency"
   },
   {
-    "path": "#/$defs/d_c4332f1bbc1cebe4fd90/oneOf/0/properties/months",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationLag/oneOf/0/properties/months",
-    "format": "uint8",
-    "maximum": 255,
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_c4332f1bbc1cebe4fd90/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationLag/oneOf/1",
-    "description": "Lag by specified number of calendar days.\n\nAlternative specification for non-standard contracts."
-  },
-  {
-    "path": "#/$defs/d_c4332f1bbc1cebe4fd90/oneOf/1/properties/days",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationLag/oneOf/1/properties/days",
-    "format": "uint16",
-    "maximum": 65535,
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_c4332f1bbc1cebe4fd90/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationLag/oneOf/2",
-    "const": "none",
-    "description": "No lag applied.\n\nUsed for inflation swaps where forecast indices are used."
+    "path": "#/$defs/d_c537fd5e895ccf0af66d/properties/quote",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurrencyPair/properties/quote",
+    "description": "Quote (to) currency in which the rate is expressed.",
+    "ref": "#/$defs/Currency",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Currency"
   },
   {
     "path": "#/$defs/d_ccdcf39725b3a38d5e6e",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/MarketScalar",
-    "description": "Single market observable that doesn't require a full curve.\n\nRepresents point-in-time market data like spot prices, spreads, or unitless\nparameters. Stored in [`MarketContext`](crate::market_data::context::MarketContext)\nalongside curves for simple lookups.\n\n# Use Cases\n\n- **Spot prices**: Equity spots, commodity prices, FX spots\n- **Recovery rates**: Credit recovery assumptions (unitless)\n- **Correlation parameters**: Equity-FX correlation, basis correlations\n- **Spreads**: Credit spreads, basis spreads (unitless or monetary)\n- **Multipliers**: Beta, vega notionals, adjustment factors\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::MarketScalar;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\n// Equity beta (unitless)\nlet beta = MarketScalar::Unitless(1.2);\n\n// Spot price (with currency)\nlet spot = MarketScalar::Price(Money::new(152.75, Currency::USD).expect(\"valid money fixture\"));\n\nassert!(matches!(beta, MarketScalar::Unitless(_)));\nif let MarketScalar::Price(m) = spot {\n    assert_eq!(m.currency(), Currency::USD);\n}\n```"
+    "description": "Single market observable that doesn't require a full curve.\n\nRepresents point-in-time market data like spot prices, spreads, or unitless\nparameters. Stored in [`MarketContext`](crate::market_data::context::MarketContext)\nalongside curves for simple lookups.\n\n# Use Cases\n\n- **Spot prices**: Equity spots, commodity prices, FX spots\n- **Recovery rates**: Credit recovery assumptions (unitless)\n- **Correlation parameters**: Equity-FX correlation, basis correlations\n- **Spreads**: Credit spreads, basis spreads (unitless or monetary)\n- **Multipliers**: Beta, vega notionals, adjustment factors\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::MarketScalar;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n# fn main() -> finstack_quant_core::Result<()> {\n\n// Equity beta (unitless)\nlet beta = MarketScalar::unitless(1.2)?;\n\n// Spot price (with currency)\nlet spot = MarketScalar::price(Money::new(152.75, Currency::USD).expect(\"valid money fixture\"));\n\nassert!(beta.is_unitless());\nif let Some(m) = spot.get_price() {\n    assert_eq!(m.currency(), Currency::USD);\n}\n# Ok(())\n# }\n```"
   },
   {
     "path": "#/$defs/d_ccdcf39725b3a38d5e6e/oneOf/0",
@@ -3189,6 +3436,39 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Money"
   },
   {
+    "path": "#/$defs/d_d7c93a9d6d6ba5ccd0ac",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolatilityClock",
+    "description": "Explicit day-count clock translating calendar expiry dates into year fractions\nrelative to a surface or cube reference date.\n\nMarket data objects such as [`FxDeltaVolSurface`](crate::market_data::surfaces::FxDeltaVolSurface)\nattach an optional `VolatilityClock` so downstream pricers can validate that\nthe surface anchor matches `as_of` and bridge between instrument day-counts\nand surface variance time without silently assuming a day-count convention.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{DayCount, DayCountContextState, VolatilityClock};\nuse time::macros::date;\n\nlet clock = VolatilityClock::try_new(\n    date!(2025 - 01 - 15),\n    DayCount::Act365F,\n    DayCountContextState::default(),\n)?;\nlet t = clock.expiry_time(date!(2026 - 01 - 15))?;\nassert!((t - 1.0).abs() < 1e-12);\n# Ok::<(), finstack_quant_core::Error>(())\n```"
+  },
+  {
+    "path": "#/$defs/d_d7c93a9d6d6ba5ccd0ac/properties/context",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolatilityClock/properties/context",
+    "default": {
+      "bus_basis": null,
+      "calendar_id": null,
+      "coupon_period": null,
+      "end_is_termination_date": null,
+      "frequency": null
+    },
+    "description": "Owned, canonicalized day-count context parameters.",
+    "ref": "#/$defs/DayCountContextState",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCountContextState"
+  },
+  {
+    "path": "#/$defs/d_d7c93a9d6d6ba5ccd0ac/properties/day_count",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolatilityClock/properties/day_count",
+    "description": "Day-count convention used to measure expiry times from `reference_date`.",
+    "ref": "#/$defs/DayCount",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCount"
+  },
+  {
+    "path": "#/$defs/d_d7c93a9d6d6ba5ccd0ac/properties/reference_date",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/VolatilityClock/properties/reference_date",
+    "description": "Valuation reference date anchored to year fraction `0.0`.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
+  },
+  {
     "path": "#/$defs/d_d99050870612e8bfc3d3",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Money",
     "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```"
@@ -3208,76 +3488,56 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Currency"
   },
   {
+    "path": "#/$defs/d_db99726271411b7c92e1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/FxButterflyConvention",
+    "const": "smile",
+    "description": "Butterfly quote convention on [`FxDeltaVolSurface`]."
+  },
+  {
     "path": "#/$defs/d_e771e792357014c84cb9",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex",
-    "description": "Inflation index time series with lagging and seasonality.\n\nWraps historical CPI/RPI observations with market-standard conventions for\nlag application and interpolation. Used for pricing TIPS, linkers, and\ninflation derivatives.\n\n# Components\n\n- **Observations**: Index levels labelled by reference date/month\n- **Interpolation**: Daily interpolation between monthly observations\n- **Lag**: Contractual observation lag (typically 3 months for TIPS)\n- **Publication dates**: Optional explicit availability dates by reference month\n- **Seasonality**: Optional monthly adjustment factors\n\n# Interpolation Methods\n\n- **Step**: Last observation carried forward (conservative)\n- **Linear**: Daily interpolation between months (TIPS standard)\n\n# Lag Application\n\nReference index calculation applies lag before interpolation:\n```text\nFor settlement date T with 3-month lag:\n1. Reference date = T - 3 months\n2. Find bracketing CPI observations\n3. Interpolate linearly between them\n```\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::{\n    InflationIndex, SeriesInterpolation, InflationLag,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\n// US CPI-U observations\nlet observations = vec![\n    (Date::from_calendar_date(2023, Month::September, 30).expect(\"Valid date\"), 296.8),\n    (Date::from_calendar_date(2023, Month::October, 31).expect(\"Valid date\"), 297.4),\n    (Date::from_calendar_date(2023, Month::November, 30).expect(\"Valid date\"), 298.1),\n    (Date::from_calendar_date(2023, Month::December, 31).expect(\"Valid date\"), 299.0),\n    (Date::from_calendar_date(2024, Month::January, 31).expect(\"Valid date\"), 300.5),\n    (Date::from_calendar_date(2024, Month::February, 29).expect(\"Valid date\"), 302.1),\n    (Date::from_calendar_date(2024, Month::March, 31).expect(\"Valid date\"), 303.8),\n    (Date::from_calendar_date(2024, Month::April, 30).expect(\"Valid date\"), 304.1),\n];\n\nlet index = InflationIndex::new(\"US-CPI-U\", observations, Currency::USD)\n    .expect(\"Index creation should succeed\")\n    .with_interpolation(SeriesInterpolation::Linear)\n    .with_lag(InflationLag::Months(3)); // TIPS standard\n\n// Calculate inflation ratio for TIPS coupon indexation\nlet base_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nlet settle_date = Date::from_calendar_date(2024, Month::June, 15).expect(\"Valid date\");\nlet ratio = index.ratio(base_date, settle_date).expect(\"Ratio calculation should succeed\");\nassert!(ratio >= 1.0); // Inflation adjustment factor\n```\n\n# Thread Safety\n\nImmutable after construction; safe to share via `Arc<InflationIndex>`.\n\n# References\n\n- **TIPS Mechanics**:\n  - US Treasury (2024). \"TIPS In Depth.\" treasurydirect.gov. `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n  - Deacon, M., Derry, A., & Mirfendereski, D. (2004). *Inflation-Indexed Securities*\n    (2nd ed.). Wiley Finance. Chapter 2 (Index-linked bond mechanics). `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`\n\n- **Index Lagging**:\n  - Kerkhof, J. (2005). \"Inflation Derivatives Explained.\" *Journal of Derivatives\n    Accounting*, 2(1), 1-19. `docs/REFERENCES.md#kerkhof-2005`\n  - Hurd, M., & Relleen, J. (2006). \"Estimating the Inflation Risk Premium.\"\n    Bank of England Quarterly Bulletin, Q2 2006. `docs/REFERENCES.md#kerkhof-2005`"
+    "description": "Immutable monthly CPI/RPI observation snapshot at an explicit knowledge date `K`.\n\nStores strictly ordered, unique first-of-month [`InflationObservation`] records\nwhose `available_on` satisfies `reference_month <= available_on <= knowledge_date`,\ntogether with distinct [`InflationExpectedRelease`] assumptions (`known_on <= knowledge_date`).\nEmpty histories are valid (allowing projection-only markets with release metadata).\n\nLookups ([`get_observation`](Self::get_observation) and\n[`qualified_monthly_observation`](Self::qualified_monthly_observation)) are exact\nby canonical first-of-month key and perform no lag, interpolation, carry, or\nseasonal adjustment.\n\n# Examples\n\n```rust\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::market_data::scalars::{InflationIndex, InflationObservation};\nuse time::macros::date;\n\nlet obs = vec![\n    InflationObservation {\n        reference_month: date!(2024 - 01 - 01),\n        value: 300.0,\n        available_on: date!(2024 - 02 - 13),\n    },\n    InflationObservation {\n        reference_month: date!(2024 - 02 - 01),\n        value: 302.0,\n        available_on: date!(2024 - 03 - 12),\n    },\n];\nlet index = InflationIndex::new(\"US-CPI-U\", obs, Currency::USD, date!(2024 - 04 - 01))\n    .expect(\"valid fixing snapshot\");\nassert_eq!(\n    index\n        .get_observation(date!(2024 - 02 - 01))\n        .expect(\"observation exists\")\n        .value,\n    302.0\n);\n```"
   },
   {
     "path": "#/$defs/d_e771e792357014c84cb9/properties/currency",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/currency",
-    "description": "Currency",
+    "description": "Reporting currency association.",
     "ref": "#/$defs/Currency",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Currency"
   },
   {
+    "path": "#/$defs/d_e771e792357014c84cb9/properties/expected_releases",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/expected_releases",
+    "description": "Distinct strictly ascending monthly expected-release schedule assumptions."
+  },
+  {
+    "path": "#/$defs/d_e771e792357014c84cb9/properties/expected_releases/items",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/expected_releases/items",
+    "ref": "#/$defs/InflationExpectedRelease",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationExpectedRelease"
+  },
+  {
     "path": "#/$defs/d_e771e792357014c84cb9/properties/id",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/id",
-    "description": "Unique identifier"
+    "description": "Unique identifier."
   },
   {
-    "path": "#/$defs/d_e771e792357014c84cb9/properties/interpolation",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/interpolation",
-    "description": "Interpolation method",
-    "ref": "#/$defs/SeriesInterpolation",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SeriesInterpolation"
-  },
-  {
-    "path": "#/$defs/d_e771e792357014c84cb9/properties/lag",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/lag",
-    "description": "Lag policy",
-    "ref": "#/$defs/InflationLag",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationLag"
-  },
-  {
-    "path": "#/$defs/d_e771e792357014c84cb9/properties/observations",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/observations",
-    "description": "Observations as (date, value) pairs"
-  },
-  {
-    "path": "#/$defs/d_e771e792357014c84cb9/properties/observations/items",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/observations/items"
-  },
-  {
-    "path": "#/$defs/d_e771e792357014c84cb9/properties/observations/items/prefixItems/0",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/observations/items/prefixItems/0",
+    "path": "#/$defs/d_e771e792357014c84cb9/properties/knowledge_date",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/knowledge_date",
+    "description": "Inclusive end-of-day snapshot knowledge cutoff date `K`.",
     "ref": "#/$defs/DateWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
   },
   {
-    "path": "#/$defs/d_e771e792357014c84cb9/properties/observations/items/prefixItems/1",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/observations/items/prefixItems/1",
-    "format": "double"
+    "path": "#/$defs/d_e771e792357014c84cb9/properties/observations",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/observations",
+    "description": "Strictly ascending canonical monthly fixing observations."
   },
   {
-    "path": "#/$defs/d_e771e792357014c84cb9/properties/publication_dates",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/publication_dates",
-    "description": "Explicit monthly observation availability; no release dates are inferred."
-  },
-  {
-    "path": "#/$defs/d_e771e792357014c84cb9/properties/publication_dates/items",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/publication_dates/items",
-    "ref": "#/$defs/InflationPublicationWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationPublicationWire"
-  },
-  {
-    "path": "#/$defs/d_e771e792357014c84cb9/properties/seasonality",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/seasonality",
-    "description": "Optional seasonality factors"
-  },
-  {
-    "path": "#/$defs/d_e771e792357014c84cb9/properties/seasonality/items",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/seasonality/items",
-    "format": "double"
+    "path": "#/$defs/d_e771e792357014c84cb9/properties/observations/items",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/observations/items",
+    "ref": "#/$defs/InflationObservation",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationObservation"
   },
   {
     "path": "#/$defs/d_e94fd584c7a9c31df19d",
@@ -3306,31 +3566,27 @@ export default [
   },
   {
     "path": "#/$defs/d_f401c4e712e4f497feef",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ForwardCurveTransform"
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ForwardCurveTransform",
+    "description": "Source interpolation and a single accumulated transformation, never a chain\nof nested curves. The adjustment is stored as its piecewise-linear derivative\nso evaluating beyond a completed triangular shock does not subtract large\nquadratic polynomials."
   },
   {
     "path": "#/$defs/d_f401c4e712e4f497feef/properties/adjustment",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ForwardCurveTransform/properties/adjustment",
-    "description": "Cumulative additive rate adjustment in source time coordinates.",
+    "description": "Cumulative derivative of the additive log-factor adjustment.",
     "ref": "#/$defs/PiecewiseLinearAdjustment",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/PiecewiseLinearAdjustment"
   },
   {
-    "path": "#/$defs/d_f401c4e712e4f497feef/properties/offset",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ForwardCurveTransform/properties/offset",
-    "description": "Current curve origin in the source curve's year-fraction coordinates.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_f401c4e712e4f497feef/properties/scale",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ForwardCurveTransform/properties/scale",
-    "description": "Accumulated parallel multiplicative factor on the source interpolation.",
-    "format": "double"
+    "path": "#/$defs/d_f401c4e712e4f497feef/properties/source_base_date",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ForwardCurveTransform/properties/source_base_date",
+    "description": "Original, untransformed curve base date defining the source coordinate system.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
   },
   {
     "path": "#/$defs/d_f401c4e712e4f497feef/properties/source_points",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ForwardCurveTransform/properties/source_points",
-    "description": "Original interpolation pillars, independent of current curve samples."
+    "description": "Original, untransformed interpolation pillars."
   },
   {
     "path": "#/$defs/d_f401c4e712e4f497feef/properties/source_points/items",
@@ -3349,7 +3605,7 @@ export default [
   {
     "path": "#/$defs/d_f9d22f9148b706cb0598",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/SeriesInterpolation",
-    "description": "Interpolation strategy for [`ScalarTimeSeries`].\n\n# Examples\n```rust\nuse finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"TS\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\"), 100.0),\n        (Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\"), 105.0),\n    ],\n    None,\n)\n.expect(\"Series creation should succeed\");\nlet stepped = series.clone().with_interpolation(SeriesInterpolation::Step);\nlet mid_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nassert_eq!(stepped.value_on(mid_date).expect(\"Value lookup should succeed\"), 100.0);\n```"
+    "description": "Interpolation strategy for [`ScalarTimeSeries`].\n\n# Examples\n```rust\nuse finstack_quant_core::market_data::scalars::{\n    ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,\n};\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet series = ScalarTimeSeries::new(\n    \"TS\",\n    vec![\n        (Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\"), 100.0),\n        (Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\"), 105.0),\n    ],\n    None,\n    SeriesInterpolation::Step,\n    SeriesExtrapolation::Error,\n)\n.expect(\"Series creation should succeed\");\nlet mid_date = Date::from_calendar_date(2024, Month::January, 15).expect(\"Valid date\");\nassert_eq!(series.get_value(mid_date).expect(\"Value lookup should succeed\"), 100.0);\n```"
   },
   {
     "path": "#/$defs/d_f9d22f9148b706cb0598/oneOf/0",
@@ -3502,7 +3758,7 @@ export default [
   {
     "path": "#/$defs/d_fe18010fa6c9de5d3f03",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/NelsonSiegelModel",
-    "description": "Nelson-Siegel model parameters.\n\nStores either the 4-parameter NS or 6-parameter NSS specification."
+    "description": "Validated Nelson-Siegel or Nelson-Siegel-Svensson model parameters."
   },
   {
     "path": "#/$defs/d_fe18010fa6c9de5d3f03/oneOf/0",
@@ -3512,25 +3768,21 @@ export default [
   {
     "path": "#/$defs/d_fe18010fa6c9de5d3f03/oneOf/0/properties/beta0",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/NelsonSiegelModel/oneOf/0/properties/beta0",
-    "description": "Long-term rate level.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_fe18010fa6c9de5d3f03/oneOf/0/properties/beta1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/NelsonSiegelModel/oneOf/0/properties/beta1",
-    "description": "Short-term component.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_fe18010fa6c9de5d3f03/oneOf/0/properties/beta2",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/NelsonSiegelModel/oneOf/0/properties/beta2",
-    "description": "Medium-term hump.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_fe18010fa6c9de5d3f03/oneOf/0/properties/tau",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/NelsonSiegelModel/oneOf/0/properties/tau",
-    "description": "Decay factor (must be > 0).",
     "format": "double"
   },
   {
@@ -3546,37 +3798,31 @@ export default [
   {
     "path": "#/$defs/d_fe18010fa6c9de5d3f03/oneOf/1/properties/beta0",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/NelsonSiegelModel/oneOf/1/properties/beta0",
-    "description": "Long-term rate level.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_fe18010fa6c9de5d3f03/oneOf/1/properties/beta1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/NelsonSiegelModel/oneOf/1/properties/beta1",
-    "description": "Short-term component.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_fe18010fa6c9de5d3f03/oneOf/1/properties/beta2",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/NelsonSiegelModel/oneOf/1/properties/beta2",
-    "description": "Medium-term hump.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_fe18010fa6c9de5d3f03/oneOf/1/properties/beta3",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/NelsonSiegelModel/oneOf/1/properties/beta3",
-    "description": "Second hump.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_fe18010fa6c9de5d3f03/oneOf/1/properties/tau1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/NelsonSiegelModel/oneOf/1/properties/tau1",
-    "description": "First decay factor (must be > 0).",
     "format": "double"
   },
   {
     "path": "#/$defs/d_fe18010fa6c9de5d3f03/oneOf/1/properties/tau2",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/NelsonSiegelModel/oneOf/1/properties/tau2",
-    "description": "Second decay factor (must be > 0, ≠ τ₁).",
     "format": "double"
   },
   {

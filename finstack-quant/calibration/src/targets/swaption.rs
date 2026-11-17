@@ -749,7 +749,7 @@ fn calculate_forward_swap_rate_dates(
             // is valid only when those dates coincide for every coupon.
             1.0 / disc.df_between_dates(period.accrual_start, period.accrual_end)? - 1.0
         };
-        float_pv += coupon * disc.df(t_pay_disc);
+        float_pv += coupon * disc.df(t_pay_disc)?;
     }
     Ok(float_pv / pv01)
 }
@@ -821,7 +821,7 @@ fn calculate_pv01_proper(
             period.payment_date,
             DayCountContext::default(),
         )?;
-        pv01 += disc.df(t) * dcf;
+        pv01 += disc.df(t)? * dcf;
     }
     Ok(pv01)
 }
@@ -1051,6 +1051,8 @@ mod tests {
             .base_date(base)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (30.0, (-0.03_f64 * 30.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let context = MarketContext::new().insert(discount);
@@ -1240,6 +1242,8 @@ mod tests {
             .base_date(base_date)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (30.0, 0.20)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let ctx = MarketContext::new().insert(disc);
@@ -1331,6 +1335,8 @@ mod tests {
             .base_date(base_date)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (30.0, 0.20)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let ctx = MarketContext::new().insert(disc);
@@ -1444,6 +1450,8 @@ mod tests {
             .base_date(base_date)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (30.0, 0.20)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let ctx = MarketContext::new().insert(disc);
@@ -1555,15 +1563,16 @@ mod tests {
             .base_date(base_date)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (30.0, 0.20)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let fwd_curve = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
-            "USD-FWD", 0.25,
+        let fwd_curve = finstack_quant_core::market_data::term_structures::ForwardCurve::flat(
+            "USD-FWD",
+            base_date,
+            -0.01,
+            DayCount::Act365F,
         )
-        .base_date(base_date)
-        .day_count(DayCount::Act365F)
-        .knots([(0.0, -0.01), (30.0, -0.01)])
-        .build()
         .expect("forward curve");
         let ctx = MarketContext::new().insert(disc).insert(fwd_curve);
 
@@ -1631,6 +1640,8 @@ mod tests {
             .base_date(base_date)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (30.0, 0.20)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let ctx = MarketContext::new().insert(disc);
@@ -1660,7 +1671,8 @@ mod tests {
                 DayCountContext::default(),
             )
             .expect("t_end");
-        let expected = (disc_ref.df(t_start) - disc_ref.df(t_end)) / pv01;
+        let expected =
+            (disc_ref.df(t_start).expect("valid") - disc_ref.df(t_end).expect("valid")) / pv01;
 
         let actual = calculate_forward_swap_rate_years(&p, expiry_years, tenor_years, &leg, &ctx)
             .expect("forward");
@@ -1680,19 +1692,21 @@ mod tests {
             .base_date(base_date)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (5.0, 0.75)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let forward = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
-            "USD-FWD", 0.25,
-        )
-        .base_date(base_date)
-        .day_count(DayCount::Act365F)
-        .knots([(0.0, 0.01), (1.0, 0.03), (2.0, 0.08), (3.0, 0.02)])
-        .projection_grid([
-            0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25,
-        ])
-        .build()
-        .expect("forward curve");
+        let forward =
+            finstack_quant_core::market_data::term_structures::ForwardCurve::from_zero_rates(
+                "USD-FWD",
+                base_date,
+                &[(0.0, 0.01), (1.0, 0.03), (2.0, 0.08), (3.0, 0.02)],
+                finstack_quant_core::math::Compounding::Continuous,
+                DayCount::Act365F,
+                finstack_quant_core::math::interp::InterpStyle::LogLinear,
+                finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+            )
+            .expect("forward curve");
         let ctx = MarketContext::new().insert(disc).insert(forward);
 
         let mut p = params(base_date);
@@ -1756,22 +1770,21 @@ mod tests {
                     DayCountContext::default(),
                 )
                 .expect("payment time");
-            let discount = disc.df(t_pay);
+            let discount = disc.df(t_pay).expect("valid");
             expected_float_pv += (fwd.df(t_start).expect("projection start DF")
                 / fwd.df(t_end).expect("projection end DF")
                 - 1.0)
                 * discount;
-            legacy_float_pv += fwd
-                .rate_period(t_start, t_end)
-                .expect("finite ordered period")
-                * accrual
-                * discount;
+            let continuous_rate = (fwd.df(t_start).expect("start factor").ln()
+                - fwd.df(t_end).expect("end factor").ln())
+                / (t_end - t_start);
+            legacy_float_pv += continuous_rate * accrual * discount;
         }
         let expected = expected_float_pv / pv01;
         let legacy = legacy_float_pv / pv01;
         assert!(
             (expected - legacy).abs() > 1e-8,
-            "test curve must distinguish DF-implied and integral-average rates"
+            "test curve must distinguish simple and continuously compounded rates"
         );
 
         let actual = calculate_forward_swap_rate_years(&p, expiry_years, tenor_years, &leg, &ctx)

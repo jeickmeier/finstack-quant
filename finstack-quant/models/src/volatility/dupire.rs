@@ -72,7 +72,7 @@ pub(crate) fn dupire_node(
     lookup: MoneynessLookup,
 ) -> Option<DupireNode> {
     let expiries = surface.expiries();
-    let strikes = surface.strikes();
+    let strikes = surface.secondary_values();
     let t = expiries[expiry_index];
     let big_k = strikes[strike_index];
     let k = (big_k / forwards[expiry_index]).ln(); // log-moneyness

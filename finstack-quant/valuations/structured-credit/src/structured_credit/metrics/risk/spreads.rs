@@ -263,22 +263,24 @@ pub fn calculate_tranche_z_spread(
     }
     let cached_flows = discounted_flows(cashflows, discount_curve, as_of)?;
 
-    let objective = |z: f64| -> f64 {
+    let objective = |z: f64| -> Result<f64> {
         let mut pv = finstack_quant_core::math::summation::NeumaierAccumulator::new();
         for (t_from_as_of, df, amount) in &cached_flows {
             let df_z = *df * (-z * *t_from_as_of).exp();
-
-            pv.add(*amount * df_z);
+            pv.add(*amount * df_z)?;
         }
-        pv.total() / target_pv.amount() - 1.0
+        Ok(pv.get_total()? / target_pv.amount() - 1.0)
     };
 
     // Solve the relative-price objective with a scale-independent tolerance.
-    let solver = BrentSolver::new()
-        .with_tolerance(Z_SPREAD_SOLVER_TOLERANCE)
-        .with_initial_bracket_size(Some(Z_SPREAD_INITIAL_BRACKET));
-
-    let z_spread = solver.solve(objective, 0.0)?;
+    let solver = BrentSolver::new(Z_SPREAD_SOLVER_TOLERANCE, 100)?;
+    let z_spread = solver.solve(objective, 0.0, -0.50, 2.0, Z_SPREAD_INITIAL_BRACKET, 20)?;
+    let residual = objective(z_spread)?;
+    if !residual.is_finite() || residual.abs() > 1e-6 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "structured-credit Z-spread residual {residual} exceeds acceptance tolerance"
+        )));
+    }
 
     // Convert to basis points
     Ok(z_spread * BASIS_POINTS_PER_UNIT)
@@ -325,14 +327,14 @@ pub fn calculate_tranche_cs01(
     for (t_from_as_of, df, amount) in discounted_flows(cashflows, discount_curve, as_of)? {
         // Base PV
         let df_base = df * (-z_spread * t_from_as_of).exp();
-        base_pv.add(amount * df_base);
+        base_pv.add(amount * df_base)?;
 
         // Bumped PV
         let df_bumped = df * (-bumped_spread * t_from_as_of).exp();
-        bumped_pv.add(amount * df_bumped);
+        bumped_pv.add(amount * df_bumped)?;
     }
 
-    Ok(bumped_pv.total() - base_pv.total())
+    Ok(bumped_pv.get_total()? - base_pv.get_total()?)
 }
 
 /// Spread convexity of a tranche's cashflows at `z_spread` (years²).
@@ -368,15 +370,15 @@ pub(crate) fn calculate_tranche_spread_convexity(
     let mut up = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     let mut down = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     for (t, df, amount) in discounted_flows(cashflows, discount_curve, as_of)? {
-        base.add(amount * df * (-z_spread * t).exp());
-        up.add(amount * df * (-(z_spread + ONE_BASIS_POINT) * t).exp());
-        down.add(amount * df * (-(z_spread - ONE_BASIS_POINT) * t).exp());
+        base.add(amount * df * (-z_spread * t).exp())?;
+        up.add(amount * df * (-(z_spread + ONE_BASIS_POINT) * t).exp())?;
+        down.add(amount * df * (-(z_spread - ONE_BASIS_POINT) * t).exp())?;
     }
-    let pv = base.total();
+    let pv = base.get_total()?;
     if pv <= 0.0 {
         return Ok(0.0);
     }
-    Ok((up.total() + down.total() - 2.0 * pv) / (pv * ONE_BASIS_POINT * ONE_BASIS_POINT))
+    Ok((up.get_total()? + down.get_total()? - 2.0 * pv) / (pv * ONE_BASIS_POINT * ONE_BASIS_POINT))
 }
 
 /// Calculate the discount margin (curve DM) for a floating-rate tranche.
@@ -604,6 +606,9 @@ mod zspread_quote_tests {
             DiscountCurve::builder(discount_curve_id.as_str())
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (1.0, 0.95)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("valid curve"),
         );

@@ -411,7 +411,7 @@ def compute_quotes(
     >>> from finstack_quant.valuations.instruments import Bond, compute_quotes
     >>> bond = Bond.example()
     >>> as_of = datetime.date(2025, 1, 15)
-    >>> market = MarketContext().insert(DiscountCurve.flat("USD-TREASURY", as_of, 0.04))
+    >>> market = MarketContext().insert(DiscountCurve.flat("USD-TREASURY", as_of, 0.04, "act_365f"))
     >>> quotes = compute_quotes(bond, market, as_of, {"clean_price_pct": 98.5})
     >>> quotes.clean_price_pct, quotes.discount_margin
     (98.5, None)

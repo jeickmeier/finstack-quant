@@ -15,12 +15,11 @@ import pytest
 
 from finstack_quant.core.market_data import (
     DiscountCurve,
-    ForwardCurve,
     MarketContext,
     ScalarTimeSeries,
 )
 from finstack_quant.valuations import instruments
-from tests.tests_typed_helpers import canonical_structured_credit_json
+from tests.tests_typed_helpers import canonical_structured_credit_json, projection_curve
 
 SC_ENTRY_POINTS = (
     "tranche_breakeven_cdr",
@@ -71,18 +70,10 @@ def _market() -> MarketContext:
     as_of = date(2024, 1, 1)
     market = (
         MarketContext()
-        .insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
-        .insert(
-            ForwardCurve(
-                "SOFR-3M",
-                0.25,
-                as_of,
-                [(0.0, 0.04), (10.0, 0.04)],
-                day_count="act_360",
-            )
-        )
+        .insert(DiscountCurve.flat("USD-OIS", as_of, 0.04, "act_365f"))
+        .insert(projection_curve("SOFR-3M", as_of, [(10.0, 0.04)]))
     )
-    market.insert_series(ScalarTimeSeries("FIXING:SOFR-3M", [(date(2023, 12, 28), 0.04)]))
+    market.insert_series(ScalarTimeSeries("FIXING:SOFR-3M", [(date(2023, 12, 28), 0.04)], "step", "error"))
     return market
 
 

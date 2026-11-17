@@ -16,7 +16,7 @@ const handle = native.MarketContext.fromJson(
       {
         id: "EQ-VOL",
         expiries: [0.5, 1, 2],
-        strikes: [80, 100, 120],
+        secondary_values: [80, 100, 120],
         secondary_axis: "strike",
         quote_type: "black_lognormal",
         interpolation_mode: "total_variance",

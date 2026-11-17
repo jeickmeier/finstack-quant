@@ -10,8 +10,8 @@ use pyo3::types::{PyList, PyModule};
 /// For mixed-sign values, prefer :func:`neumaier_sum`.
 #[pyfunction]
 #[pyo3(text_signature = "(values)")]
-fn kahan_sum(values: Vec<f64>) -> f64 {
-    summation::kahan_sum(values)
+fn kahan_sum(values: Vec<f64>) -> PyResult<f64> {
+    summation::kahan_sum(values).map_err(crate::errors::core_to_py)
 }
 
 /// Neumaier compensated summation — handles mixed-sign values better than Kahan.
@@ -19,8 +19,8 @@ fn kahan_sum(values: Vec<f64>) -> f64 {
 /// Recommended for financial calculations with mixed-sign cashflows.
 #[pyfunction]
 #[pyo3(text_signature = "(values)")]
-fn neumaier_sum(values: Vec<f64>) -> f64 {
-    summation::neumaier_sum(values)
+fn neumaier_sum(values: Vec<f64>) -> PyResult<f64> {
+    summation::neumaier_sum(values).map_err(crate::errors::core_to_py)
 }
 
 /// Build the `finstack_quant.core.math.summation` submodule.

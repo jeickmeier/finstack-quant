@@ -20,7 +20,7 @@ use finstack_quant_calibration::quotes::{Pillar, QuoteId};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, ParInterp, Seniority};
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, Seniority};
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::Instrument;
@@ -38,6 +38,8 @@ fn create_discount_curve(base_date: Date) -> DiscountCurve {
             (10.0, 0.70),
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -77,7 +79,6 @@ fn test_cds_par_spread_roundtrip_1y() {
         notional: 1.0,
         method: CalibrationMethod::Bootstrap,
 
-        par_interp: ParInterp::Linear,
         doc_clause: None,
         cds_valuation_convention: None,
     };
@@ -173,7 +174,6 @@ fn test_cds_par_spread_roundtrip_multi_tenor() {
         notional: 1.0,
         method: CalibrationMethod::Bootstrap,
 
-        par_interp: ParInterp::Linear,
         doc_clause: None,
         cds_valuation_convention: None,
     };
@@ -253,7 +253,6 @@ fn test_cds_par_spread_calculation_consistency() {
         notional: 1.0,
         method: CalibrationMethod::Bootstrap,
 
-        par_interp: ParInterp::Linear,
         doc_clause: None,
         cds_valuation_convention: None,
     };

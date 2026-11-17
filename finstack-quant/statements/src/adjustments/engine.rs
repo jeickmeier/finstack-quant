@@ -110,7 +110,7 @@ pub fn normalize(
                     adjustment.id
                 )));
             }
-            let running_total = total_acc.total();
+            let running_total = total_acc.get_total()?;
             let (capped_amount, is_capped) = if let Some(cap) = &adjustment.cap {
                 apply_cap(
                     cap,
@@ -124,7 +124,7 @@ pub fn normalize(
                 (raw_amount, false)
             };
 
-            total_acc.add(capped_amount);
+            total_acc.add(capped_amount)?;
 
             applied_adjustments.push(AppliedAdjustment {
                 adjustment_id: adjustment.id.clone(),
@@ -133,11 +133,12 @@ pub fn normalize(
                 capped_amount,
                 is_capped,
                 // Same expression as `final_value`, so the last step matches it exactly.
-                adjusted_value: base_value + total_acc.total(),
+                adjusted_value: base_value + total_acc.get_total()?,
             });
         }
 
-        if !(base_value + total_acc.total()).is_finite() {
+        let final_value = base_value + total_acc.get_total()?;
+        if !final_value.is_finite() {
             return Err(Error::eval(format!(
                 "Non-finite normalized result for {period_id}"
             )));
@@ -147,7 +148,7 @@ pub fn normalize(
             period: *period_id,
             base_value,
             adjustments: applied_adjustments,
-            final_value: base_value + total_acc.total(),
+            final_value,
         });
     }
 

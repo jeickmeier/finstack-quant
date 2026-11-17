@@ -734,33 +734,35 @@ pub fn hw1f_term_caplet_price_from_dfs_with_model(
 /// # Arguments
 ///
 /// * `params` - Validated constant Hull-White parameters.
-/// * `discount_df` - Discount-factor function for payment discounting.
-/// * `forward_df` - Projection-curve discount-factor function.
+/// * `discount_df` - Fallible discount-factor function for payment discounting.
+/// * `forward_df` - Fallible projection-curve discount-factor function.
 /// * `periods` - Coupon periods as `(fixing_time, payment_time, accrual)` in years.
 /// * `strike` - Cap or floor strike as a decimal rate.
 /// * `is_cap` - `true` for a cap and `false` for a floor.
-#[must_use]
+///
+/// # Errors
+///
+/// Propagates any error returned by `discount_df` or `forward_df`.
 pub fn hw1f_cap_floor_price(
     params: HullWhiteCalibrationParams,
-    discount_df: &dyn Fn(f64) -> f64,
-    forward_df: &dyn Fn(f64) -> f64,
+    discount_df: &dyn Fn(f64) -> finstack_quant_core::Result<f64>,
+    forward_df: &dyn Fn(f64) -> finstack_quant_core::Result<f64>,
     periods: &[(f64, f64, f64)],
     strike: f64,
     is_cap: bool,
-) -> f64 {
-    periods
-        .iter()
-        .map(|&(t_fix, t_pay, accrual)| {
-            hw1f_caplet_price_from_dfs(
-                params.kappa,
-                params.sigma,
-                (forward_df(t_fix), forward_df(t_pay), discount_df(t_pay)),
-                (t_fix, t_pay, accrual),
-                strike,
-                is_cap,
-            )
-        })
-        .sum()
+) -> finstack_quant_core::Result<f64> {
+    let mut total = 0.0;
+    for &(t_fix, t_pay, accrual) in periods {
+        total += hw1f_caplet_price_from_dfs(
+            params.kappa,
+            params.sigma,
+            (forward_df(t_fix)?, forward_df(t_pay)?, discount_df(t_pay)?),
+            (t_fix, t_pay, accrual),
+            strike,
+            is_cap,
+        );
+    }
+    Ok(total)
 }
 
 /// Convert constant Hull-White σ to the approximate caplet normal volatility.

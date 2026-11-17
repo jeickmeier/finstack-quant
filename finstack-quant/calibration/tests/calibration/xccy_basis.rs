@@ -7,8 +7,11 @@ use finstack_quant_calibration::quotes::RateQuote;
 use finstack_quant_calibration::quotes::{Pillar, QuoteId};
 use finstack_quant_calibration::{CalibrationConfig, CalibrationMethod, RatesStepConventions};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::diff::{
+    RateDiffScale, measure_discounting_zero_rate_difference,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
@@ -23,12 +26,11 @@ fn params(day_count: DayCount) -> StepParams {
         domestic_discount_id: "USD-OIS".into(),
         method: CalibrationMethod::Bootstrap,
         interpolation: InterpStyle::LogLinear,
-        extrapolation: ExtrapolationPolicy::FlatZero,
+        extrapolation: ExtrapolationPolicy::Flat,
         conventions: RatesStepConventions {
             curve_day_count: Some(day_count),
             ois_compounding: None,
         },
-        basis_spread_curve_id: Some("EUR-USD-BASIS".into()),
     })
 }
 
@@ -46,7 +48,7 @@ fn market(day_count: DayCount, base: Date) -> MarketContext {
             (10.0, (-0.02_f64 * denominator / 365.0 * 10.0).exp()),
         ])
         .interp(InterpStyle::LogLinear)
-        .extrapolation(ExtrapolationPolicy::FlatZero)
+        .extrapolation(ExtrapolationPolicy::Flat)
         .build()
         .expect("domestic discount curve");
     MarketContext::new().insert(discount)
@@ -64,6 +66,7 @@ fn deposit(rate: f64) -> MarketQuote {
 #[test]
 fn xccy_basis_builds_signed_spread_output_with_default_discount_interpolation() {
     let base = date!(2025 - 01 - 02);
+    let maturity = date!(2026 - 01 - 06);
     for (rate, expected_sign) in [(0.01, -1.0), (0.03, 1.0)] {
         let (context, report) = cal_utils::execute_step(
             &params(DayCount::Act365F),
@@ -73,19 +76,24 @@ fn xccy_basis_builds_signed_spread_output_with_default_discount_interpolation() 
         )
         .expect("zero and negative basis spreads must build");
         assert!(report.success);
-        let spread = context
-            .curve("EUR-USD-BASIS")
-            .and_then(|c| c.basis_spread())
-            .cloned()
-            .expect("basis curve");
-        assert_eq!(spread.interp_style(), InterpStyle::Linear);
-        assert_eq!(spread.spread(0.0), 0.0);
-        assert!(spread.spread(1.0) * expected_sign > 0.0);
+        let domestic = context.get_discount("USD-OIS").expect("domestic curve");
+        let foreign = context.get_discount("EUR-OIS").expect("foreign curve");
+        let spread = measure_discounting_zero_rate_difference(
+            domestic.as_ref(),
+            foreign.as_ref(),
+            base,
+            maturity,
+            DayCount::Act365F,
+            DayCountContext::default(),
+            RateDiffScale::Decimal,
+        )
+        .expect("checked zero-rate difference");
+        assert!(spread * expected_sign > 0.0);
     }
 }
 
 #[test]
-fn xccy_basis_preserves_foreign_and_spread_curve_day_counts() {
+fn xccy_basis_preserves_foreign_curve_day_count_and_zero_rate_difference() {
     let base = date!(2025 - 01 - 02);
     let (context, report) = cal_utils::execute_step(
         &params(DayCount::Act360),
@@ -95,14 +103,9 @@ fn xccy_basis_preserves_foreign_and_spread_curve_day_counts() {
     )
     .expect("Act360 foreign curve");
     assert!(report.success);
+    let domestic = context.get_discount("USD-OIS").expect("domestic curve");
     let foreign = context.get_discount("EUR-OIS").expect("foreign curve");
-    let spread = context
-        .curve("EUR-USD-BASIS")
-        .and_then(|c| c.basis_spread())
-        .cloned()
-        .expect("basis curve");
     assert_eq!(foreign.day_count(), DayCount::Act360);
-    assert_eq!(spread.day_count(), DayCount::Act360);
     // ESTR deposits start two TARGET business days after 2 January and mature
     // one year later, so the pillar date is 6 January 2026.
     let maturity = date!(2026 - 01 - 06);
@@ -112,20 +115,29 @@ fn xccy_basis_preserves_foreign_and_spread_curve_day_counts() {
         (foreign.df_between_dates(base, maturity).expect("dated DF") - foreign.dfs()[1]).abs()
             < 1e-12
     );
-    let expected = (context
-        .get_discount("USD-OIS")
-        .expect("domestic")
+    let expected = (domestic
         .df_between_dates(base, maturity)
         .expect("domestic dated DF")
         / foreign.dfs()[1])
         .ln()
         / time;
-    assert!((spread.spread(time) - expected).abs() < 1e-12);
+    let spread = measure_discounting_zero_rate_difference(
+        domestic.as_ref(),
+        foreign.as_ref(),
+        base,
+        maturity,
+        DayCount::Act360,
+        DayCountContext::default(),
+        RateDiffScale::Decimal,
+    )
+    .expect("checked zero-rate difference");
+    assert!((spread - expected).abs() < 1e-12);
 }
 
 #[test]
 fn xccy_basis_is_invariant_to_domestic_curve_clock_and_base() {
     let base = date!(2025 - 01 - 02);
+    let maturity = date!(2026 - 01 - 06);
     let mut spreads = Vec::new();
     for domestic_day_count in [DayCount::Act365F, DayCount::Act360] {
         for domestic_base in [base, date!(2024 - 10 - 01)] {
@@ -137,13 +149,19 @@ fn xccy_basis_is_invariant_to_domestic_curve_clock_and_base() {
             )
             .expect("economically equivalent domestic curve");
             assert!(report.success);
+            let domestic = context.get_discount("USD-OIS").expect("domestic curve");
+            let foreign = context.get_discount("EUR-OIS").expect("foreign curve");
             spreads.push(
-                context
-                    .curve("EUR-USD-BASIS")
-                    .and_then(|c| c.basis_spread())
-                    .cloned()
-                    .expect("basis")
-                    .spread(1.0),
+                measure_discounting_zero_rate_difference(
+                    domestic.as_ref(),
+                    foreign.as_ref(),
+                    base,
+                    maturity,
+                    DayCount::Act365F,
+                    DayCountContext::default(),
+                    RateDiffScale::Decimal,
+                )
+                .expect("zero-rate difference"),
             );
         }
     }

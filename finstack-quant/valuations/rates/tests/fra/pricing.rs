@@ -46,8 +46,12 @@ fn test_at_market_fra_near_zero_pv() {
         .day_count()
         .year_fraction(fwd.base_date(), end, DayCountContext::default())
         .expect("end time");
+    let accrual = fwd
+        .day_count()
+        .year_fraction(start, end, DayCountContext::default())
+        .expect("accrual");
     let implied = fwd
-        .rate_between(t_start, t_end)
+        .rate_between(t_start, t_end, accrual)
         .expect("contractual FRA forward");
     approx_eq(
         implied,

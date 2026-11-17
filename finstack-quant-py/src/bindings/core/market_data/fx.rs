@@ -11,7 +11,7 @@ use pyo3::types::PyModule;
 use pyo3::wrap_pyfunction;
 
 use crate::bindings::core::currency::{PyCurrency, extract_currency};
-use crate::bindings::date_utils::py_to_date;
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::{
     impl_repr_html_via_dataframe, label_enum, typed_or_label, wire_methods,
 };
@@ -19,7 +19,7 @@ use crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_sch
 use crate::errors::core_to_py;
 
 typed_or_label!(
-    fn extract_fx_policy -> FxConversionPolicy,
+    pub(super) fn extract_fx_policy -> FxConversionPolicy,
     PyFxConversionPolicy,
     "FxConversionPolicy or str",
     |label| label.parse().map_err(core_to_py)
@@ -142,6 +142,61 @@ fn optional_pivot(
     }
 }
 
+/// Build a pandas ``DataFrame`` from pair-global or cached `(base, quote, rate)` FX quotes.
+fn pair_quotes_dataframe<'py>(
+    py: Python<'py>,
+    rows: &[(
+        finstack_quant_core::currency::Currency,
+        finstack_quant_core::currency::Currency,
+        f64,
+    )],
+) -> PyResult<Bound<'py, PyAny>> {
+    let data = pyo3::types::PyDict::new(py);
+    data.set_item(
+        "base",
+        rows.iter().map(|q| q.0.to_string()).collect::<Vec<_>>(),
+    )?;
+    data.set_item(
+        "quote",
+        rows.iter().map(|q| q.1.to_string()).collect::<Vec<_>>(),
+    )?;
+    data.set_item("rate", rows.iter().map(|q| q.2).collect::<Vec<_>>())?;
+    crate::bindings::pandas_utils::dict_to_dataframe(py, &data, None)
+}
+
+/// Build a pandas ``DataFrame`` from date-and-policy pinned `(base, quote, date, policy, rate)` quotes.
+fn pinned_quotes_dataframe<'py>(
+    py: Python<'py>,
+    rows: &[(
+        finstack_quant_core::currency::Currency,
+        finstack_quant_core::currency::Currency,
+        finstack_quant_core::dates::Date,
+        finstack_quant_core::money::fx::FxConversionPolicy,
+        f64,
+    )],
+) -> PyResult<Bound<'py, PyAny>> {
+    let data = pyo3::types::PyDict::new(py);
+    data.set_item(
+        "base",
+        rows.iter().map(|q| q.0.to_string()).collect::<Vec<_>>(),
+    )?;
+    data.set_item(
+        "quote",
+        rows.iter().map(|q| q.1.to_string()).collect::<Vec<_>>(),
+    )?;
+    let dates = rows
+        .iter()
+        .map(|q| date_to_py(py, q.2))
+        .collect::<PyResult<Vec<_>>>()?;
+    data.set_item("date", dates)?;
+    data.set_item(
+        "policy",
+        rows.iter().map(|q| q.3.to_string()).collect::<Vec<_>>(),
+    )?;
+    data.set_item("rate", rows.iter().map(|q| q.4).collect::<Vec<_>>())?;
+    crate::bindings::pandas_utils::dict_to_dataframe(py, &data, None)
+}
+
 /// Extract a numeric FX value as `f64`, rejecting Python `bool`.
 fn extract_fx_float(value: &Bound<'_, PyAny>, field: &str) -> PyResult<f64> {
     if value.is_instance_of::<pyo3::types::PyBool>() {
@@ -167,9 +222,9 @@ impl PyFxMatrix {
         })
     }
 
-    /// Set an authoritative FX quote scoped to one date and policy.
-    /// Pair-global quotes in either orientation take priority; this fixing
-    /// takes priority over provider observations.
+    /// Set a non-evicting pinned FX quote scoped to one date and policy.
+    /// For its ``(on, policy)``, this fixing takes highest authority:
+    /// it outranks both pair-global quotes (``set_quotes``) and provider observations.
     #[pyo3(text_signature = "(self, base, quote, date, policy, rate)")]
     fn set_quote_on(
         &self,
@@ -295,7 +350,8 @@ impl PyFxMatrix {
     ///
     /// Columns: ``base``, ``quote`` (ISO codes) and ``rate``, in the Rust
     /// snapshot order (by ISO-4217 numeric code of base, then quote).
-    /// Date-scoped quotes set with ``set_quote_on`` are not included.
+    /// Pair-global quotes outrank provider observations but rank below
+    /// date-and-policy fixings set via ``set_quote_on`` (see ``pinned_quotes``).
     ///
     /// Returns
     /// -------
@@ -307,34 +363,91 @@ impl PyFxMatrix {
     ///     If repeated quote updates prevent a coherent snapshot or the
     ///     provider cannot version its snapshot quotes.
     fn quotes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let state: Vec<(String, String, f64)> = self
-            .inner
-            .get_serializable_state()
-            .map_err(core_to_py)?
-            .quotes
-            .into_iter()
-            .map(|(base, quote, rate)| (base.to_string(), quote.to_string(), rate))
-            .collect();
-        let data = pyo3::types::PyDict::new(py);
-        data.set_item(
-            "base",
-            state.iter().map(|q| q.0.as_str()).collect::<Vec<_>>(),
-        )?;
-        data.set_item(
-            "quote",
-            state.iter().map(|q| q.1.as_str()).collect::<Vec<_>>(),
-        )?;
-        data.set_item("rate", state.iter().map(|q| q.2).collect::<Vec<_>>())?;
-        crate::bindings::pandas_utils::dict_to_dataframe(py, &data, None)
+        let state = self.inner.get_serializable_state().map_err(core_to_py)?;
+        pair_quotes_dataframe(py, &state.quotes)
+    }
+
+    /// Cached provider-observed quotes as a pandas ``DataFrame``.
+    ///
+    /// Columns: ``base``, ``quote`` (ISO codes) and ``rate``, in the Rust
+    /// snapshot order (by ISO-4217 numeric code of base, then quote).
+    /// Provider observations rank below explicit pair-global quotes
+    /// (``set_quotes``) and below date-and-policy pinned fixings
+    /// (``set_quote_on``).
+    ///
+    /// Returns
+    /// -------
+    /// pandas.DataFrame
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If repeated quote updates prevent a coherent snapshot or the
+    ///     provider cannot version its snapshot quotes.
+    fn provider_quotes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let state = self.inner.get_serializable_state().map_err(core_to_py)?;
+        pair_quotes_dataframe(py, &state.provider_quotes)
+    }
+
+    /// Explicit date-and-policy pinned quotes (``set_quote_on``) as a pandas ``DataFrame``.
+    ///
+    /// Columns: ``base``, ``quote`` (ISO codes), ``date`` (``datetime.date``),
+    /// ``policy`` (conversion policy label), and ``rate``. For their
+    /// ``(date, policy)``, pinned quotes take highest authority, outranking
+    /// both pair-global quotes (``set_quotes``) and provider observations.
+    ///
+    /// Returns
+    /// -------
+    /// pandas.DataFrame
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If repeated quote updates prevent a coherent snapshot or the
+    ///     provider cannot version its snapshot quotes.
+    fn pinned_quotes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let state = self.inner.get_serializable_state().map_err(core_to_py)?;
+        pinned_quotes_dataframe(py, &state.pinned_quotes)
+    }
+
+    /// Cached provider-observed date-and-policy quotes as a pandas ``DataFrame``.
+    ///
+    /// Columns: ``base``, ``quote`` (ISO codes), ``date`` (``datetime.date``),
+    /// ``policy`` (conversion policy label), and ``rate``. These rank below
+    /// both pinned fixings (``set_quote_on``) and explicit pair-global quotes
+    /// (``set_quotes``).
+    ///
+    /// Returns
+    /// -------
+    /// pandas.DataFrame
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If repeated quote updates prevent a coherent snapshot or the
+    ///     provider cannot version its snapshot quotes.
+    fn provider_pinned_quotes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let state = self.inner.get_serializable_state().map_err(core_to_py)?;
+        pinned_quotes_dataframe(py, &state.provider_pinned_quotes)
     }
 
     fn __repr__(&self) -> PyResult<String> {
         let state = self.inner.get_serializable_state().map_err(core_to_py)?;
-        Ok(format!(
-            "FxMatrix(quotes={}, pinned_quotes={})",
-            state.quotes.len(),
-            state.pinned_quotes.len()
-        ))
+        if state.provider_quotes.is_empty() && state.provider_pinned_quotes.is_empty() {
+            Ok(format!(
+                "FxMatrix(quotes={}, pinned_quotes={})",
+                state.quotes.len(),
+                state.pinned_quotes.len()
+            ))
+        } else {
+            Ok(format!(
+                "FxMatrix(quotes={}, pinned_quotes={}, provider_quotes={}, provider_pinned_quotes={})",
+                state.quotes.len(),
+                state.pinned_quotes.len(),
+                state.provider_quotes.len(),
+                state.provider_pinned_quotes.len()
+            ))
+        }
     }
 }
 

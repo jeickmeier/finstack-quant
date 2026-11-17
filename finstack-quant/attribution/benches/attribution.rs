@@ -369,7 +369,8 @@ fn bench_hot_paths(c: &mut Criterion) {
                 black_box(&lean.market_t1),
                 &snap,
                 MarketRestoreFlags::RATES,
-            );
+            )
+            .unwrap();
             black_box(restored);
         });
     });
@@ -382,7 +383,8 @@ fn bench_hot_paths(c: &mut Criterion) {
                 black_box(&fat.market_t1),
                 &snap,
                 MarketRestoreFlags::all(),
-            );
+            )
+            .unwrap();
             black_box(restored);
         });
     });

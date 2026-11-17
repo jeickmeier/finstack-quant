@@ -19,8 +19,11 @@ impl finstack_quant_core::market_data::traits::Discounting for InvalidDiscountCu
     fn base_date(&self) -> finstack_quant_core::dates::Date {
         self.0.base_date()
     }
-    fn df(&self, _t: f64) -> f64 {
-        f64::NAN
+    fn df(&self, _t: f64) -> Result<f64> {
+        Ok(f64::NAN)
+    }
+    fn instantaneous_forward(&self, _t: f64) -> Result<f64> {
+        Ok(f64::NAN)
     }
 }
 
@@ -73,11 +76,18 @@ fn invalid_later_discount_targets_fail_without_replacing_calibration() {
         fn base_date(&self) -> finstack_quant_core::dates::Date {
             self.curve.base_date()
         }
-        fn df(&self, time: f64) -> f64 {
+        fn df(&self, time: f64) -> Result<f64> {
             if time < 0.75 {
                 self.curve.df(time)
             } else {
-                self.target
+                Ok(self.target)
+            }
+        }
+        fn instantaneous_forward(&self, time: f64) -> Result<f64> {
+            if time < 0.75 {
+                self.curve.instantaneous_forward(time)
+            } else {
+                Ok(self.target)
             }
         }
     }
@@ -114,8 +124,10 @@ fn create_test_curve() -> DiscountCurve {
             finstack_quant_core::dates::Date::from_calendar_date(2025, Month::January, 1)
                 .expect("should succeed"),
         )
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, 0.97), (2.0, 0.94), (5.0, 0.85)])
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("should succeed")
 }
@@ -129,8 +141,10 @@ fn create_flat_curve(rate: f64) -> DiscountCurve {
             finstack_quant_core::dates::Date::from_calendar_date(2025, Month::January, 1)
                 .expect("should succeed"),
         )
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots(knots)
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("should succeed")
 }
@@ -201,7 +215,7 @@ fn ho_lee_stored_lattice_prices_zero_coupon_to_calibration_curve() {
             &ConstantValuator,
         )
         .expect("Ho-Lee zero-coupon price");
-    let expected = curve.df(maturity);
+    let expected = curve.df(maturity).expect("valid");
 
     assert!(
         (actual - expected).abs() < 1e-8,
@@ -243,7 +257,7 @@ fn ho_lee_noncontinuous_compounding_reprices_curve() {
                 &ConstantValuator,
             )
             .expect("zero-coupon price");
-        let expected = curve.df(maturity);
+        let expected = curve.df(maturity).expect("valid");
         assert!(
             ((actual - expected) / expected).abs() * 10_000.0 < 0.1,
             "{compounding:?}: zero coupon must reprice to <0.1bp: \
@@ -366,7 +380,7 @@ fn test_bdt_stored_lattice_prices_zero_coupon_to_calibration_curve() {
             &ConstantValuator,
         )
         .expect("BDT zero coupon price");
-    let expected = curve.df(maturity);
+    let expected = curve.df(maturity).expect("valid");
 
     assert!(
         (actual - expected).abs() < 1e-8,
@@ -488,7 +502,7 @@ fn test_bdt_mean_reversion_calibrates_and_tightens_rate_dispersion() {
             &ConstantValuator,
         )
         .expect("ZCB price");
-    let target = curve.df(2.0);
+    let target = curve.df(2.0).expect("valid");
     assert!(
         (zcb - target).abs() < 1e-6,
         "BK(κ=0.05) should still price ZCBs to curve: got={zcb:.8}, target={target:.8}"
@@ -519,7 +533,7 @@ fn bk_trinomial_reprices_curve_to_a_tenth_bp() {
             &ConstantValuator,
         )
         .expect("ZCB price");
-    let target = curve.df(maturity);
+    let target = curve.df(maturity).expect("valid");
     let error_bp = ((zcb - target) / target).abs() * 10_000.0;
     assert!(
         error_bp < 0.1,
@@ -976,7 +990,7 @@ fn test_ho_lee_rejects_nonzero_mean_reversion() {
         model: ShortRateModel::HoLee,
         volatility: 0.01,
         mean_reversion: 0.05,
-        compounding: Compounding::default(),
+        compounding: Compounding::Continuous,
         curve_fit_tolerance_bp: DEFAULT_CURVE_FIT_TOLERANCE_BP,
     };
     let mut tree = ShortRateTree::new(config);
@@ -997,7 +1011,7 @@ fn test_ho_lee_allows_zero_mean_reversion() {
         model: ShortRateModel::HoLee,
         volatility: 0.01,
         mean_reversion: 0.0,
-        compounding: Compounding::default(),
+        compounding: Compounding::Continuous,
         curve_fit_tolerance_bp: DEFAULT_CURVE_FIT_TOLERANCE_BP,
     };
     let mut tree = ShortRateTree::new(config);
@@ -1151,9 +1165,9 @@ fn short_rate_tree_prices_are_bit_pinned() {
     assert_eq!(
         bits,
         [
-            4_581_796_644_146_762_841_u64,
-            4_580_922_846_417_299_753,
-            4_580_880_735_554_357_352,
+            4_581_796_644_146_762_626_u64,
+            4_580_922_846_417_299_881,
+            4_580_880_735_554_359_575,
         ]
     );
 }
@@ -1165,12 +1179,14 @@ fn periodic_oas_is_added_to_each_node_rate_on_its_own_compounding() {
     let flat_rate = 0.04_f64;
     let curve = DiscountCurve::builder("USD-FLAT")
         .base_date(base_date)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots([
             (0.0, 1.0),
             (1.0, (-flat_rate).exp()),
             (2.0, (-2.0 * flat_rate).exp()),
         ])
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("flat curve");
     // Zero volatility: every node carries the flat rate, so the semiannual

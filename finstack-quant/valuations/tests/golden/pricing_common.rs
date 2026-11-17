@@ -124,7 +124,7 @@ pub(crate) fn run_pricing_fixture(
 mod tests {
     use super::*;
     use crate::golden::golden::schema::SCHEMA;
-    use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+    use finstack_quant_core::market_data::bumps::BumpSpec;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
@@ -264,7 +264,7 @@ mod tests {
         // uses ACT/360. Market/par quotes are not tenor forward rates.
         for &time in stripped.knots() {
             let actual = projection.df(time * 365.0 / 360.0).expect("projection DF");
-            let expected = stripped.df(time);
+            let expected = stripped.df(time).expect("stripped DF");
             assert!(
                 (actual - expected).abs() < 1e-12,
                 "projection must reproduce captured DF at {time}: {actual} != {expected}"
@@ -383,11 +383,17 @@ mod tests {
         curve_ids: &[CurveId],
     ) -> f64 {
         let bumped_market = |direction| {
+            let bumps: Vec<_> = curve_ids
+                .iter()
+                .map(|id| {
+                    market
+                        .curve_target(id)
+                        .expect("curve target")
+                        .into_bump(BumpSpec::parallel_bp(direction))
+                })
+                .collect();
             market
-                .bump(curve_ids.iter().cloned().map(|id| MarketBump::Curve {
-                    id,
-                    spec: BumpSpec::parallel_bp(direction),
-                }))
+                .bump(bumps)
                 .expect("declared curve should support a parallel bump")
         };
         let up = price_fixture_npv(fixture, &bumped_market(1.0), instrument_json);
@@ -716,8 +722,8 @@ mod tests {
         .expect("registry DV01 should price");
         let registry_dv01 = registry_result.measures["dv01"];
 
-        assert_close(discount, -3_083.076_104_730_368, 1e-6);
-        assert_close(sofr_3m, 2_796.256_580_974_907, 1e-6);
+        assert_close(discount, -3_082.562_966_541_387, 1e-6);
+        assert_close(sofr_3m, 2_825.346_320_159_733, 1e-6);
         // Take the combined target from the fixture rather than repeating the
         // literal here, so a re-blessed fixture cannot leave this test stale.
         assert_close(combined, fixture.expected["dv01"], 1e-6);

@@ -31,7 +31,6 @@ use crate::cap_floor::pricing::projection::{
 use crate::cap_floor::types::CapFloor;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::rates::hull_white::{
     HullWhiteCalibrationParams, HullWhiteParams, TermCapletPeriod, capfloor_hw1f_scalar_keys,
@@ -437,20 +436,12 @@ pub(crate) fn resolve_capfloor_hw1f_model_params(
         let schedule_key = capfloor_hw1f_sigma_schedule_key(cap_floor.discount_curve_id.as_str());
         if let Ok(series) = market.get_series(&schedule_key) {
             let (kappa_key, _) = capfloor_hw1f_scalar_keys(cap_floor.discount_curve_id.as_str());
-            let stored_kappa = market
-                .get_price(&kappa_key)
-                .ok()
-                .and_then(|scalar| match scalar {
-                    MarketScalar::Unitless(value) if value.is_finite() && *value > 0.0 => {
-                        Some(*value)
-                    }
-                    MarketScalar::Price(money)
-                        if money.amount().is_finite() && money.amount() > 0.0 =>
-                    {
-                        Some(money.amount())
-                    }
-                    _ => None,
-                });
+            let stored_kappa = market.get_price(&kappa_key).ok().and_then(|scalar| {
+                scalar
+                    .get_unitless()
+                    .or_else(|| scalar.get_price().map(|money| money.amount()))
+                    .filter(|value| value.is_finite() && *value > 0.0)
+            });
             let kappa = cap_floor
                 .instrument_pricing_overrides
                 .model_config
@@ -755,8 +746,15 @@ mod tests {
             ));
         let (kappa_key, sigma_key) = capfloor_hw1f_scalar_keys(cap.discount_curve_id.as_str());
         let market = market
-            .insert_price(&kappa_key, MarketScalar::Unitless(0.05))
-            .insert_price(&sigma_key, MarketScalar::Unitless(0.01));
+            .insert_price(
+                &kappa_key,
+                finstack_quant_core::market_data::scalars::MarketScalar::unitless(0.05)
+                    .expect("valid scalar"),
+            )
+            .insert_price(
+                &sigma_key,
+                MarketScalar::unitless(0.01).expect("valid scalar"),
+            );
         (as_of, cap, market)
     }
 
@@ -808,8 +806,14 @@ mod tests {
 
         let (kappa_key, sigma_key) = capfloor_hw1f_scalar_keys(cap.discount_curve_id.as_str());
         let calibrated_market = baseline_market
-            .insert_price(&kappa_key, MarketScalar::Unitless(0.10))
-            .insert_price(&sigma_key, MarketScalar::Unitless(0.030));
+            .insert_price(
+                &kappa_key,
+                MarketScalar::unitless(0.10).expect("valid scalar"),
+            )
+            .insert_price(
+                &sigma_key,
+                MarketScalar::unitless(0.030).expect("valid scalar"),
+            );
 
         let calibrated_pv = CapFloorHullWhitePricer
             .price_internal(&cap, &calibrated_market, as_of)
@@ -833,8 +837,14 @@ mod tests {
         let (as_of, mut cap, market) = example_cap_market();
         let (kappa_key, sigma_key) = capfloor_hw1f_scalar_keys(cap.discount_curve_id.as_str());
         let market = market
-            .insert_price(&kappa_key, MarketScalar::Unitless(0.10))
-            .insert_price(&sigma_key, MarketScalar::Unitless(0.030));
+            .insert_price(
+                &kappa_key,
+                MarketScalar::unitless(0.10).expect("valid scalar"),
+            )
+            .insert_price(
+                &sigma_key,
+                MarketScalar::unitless(0.030).expect("valid scalar"),
+            );
 
         let market_pv = CapFloorHullWhitePricer
             .price_internal(&cap, &market, as_of)
@@ -1340,8 +1350,14 @@ mod tests {
             .model_config
             .hw1f_mean_reversion = Some(0.05);
         caplet.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.012);
-        let fixings = ScalarTimeSeries::new("FIXING:TEST-TERM-3M", vec![(fixing_date, 0.07)], None)
-            .expect("fixings");
+        let fixings = ScalarTimeSeries::new(
+            "FIXING:TEST-TERM-3M",
+            vec![(fixing_date, 0.07)],
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("fixings");
         let market = MarketContext::new()
             .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
             .insert(flat_forward_with_tenor("TEST-TERM-3M", as_of, 0.12, 5.0))
@@ -1405,8 +1421,14 @@ mod tests {
                 .expect("next observation")
                 .min(accrual_end);
         }
-        let fixings =
-            ScalarTimeSeries::new("FIXING:USD-SOFR-OIS", fixing_values, None).expect("fixings");
+        let fixings = ScalarTimeSeries::new(
+            "FIXING:USD-SOFR-OIS",
+            fixing_values,
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("fixings");
         let market = MarketContext::new()
             .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
             .insert(flat_forward_with_tenor("USD-SOFR-OIS", as_of, 0.12, 5.0))
@@ -1642,11 +1664,17 @@ mod tests {
             capfloor_hw1f_sigma_schedule_key("USD-OIS"),
             vec![(as_of, 0.01), (date(2025, 12, 2), 0.02)],
             None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Flat,
         )
         .expect("schedule");
         let market = MarketContext::new()
             .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.045, 5.0))
-            .insert_price(&kappa_key, MarketScalar::Unitless(0.05))
+            .insert_price(
+                &kappa_key,
+                finstack_quant_core::market_data::scalars::MarketScalar::unitless(0.05)
+                    .expect("valid scalar"),
+            )
             .insert_series(schedule);
 
         let model = resolve_capfloor_hw1f_model_params(&caplet, &market, as_of).expect("model");
@@ -1663,7 +1691,7 @@ mod tests {
         let registry = crate::RATES.pricers();
         let price = |bp: f64| {
             let shifted = market
-                .bump([MarketBump::Curve {
+                .bump([MarketBump::ForwardCurve {
                     id: cap.forward_curve_id.clone(),
                     spec: BumpSpec::parallel_bp(bp),
                 }])

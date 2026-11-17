@@ -65,7 +65,7 @@ Full item documentation is in the rustdoc (`cargo doc -p finstack-quant-core
 | Path | What it is |
 |------|------------|
 | `market_data::context::MarketContext` | Immutable container keyed by curve id, with typed getters (`get_discount`, `get_forward`, …) returning `Arc<T>`. Bumping returns a new context. |
-| `market_data::term_structures` | `DiscountCurve`, `ForwardCurve`, `HazardCurve`, `InflationCurve`, `BaseCorrelationCurve`, `BasisSpreadCurve`, `PriceCurve` (signed prices or, via `PriceCurveKind::VolIndex`, non-negative volatility-index levels), `ParametricCurve` (Nelson-Siegel / Svensson), `ForwardVarianceCurve`, `CreditIndexData`, plus builders and rate-calibration helpers. |
+| `market_data::term_structures` | `DiscountCurve`, `ForwardCurve`, `HazardCurve`, `InflationCurve`, `BaseCorrelationCurve`, `PriceCurve` (signed prices or, via `PriceCurveKind::VolIndex`, non-negative volatility-index levels), `ParametricCurve` (Nelson-Siegel / Svensson), `ForwardVarianceCurve`, `CreditIndexData`, plus builders and rate-calibration helpers. |
 | `market_data::surfaces` | `VolSurface`, `VolCube`, `FxDeltaVolSurface` (validated ATM / risk-reversal / butterfly quotes; conversion lives in `finstack-quant-models::volatility`). |
 | `market_data::scalars` | `MarketScalar`, `ScalarTimeSeries`, `SeriesInterpolation`, plus `InflationIndex` with its `InflationLag` convention. |
 | `market_data::dividends` | `DividendEvent`, `DividendKind`, `DividendSchedule`. |
@@ -83,12 +83,12 @@ want it; domain-specific numerics (stochastic processes, payoffs) belong in
 
 | Path | What it is |
 |------|------------|
-| `math::stats` | `mean`, `variance`, `correlation`, `covariance`, `quantile`, NaN-tolerant `*_or_nan` variants, streaming `OnlineStats`/`OnlineCovariance`, realized-variance estimators. |
+| `math::stats` | `mean`, `variance`, `population_variance`, `std_dev`, `mean_var`, `correlation`, `covariance`, `optimal_beta`, `quantile`, `median`, `finite_min`/`finite_max`/`finite_count`, streaming `OnlineStats`/`OnlineCovariance`, realized-variance estimators. |
 | `math::summation` | `kahan_sum`, `neumaier_sum`, `NeumaierAccumulator`. |
 | `math::special_functions` | `norm_cdf`, `norm_pdf`, `erf`, `ln_gamma`, `standard_normal_inv_cdf`, Student-t CDF/inverse. |
 | `math::linalg` | Cholesky (`cholesky_decomposition`, `cholesky_correlation`), `symmetric_eigen`, correlation-matrix construction and validation. |
 | `math::interp` | `Interpolator`, `InterpStyle`, `ExtrapolationPolicy`, `ValidationPolicy` and the strategies (`LinearStrategy`, `LogLinearStrategy`, `CubicHermiteStrategy`, `MonotoneConvexStrategy`, `PiecewiseQuadraticForwardStrategy`). |
-| `math::solver` / `math::solver_multi` | `BrentSolver`; `LevenbergMarquardtSolver` and `AnalyticalDerivatives` for systems. |
+| `math::solver` / `math::solver_multi` | `BrentSolver` and `LevenbergMarquardtSolver` for root finding and least-squares calibration. |
 | `math::integration` | Gauss-Legendre (fixed, composite, adaptive), Gauss-Hermite. |
 | `math::random` | `Pcg64Rng`, `RandomNumberGenerator`, `SobolRng` (up to `MAX_SOBOL_DIMENSION` = 40), `BrownianBridge`, Poisson inversion, `box_muller_transform`. |
 | `math::distributions` / `math::probability` | Binomial and chi-squared helpers, `CorrelatedBernoulli`, `correlation_bounds`. |

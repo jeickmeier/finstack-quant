@@ -80,6 +80,8 @@ fn test_upfront_fee_sign() {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, 0.9999)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let market = MarketContext::new().insert(disc_curve);
@@ -101,6 +103,8 @@ fn test_upfront_fee_sign() {
         .base_date(start)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, 0.9999)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let market2 = MarketContext::new().insert(disc_curve2);
@@ -147,6 +151,8 @@ fn test_mid_period_draw_accrual() {
         .base_date(start)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (0.25, 0.9999)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let market = MarketContext::new().insert(disc_curve);
@@ -186,14 +192,22 @@ fn test_floating_vs_margin_only() {
     let end = Date::from_calendar_date(2026, Month::January, 1).unwrap();
 
     // Create a steepened forward curve
-    let fwd_curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let fwd_curve = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(start)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots([
-            (0.0, 0.01),   // 1% at start
-            (0.25, 0.015), // 1.5% at 3M
-            (0.5, 0.02),   // 2% at 6M
-            (1.0, 0.025),  // 2.5% at 1Y
+            (0.0, 1.0),
+            (0.125, 0.998594738306208),
+            (0.25, 0.996879877730208),
+            (0.375, 0.994857020638324),
+            (0.5, 0.992528054819138),
+            (0.625, 0.98997248912722),
+            (0.75, 0.987269230647777),
+            (0.875, 0.984419526225634),
+            (1.0, 0.981424687747777),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -238,6 +252,8 @@ fn test_floating_vs_margin_only() {
         .base_date(start)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, (-0.02f64).exp())])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -252,6 +268,8 @@ fn test_floating_vs_margin_only() {
                     0.01,
                 )],
                 None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
             )
             .unwrap(),
         );
@@ -279,16 +297,21 @@ fn test_reset_frequency_mismatch() {
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let end = Date::from_calendar_date(2025, Month::April, 1).unwrap(); // One quarter
 
-    let fwd_curve = ForwardCurve::builder("USD-SOFR-1M", 1.0 / 12.0)
-        .base_date(start)
-        .knots([
+    let fwd_curve = ForwardCurve::from_zero_rates(
+        "USD-SOFR-1M",
+        start,
+        &[
             (0.0, 0.01),
             (1.0 / 12.0, 0.011),
             (2.0 / 12.0, 0.012),
             (3.0 / 12.0, 0.013),
-        ])
-        .build()
-        .unwrap();
+        ],
+        finstack_quant_core::math::Compounding::Continuous,
+        DayCount::Act365F,
+        finstack_quant_core::math::interp::InterpStyle::LogLinear,
+        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+    )
+    .unwrap();
 
     let facility = RevolvingCredit::builder()
         .id("RC-RESET-TEST".into())
@@ -331,6 +354,8 @@ fn test_reset_frequency_mismatch() {
         .base_date(start)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (0.5, 0.9999)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -345,6 +370,8 @@ fn test_reset_frequency_mismatch() {
                     0.01,
                 )],
                 None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
             )
             .unwrap(),
         );
@@ -446,6 +473,8 @@ fn test_utilization_tier() {
         .base_date(start)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (0.5, 0.9999)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let market = MarketContext::new().insert(disc_curve);
@@ -522,6 +551,8 @@ fn test_as_of_filtering() {
         .base_date(start)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (0.5, 0.9999)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let market = MarketContext::new().insert(disc_curve);

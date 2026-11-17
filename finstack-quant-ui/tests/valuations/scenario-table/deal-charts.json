@@ -1,7 +1,7 @@
 {
   "instrumentSource": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
   "marketSource": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-  "marketSha256": "3ee1b64c7eb259dfa64ffbcc2d253995ca398d7c10794631a247b6f7111ee2c3",
+  "marketSha256": "91b9c85cfc0472093142fed8ccd69a008c068f3cfd8b484c7d9d09495ae91b89",
   "asOf": "2024-01-01",
   "units": {
     "coverage_tests": [
@@ -318,14 +318,14 @@
               [
                 "2025-04-01",
                 {
-                  "amount": "82433.7810087748",
+                  "amount": "82433.7810087746",
                   "currency": "USD"
                 }
               ],
               [
                 "2025-07-01",
                 {
-                  "amount": "83285.8693339152",
+                  "amount": "83285.8693339153",
                   "currency": "USD"
                 }
               ],
@@ -339,14 +339,14 @@
               [
                 "2026-01-02",
                 {
-                  "amount": "79400.8397014305",
+                  "amount": "79400.8397014306",
                   "currency": "USD"
                 }
               ],
               [
                 "2026-04-01",
                 {
-                  "amount": "65240.6215238088",
+                  "amount": "65240.62152380884",
                   "currency": "USD"
                 }
               ]
@@ -396,7 +396,7 @@
                 "date": "2025-04-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "82433.7810087748",
+                  "amount": "82433.7810087746",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -406,7 +406,7 @@
                 "date": "2025-07-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "83285.8693339152",
+                  "amount": "83285.8693339153",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -426,7 +426,7 @@
                 "date": "2026-01-02",
                 "reset_date": null,
                 "amount": {
-                  "amount": "79400.8397014305",
+                  "amount": "79400.8397014306",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -436,7 +436,7 @@
                 "date": "2026-04-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "65240.6215238088",
+                  "amount": "65240.62152380884",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -491,14 +491,14 @@
               [
                 "2025-04-01",
                 {
-                  "amount": "82433.7810087748",
+                  "amount": "82433.7810087746",
                   "currency": "USD"
                 }
               ],
               [
                 "2025-07-01",
                 {
-                  "amount": "83285.8693339152",
+                  "amount": "83285.8693339153",
                   "currency": "USD"
                 }
               ],
@@ -512,14 +512,14 @@
               [
                 "2026-01-02",
                 {
-                  "amount": "79400.8397014305",
+                  "amount": "79400.8397014306",
                   "currency": "USD"
                 }
               ],
               [
                 "2026-04-01",
                 {
-                  "amount": "65240.6215238088",
+                  "amount": "65240.62152380884",
                   "currency": "USD"
                 }
               ]
@@ -541,7 +541,7 @@
               "currency": "USD"
             },
             "total_interest": {
-              "amount": "1819899.58912124322",
+              "amount": "1819899.58912124326",
               "currency": "USD"
             },
             "total_principal": {
@@ -1077,14 +1077,14 @@
               [
                 "2025-04-01",
                 {
-                  "amount": "2581831.7763163594",
+                  "amount": "2581831.7763163596",
                   "currency": "USD"
                 }
               ],
               [
                 "2025-07-01",
                 {
-                  "amount": "2527195.9023941131",
+                  "amount": "2527195.902394113",
                   "currency": "USD"
                 }
               ],
@@ -1098,14 +1098,14 @@
               [
                 "2026-01-02",
                 {
-                  "amount": "2412698.8909849541",
+                  "amount": "2412698.890984954",
                   "currency": "USD"
                 }
               ],
               [
                 "2026-04-01",
                 {
-                  "amount": "2337576.7136452485",
+                  "amount": "2337576.71364524846",
                   "currency": "USD"
                 }
               ],
@@ -1243,7 +1243,7 @@
                 "date": "2025-04-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "792606.7101444455",
+                  "amount": "792606.7101444457",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -1268,7 +1268,7 @@
                 "date": "2025-07-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "778799.6345597111",
+                  "amount": "778799.634559711",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -1318,7 +1318,7 @@
                 "date": "2026-01-02",
                 "reset_date": null,
                 "amount": {
-                  "amount": "743186.4308187119",
+                  "amount": "743186.4308187118",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -1343,7 +1343,7 @@
                 "date": "2026-04-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "706161.2983097055",
+                  "amount": "706161.29830970546",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -1368,7 +1368,7 @@
                 "date": "2026-07-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "693388.25679154486",
+                  "amount": "693388.25679154476",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -1378,13 +1378,13 @@
                 "date": "2026-07-01",
                 "reset_date": null,
                 "amount": {
-                  "amount": "1594187.7170114089",
+                  "amount": "1594187.717011409",
                   "currency": "USD"
                 },
                 "kind": "amortization",
                 "accrual_factor": 0,
                 "principal_delta": {
-                  "amount": "-1594187.7170114089",
+                  "amount": "-1594187.717011409",
                   "currency": "USD"
                 },
                 "principal_date": "2026-07-01"
@@ -1586,7 +1586,7 @@
                 "end": "2026-10-01",
                 "payment_date": "2026-10-01",
                 "opening_balance": {
-                  "amount": "53267300.7324294786",
+                  "amount": "53267300.7324294785",
                   "currency": "USD"
                 },
                 "coupon_rate": 0.05,
@@ -1597,7 +1597,7 @@
                 "end": "2027-01-01",
                 "payment_date": "2027-01-04",
                 "opening_balance": {
-                  "amount": "51709491.2050827391",
+                  "amount": "51709491.205082739",
                   "currency": "USD"
                 },
                 "coupon_rate": 0.05,
@@ -1636,14 +1636,14 @@
               [
                 "2025-04-01",
                 {
-                  "amount": "792606.7101444455",
+                  "amount": "792606.7101444457",
                   "currency": "USD"
                 }
               ],
               [
                 "2025-07-01",
                 {
-                  "amount": "778799.6345597111",
+                  "amount": "778799.634559711",
                   "currency": "USD"
                 }
               ],
@@ -1657,21 +1657,21 @@
               [
                 "2026-01-02",
                 {
-                  "amount": "743186.4308187119",
+                  "amount": "743186.4308187118",
                   "currency": "USD"
                 }
               ],
               [
                 "2026-04-01",
                 {
-                  "amount": "706161.2983097055",
+                  "amount": "706161.29830970546",
                   "currency": "USD"
                 }
               ],
               [
                 "2026-07-01",
                 {
-                  "amount": "693388.25679154486",
+                  "amount": "693388.25679154476",
                   "currency": "USD"
                 }
               ],
@@ -1757,7 +1757,7 @@
               [
                 "2026-07-01",
                 {
-                  "amount": "1594187.7170114089",
+                  "amount": "1594187.717011409",
                   "currency": "USD"
                 }
               ],
@@ -1799,11 +1799,11 @@
               "currency": "USD"
             },
             "total_interest": {
-              "amount": "9260112.576414681055",
+              "amount": "9260112.576414680915",
               "currency": "USD"
             },
             "total_principal": {
-              "amount": "20007326.20966674865",
+              "amount": "20007326.20966674875",
               "currency": "USD"
             },
             "total_pik": {
@@ -2731,7 +2731,7 @@
                 "amount": "0",
                 "currency": "USD"
               },
-              "excess_spread": -0.008552827433709368,
+              "excess_spread": -0.008552827433709357,
               "coverage_tests": [
                 {
                   "test_id": "OC_SENIOR",
@@ -2961,7 +2961,7 @@
               "credit_enhancement": [
                 {
                   "tranche_id": "SENIOR",
-                  "credit_enhancement": 0.3045784512880496
+                  "credit_enhancement": 0.30457845128804956
                 },
                 {
                   "tranche_id": "MEZZ",
@@ -3031,16 +3031,16 @@
               "coverage_tests": [
                 {
                   "test_id": "OC_SENIOR",
-                  "ratio": 1.4269403794631894,
+                  "ratio": 1.4269403794631892,
                   "trigger_level": 1.415,
-                  "cushion": 0.011940379463189377,
+                  "cushion": 0.011940379463189155,
                   "passing": true
                 },
                 {
                   "test_id": "IC_SENIOR",
-                  "ratio": 1.9977165312484653,
+                  "ratio": 1.997716531248465,
                   "trigger_level": 1.05,
-                  "cushion": 0.9477165312484652,
+                  "cushion": 0.947716531248465,
                   "passing": true
                 },
                 {
@@ -3061,7 +3061,7 @@
                   [
                     "SENIOR_interest",
                     {
-                      "amount": "792606.7101444456",
+                      "amount": "792606.7101444458",
                       "currency": "USD"
                     }
                   ],
@@ -3096,7 +3096,7 @@
                   [
                     "equity",
                     {
-                      "amount": "82433.7810087748",
+                      "amount": "82433.7810087746",
                       "currency": "USD"
                     }
                   ]
@@ -3110,11 +3110,11 @@
                       "tranche": "SENIOR"
                     },
                     "requested_amount": {
-                      "amount": "792606.7101444456",
+                      "amount": "792606.7101444458",
                       "currency": "USD"
                     },
                     "paid_amount": {
-                      "amount": "792606.7101444456",
+                      "amount": "792606.7101444458",
                       "currency": "USD"
                     },
                     "shortfall": {
@@ -3154,7 +3154,7 @@
                       "tranche": "SENIOR"
                     },
                     "requested_amount": {
-                      "amount": "63408536.81155565",
+                      "amount": "63408536.811555654",
                       "currency": "USD"
                     },
                     "paid_amount": {
@@ -3162,7 +3162,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "63000173.7750748507",
+                      "amount": "63000173.7750748547",
                       "currency": "USD"
                     },
                     "diverted": true,
@@ -3176,7 +3176,7 @@
                       "tranche": "SENIOR"
                     },
                     "requested_amount": {
-                      "amount": "63000173.77507485",
+                      "amount": "63000173.775074854",
                       "currency": "USD"
                     },
                     "paid_amount": {
@@ -3184,7 +3184,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "61619311.7453837355",
+                      "amount": "61619311.7453837395",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -3196,11 +3196,11 @@
                     "priority": 6,
                     "recipient": "equity",
                     "requested_amount": {
-                      "amount": "82433.7810087748",
+                      "amount": "82433.7810087746",
                       "currency": "USD"
                     },
                     "paid_amount": {
-                      "amount": "82433.7810087748",
+                      "amount": "82433.7810087746",
                       "currency": "USD"
                     },
                     "shortfall": {
@@ -3212,8 +3212,8 @@
                   }
                 ],
                 "coverage_tests": [
-                  ["OC_SENIOR", 1.4269403794631894, true],
-                  ["IC_SENIOR", 1.9977165312484653, true],
+                  ["OC_SENIOR", 1.4269403794631892, true],
+                  ["IC_SENIOR", 1.997716531248465, true],
                   ["OC_MEZZ", 1.1539585516886228, false]
                 ],
                 "diverted_cash": {
@@ -3257,7 +3257,7 @@
               "credit_enhancement": [
                 {
                   "tranche_id": "SENIOR",
-                  "credit_enhancement": 0.3084201066246662
+                  "credit_enhancement": 0.3084201066246663
                 },
                 {
                   "tranche_id": "MEZZ",
@@ -3327,16 +3327,16 @@
               "coverage_tests": [
                 {
                   "test_id": "OC_SENIOR",
-                  "ratio": 1.4348668868361032,
+                  "ratio": 1.4348668868361034,
                   "trigger_level": 1.415,
-                  "cushion": 0.01986688683610316,
+                  "cushion": 0.01986688683610338,
                   "passing": true
                 },
                 {
                   "test_id": "IC_SENIOR",
-                  "ratio": 2.0088136415705447,
+                  "ratio": 2.008813641570545,
                   "trigger_level": 1.05,
-                  "cushion": 0.9588136415705446,
+                  "cushion": 0.958813641570545,
                   "passing": true
                 },
                 {
@@ -3357,7 +3357,7 @@
                   [
                     "SENIOR_interest",
                     {
-                      "amount": "778799.6345597112",
+                      "amount": "778799.6345597111",
                       "currency": "USD"
                     }
                   ],
@@ -3392,7 +3392,7 @@
                   [
                     "equity",
                     {
-                      "amount": "83285.8693339152",
+                      "amount": "83285.8693339153",
                       "currency": "USD"
                     }
                   ]
@@ -3406,11 +3406,11 @@
                       "tranche": "SENIOR"
                     },
                     "requested_amount": {
-                      "amount": "778799.6345597112",
+                      "amount": "778799.6345597111",
                       "currency": "USD"
                     },
                     "paid_amount": {
-                      "amount": "778799.6345597112",
+                      "amount": "778799.6345597111",
                       "currency": "USD"
                     },
                     "shortfall": {
@@ -3450,7 +3450,7 @@
                       "tranche": "SENIOR"
                     },
                     "requested_amount": {
-                      "amount": "61619311.74538375",
+                      "amount": "61619311.74538374",
                       "currency": "USD"
                     },
                     "paid_amount": {
@@ -3458,7 +3458,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "61220267.2526570068",
+                      "amount": "61220267.2526569968",
                       "currency": "USD"
                     },
                     "diverted": true,
@@ -3472,7 +3472,7 @@
                       "tranche": "SENIOR"
                     },
                     "requested_amount": {
-                      "amount": "61220267.252657",
+                      "amount": "61220267.252656996",
                       "currency": "USD"
                     },
                     "paid_amount": {
@@ -3480,7 +3480,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "59870915.4775493413",
+                      "amount": "59870915.4775493373",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -3492,11 +3492,11 @@
                     "priority": 6,
                     "recipient": "equity",
                     "requested_amount": {
-                      "amount": "83285.8693339152",
+                      "amount": "83285.8693339153",
                       "currency": "USD"
                     },
                     "paid_amount": {
-                      "amount": "83285.8693339152",
+                      "amount": "83285.8693339153",
                       "currency": "USD"
                     },
                     "shortfall": {
@@ -3508,8 +3508,8 @@
                   }
                 ],
                 "coverage_tests": [
-                  ["OC_SENIOR", 1.4348668868361032, true],
-                  ["IC_SENIOR", 2.0088136415705447, true],
+                  ["OC_SENIOR", 1.4348668868361034, true],
+                  ["IC_SENIOR", 2.008813641570545, true],
                   ["OC_MEZZ", 1.1539585516886228, false]
                 ],
                 "diverted_cash": {
@@ -3915,7 +3915,7 @@
                 "amount": "0",
                 "currency": "USD"
               },
-              "excess_spread": -0.009052033221869992,
+              "excess_spread": -0.009052033221869982,
               "coverage_tests": [
                 {
                   "test_id": "OC_SENIOR",
@@ -3970,7 +3970,7 @@
                   [
                     "MEZZ_coverage",
                     {
-                      "amount": "381040.4797953815",
+                      "amount": "381040.4797953814",
                       "currency": "USD"
                     }
                   ],
@@ -3984,7 +3984,7 @@
                   [
                     "equity",
                     {
-                      "amount": "79400.8397014305",
+                      "amount": "79400.8397014306",
                       "currency": "USD"
                     }
                   ]
@@ -4046,11 +4046,11 @@
                       "currency": "USD"
                     },
                     "paid_amount": {
-                      "amount": "381040.4797953815",
+                      "amount": "381040.4797953814",
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "57781375.8451472885",
+                      "amount": "57781375.8451472886",
                       "currency": "USD"
                     },
                     "diverted": true,
@@ -4084,11 +4084,11 @@
                     "priority": 6,
                     "recipient": "equity",
                     "requested_amount": {
-                      "amount": "79400.8397014305",
+                      "amount": "79400.8397014306",
                       "currency": "USD"
                     },
                     "paid_amount": {
-                      "amount": "79400.8397014305",
+                      "amount": "79400.8397014306",
                       "currency": "USD"
                     },
                     "shortfall": {
@@ -4105,7 +4105,7 @@
                   ["OC_MEZZ", 1.1539585516886222, false]
                 ],
                 "diverted_cash": {
-                  "amount": "381040.4797953815",
+                  "amount": "381040.4797953814",
                   "currency": "USD"
                 },
                 "remaining_cash": {
@@ -4130,7 +4130,7 @@
                     "source_tier": "MEZZ_coverage",
                     "target_tranche": "SENIOR_principal",
                     "amount": {
-                      "amount": "381040.4797953815",
+                      "amount": "381040.4797953814",
                       "currency": "USD"
                     },
                     "reason": "coverage test failed: OC_MEZZ"
@@ -4266,7 +4266,7 @@
                   [
                     "MEZZ_coverage",
                     {
-                      "amount": "372345.4166631848",
+                      "amount": "372345.41666318476",
                       "currency": "USD"
                     }
                   ],
@@ -4280,7 +4280,7 @@
                   [
                     "equity",
                     {
-                      "amount": "65240.6215238088",
+                      "amount": "65240.62152380884",
                       "currency": "USD"
                     }
                   ]
@@ -4342,11 +4342,11 @@
                       "currency": "USD"
                     },
                     "paid_amount": {
-                      "amount": "372345.4166631848",
+                      "amount": "372345.41666318476",
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "56120558.4481132452",
+                      "amount": "56120558.44811324524",
                       "currency": "USD"
                     },
                     "diverted": true,
@@ -4380,11 +4380,11 @@
                     "priority": 6,
                     "recipient": "equity",
                     "requested_amount": {
-                      "amount": "65240.6215238088",
+                      "amount": "65240.62152380884",
                       "currency": "USD"
                     },
                     "paid_amount": {
-                      "amount": "65240.6215238088",
+                      "amount": "65240.62152380884",
                       "currency": "USD"
                     },
                     "shortfall": {
@@ -4401,7 +4401,7 @@
                   ["OC_MEZZ", 1.1539585516886228, false]
                 ],
                 "diverted_cash": {
-                  "amount": "372345.4166631848",
+                  "amount": "372345.41666318476",
                   "currency": "USD"
                 },
                 "remaining_cash": {
@@ -4426,7 +4426,7 @@
                     "source_tier": "MEZZ_coverage",
                     "target_tranche": "SENIOR_principal",
                     "amount": {
-                      "amount": "372345.4166631848",
+                      "amount": "372345.41666318476",
                       "currency": "USD"
                     },
                     "reason": "coverage test failed: OC_MEZZ"
@@ -4787,9 +4787,9 @@
                 },
                 {
                   "test_id": "IC_SENIOR",
-                  "ratio": 2.167308107176213,
+                  "ratio": 2.1673081071762135,
                   "trigger_level": 1.05,
-                  "cushion": 1.117308107176213,
+                  "cushion": 1.1173081071762134,
                   "passing": true
                 },
                 {
@@ -4935,7 +4935,7 @@
                 ],
                 "coverage_tests": [
                   ["OC_SENIOR", 1.4789117225331003, true],
-                  ["IC_SENIOR", 2.167308107176213, true],
+                  ["IC_SENIOR", 2.1673081071762135, true],
                   ["OC_MEZZ", 1.1539585516886226, false]
                 ],
                 "diverted_cash": {
@@ -5045,7 +5045,7 @@
                 "amount": "0",
                 "currency": "USD"
               },
-              "excess_spread": -0.009575034259111081,
+              "excess_spread": -0.009575034259111074,
               "coverage_tests": [
                 {
                   "test_id": "OC_SENIOR",
@@ -5695,7 +5695,7 @@
                 "date": "2025-01-02",
                 "reset_date": null,
                 "amount": {
-                  "amount": "1299371.0240867193",
+                  "amount": "1299371.0240867203",
                   "currency": "USD"
                 },
                 "kind": "fixed",
@@ -5705,13 +5705,13 @@
                 "date": "2025-01-02",
                 "reset_date": null,
                 "amount": {
-                  "amount": "4497907.053740233",
+                  "amount": "4497907.053740232",
                   "currency": "USD"
                 },
                 "kind": "amortization",
                 "accrual_factor": 0,
                 "principal_delta": {
-                  "amount": "-4497907.053740233",
+                  "amount": "-4497907.053740232",
                   "currency": "USD"
                 },
                 "principal_date": "2025-01-02"
@@ -5786,7 +5786,7 @@
                 "kind": "defaulted_notional",
                 "accrual_factor": 0,
                 "principal_delta": {
-                  "amount": "-79137472.5894618048",
+                  "amount": "-79137472.5894618058",
                   "currency": "USD"
                 },
                 "principal_date": "2026-01-02"
@@ -5863,7 +5863,7 @@
               [
                 "2025-01-02",
                 {
-                  "amount": "1299371.0240867193",
+                  "amount": "1299371.0240867203",
                   "currency": "USD"
                 }
               ]
@@ -5893,7 +5893,7 @@
               [
                 "2025-01-02",
                 {
-                  "amount": "4497907.053740233",
+                  "amount": "4497907.053740232",
                   "currency": "USD"
                 }
               ],
@@ -5932,7 +5932,7 @@
               [
                 "2026-01-02",
                 {
-                  "amount": "79137472.58946182",
+                  "amount": "79137472.58946183",
                   "currency": "USD"
                 }
               ]
@@ -5942,11 +5942,11 @@
               "currency": "USD"
             },
             "total_interest": {
-              "amount": "5623492.0053072092",
+              "amount": "5623492.0053072102",
               "currency": "USD"
             },
             "total_principal": {
-              "amount": "20862527.4105381952",
+              "amount": "20862527.4105381942",
               "currency": "USD"
             },
             "total_pik": {
@@ -5958,7 +5958,7 @@
               "currency": "USD"
             },
             "total_writedown": {
-              "amount": "79137472.58946182",
+              "amount": "79137472.58946183",
               "currency": "USD"
             }
           }
@@ -6580,7 +6580,7 @@
                 "amount": "0",
                 "currency": "USD"
               },
-              "excess_spread": 0.0009330550169748146,
+              "excess_spread": 0.0009330550169748118,
               "coverage_tests": [],
               "waterfall": {
                 "payment_date": "2025-01-02",
@@ -6778,7 +6778,7 @@
               "credit_enhancement": [
                 {
                   "tranche_id": "CLONOTES-A",
-                  "credit_enhancement": -0.02351634532722741
+                  "credit_enhancement": -0.0235163453272276
                 }
               ]
             }
@@ -10161,9 +10161,9 @@
               "coverage_tests": [
                 {
                   "test_id": "OC_SENIOR",
-                  "ratio": 47.243320960527825,
+                  "ratio": 47.24332096052783,
                   "trigger_level": 1.1,
-                  "cushion": 46.143320960527824,
+                  "cushion": 46.14332096052783,
                   "passing": true
                 },
                 {
@@ -10284,7 +10284,7 @@
                       "tranche": "SENIOR"
                     },
                     "requested_amount": {
-                      "amount": "2005687.864883996",
+                      "amount": "2005687.8648839958",
                       "currency": "USD"
                     },
                     "paid_amount": {
@@ -10292,7 +10292,7 @@
                       "currency": "USD"
                     },
                     "shortfall": {
-                      "amount": "559580.6469325701",
+                      "amount": "559580.6469325699",
                       "currency": "USD"
                     },
                     "diverted": false,
@@ -10320,7 +10320,7 @@
                   }
                 ],
                 "coverage_tests": [
-                  ["OC_SENIOR", 47.243320960527825, true],
+                  ["OC_SENIOR", 47.24332096052783, true],
                   ["IC_SENIOR", 66.14064934473895, true],
                   ["OC_MEZZ", 1.1554729679662379, true]
                 ],

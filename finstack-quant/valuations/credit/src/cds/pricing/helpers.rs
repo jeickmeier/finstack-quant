@@ -239,8 +239,8 @@ pub(super) fn isda_standard_model_boundaries(
 pub(super) fn sp_cond_to(surv: &HazardCurve, as_of: Date, date: Date) -> Result<f64> {
     let t_asof = haz_t(surv, as_of)?;
     let t_date = haz_t(surv, date)?;
-    let sp_asof = surv.sp(t_asof);
-    let sp_date = surv.sp(t_date);
+    let sp_asof = surv.sp(t_asof)?;
+    let sp_date = surv.sp(t_date)?;
     // Conditional survival: S(date) / S(as_of)
     // Use floor constant to prevent division by near-zero producing inf/NaN
     if sp_asof > credit::SURVIVAL_PROBABILITY_FLOOR {

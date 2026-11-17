@@ -54,10 +54,7 @@
           ]
         ],
         "interp_style": "log_linear",
-        "extrapolation": "flat_forward",
-        "min_forward_rate": null,
-        "allow_non_monotonic": false,
-        "min_forward_tenor": 1e-06,
+        "extrapolation": "extend",
         "rate_calibration": null,
         "fx_policy": null
       },
@@ -76,8 +73,6 @@
         "seniority": null,
         "currency": null,
         "day_count": "act_365f",
-        "par_points": [],
-        "par_interp": "linear",
         "hazard_calibration": null
       },
       {

@@ -18,6 +18,8 @@ from finstack_quant.core.money import Money
 from finstack_quant.core.types import Rate
 from finstack_quant.valuations.instruments import Bond, TermLoan
 
+SWEEP_PRIORITIES = ["fees", "interest", "amortization", "sweep", "equity"]
+
 
 def _debt_envelope_json(instrument_id: str) -> str:
     return Bond.fixed(
@@ -89,7 +91,6 @@ class TestWaterfallSpec:
             "fees",
             "interest",
             "amortization",
-            "sweep",
             "equity",
         ]
         assert not ws.has_ecf_sweep
@@ -100,8 +101,10 @@ class TestWaterfallSpec:
         assert ws.voluntary_prepay_node is None
 
     def test_custom_priority(self) -> None:
-        ws = statements.WaterfallSpec(priority_of_payments=["interest", "sweep", "equity"])
-        assert ws.priority_of_payments == ["interest", "sweep", "equity"]
+        priorities = ["fees", "amortization", "interest", "equity"]
+        ws = statements.WaterfallSpec(priority_of_payments=priorities)
+        ws.validate()
+        assert ws.priority_of_payments == priorities
 
     def test_rejects_unknown_priority_token(self) -> None:
         with pytest.raises(ValueError, match="nonexistent"):
@@ -110,14 +113,25 @@ class TestWaterfallSpec:
     def test_with_ecf_and_pik(self) -> None:
         ecf = statements.EcfSweepSpec(ebitda_node="ebitda", sweep_percentage=0.5)
         pik = statements.PikToggleSpec(liquidity_metric="cash", threshold=1e6, target_instrument_ids=["TL"])
-        ws = statements.WaterfallSpec(ecf_sweep=ecf, pik_toggle=pik)
+        ws = statements.WaterfallSpec(priority_of_payments=SWEEP_PRIORITIES, ecf_sweep=ecf, pik_toggle=pik)
+        ws.validate()
         assert ws.has_ecf_sweep
         assert ws.has_pik_toggle
 
     def test_validate_accepts_standard_priority(self) -> None:
-        ecf = statements.EcfSweepSpec(ebitda_node="ebitda", sweep_percentage=0.5)
+        statements.WaterfallSpec(available_cash_node="cash").validate()
+
+    @pytest.mark.parametrize("percentage", [0.0, 0.5])
+    def test_validate_requires_explicit_sweep_priority(self, percentage: float) -> None:
+        ecf = statements.EcfSweepSpec(ebitda_node="ebitda", sweep_percentage=percentage)
         ws = statements.WaterfallSpec(ecf_sweep=ecf, available_cash_node="cash")
-        ws.validate()  # should not raise
+        with pytest.raises(ValueError, match="requires the `Sweep` priority"):
+            ws.validate()
+
+    def test_validate_requires_sizing_for_sweep_priority(self) -> None:
+        ws = statements.WaterfallSpec(priority_of_payments=SWEEP_PRIORITIES)
+        with pytest.raises(ValueError, match="requires `ecf_sweep`"):
+            ws.validate()
 
     def test_validate_rejects_sweep_after_equity(self) -> None:
         ecf = statements.EcfSweepSpec(ebitda_node="ebitda", sweep_percentage=0.5)
@@ -133,7 +147,11 @@ class TestWaterfallSpec:
 
     def test_json_roundtrip(self) -> None:
         ecf = statements.EcfSweepSpec(ebitda_node="ebitda", sweep_percentage=0.25)
-        ws = statements.WaterfallSpec(available_cash_node="free_cash_flow", ecf_sweep=ecf)
+        ws = statements.WaterfallSpec(
+            priority_of_payments=SWEEP_PRIORITIES,
+            available_cash_node="free_cash_flow",
+            ecf_sweep=ecf,
+        )
         restored = statements.WaterfallSpec.from_json(ws.to_json())
         assert restored.to_json() == ws.to_json()
 
@@ -143,7 +161,7 @@ class TestModelBuilderCapitalStructure:
     def usd(self) -> Currency:
         return Currency("USD")
 
-    def test_add_bond_appears_in_model_json(self, usd: Currency) -> None:
+    def test_add_bond_with_default_waterfall_appears_in_model_json(self, usd: Currency) -> None:
         b = statements.ModelBuilder("deal")
         b.add_bond(
             id="BOND-001",
@@ -154,10 +172,12 @@ class TestModelBuilderCapitalStructure:
             discount_curve_id="USD-OIS",
         )
         b.periods("2025Q1..Q4", None)
-        b.value("revenue", [("2025Q1", 1.0)])
+        b.value("cash", [("2025Q1", 1.0)])
+        b.waterfall(statements.WaterfallSpec())
         model = b.build()
         js = model.to_json()
         assert '"capital_structure"' in js
+        assert '"waterfall"' in js
         assert '"BOND-001"' in js
 
     def test_add_swap_appears_in_model_json(self, usd: Currency) -> None:
@@ -209,6 +229,7 @@ class TestModelBuilderCapitalStructure:
         )
         first_lien = statements.PaymentClassSpec("1L", 0, [loan.id])
         ws = statements.WaterfallSpec(
+            priority_of_payments=SWEEP_PRIORITIES,
             ecf_sweep=ecf,
             available_cash_node="cash",
             payment_classes=[first_lien],

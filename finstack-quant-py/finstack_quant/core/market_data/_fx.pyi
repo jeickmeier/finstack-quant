@@ -533,18 +533,107 @@ class FxMatrix:
         """
         Explicit pair-global quotes as a pandas ``DataFrame``.
 
-        Date-scoped quotes set with :meth:`set_quote_on` are not included.
+        Pair-global quotes outrank provider observations (see
+        :meth:`provider_quotes`) while ranking below date-and-policy fixings set
+        with :meth:`set_quote_on` (see :meth:`pinned_quotes`). Date-scoped quotes
+        are not included here.
 
         Returns
         -------
         pd.DataFrame
-            Columns ``base``, ``quote`` (ISO codes) and ``rate``, sorted by pair.
+            Columns ``base``, ``quote`` (ISO codes) and ``rate``, in Rust snapshot order.
 
         Raises
         ------
         ValueError
             If the frame cannot be built, concurrent quote updates prevent a
             coherent snapshot, or the provider cannot version its snapshot quotes.
+        """
+        ...
+
+    def provider_quotes(self) -> pd.DataFrame:
+        """
+        Cached provider-observed quotes as a pandas ``DataFrame``.
+
+        Columns are ``base`` (``str``), ``quote`` (``str``) and ``rate``
+        (``float``). Provider observations rank below explicit pair-global
+        quotes (``set_quotes``) and below date-and-policy pinned fixings
+        (``set_quote_on``).
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with ``base``, ``quote``, and ``rate`` columns.
+
+        Raises
+        ------
+        ValueError
+            If a coherent snapshot cannot be captured from the matrix.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import FxMatrix
+        >>> FxMatrix(None).provider_quotes().columns.tolist()
+        ['base', 'quote', 'rate']
+        """
+        ...
+
+    def pinned_quotes(self) -> pd.DataFrame:
+        """
+        Explicit date-and-policy pinned fixings (``set_quote_on``) as a ``DataFrame``.
+
+        Columns are ``base`` (``str``), ``quote`` (``str``), ``date``
+        (``datetime.date``), ``policy`` (``str``), and ``rate`` (``float``).
+        For their ``(date, policy)``, pinned quotes take highest authority,
+        outranking both pair-global quotes (``set_quotes``) and provider
+        observations.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with ``base``, ``quote``, ``date``, ``policy``, and ``rate``.
+
+        Raises
+        ------
+        ValueError
+            If a coherent snapshot cannot be captured from the matrix.
+
+        Examples
+        --------
+        >>> from datetime import date
+        >>> from finstack_quant.core.market_data import FxConversionPolicy, FxMatrix
+        >>> fx = FxMatrix(None)
+        >>> fx.set_quote_on("EUR", "USD", date(2025, 1, 15), FxConversionPolicy.CASHFLOW_DATE, 1.12)
+        >>> df = fx.pinned_quotes()
+        >>> df["policy"].tolist()
+        ['cashflow_date']
+        """
+        ...
+
+    def provider_pinned_quotes(self) -> pd.DataFrame:
+        """
+        Cached provider-observed date-and-policy quotes as a pandas ``DataFrame``.
+
+        Columns are ``base`` (``str``), ``quote`` (``str``), ``date``
+        (``datetime.date``), ``policy`` (``str``), and ``rate`` (``float``).
+        These rank below both pinned fixings (``set_quote_on``) and explicit
+        pair-global quotes (``set_quotes``).
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with ``base``, ``quote``, ``date``, ``policy``, and ``rate``.
+
+        Raises
+        ------
+        ValueError
+            If a coherent snapshot cannot be captured from the matrix.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import FxMatrix
+        >>> FxMatrix(None).provider_pinned_quotes().columns.tolist()
+        ['base', 'quote', 'date', 'policy', 'rate']
         """
         ...
 

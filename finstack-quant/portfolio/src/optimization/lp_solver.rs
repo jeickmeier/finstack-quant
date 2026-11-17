@@ -521,7 +521,7 @@ fn reconstruct_result(
     rows: &LpRows,
     model: &AssembledModel,
     config: &FinstackConfig,
-) -> PortfolioOptimizationResult {
+) -> Result<PortfolioOptimizationResult> {
     let AssembledModel { solution, w_vars } = model;
     let solution = solution.as_ref();
 
@@ -582,9 +582,9 @@ fn reconstruct_result(
     let mut objective_acc = NeumaierAccumulator::new();
     for (coef, w_var) in rows.coeffs_objective.iter().zip(w_vars) {
         let w_star = solution.value(*w_var);
-        objective_acc.add(*coef * w_star);
+        objective_acc.add(*coef * w_star)?;
     }
-    let objective_value = objective_acc.total();
+    let objective_value = objective_acc.get_total()?;
 
     let mut constraint_slacks: IndexMap<String, f64> = IndexMap::new();
     for lc in &rows.lp_constraints {
@@ -671,7 +671,7 @@ fn reconstruct_result(
     );
     let binding_constraints = binding_constraint_names(&constraint_slacks);
 
-    PortfolioOptimizationResult {
+    Ok(PortfolioOptimizationResult {
         meta: finstack_quant_core::config::results_meta(config),
         schema_version: SchemaVersion::CURRENT,
         status: OptimizationStatus::Optimal,
@@ -685,7 +685,7 @@ fn reconstruct_result(
         constraint_slacks,
         binding_constraints,
         label: problem.label.clone(),
-    }
+    })
 }
 
 /// Solve a portfolio optimization problem as a linear program (`good_lp`
@@ -831,7 +831,7 @@ pub fn optimize(
         }
     }
 
-    Ok(reconstruct_result(
+    reconstruct_result(
         problem,
         (&decision_items, &decision_features),
         current_weights,
@@ -839,7 +839,7 @@ pub fn optimize(
         &rows,
         &model,
         config,
-    ))
+    )
 }
 
 #[cfg(test)]

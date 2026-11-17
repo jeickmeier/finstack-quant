@@ -317,28 +317,17 @@ fn parametric_delivered_models_reprice_short_end_deposits_analytically() {
     let models = [
         (
             NsVariant::Ns,
-            NelsonSiegelModel::Ns {
-                beta0: 0.03,
-                beta1: 0.15,
-                beta2: -0.1,
-                tau: 0.05,
-            },
+            NelsonSiegelModel::ns(0.03, 0.15, -0.1, 0.05).expect("ns model"),
         ),
         (
             NsVariant::Nss,
-            NelsonSiegelModel::Nss {
-                beta0: 0.03,
-                beta1: 0.15,
-                beta2: -0.1,
-                beta3: 0.02,
-                tau1: 0.05,
-                tau2: 0.5,
-            },
+            NelsonSiegelModel::nss(0.03, 0.15, -0.1, 0.02, 0.05, 0.5).expect("nss model"),
         ),
     ];
     for (variant, model) in models {
         let reference = ParametricCurve::builder("USD-NS")
             .base_date(base)
+            .day_count(DayCount::Act365F)
             .model(model.clone())
             .build()
             .expect("reference model");
@@ -383,7 +372,9 @@ fn parametric_delivered_models_reprice_short_end_deposits_analytically() {
                     DayCountContext::default(),
                 )
                 .expect("index accrual");
-            let rate = (reference.df(start_time) / reference.df(end_time) - 1.0) / accrual;
+            let rate =
+                (reference.df(start_time).expect("df") / reference.df(end_time).expect("df") - 1.0)
+                    / accrual;
             if let RateQuote::Deposit {
                 rate: quote_rate, ..
             } = &mut quote
@@ -440,7 +431,8 @@ fn parametric_delivered_models_reprice_short_end_deposits_analytically() {
         for (id, start, end, accrual, rate) in contracts {
             // Independent deposit economics evaluated directly on the delivered
             // analytical object, without the calibration's DiscountCurve adapter.
-            let residual = (1.0 + rate * accrual) * delivered.df(end) - delivered.df(start);
+            let residual = (1.0 + rate * accrual) * delivered.df(end).expect("df")
+                - delivered.df(start).expect("df");
             assert!(residual.abs() < 1e-8, "{variant:?} {id}: {residual}");
             assert!(
                 (report.residuals[&id] - residual).abs() < 1e-12,
@@ -471,9 +463,11 @@ fn parametric_delivered_curve_reprices_ois_with_payment_lag_analytically() {
         terms.iter().fold(
             (0.0, 0.0),
             |(floating, annuity), &(start, end, pay, alpha)| {
-                let payment_df = curve.df(pay);
+                let payment_df = curve.df(pay).expect("df");
                 (
-                    floating + (curve.df(start) / curve.df(end) - 1.0) * payment_df,
+                    floating
+                        + (curve.df(start).expect("df") / curve.df(end).expect("df") - 1.0)
+                            * payment_df,
                     annuity + alpha * payment_df,
                 )
             },
@@ -481,14 +475,10 @@ fn parametric_delivered_curve_reprices_ois_with_payment_lag_analytically() {
     }
 
     let base = Date::from_calendar_date(2025, Month::January, 2).expect("date");
-    let model = NelsonSiegelModel::Ns {
-        beta0: 0.03,
-        beta1: 0.15,
-        beta2: -0.1,
-        tau: 0.05,
-    };
+    let model = NelsonSiegelModel::ns(0.03, 0.15, -0.1, 0.05).expect("ns model");
     let reference = ParametricCurve::builder("USD-NS-OIS")
         .base_date(base)
+        .day_count(DayCount::Act365F)
         .model(model.clone())
         .build()
         .expect("reference model");

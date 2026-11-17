@@ -59,6 +59,8 @@ fn create_usd_discount_curve(as_of: Date) -> DiscountCurve {
             (7.0f64, 0.680f64),
             (10.0f64, 0.580f64),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("Curve should build")
 }
@@ -157,6 +159,8 @@ fn create_multi_currency_market(as_of: Date) -> MarketContext {
             (5.0f64, 0.85f64),
             (10.0f64, 0.70f64),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("EUR curve should build");
     market = market.insert(eur_curve);
@@ -172,6 +176,8 @@ fn create_multi_currency_market(as_of: Date) -> MarketContext {
             (5.0f64, 0.82f64),
             (10.0f64, 0.67f64),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("GBP curve should build");
     market = market.insert(gbp_curve);

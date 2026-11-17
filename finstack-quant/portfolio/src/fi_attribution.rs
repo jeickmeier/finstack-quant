@@ -336,15 +336,27 @@ impl FiAttributionResult {
     /// ```
     pub fn reconciliation_check(&self, tolerance: f64) -> ReconciliationReport {
         let mut acc = NeumaierAccumulator::new();
-        acc.add(self.total_allocation);
-        acc.add(self.total_active_carry);
-        acc.add(self.total_active_treasury);
-        acc.add(self.total_active_spread);
-        acc.add(self.total_selection);
-        let total_residual = self.active_return - acc.total();
+        let mut valid = true;
+        for term in [
+            self.total_allocation,
+            self.total_active_carry,
+            self.total_active_treasury,
+            self.total_active_spread,
+            self.total_selection,
+        ] {
+            if acc.add(term).is_err() {
+                valid = false;
+            }
+        }
+        let explained = if valid {
+            acc.get_total().unwrap_or(f64::NAN)
+        } else {
+            f64::NAN
+        };
+        let total_residual = self.active_return - explained;
         ReconciliationReport {
             total_residual,
-            is_reconciled: total_residual.abs() <= tolerance,
+            is_reconciled: total_residual.is_finite() && total_residual.abs() <= tolerance,
             tolerance,
         }
     }
@@ -451,12 +463,12 @@ fn aggregate_side(
         let (carry, treasury, spread) = position_components(s, config);
         let selection = s.total_return - carry - treasury - spread;
 
-        sum_w.add(s.weight);
-        sum_r.add(s.weight * s.total_return);
-        sum_carry.add(s.weight * carry);
-        sum_tsy.add(s.weight * treasury);
-        sum_spr.add(s.weight * spread);
-        sum_sel.add(s.weight * selection);
+        sum_w.add(s.weight)?;
+        sum_r.add(s.weight * s.total_return)?;
+        sum_carry.add(s.weight * carry)?;
+        sum_tsy.add(s.weight * treasury)?;
+        sum_spr.add(s.weight * spread)?;
+        sum_sel.add(s.weight * selection)?;
 
         let entry = sectors.entry(s.sector.clone()).or_default();
         let agg = if is_portfolio {
@@ -473,14 +485,14 @@ fn aggregate_side(
         agg.selection += s.weight * selection;
     }
 
-    let total_w = sum_w.total();
+    let total_w = sum_w.get_total()?;
     check_weights_sum(side_name, total_w)?;
 
-    let ret = sum_r.total();
-    let carry = sum_carry.total();
-    let treasury = sum_tsy.total();
-    let spread = sum_spr.total();
-    let selection = sum_sel.total();
+    let ret = sum_r.get_total()?;
+    let carry = sum_carry.get_total()?;
+    let treasury = sum_tsy.get_total()?;
+    let spread = sum_spr.get_total()?;
+    let selection = sum_sel.get_total()?;
     Ok((
         ret,
         FiComponents {
@@ -646,11 +658,11 @@ pub fn campisi_attribution(
         let active_spread = p.weight * (p.rate(p.spread) - spread_b);
         let selection = p.weight * (p.rate(p.selection) - selection_b);
 
-        total_allocation.add(allocation);
-        total_active_carry.add(active_carry);
-        total_active_treasury.add(active_treasury);
-        total_active_spread.add(active_spread);
-        total_selection.add(selection);
+        total_allocation.add(allocation)?;
+        total_active_carry.add(active_carry)?;
+        total_active_treasury.add(active_treasury)?;
+        total_active_spread.add(active_spread)?;
+        total_selection.add(selection)?;
 
         sector_effects.push(FiSectorEffect {
             sector,
@@ -674,11 +686,11 @@ pub fn campisi_attribution(
         portfolio_return,
         benchmark_return,
         active_return: portfolio_return - benchmark_return,
-        total_allocation: total_allocation.total(),
-        total_active_carry: total_active_carry.total(),
-        total_active_treasury: total_active_treasury.total(),
-        total_active_spread: total_active_spread.total(),
-        total_selection: total_selection.total(),
+        total_allocation: total_allocation.get_total()?,
+        total_active_carry: total_active_carry.get_total()?,
+        total_active_treasury: total_active_treasury.get_total()?,
+        total_active_spread: total_active_spread.get_total()?,
+        total_selection: total_selection.get_total()?,
     })
 }
 
@@ -853,7 +865,7 @@ pub fn campisi_carino_link(periods: &[FiAttributionResult]) -> Result<FiCarinoLi
             active_spread,
             selection,
         ]) {
-            total.add(value);
+            total.add(value)?;
         }
         linked_sectors.push(FiLinkedSectorEffect {
             sector: name,
@@ -866,13 +878,11 @@ pub fn campisi_carino_link(periods: &[FiAttributionResult]) -> Result<FiCarinoLi
         });
     }
 
-    let [
-        linked_allocation,
-        linked_active_carry,
-        linked_active_treasury,
-        linked_active_spread,
-        linked_selection,
-    ] = totals.map(|value| value.total());
+    let linked_allocation = totals[0].get_total()?;
+    let linked_active_carry = totals[1].get_total()?;
+    let linked_active_treasury = totals[2].get_total()?;
+    let linked_active_spread = totals[3].get_total()?;
+    let linked_selection = totals[4].get_total()?;
     Ok(FiCarinoLinkedResult {
         periods: periods.to_vec(),
         portfolio_return_compounded: linked.portfolio_return_compounded,

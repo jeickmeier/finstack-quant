@@ -3,15 +3,15 @@
   "sources": [
     {
       "path": "finstack-quant-ui/tests/portfolio/margin/cases.json",
-      "sha256": "0bf378c1df46c9b3bf81392c3fcfa96e0adf88c6871c1af039833e967df57290"
+      "sha256": "406e182a1806df5446145adb091bc046043aabe87b4c35a61afb38588d90676b"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-      "sha256": "3ee1b64c7eb259dfa64ffbcc2d253995ca398d7c10794631a247b6f7111ee2c3"
+      "sha256": "91b9c85cfc0472093142fed8ccd69a008c068f3cfd8b484c7d9d09495ae91b89"
     },
     {
       "path": "finstack-quant/portfolio/tests/fixtures/host_parity.json",
-      "sha256": "9bb9d500d5250a6daea4837ad6f0a5330d5deb58873a8fee7cafc7c38af1e011"
+      "sha256": "b3f20749ec7b8357cffb422591bfd258fa953feda6b4fb260ad07c9bbc31f788"
     }
   ],
   "specJson": "{\"id\":\"MARGIN-BOOK\",\"name\":\"Margined rates book\",\"base_currency\":\"USD\",\"as_of\":\"2023-12-28\",\"entities\":{\"RATES\":{\"id\":\"RATES\",\"name\":\"Rates\"}},\"positions\":[{\"position_id\":\"IRS-A\",\"entity_id\":\"RATES\",\"instrument_id\":\"IRS-A\",\"instrument_spec\":{\"spec\":{\"adjust_fixed_accrual_dates\":false,\"adjust_float_accrual_dates\":false,\"attributes\":{},\"fixed_leg\":{\"business_day_convention\":\"modified_following\",\"calendar_id\":\"usny\",\"day_count\":\"30_360\",\"discount_curve_id\":\"USD-OIS\",\"end\":\"2029-01-02\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.04\",\"start\":\"2024-01-02\",\"stub\":\"short_front\"},\"float_leg\":{\"business_day_convention\":\"modified_following\",\"calendar_id\":\"usny\",\"compounding\":\"simple\",\"day_count\":\"act_360\",\"discount_curve_id\":\"USD-OIS\",\"end\":\"2029-01-02\",\"end_of_month\":false,\"fixing_calendar_id\":\"usny\",\"forward_curve_id\":\"USD-SOFR-3M\",\"frequency\":{\"count\":3,\"unit\":\"months\"},\"payment_lag_days\":0,\"reset_lag_days\":2,\"spread_bp\":\"0\",\"start\":\"2024-01-02\",\"stub\":\"short_front\"},\"id\":\"IRS-A\",\"notional\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"side\":\"pay\",\"margin_spec\":{\"clearing_status\":\"bilateral\",\"csa\":{\"id\":\"USD-REGULATORY-CSA\",\"base_currency\":\"USD\",\"calendar_id\":\"usny\",\"vm_params\":{\"threshold\":{\"amount\":\"0\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"500000\",\"currency\":\"USD\"},\"rounding\":{\"amount\":\"10000\",\"currency\":\"USD\"},\"independent_amount\":{\"amount\":\"0\",\"currency\":\"USD\"},\"frequency\":\"daily\",\"settlement_lag\":1},\"im_params\":{\"methodology\":\"simm\",\"mpor_days\":10,\"threshold\":{\"amount\":\"50000000\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"0\",\"currency\":\"USD\"},\"segregated\":true},\"eligible_collateral\":{\"eligible\":[{\"asset_class\":\"cash\",\"haircut\":0,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":null,\"max_remaining_years\":1},\"haircut\":0.005,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":1,\"max_remaining_years\":5},\"haircut\":0.02,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":5,\"max_remaining_years\":null},\"haircut\":0.04,\"fx_haircut_addon\":0.08}],\"rehypothecation_allowed\":false},\"call_timing\":{\"notification_deadline_hours\":13,\"response_deadline_hours\":2,\"dispute_resolution_days\":1,\"delivery_grace_days\":0},\"collateral_curve_id\":\"USD-OIS\"}}},\"type\":\"interest_rate_swap\"},\"quantity\":1,\"unit\":\"units\"},{\"position_id\":\"IRS-B\",\"entity_id\":\"RATES\",\"instrument_id\":\"IRS-B\",\"instrument_spec\":{\"spec\":{\"adjust_fixed_accrual_dates\":false,\"adjust_float_accrual_dates\":false,\"attributes\":{},\"fixed_leg\":{\"business_day_convention\":\"modified_following\",\"calendar_id\":\"usny\",\"day_count\":\"30_360\",\"discount_curve_id\":\"USD-OIS\",\"end\":\"2029-01-02\",\"end_of_month\":false,\"frequency\":{\"count\":6,\"unit\":\"months\"},\"payment_lag_days\":0,\"rate\":\"0.04\",\"start\":\"2024-01-02\",\"stub\":\"short_front\"},\"float_leg\":{\"business_day_convention\":\"modified_following\",\"calendar_id\":\"usny\",\"compounding\":\"simple\",\"day_count\":\"act_360\",\"discount_curve_id\":\"USD-OIS\",\"end\":\"2029-01-02\",\"end_of_month\":false,\"fixing_calendar_id\":\"usny\",\"forward_curve_id\":\"USD-SOFR-3M\",\"frequency\":{\"count\":3,\"unit\":\"months\"},\"payment_lag_days\":0,\"reset_lag_days\":2,\"spread_bp\":\"0\",\"start\":\"2024-01-02\",\"stub\":\"short_front\"},\"id\":\"IRS-B\",\"notional\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"side\":\"pay\",\"margin_spec\":{\"clearing_status\":\"bilateral\",\"csa\":{\"id\":\"CSA-B\",\"base_currency\":\"USD\",\"calendar_id\":\"usny\",\"vm_params\":{\"threshold\":{\"amount\":\"0\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"500000\",\"currency\":\"USD\"},\"rounding\":{\"amount\":\"10000\",\"currency\":\"USD\"},\"independent_amount\":{\"amount\":\"0\",\"currency\":\"USD\"},\"frequency\":\"daily\",\"settlement_lag\":1},\"im_params\":{\"methodology\":\"simm\",\"mpor_days\":10,\"threshold\":{\"amount\":\"50000000\",\"currency\":\"USD\"},\"mta\":{\"amount\":\"0\",\"currency\":\"USD\"},\"segregated\":true},\"eligible_collateral\":{\"eligible\":[{\"asset_class\":\"cash\",\"haircut\":0,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":null,\"max_remaining_years\":1},\"haircut\":0.005,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":1,\"max_remaining_years\":5},\"haircut\":0.02,\"fx_haircut_addon\":0.08},{\"asset_class\":\"government_bonds\",\"min_rating\":\"AA-\",\"maturity_constraints\":{\"min_remaining_years\":5,\"max_remaining_years\":null},\"haircut\":0.04,\"fx_haircut_addon\":0.08}],\"rehypothecation_allowed\":false},\"call_timing\":{\"notification_deadline_hours\":13,\"response_deadline_hours\":2,\"dispute_resolution_days\":1,\"delivery_grace_days\":0},\"collateral_curve_id\":\"USD-OIS\"}}},\"type\":\"interest_rate_swap\"},\"quantity\":2,\"unit\":\"units\"},{\"position_id\":\"DEP-1\",\"entity_id\":\"RATES\",\"instrument_id\":\"DEP-USD-6M\",\"instrument_spec\":{\"spec\":{\"attributes\":{},\"business_day_convention\":\"modified_following\",\"calendar_id\":null,\"day_count\":\"act_360\",\"discount_curve_id\":\"USD-OIS\",\"fixed_rate\":\"0.045\",\"id\":\"DEP-USD-6M\",\"maturity\":\"2024-07-01\",\"notional\":{\"amount\":\"100000\",\"currency\":\"USD\"},\"start_date\":\"2024-01-03\"},\"type\":\"deposit\"},\"quantity\":1,\"unit\":\"units\"}]}",
@@ -34,11 +34,11 @@
           "position_id": "IRS-A",
           "entity_id": "RATES",
           "value_native": {
-            "amount": "8912.216324015288",
+            "amount": "8922.36176020559",
             "currency": "USD"
           },
           "value_base": {
-            "amount": "8912.216324015288",
+            "amount": "8922.36176020559",
             "currency": "USD"
           },
           "metric_scale": 1,
@@ -48,35 +48,35 @@
             "instrument_id": "IRS-A",
             "as_of": "2023-12-28",
             "value": {
-              "amount": "8912.216324015288",
+              "amount": "8922.36176020559",
               "currency": "USD"
             },
             "measures": {
-              "dv01": 4646.214810040081,
-              "bucketed_dv01": 4646.214608195121,
-              "theta": 0.7437544467393309,
+              "dv01": 4692.518301375443,
+              "bucketed_dv01": 4692.518117480911,
+              "theta": 0.7446011176798493,
               "bucketed_dv01::USD-OIS::10y": 0,
               "bucketed_dv01::USD-OIS::15y": 0,
-              "bucketed_dv01::USD-OIS::1y": 0.011910163215361536,
+              "bucketed_dv01::USD-OIS::1y": 0.011884785373695195,
               "bucketed_dv01::USD-OIS::20y": 0,
-              "bucketed_dv01::USD-OIS::2y": 0.029114182107150555,
+              "bucketed_dv01::USD-OIS::2y": 0.02908076415769756,
               "bucketed_dv01::USD-OIS::30y": 0,
-              "bucketed_dv01::USD-OIS::3m": -2.466555585619062,
-              "bucketed_dv01::USD-OIS::3y": -0.06902558368165046,
-              "bucketed_dv01::USD-OIS::5y": 21.374671394820325,
-              "bucketed_dv01::USD-OIS::6m": 1.249563217163086,
-              "bucketed_dv01::USD-OIS::7y": 0.4102728351717815,
+              "bucketed_dv01::USD-OIS::3m": -2.4665219095768407,
+              "bucketed_dv01::USD-OIS::3y": -0.0698400455294177,
+              "bucketed_dv01::USD-OIS::5y": 21.371207312331535,
+              "bucketed_dv01::USD-OIS::6m": 1.2494867191417143,
+              "bucketed_dv01::USD-OIS::7y": 0.41025575157254934,
               "bucketed_dv01::USD-SOFR-3M::10y": 0,
               "bucketed_dv01::USD-SOFR-3M::15y": 0,
-              "bucketed_dv01::USD-SOFR-3M::1y": 714.3639620118774,
+              "bucketed_dv01::USD-SOFR-3M::1y": 25.560969347017817,
               "bucketed_dv01::USD-SOFR-3M::20y": 0,
-              "bucketed_dv01::USD-SOFR-3M::2y": 934.0777982304571,
+              "bucketed_dv01::USD-SOFR-3M::2y": 56.962861594045535,
               "bucketed_dv01::USD-SOFR-3M::30y": 0,
-              "bucketed_dv01::USD-SOFR-3M::3m": 490.76297601510305,
-              "bucketed_dv01::USD-SOFR-3M::3y": 1347.550214181072,
-              "bucketed_dv01::USD-SOFR-3M::5y": 773.4885379035259,
-              "bucketed_dv01::USD-SOFR-3M::6m": 365.43116922990885,
-              "bucketed_dv01::USD-SOFR-3M::7y": 0,
+              "bucketed_dv01::USD-SOFR-3M::3m": -11.83506603166461,
+              "bucketed_dv01::USD-SOFR-3M::3y": 136.43415661458857,
+              "bucketed_dv01::USD-SOFR-3M::5y": 4416.508815019974,
+              "bucketed_dv01::USD-SOFR-3M::6m": 6.566448904690333,
+              "bucketed_dv01::USD-SOFR-3M::7y": 41.78437865478918,
               "theta_period_days": 1
             },
             "meta": {
@@ -121,11 +121,11 @@
           "position_id": "IRS-B",
           "entity_id": "RATES",
           "value_native": {
-            "amount": "17824.432648030575",
+            "amount": "17844.72352041118",
             "currency": "USD"
           },
           "value_base": {
-            "amount": "17824.432648030575",
+            "amount": "17844.72352041118",
             "currency": "USD"
           },
           "metric_scale": 2,
@@ -135,35 +135,35 @@
             "instrument_id": "IRS-B",
             "as_of": "2023-12-28",
             "value": {
-              "amount": "8912.216324015288",
+              "amount": "8922.36176020559",
               "currency": "USD"
             },
             "measures": {
-              "dv01": 4646.214810040081,
-              "bucketed_dv01": 4646.214608195121,
-              "theta": 0.7437544467393309,
+              "dv01": 4692.518301375443,
+              "bucketed_dv01": 4692.518117480911,
+              "theta": 0.7446011176798493,
               "bucketed_dv01::USD-OIS::10y": 0,
               "bucketed_dv01::USD-OIS::15y": 0,
-              "bucketed_dv01::USD-OIS::1y": 0.011910163215361536,
+              "bucketed_dv01::USD-OIS::1y": 0.011884785373695195,
               "bucketed_dv01::USD-OIS::20y": 0,
-              "bucketed_dv01::USD-OIS::2y": 0.029114182107150555,
+              "bucketed_dv01::USD-OIS::2y": 0.02908076415769756,
               "bucketed_dv01::USD-OIS::30y": 0,
-              "bucketed_dv01::USD-OIS::3m": -2.466555585619062,
-              "bucketed_dv01::USD-OIS::3y": -0.06902558368165046,
-              "bucketed_dv01::USD-OIS::5y": 21.374671394820325,
-              "bucketed_dv01::USD-OIS::6m": 1.249563217163086,
-              "bucketed_dv01::USD-OIS::7y": 0.4102728351717815,
+              "bucketed_dv01::USD-OIS::3m": -2.4665219095768407,
+              "bucketed_dv01::USD-OIS::3y": -0.0698400455294177,
+              "bucketed_dv01::USD-OIS::5y": 21.371207312331535,
+              "bucketed_dv01::USD-OIS::6m": 1.2494867191417143,
+              "bucketed_dv01::USD-OIS::7y": 0.41025575157254934,
               "bucketed_dv01::USD-SOFR-3M::10y": 0,
               "bucketed_dv01::USD-SOFR-3M::15y": 0,
-              "bucketed_dv01::USD-SOFR-3M::1y": 714.3639620118774,
+              "bucketed_dv01::USD-SOFR-3M::1y": 25.560969347017817,
               "bucketed_dv01::USD-SOFR-3M::20y": 0,
-              "bucketed_dv01::USD-SOFR-3M::2y": 934.0777982304571,
+              "bucketed_dv01::USD-SOFR-3M::2y": 56.962861594045535,
               "bucketed_dv01::USD-SOFR-3M::30y": 0,
-              "bucketed_dv01::USD-SOFR-3M::3m": 490.76297601510305,
-              "bucketed_dv01::USD-SOFR-3M::3y": 1347.550214181072,
-              "bucketed_dv01::USD-SOFR-3M::5y": 773.4885379035259,
-              "bucketed_dv01::USD-SOFR-3M::6m": 365.43116922990885,
-              "bucketed_dv01::USD-SOFR-3M::7y": 0,
+              "bucketed_dv01::USD-SOFR-3M::3m": -11.83506603166461,
+              "bucketed_dv01::USD-SOFR-3M::3y": 136.43415661458857,
+              "bucketed_dv01::USD-SOFR-3M::5y": 4416.508815019974,
+              "bucketed_dv01::USD-SOFR-3M::6m": 6.566448904690333,
+              "bucketed_dv01::USD-SOFR-3M::7y": 41.78437865478918,
               "theta_period_days": 1
             },
             "meta": {
@@ -282,12 +282,12 @@
         }
       },
       "total_base_currency": {
-        "amount": "27461.868441111696",
+        "amount": "27492.3047496826",
         "currency": "USD"
       },
       "by_entity": {
         "RATES": {
-          "amount": "27461.868441111696",
+          "amount": "27492.3047496826",
           "currency": "USD"
         }
       },
@@ -297,23 +297,23 @@
       "aggregated": {
         "dv01": {
           "metric_id": "dv01",
-          "total": 13933.678435463291,
+          "total": 14072.588909469378,
           "by_entity": {
-            "RATES": 13933.678435463291
+            "RATES": 14072.588909469378
           }
         },
         "bucketed_dv01": {
           "metric_id": "bucketed_dv01",
-          "total": 13933.677829928545,
+          "total": 14072.588357785915,
           "by_entity": {
-            "RATES": 13933.677829928545
+            "RATES": 14072.588357785915
           }
         },
         "theta": {
           "metric_id": "theta",
-          "total": 2.291785345689391,
+          "total": 2.294325358510946,
           "by_entity": {
-            "RATES": 2.291785345689391
+            "RATES": 2.294325358510946
           }
         },
         "bucketed_dv01::USD-OIS::10y": {
@@ -332,9 +332,9 @@
         },
         "bucketed_dv01::USD-OIS::1y": {
           "metric_id": "bucketed_dv01::USD-OIS::1y",
-          "total": -0.06265874736436672,
+          "total": -0.06273488088936574,
           "by_entity": {
-            "RATES": -0.06265874736436672
+            "RATES": -0.06273488088936574
           }
         },
         "bucketed_dv01::USD-OIS::20y": {
@@ -346,9 +346,9 @@
         },
         "bucketed_dv01::USD-OIS::2y": {
           "metric_id": "bucketed_dv01::USD-OIS::2y",
-          "total": 0.08734254632145166,
+          "total": 0.08724229247309268,
           "by_entity": {
-            "RATES": 0.08734254632145166
+            "RATES": 0.08724229247309268
           }
         },
         "bucketed_dv01::USD-OIS::30y": {
@@ -360,37 +360,37 @@
         },
         "bucketed_dv01::USD-OIS::3m": {
           "metric_id": "bucketed_dv01::USD-OIS::3m",
-          "total": -7.235365481348708,
+          "total": -7.235264453222044,
           "by_entity": {
-            "RATES": -7.235365481348708
+            "RATES": -7.235264453222044
           }
         },
         "bucketed_dv01::USD-OIS::3y": {
           "metric_id": "bucketed_dv01::USD-OIS::3y",
-          "total": -0.20707675104495138,
+          "total": -0.20952013658825308,
           "by_entity": {
-            "RATES": -0.20707675104495138
+            "RATES": -0.20952013658825308
           }
         },
         "bucketed_dv01::USD-OIS::5y": {
           "metric_id": "bucketed_dv01::USD-OIS::5y",
-          "total": 64.12401418446098,
+          "total": 64.1136219369946,
           "by_entity": {
-            "RATES": 64.12401418446098
+            "RATES": 64.1136219369946
           }
         },
         "bucketed_dv01::USD-OIS::6m": {
           "metric_id": "bucketed_dv01::USD-OIS::6m",
-          "total": -1.2832170438271078,
+          "total": -1.2834465378912228,
           "by_entity": {
-            "RATES": -1.2832170438271078
+            "RATES": -1.2834465378912228
           }
         },
         "bucketed_dv01::USD-OIS::7y": {
           "metric_id": "bucketed_dv01::USD-OIS::7y",
-          "total": 1.2308185055153444,
+          "total": 1.230767254717648,
           "by_entity": {
-            "RATES": 1.2308185055153444
+            "RATES": 1.230767254717648
           }
         },
         "bucketed_dv01::USD-SOFR-3M::10y": {
@@ -409,9 +409,9 @@
         },
         "bucketed_dv01::USD-SOFR-3M::1y": {
           "metric_id": "bucketed_dv01::USD-SOFR-3M::1y",
-          "total": 2143.0918860356323,
+          "total": 76.68290804105345,
           "by_entity": {
-            "RATES": 2143.0918860356323
+            "RATES": 76.68290804105345
           }
         },
         "bucketed_dv01::USD-SOFR-3M::20y": {
@@ -423,9 +423,9 @@
         },
         "bucketed_dv01::USD-SOFR-3M::2y": {
           "metric_id": "bucketed_dv01::USD-SOFR-3M::2y",
-          "total": 2802.2333946913714,
+          "total": 170.8885847821366,
           "by_entity": {
-            "RATES": 2802.2333946913714
+            "RATES": 170.8885847821366
           }
         },
         "bucketed_dv01::USD-SOFR-3M::30y": {
@@ -437,37 +437,37 @@
         },
         "bucketed_dv01::USD-SOFR-3M::3m": {
           "metric_id": "bucketed_dv01::USD-SOFR-3M::3m",
-          "total": 1472.2889280453091,
+          "total": -35.50519809499383,
           "by_entity": {
-            "RATES": 1472.2889280453091
+            "RATES": -35.50519809499383
           }
         },
         "bucketed_dv01::USD-SOFR-3M::3y": {
           "metric_id": "bucketed_dv01::USD-SOFR-3M::3y",
-          "total": 4042.6506425432162,
+          "total": 409.3024698437657,
           "by_entity": {
-            "RATES": 4042.6506425432162
+            "RATES": 409.3024698437657
           }
         },
         "bucketed_dv01::USD-SOFR-3M::5y": {
           "metric_id": "bucketed_dv01::USD-SOFR-3M::5y",
-          "total": 2320.4656137105776,
+          "total": 13249.52644505992,
           "by_entity": {
-            "RATES": 2320.4656137105776
+            "RATES": 13249.52644505992
           }
         },
         "bucketed_dv01::USD-SOFR-3M::6m": {
           "metric_id": "bucketed_dv01::USD-SOFR-3M::6m",
-          "total": 1096.2935076897265,
+          "total": 19.699346714070998,
           "by_entity": {
-            "RATES": 1096.2935076897265
+            "RATES": 19.699346714070998
           }
         },
         "bucketed_dv01::USD-SOFR-3M::7y": {
           "metric_id": "bucketed_dv01::USD-SOFR-3M::7y",
-          "total": 0,
+          "total": 125.35313596436754,
           "by_entity": {
-            "RATES": 0
+            "RATES": 125.35313596436754
           }
         }
       },
@@ -475,62 +475,62 @@
         "IRS-A": {
           "currency": "USD",
           "metrics": {
-            "dv01": 4646.214810040081,
-            "bucketed_dv01": 4646.214608195121,
-            "theta": 0.7437544467393309,
+            "dv01": 4692.518301375443,
+            "bucketed_dv01": 4692.518117480911,
+            "theta": 0.7446011176798493,
             "bucketed_dv01::USD-OIS::10y": 0,
             "bucketed_dv01::USD-OIS::15y": 0,
-            "bucketed_dv01::USD-OIS::1y": 0.011910163215361536,
+            "bucketed_dv01::USD-OIS::1y": 0.011884785373695195,
             "bucketed_dv01::USD-OIS::20y": 0,
-            "bucketed_dv01::USD-OIS::2y": 0.029114182107150555,
+            "bucketed_dv01::USD-OIS::2y": 0.02908076415769756,
             "bucketed_dv01::USD-OIS::30y": 0,
-            "bucketed_dv01::USD-OIS::3m": -2.466555585619062,
-            "bucketed_dv01::USD-OIS::3y": -0.06902558368165046,
-            "bucketed_dv01::USD-OIS::5y": 21.374671394820325,
-            "bucketed_dv01::USD-OIS::6m": 1.249563217163086,
-            "bucketed_dv01::USD-OIS::7y": 0.4102728351717815,
+            "bucketed_dv01::USD-OIS::3m": -2.4665219095768407,
+            "bucketed_dv01::USD-OIS::3y": -0.0698400455294177,
+            "bucketed_dv01::USD-OIS::5y": 21.371207312331535,
+            "bucketed_dv01::USD-OIS::6m": 1.2494867191417143,
+            "bucketed_dv01::USD-OIS::7y": 0.41025575157254934,
             "bucketed_dv01::USD-SOFR-3M::10y": 0,
             "bucketed_dv01::USD-SOFR-3M::15y": 0,
-            "bucketed_dv01::USD-SOFR-3M::1y": 714.3639620118774,
+            "bucketed_dv01::USD-SOFR-3M::1y": 25.560969347017817,
             "bucketed_dv01::USD-SOFR-3M::20y": 0,
-            "bucketed_dv01::USD-SOFR-3M::2y": 934.0777982304571,
+            "bucketed_dv01::USD-SOFR-3M::2y": 56.962861594045535,
             "bucketed_dv01::USD-SOFR-3M::30y": 0,
-            "bucketed_dv01::USD-SOFR-3M::3m": 490.76297601510305,
-            "bucketed_dv01::USD-SOFR-3M::3y": 1347.550214181072,
-            "bucketed_dv01::USD-SOFR-3M::5y": 773.4885379035259,
-            "bucketed_dv01::USD-SOFR-3M::6m": 365.43116922990885,
-            "bucketed_dv01::USD-SOFR-3M::7y": 0,
+            "bucketed_dv01::USD-SOFR-3M::3m": -11.83506603166461,
+            "bucketed_dv01::USD-SOFR-3M::3y": 136.43415661458857,
+            "bucketed_dv01::USD-SOFR-3M::5y": 4416.508815019974,
+            "bucketed_dv01::USD-SOFR-3M::6m": 6.566448904690333,
+            "bucketed_dv01::USD-SOFR-3M::7y": 41.78437865478918,
             "theta_period_days": 1
           }
         },
         "IRS-B": {
           "currency": "USD",
           "metrics": {
-            "dv01": 9292.429620080162,
-            "bucketed_dv01": 9292.429216390243,
-            "theta": 1.4875088934786618,
+            "dv01": 9385.036602750886,
+            "bucketed_dv01": 9385.036234961823,
+            "theta": 1.4892022353596985,
             "bucketed_dv01::USD-OIS::10y": 0,
             "bucketed_dv01::USD-OIS::15y": 0,
-            "bucketed_dv01::USD-OIS::1y": 0.02382032643072307,
+            "bucketed_dv01::USD-OIS::1y": 0.02376957074739039,
             "bucketed_dv01::USD-OIS::20y": 0,
-            "bucketed_dv01::USD-OIS::2y": 0.05822836421430111,
+            "bucketed_dv01::USD-OIS::2y": 0.05816152831539512,
             "bucketed_dv01::USD-OIS::30y": 0,
-            "bucketed_dv01::USD-OIS::3m": -4.933111171238124,
-            "bucketed_dv01::USD-OIS::3y": -0.13805116736330092,
-            "bucketed_dv01::USD-OIS::5y": 42.74934278964065,
-            "bucketed_dv01::USD-OIS::6m": 2.499126434326172,
-            "bucketed_dv01::USD-OIS::7y": 0.820545670343563,
+            "bucketed_dv01::USD-OIS::3m": -4.933043819153681,
+            "bucketed_dv01::USD-OIS::3y": -0.1396800910588354,
+            "bucketed_dv01::USD-OIS::5y": 42.74241462466307,
+            "bucketed_dv01::USD-OIS::6m": 2.4989734382834285,
+            "bucketed_dv01::USD-OIS::7y": 0.8205115031450987,
             "bucketed_dv01::USD-SOFR-3M::10y": 0,
             "bucketed_dv01::USD-SOFR-3M::15y": 0,
-            "bucketed_dv01::USD-SOFR-3M::1y": 1428.727924023755,
+            "bucketed_dv01::USD-SOFR-3M::1y": 51.121938694035634,
             "bucketed_dv01::USD-SOFR-3M::20y": 0,
-            "bucketed_dv01::USD-SOFR-3M::2y": 1868.1555964609142,
+            "bucketed_dv01::USD-SOFR-3M::2y": 113.92572318809107,
             "bucketed_dv01::USD-SOFR-3M::30y": 0,
-            "bucketed_dv01::USD-SOFR-3M::3m": 981.5259520302061,
-            "bucketed_dv01::USD-SOFR-3M::3y": 2695.100428362144,
-            "bucketed_dv01::USD-SOFR-3M::5y": 1546.9770758070517,
-            "bucketed_dv01::USD-SOFR-3M::6m": 730.8623384598177,
-            "bucketed_dv01::USD-SOFR-3M::7y": 0,
+            "bucketed_dv01::USD-SOFR-3M::3m": -23.67013206332922,
+            "bucketed_dv01::USD-SOFR-3M::3y": 272.86831322917715,
+            "bucketed_dv01::USD-SOFR-3M::5y": 8833.017630039947,
+            "bucketed_dv01::USD-SOFR-3M::6m": 13.132897809380665,
+            "bucketed_dv01::USD-SOFR-3M::7y": 83.56875730957836,
             "theta_period_days": 1
           }
         },
@@ -577,9 +577,9 @@
       },
       {
         "components": ["USD-OIS", "1y"],
-        "total": -0.06265874736436672,
+        "total": -0.06273488088936574,
         "by_entity": {
-          "RATES": -0.06265874736436672
+          "RATES": -0.06273488088936574
         }
       },
       {
@@ -591,9 +591,9 @@
       },
       {
         "components": ["USD-OIS", "2y"],
-        "total": 0.08734254632145166,
+        "total": 0.08724229247309268,
         "by_entity": {
-          "RATES": 0.08734254632145166
+          "RATES": 0.08724229247309268
         }
       },
       {
@@ -605,37 +605,37 @@
       },
       {
         "components": ["USD-OIS", "3m"],
-        "total": -7.235365481348708,
+        "total": -7.235264453222044,
         "by_entity": {
-          "RATES": -7.235365481348708
+          "RATES": -7.235264453222044
         }
       },
       {
         "components": ["USD-OIS", "3y"],
-        "total": -0.20707675104495138,
+        "total": -0.20952013658825308,
         "by_entity": {
-          "RATES": -0.20707675104495138
+          "RATES": -0.20952013658825308
         }
       },
       {
         "components": ["USD-OIS", "5y"],
-        "total": 64.12401418446098,
+        "total": 64.1136219369946,
         "by_entity": {
-          "RATES": 64.12401418446098
+          "RATES": 64.1136219369946
         }
       },
       {
         "components": ["USD-OIS", "6m"],
-        "total": -1.2832170438271078,
+        "total": -1.2834465378912228,
         "by_entity": {
-          "RATES": -1.2832170438271078
+          "RATES": -1.2834465378912228
         }
       },
       {
         "components": ["USD-OIS", "7y"],
-        "total": 1.2308185055153444,
+        "total": 1.230767254717648,
         "by_entity": {
-          "RATES": 1.2308185055153444
+          "RATES": 1.230767254717648
         }
       },
       {
@@ -654,9 +654,9 @@
       },
       {
         "components": ["USD-SOFR-3M", "1y"],
-        "total": 2143.0918860356323,
+        "total": 76.68290804105345,
         "by_entity": {
-          "RATES": 2143.0918860356323
+          "RATES": 76.68290804105345
         }
       },
       {
@@ -668,9 +668,9 @@
       },
       {
         "components": ["USD-SOFR-3M", "2y"],
-        "total": 2802.2333946913714,
+        "total": 170.8885847821366,
         "by_entity": {
-          "RATES": 2802.2333946913714
+          "RATES": 170.8885847821366
         }
       },
       {
@@ -682,37 +682,37 @@
       },
       {
         "components": ["USD-SOFR-3M", "3m"],
-        "total": 1472.2889280453091,
+        "total": -35.50519809499383,
         "by_entity": {
-          "RATES": 1472.2889280453091
+          "RATES": -35.50519809499383
         }
       },
       {
         "components": ["USD-SOFR-3M", "3y"],
-        "total": 4042.6506425432162,
+        "total": 409.3024698437657,
         "by_entity": {
-          "RATES": 4042.6506425432162
+          "RATES": 409.3024698437657
         }
       },
       {
         "components": ["USD-SOFR-3M", "5y"],
-        "total": 2320.4656137105776,
+        "total": 13249.52644505992,
         "by_entity": {
-          "RATES": 2320.4656137105776
+          "RATES": 13249.52644505992
         }
       },
       {
         "components": ["USD-SOFR-3M", "6m"],
-        "total": 1096.2935076897265,
+        "total": 19.699346714070998,
         "by_entity": {
-          "RATES": 1096.2935076897265
+          "RATES": 19.699346714070998
         }
       },
       {
         "components": ["USD-SOFR-3M", "7y"],
-        "total": 0,
+        "total": 125.35313596436754,
         "by_entity": {
-          "RATES": 0
+          "RATES": 125.35313596436754
         }
       }
     ]
@@ -1158,16 +1158,16 @@
         "scenario_id": "up_10bp",
         "pnl": {
           "total": {
-            "amount": "564.910165637914",
+            "amount": "564.778547886243",
             "currency": "USD"
           },
           "by_position": {
             "IRS-A": {
-              "amount": "204.8523520655",
+              "amount": "204.808479481609",
               "currency": "USD"
             },
             "IRS-B": {
-              "amount": "409.704704131",
+              "amount": "409.616958963218",
               "currency": "USD"
             },
             "DEP-1": {
@@ -1230,16 +1230,16 @@
         "scenario_id": "down_15bp",
         "pnl": {
           "total": {
-            "amount": "-853.487521146494",
+            "amount": "-853.288968331017",
             "currency": "USD"
           },
           "by_position": {
             "IRS-A": {
-              "amount": "-309.33560981066",
+              "amount": "-309.269425538835",
               "currency": "USD"
             },
             "IRS-B": {
-              "amount": "-618.671219621319",
+              "amount": "-618.53885107767",
               "currency": "USD"
             },
             "DEP-1": {
@@ -1304,13 +1304,13 @@
     "as_of": "2023-12-28",
     "base_currency": "USD",
     "total_initial_margin": {
-      "amount": "846166.1350841024",
+      "amount": "844986.3136094112",
       "currency": "USD"
     },
     "by_csa": {
       "CSA-B": {
         "gross_initial_margin": {
-          "amount": "564110.7567227349",
+          "amount": "563324.2090729409",
           "currency": "USD"
         },
         "required_collateral": {
@@ -1329,7 +1329,7 @@
       },
       "USD-REGULATORY-CSA": {
         "gross_initial_margin": {
-          "amount": "282055.37836136745",
+          "amount": "281662.10453647043",
           "currency": "USD"
         },
         "required_collateral": {
@@ -1364,7 +1364,7 @@
       "currency": "USD"
     },
     "total_margin": {
-      "amount": "846166.1350841024",
+      "amount": "844986.3136094112",
       "currency": "USD"
     },
     "netting_sets": [
@@ -1377,7 +1377,7 @@
         "csa_id": "CSA-B",
         "as_of": "2023-12-28",
         "initial_margin": {
-          "amount": "564110.7567227349",
+          "amount": "563324.2090729409",
           "currency": "USD"
         },
         "variation_margin": {
@@ -1385,7 +1385,7 @@
           "currency": "USD"
         },
         "total_margin": {
-          "amount": "564110.7567227349",
+          "amount": "563324.2090729409",
           "currency": "USD"
         },
         "position_count": 1,
@@ -1394,15 +1394,15 @@
         "sensitivities": {
           "base_currency": "USD",
           "ir_delta": [
-            ["USD", "10Y", 0.820545670343563],
+            ["USD", "10Y", 84.38926881272346],
             ["USD", "15Y", 0],
-            ["USD", "1Y", 1428.7517443501856],
+            ["USD", "1Y", 51.145708264783025],
             ["USD", "20Y", 0],
-            ["USD", "2Y", 1868.2138248251285],
+            ["USD", "2Y", 113.98388471640646],
             ["USD", "30Y", 0],
-            ["USD", "3Y", 2694.962377194781],
-            ["USD", "5Y", 1589.7264185966924],
-            ["USD", "6M", 1709.9543057531118]
+            ["USD", "3Y", 272.7286331381183],
+            ["USD", "5Y", 8875.76004466461],
+            ["USD", "6M", -12.971304634818807]
           ],
           "ir_vega": [],
           "credit_qualifying_delta": [],
@@ -1419,7 +1419,7 @@
         },
         "im_breakdown": {
           "IR_Delta": {
-            "amount": "564110.7567227349",
+            "amount": "563324.2090729409",
             "currency": "USD"
           }
         }
@@ -1433,7 +1433,7 @@
         "csa_id": "USD-REGULATORY-CSA",
         "as_of": "2023-12-28",
         "initial_margin": {
-          "amount": "282055.37836136745",
+          "amount": "281662.10453647043",
           "currency": "USD"
         },
         "variation_margin": {
@@ -1441,7 +1441,7 @@
           "currency": "USD"
         },
         "total_margin": {
-          "amount": "282055.37836136745",
+          "amount": "281662.10453647043",
           "currency": "USD"
         },
         "position_count": 1,
@@ -1450,15 +1450,15 @@
         "sensitivities": {
           "base_currency": "USD",
           "ir_delta": [
-            ["USD", "10Y", 0.4102728351717815],
+            ["USD", "10Y", 42.19463440636173],
             ["USD", "15Y", 0],
-            ["USD", "1Y", 714.3758721750928],
+            ["USD", "1Y", 25.572854132391512],
             ["USD", "20Y", 0],
-            ["USD", "2Y", 934.1069124125643],
+            ["USD", "2Y", 56.99194235820323],
             ["USD", "30Y", 0],
-            ["USD", "3Y", 1347.4811885973904],
-            ["USD", "5Y", 794.8632092983462],
-            ["USD", "6M", 854.9771528765559]
+            ["USD", "3Y", 136.36431656905916],
+            ["USD", "5Y", 4437.880022332305],
+            ["USD", "6M", -6.485652317409404]
           ],
           "ir_vega": [],
           "credit_qualifying_delta": [],
@@ -1475,7 +1475,7 @@
         },
         "im_breakdown": {
           "IR_Delta": {
-            "amount": "282055.37836136745",
+            "amount": "281662.10453647043",
             "currency": "USD"
           }
         }

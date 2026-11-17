@@ -266,7 +266,14 @@ test('string arrays must be arrays of strings (portfolio metrics)', () => {
 });
 
 test('Rust types reject unknown keys and non-finite numbers in object inputs', () => {
-  const options = { id: 'F', tenor: 0.25, baseDate: '2025-01-01', knots: [0, 0.03, 1, 0.035] };
+  const options = {
+    id: 'F',
+    baseDate: '2025-01-01',
+    knots: [0, 1, 1, Math.exp(-0.035)],
+    dayCount: 'act_360',
+    interp: 'log_linear',
+    extrapolation: 'extend',
+  };
   assert.equal(new core.ForwardCurve(options).id, 'F');
   assert.equal(
     new core.ForwardCurve({ ...options, knots: Float64Array.from(options.knots) }).id,
@@ -358,8 +365,9 @@ test('number arrays must be arrays of numbers or Float64Array', () => {
   assert.throws(() => core.mean([1, , 3]), invalidType('data[1]'));
 
   assert.throws(() => core.mean([1, new Number(2)]), invalidType('data[1]'));
-  assert.ok(Number.isNaN(core.mean([1, Number.NaN])));
-  assert.equal(core.mean([1, Number.POSITIVE_INFINITY]), Number.POSITIVE_INFINITY);
+  assert.throws(() => core.mean([1, Number.NaN]), /finite/);
+  assert.throws(() => core.mean([1, Number.POSITIVE_INFINITY]), /finite/);
+  assert.equal(core.finiteCount([1, Number.NaN, Number.POSITIVE_INFINITY]), 1);
 });
 
 test('analytics numeric policy inputs reject omission, null and wrong types', () => {

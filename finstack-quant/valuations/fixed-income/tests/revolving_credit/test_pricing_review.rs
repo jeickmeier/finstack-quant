@@ -71,6 +71,8 @@ fn test_pricing_recovery_consistency() {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots(vec![(0.0, 1.0), (10.0, (-r * 10.0).exp())])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -79,7 +81,7 @@ fn test_pricing_recovery_consistency() {
     let hazard_curve = HazardCurve::builder("BORROWER-HAZARD")
         .base_date(as_of)
         .day_count(DayCount::Act365F)
-        .knots(vec![(0.0, hazard_rate), (10.0, hazard_rate)])
+        .knots(vec![(10.0, hazard_rate)])
         .recovery_rate(0.40)
         .build()
         .unwrap();
@@ -241,12 +243,50 @@ fn test_floating_rcf_dv01_bumps_forward_curve() {
             (1.0, (-0.04_f64).exp()),
             (5.0, (-0.04_f64 * 5.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let fwd_curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let fwd_curve = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(as_of)
         .day_count(DayCount::Act360)
-        .knots([(0.0, 0.04), (1.0, 0.042), (2.0, 0.044), (5.0, 0.045)])
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.994996932244156),
+            (0.25, 0.98998795756821),
+            (0.375, 0.984973417976586),
+            (0.5, 0.979953654267085),
+            (0.625, 0.9749290059945),
+            (0.75, 0.969899811434621),
+            (0.875, 0.964866407548615),
+            (1.0, 0.959829129947799),
+            (1.125, 0.954788312858801),
+            (1.25, 0.949744289089123),
+            (1.375, 0.944697389993104),
+            (1.5, 0.939647945438284),
+            (1.625, 0.934596283772186),
+            (1.75, 0.929542731789505),
+            (1.875, 0.92448761469972),
+            (2.0, 0.919431256095125),
+            (2.1875, 0.911871808744082),
+            (2.375, 0.904363916135093),
+            (2.5625, 0.896907329033208),
+            (2.75, 0.88950179846074),
+            (2.9375, 0.882147075706763),
+            (3.125, 0.874842912336522),
+            (3.3125, 0.867589060200745),
+            (3.5, 0.860385271444864),
+            (3.6875, 0.853231298518141),
+            (3.875, 0.846126894182699),
+            (4.0625, 0.839071811522465),
+            (4.25, 0.832065803952015),
+            (4.4375, 0.825108625225324),
+            (4.625, 0.818200029444432),
+            (4.8125, 0.811339771068008),
+            (5.0, 0.804527604919828),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -261,6 +301,8 @@ fn test_floating_rcf_dv01_bumps_forward_curve() {
                     0.04,
                 )],
                 None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
             )
             .unwrap(),
         );
@@ -316,6 +358,8 @@ fn test_upfront_fee_excluded_after_commitment() {
         .base_date(after_commitment)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, 0.97)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let market = MarketContext::new().insert(disc_curve);

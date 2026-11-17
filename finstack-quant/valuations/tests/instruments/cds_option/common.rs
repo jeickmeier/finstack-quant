@@ -61,18 +61,20 @@ pub fn flat_discount(id: &str, base: Date, rate: f64) -> DiscountCurve {
                 },
             ],
         })
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
 
 /// Standard flat hazard curve for testing
 pub fn flat_hazard(id: &str, base: Date, recovery: f64, hazard_rate: f64) -> HazardCurve {
-    let par = hazard_rate * 10000.0 * (1.0 - recovery);
     HazardCurve::builder(id)
         .base_date(base)
         .recovery_rate(recovery)
         .knots([(1.0, hazard_rate), (5.0, hazard_rate), (10.0, hazard_rate)])
-        .par_spreads([(1.0, par), (5.0, par), (10.0, par)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap()
 }

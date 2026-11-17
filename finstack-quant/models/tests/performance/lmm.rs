@@ -532,21 +532,46 @@ fn caplet_seed(params: &LmmParams, seed: u64, streams: usize) -> Value {
             max_path_difference = normalized;
             worst = json!({"stream": stream, "candidate_components": actual_values, "reference_components": expected_values, "pv_difference": difference});
         }
-        reference_stats.update(expected_values[3]);
-        candidate_stats.update(actual_values[3]);
-        delta_stats.update(difference);
+        reference_stats
+            .update(expected_values[3])
+            .expect("finite reference PV");
+        candidate_stats
+            .update(actual_values[3])
+            .expect("finite candidate PV");
+        delta_stats.update(difference).expect("finite delta PV");
     }
-    assert!(delta_stats.mean().abs() / NOTIONAL <= 1e-12);
-    assert!(delta_stats.stderr() / NOTIONAL <= 1e-12);
-    assert!(delta_stats.mean().abs() + 4.0 * delta_stats.stderr() <= 1e-11 * NOTIONAL);
-    if reference_stats.stderr() == 0.0 {
-        assert_eq!(
-            candidate_stats.mean().to_bits(),
-            reference_stats.mean().to_bits()
-        );
+    let ref_mean = reference_stats
+        .get_mean()
+        .expect("finite ref mean")
+        .expect("non-empty");
+    let ref_stderr = reference_stats
+        .get_stderr()
+        .expect("finite ref stderr")
+        .expect("at least 2 streams");
+    let cand_mean = candidate_stats
+        .get_mean()
+        .expect("finite cand mean")
+        .expect("non-empty");
+    let cand_stderr = candidate_stats
+        .get_stderr()
+        .expect("finite cand stderr")
+        .expect("at least 2 streams");
+    let delta_mean = delta_stats
+        .get_mean()
+        .expect("finite delta mean")
+        .expect("non-empty");
+    let delta_stderr = delta_stats
+        .get_stderr()
+        .expect("finite delta stderr")
+        .expect("at least 2 streams");
+    assert!(delta_mean.abs() / NOTIONAL <= 1e-12);
+    assert!(delta_stderr / NOTIONAL <= 1e-12);
+    assert!(delta_mean.abs() + 4.0 * delta_stderr <= 1e-11 * NOTIONAL);
+    if ref_stderr == 0.0 {
+        assert_eq!(cand_mean.to_bits(), ref_mean.to_bits());
         assert_eq!(max_path_difference, 0.0);
     } else {
-        assert!(delta_stats.mean().abs() <= 0.01 * reference_stats.stderr());
+        assert!(delta_mean.abs() <= 0.01 * ref_stderr);
     }
     let mut grid_hash = Fingerprint::new();
     grid_hash.values(grid.times());
@@ -556,9 +581,9 @@ fn caplet_seed(params: &LmmParams, seed: u64, streams: usize) -> Value {
         "parameters_fingerprint": json_fingerprint(params), "grid_fingerprint": grid_hash.finish(),
         "innovations_fingerprint": innovations_hash.finish(),
         "reference_components_fingerprint": original_hash.finish(), "candidate_components_fingerprint": candidate_hash.finish(),
-        "reference_mean": reference_stats.mean(), "reference_stderr": reference_stats.stderr(),
-        "candidate_mean": candidate_stats.mean(), "candidate_stderr": candidate_stats.stderr(),
-        "paired_mean_delta": delta_stats.mean(), "paired_delta_stderr": delta_stats.stderr(),
+        "reference_mean": ref_mean, "reference_stderr": ref_stderr,
+        "candidate_mean": cand_mean, "candidate_stderr": cand_stderr,
+        "paired_mean_delta": delta_mean, "paired_delta_stderr": delta_stderr,
         "max_path_pv_difference_per_notional": max_path_difference, "worst": worst,
     })
 }

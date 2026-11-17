@@ -19,12 +19,17 @@
 //! # Usage
 //!
 //! ```rust
-//! use finstack_quant_core::market_data::surfaces::VolSurface;
+//! use finstack_quant_core::market_data::surfaces::{
+//!     VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+//! };
 //! use finstack_quant_models::volatility::arbitrage::{check_surface, ArbitrageCheckConfig};
 //!
 //! let surface = VolSurface::builder("TEST")
 //!     .expiries(&[0.5, 1.0, 2.0])
-//!     .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
+//!     .secondary_values(&[80.0, 90.0, 100.0, 110.0, 120.0])
+//!     .secondary_axis(VolSurfaceAxis::Strike)
+//!     .quote_type(VolQuoteType::BlackLognormal)
+//!     .interpolation_mode(VolInterpolationMode::Vol)
 //!     .row(&[0.30, 0.25, 0.20, 0.22, 0.28])
 //!     .row(&[0.28, 0.24, 0.19, 0.21, 0.26])
 //!     .row(&[0.26, 0.22, 0.18, 0.20, 0.24])
@@ -271,7 +276,10 @@ fn surface_from_rows(
 ) -> finstack_quant_core::Result<VolSurface> {
     VolSurface::builder("surface-grid")
         .expiries(expiries)
-        .strikes(strikes)
+        .secondary_values(strikes)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol)
         .rows(vols)
         .build()
 }
@@ -420,7 +428,12 @@ mod tests {
     fn flat_surface() -> VolSurface {
         VolSurface::builder("FLAT-20")
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
+            .secondary_values(&[80.0, 90.0, 100.0, 110.0, 120.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             .row(&[0.20, 0.20, 0.20, 0.20, 0.20])
             .row(&[0.20, 0.20, 0.20, 0.20, 0.20])
             .row(&[0.20, 0.20, 0.20, 0.20, 0.20])
@@ -435,7 +448,12 @@ mod tests {
     fn clean_smile_surface() -> VolSurface {
         VolSurface::builder("CLEAN-SMILE")
             .expiries(&[0.5, 1.0, 2.0])
-            .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
+            .secondary_values(&[80.0, 90.0, 100.0, 110.0, 120.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             .row(&[0.35, 0.27, 0.20, 0.27, 0.35])
             .row(&[0.33, 0.26, 0.20, 0.26, 0.33])
             .row(&[0.31, 0.25, 0.20, 0.25, 0.31])
@@ -448,7 +466,12 @@ mod tests {
     fn butterfly_violation_surface() -> VolSurface {
         VolSurface::builder("BUTTERFLY-BAD")
             .expiries(&[0.5, 1.0])
-            .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
+            .secondary_values(&[80.0, 90.0, 100.0, 110.0, 120.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             .row(&[0.30, 0.25, 0.20, 0.25, 0.30]) // T=0.5 clean
             .row(&[0.22, 0.25, 0.30, 0.25, 0.22]) // T=1.0 concave in total var
             .build()
@@ -462,7 +485,12 @@ mod tests {
         // T=2.0: vol = 0.15 -> total var = 0.045 < 0.0625 => violation
         VolSurface::builder("CALENDAR-BAD")
             .expiries(&[0.5, 1.0, 2.0])
-            .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
+            .secondary_values(&[80.0, 90.0, 100.0, 110.0, 120.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             .row(&[0.30, 0.25, 0.20, 0.25, 0.30])
             .row(&[0.30, 0.25, 0.25, 0.25, 0.30]) // T=1.0 higher vol
             .row(&[0.20, 0.15, 0.15, 0.15, 0.20]) // T=2.0 much lower vol
@@ -700,7 +728,12 @@ mod tests {
     fn single_expiry_surface_no_calendar_violations() {
         let surface = VolSurface::builder("SINGLE-EXP")
             .expiries(&[1.0])
-            .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
+            .secondary_values(&[80.0, 90.0, 100.0, 110.0, 120.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             .row(&[0.30, 0.25, 0.20, 0.25, 0.30])
             .build()
             .expect("single expiry surface should build");
@@ -724,7 +757,12 @@ mod tests {
     fn two_strikes_no_butterfly_violations() {
         let surface = VolSurface::builder("TWO-STRIKES")
             .expiries(&[1.0, 2.0])
-            .strikes(&[90.0, 110.0])
+            .secondary_values(&[90.0, 110.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             .row(&[0.25, 0.25])
             .row(&[0.24, 0.24])
             .build()

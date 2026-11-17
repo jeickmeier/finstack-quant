@@ -229,7 +229,7 @@ fn sum_by_period<T: HasDate>(
         per_currency.clear();
         while flow_idx < n && sorted[flow_idx].flow_date() < p.end {
             let (ccy, amount) = value(flow_idx, &sorted[flow_idx])?;
-            per_currency.entry(ccy).or_default().add(amount);
+            per_currency.entry(ccy).or_default().add(amount)?;
             flow_idx += 1;
         }
         if per_currency.is_empty() {
@@ -238,7 +238,7 @@ fn sum_by_period<T: HasDate>(
 
         let mut result: IndexMap<Currency, Money> = IndexMap::with_capacity(per_currency.len());
         for (&ccy, acc) in &per_currency {
-            result.insert(ccy, Money::new(acc.total(), ccy)?);
+            result.insert(ccy, Money::new(acc.get_total()?, ccy)?);
         }
         out.insert(p.id, result);
     }
@@ -583,24 +583,24 @@ pub(crate) fn calendar_year_ladder_rows(
             ]
         });
         if kind.is_principal_like() {
-            slot[1].add(amount);
+            slot[1].add(amount)?;
         } else {
-            slot[0].add(amount);
+            slot[0].add(amount)?;
         }
-        slot[2].add(pv);
+        slot[2].add(pv)?;
     }
 
-    Ok(by_year
+    by_year
         .into_iter()
-        .map(
-            |(year, [non_principal, principal, pv])| CalendarYearLadderRow {
+        .map(|(year, [non_principal, principal, pv])| {
+            Ok(CalendarYearLadderRow {
                 year,
-                non_principal: non_principal.total(),
-                principal: principal.total(),
-                pv: pv.total(),
-            },
-        )
-        .collect())
+                non_principal: non_principal.get_total()?,
+                principal: principal.get_total()?,
+                pv: pv.get_total()?,
+            })
+        })
+        .collect()
 }
 
 /// Survival-weighted settlement PV, excluding any estimated principal recovery.
@@ -694,7 +694,7 @@ fn lot_recovery_pv(
         let dq = default_mass(q0, q1)?;
         let t1 = curve_dc.signed_year_fraction(curve_base, d1, curve_ctx)?;
         if dq > 0.0 {
-            let df_mid = curve.df(0.5 * (t0 + t1));
+            let df_mid = curve.df(0.5 * (t0 + t1))?;
             if !df_mid.is_finite() || df_mid <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "Invalid discount factor at midpoint before {d1}: {df_mid}"
@@ -706,12 +706,12 @@ fn lot_recovery_pv(
                     "Invalid relative discount factor before {d1}: {rel_df}"
                 )));
             }
-            acc.add(amount * rel_df * dq);
+            acc.add(amount * rel_df * dq)?;
         }
         q0 = q1;
         t0 = t1;
     }
-    Ok(acc.total())
+    acc.get_total()
 }
 
 /// Present values of a complete cashflow stream under default-time recovery.
@@ -810,7 +810,7 @@ pub fn credit_adjusted_cashflow_pvs(
                 as_of,
                 curve.day_count_context(),
             )?;
-            let df_as_of = curve.df(t_as_of);
+            let df_as_of = curve.df(t_as_of)?;
             if !df_as_of.is_finite() || df_as_of <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "Invalid discount factor on 'from' date ({as_of}): {df_as_of}"
@@ -820,9 +820,9 @@ pub fn credit_adjusted_cashflow_pvs(
             for &(start, amount) in lots {
                 row_acc.add(lot_recovery_pv(
                     start, amount, pay_date, curve, df_as_of, hazard, as_of,
-                )?);
+                )?)?;
             }
-            pvs[index] += recovery * row_acc.total();
+            pvs[index] += recovery * row_acc.get_total()?;
         }
     }
     Ok(pvs)
@@ -911,12 +911,12 @@ where
             date,
             finstack_quant_core::dates::DayCountContext::default(),
         )?;
-        weighted.add(amount.amount() * years);
-        total.add(amount.amount());
+        weighted.add(amount.amount() * years)?;
+        total.add(amount.amount())?;
     }
-    let principal_total = total.total();
+    let principal_total = total.get_total()?;
     Ok(if principal_total > 0.0 {
-        weighted.total() / principal_total
+        weighted.get_total()? / principal_total
     } else {
         0.0
     })
@@ -1042,7 +1042,7 @@ fn funded_principal(
             }
             if cf.get_date() > base && repayment > 0.0 {
                 repayments.push((index, repayment));
-                opening.add(repayment);
+                opening.add(repayment)?;
             }
         }
         if repayments.is_empty() {
@@ -1056,7 +1056,7 @@ fn funded_principal(
                 .filter(|&(_, amount)| amount > 0.0),
         );
         for &(_, increase) in &increases {
-            opening.add(-increase);
+            opening.add(-increase)?;
         }
         increases.sort_by_key(|&(date, _)| date);
         repayments.sort_by_key(|&(index, _)| cashflows[index].get_date());
@@ -1065,15 +1065,16 @@ fn funded_principal(
             .map(|&(_, amount)| amount)
             .fold(1.0, f64::max);
         let tolerance = scale * 1e-12;
-        if opening.total() < -tolerance {
+        let opening_total = opening.get_total()?;
+        if opening_total < -tolerance {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "future {currency} funding exceeds remaining principal repayments; \
                  recovery requires a complete principal stream"
             )));
         }
         let mut lots = std::collections::VecDeque::new();
-        if opening.total() > 0.0 {
-            lots.push_back((base, opening.total()));
+        if opening_total > 0.0 {
+            lots.push_back((base, opening_total));
         }
         lots.extend(increases);
         for (index, mut remaining) in repayments {
@@ -1314,12 +1315,15 @@ mod period_contract_tests {
         fn base_date(&self) -> Date {
             self.base
         }
-        fn df(&self, _t: f64) -> f64 {
-            1.0
+        fn df(&self, _t: f64) -> finstack_quant_core::Result<f64> {
+            Ok(1.0)
+        }
+        fn instantaneous_forward(&self, _t: f64) -> finstack_quant_core::Result<f64> {
+            Ok(0.0)
         }
     }
 
-    /// Discount curve that returns NaN for any positive time point.
+    /// Non-conforming discount curve that returns NaN for any positive time point.
     struct NanDiscount {
         base: Date,
     }
@@ -1333,8 +1337,11 @@ mod period_contract_tests {
         fn base_date(&self) -> Date {
             self.base
         }
-        fn df(&self, t: f64) -> f64 {
-            if t > 0.0 { f64::NAN } else { 1.0 }
+        fn df(&self, t: f64) -> finstack_quant_core::Result<f64> {
+            Ok(if t > 0.0 { f64::NAN } else { 1.0 })
+        }
+        fn instantaneous_forward(&self, _t: f64) -> finstack_quant_core::Result<f64> {
+            Ok(f64::NAN)
         }
     }
 
@@ -1590,8 +1597,11 @@ mod credit_pv_tests {
         fn base_date(&self) -> Date {
             self.base
         }
-        fn df(&self, _t: f64) -> f64 {
-            1.0
+        fn df(&self, _t: f64) -> finstack_quant_core::Result<f64> {
+            Ok(1.0)
+        }
+        fn instantaneous_forward(&self, _t: f64) -> finstack_quant_core::Result<f64> {
+            Ok(0.0)
         }
     }
 
@@ -1599,11 +1609,19 @@ mod credit_pv_tests {
         let t = DayCount::Act365F
             .year_fraction(base, target, DayCountContext::default())
             .expect("valid year fraction");
-        HazardCurve::from_survival_probs("hzd", base, &[(t, sp)], 0.4).expect("valid hazard curve")
+        HazardCurve::from_survival_probs("hzd", base, &[(t, sp)], 0.4, DayCount::Act365F)
+            .expect("valid hazard curve")
     }
 
     fn annual_survival(base: Date) -> HazardCurve {
-        HazardCurve::flat("annual-survival", base, -0.8_f64.ln(), 0.4).expect("valid hazard curve")
+        HazardCurve::flat(
+            "annual-survival",
+            base,
+            -0.8_f64.ln(),
+            0.4,
+            DayCount::Act365F,
+        )
+        .expect("valid hazard curve")
     }
 
     fn make_period(base: Date, end: Date) -> Period {
@@ -1704,8 +1722,12 @@ mod credit_pv_tests {
                 self.base
             }
 
-            fn df(&self, t: f64) -> f64 {
-                (-0.05 * t).exp()
+            fn df(&self, t: f64) -> finstack_quant_core::Result<f64> {
+                Ok((-0.05 * t).exp())
+            }
+
+            fn instantaneous_forward(&self, _t: f64) -> finstack_quant_core::Result<f64> {
+                Ok(0.05)
             }
         }
 
@@ -1969,9 +1991,14 @@ mod credit_pv_tests {
         let t2 = 334.0 / 365.0; // 2025-01-01 → 2025-12-01
         let sp1 = 1.0 - 0.1 * t1;
         let sp2 = 1.0 - 0.1 * t2;
-        let hazard =
-            HazardCurve::from_survival_probs("hzd-linear", base, &[(t1, sp1), (t2, sp2)], 0.4)
-                .expect("valid hazard curve");
+        let hazard = HazardCurve::from_survival_probs(
+            "hzd-linear",
+            base,
+            &[(t1, sp1), (t2, sp2)],
+            0.4,
+            DayCount::Act365F,
+        )
+        .expect("valid hazard curve");
         let flows = vec![
             flow(d(2025, 6, 1), -500_000.0, CFKind::Notional),
             flow(d(2025, 12, 1), 500_000.0, CFKind::Amortization),

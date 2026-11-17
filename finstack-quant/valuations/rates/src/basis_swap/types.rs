@@ -416,9 +416,9 @@ impl BasisSwap {
                     continue;
                 }
                 let df = disc.as_ref().df_between_dates(as_of, flow.get_date())?;
-                acc.add(flow.get_amount().amount() * df);
+                acc.add(flow.get_amount().amount() * df)?;
             }
-            return Money::from_model_value(acc.total(), currency);
+            return Money::from_model_value(acc.get_total()?, currency);
         }
         let fwd = market.get_forward(&leg.forward_curve_id)?;
 
@@ -472,10 +472,10 @@ impl BasisSwap {
                 * (index_rate + spread_bp * finstack_quant_core::math::units::ONE_BASIS_POINT)
                 * period.accrual_year_fraction;
             let df = disc.as_ref().df_between_dates(as_of, period.payment_date)?;
-            acc.add(coupon * df);
+            acc.add(coupon * df)?;
         }
 
-        Money::from_model_value(acc.total(), currency)
+        Money::from_model_value(acc.get_total()?, currency)
     }
 
     /// Calculates the discounted accrual sum (annuity) for a leg.
@@ -838,20 +838,27 @@ mod tests {
         let discount_curve = DiscountCurve::builder("OIS")
             .base_date(base_date)
             .knots(vec![(0.0, 1.0), (1.0, 0.98), (2.0, 0.96)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("should succeed");
 
-        let forward_3m = ForwardCurve::builder("3M-SOFR", 0.25)
-            .base_date(base_date)
-            .knots(vec![(0.0, 0.03), (1.0, 0.03), (2.0, 0.03)])
-            .build()
-            .expect("should succeed");
+        let forward_3m = ForwardCurve::flat(
+            "3M-SOFR",
+            base_date,
+            0.03,
+            finstack_quant_core::dates::DayCount::Act360,
+        )
+        .expect("should succeed");
 
-        let forward_6m = ForwardCurve::builder("6M-SOFR", 0.5)
-            .base_date(base_date)
-            .knots(vec![(0.0, 0.0305), (1.0, 0.0305), (2.0, 0.0305)])
-            .build()
-            .expect("should succeed");
+        let forward_6m = ForwardCurve::flat(
+            "6M-SOFR",
+            base_date,
+            0.0305,
+            finstack_quant_core::dates::DayCount::Act360,
+        )
+        .expect("should succeed");
 
         // Create context
         let context = MarketContext::new()
@@ -928,18 +935,25 @@ mod tests {
         let discount_curve = DiscountCurve::builder("OIS")
             .base_date(base_date)
             .knots(vec![(0.0, 1.0), (1.0, 0.99)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("should succeed");
-        let forward_3m = ForwardCurve::builder("3M-SOFR", 0.25)
-            .base_date(base_date)
-            .knots(vec![(0.0, 0.03), (1.0, 0.03)])
-            .build()
-            .expect("should succeed");
-        let forward_6m = ForwardCurve::builder("6M-SOFR", 0.5)
-            .base_date(base_date)
-            .knots(vec![(0.0, 0.03), (1.0, 0.03)])
-            .build()
-            .expect("should succeed");
+        let forward_3m = ForwardCurve::flat(
+            "3M-SOFR",
+            base_date,
+            0.03,
+            finstack_quant_core::dates::DayCount::Act360,
+        )
+        .expect("should succeed");
+        let forward_6m = ForwardCurve::flat(
+            "6M-SOFR",
+            base_date,
+            0.03,
+            finstack_quant_core::dates::DayCount::Act360,
+        )
+        .expect("should succeed");
 
         let context = MarketContext::new()
             .insert(discount_curve)
@@ -1008,19 +1022,26 @@ mod tests {
         let discount_curve = DiscountCurve::builder("OIS")
             .base_date(base_date)
             .knots(vec![(0.0, 1.0), (1.0, 0.90), (2.0, 0.82)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("should succeed");
 
-        let forward_3m = ForwardCurve::builder("3M-SOFR", 0.25)
-            .base_date(base_date)
-            .knots(vec![(0.0, 0.03), (1.0, 0.03), (2.0, 0.03)])
-            .build()
-            .expect("should succeed");
-        let forward_6m = ForwardCurve::builder("6M-SOFR", 0.5)
-            .base_date(base_date)
-            .knots(vec![(0.0, 0.03), (1.0, 0.03), (2.0, 0.03)])
-            .build()
-            .expect("should succeed");
+        let forward_3m = ForwardCurve::flat(
+            "3M-SOFR",
+            base_date,
+            0.03,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("should succeed");
+        let forward_6m = ForwardCurve::flat(
+            "6M-SOFR",
+            base_date,
+            0.03,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("should succeed");
 
         let context = MarketContext::new()
             .insert(discount_curve)
@@ -1207,13 +1228,18 @@ mod tests {
         let discount_curve = DiscountCurve::builder("OIS")
             .base_date(base_date)
             .knots(vec![(0.0, 1.0), (1.0, 0.98)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("should succeed");
-        let forward = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-            .base_date(base_date)
-            .knots(vec![(0.0, 0.03), (1.0, 0.03)])
-            .build()
-            .expect("should succeed");
+        let forward = ForwardCurve::flat(
+            "USD-SOFR-3M",
+            base_date,
+            0.03,
+            finstack_quant_core::dates::DayCount::Act360,
+        )
+        .expect("should succeed");
 
         let context = MarketContext::new().insert(discount_curve).insert(forward);
 
@@ -1274,20 +1300,33 @@ mod tests {
         let discount_curve = DiscountCurve::builder("OIS")
             .base_date(base_date)
             .knots(vec![(0.0, 1.0), (1.0, 0.97), (2.0, 0.94), (3.0, 0.91)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("should succeed");
 
-        let forward_3m = ForwardCurve::builder("3M-SOFR", 0.25)
-            .base_date(base_date)
-            .knots(vec![(0.0, 0.030), (1.0, 0.032), (2.0, 0.034)])
-            .build()
-            .expect("should succeed");
+        let forward_3m = ForwardCurve::from_zero_rates(
+            "3M-SOFR",
+            base_date,
+            &[(0.0, 0.030), (1.0, 0.032), (2.0, 0.034)],
+            finstack_quant_core::math::Compounding::Continuous,
+            finstack_quant_core::dates::DayCount::Act360,
+            finstack_quant_core::math::interp::InterpStyle::LogLinear,
+            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+        )
+        .expect("should succeed");
 
-        let forward_6m = ForwardCurve::builder("6M-SOFR", 0.5)
-            .base_date(base_date)
-            .knots(vec![(0.0, 0.031), (1.0, 0.033), (2.0, 0.035)])
-            .build()
-            .expect("should succeed");
+        let forward_6m = ForwardCurve::from_zero_rates(
+            "6M-SOFR",
+            base_date,
+            &[(0.0, 0.031), (1.0, 0.033), (2.0, 0.035)],
+            finstack_quant_core::math::Compounding::Continuous,
+            finstack_quant_core::dates::DayCount::Act360,
+            finstack_quant_core::math::interp::InterpStyle::LogLinear,
+            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+        )
+        .expect("should succeed");
 
         let context = MarketContext::new()
             .insert(discount_curve)
@@ -1487,18 +1526,25 @@ mod tests {
         let discount_curve = DiscountCurve::builder("OIS")
             .base_date(base_date)
             .knots(vec![(0.0, 1.0), (1.0, 0.98), (2.0, 0.96)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("should succeed");
-        let forward_3m = ForwardCurve::builder("3M-SOFR", 0.25)
-            .base_date(base_date)
-            .knots(vec![(0.0, 0.03), (1.0, 0.03), (2.0, 0.03)])
-            .build()
-            .expect("should succeed");
-        let forward_6m = ForwardCurve::builder("6M-SOFR", 0.5)
-            .base_date(base_date)
-            .knots(vec![(0.0, 0.031), (1.0, 0.031), (2.0, 0.031)])
-            .build()
-            .expect("should succeed");
+        let forward_3m = ForwardCurve::flat(
+            "3M-SOFR",
+            base_date,
+            0.03,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("should succeed");
+        let forward_6m = ForwardCurve::flat(
+            "6M-SOFR",
+            base_date,
+            0.031,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("should succeed");
         let context = MarketContext::new()
             .insert(discount_curve)
             .insert(forward_3m)
@@ -1558,18 +1604,25 @@ mod tests {
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(start)
             .knots(vec![(0.0, 1.0), (1.0, 0.96)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount");
-        let ois = ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 365.0)
-            .base_date(start)
-            .knots(vec![(0.0, 0.04), (1.0, 0.04)])
-            .build()
-            .expect("ois forward");
-        let term = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-            .base_date(start)
-            .knots(vec![(0.0, 0.041), (1.0, 0.041)])
-            .build()
-            .expect("term forward");
+        let ois = ForwardCurve::flat(
+            "USD-SOFR-OIS",
+            start,
+            0.04,
+            finstack_quant_core::dates::DayCount::Act360,
+        )
+        .expect("ois forward");
+        let term = ForwardCurve::flat(
+            "USD-SOFR-3M",
+            start,
+            0.041,
+            finstack_quant_core::dates::DayCount::Act360,
+        )
+        .expect("term forward");
         let market = MarketContext::new()
             .insert(disc)
             .insert(ois.clone())
@@ -1678,18 +1731,28 @@ mod tests {
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(start)
             .knots(vec![(0.0, 1.0), (1.0, 0.96)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount");
-        let ois = ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 365.0)
-            .base_date(start)
-            .knots(vec![(0.0, 0.04), (1.0, 0.08)])
-            .build()
-            .expect("ois forward");
-        let term = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-            .base_date(start)
-            .knots(vec![(0.0, 0.041), (1.0, 0.041)])
-            .build()
-            .expect("term forward");
+        let ois = ForwardCurve::from_zero_rates(
+            "USD-SOFR-OIS",
+            start,
+            &[(0.0, 0.04), (1.0, 0.08)],
+            finstack_quant_core::math::Compounding::Continuous,
+            finstack_quant_core::dates::DayCount::Act360,
+            finstack_quant_core::math::interp::InterpStyle::LogLinear,
+            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+        )
+        .expect("ois forward");
+        let term = ForwardCurve::flat(
+            "USD-SOFR-3M",
+            start,
+            0.041,
+            finstack_quant_core::dates::DayCount::Act360,
+        )
+        .expect("term forward");
         let market = MarketContext::new()
             .insert(disc)
             .insert(ois.clone())
@@ -1795,18 +1858,25 @@ mod tests {
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(start)
             .knots(vec![(0.0, 1.0), (1.0, 0.96)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount");
-        let ois = ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 365.0)
-            .base_date(start)
-            .knots(vec![(0.0, 0.04), (1.0, 0.04)])
-            .build()
-            .expect("ois forward");
-        let term = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-            .base_date(start)
-            .knots(vec![(0.0, 0.041), (1.0, 0.041)])
-            .build()
-            .expect("term forward");
+        let ois = ForwardCurve::flat(
+            "USD-SOFR-OIS",
+            start,
+            0.04,
+            finstack_quant_core::dates::DayCount::Act360,
+        )
+        .expect("ois forward");
+        let term = ForwardCurve::flat(
+            "USD-SOFR-3M",
+            start,
+            0.041,
+            finstack_quant_core::dates::DayCount::Act360,
+        )
+        .expect("term forward");
         let market = MarketContext::new().insert(disc).insert(ois).insert(term);
         let primary = FloatLegSpec {
             end_of_month: false,

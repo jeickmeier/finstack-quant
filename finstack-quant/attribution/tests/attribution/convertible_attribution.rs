@@ -114,6 +114,8 @@ fn market_with_rate(credit_spread_bp: f64, rf: f64) -> MarketContext {
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, (-rf).exp()), (10.0, (-rf * 10.0).exp())])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let credit_curve = super::attribution_support::calibrated_hazard_curve(
@@ -134,9 +136,15 @@ fn market_with_rate(credit_spread_bp: f64, rf: f64) -> MarketContext {
         .insert(credit_curve)
         // Spot well below the $100 conversion price → bond-like, so the credit
         // factor is material rather than swamped by equity optionality.
-        .insert_price("AAPL", MarketScalar::Unitless(50.0))
-        .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
-        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02))
+        .insert_price("AAPL", MarketScalar::unitless(50.0).expect("valid scalar"))
+        .insert_price(
+            "AAPL-VOL",
+            MarketScalar::unitless(0.25).expect("valid scalar"),
+        )
+        .insert_price(
+            "AAPL-DIVYIELD",
+            MarketScalar::unitless(0.02).expect("valid scalar"),
+        )
 }
 
 /// Taylor attribution must explain a convertible-bond credit-spread move.

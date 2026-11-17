@@ -8,6 +8,7 @@
         0.25
       ],
       "attributes": {},
+      "cms_fixing_index_id": "USD-CMS-10Y",
       "cms_tenor": {
         "count": 10,
         "unit": "years"

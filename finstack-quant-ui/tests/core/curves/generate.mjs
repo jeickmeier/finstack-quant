@@ -2,20 +2,19 @@ import { emit } from "../../../scripts/fixture-output.mjs";
 import { native } from "../../../scripts/fixture-inputs.mjs";
 import { pricingCases } from "../../browser/cases.mjs";
 const market = JSON.parse((await pricingCases()).bond.marketJson);
-const base = {
-  base: "2025-01-01",
-  day_count: "act_365f",
-  interp_style: "linear",
-  extrapolation: "flat_forward",
-};
+const base = { base: "2025-01-01", day_count: "act_365f" };
+// Factor curves (discount, forward projection factors, CPI) use a log-space
+// style whose extended tail holds the last forward rate; price curves hold the
+// boundary value.
+const factor = { interp_style: "log_linear", extrapolation: "extend" };
+const level = { interp_style: "linear", extrapolation: "flat" };
 // Explicit representation fixtures. Native Market validates and serializes them; no samples are evaluated.
 market.curves.push(
   {
     ...base,
+    ...factor,
     type: "discount",
     id: "OVERLAY",
-    allow_non_monotonic: false,
-    min_forward_tenor: 0.0001,
     knot_points: [
       [0, 1],
       [1, 0.9512345678901234],
@@ -24,23 +23,22 @@ market.curves.push(
   },
   {
     ...base,
+    ...factor,
     type: "forward",
     id: "FORWARD",
-    reset_lag: 2,
-    tenor: 0.25,
+    index_tenor: { count: 3, unit: "months" },
     knot_points: [
-      [0, 0.044],
-      [1, 0.041],
-      [5, 0.039],
+      [0, 1],
+      [1, 0.9579],
+      [5, 0.8228],
     ],
   },
   {
+    ...factor,
     type: "inflation",
     id: "CPI",
     base_date: base.base,
-    base_cpi: 300,
-    interp_style: "linear",
-    extrapolation: "flat_forward",
+    day_count: base.day_count,
     knot_points: [
       [0, 300],
       [1, 307.5],
@@ -74,17 +72,9 @@ market.curves.push(
         [5, 20],
       ],
     },
-    {
-      type: "basis_spread",
-      id: "BASIS_SPREAD",
-      knot_points: [
-        [0, -0.001],
-        [1, -0.0012],
-        [5, -0.0015],
-      ],
-    },
   ].map((curve) => ({
     ...base,
+    ...level,
     ...curve,
   })),
   {
@@ -92,7 +82,6 @@ market.curves.push(
     id: "NS",
     base_date: base.base,
     day_count: base.day_count,
-    time_offset: 0.0,
     model: {
       variant: "ns",
       beta0: 0.04,
@@ -115,5 +104,5 @@ try {
   state.free();
 }
 console.log(
-  "Retained native-validated state for all eight curve storage types.",
+  "Retained native-validated state for all seven curve storage types.",
 );

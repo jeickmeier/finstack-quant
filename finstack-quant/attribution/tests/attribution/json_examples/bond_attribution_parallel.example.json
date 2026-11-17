@@ -49,7 +49,7 @@
       "fx_delta_vol_surfaces": [],
       "vol_cubes": [],
       "hierarchy": {
-        "roots": {}
+        "roots": []
       }
     },
     "market_t1": {
@@ -65,7 +65,7 @@
       "fx_delta_vol_surfaces": [],
       "vol_cubes": [],
       "hierarchy": {
-        "roots": {}
+        "roots": []
       }
     },
     "as_of_t0": "2025-01-15",

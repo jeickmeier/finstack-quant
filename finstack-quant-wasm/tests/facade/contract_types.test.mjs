@@ -226,10 +226,7 @@ const OIS_MARKET = {
         [2.0, 0.92],
       ],
       interp_style: 'monotone_convex',
-      extrapolation: 'flat_forward',
-      min_forward_rate: -0.005,
-      allow_non_monotonic: false,
-      min_forward_tenor: 1e-6,
+      extrapolation: 'extend',
       rate_calibration: null,
       fx_policy: null,
     },
@@ -371,8 +368,10 @@ test('namespace results match their published result types', () => {
     baseDate: '2025-01-01',
     knots: [0.0, 1.0, 4.0, 1.0],
     interp: 'log_linear',
+    extrapolation: 'extend',
+    dayCount: 'act_365f',
   });
-  const hazard = core.HazardCurve.flat('HZ', '2025-01-01', 0.02, 0.4);
+  const hazard = core.HazardCurve.flat('HZ', '2025-01-01', 0.02, 0.4, 'act_365f');
   try {
     const xva = margin.computeBilateralXva(
       JSON.stringify({ times: [1.0, 2.0], mtm_values: [1e6, 1e6], epe: [1e6, 1e6], ene: [0, 0] }),

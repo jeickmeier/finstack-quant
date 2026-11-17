@@ -1076,7 +1076,7 @@ impl PyPriceDatum {
     ) -> PyResult<Self> {
         let scalar = match currency {
             Some(currency) => {
-                MarketScalar::Price(money_from_amount(value, extract_currency(currency)?)?)
+                MarketScalar::price(money_from_amount(value, extract_currency(currency)?)?)
             }
             None => MarketScalar::unitless(extract_f64(value, "value")?).map_err(core_to_py)?,
         };
@@ -1097,19 +1097,24 @@ impl PyPriceDatum {
     /// Spot value: ``float`` when unitless, lossless ``Decimal`` for a monetary price.
     #[getter]
     fn value(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        match &self.inner.scalar {
-            MarketScalar::Unitless(value) => value.into_py_any(py),
-            MarketScalar::Price(money) => Ok(decimal_to_py(py, money.amount_decimal())?.unbind()),
+        if let Some(money) = self.inner.scalar.get_price() {
+            Ok(decimal_to_py(py, money.amount_decimal())?.unbind())
+        } else if let Some(value) = self.inner.scalar.get_unitless() {
+            value.into_py_any(py)
+        } else {
+            Err(crate::errors::value_error(
+                "PriceDatum scalar must be unitless or monetary",
+            ))
         }
     }
 
     /// Currency code of a monetary price; ``None`` when unitless.
     #[getter]
     fn currency(&self) -> Option<String> {
-        match &self.inner.scalar {
-            MarketScalar::Unitless(_) => None,
-            MarketScalar::Price(money) => Some(money.currency().to_string()),
-        }
+        self.inner
+            .scalar
+            .get_price()
+            .map(|money| money.currency().to_string())
     }
 
     fn __repr__(&self) -> String {

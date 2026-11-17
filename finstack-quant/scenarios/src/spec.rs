@@ -46,13 +46,11 @@ use serde::{Deserialize, Serialize};
 ///   to determine merge ordering (lower numbers run first).
 /// - `resolution_mode`: Controls how hierarchy-targeted shocks at multiple tree
 ///   levels combine for a single curve. Defaults to [`ResolutionMode::MostSpecificWins`].
-/// - `hazard_bump_mode`: ParCDS delivery. Defaults to
-///   [`HazardBumpMode::SolveToPar`].
 ///
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_scenarios::{HazardBumpMode, ScenarioSpec, OperationSpec, CurveKind};
+/// use finstack_quant_scenarios::{ScenarioSpec, OperationSpec, CurveKind};
 /// use finstack_quant_core::market_data::hierarchy::ResolutionMode;
 ///
 /// let scenario = ScenarioSpec {
@@ -69,7 +67,6 @@ use serde::{Deserialize, Serialize};
 ///     ],
 ///     priority: 0,
 ///     resolution_mode: ResolutionMode::default(),
-///     hazard_bump_mode: HazardBumpMode::default(),
 /// };
 /// ```
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -100,38 +97,6 @@ pub struct ScenarioSpec {
     /// Default: [`ResolutionMode::MostSpecificWins`].
     #[serde(default)]
     pub resolution_mode: ResolutionMode,
-
-    /// How ParCDS curve operations rewrite hazard curves.
-    ///
-    /// Default: [`HazardBumpMode::SolveToPar`]. Omitted from JSON when left
-    /// at that default so existing envelopes keep their wire shape.
-    #[serde(default, skip_serializing_if = "HazardBumpMode::is_solve_to_par")]
-    pub hazard_bump_mode: HazardBumpMode,
-}
-
-/// How ParCDS operations deliver a spread shock onto a hazard curve.
-///
-/// [`Self::SolveToPar`] is the production default: implied par CDS spreads are
-/// shocked and the hazard is re-bootstrapped so the curve still prices those
-/// quotes. [`Self::FirstOrderShift`] converts the spread shock to a hazard
-/// shift using `delta_hazard = delta_spread / (1 - recovery)` and emits an
-/// approximation warning. It does not reconcile the resulting par quotes.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum HazardBumpMode {
-    /// Shock implied par CDS spreads and re-bootstrap the hazard curve.
-    #[default]
-    SolveToPar,
-    /// Convert spread to hazard using loss given default, without exact par repricing.
-    FirstOrderShift,
-}
-
-impl HazardBumpMode {
-    /// Whether this is the serde-default solve-to-par delivery.
-    const fn is_solve_to_par(&self) -> bool {
-        matches!(self, Self::SolveToPar)
-    }
 }
 
 impl ScenarioSpec {
@@ -141,8 +106,8 @@ impl ScenarioSpec {
     ///
     /// Every input is validated first (see [`ScenarioSpec::validate`]), so
     /// the composed spec is built only from valid scenarios. Composition then
-    /// rejects scenarios with different [`HazardBumpMode`] values and scenarios
-    /// that together contain more than one [`OperationSpec::TimeRollForward`].
+    /// rejects scenarios that together contain more than one
+    /// [`OperationSpec::TimeRollForward`].
     ///
     /// # Merge rules
     ///
@@ -156,13 +121,12 @@ impl ScenarioSpec {
     /// | `description` | Present input descriptions joined with `" + "`; `None` when no input has one |
     /// | `operations` | Input operations concatenated in execution order |
     /// | `priority` | The lowest input priority, so the composed spec sorts where its first-running input did (`0` when empty) |
-    /// | `resolution_mode` | The shared mode, or [`ResolutionMode::Cumulative`] when inputs differ |
-    /// | `hazard_bump_mode` | The shared mode (inputs must agree) |
+    /// | `resolution_mode` | The shared mode (inputs must agree; [`ResolutionMode::default`] when empty) |
     ///
     /// # Arguments
     ///
     /// * `scenarios` - Scenario specifications to merge in ascending priority
-    ///   order. Every non-empty input must use the same `hazard_bump_mode`;
+    ///   order. Every non-empty input must use the same `resolution_mode`;
     ///   conflicting modes are rejected before composition.
     ///
     /// # Errors
@@ -170,7 +134,7 @@ impl ScenarioSpec {
     /// Returns a validation error, prefixed with the offending scenario id,
     /// when any input fails [`ScenarioSpec::validate`] (blank id, invalid or
     /// non-finite operation fields, more than one time roll), and a validation
-    /// error when `scenarios` contain conflicting `hazard_bump_mode` values or
+    /// error when `scenarios` contain conflicting `resolution_mode` values or
     /// together contain more than one time-roll operation.
     pub fn compose(mut scenarios: Vec<ScenarioSpec>) -> crate::Result<Self> {
         for scenario in &scenarios {
@@ -185,18 +149,17 @@ impl ScenarioSpec {
             && let Some(conflicting) = scenarios
                 .iter()
                 .skip(1)
-                .find(|scenario| scenario.hazard_bump_mode != first.hazard_bump_mode)
+                .find(|scenario| scenario.resolution_mode != first.resolution_mode)
         {
             return Err(crate::error::Error::validation(format!(
-                "Cannot compose scenarios '{}' (hazard_bump_mode '{}') and '{}' \
-                     (hazard_bump_mode '{}'): all scenarios must use the same hazard_bump_mode.",
+                "Cannot compose scenarios '{}' (resolution_mode '{}') and '{}' \
+                     (resolution_mode '{}'): all scenarios must use the same resolution_mode.",
                 first.id,
-                finstack_quant_core::wire::serde_label(&first.hazard_bump_mode)?,
+                finstack_quant_core::wire::serde_label(&first.resolution_mode)?,
                 conflicting.id,
-                finstack_quant_core::wire::serde_label(&conflicting.hazard_bump_mode)?,
+                finstack_quant_core::wire::serde_label(&conflicting.resolution_mode)?,
             )));
         }
-
         // Stable so equal-priority scenarios keep input order.
         scenarios.sort_by_key(|s| s.priority);
 
@@ -220,21 +183,9 @@ impl ScenarioSpec {
                     .join(" + "),
             )
         };
-        let resolution_mode = if scenarios.is_empty() {
-            ResolutionMode::default()
-        } else if scenarios
-            .iter()
-            .all(|scenario| scenario.resolution_mode == scenarios[0].resolution_mode)
-        {
-            scenarios[0].resolution_mode
-        } else {
-            ResolutionMode::Cumulative
-        };
-        let hazard_bump_mode = scenarios
+        let resolution_mode = scenarios
             .first()
-            .map_or_else(HazardBumpMode::default, |scenario| {
-                scenario.hazard_bump_mode
-            });
+            .map_or_else(ResolutionMode::default, |scenario| scenario.resolution_mode);
         let priority = scenarios.first().map_or(0, |scenario| scenario.priority);
         let descriptions: Vec<&str> = scenarios
             .iter()
@@ -266,7 +217,6 @@ impl ScenarioSpec {
             operations: all_operations,
             priority,
             resolution_mode,
-            hazard_bump_mode,
         })
     }
 
@@ -558,13 +508,13 @@ pub enum OperationSpec {
     /// Parallel percent shift to a volatility surface.
     ///
     /// Shocks are **sticky-strike** multiplicative grid moves: each stored
-    /// `(expiry, strike)` vol is multiplied by `1 + pct/100`. This is not a
-    /// sticky-delta re-mark. The post-shock calendar-spread check is
-    /// fixed-strike and is a heuristic screen, not a no-arbitrage certificate.
+    /// `(expiry, secondary_value)` vol is multiplied by `1 + pct/100`. This is
+    /// not a sticky-delta re-mark. The post-shock fixed-strike calendar-spread
+    /// check applies only to `Strike`-axis `BlackLognormal` surfaces and is a
+    /// heuristic screen, not a no-arbitrage certificate.
     ///
-    /// `pct` may be `<= -100`: vol-to-zero is sometimes used in degenerate
-    /// stress (non-positive vol is a hard error; calendar-spread flags a
-    /// warning).
+    /// `pct` must satisfy `pct >= -100` (`-100%` collapses vols to `0.0`;
+    /// `pct < -100` fails validation).
     ///
     /// # Example
     /// ```rust
@@ -586,8 +536,11 @@ pub enum OperationSpec {
     ///
     /// Same sticky-strike multiplicative convention as
     /// [`OperationSpec::VolSurfaceParallelPct`], restricted to the selected
-    /// expiry/strike buckets. The calendar-spread check remains fixed-strike
-    /// and is not a no-arbitrage certificate.
+    /// expiry/strike buckets (`pct >= -100`). Tenor selection requires an
+    /// explicit `expiry_clock` on the target surface anchored at the execution
+    /// date; strike filtering requires a `Strike` secondary axis. The
+    /// calendar-spread check applies only to `Strike`-axis `BlackLognormal`
+    /// surfaces and is not a no-arbitrage certificate.
     ///
     /// # Example
     /// ```rust
@@ -829,8 +782,8 @@ pub enum OperationSpec {
     /// Hierarchy-targeted vol-surface parallel shift.
     ///
     /// Resolution follows the same hierarchy-expansion rules as
-    /// [`OperationSpec::HierarchyCurveParallelBp`], but targets volatility
-    /// surfaces.
+    /// [`OperationSpec::HierarchyCurveParallelBp`], expanding into
+    /// [`OperationSpec::VolSurfaceParallelPct`] per matched surface (`pct >= -100`).
     HierarchyVolSurfaceParallelPct {
         /// Hierarchy target to resolve to surfaces.
         target: HierarchyTarget,
@@ -1202,7 +1155,7 @@ pub struct RateBindingSpec {
     pub tenor: String,
 
     /// Compounding convention for rate conversion.
-    #[serde(default)]
+    #[serde(default = "default_continuous_compounding")]
     pub compounding: Compounding,
 
     /// Output quote day-count convention. If `None`, uses the curve's convention.
@@ -1210,6 +1163,10 @@ pub struct RateBindingSpec {
     /// curve-implied accumulation factor; native curve query times are unchanged.
     #[serde(default)]
     pub day_count: Option<DayCount>,
+}
+
+const fn default_continuous_compounding() -> Compounding {
+    Compounding::Continuous
 }
 
 impl RateBindingSpec {
@@ -1422,6 +1379,7 @@ impl OperationSpec {
             } => {
                 check_id(vol_surface_id.as_str(), "vol_surface_id")?;
                 check_finite(*pct, "pct")?;
+                check_price_pct_floor(*pct, "pct")?;
             }
             OperationSpec::StmtForecastPercent { node_id, pct } => {
                 check_id(node_id.as_str(), "node_id")?;
@@ -1462,39 +1420,26 @@ impl OperationSpec {
                 discount_curve_id,
                 ..
             } => {
-                if target.path.is_empty() {
-                    return Err(crate::error::Error::Validation(
-                        "Hierarchy target path cannot be empty".into(),
-                    ));
-                }
+                target
+                    .validate()
+                    .map_err(|err| crate::error::Error::Validation(err.to_string()))?;
                 check_finite(*bp, "bp")?;
                 if let Some(dcid) = discount_curve_id {
                     check_id(dcid.as_str(), "discount_curve_id")?;
                 }
             }
-            OperationSpec::HierarchyVolSurfaceParallelPct { target, pct, .. } => {
-                if target.path.is_empty() {
-                    return Err(crate::error::Error::Validation(
-                        "Hierarchy target path cannot be empty".into(),
-                    ));
-                }
-                check_finite(*pct, "pct")?;
-            }
-            OperationSpec::HierarchyEquityPricePct { target, pct } => {
-                if target.path.is_empty() {
-                    return Err(crate::error::Error::Validation(
-                        "Hierarchy target path cannot be empty".into(),
-                    ));
-                }
+            OperationSpec::HierarchyVolSurfaceParallelPct { target, pct, .. }
+            | OperationSpec::HierarchyEquityPricePct { target, pct } => {
+                target
+                    .validate()
+                    .map_err(|err| crate::error::Error::Validation(err.to_string()))?;
                 check_finite(*pct, "pct")?;
                 check_price_pct_floor(*pct, "pct")?;
             }
             OperationSpec::HierarchyBaseCorrParallelPts { target, points } => {
-                if target.path.is_empty() {
-                    return Err(crate::error::Error::Validation(
-                        "Hierarchy target path cannot be empty".into(),
-                    ));
-                }
+                target
+                    .validate()
+                    .map_err(|err| crate::error::Error::Validation(err.to_string()))?;
                 check_corr_delta(*points, "points")?;
             }
             OperationSpec::TimeRollForward { period, .. } => {

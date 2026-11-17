@@ -1,58 +1,41 @@
-//! Inflation curves for CPI/RPI modeling and inflation-linked securities.
+//! Inflation curves for projected CPI/RPI index levels and annual growth.
 //!
-//! Represents expected future inflation as a term structure of CPI (Consumer
-//! Price Index) levels. Used for pricing inflation-linked bonds (TIPS, linkers),
-//! inflation swaps, and inflation caps/floors.
+//! Represents a projected term structure of CPI (Consumer Price Index) levels
+//! anchored at `(0.0, I₀)` on an explicit [`DayCount`] clock (plus a holiday
+//! calendar when using `Bus/252`), explicit interpolation style (`Linear`,
+//! `CubicHermite`, or `LogLinear`), and explicit extrapolation policy (`Flat`,
+//! `Extend`, or `Error`).
 //!
-//! # Financial Concept
+//! # Source Boundary (`CORE-MARKET-10`)
 //!
-//! The inflation curve maps time to expected CPI index levels:
+//! An [`InflationCurve`] holds **unlagged** projected CPI levels; contractual
+//! observation lags, daily reference-month weights, publication cutoffs, and
+//! deflation floors belong to contracts and the shared valuation resolver
+//! rather than the curve source. Conditioning the curve preserves its original
+//! source clock, anchor date, and absolute CPI levels unchanged.
+//!
+//! # Mathematical Representation
+//!
 //! ```text
-//! I(t) = CPI index level at time t
-//! π(t₁, t₂) = [I(t₂) / I(t₁)]^(1/(t₂-t₁)) - 1  (annualized inflation rate)
+//! I(t) = projected CPI index level at time t >= 0
+//! π(t₁, t₂) = exp(ln(I(t₂) / I(t₁)) / (t₂ - t₁)) - 1  (annualized CAGR)
 //! ```
-//!
-//! # Market Construction
-//!
-//! Inflation curves are bootstrapped from:
-//! - **Zero-coupon inflation swaps** (ZCIS): Market standard for breakeven inflation
-//! - **Inflation-linked bonds**: TIPS (US), Linkers (UK), OATi (France)
-//! - **Year-on-year swaps** (YoY): Annual inflation rate swaps
-//! - **Seasonality adjustments**: Monthly patterns in published CPI
-//!
-//! # Curve Types
-//!
-//! - **Real inflation**: Market expectations from inflation swaps
-//! - **Breakeven inflation**: Implied from TIPS vs nominal bond spreads
-//! - **Seasonal inflation**: Incorporates month-to-month volatility
-//!
-//! # Interpolation
-//!
-//! LogLinear interpolation is standard (constant inflation rate between knots):
-//! ```text
-//! I(t) = I(t₁) * exp(π * (t - t₁))
-//! ```
-//!
-//! # Use Cases
-//!
-//! - **TIPS pricing**: Inflation-adjusted principal and coupons
-//! - **Inflation swap valuation**: Zero-coupon and year-on-year structures
-//! - **Real rate extraction**: Separate nominal rates into real + inflation
-//! - **Pension liability valuation**: Inflation-linked obligations
 //!
 //! # Examples
 //!
 //! ```rust
+//! use finstack_quant_core::dates::{Date, DayCount};
 //! use finstack_quant_core::market_data::term_structures::InflationCurve;
-//! # use finstack_quant_core::math::interp::InterpStyle;
-//! # use finstack_quant_core::dates::Date;
-//! # use time::Month;
-//! # let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
+//! use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
+//! use time::Month;
+//!
+//! let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
 //! let ic = InflationCurve::builder("US-CPI")
 //!     .base_date(base)
-//!     .base_cpi(300.0)
+//!     .day_count(DayCount::Act365F)
 //!     .knots([(0.0, 300.0), (5.0, 327.0)])
 //!     .interp(InterpStyle::LogLinear)
+//!     .extrapolation(ExtrapolationPolicy::Extend)
 //!     .build()
 //!     .expect("InflationCurve builder should succeed");
 //! assert!(ic.inflation_rate(0.0, 5.0).expect("valid interval") > 0.0);
@@ -72,134 +55,77 @@
 //!   - Fleckenstein, M., Longstaff, F. A., & Lustig, H. (2017). "Deflation Risk."
 //!     *Review of Financial Studies*, 30(8), 2719-2760. `docs/REFERENCES.md#kerkhof-2005`
 
-use super::common::{InterpRollState, roll_knots};
-use crate::dates::DateExt;
-use crate::dates::{Date, DayCount};
-use crate::market_data::bumps::{BumpSpec, Bumpable};
-use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
-use crate::{error::InputError, math::interp::Interp, types::CurveId};
+use super::common::{
+    CurveCalendar, signed_curve_year_fraction, stable_positive_log_ratio, validate_curve_clock,
+};
+use crate::dates::{Date, DayCount, DayCountContext};
+use crate::market_data::bumps::{BumpSpec, BumpType, Bumpable};
+use crate::math::interp::{
+    ExtrapolationPolicy, Interp, InterpStyle, exact_f64_eq, validate_knots,
+    validate_positive_series,
+};
+use crate::math::stats;
+use crate::types::CurveId;
 
-/// Default indexation lag in months for inflation-linked securities.
+/// Projected CPI/RPI index-level curve on an explicit day-count clock.
 ///
-/// Most inflation-linked bonds (US TIPS, UK IL Gilts, Euro ILBs, JGBi) use a
-/// 3-month lag per the Canadian model (ISDA standard): the CPI reference for
-/// a settlement date is based on CPI values published 3 months prior. Note
-/// that [`InflationCurve::cpi_with_lag`] applies this lag as a continuous
-/// `lag/12`-year time shift on the curve's own interpolation; the
-/// Canadian-model linear interpolation between *monthly* prints lives in the
-/// historical `InflationIndex` scalar.
-pub(crate) const DEFAULT_INDEXATION_LAG_MONTHS: u32 = 3;
-
-/// Inflation curve representing CPI/RPI index levels over time.
-///
-/// Stores CPI index levels at knot times and interpolates between them using
-/// the specified interpolation method. LogLinear interpolation (constant
-/// inflation rate) is the market standard.
-///
-/// # Mathematical Representation
-///
-/// ```text
-/// I(t) = CPI index level at time t
-/// π(t₁, t₂) = annualized inflation rate from t₁ to t₂
-///           = [I(t₂) / I(t₁)]^(1/(t₂-t₁)) - 1  (CAGR formula)
-/// ```
-///
-/// # Indexation Lag
-///
-/// Inflation-linked bonds use a publication lag (default: 3 months).
-/// [`cpi_with_lag`](Self::cpi_with_lag) applies the lag as a **continuous
-/// time shift** of `lag_months / 12` years and evaluates the curve's own
-/// interpolation at the shifted time. This is *not* the Canadian-model
-/// reference-index convention, which interpolates linearly between two
-/// specific *monthly* CPI prints by day-of-month weight; that month-grid
-/// interpolation lives in the historical `InflationIndex` scalar (see
-/// `market_data::scalars`). Use [`cpi`](Self::cpi) for raw (no-lag) lookups.
-/// The curve has no seasonality adjustment support.
-///
-/// # Use Cases
-///
-/// - TIPS (Treasury Inflation-Protected Securities) pricing
-/// - Inflation swap valuation (zero-coupon and year-on-year)
-/// - Real rate curve construction (nominal - breakeven = real)
-/// - Pension liability modeling with inflation indexation
+/// Stores finite strictly positive CPI levels beginning with the explicit
+/// origin pillar `(0.0, I₀)` and at least one positive-time pillar. Interpolation
+/// supports [`InterpStyle::Linear`], [`InterpStyle::CubicHermite`], and
+/// [`InterpStyle::LogLinear`], with literal [`ExtrapolationPolicy`] tails
+/// (`Flat`, `Extend`, `Error`).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "RawInflationCurve", into = "RawInflationCurve")]
 pub struct InflationCurve {
     id: CurveId,
-    base_cpi: f64,
-    /// Reference observation date represented by the zero-time CPI level.
+    /// Anchor date represented by `t = 0.0` (`I₀`).
     base_date: Date,
-    /// Day-count basis for time conversions.
+    /// Explicit day-count convention mapping dates on/after `base_date` to curve time.
     day_count: DayCount,
-    /// Indexation lag in months (default: 3 for TIPS/linkers).
-    indexation_lag_months: u32,
-    /// Knot times in **years**.
+    /// Optional resolved holiday calendar (required for `Bus/252`).
+    calendar: Option<CurveCalendar>,
+    /// Strictly ascending knot times starting at `0.0` with length `>= 2`.
     knots: Box<[f64]>,
-    /// CPI index levels at each knot.
+    /// Finite, strictly positive projected CPI levels corresponding to `knots`.
     cpi_levels: Box<[f64]>,
-    /// Source interpolation; the unrolled source when `roll` is set.
+    /// Scalar interpolator built from `knots` and `cpi_levels`.
     interp: Interp,
-    /// Source grid and origin of a rolled curve.
-    roll: Option<InterpRollState>,
 }
 
-/// Raw serializable state of an InflationCurve
+/// Raw canonical JSON/wire state of an [`InflationCurve`].
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct RawInflationCurve {
-    /// Curve identifier
+    /// Curve identifier.
     pub id: String,
-    /// Base CPI level at t=0
-    pub base_cpi: f64,
-    /// Base date
+    /// Anchor date represented by the `t = 0.0` CPI pillar.
     #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
     pub base_date: Date,
-    /// Day count convention
-    #[serde(default = "default_day_count")]
+    /// Explicit day-count convention.
     pub day_count: DayCount,
-    /// Indexation lag in months
-    #[serde(default = "default_lag")]
-    pub indexation_lag_months: u32,
-    /// Time/value pairs used to construct the curve
-    pub knot_points: Vec<(f64, f64)>,
-    /// Interpolation style
-    pub interp_style: InterpStyle,
-    /// Extrapolation policy
-    pub extrapolation: ExtrapolationPolicy,
-    /// Source interpolation and accumulated time origin for a rolled curve.
+    /// Optional registered holiday calendar identifier (`"brbd"`, `"usny+target2"`, etc.).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub roll_transform: Option<InterpRollState>,
-}
-
-fn default_day_count() -> DayCount {
-    DayCount::Act365F
-}
-
-fn default_lag() -> u32 {
-    DEFAULT_INDEXATION_LAG_MONTHS
+    pub calendar_id: Option<String>,
+    /// Strictly increasing `(time_years, cpi_level)` pillars starting at `0.0`.
+    pub knot_points: Vec<(f64, f64)>,
+    /// Explicit scalar interpolation style (`linear`, `cubic_hermite`, or `log_linear`).
+    pub interp_style: InterpStyle,
+    /// Explicit extrapolation policy (`flat`, `extend`, or `error`).
+    pub extrapolation: ExtrapolationPolicy,
 }
 
 impl From<InflationCurve> for RawInflationCurve {
     fn from(curve: InflationCurve) -> Self {
-        let knot_points: Vec<(f64, f64)> = curve
-            .knots
-            .iter()
-            .copied()
-            .zip(curve.cpi_levels.iter().copied())
-            .collect();
-
-        RawInflationCurve {
+        Self {
             id: curve.id.to_string(),
-            base_cpi: curve.base_cpi,
             base_date: curve.base_date,
             day_count: curve.day_count,
-            indexation_lag_months: curve.indexation_lag_months,
-            knot_points,
+            calendar_id: curve.calendar.as_ref().map(|cal| cal.id.clone()),
+            knot_points: curve.knot_points().collect(),
             interp_style: curve.interp.style(),
             extrapolation: curve.interp.extrapolation(),
-            roll_transform: curve.roll,
         }
     }
 }
@@ -209,303 +135,145 @@ impl TryFrom<RawInflationCurve> for InflationCurve {
 
     fn try_from(state: RawInflationCurve) -> crate::Result<Self> {
         InflationCurve::builder(state.id)
-            .base_cpi(state.base_cpi)
             .base_date(state.base_date)
             .day_count(state.day_count)
-            .indexation_lag_months(state.indexation_lag_months)
+            .calendar_id_opt(state.calendar_id)
             .knots(state.knot_points)
             .interp(state.interp_style)
             .extrapolation(state.extrapolation)
-            .roll_transform(state.roll_transform)
             .build()
     }
 }
 
 impl InflationCurve {
-    /// Start building an inflation curve with identifier `id`.
+    /// Start building an [`InflationCurve`] with explicit required conventions.
     ///
-    /// # Examples
-    /// ```rust
-    /// use finstack_quant_core::market_data::term_structures::InflationCurve;
-    /// use finstack_quant_core::math::interp::InterpStyle;
-    /// use finstack_quant_core::dates::Date;
-    /// use time::Month;
+    /// # Arguments
     ///
-    /// let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
-    /// let curve = InflationCurve::builder("US-CPI")
-    ///     .base_date(base)
-    ///     .base_cpi(300.0)
-    ///     .knots([(0.0, 300.0), (5.0, 325.0)])
-    ///     .interp(InterpStyle::LogLinear)
-    ///     .build()
-    ///     .expect("InflationCurve builder should succeed");
-    /// assert!(curve.inflation_rate(0.0, 5.0).expect("valid interval") > 0.0);
-    /// ```
+    /// * `id` - Unique identifier used to key the curve inside a market context.
     #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> InflationCurveBuilder {
         InflationCurveBuilder {
             id: id.into(),
-            base_cpi: 100.0,
             base_date: None,
-            day_count: DayCount::Act365F,
-            indexation_lag_months: DEFAULT_INDEXATION_LAG_MONTHS,
+            day_count: None,
+            calendar_id: None,
             points: Vec::new(),
-            style: InterpStyle::LogLinear,
-            extrapolation: ExtrapolationPolicy::default(),
-            roll_transform: None,
+            style: None,
+            extrapolation: None,
         }
     }
 
-    /// CPI level at time `t` (years), without indexation lag.
+    /// Projected CPI level at non-negative finite time `t` (years from `base_date`).
     ///
-    /// Evaluates pre-base CPI pillars (`t < 0`) and the configured extrapolation
-    /// policy when `t` precedes the earliest pillar. At `t == 0.0`, returns
-    /// [`base_cpi`](Self::base_cpi) directly.
+    /// Returns exact stored knot levels on exact knot hits and evaluates the
+    /// configured interpolator and extrapolation policy otherwise, rejecting
+    /// `t < 0.0`, non-finite times, and non-positive or non-finite interpolated results.
     ///
     /// # Arguments
     ///
-    /// * `t` - Year-fraction time from the curve base date to the query point
-    #[must_use]
-    pub fn cpi(&self, t: f64) -> f64 {
-        if t.is_nan() {
-            return f64::NAN;
-        }
-        if t == 0.0 {
-            return self.base_cpi;
-        }
-        InterpRollState::eval(self.roll.as_ref(), &self.interp, t)
-    }
-
-    /// Earliest knot time supported by this curve (including rolled source pillars).
+    /// * `t` - Finite non-negative curve time in years from [`base_date`](Self::base_date).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `t` is non-finite or negative, if `t` lies outside the
+    /// knots under [`ExtrapolationPolicy::Error`], or if interpolation produces
+    /// a non-finite or non-positive CPI level.
     #[inline]
-    fn min_supported_time(&self) -> f64 {
-        self.roll
-            .as_ref()
-            .and_then(InterpRollState::min_supported_time)
-            .unwrap_or_else(|| self.knots.first().copied().unwrap_or(0.0))
-    }
-
-    /// CPI level at time `t` (years), adjusted for the indexation lag.
-    ///
-    /// Applies the lag as a **continuous shift**: evaluates the curve's own
-    /// interpolation (LogLinear by default) at `t - indexation_lag_months/12`.
-    /// When `t - lag` precedes the earliest supported knot on the curve (for
-    /// example `0 <= t < lag` on a curve without pre-base CPI pillars), returns
-    /// `f64::NAN` rather than silently flattening lagged CPI to `base_cpi`.
-    /// This is *not* the Canadian-model reference-index calculation used for
-    /// bond settlement, which interpolates linearly between the two lagged
-    /// *monthly* CPI prints weighted by day of month; that month-grid
-    /// interpolation is provided by the historical `InflationIndex` scalar.
-    /// For projected curve lookups the continuous shift is a smooth
-    /// approximation that coincides with the monthly convention only when the
-    /// curve's knots sit on the monthly grid with linear interpolation. No
-    /// seasonality adjustment is applied.
-    ///
-    /// # Arguments
-    /// * `t` - Time in years from base date (the settlement date)
-    ///
-    /// # Returns
-    /// CPI level corresponding to `t - lag`, where lag is the configured
-    /// indexation lag in years (`indexation_lag_months / 12`), or `f64::NAN`
-    /// if `t - lag` precedes the curve's earliest supported CPI pillar.
-    #[must_use]
-    pub fn cpi_with_lag(&self, t: f64) -> f64 {
-        if !t.is_finite() {
-            return f64::NAN;
-        }
-        let lag_years = self.indexation_lag_months as f64 / 12.0;
-        let lagged_t = t - lag_years;
-        if lagged_t < self.min_supported_time() {
-            return f64::NAN;
-        }
-        self.cpi(lagged_t)
-    }
-
-    /// Principal indexation ratio at time `t` (years).
-    ///
-    /// Returns `cpi_with_lag(t) / base_cpi` — the factor by which the notional
-    /// of an inflation-linked security is uplifted at `t`. A value of `1.0`
-    /// means no accrued indexation; `1.08` means the inflation-adjusted
-    /// principal is 108% of the original face. Deflation gives a ratio below
-    /// `1.0` (this accessor applies no deflation floor; US TIPS' par floor at
-    /// maturity is an instrument-level feature, not a curve-level one).
-    ///
-    /// This is the curve-level view of the same quantity that the valuation
-    /// layer computes per cashflow and reports as `inflation_index_ratio` in
-    /// its cashflow exports; exposing it here lets callers inspect the
-    /// indexation profile of a curve without building an instrument.
-    ///
-    /// The lag is applied exactly as in [`cpi_with_lag`](Self::cpi_with_lag) —
-    /// a continuous `indexation_lag_months / 12`-year shift on the curve's own
-    /// interpolation, not the Canadian-model monthly-print convention.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::Error::Validation`] if `base_cpi` is not strictly
-    /// positive (the ratio would be undefined or sign-flipped). Builder
-    /// validation normally prevents this, but the guard keeps deserialized
-    /// curves safe.
-    ///
-    /// # Arguments
-    ///
-    /// * `t` - Time in years from the curve's base date (the settlement date
-    ///   whose indexed principal is wanted).
-    ///
-    /// # Returns
-    ///
-    /// The lagged CPI level at `t` divided by the curve's base CPI.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use finstack_quant_core::market_data::term_structures::InflationCurve;
-    /// use finstack_quant_core::dates::Date;
-    /// use time::Month;
-    ///
-    /// let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
-    /// let curve = InflationCurve::builder("US-CPI")
-    ///     .base_date(base)
-    ///     .base_cpi(300.0)
-    ///     .knots([(0.0, 300.0), (5.0, 330.0)])
-    ///     .indexation_lag_months(0)
-    ///     .build()
-    ///     .expect("InflationCurve builder should succeed");
-    ///
-    /// // With no lag, t = 0 sits exactly on the base CPI knot.
-    /// assert!((curve.index_ratio(0.0).expect("positive base CPI") - 1.0).abs() < 1e-12);
-    /// assert!(curve.index_ratio(5.0).expect("positive base CPI") > 1.0);
-    /// ```
-    ///
-    /// # References
-    ///
-    /// - Deacon, M., Derry, A., & Mirfendereski, D. (2004). *Inflation-Indexed
-    ///   Securities: Bonds, Swaps and Other Derivatives* (2nd ed.). Wiley,
-    ///   Chapter 2 (index ratio and indexation lag conventions). `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`
-    #[must_use = "computed index ratio should not be discarded"]
-    pub fn index_ratio(&self, t: f64) -> crate::Result<f64> {
-        if !t.is_finite() {
+    #[must_use = "computed CPI level should not be discarded"]
+    pub fn cpi(&self, t: f64) -> crate::Result<f64> {
+        if !t.is_finite() || t < 0.0 {
             return Err(crate::Error::Validation(format!(
-                "InflationCurve '{}' index_ratio requires finite time t, got {t}",
+                "InflationCurve '{}' requires finite non-negative time t >= 0.0, got {t}",
                 self.id
             )));
         }
-        if !(self.base_cpi.is_finite() && self.base_cpi > 0.0) {
+        let val = self.interp.interp(t)?;
+        if !val.is_finite() || val <= 0.0 {
             return Err(crate::Error::Validation(format!(
-                "InflationCurve '{}' base_cpi must be finite and positive to compute an index ratio, got {}",
-                self.id, self.base_cpi
-            )));
-        }
-        let lag_years = self.indexation_lag_months as f64 / 12.0;
-        let lagged_t = t - lag_years;
-        let min_t = self.min_supported_time();
-        if lagged_t < min_t {
-            return Err(crate::Error::Validation(format!(
-                "InflationCurve '{}' lagged time {lagged_t:.6} (t={t:.6}, lag={}m) precedes earliest supported knot {min_t:.6}",
-                self.id, self.indexation_lag_months
-            )));
-        }
-        let lagged_cpi = self.cpi(lagged_t);
-        if !(lagged_cpi.is_finite() && lagged_cpi > 0.0) {
-            return Err(crate::Error::Validation(format!(
-                "InflationCurve '{}' lagged CPI at t={t:.6} must be finite and positive, got {lagged_cpi}",
+                "InflationCurve '{}' CPI at t={t:.6} must be finite and strictly positive, got {val}",
                 self.id
             )));
         }
-        Ok(lagged_cpi / self.base_cpi)
+        Ok(val)
     }
 
-    /// Annualised inflation rate between `t1` and `t2` using CAGR formula.
-    ///
-    /// Uses the Compound Annual Growth Rate, which is the market-standard
-    /// formula for annualised inflation:
-    /// ```text
-    /// π(t₁, t₂) = [I(t₂) / I(t₁)]^(1/(t₂-t₁)) - 1
-    /// ```
-    ///
-    /// This correctly compounds and matches QuantLib/Bloomberg conventions.
-    /// For short periods (< 1 year), this equals `(I2/I1)^(1/dt) - 1`
-    /// rather than the simple linear approximation `(I2/I1 - 1) / dt`.
+    /// Projected CPI level on calendar `date` (`date >= base_date`) using the curve clock.
     ///
     /// # Arguments
     ///
-    /// * `t1` - Finite start time in years from the curve base date, using its
-    ///   day-count convention. Non-positive times use the base CPI.
-    /// * `t2` - Finite end time in the same units, strictly greater than `t1`.
+    /// * `date` - Calendar target date on or after [`base_date`](Self::base_date).
     ///
     /// # Errors
     ///
-    /// Returns a validation error for invalid intervals, non-positive or
-    /// non-finite interpolated CPI levels, or a non-finite annualized rate.
-    pub fn inflation_rate(&self, t1: f64, t2: f64) -> crate::Result<f64> {
-        let dt = t2 - t1;
-        if !t1.is_finite() || !t2.is_finite() || !dt.is_finite() || dt <= 0.0 {
-            return Err(crate::Error::Validation(
-                "inflation_rate requires finite t1 < t2 and a finite interval".to_string(),
-            ));
-        }
-        let c1 = self.cpi(t1);
-        let c2 = self.cpi(t2);
-        if !c1.is_finite() || !c2.is_finite() || c1 <= 0.0 || c2 <= 0.0 {
-            return Err(crate::Error::Validation(
-                "inflation_rate requires finite positive CPI levels".to_string(),
-            ));
-        }
-        let rate = ((c2.ln() - c1.ln()) / dt).exp_m1();
-        if !rate.is_finite() {
-            return Err(crate::Error::Validation(
-                "annualized inflation rate is not finite".to_string(),
-            ));
-        }
-        Ok(rate)
-    }
-
-    /// CPI level on a specific calendar date, without indexation lag.
-    ///
-    /// This is the date-based equivalent of [`cpi`](Self::cpi), consistent with
-    /// `DiscountCurve::df_on_date` and `HazardCurve::sp_on_date`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the year fraction calculation fails.
+    /// Returns an error if `date < self.base_date`, if day-count year-fraction
+    /// mapping fails, or if [`cpi`](Self::cpi) rejects the mapped coordinate.
     #[inline]
     #[must_use = "computed CPI level should not be discarded"]
     pub fn cpi_on_date(&self, date: Date) -> crate::Result<f64> {
-        let t = self.year_fraction_to(date)?;
-        let cpi = self.cpi(t);
-        if !(cpi.is_finite() && cpi > 0.0) {
+        if date < self.base_date {
             return Err(crate::Error::Validation(format!(
-                "InflationCurve '{}' CPI on {date} (t={t:.6}) is not finite and positive: {cpi}",
+                "InflationCurve '{}' query date {date} precedes base_date {}",
+                self.id, self.base_date
+            )));
+        }
+        let t = signed_curve_year_fraction(
+            self.base_date,
+            date,
+            self.day_count,
+            self.calendar.as_ref(),
+        )?;
+        self.cpi(t)
+    }
+
+    /// Annualized compound CPI growth rate (CAGR) between `t1` and `t2`.
+    ///
+    /// Evaluates `exp(ln(I(t2) / I(t1)) / (t2 - t1)) - 1` using stable
+    /// positive-level log-difference arithmetic on finite `0.0 <= t1 < t2`.
+    ///
+    /// # Arguments
+    ///
+    /// * `t1` - Finite non-negative start time in years from [`base_date`](Self::base_date).
+    /// * `t2` - Finite end time strictly greater than `t1`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the interval is invalid (`t1 < 0`, `t2 <= t1`, non-finite,
+    /// or non-positive interval width), if either endpoint [`cpi`](Self::cpi) query
+    /// fails, or if the annual decimal rate overflows, rounds onto `-1.0`, or
+    /// underflows a non-zero growth ratio to `0.0`.
+    pub fn inflation_rate(&self, t1: f64, t2: f64) -> crate::Result<f64> {
+        let dt = t2 - t1;
+        if !t1.is_finite() || !t2.is_finite() || t1 < 0.0 || !dt.is_finite() || dt <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "InflationCurve '{}' inflation_rate requires finite 0.0 <= t1 < t2 and finite dt, got [{t1}, {t2}]",
                 self.id
             )));
         }
-        Ok(cpi)
-    }
-    /// Helper: compute year fraction from base date to target date using curve's day-count.
-    #[inline]
-    fn year_fraction_to(&self, date: Date) -> crate::Result<f64> {
-        self.day_count.signed_year_fraction(
-            self.base_date,
-            date,
-            crate::dates::DayCountContext::default(),
-        )
-    }
-
-    /// Reference observation date represented by the zero-time CPI level.
-    #[inline]
-    pub fn base_date(&self) -> Date {
-        self.base_date
-    }
-
-    /// Day count convention used by this curve.
-    #[inline]
-    pub fn day_count(&self) -> DayCount {
-        self.day_count
-    }
-
-    /// Indexation lag in months.
-    #[inline]
-    pub fn indexation_lag_months(&self) -> u32 {
-        self.indexation_lag_months
+        let i1 = self.cpi(t1)?;
+        let i2 = self.cpi(t2)?;
+        if i1.to_bits() == i2.to_bits() {
+            return Ok(0.0);
+        }
+        let delta_log = stable_positive_log_ratio(i2, i1)?;
+        if delta_log == 0.0 {
+            return Ok(0.0);
+        }
+        let annual_log = delta_log / dt;
+        if !annual_log.is_finite() {
+            return Err(crate::Error::Validation(format!(
+                "InflationCurve '{}' annual log growth overflowed on [{t1}, {t2}]",
+                self.id
+            )));
+        }
+        let rate = annual_log.exp_m1();
+        if !rate.is_finite() || rate <= -1.0 || rate == 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "InflationCurve '{}' annualized inflation rate {rate} is outside the valid quote domain (-1, +inf)",
+                self.id
+            )));
+        }
+        Ok(rate)
     }
 
     /// Curve identifier.
@@ -514,315 +282,420 @@ impl InflationCurve {
         &self.id
     }
 
-    /// Underlying bootstrap knot times (years).
+    /// Reference observation date represented by the `t = 0.0` CPI pillar.
+    #[inline]
+    pub fn base_date(&self) -> Date {
+        self.base_date
+    }
+
+    /// Day-count convention used by this curve.
+    #[inline]
+    pub fn day_count(&self) -> DayCount {
+        self.day_count
+    }
+
+    /// Registered holiday calendar id of the curve's time axis, if any.
+    #[must_use]
+    pub fn calendar_id(&self) -> Option<&str> {
+        self.calendar.as_ref().map(|cal| cal.id.as_str())
+    }
+
+    /// Day-count context constructed from this curve's resolved calendar, if any.
+    #[must_use]
+    pub fn day_count_context(&self) -> DayCountContext<'static> {
+        DayCountContext {
+            calendar: self.calendar.as_ref().map(|cal| cal.calendar),
+            ..DayCountContext::default()
+        }
+    }
+
+    /// Origin CPI level `I₀` at `t = 0.0`.
+    #[inline]
+    pub fn base_cpi(&self) -> f64 {
+        self.cpi_levels[0]
+    }
+
+    /// Knot times in years from [`base_date`](Self::base_date), starting at `0.0`.
     #[inline]
     pub fn knots(&self) -> &[f64] {
         &self.knots
     }
 
-    /// CPI levels provided at each knot.
+    /// Projected CPI index levels at each knot.
     #[inline]
     pub fn cpi_levels(&self) -> &[f64] {
         &self.cpi_levels
     }
 
-    /// Base CPI level at t = 0.
-    #[inline]
-    pub fn base_cpi(&self) -> f64 {
-        self.base_cpi
+    /// Iterator over paired `(time_years, cpi_level)` pillars stored on this curve.
+    pub fn knot_points(&self) -> impl Iterator<Item = (f64, f64)> + '_ {
+        self.knots
+            .iter()
+            .copied()
+            .zip(self.cpi_levels.iter().copied())
     }
 
-    /// Interpolation style used by this curve.
+    /// Scalar interpolation style used between pillars.
     #[inline]
     pub fn interp_style(&self) -> InterpStyle {
         self.interp.style()
     }
 
-    /// Extrapolation policy used by this curve.
+    /// Extrapolation policy beyond the final pillar.
     #[inline]
     pub fn extrapolation(&self) -> ExtrapolationPolicy {
         self.interp.extrapolation()
     }
 
-    /// Number of knot points in the curve.
+    /// Number of knot points stored on the curve.
     #[inline]
     #[must_use]
     pub fn len(&self) -> usize {
         self.knots.len()
     }
 
-    /// Returns `true` if the curve has no knot points.
+    /// Returns `true` if the curve stores no knot points.
     #[inline]
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.knots.is_empty()
     }
 
-    /// Create a builder pre-populated with this curve's data but a new ID.
-    ///
-    /// The builder keeps the curve's CPI pillars, base CPI, indexation lag and
-    /// any roll state, so `build()` reproduces the curve under `new_id`;
-    /// supplying more pillars through [`InflationCurveBuilder::knots`] drops
-    /// the roll state.
+    /// Create a builder pre-populated with this curve's state and `new_id`.
     ///
     /// # Arguments
     ///
-    /// * `new_id` - Identifier of the rebuilt curve, the `MarketContext` lookup key.
+    /// * `new_id` - Identifier assigned to the rebuilt curve.
     pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> InflationCurveBuilder {
-        self.metadata_builder(new_id)
-            .knots(
-                self.knots
-                    .iter()
-                    .copied()
-                    .zip(self.cpi_levels.iter().copied()),
-            )
-            .roll_transform(self.roll.clone())
+        self.metadata_builder(new_id).knots(self.knot_points())
     }
 
-    /// Builder seeded with this curve's base CPI, base date, day count,
-    /// indexation lag, interpolation style and extrapolation policy; the
-    /// caller supplies pillars and any roll state.
     fn metadata_builder(&self, id: impl Into<CurveId>) -> InflationCurveBuilder {
         InflationCurve::builder(id)
-            .base_cpi(self.base_cpi)
             .base_date(self.base_date)
             .day_count(self.day_count)
-            .indexation_lag_months(self.indexation_lag_months)
+            .calendar_id_opt(self.calendar_id().map(str::to_owned))
             .interp(self.interp.style())
             .extrapolation(self.interp.extrapolation())
-    }
-
-    /// Roll the curve forward by a specified number of days.
-    ///
-    /// This creates a new curve with:
-    /// - Base date advanced by `days`
-    /// - Knot times shifted backwards (t' = t - dt_years)
-    /// - Points with t' <= 0 are filtered out (expired)
-    /// - CPI levels are preserved
-    /// - Base CPI is updated to the interpolated value at the roll time
-    ///
-    /// # Arguments
-    /// * `days` - Non-negative calendar-day shift; `0` returns an unmodified clone and negative values are rejected.
-    ///
-    /// # Returns
-    /// A new inflation curve with shifted knots and updated base CPI.
-    ///
-    /// # Errors
-    /// Returns an error if `days < 0` or if no knot points remain after filtering expired points.
-    /// Returns a validation error if the rolled base date exceeds the supported calendar range.
-    pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
-        if days < 0 {
-            return Err(crate::Error::Validation(format!(
-                "InflationCurve::roll_forward requires non-negative days, got {days}"
-            )));
-        }
-        if days == 0 {
-            return Ok(self.clone());
-        }
-        let new_base = self.base_date.add_days(days)?;
-        let dt_years = self.day_count.signed_year_fraction(
-            self.base_date,
-            new_base,
-            crate::dates::DayCountContext::default(),
-        )?;
-
-        let new_base_cpi = self.cpi(dt_years);
-
-        let mut rolled_points = roll_knots(&self.knots, &self.cpi_levels, dt_years);
-
-        if rolled_points.is_empty() {
-            return Err(crate::InputError::TooFewPoints.into());
-        }
-        rolled_points.insert(0, (0.0, new_base_cpi));
-
-        self.metadata_builder(self.id.clone())
-            .base_date(new_base)
-            .base_cpi(new_base_cpi)
-            .knots(rolled_points)
-            .roll_transform(InterpRollState::advance(
-                self.roll.as_ref(),
-                dt_years,
-                self.knots
-                    .iter()
-                    .copied()
-                    .zip(self.cpi_levels.iter().copied()),
-            )?)
-            .build()
     }
 }
 
 /// Fluent builder for [`InflationCurve`].
 ///
+/// Requires explicit `base_date`, `day_count` (plus `calendar_id` for
+/// `Bus/252`), `knots` (at least two points starting with exact `(0.0, I₀)`),
+/// `interp` (`Linear`, `CubicHermite`, or `LogLinear`), and `extrapolation`.
+///
 /// # Examples
 ///
 /// ```rust
+/// use finstack_quant_core::dates::{Date, DayCount};
 /// use finstack_quant_core::market_data::term_structures::InflationCurve;
-/// use finstack_quant_core::math::interp::InterpStyle;
-/// use finstack_quant_core::dates::Date;
+/// use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 /// use time::Month;
 ///
 /// let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
 /// let curve = InflationCurve::builder("US-CPI")
 ///     .base_date(base)
-///     .base_cpi(300.0)
+///     .day_count(DayCount::Act365F)
 ///     .knots([(0.0, 300.0), (5.0, 327.0)])
 ///     .interp(InterpStyle::LogLinear)
+///     .extrapolation(ExtrapolationPolicy::Extend)
 ///     .build()
 ///     .expect("InflationCurve builder should succeed");
-/// assert!(curve.inflation_rate(0.0, 5.0).expect("valid interval") > 0.0);
+/// assert_eq!(curve.base_cpi(), 300.0);
 /// ```
 pub struct InflationCurveBuilder {
     id: CurveId,
-    base_cpi: f64,
     base_date: Option<Date>,
-    day_count: DayCount,
-    indexation_lag_months: u32,
-    points: Vec<(f64, f64)>, // (t, cpi)
-    style: InterpStyle,
-    extrapolation: ExtrapolationPolicy,
-    roll_transform: Option<InterpRollState>,
+    day_count: Option<DayCount>,
+    calendar_id: Option<String>,
+    points: Vec<(f64, f64)>,
+    style: Option<InterpStyle>,
+    extrapolation: Option<ExtrapolationPolicy>,
 }
 
 impl InflationCurveBuilder {
-    /// Set the **base CPI** level at t = 0.
+    /// Set the **base date** (`t = 0.0` anchor).
     ///
     /// # Arguments
     ///
-    /// * `cpi` - Finite, strictly positive absolute index level at the base
-    ///   date. Must equal any supplied zero-time CPI knot; validated at build.
-    ///   The builder inserts this level at zero when that knot is omitted.
-    pub fn base_cpi(mut self, cpi: f64) -> Self {
-        self.base_cpi = cpi;
-        self
-    }
-
-    /// Override the default **base date** (valuation date).
+    /// * `d` - Anchor date represented by the `(0.0, I₀)` pillar.
     pub fn base_date(mut self, d: Date) -> Self {
         self.base_date = Some(d);
         self
     }
 
-    /// Choose the day-count basis for time calculations.
-    pub fn day_count(mut self, day_count: DayCount) -> Self {
-        self.day_count = day_count;
-        self
-    }
-
-    /// Set the indexation lag in months.
-    ///
-    /// Default is 3 months (Canadian model, used by TIPS, IL Gilts, etc.).
-    /// Set to 0 to disable lag adjustment.
-    pub fn indexation_lag_months(mut self, months: u32) -> Self {
-        self.indexation_lag_months = months;
-        self
-    }
-
-    /// Supply knot points `(t, cpi_level)`.
-    ///
-    /// Supplied pillars define the curve's interpolation; any roll state
-    /// carried over from [`InflationCurve::to_builder_with_id`] is dropped.
+    /// Set the explicit day-count convention for date-to-time mapping.
     ///
     /// # Arguments
     ///
-    /// * `pts` - `(time, cpi_level)` pillars appended to any already supplied:
-    ///   times in years from the base date under the curve day count, CPI
-    ///   levels in index points.
+    /// * `day_count` - Supported complete day count (cannot need coupon metadata).
+    pub fn day_count(mut self, day_count: DayCount) -> Self {
+        self.day_count = Some(day_count);
+        self
+    }
+
+    /// Set the registered holiday calendar of the curve's time axis.
+    ///
+    /// # Arguments
+    ///
+    /// * `calendar_id` - Registered calendar id (or `+`-joined union); required for `Bus/252`.
+    pub fn calendar_id(mut self, calendar_id: impl Into<String>) -> Self {
+        self.calendar_id = Some(calendar_id.into());
+        self
+    }
+
+    /// Optionally set the time-axis holiday calendar; `None` clears it.
+    ///
+    /// # Arguments
+    ///
+    /// * `calendar_id` - Optional registered holiday calendar identifier.
+    pub fn calendar_id_opt(mut self, calendar_id: Option<String>) -> Self {
+        self.calendar_id = calendar_id;
+        self
+    }
+
+    /// Append `(time_years, cpi_level)` pillars starting from `(0.0, I₀)`.
+    ///
+    /// # Arguments
+    ///
+    /// * `pts` - Strictly increasing `(t, I)` pairs beginning at exact `t = 0.0`
+    ///   with finite strictly positive index levels.
     pub fn knots<I>(mut self, pts: I) -> Self
     where
         I: IntoIterator<Item = (f64, f64)>,
     {
         self.points.extend(pts);
-        self.roll_transform = None;
-        self
-    }
-    /// Select interpolation style for this curve.
-    pub fn interp(mut self, style: InterpStyle) -> Self {
-        self.style = style;
         self
     }
 
-    /// Select extrapolation policy for CPI lookups outside the knot range.
-    pub fn extrapolation(mut self, extrapolation: ExtrapolationPolicy) -> Self {
-        self.extrapolation = extrapolation;
-        self
-    }
-
-    fn roll_transform(mut self, state: Option<InterpRollState>) -> Self {
-        self.roll_transform = state;
-        self
-    }
-
-    /// Validate input and build the [`InflationCurve`].
+    /// Set the scalar interpolation style (`Linear`, `CubicHermite`, or `LogLinear`).
     ///
-    /// Knot times are years from `base_date`, and knot values are CPI index
-    /// levels rather than inflation rates. The selected interpolation and
-    /// extrapolation policies govern later CPI lookups; the indexation lag is
-    /// stored as metadata used by [`InflationCurve::cpi_with_lag`].
-    /// A missing zero-time knot is inserted with `base_cpi`, so interpolation
-    /// connects the known base level to the future CPI quotes.
+    /// # Arguments
+    ///
+    /// * `style` - Interpolation method between CPI pillars.
+    pub fn interp(mut self, style: InterpStyle) -> Self {
+        self.style = Some(style);
+        self
+    }
+
+    /// Set the extrapolation policy beyond the last pillar (`Flat`, `Extend`, or `Error`).
+    ///
+    /// # Arguments
+    ///
+    /// * `extrapolation` - Out-of-range tail policy for `t > knots.last()`.
+    pub fn extrapolation(mut self, extrapolation: ExtrapolationPolicy) -> Self {
+        self.extrapolation = Some(extrapolation);
+        self
+    }
+
+    /// Validate all inputs and build the [`InflationCurve`].
     ///
     /// # Errors
     ///
-    /// Returns an error if the base date was not explicitly set, no knots are
-    /// supplied, knot times are invalid or not strictly increasing, a supplied
-    /// CPI knot or base CPI is non-finite/non-positive, a zero-time knot differs
-    /// from base CPI, or the selected interpolation strategy cannot be built
-    /// from the knot grid and CPI levels.
+    /// Returns an error if `base_date`, `day_count`, `interp`, or `extrapolation`
+    /// is missing; if `day_count` is unsupported or missing a required calendar;
+    /// if `interp` is `MonotoneConvex` or `PiecewiseQuadraticForward`; if fewer
+    /// than two pillars are provided; if knots are non-finite, unsorted, or do
+    /// not begin at exact `0.0`; or if any CPI level is non-finite or `<= 0.0`.
     pub fn build(self) -> crate::Result<InflationCurve> {
-        if !self.base_cpi.is_finite() || self.base_cpi <= 0.0 {
-            return Err(crate::Error::Validation(
-                "base_cpi must be finite and strictly positive".to_string(),
-            ));
-        }
         let base_date = self.base_date.ok_or_else(|| {
-            crate::Error::Validation("InflationCurve requires base_date".to_string())
+            crate::Error::Validation(format!("InflationCurve '{}' requires base_date", self.id))
         })?;
-        crate::math::interp::validate_knots(&self.points.iter().map(|p| p.0).collect::<Vec<_>>())?;
-        if self.points.iter().any(|&(_, c)| !c.is_finite() || c <= 0.0) {
-            return Err(InputError::NonPositiveValue.into());
+        let day_count = self.day_count.ok_or_else(|| {
+            crate::Error::Validation(format!("InflationCurve '{}' requires day_count", self.id))
+        })?;
+        let style = self.style.ok_or_else(|| {
+            crate::Error::Validation(format!(
+                "InflationCurve '{}' requires interp style",
+                self.id
+            ))
+        })?;
+        let extrapolation = self.extrapolation.ok_or_else(|| {
+            crate::Error::Validation(format!(
+                "InflationCurve '{}' requires extrapolation policy",
+                self.id
+            ))
+        })?;
+
+        if matches!(
+            style,
+            InterpStyle::MonotoneConvex | InterpStyle::PiecewiseQuadraticForward
+        ) {
+            return Err(crate::Error::Validation(format!(
+                "InflationCurve '{}' does not support {style:?} interpolation; use Linear, CubicHermite, or LogLinear",
+                self.id
+            )));
         }
-        if self
-            .points
-            .iter()
-            .any(|&(t, c)| t == 0.0 && c.total_cmp(&self.base_cpi).is_ne())
-        {
-            return Err(crate::Error::Validation(
-                "CPI knot at t=0 must equal base_cpi".to_string(),
-            ));
+
+        let calendar = validate_curve_clock(
+            "InflationCurve",
+            self.id.as_str(),
+            day_count,
+            self.calendar_id.as_deref(),
+        )?;
+
+        let (kvec, cvec): (Vec<f64>, Vec<f64>) = self.points.into_iter().unzip();
+        validate_knots(&kvec)?;
+        if !exact_f64_eq(kvec[0], 0.0) {
+            return Err(crate::Error::Validation(format!(
+                "InflationCurve '{}' requires explicit (0.0, I_0) origin as first pillar, got first t={}",
+                self.id, kvec[0]
+            )));
         }
-        let (mut kvec, mut cvec): (Vec<f64>, Vec<f64>) = self.points.into_iter().unzip();
-        let origin = kvec.partition_point(|&t| t < 0.0);
-        if kvec.get(origin).is_none_or(|&t| t != 0.0) {
-            kvec.insert(origin, 0.0);
-            cvec.insert(origin, self.base_cpi);
-        }
+        validate_positive_series(&cvec)?;
+
         let knots = kvec.into_boxed_slice();
         let cpi_levels = cvec.into_boxed_slice();
-        if self.style == InterpStyle::MonotoneConvex {
-            return Err(crate::Error::Validation(
-                "MonotoneConvex interpolation is only supported on DiscountCurve".to_string(),
-            ));
-        }
-        let interp = InterpRollState::build_source(
-            self.roll_transform.as_ref(),
-            self.style,
-            self.extrapolation,
-            ValidationPolicy::Strict,
-            &knots,
-            &cpi_levels,
-        )?;
+        let interp = style.build_enum(knots.clone(), cpi_levels.clone(), extrapolation)?;
+
         Ok(InflationCurve {
             id: self.id,
-            base_cpi: self.base_cpi,
             base_date,
-            day_count: self.day_count,
-            indexation_lag_months: self.indexation_lag_months,
+            day_count,
+            calendar,
             knots,
             cpi_levels,
             interp,
-            roll: self.roll_transform,
         })
     }
+}
+
+/// Evaluate `level * exp(log_delta)` without spurious intermediate overflow/underflow.
+#[inline]
+fn scale_positive_level_log(level: f64, log_delta: f64) -> Option<f64> {
+    if log_delta.abs() < 700.0 {
+        let factor = log_delta.exp();
+        let prod = level * factor;
+        if prod.is_finite() && prod > 0.0 && (level.is_subnormal() || prod.is_normal()) {
+            return Some(prod);
+        }
+    }
+    let val = (level.ln() + log_delta).exp();
+    (val.is_finite() && val > 0.0).then_some(val)
+}
+
+/// Evaluate `I_0 * d^t * (1 + exp(v))^t` stably when `d > exp(h)` (`v = h - ln(d) < 0`).
+#[inline]
+fn positive_dominated_shift_level(
+    base_cpi: f64,
+    level: f64,
+    t: f64,
+    d: f64,
+    v: f64,
+) -> Option<f64> {
+    let e0 = stats::frexp_exp(base_cpi);
+    let m0 = stats::ldexp(base_cpi, -e0);
+    let ed = stats::frexp_exp(d);
+    let md = stats::ldexp(d, -ed);
+
+    if exact_f64_eq(t, 1.0) {
+        let base_times_d = stats::ldexp(m0 * md, e0 + ed);
+        if base_times_d.is_finite() && base_times_d > 0.0 {
+            let val = level + base_times_d;
+            if val.is_finite() && val > 0.0 {
+                return Some(val);
+            }
+        }
+    }
+
+    let correction = if v > -745.0 { v.exp().ln_1p() } else { 0.0 };
+    let exp_val = (m0.ln() + t * md.ln())
+        + (f64::from(e0) + t * f64::from(ed)) * std::f64::consts::LN_2
+        + t * correction;
+    let val = exp_val.exp();
+    (exp_val.is_finite() && val.is_finite() && val > 0.0).then_some(val)
+}
+
+fn bump_pillar_cpi(
+    curve_id: &CurveId,
+    t: f64,
+    level: f64,
+    base_cpi: f64,
+    shift: f64,
+    is_multiplicative: bool,
+    weight: f64,
+) -> crate::Result<f64> {
+    if !is_multiplicative {
+        if exact_f64_eq(shift, 0.0) || exact_f64_eq(weight, 0.0) {
+            return Ok(level);
+        }
+        let d = shift * weight;
+        if !d.is_finite() || d == 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "InflationCurve '{}' weighted additive shift underflowed at t={t:.6}",
+                curve_id
+            )));
+        }
+
+        let h = stable_positive_log_ratio(level, base_cpi)? / t;
+        if !h.is_finite() {
+            return Err(crate::Error::Validation(format!(
+                "InflationCurve '{}' source annual log growth overflowed at t={t:.6}",
+                curve_id
+            )));
+        }
+        let log_abs_d = d.abs().ln();
+        let new_level = if d < 0.0 {
+            if h <= log_abs_d {
+                return Err(crate::Error::Validation(format!(
+                    "InflationCurve '{}' additive bump at t={t:.6} drives annual gross growth non-positive (h={h}, d={d})",
+                    curve_id
+                )));
+            }
+            let u = h - log_abs_d;
+            let delta_h = if u <= 1.0 {
+                (-(-u).exp_m1()).ln()
+            } else {
+                (-(-u).exp()).ln_1p()
+            };
+            scale_positive_level_log(level, t * delta_h)
+        } else if h >= log_abs_d {
+            let u = log_abs_d - h;
+            let delta_h = if u > -745.0 { u.exp().ln_1p() } else { 0.0 };
+            scale_positive_level_log(level, t * delta_h)
+        } else {
+            let v = h - log_abs_d;
+            positive_dominated_shift_level(base_cpi, level, t, d, v)
+        };
+
+        return new_level.ok_or_else(|| {
+            crate::Error::Validation(format!(
+                "InflationCurve '{}' bumped CPI level at t={t:.6} is not finite and positive",
+                curve_id
+            ))
+        });
+    }
+
+    if exact_f64_eq(weight, 0.0) || exact_f64_eq(shift, 1.0) {
+        return Ok(level);
+    }
+    let log_m = if exact_f64_eq(weight, 1.0) {
+        shift.ln()
+    } else {
+        let m = (1.0 - weight) + shift * weight;
+        if !m.is_finite() || m <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "InflationCurve '{}' multiplicative gross multiplier must be finite and positive at t={t:.6}, got {m}",
+                curve_id
+            )));
+        }
+        m.ln()
+    };
+    let log_delta = t * log_m;
+    if !log_delta.is_finite() {
+        return Err(crate::Error::Validation(format!(
+            "InflationCurve '{}' multiplicative log shift overflowed at t={t:.6}",
+            curve_id
+        )));
+    }
+    scale_positive_level_log(level, log_delta).ok_or_else(|| {
+        crate::Error::Validation(format!(
+            "InflationCurve '{}' bumped CPI level at t={t:.6} is not finite and positive",
+            curve_id
+        ))
+    })
 }
 
 impl Bumpable for InflationCurve {
@@ -831,368 +704,269 @@ impl Bumpable for InflationCurve {
             "InflationCurve",
             "only supports Additive/{RateBp,Percent,Fraction} or Multiplicative/Factor",
         )?;
+        if is_multiplicative && (!shift.is_finite() || shift <= 0.0) {
+            return Err(crate::Error::Validation(format!(
+                "InflationCurve '{}' Multiplicative/Factor bump requires finite k > 0.0, got {shift}",
+                self.id
+            )));
+        }
 
-        let bumped_id = spec.standard_bump_id(self.id());
+        if let BumpType::TriangularKeyRate {
+            prev_bucket,
+            target_bucket,
+            ..
+        } = spec.bump_type
+            && (prev_bucket.is_some_and(|prev| prev < 0.0)
+                || target_bucket <= 0.0
+                || !self
+                    .knots
+                    .get(1..)
+                    .is_some_and(|pos| pos.iter().any(|&k| exact_f64_eq(k, target_bucket))))
+        {
+            return Err(crate::Error::Validation(format!(
+                "InflationCurve '{}' key-rate target {target_bucket} must match an exact positive source pillar",
+                self.id
+            )));
+        }
+
         let base_cpi = self.base_cpi();
-        // Shock the annualized zero inflation rate to time `t` and return the
-        // implied CPI level; base and realized pre-base CPI fixings never move.
-        let try_shocked_cpi_from_rate = |t: f64, zero_rate: f64| -> crate::Result<f64> {
-            let weight = spec.bump_type.weight(t);
-            let bumped_zero_rate = if is_multiplicative {
-                zero_rate * (1.0 + (shift - 1.0) * weight)
-            } else {
-                zero_rate + shift * weight
-            };
-            if !bumped_zero_rate.is_finite() || 1.0 + bumped_zero_rate <= 0.0 {
-                return Err(crate::Error::Validation(format!(
-                    "InflationCurve '{}' bumped annual inflation rate at t={t:.6} must satisfy 1 + r > 0, got r={bumped_zero_rate}",
-                    self.id
-                )));
-            }
-            let cpi = base_cpi * (t * bumped_zero_rate.ln_1p()).exp();
-            if !cpi.is_finite() || cpi <= 0.0 {
-                return Err(crate::Error::Validation(format!(
-                    "InflationCurve '{}' bumped CPI level at t={t:.6} is not finite and positive: {cpi}",
-                    self.id
-                )));
-            }
-            Ok(cpi)
-        };
-        let shocked_cpi = |t: f64, cpi: f64| -> f64 {
-            if t <= 0.0 {
-                return cpi;
-            }
-            let zero_rate = ((cpi.ln() - base_cpi.ln()) / t).exp_m1();
-            try_shocked_cpi_from_rate(t, zero_rate).unwrap_or(f64::NAN)
-        };
+        let mut bumped_points = Vec::with_capacity(self.knots.len());
+        bumped_points.push((self.knots[0], base_cpi));
 
-        let builder = self.metadata_builder(bumped_id);
-        // A rolled curve shocks its source pillars and reads its current
-        // pillars back, so base and shocked curves share one interpolation.
-        if let Some(roll) = &self.roll {
-            for &(source_t, source_cpi) in &roll.source_points {
-                let current_t = source_t - roll.offset;
-                if current_t > 0.0 {
-                    let zero_rate = ((source_cpi.ln() - base_cpi.ln()) / current_t).exp_m1();
-                    try_shocked_cpi_from_rate(current_t, zero_rate)?;
-                }
-            }
-            let (state, levels) = roll.bump(
-                &self.interp,
-                ValidationPolicy::Strict,
-                self.knots(),
-                shocked_cpi,
-            )?;
-            return builder
-                .knots(self.knots().iter().copied().zip(levels))
-                .roll_transform(Some(state))
-                .build();
+        for (&t, &cpi) in self.knots[1..].iter().zip(self.cpi_levels[1..].iter()) {
+            let weight = spec.bump_type.weight(t);
+            let bumped =
+                bump_pillar_cpi(&self.id, t, cpi, base_cpi, shift, is_multiplicative, weight)?;
+            bumped_points.push((t, bumped));
         }
-        let mut bumped_points = Vec::with_capacity(self.knots().len());
-        for (&t, &cpi) in self.knots().iter().zip(self.cpi_levels.iter()) {
-            if t <= 0.0 {
-                bumped_points.push((t, cpi));
-                continue;
-            }
-            let zero_rate = self.inflation_rate(0.0, t)?;
-            bumped_points.push((t, try_shocked_cpi_from_rate(t, zero_rate)?));
-        }
-        builder.knots(bumped_points).build()
+
+        self.metadata_builder(self.id.clone())
+            .knots(bumped_points)
+            .build()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::market_data::bumps::{BumpMode, BumpUnits};
+    use time::Month;
 
     fn sample_curve() -> InflationCurve {
-        let base =
-            Date::from_calendar_date(2025, time::Month::January, 1).expect("Valid test date");
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
         InflationCurve::builder("US-CPI")
             .base_date(base)
-            .base_cpi(300.0)
+            .day_count(DayCount::Act365F)
             .knots([(0.0, 300.0), (1.0, 306.0), (2.0, 312.0)])
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .build()
             .expect("InflationCurve builder should succeed in test")
     }
 
     #[test]
-    fn cpi_hits_knots() {
-        let ic = sample_curve();
-        assert!((ic.cpi(1.0) - 306.0).abs() < 1e-9);
-    }
-
-    #[test]
-    fn future_only_quotes_interpolate_from_base_cpi() {
-        let curve = InflationCurve::builder("CPI-ORIGIN")
-            .base_date(Date::from_calendar_date(2025, time::Month::January, 1).unwrap())
-            .base_cpi(300.0)
-            .knots([(1.0, 330.0), (2.0, 345.0)])
-            .build()
-            .unwrap();
-        assert_eq!(curve.knots(), &[0.0, 1.0, 2.0]);
-        assert!((curve.cpi(0.5) - (300.0_f64 * 330.0).sqrt()).abs() < 1e-12);
-        assert!((curve.cpi(1e-6) - 300.0 * 1.1_f64.powf(1e-6)).abs() < 1e-12);
-        assert!((curve.cpi(1.0) - 330.0).abs() < 1e-12);
-
-        let restored: InflationCurve =
-            serde_json::from_str(&serde_json::to_string(&curve).unwrap()).unwrap();
-        assert_eq!(restored.knots(), curve.knots());
-        assert_eq!(restored.cpi(0.5), curve.cpi(0.5));
-    }
-
-    #[test]
-    fn inflation_rate_positive() {
-        let ic = sample_curve();
-        let r = ic.inflation_rate(0.0, 1.0).expect("valid interval");
-        assert!(r > 0.0);
-    }
-
-    #[test]
-    fn inflation_rate_rejects_invalid_intervals() {
-        let ic = sample_curve();
-        for (t1, t2) in [
-            (1.0, 0.0),
-            (1.0, 1.0),
-            (f64::NAN, 1.0),
-            (0.0, f64::INFINITY),
+    fn builder_requires_all_explicit_conventions_and_origin() {
+        let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+        // Missing origin or non-zero first knot rejected
+        assert!(
+            InflationCurve::builder("US-CPI")
+                .base_date(base)
+                .day_count(DayCount::Act365F)
+                .knots([(1.0, 306.0), (2.0, 312.0)])
+                .interp(InterpStyle::LogLinear)
+                .extrapolation(ExtrapolationPolicy::Flat)
+                .build()
+                .is_err()
+        );
+        // Single origin knot without positive pillar rejected
+        assert!(
+            InflationCurve::builder("US-CPI")
+                .base_date(base)
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 300.0)])
+                .interp(InterpStyle::LogLinear)
+                .extrapolation(ExtrapolationPolicy::Flat)
+                .build()
+                .is_err()
+        );
+        // Negative first knot rejected
+        assert!(
+            InflationCurve::builder("US-CPI")
+                .base_date(base)
+                .day_count(DayCount::Act365F)
+                .knots([(-0.5, 297.0), (0.0, 300.0), (1.0, 306.0)])
+                .interp(InterpStyle::LogLinear)
+                .extrapolation(ExtrapolationPolicy::Flat)
+                .build()
+                .is_err()
+        );
+        // Unsupported interpolation styles rejected
+        for unsupported in [
+            InterpStyle::MonotoneConvex,
+            InterpStyle::PiecewiseQuadraticForward,
         ] {
-            assert!(ic.inflation_rate(t1, t2).is_err());
+            assert!(
+                InflationCurve::builder("US-CPI")
+                    .base_date(base)
+                    .day_count(DayCount::Act365F)
+                    .knots([(0.0, 300.0), (1.0, 306.0)])
+                    .interp(unsupported)
+                    .extrapolation(ExtrapolationPolicy::Flat)
+                    .build()
+                    .is_err()
+            );
         }
-    }
-
-    #[test]
-    fn inflation_rate_uses_cagr() {
-        let ic = sample_curve();
-        // CPI goes from 300 to 306 in 1 year → CAGR = (306/300)^1 - 1 = 2%
-        let r = ic.inflation_rate(0.0, 1.0).expect("valid interval");
+        // Bus252 without calendar rejected
         assert!(
-            (r - 0.02).abs() < 1e-6,
-            "Expected ~2% CAGR inflation rate, got {:.4}%",
-            r * 100.0
+            InflationCurve::builder("US-CPI")
+                .base_date(base)
+                .day_count(DayCount::Bus252)
+                .knots([(0.0, 300.0), (1.0, 306.0)])
+                .interp(InterpStyle::Linear)
+                .extrapolation(ExtrapolationPolicy::Flat)
+                .build()
+                .is_err()
         );
     }
 
     #[test]
-    fn cpi_with_lag_applies_3_month_lag() {
+    fn checked_queries_and_subnormals_behave_per_adr() {
+        let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
         let ic = sample_curve();
-        // At t=1.0 with 3-month lag, should return CPI at t=0.75
-        let lagged = ic.cpi_with_lag(1.0);
-        let direct = ic.cpi(0.75);
+        assert!((ic.cpi(1.0).unwrap() - 306.0).abs() < 1e-12);
+        assert!(ic.cpi(-0.01).is_err());
+        assert!(ic.cpi(f64::NAN).is_err());
         assert!(
-            (lagged - direct).abs() < 1e-12,
-            "Lagged CPI at t=1.0 should equal CPI at t=0.75"
+            ic.cpi_on_date(Date::from_calendar_date(2024, Month::December, 31).unwrap())
+                .is_err()
         );
-    }
 
-    #[test]
-    fn index_ratio_equals_lagged_cpi_over_base_cpi() {
-        let ic = sample_curve();
-        let ratio = ic.index_ratio(1.0).expect("positive base CPI");
-        let expected = ic.cpi_with_lag(1.0) / ic.base_cpi();
-        assert!((ratio - expected).abs() < 1e-12);
-        // A rising CPI curve indexes principal above par.
-        assert!(ratio > 1.0, "expected uplift above par, got {ratio}");
-    }
-
-    #[test]
-    fn index_ratio_is_one_at_base_without_lag() {
-        let base =
-            Date::from_calendar_date(2025, time::Month::January, 1).expect("Valid test date");
-        let ic = InflationCurve::builder("CPI-NOLAG")
+        // Annual growth 300 -> 306 in 1y is 2%, in 0.5y is 4.04%
+        assert!((ic.inflation_rate(0.0, 1.0).unwrap() - 0.02).abs() < 1e-12);
+        let half_year = InflationCurve::builder("HALF")
             .base_date(base)
-            .base_cpi(300.0)
-            .knots([(0.0, 300.0), (5.0, 330.0)])
-            .indexation_lag_months(0)
-            .build()
-            .expect("InflationCurve builder should succeed in test");
-        assert!((ic.index_ratio(0.0).expect("positive base CPI") - 1.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn base_date_is_set() {
-        let ic = sample_curve();
-        let expected =
-            Date::from_calendar_date(2025, time::Month::January, 1).expect("Valid test date");
-        assert_eq!(ic.base_date(), expected);
-    }
-
-    #[test]
-    fn roll_forward_uses_day_count() {
-        let base =
-            Date::from_calendar_date(2025, time::Month::January, 1).expect("Valid test date");
-        let ic = InflationCurve::builder("CPI-ROLL")
-            .base_date(base)
-            .base_cpi(300.0)
-            .knots([
-                (0.5, 303.0),
-                (1.0, 306.0),
-                (2.0, 312.0),
-                (5.0, 330.0),
-                (10.0, 360.0),
-            ])
-            .build()
-            .expect("InflationCurve builder should succeed in test");
-
-        let rolled = ic.roll_forward(365).expect("roll_forward should succeed");
-        // After rolling 365 days (~1 year), base date should advance
-        assert!(rolled.base_date() > base);
-        // And knot count should decrease as early knots expire
-        assert!(rolled.knots().len() < ic.knots().len());
-    }
-
-    #[test]
-    fn roll_forward_preserves_interp_style_and_extrapolation() {
-        let base =
-            Date::from_calendar_date(2025, time::Month::January, 1).expect("Valid test date");
-        let ic = InflationCurve::builder("CPI-ROLL")
-            .base_date(base)
-            .base_cpi(300.0)
-            .knots([(0.5, 303.0), (1.0, 306.0), (5.0, 330.0)])
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 300.0), (0.5, 306.0)])
             .interp(InterpStyle::Linear)
-            .extrapolation(ExtrapolationPolicy::FlatZero)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .build()
-            .expect("InflationCurve builder should succeed in test");
+            .unwrap();
+        assert!((half_year.inflation_rate(0.0, 0.5).unwrap() - 0.0404).abs() < 1e-12);
 
-        let rolled = ic.roll_forward(30).expect("roll_forward should succeed");
-        assert_eq!(rolled.interp_style(), InterpStyle::Linear);
-        assert_eq!(rolled.extrapolation(), ExtrapolationPolicy::FlatZero);
-    }
-
-    #[test]
-    fn rolls_preserve_source_interpolation_through_rebuilds_bumps_and_serde() {
-        let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
-        let source = InflationCurve::builder("CPI-SHAPE-ROLL")
+        // Severe deflation exp(-40) survives direct CPI lookup without quote overflow,
+        // while annual quote rounding to -1 errors cleanly.
+        let exp_minus_40 = InflationCurve::builder("DEFL")
             .base_date(base)
-            .base_cpi(300.0)
-            .knots([(0.0, 300.0), (1.0, 306.0), (2.0, 318.0), (3.0, 336.0)])
-            .interp(InterpStyle::CubicHermite)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (1.0, (-40.0_f64).exp())])
+            .interp(InterpStyle::Linear)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .build()
             .unwrap();
-        let unchanged = source.roll_forward(0).unwrap();
-        assert_eq!(
-            serde_json::to_value(&source).unwrap(),
-            serde_json::to_value(&unchanged).unwrap()
-        );
+        assert_eq!(exp_minus_40.cpi(1.0).unwrap(), (-40.0_f64).exp());
+        assert!(exp_minus_40.inflation_rate(0.0, 1.0).is_err());
 
-        let rolled = source.roll_forward(365).unwrap();
-        for time in [0.25, 0.5, 1.5] {
-            assert!((rolled.cpi(time) - source.cpi(time + 1.0)).abs() < 1e-12);
-        }
-        let rebuilt = rolled
-            .to_builder_with_id("CPI-SHAPE-REBUILT")
-            .build()
-            .unwrap();
-        assert!((rebuilt.cpi(0.5) - source.cpi(1.5)).abs() < 1e-12);
-
-        let restored: InflationCurve =
-            serde_json::from_str(&serde_json::to_string(&rolled).unwrap()).unwrap();
-        assert!((restored.cpi(0.5) - source.cpi(1.5)).abs() < 1e-12);
-        let twice = restored.roll_forward(180).unwrap();
-        assert!((twice.cpi(0.5) - source.cpi(1.5 + 180.0 / 365.0)).abs() < 1e-12);
-
-        let bumped = restored.apply_bump(BumpSpec::parallel_bp(10.0)).unwrap();
-        let bumped_round_trip: InflationCurve =
-            serde_json::from_str(&serde_json::to_string(&bumped).unwrap()).unwrap();
-        assert!((bumped_round_trip.cpi(0.5) - bumped.cpi(0.5)).abs() < 1e-12);
-        // The base CPI is a fixing: a rate shock never moves it.
-        assert_eq!(bumped.base_cpi(), restored.base_cpi());
-        assert_eq!(bumped.cpi(0.0), restored.cpi(0.0));
-
-        // A zero shock keeps the rolled Hermite shape off-pillar.
-        let flat = restored.apply_bump(BumpSpec::parallel_bp(0.0)).unwrap();
-        for time in [0.1, 0.25, 0.75] {
-            assert!((flat.cpi(time) - restored.cpi(time)).abs() < 1e-12);
-        }
-    }
-
-    #[test]
-    fn rolled_log_linear_curve_shock_pins_base_cpi_and_backward_roll_rebuilds() {
-        let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
-        let curve = InflationCurve::builder("CPI-LOGLIN")
+        // Neighboring huge levels preserve nonzero annual rate via checked_log_cross_ratio.
+        let big = 1e300_f64;
+        let next_big = f64::from_bits(big.to_bits() + 1);
+        let huge_curve = InflationCurve::builder("HUGE")
             .base_date(base)
-            .base_cpi(300.0)
-            .knots([(0.0, 300.0), (1.0, 306.0), (2.0, 318.0)])
-            .interp(InterpStyle::LogLinear)
-            .extrapolation(ExtrapolationPolicy::FlatForward)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, big), (1.0, next_big)])
+            .interp(InterpStyle::Linear)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .build()
             .unwrap();
-        let rolled = curve.roll_forward(182).unwrap();
-        let bumped = rolled.apply_bump(BumpSpec::parallel_bp(25.0)).unwrap();
-        assert_eq!(bumped.base_cpi(), rolled.base_cpi());
-        assert!((bumped.cpi(0.0) - rolled.base_cpi()).abs() < 1e-12);
-        assert!(bumped.cpi(1.0) > rolled.cpi(1.0));
-
-        assert!(curve.roll_forward(-30).is_err());
+        let tiny_rate = huge_curve.inflation_rate(0.0, 1.0).unwrap();
+        assert!((tiny_rate - 1.487016908477783e-16).abs() < 1e-28);
     }
 
     #[test]
-    fn multiplicative_bump_scales_zero_inflation_rate_not_gross_factor() {
-        use crate::market_data::bumps::{BumpMode, BumpType, BumpUnits};
-
-        let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+    fn shocks_follow_gross_annual_growth_and_extreme_domain_identities() {
+        let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
         let curve = InflationCurve::builder("CPI-MULT")
             .base_date(base)
-            .base_cpi(300.0)
+            .day_count(DayCount::Act365F)
             .knots([(0.0, 300.0), (1.0, 306.0), (5.0, 300.0 * 1.02_f64.powi(5))])
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
-        let bumped = curve
+        // Additive +100bp gives 309 at 1y (annual gross 1.02 + 0.01 = 1.03)
+        let add = curve.apply_bump(BumpSpec::parallel_bp(100.0)).unwrap();
+        assert_eq!(add.id().as_str(), "CPI-MULT");
+        assert!((add.cpi(1.0).unwrap() - 309.0).abs() < 1e-12);
+
+        // Multiplicative factor 1.10 scales gross growth 1.02 -> 1.122 (12.2% annual rate)
+        let mult = curve.apply_bump(BumpSpec::multiplier(1.10)).unwrap();
+        assert!((mult.cpi(1.0).unwrap() - 336.6).abs() < 1e-11);
+        assert!((mult.inflation_rate(0.0, 1.0).unwrap() - 0.122).abs() < 1e-12);
+        assert!((mult.inflation_rate(0.0, 5.0).unwrap() - 0.122).abs() < 1e-12);
+
+        // Exact identity preserves bit-identical source levels (even for extreme deflation)
+        let defl = InflationCurve::builder("DEFL-ID")
+            .base_date(base)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (1.0, (-40.0_f64).exp())])
+            .interp(InterpStyle::Linear)
+            .extrapolation(ExtrapolationPolicy::Flat)
+            .build()
+            .unwrap();
+        let ident = defl.apply_bump(BumpSpec::parallel_bp(0.0)).unwrap();
+        assert_eq!(ident.cpi_levels(), defl.cpi_levels());
+
+        // Origin, unknown, and zero/negative factor bumps are rejected
+        assert!(
+            curve
+                .apply_bump(BumpSpec::triangular_key_rate_first_bp(0.0, 1.0, 10.0))
+                .is_err()
+        );
+        assert!(
+            curve
+                .apply_bump(BumpSpec::triangular_key_rate_bp(1.0, 2.5, 5.0, 10.0))
+                .is_err()
+        );
+        assert!(
+            curve
+                .apply_bump(BumpSpec {
+                    mode: BumpMode::Multiplicative,
+                    units: BumpUnits::Factor,
+                    value: 0.0,
+                    bump_type: BumpType::Parallel,
+                })
+                .is_err()
+        );
+
+        // Extreme cross-magnitude additive rescue: I0=1e300, I1=1e-300, t=1, d=1e-300 -> 1.0
+        let cross = InflationCurve::builder("CROSS")
+            .base_date(base)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1e300), (1.0, 1e-300)])
+            .interp(InterpStyle::Linear)
+            .extrapolation(ExtrapolationPolicy::Flat)
+            .build()
+            .unwrap();
+        let rescued = cross
             .apply_bump(BumpSpec {
-                mode: BumpMode::Multiplicative,
-                units: BumpUnits::Factor,
-                value: 1.10,
+                mode: BumpMode::Additive,
+                units: BumpUnits::Fraction,
+                value: 1e-300,
                 bump_type: BumpType::Parallel,
             })
-            .expect("1.10x multiplicative bump");
+            .unwrap();
+        assert!((rescued.cpi(1.0).unwrap() - 1.0).abs() < 1e-12);
 
-        let r1 = bumped.inflation_rate(0.0, 1.0).unwrap();
-        let r5 = bumped.inflation_rate(0.0, 5.0).unwrap();
-        assert!(
-            (r1 - 0.022).abs() < 1e-12,
-            "1.10x bump on 2.00% zero inflation rate must give 2.20%, got {r1}"
-        );
-        assert!(
-            (r5 - 0.022).abs() < 1e-12,
-            "1.10x bump on 5Y 2.00% zero inflation rate must give 2.20%, got {r5}"
-        );
-
-        let too_negative = curve.apply_bump(BumpSpec {
-            mode: BumpMode::Additive,
-            units: BumpUnits::Fraction,
-            value: -1.05,
-            bump_type: BumpType::Parallel,
-        });
-        assert!(
-            too_negative.is_err(),
-            "bumped inflation rate with 1 + r <= 0 must be rejected"
-        );
-    }
-
-    #[test]
-    fn pre_base_knots_and_lag_domain_are_honored() {
-        let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
-        let with_pre_base = InflationCurve::builder("CPI-PREBASE")
+        // Extreme tiny gross multiplier k=1e-300 on I0=1, I1=1e300 -> 1.0
+        let giant = InflationCurve::builder("GIANT")
             .base_date(base)
-            .base_cpi(300.0)
-            .knots([(-0.5, 297.0), (0.0, 300.0), (1.0, 306.0)])
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (1.0, 1e300)])
             .interp(InterpStyle::Linear)
-            .indexation_lag_months(3)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .build()
             .unwrap();
-        assert!((with_pre_base.cpi(-0.25) - 298.5).abs() < 1e-12);
-        assert!((with_pre_base.cpi_with_lag(0.0) - 298.5).abs() < 1e-12);
-        assert!((with_pre_base.index_ratio(0.0).unwrap() - 298.5 / 300.0).abs() < 1e-12);
-
-        let future_only = sample_curve();
-        assert!(
-            future_only.cpi_with_lag(0.1).is_nan(),
-            "lagged CPI before earliest knot must not flatten to base_cpi"
-        );
-        assert!(
-            future_only.index_ratio(0.1).is_err(),
-            "index_ratio must reject t - lag before earliest knot"
-        );
+        let scaled_down = giant.apply_bump(BumpSpec::multiplier(1e-300)).unwrap();
+        assert!((scaled_down.cpi(1.0).unwrap() - 1.0).abs() < 1e-12);
     }
 }

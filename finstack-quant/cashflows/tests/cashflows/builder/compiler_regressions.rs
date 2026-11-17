@@ -477,10 +477,13 @@ fn overnight_spec() -> Value {
 }
 
 fn overnight_market() -> MarketContext {
-    let curve = ForwardCurve::builder("RFR", 1.0 / 360.0)
+    let p_day1 = 1.0 / (1.0 + 0.1 / 360.0);
+    let curve = ForwardCurve::builder("RFR")
         .base_date(date("2025-01-06"))
         .day_count(DayCount::Act360)
-        .knots([(0.0, 0.2), (1.0 / 360.0, 0.0), (1.0, 0.0)])
+        .knots([(0.0, 1.0), (1.0 / 360.0, p_day1), (1.0, p_day1)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("valid curve");
     MarketContext::new().insert(curve)
@@ -598,11 +601,8 @@ fn overnight_zero_daycount_segment_keeps_replay_clock_and_emits_zero() {
     value["principal_events"][0]["payment_date"] = json!("2025-01-31");
     value["coupon_program"][0]["spec"]["day_count"] = json!("30_360");
     value["coupon_program"][0]["spec"]["rate_spec"]["overnight_basis"] = json!("act_360");
-    let curve = ForwardCurve::builder("RFR", 1.0 / 360.0)
-        .base_date(date("2025-01-30"))
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.1), (1.0, 0.1)])
-        .build()
+    let cont_rate = 360.0 * (0.1_f64 / 360.0).ln_1p();
+    let curve = ForwardCurve::flat("RFR", date("2025-01-30"), cont_rate, DayCount::Act360)
         .expect("flat curve");
     let schedule = build(value, Some(&MarketContext::new().insert(curve)));
     let zero = schedule
@@ -630,12 +630,16 @@ fn weekend_balance_splits_record_one_raw_fixing_and_materialize_without_conflict
     value["principal_events"][0]["date"] = json!("2025-01-05");
     value["principal_events"][0]["payment_date"] = json!("2025-01-05");
     let base = date("2025-01-03");
-    let curve = ForwardCurve::builder("RFR", 1.0 / 360.0)
-        .base_date(base)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.02), (0.1, 0.15), (1.0, 0.15)])
-        .build()
-        .expect("sloped curve");
+    let curve = ForwardCurve::from_zero_rates(
+        "RFR",
+        base,
+        &[(0.0, 0.02), (0.1, 0.15), (1.0, 0.15)],
+        finstack_quant_core::math::Compounding::Continuous,
+        DayCount::Act360,
+        finstack_quant_core::math::interp::InterpStyle::LogLinear,
+        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+    )
+    .expect("sloped curve");
     let market = MarketContext::new().insert(curve);
     let schedule = build(value.clone(), Some(&market));
     let known: Vec<_> = schedule
@@ -648,7 +652,7 @@ fn weekend_balance_splits_record_one_raw_fixing_and_materialize_without_conflict
     let expected = market
         .get_forward("RFR")
         .expect("curve")
-        .rate_period(0.0, 1.0 / 360.0)
+        .rate_between_dates(base, date("2025-01-04"), 1.0 / 360.0)
         .expect("finite ordered period");
     close(known[0].value.expect("raw fixing"), expected);
     let realized = finstack_quant_cashflows::fixings::materialize_fixings(
@@ -659,11 +663,7 @@ fn weekend_balance_splits_record_one_raw_fixing_and_materialize_without_conflict
     )
     .expect("raw published observations have no conflicting slice-tenor values")
     .insert(
-        ForwardCurve::builder("RFR", 1.0 / 360.0)
-            .base_date(date("2025-01-07"))
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.3), (1.0, 0.3)])
-            .build()
+        ForwardCurve::flat("RFR", date("2025-01-07"), 0.3, DayCount::Act360)
             .expect("post-roll curve"),
     );
     let replayed = build(value, Some(&realized));

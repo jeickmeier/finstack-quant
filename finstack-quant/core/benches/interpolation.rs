@@ -6,7 +6,7 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::math::interp::{
     CubicHermiteStrategy, ExtrapolationPolicy, Interpolator, LinearStrategy, LogLinearStrategy,
-    MonotoneConvexStrategy, PiecewiseQuadraticForwardStrategy, ValidationPolicy,
+    MonotoneConvexStrategy, PiecewiseQuadraticForwardStrategy,
 };
 use std::hint::black_box;
 
@@ -26,13 +26,8 @@ fn create_test_curve(num_points: usize) -> (Box<[f64]>, Box<[f64]>) {
 macro_rules! create_interp {
     ($strategy:ty, $num_points:expr) => {{
         let (knots, dfs) = create_test_curve($num_points);
-        Interpolator::<$strategy>::new(
-            knots,
-            dfs,
-            ExtrapolationPolicy::FlatZero,
-            ValidationPolicy::Strict,
-        )
-        .expect("valid positive, increasing interpolation fixture")
+        Interpolator::<$strategy>::new(knots, dfs, ExtrapolationPolicy::Flat)
+            .expect("valid positive, increasing interpolation fixture")
     }};
 }
 
@@ -83,7 +78,7 @@ macro_rules! check_queries {
         assert!(!$times.is_empty());
         for &time in $times {
             assert_close(
-                $interp.interp(time),
+                $interp.interp(time).expect("valid query"),
                 expected_df(time, $num_points, $reference),
             );
         }
@@ -179,29 +174,29 @@ fn bench_interp_extrapolation(c: &mut Criterion) {
     for (name, policy, time) in [
         (
             "interp_extrap_flat_zero_left",
-            ExtrapolationPolicy::FlatZero,
+            ExtrapolationPolicy::Flat,
             -1.0,
         ),
         (
             "interp_extrap_flat_zero_right",
-            ExtrapolationPolicy::FlatZero,
+            ExtrapolationPolicy::Flat,
             100.0,
         ),
         (
             "interp_extrap_flat_fwd_left",
-            ExtrapolationPolicy::FlatForward,
+            ExtrapolationPolicy::Extend,
             -1.0,
         ),
         (
             "interp_extrap_flat_fwd_right",
-            ExtrapolationPolicy::FlatForward,
+            ExtrapolationPolicy::Extend,
             100.0,
         ),
     ] {
         c.bench_function(name, |b| {
             let (knots, dfs) = create_test_curve(10);
             let boundary = if time < 0.0 { 0 } else { knots.len() - 1 };
-            let expected = if matches!(policy, ExtrapolationPolicy::FlatZero) {
+            let expected = if matches!(policy, ExtrapolationPolicy::Flat) {
                 dfs[boundary]
             } else {
                 let (left, right) = if time < 0.0 { (0, 1) } else { (8, 9) };
@@ -209,10 +204,9 @@ fn bench_interp_extrapolation(c: &mut Criterion) {
                     + (dfs[right] - dfs[left]) / (knots[right] - knots[left])
                         * (time - knots[boundary])
             };
-            let interp =
-                Interpolator::<LinearStrategy>::new(knots, dfs, policy, ValidationPolicy::Strict)
-                    .expect("valid extrapolation fixture");
-            assert_close(interp.interp(time), expected);
+            let interp = Interpolator::<LinearStrategy>::new(knots, dfs, policy)
+                .expect("valid extrapolation fixture");
+            assert_close(interp.interp(time).expect("valid query"), expected);
             b.iter(|| black_box(black_box(&interp).interp(black_box(time))));
         });
     }

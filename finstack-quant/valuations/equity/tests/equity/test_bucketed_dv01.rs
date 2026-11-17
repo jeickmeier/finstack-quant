@@ -32,6 +32,8 @@ fn build_flat_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve
             (5.0, (-rate * 5.0).exp()),
             (10.0, (-rate * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("Failed to build discount curve")
 }
@@ -55,7 +57,7 @@ fn test_equity_bucketed_dv01_computed() {
     let usd_curve = build_flat_curve(0.05, as_of, "USD");
     let market = MarketContext::new().insert(usd_curve).insert_price(
         "AAPL",
-        MarketScalar::Price(Money::new(150.0, Currency::USD).expect("valid money fixture")),
+        MarketScalar::price(Money::new(150.0, Currency::USD).expect("valid money fixture")),
     );
 
     let result = equity
@@ -99,7 +101,7 @@ fn test_equity_bucketed_dv01_with_market_price() {
     let usd_curve = build_flat_curve(0.03, as_of, "USD");
     let market = MarketContext::new().insert(usd_curve).insert_price(
         "MSFT",
-        MarketScalar::Price(Money::new(350.0, Currency::USD).expect("valid money fixture")),
+        MarketScalar::price(Money::new(350.0, Currency::USD).expect("valid money fixture")),
     );
 
     let result = equity

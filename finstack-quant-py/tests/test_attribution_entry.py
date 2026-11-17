@@ -74,7 +74,9 @@ def _market_json(as_of: str, shift: float = 0.0) -> str:
         (5.0, 0.800 - shift),
         (10.0, 0.650 - shift),
     ]
-    mc.insert(DiscountCurve("USD-OIS", base, knots, day_count="act_365f"))
+    mc.insert(
+        DiscountCurve("USD-OIS", base, knots, day_count="act_365f", interp="monotone_convex", extrapolation="extend")
+    )
     return mc.to_json()
 
 

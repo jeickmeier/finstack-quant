@@ -1,131 +1,85 @@
-//! Forward rate curves for simple term floating-rate indices.
+//! Factor-native forward projection curves for floating-rate indices.
 //!
-//! A forward curve represents expected future simple rates for a specific
-//! tenor-index projection (e.g., 3-month SOFR term, 6-month EURIBOR). These
-//! curves are essential for pricing floating-rate instruments and calculating
-//! forward-looking cash flows in swaps and floating-rate notes.
+//! A [`ForwardCurve`] represents a normalized positive projection factor curve
+//! `P_x(t) > 0` with `P_x(0) = 1.0`, sharing the positive-factor mathematical
+//! foundation with [`DiscountCurve`](super::DiscountCurve) while keeping
+//! projection sources explicitly distinct from funding/discount curves (it does
+//! not implement [`Discounting`](crate::market_data::traits::Discounting)).
 //!
-//! # Financial Concept
+//! # Simple Rate Projection
 //!
-//! The forward rate f(t₁, t₂) is the rate agreed today for borrowing/lending
-//! from time t₁ to t₂:
+//! Over any accrual period `[S, E]` with contractual index year fraction
+//! `alpha > 0`:
 //! ```text
-//! f(t₁, t₂) = [DF(t₁) / DF(t₂) - 1] / (t₂ - t₁)
-//!
-//! For a fixed-tenor index (e.g., 3M):
-//! f(t) = forward rate resetting at time t for the index tenor
+//! L_x(S, E; alpha) = (P_x(S) / P_x(E) - 1) / alpha
 //! ```
-//!
-//! # Market Construction
-//!
-//! Forward curves are typically bootstrapped from:
-//! - **Futures**: SOFR futures, Eurodollar futures (liquid up to ~5 years)
-//! - **FRA** (Forward Rate Agreements): OTC quotes for forward rates
-//! - **Swaps**: Float leg expectations from swap rates
-//! - **Basis spreads**: Tenor basis between different index tenors
-//!
-//! # Index Conventions
-//!
-//! This type stores simple tenor forwards plus day-count/reset-lag metadata.
-//! It does **not** model overnight compounded-in-arrears fixings, observation
-//! shifts, or lookbacks. Use it for term indices or already-compounded term
-//! projections. Overnight RFR instruments need a separate compounding model.
-//!
-//! # Use Cases
-//!
-//! - **Floating-rate note pricing**: Project future coupon payments
-//! - **Interest rate swap valuation**: Mark-to-market floating leg
-//! - **Cap/floor pricing**: Forward rates determine intrinsic value
-//! - **Basis swap pricing**: Spread between different index tenors
+//! evaluated via [`ForwardCurve::rate_between`] and
+//! [`ForwardCurve::rate_between_dates`].
 //!
 //! # Examples
 //!
 //! ```rust
+//! use finstack_quant_core::dates::{Date, DayCount, Tenor};
 //! use finstack_quant_core::market_data::term_structures::ForwardCurve;
-//! use finstack_quant_core::math::interp::InterpStyle;
-//! use finstack_quant_core::dates::Date;
+//! use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 //! use time::Month;
 //!
 //! let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
-//! let fc = ForwardCurve::builder("USD-SOFR3M", 0.25)
+//! let fc = ForwardCurve::builder("USD-SOFR-3M")
 //!     .base_date(base)
-//!     .knots([(0.0, 0.03), (5.0, 0.04)])
-//!     .interp(InterpStyle::Linear)
+//!     .day_count(DayCount::Act360)
+//!     .index_tenor(Tenor::quarterly())
+//!     .knots([(0.0, 1.0), (5.0, (-0.04_f64 * 5.0).exp())])
+//!     .interp(InterpStyle::LogLinear)
+//!     .extrapolation(ExtrapolationPolicy::Extend)
 //!     .build()
 //!     .expect("ForwardCurve builder should succeed");
-//! assert!(fc.rate(1.0) > 0.0);
+//! assert!(fc.rate_between(0.0, 0.25, 0.25).expect("valid rate") > 0.0);
 //! ```
-//!
-//! # References
-//!
-//! - Hull, J. C. (2018). *Options, Futures, and Other Derivatives* (10th ed.).
-//!   Chapters 4-6 (Forward rates and curve construction). `docs/REFERENCES.md#hull-options-futures`
-//! - Andersen, L., & Piterbarg, V. (2010). *Interest Rate Modeling*.
-//!   Volume 1, Chapter 3 (Multi-curve framework). `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
-//! - Ametrano, F. M., & Bianchetti, M. (2013). "Everything You Always Wanted to
-//!   Know About Multiple Interest Rate Curve Bootstrapping but Were Afraid to Ask."
-//!   SSRN Working Paper. `docs/REFERENCES.md#ametrano-bianchetti-2013`
 
-use crate::market_data::term_structures::common::roll_knots;
-use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
-use crate::{
-    dates::{Date, DayCount},
-    error::InputError,
-    math::integration::simpson_rule,
-    math::interp::Interp,
-    types::CurveId,
-};
+use super::common::CurveCalendar;
+use crate::dates::{Date, DayCount, Tenor};
+use crate::math::interp::{ExtrapolationPolicy, Interp, InterpStyle};
+use crate::types::CurveId;
 
-/// Forward rate curve for a simple floating-rate index with fixed tenor.
+/// Positive normalized factor curve for projecting floating-rate index fixings.
 ///
-/// Represents expected future simple rates for a specific tenor-index projection
-/// (e.g., 3-month SOFR term, 6-month EURIBOR). Stores simple forward rates at
-/// knot times and interpolates between them.
-///
-/// # Index Components
-///
-/// - **Tenor**: Index accrual period (e.g., 0.25 years = 3 months)
-/// - **Reset lag**: Days from fixing date to effective date
-/// - **Day count**: Convention for accrual (usually Act/360 or Act/365F)
-///
-/// # Thread Safety
-///
-/// Immutable after construction; safe to share via `Arc<ForwardCurve>`.
+/// Stores strictly positive projection factors `(t_i, P_x(t_i))` anchored at
+/// `(0.0, 1.0)` on an explicit [`DayCount`] clock (plus resolved holiday calendar
+/// when using `Bus/252`), optional index tenor metadata ([`Tenor`]), an explicit
+/// interpolation style, and an explicit extrapolation policy.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "RawForwardCurve", into = "RawForwardCurve")]
 pub struct ForwardCurve {
-    id: CurveId,
-    base: Date,
-    /// Business days from fixing to spot using positive T-minus semantics.
-    reset_lag: i32,
-    /// Day-count basis used for accrual.
-    day_count: DayCount,
-    /// Index tenor in **years** (0.25 = 3M).
-    tenor: f64,
-    /// Knot times in **years** (strictly increasing, first may be 0.0).
-    knots: Box<[f64]>,
-    /// Simple forward rates (e.g. 0.025 = 2.5 %).
-    forwards: Box<[f64]>,
-    /// Optional contractual reset/end-date boundaries, separate from interpolation knots.
-    projection_grid: Option<Box<[f64]>>,
-    interp: Interp,
-    /// Exact source interpolation plus accumulated continuous transformations.
+    pub(crate) id: CurveId,
+    pub(crate) base: Date,
+    /// Day-count basis mapping dates to projection factor times.
+    pub(crate) day_count: DayCount,
+    /// Business-day calendar of the time axis; required by Bus/252.
+    pub(crate) calendar: Option<CurveCalendar>,
+    /// Optional index accrual tenor metadata associated with this projection source.
+    pub(crate) index_tenor: Option<Tenor>,
+    /// Knot times in **years**.
+    pub(crate) knots: Box<[f64]>,
+    /// Normalized positive projection factors (unitless, `P_x(0) = 1.0`).
+    pub(crate) factors: Box<[f64]>,
+    pub(crate) interp: Interp,
+    /// Exact accumulated conditioning and continuous zero-rate shock evaluation.
     transform: Option<evaluation::CurveTransform>,
     /// Exact typed recipe used to replay calibration after quote shocks.
-    rate_calibration: Option<crate::market_data::term_structures::RateCalibrationRecipe>,
-    /// Opaque FX policy stamp; see [`DiscountCurve::fx_policy`].
-    fx_policy: Option<String>,
+    pub(crate) rate_calibration: Option<super::RateCalibrationRecipe>,
+    /// Opaque FX policy stamp when bootstrap used cross-currency assumptions.
+    pub(crate) fx_policy: Option<String>,
 }
 
 mod builder;
-mod conventions;
 mod curve;
 mod evaluation;
 #[cfg(test)]
 mod tests;
 mod transform;
 mod wire;
+
 pub use builder::ForwardCurveBuilder;
-use conventions::infer_forward_curve_defaults;
 use wire::RawForwardCurve;

@@ -18,7 +18,14 @@ class InflationCurve:
     Examples
     --------
     >>> from finstack_quant.core.market_data import InflationCurve
-    >>> curve = InflationCurve("US-CPI", "2025-01-01", 300.0, [(0.0, 300.0), (1.0, 306.0), (2.0, 312.0)])
+    >>> curve = InflationCurve(
+    ...     "US-CPI",
+    ...     "2025-01-01",
+    ...     [(0.0, 300.0), (1.0, 306.0), (2.0, 312.0)],
+    ...     day_count="act_365f",
+    ...     interp="log_linear",
+    ...     extrapolation="extend",
+    ... )
     >>> round(curve.inflation_rate(0.0, 1.0), 4)
     0.02
     >>> curve.cpi_levels
@@ -30,13 +37,12 @@ class InflationCurve:
         self,
         id: str,
         base_date: DateLike,
-        base_cpi: float,
         knots: Sequence[tuple[float, float]],
         *,
-        day_count: Optional[Union[DayCount, str]] = None,
-        indexation_lag_months: Optional[int] = None,
-        interp: Optional[str] = None,
-        extrapolation: Optional[str] = None,
+        day_count: Union[DayCount, str],
+        interp: str,
+        extrapolation: str,
+        calendar_id: Optional[str] = None,
     ) -> None:
         """
         Construct an inflation curve from CPI knot points.
@@ -47,34 +53,41 @@ class InflationCurve:
             Unique curve identifier (e.g. ``"US-CPI"``).
         base_date : datetime.date or str
             Valuation date anchoring ``t = 0``.
-        base_cpi : float
-            Finite, strictly positive reference CPI level at ``t = 0`` used by
-            :meth:`index_ratio`; must equal any zero-time CPI knot.
-            Inserted as the zero-time interpolation knot when absent.
         knots : Sequence[tuple[float, float]]
-            ``(time_years, cpi_level)`` pairs; levels must be positive.
-        day_count : DayCount | str, optional
-            Day-count label; default ``"act_365f"``.
-        indexation_lag_months : int, optional
-            Indexation lag in months applied by :meth:`cpi_with_lag`; default ``3``.
-        interp : str, optional
-            Interpolation style; default ``"log_linear"``.
-        extrapolation : str, optional
-            Extrapolation policy; default ``"flat_zero"``.
+            Strictly ascending ``(time_years, cpi_level)`` pairs beginning with
+            explicit ``(0.0, I0)`` and at least one positive-time pillar.
+            Levels must be finite and strictly positive.
+        day_count : DayCount | str
+            Required source clock, for example ``"act_365f"``.
+        interp : str
+            Required ``"linear"``, ``"cubic_hermite"`` or ``"log_linear"``.
+        extrapolation : str
+            Required right-tail policy: ``"flat"``, ``"extend"`` or ``"error"``.
+        calendar_id : str, optional
+            Registered holiday calendar identifier; required for Bus/252.
+            ``None`` omits the calendar.
 
         Raises
         ------
         ValueError
-            If no knots are given, a knot is non-finite, duplicated or
-            non-positive, base CPI is non-finite/non-positive or differs from
-            a zero-time knot, or a label is unknown.
+            If knots are invalid, the explicit origin or positive-time pillar
+            is missing, a convention is unsupported, or the clock is invalid.
+        TypeError
+            If required conventions are omitted or inputs have unsupported types.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import InflationCurve
-        >>> curve = InflationCurve("US-CPI", "2025-01-01", 300.0, [(0.0, 300.0), (1.0, 306.0)], indexation_lag_months=2)
-        >>> curve.indexation_lag_months
-        2
+        >>> curve = InflationCurve(
+        ...     "US-CPI",
+        ...     "2025-01-01",
+        ...     [(0.0, 300.0), (1.0, 306.0)],
+        ...     day_count="act_365f",
+        ...     interp="log_linear",
+        ...     extrapolation="error",
+        ... )
+        >>> curve.base_cpi
+        300.0
 
         """
         ...
@@ -92,7 +105,7 @@ class InflationCurve:
         Returns
         -------
         InflationCurve
-            The constructed inflation curve, ready for CPI and uplift queries.
+            The validated unlagged CPI projection curve.
 
         Raises
         ------
@@ -102,8 +115,15 @@ class InflationCurve:
         Examples
         --------
         >>> from finstack_quant.core.market_data import InflationCurve
-        >>> curve = InflationCurve("US-CPI", "2025-01-01", 300.0, [(0.0, 300.0), (1.0, 306.0)])
-        >>> InflationCurve.from_json(curve.to_json()) == curve
+        >>> curve = InflationCurve(
+        ...     "US-CPI",
+        ...     "2025-01-01",
+        ...     [(0.0, 300.0), (1.0, 306.0)],
+        ...     day_count="act_365f",
+        ...     interp="log_linear",
+        ...     extrapolation="extend",
+        ... )
+        >>> InflationCurve.from_json(curve.to_json()).to_json() == curve.to_json()
         True
 
         """
@@ -143,50 +163,8 @@ class InflationCurve:
         Raises
         ------
         ValueError
-            If a date precedes ``base_date``.
-        """
-        ...
-
-    def cpi_with_lag(self, t: float) -> float:
-        """
-        CPI level at year fraction ``t`` with the configured indexation lag applied.
-
-        Parameters
-        ----------
-        t : float
-            Year fraction from ``base_date``.
-
-        Returns
-        -------
-        float
-            Lagged CPI index level.
-        Notes
-        -----
-        This method does not raise.
-
-        """
-        ...
-
-    def index_ratio(self, t: float) -> float:
-        """
-        Principal indexation ratio ``cpi_with_lag(t) / base_cpi`` at year fraction ``t``.
-
-        No deflation floor is applied.
-
-        Parameters
-        ----------
-        t : float
-            Year fraction from ``base_date``.
-
-        Returns
-        -------
-        float
-            Indexation ratio.
-
-        Raises
-        ------
-        ValueError
-            If ``base_cpi`` is not strictly positive.
+            If time is non-finite or negative, a date precedes ``base_date``,
+            a query violates ``"error"`` extrapolation, or CPI is invalid.
         """
         ...
 
@@ -279,14 +257,14 @@ class InflationCurve:
         ...
 
     @property
-    def indexation_lag_months(self) -> int:
+    def calendar_id(self) -> Optional[str]:
         """
-        Publication lag applied when reading the index.
+        Registered holiday calendar used by the source clock.
 
         Returns
         -------
-        int
-            Whole months between the reference month and the published CPI print (``3`` for most inflation-linked bonds).
+        str or None
+            Calendar identifier, or ``None`` when no calendar is attached.
 
         Notes
         -----
@@ -366,7 +344,7 @@ class InflationCurve:
         Returns
         -------
         str
-            Policy label such as ``"flat_forward"``, ``"flat_zero"`` or ``"none"``; it governs queries outside the knot range.
+            Policy label such as ``"extend"``, ``"flat"`` or ``"error"``; it governs queries outside the knot range.
 
         Notes
         -----
@@ -375,6 +353,8 @@ class InflationCurve:
         ...
 
     def __eq__(self, other: object) -> bool: ...
-    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """Reconstruct the curve through its validated canonical JSON when unpickling."""
+        ...
     def __repr__(self) -> str: ...
     def _repr_html_(self) -> Optional[str]: ...

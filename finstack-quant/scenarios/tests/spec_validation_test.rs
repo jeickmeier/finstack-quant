@@ -17,7 +17,6 @@ fn scenario_validate_rejects_empty_id() {
         operations: vec![],
         priority: 0,
         resolution_mode: ResolutionMode::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let error = scenario
@@ -48,7 +47,6 @@ fn scenario_validate_rejects_multiple_time_rolls() {
         ],
         priority: 0,
         resolution_mode: ResolutionMode::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let error = scenario
@@ -80,7 +78,6 @@ fn scenario_validate_prefixes_invalid_operation_index() {
         ],
         priority: 0,
         resolution_mode: ResolutionMode::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let error = scenario
@@ -273,14 +270,30 @@ fn operation_validate_rejects_non_finite_and_fx_floor_violation() {
         pct: -100.0,
     };
 
-    // Vol surfaces accept any finite percentage and enforce positivity when
-    // previewing the stressed surface. Instrument price shocks reject values
-    // below -100% during spec validation so they cannot create negative prices.
-    let vol_floor_relaxed = OperationSpec::VolSurfaceBucketPct {
+    // Vol surfaces admit pct == -100% (vol-to-zero stress) and reject pct < -100%,
+    // matching instrument price shock floors.
+    let vol_floor_admitted = OperationSpec::VolSurfaceBucketPct {
         vol_surface_id: "SPX".into(),
         tenors: None,
         strikes: Some(vec![100.0]),
         pct: -100.0,
+    };
+    let vol_below_floor = OperationSpec::VolSurfaceParallelPct {
+        vol_surface_id: "SPX".into(),
+        pct: -100.1,
+    };
+    let vol_bucket_below_floor = OperationSpec::VolSurfaceBucketPct {
+        vol_surface_id: "SPX".into(),
+        tenors: None,
+        strikes: Some(vec![100.0]),
+        pct: -100.1,
+    };
+    let hier_vol_below_floor = OperationSpec::HierarchyVolSurfaceParallelPct {
+        target: HierarchyTarget {
+            path: vec!["Vol".into()],
+            tag_filter: None,
+        },
+        pct: -100.1,
     };
     let type_floor_rejected = OperationSpec::InstrumentPricePctByType {
         instrument_types: vec![InstrumentType::Bond],
@@ -301,9 +314,22 @@ fn operation_validate_rejects_non_finite_and_fx_floor_violation() {
             .to_string()
             .contains("greater than -100%")
     );
-    vol_floor_relaxed
+    vol_floor_admitted
         .validate()
-        .expect("vol surface -100% bucket shock should now validate");
+        .expect("vol surface -100% bucket shock should validate");
+    for rejected in [
+        vol_below_floor,
+        vol_bucket_below_floor,
+        hier_vol_below_floor,
+    ] {
+        assert!(
+            rejected
+                .validate()
+                .expect_err("vol shocks below -100% should fail")
+                .to_string()
+                .contains("must be at least -100%")
+        );
+    }
     assert!(
         type_floor_rejected
             .validate()
@@ -378,7 +404,6 @@ fn scenario_validate_accepts_mixed_valid_operations() {
         ],
         priority: 1,
         resolution_mode: ResolutionMode::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     scenario
@@ -402,7 +427,6 @@ fn engine_apply_rejects_invalid_spec() {
         operations: vec![],
         priority: 0,
         resolution_mode: ResolutionMode::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let mut market = MarketContext::new();

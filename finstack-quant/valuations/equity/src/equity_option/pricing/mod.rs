@@ -146,11 +146,18 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (10.0, (-rate * 10.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let surface = VolSurface::builder("SPX-VOL")
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&[80.0, 100.0, 120.0, 150.0])
+            .secondary_values(&[80.0, 100.0, 120.0, 150.0])
+            .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+            .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             .row(&[vol, vol, vol, vol])
             .row(&[vol, vol, vol, vol])
             .row(&[vol, vol, vol, vol])
@@ -161,8 +168,14 @@ mod tests {
         MarketContext::new()
             .insert(curve)
             .insert_surface(surface)
-            .insert_price("SPX-SPOT", MarketScalar::Unitless(spot))
-            .insert_price("SPX-DIV", MarketScalar::Unitless(div_yield))
+            .insert_price(
+                "SPX-SPOT",
+                MarketScalar::unitless(spot).expect("valid scalar"),
+            )
+            .insert_price(
+                "SPX-DIV",
+                MarketScalar::unitless(div_yield).expect("valid scalar"),
+            )
     }
 
     fn option(
@@ -644,7 +657,7 @@ mod tests {
         let expiry = date(2026, 1, 1);
         let curves = market(as_of, 100.0, 0.20, 0.03, 0.0).insert_price(
             "SPX-SPOT",
-            MarketScalar::Price(Money::from((100_i64, Currency::EUR))),
+            MarketScalar::price(Money::from((100_i64, Currency::EUR))),
         );
         let option = option(expiry, OptionType::Call, ExerciseStyle::European);
 

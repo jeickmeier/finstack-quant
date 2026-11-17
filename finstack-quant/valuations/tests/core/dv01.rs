@@ -31,6 +31,8 @@ fn collect_curves_never_duplicates_a_dual_role_curve_id() {
         .base_date(date!(2024 - 01 - 02))
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (10.0, 0.70)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("valid discount curve");
     let market = MarketContext::new().insert(curve);

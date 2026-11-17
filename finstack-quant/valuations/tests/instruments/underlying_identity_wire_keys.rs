@@ -214,9 +214,15 @@ fn equity_never_prices_off_a_derived_or_global_spot_id() {
     // Scalars under every id the retired candidate list tried: the ticker,
     // `{ticker}-SPOT`, `{id}-SPOT` and the global `EQUITY-SPOT`.
     let market = MarketContext::new()
-        .insert_price("AAPL", MarketScalar::Unitless(1.0))
-        .insert_price("AAPL-SPOT", MarketScalar::Unitless(2.0))
-        .insert_price("EQUITY-SPOT", MarketScalar::Unitless(3.0));
+        .insert_price("AAPL", MarketScalar::unitless(1.0).expect("valid scalar"))
+        .insert_price(
+            "AAPL-SPOT",
+            MarketScalar::unitless(2.0).expect("valid scalar"),
+        )
+        .insert_price(
+            "EQUITY-SPOT",
+            MarketScalar::unitless(3.0).expect("valid scalar"),
+        );
     let as_of = time::macros::date!(2025 - 01 - 02);
     let equity = Equity::new("AAPL", "AAPL", finstack_quant_core::currency::Currency::USD);
     let err = equity
@@ -230,7 +236,10 @@ fn equity_never_prices_off_a_derived_or_global_spot_id() {
         .expect("typed spot_id");
     assert_eq!(price.amount(), 2.0);
     // No dividend-yield id means a zero yield, never `{ticker}-DIVYIELD`.
-    let market = market.insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.5));
+    let market = market.insert_price(
+        "AAPL-DIVYIELD",
+        MarketScalar::unitless(0.5).expect("valid scalar"),
+    );
     assert_eq!(priced.dividend_yield(&market).expect("zero"), 0.0);
 }
 

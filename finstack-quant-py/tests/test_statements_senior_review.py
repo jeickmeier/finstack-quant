@@ -8,9 +8,10 @@ import pytest
 from finstack_quant import statements as s
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import PeriodPlan
-from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext
+from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.statements_analytics import run_checks
+from tests.tests_typed_helpers import projection_curve
 
 
 def test_canonical_forecast_and_registry_names() -> None:
@@ -161,8 +162,8 @@ def test_swap_with_two_receiving_legs_reports_interest_income(
     model = s.FinancialModelSpec.from_json(json.dumps(model_payload))
     market = (
         MarketContext()
-        .insert(DiscountCurve.flat("USD-OIS", "2025-01-01", 0.02))
-        .insert(ForwardCurve.flat("USD-SOFR-3M", 0.25, "2025-01-01", forward_rate))
+        .insert(DiscountCurve.flat("USD-OIS", "2025-01-01", 0.02, "act_365f"))
+        .insert(projection_curve("USD-SOFR-3M", "2025-01-01", [(10.0, forward_rate)]))
     )
     results = s.Evaluator().evaluate_with_market(model, market, "2025-01-01")
     assert results.cs_cashflows is not None

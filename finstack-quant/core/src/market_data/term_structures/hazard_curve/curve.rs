@@ -1,9 +1,24 @@
-//! Curve evaluation and accessors.
+//! Hazard-curve factories, checked local integration, survival/PD queries, and accessors.
 
+use super::super::common::{signed_curve_year_fraction, stable_positive_log_ratio};
 use super::*;
+
+/// Result of direct local intensity integration over `[a, b]`.
+///
+/// Separates representable non-negative finite integrals from genuine overflow
+/// of positive products/sums so probability callers return saturating `S = 0` /
+/// conditional `PD = 1`, whereas explicit finite-integral callers fail closed.
+enum HazardIntegral {
+    Finite(f64),
+    Overflow,
+}
 
 impl HazardCurve {
     /// Start building a hazard curve with identifier `id`.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Unique curve identifier (for example `"ACME-HZD"`).
     #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> HazardCurveBuilder {
         HazardCurveBuilder {
@@ -14,93 +29,91 @@ impl HazardCurve {
             issuer: None,
             seniority: None,
             currency: None,
-            day_count: DayCount::Act365F,
-            par_points: Vec::new(),
-            par_interp: ParInterp::Linear,
-            max_hazard_rate: DEFAULT_MAX_HAZARD_RATE,
+            day_count: None,
+            calendar_id: None,
             hazard_calibration: None,
             fx_policy: None,
+            source: None,
         }
     }
 
     /// Construct a flat (constant-intensity) hazard curve.
     ///
-    /// The curve stores a single knot at `t = 1` carrying `hazard_rate`; with
-    /// flat-forward extrapolation this gives `S(t) = exp(-hazard_rate * t)`
-    /// for every non-negative maturity.
+    /// Stores a single ending pillar `(1.0, hazard_rate)` whose constant tail
+    /// continuation yields `S(t) = exp(-hazard_rate * t)` for every `t >= 0`.
     ///
     /// # Arguments
     ///
     /// * `id` - Unique curve identifier (for example `"ACME-HZD"`).
-    /// * `base_date` - Valuation date anchoring `t = 0`; the curve day count
-    ///   is `Act/365F`.
+    /// * `base_date` - Valuation date anchoring `t = 0`.
     /// * `hazard_rate` - Constant annual default intensity as a decimal
     ///   fraction (`0.02` is 2% per year); must be finite and non-negative.
     /// * `recovery_rate` - Assumed recovery on default as a decimal fraction
     ///   in `[0, 1]`.
+    /// * `day_count` - Explicit supported curve day-count convention (cannot be
+    ///   calendar-dependent `Bus252`, `ActActIsma`, `Act365L`, or
+    ///   `ThirtyE360Isda`).
     ///
     /// # Errors
     ///
-    /// Returns a validation error if `hazard_rate` is non-finite, negative or
-    /// exceeds the default `max_hazard_rate` of `10.0`, or if `recovery_rate`
-    /// is outside `[0, 1]`.
+    /// Returns a validation error if `hazard_rate` is non-finite or negative,
+    /// `recovery_rate` is outside `[0, 1]`, or `day_count` is unsupported.
     pub fn flat(
         id: impl Into<CurveId>,
         base_date: Date,
         hazard_rate: f64,
         recovery_rate: f64,
+        day_count: DayCount,
     ) -> crate::Result<Self> {
-        if !hazard_rate.is_finite() {
-            return Err(crate::Error::Validation(format!(
-                "HazardCurve::flat hazard_rate must be finite, got {hazard_rate}"
-            )));
-        }
         Self::builder(id)
             .base_date(base_date)
+            .day_count(day_count)
             .knots([(1.0, hazard_rate)])
             .recovery_rate(recovery_rate)
             .build()
     }
 
-    /// Construct a hazard curve from survival-probability pillars.
+    /// Construct a hazard curve from strictly ordered survival-probability pillars.
     ///
-    /// Each pillar `(t, S(t))` is converted to the piecewise-constant hazard
-    /// rate of the segment ending at `t`:
-    /// `λᵢ = -ln(S(tᵢ) / S(tᵢ₋₁)) / (tᵢ - tᵢ₋₁)` with `S(0) = 1`. A pillar at
-    /// `t = 0` is accepted only when its survival probability is `1`.
+    /// Each positive-time pillar `(tᵢ, Sᵢ)` defines the piecewise-constant
+    /// intensity over `(tᵢ₋₁, tᵢ]` via `-ln(Sᵢ / Sᵢ₋₁) / (tᵢ - tᵢ₋₁)`. An
+    /// optional leading `(0.0, 1.0)` point is admitted as normalization without
+    /// emitting a `t = 0` knot; at least one `t > 0` pillar is required.
     ///
     /// # Arguments
     ///
     /// * `id` - Unique curve identifier.
-    /// * `base_date` - Valuation date anchoring `t = 0`; the curve day count
-    ///   is `Act/365F`.
-    /// * `points` - `(time_years, survival_probability)` pillars. Times must be
-    ///   finite and non-negative and may be supplied in any order; survival
-    ///   probabilities must lie in `(0, 1]` and be non-increasing in time.
+    /// * `base_date` - Valuation date anchoring `t = 0`.
+    /// * `points` - Strictly ascending `(time_years, survival_probability)`
+    ///   pillars with finite `t >= 0` (`t = 0` permitted only at index 0 with
+    ///   exact `S = 1.0`), `0 < S <= 1`, and non-increasing survival.
     /// * `recovery_rate` - Assumed recovery on default as a decimal fraction
     ///   in `[0, 1]`.
+    /// * `day_count` - Explicit supported curve day-count convention.
     ///
     /// # Errors
     ///
-    /// Returns a validation error if `points` is empty, a time is negative or
-    /// duplicated, a survival probability is outside `(0, 1]` or increases
-    /// with time, or `recovery_rate` is outside `[0, 1]`.
+    /// Returns an error when `points` is empty or has no `t > 0` pillar, times
+    /// are negative or not strictly increasing as supplied, an origin point has
+    /// `S != 1.0`, any survival probability is outside `(0, 1]` or increases
+    /// with time, derived intensity overflows or underflows non-equal pillars
+    /// to zero, `recovery_rate` is outside `[0, 1]`, or `day_count` is invalid.
     pub fn from_survival_probs(
         id: impl Into<CurveId>,
         base_date: Date,
         points: &[(f64, f64)],
         recovery_rate: f64,
+        day_count: DayCount,
     ) -> crate::Result<Self> {
         if points.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }
-        let mut sorted = points.to_vec();
-        sorted.sort_by(|a, b| a.0.total_cmp(&b.0));
+        crate::validation::validate_f64_unit_interval(recovery_rate, "recovery_rate")?;
 
-        let mut knots = Vec::with_capacity(sorted.len());
+        let mut knots = Vec::with_capacity(points.len());
         let mut prev_t = 0.0_f64;
         let mut prev_sp = 1.0_f64;
-        for &(t, sp) in &sorted {
+        for (idx, &(t, sp)) in points.iter().enumerate() {
             if !t.is_finite() || t < 0.0 {
                 return Err(crate::Error::Validation(format!(
                     "HazardCurve::from_survival_probs time must be finite and non-negative, got t={t}"
@@ -111,28 +124,42 @@ impl HazardCurve {
                     "HazardCurve::from_survival_probs survival probability must be in (0, 1], got {sp} at t={t}"
                 )));
             }
-            if t == 0.0 {
-                if (sp - 1.0).abs() > 1e-12 {
+            if idx == 0 && exact_f64_eq(t, 0.0) {
+                if !exact_f64_eq(sp, 1.0) {
                     return Err(crate::Error::Validation(format!(
-                        "HazardCurve::from_survival_probs survival probability at t=0 must be 1, got {sp}"
+                        "HazardCurve::from_survival_probs survival probability at t=0 must equal 1.0 exactly, got {sp}"
                     )));
                 }
                 continue;
             }
-            if t <= prev_t {
-                return Err(crate::Error::Validation(format!(
-                    "HazardCurve::from_survival_probs times must be strictly increasing, got duplicate t={t}"
-                )));
+            if !exact_f64_eq(prev_t, 0.0) && t <= prev_t {
+                return Err(InputError::NonMonotonicKnots.into());
+            }
+            if t <= 0.0 {
+                return Err(InputError::NonMonotonicKnots.into());
             }
             if sp > prev_sp {
                 return Err(crate::Error::Validation(format!(
                     "HazardCurve::from_survival_probs survival probability must be non-increasing, got {sp} at t={t} after {prev_sp}"
                 )));
             }
-            let lambda = if sp.total_cmp(&prev_sp).is_eq() {
+            let lambda = if exact_f64_eq(sp, prev_sp) {
                 0.0
             } else {
-                (prev_sp.ln() - sp.ln()) / (t - prev_t)
+                let dt = t - prev_t;
+                if !dt.is_finite() || dt <= 0.0 {
+                    return Err(crate::Error::Validation(format!(
+                        "HazardCurve::from_survival_probs positive time step invalid over [{prev_t}, {t}]"
+                    )));
+                }
+                let neg_log = stable_positive_log_ratio(prev_sp, sp)?;
+                let rate = neg_log / dt;
+                if !rate.is_finite() || rate <= 0.0 {
+                    return Err(crate::Error::Validation(format!(
+                        "HazardCurve::from_survival_probs derived hazard rate overflowed or underflowed at t={t}"
+                    )));
+                }
+                rate
             };
             knots.push((t, lambda));
             prev_t = t;
@@ -143,64 +170,253 @@ impl HazardCurve {
         }
         Self::builder(id)
             .base_date(base_date)
+            .day_count(day_count)
             .knots(knots)
             .recovery_rate(recovery_rate)
             .build()
     }
 
-    /// Integrate piecewise-constant hazard `∫_{start}^{end} λ(u) du` over `0 <= start <= end`
-    /// with finite `start` and `end`.
-    #[inline]
-    pub(super) fn cumulative_hazard_between(&self, start_time: f64, end_time: f64) -> f64 {
-        if end_time <= start_time || end_time <= 0.0 {
-            return 0.0;
+    /// Directly integrate piecewise-constant intensities over `0 <= a <= b`.
+    fn integrate_segments<I>(
+        segments: I,
+        tail_lambda: f64,
+        a: f64,
+        b: f64,
+    ) -> crate::Result<HazardIntegral>
+    where
+        I: Iterator<Item = (f64, f64)>,
+    {
+        if exact_f64_eq(a, b) {
+            return Ok(HazardIntegral::Finite(0.0));
         }
-        let a = start_time.max(0.0);
-        let b = end_time;
         let mut acc = crate::math::summation::NeumaierAccumulator::new();
-        let mut previous_time = 0.0_f64;
-        for (&time, &lambda) in self.knots.iter().zip(self.lambdas.iter()) {
-            let overlap = b.min(time) - a.max(previous_time);
-            if overlap > 0.0 && lambda > 0.0 {
-                acc.add(lambda * overlap);
+        let mut prev_time = 0.0_f64;
+        for (time, lambda) in segments {
+            let lo = a.max(prev_time);
+            let hi = b.min(time);
+            if hi > lo {
+                let overlap = hi - lo;
+                if !exact_f64_eq(lambda, 0.0) {
+                    let inc = lambda * overlap;
+                    if !inc.is_finite() {
+                        return Ok(HazardIntegral::Overflow);
+                    }
+                    if exact_f64_eq(inc, 0.0) {
+                        return Err(crate::Error::Validation(
+                            "integrated hazard contribution underflowed positive product to zero"
+                                .to_string(),
+                        ));
+                    }
+                    if acc.add(inc).is_err() {
+                        return Ok(HazardIntegral::Overflow);
+                    }
+                }
             }
             if time >= b {
-                return acc.total().max(0.0);
+                let total = match acc.get_total() {
+                    Ok(v) if v.is_finite() => v.max(0.0),
+                    _ => return Ok(HazardIntegral::Overflow),
+                };
+                return Ok(HazardIntegral::Finite(if exact_f64_eq(total, 0.0) {
+                    0.0
+                } else {
+                    total
+                }));
             }
-            previous_time = time;
+            prev_time = time;
         }
-        let tail_start = a.max(previous_time);
-        if b > tail_start {
-            let tail_lambda = self.lambdas[self.lambdas.len() - 1];
-            if tail_lambda > 0.0 {
-                acc.add(tail_lambda * (b - tail_start));
+        let tail_start = a.max(prev_time);
+        if b > tail_start && !exact_f64_eq(tail_lambda, 0.0) {
+            let overlap = b - tail_start;
+            let inc = tail_lambda * overlap;
+            if !inc.is_finite() {
+                return Ok(HazardIntegral::Overflow);
+            }
+            if exact_f64_eq(inc, 0.0) {
+                return Err(crate::Error::Validation(
+                    "integrated tail hazard contribution underflowed positive product to zero"
+                        .to_string(),
+                ));
+            }
+            if acc.add(inc).is_err() {
+                return Ok(HazardIntegral::Overflow);
             }
         }
-        acc.total().max(0.0)
+        let total = match acc.get_total() {
+            Ok(v) if v.is_finite() => v.max(0.0),
+            _ => return Ok(HazardIntegral::Overflow),
+        };
+        Ok(HazardIntegral::Finite(if exact_f64_eq(total, 0.0) {
+            0.0
+        } else {
+            total
+        }))
     }
 
-    /// Survival probability S(t) up to time `t` (in **years**).
+    /// Evaluate piecewise-constant left-continuous hazard intensity `λ(t)` on `knots`/`lambdas`.
+    #[inline]
+    pub(super) fn hazard_rate_slices(knots: &[f64], lambdas: &[f64], t: f64) -> f64 {
+        if exact_f64_eq(t, 0.0) {
+            return lambdas[0];
+        }
+        let idx = knots.partition_point(|&k| k < t).min(lambdas.len() - 1);
+        lambdas[idx]
+    }
+
+    /// Evaluate piecewise-constant hazard intensity `λ(t)` on `(time, lambda)` pairs for `t >= 0`.
+    #[inline]
+    pub(super) fn hazard_rate_in_pairs(pairs: &[(f64, f64)], t: f64) -> f64 {
+        if exact_f64_eq(t, 0.0) {
+            return pairs[0].1;
+        }
+        let idx = pairs.partition_point(|&(k, _)| k < t).min(pairs.len() - 1);
+        pairs[idx].1
+    }
+
+    #[inline]
+    fn integrate_local(&self, a: f64, b: f64) -> crate::Result<HazardIntegral> {
+        let tail_lambda = self.lambdas[self.lambdas.len() - 1];
+        Self::integrate_segments(
+            self.knots.iter().copied().zip(self.lambdas.iter().copied()),
+            tail_lambda,
+            a,
+            b,
+        )
+    }
+
+    #[inline]
+    fn integrate_source(
+        src: &HazardConditionSource,
+        a: f64,
+        b: f64,
+    ) -> crate::Result<HazardIntegral> {
+        let tail_lambda = src.knot_points[src.knot_points.len() - 1].1;
+        Self::integrate_segments(src.knot_points.iter().copied(), tail_lambda, a, b)
+    }
+
+    /// Integrated hazard `J(t1, t2) = ∫_{t1}^{t2} λ(u) du` for finite `0 <= t1 <= t2`.
     ///
     /// # Arguments
     ///
-    /// * `t` - Year-fraction time from the curve base date to the query point
-    #[must_use]
-    pub fn sp(&self, t: f64) -> f64 {
-        if t.is_nan() {
-            return f64::NAN;
+    /// * `t1` - Finite non-negative start year fraction from [`base_date`](Self::base_date).
+    /// * `t2` - Finite end year fraction from [`base_date`](Self::base_date) with `t2 >= t1`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `t1` or `t2` is non-finite, `t1 < 0.0`, `t2 < t1`,
+    /// an active positive hazard contribution underflows to zero, or the
+    /// integral overflows `f64`.
+    #[must_use = "computed integrated hazard should not be discarded"]
+    pub fn integrated_hazard(&self, t1: f64, t2: f64) -> crate::Result<f64> {
+        if !t1.is_finite() || !t2.is_finite() || t1 < 0.0 || t2 < t1 {
+            return Err(crate::Error::Validation(format!(
+                "integrated_hazard requires finite 0 <= t1 <= t2 (got t1={t1}, t2={t2})"
+            )));
         }
-        if t <= 0.0 {
-            return 1.0;
+        match self.integrate_local(t1, t2)? {
+            HazardIntegral::Finite(val) => Ok(val),
+            HazardIntegral::Overflow => Err(crate::Error::Validation(format!(
+                "integrated_hazard overflowed f64 over [{t1}, {t2}]"
+            ))),
         }
-        if t == f64::INFINITY {
-            let tail_lambda = self.lambdas[self.lambdas.len() - 1];
-            if tail_lambda > 0.0 {
-                return 0.0;
+    }
+
+    /// Integrated hazard `∫_{start}^{end} λ(u) du` between two chronological dates.
+    ///
+    /// Conditioned curves map both dates onto their retained source clock.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - Start date on or after [`base_date`](Self::base_date).
+    /// * `end` - End date on or after `start`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `start < base_date()`, `end < start`, day-count
+    /// mapping fails, a positive contribution underflows to zero, or the
+    /// integral overflows `f64`.
+    #[must_use = "computed integrated hazard should not be discarded"]
+    pub fn integrated_hazard_between_dates(&self, start: Date, end: Date) -> crate::Result<f64> {
+        let (a, b, integral) = self.integrated_between_dates_classified(start, end)?;
+        match integral {
+            HazardIntegral::Finite(val) => Ok(val),
+            HazardIntegral::Overflow => Err(crate::Error::Validation(format!(
+                "integrated_hazard_between_dates overflowed f64 over [{a}, {b}]"
+            ))),
+        }
+    }
+
+    fn integrated_between_dates_classified(
+        &self,
+        start: Date,
+        end: Date,
+    ) -> crate::Result<(f64, f64, HazardIntegral)> {
+        if start < self.base {
+            return Err(crate::Error::Validation(format!(
+                "date query {start} precedes HazardCurve base_date ({})",
+                self.base
+            )));
+        }
+        if end < start {
+            return Err(crate::Error::Validation(format!(
+                "date interval requires end >= start (start={start}, end={end})"
+            )));
+        }
+        if let Some(src) = &self.source {
+            let start_t = self.source_year_fraction_to(src, start)?;
+            let end_t = self.source_year_fraction_to(src, end)?;
+            if !start_t.is_finite() || !end_t.is_finite() || start_t < src.offset || end_t < start_t
+            {
+                return Err(crate::Error::Validation(format!(
+                    "mapped source dates must be finite and ordered from offset {} (got [{start_t}, {end_t}])",
+                    src.offset
+                )));
             }
-            let last_t = self.knots.last().copied().unwrap_or(0.0);
-            return (-self.cumulative_hazard_between(0.0, last_t)).exp();
+            if start == end || exact_f64_eq(start_t, end_t) {
+                return Ok((start_t, end_t, HazardIntegral::Finite(0.0)));
+            }
+            let integral = Self::integrate_source(src, start_t, end_t)?;
+            return Ok((start_t, end_t, integral));
         }
-        (-self.cumulative_hazard_between(0.0, t)).exp()
+
+        let start_t = self.year_fraction_to(start)?;
+        let end_t = self.year_fraction_to(end)?;
+        if !start_t.is_finite() || !end_t.is_finite() || start_t < 0.0 || end_t < start_t {
+            return Err(crate::Error::Validation(format!(
+                "mapped dates must be finite and non-negative with start_t <= end_t (got [{start_t}, {end_t}])"
+            )));
+        }
+        if start == end || exact_f64_eq(start_t, end_t) {
+            return Ok((start_t, end_t, HazardIntegral::Finite(0.0)));
+        }
+        let integral = self.integrate_local(start_t, end_t)?;
+        Ok((start_t, end_t, integral))
+    }
+
+    /// Survival probability `S(t) = exp(-∫₀ᵗ λ(u) du)` at time `t >= 0`.
+    ///
+    /// # Arguments
+    ///
+    /// * `t` - Finite non-negative year fraction from [`base_date`](Self::base_date).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `t` is non-finite or negative (`t < 0.0`), or if a
+    /// positive hazard contribution underflows to zero during integration.
+    #[must_use = "computed survival probability should not be discarded"]
+    pub fn sp(&self, t: f64) -> crate::Result<f64> {
+        if !t.is_finite() || t < 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "HazardCurve::sp requires finite non-negative time t >= 0, got {t}"
+            )));
+        }
+        if exact_f64_eq(t, 0.0) {
+            return Ok(1.0);
+        }
+        match self.integrate_local(0.0, t)? {
+            HazardIntegral::Finite(integral) => Ok((-integral).exp()),
+            HazardIntegral::Overflow => Ok(0.0),
+        }
     }
 
     /// Conditional survival probability `P(τ > t2 | τ > t1) = exp(-∫_{t1}^{t2} λ(u) du)`.
@@ -216,8 +432,8 @@ impl HazardCurve {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::Validation`] if `t1` or `t2` is non-finite,
-    /// `t1 < 0`, or `t2 < t1`.
+    /// Returns an error if `t1` or `t2` is non-finite, `t1 < 0.0`, `t2 < t1`,
+    /// or a positive hazard contribution underflows to zero.
     #[must_use = "computed conditional survival probability should not be discarded"]
     pub fn sp_between(&self, t1: f64, t2: f64) -> crate::Result<f64> {
         if !t1.is_finite() || !t2.is_finite() || t1 < 0.0 || t2 < t1 {
@@ -225,162 +441,196 @@ impl HazardCurve {
                 "sp_between requires finite 0 <= t1 <= t2 (got t1={t1}, t2={t2})"
             )));
         }
-        if t1 >= t2 {
+        if exact_f64_eq(t1, t2) {
             return Ok(1.0);
         }
-        Ok((-self.cumulative_hazard_between(t1, t2)).exp())
+        match self.integrate_local(t1, t2)? {
+            HazardIntegral::Finite(integral) => Ok((-integral).exp()),
+            HazardIntegral::Overflow => Ok(0.0),
+        }
     }
 
-    /// Default probability between `t1` and `t2`.
+    /// Unconditional default probability on `[t1, t2]`, equal to `S(t1) - S(t2)`.
     ///
-    /// Returns `S(t1) - S(t2) = S(t1) * (1 - exp(-∫_{t1}^{t2} λ(u) du))`, the
-    /// unconditional probability of default occurring in `[t1, t2]`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `t1` or `t2` is non-finite or `t2 < t1`.
+    /// Computes `exp(-J(0, t1)) * (-expm1(-J(t1, t2)))` locally in log/scaled
+    /// form so small interval probabilities remain accurate even after large
+    /// cumulative hazard histories.
     ///
     /// # Arguments
     ///
-    /// * `t1` - Start year-fraction of the default interval being queried
-    /// * `t2` - End year-fraction of the default interval being queried
+    /// * `t1` - Finite non-negative start year fraction (`t1 >= 0.0`).
+    /// * `t2` - Finite end year fraction (`t2 >= t1`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `t1` or `t2` is non-finite, `t1 < 0.0`, `t2 < t1`,
+    /// or local integration encounters positive-product zero underflow.
     #[must_use = "computed default probability should not be discarded"]
     pub fn default_prob(&self, t1: f64, t2: f64) -> crate::Result<f64> {
-        if !t1.is_finite() || !t2.is_finite() || t2 < t1 {
+        if !t1.is_finite() || !t2.is_finite() || t1 < 0.0 || t2 < t1 {
             return Err(crate::Error::Validation(format!(
-                "default_prob requires finite t2 >= t1 (t1={t1}, t2={t2})"
+                "default_prob requires finite 0 <= t1 <= t2 (got t1={t1}, t2={t2})"
             )));
         }
-        if t2 <= 0.0 || t1 >= t2 {
+        if exact_f64_eq(t1, t2) {
             return Ok(0.0);
         }
-        let a = t1.max(0.0);
-        let sp_a = (-self.cumulative_hazard_between(0.0, a)).exp();
-        let cond_pd = -(-self.cumulative_hazard_between(a, t2)).exp_m1();
-        Ok((sp_a * cond_pd).clamp(0.0, 1.0))
+        let j0 = match self.integrate_local(0.0, t1)? {
+            HazardIntegral::Finite(v) => v,
+            HazardIntegral::Overflow => return Ok(0.0),
+        };
+        let cond_pd = match self.integrate_local(t1, t2)? {
+            HazardIntegral::Finite(v) => -(-v).exp_m1(),
+            HazardIntegral::Overflow => 1.0,
+        };
+        if exact_f64_eq(cond_pd, 0.0) {
+            return Ok(0.0);
+        }
+        let pd = if j0 > 700.0 {
+            (cond_pd.ln() - j0).exp()
+        } else {
+            (-j0).exp() * cond_pd
+        };
+        Ok(pd.clamp(0.0, 1.0))
     }
 
     /// Default probability between two dates, conditional on survival to `start`.
     ///
-    /// Computes `1 - exp(-integral(lambda))` directly over the intervening
-    /// piecewise-constant hazard segments. This remains well-defined when
-    /// unconditional survival at `start` underflows; it does not infer an
-    /// observed default from low survival probabilities.
+    /// Evaluates `1 - exp(-∫_{start}^{end} λ(u) du)` directly over the local
+    /// intensity intervals (using the retained source clock when conditioned).
     ///
     /// # Arguments
     ///
-    /// * `start` - Conditioning date, converted from the curve base date with
-    ///   the curve's day-count convention. Dates before the base are clamped
-    ///   to time zero, matching date-based survival queries.
-    /// * `end` - End date of the default interval; must be on or after `start`.
-    ///   Equal dates return zero. The final hazard rate extends beyond the
-    ///   last knot.
-    ///
-    /// # Returns
-    ///
-    /// Conditional default probability as a decimal fraction in `[0, 1]`.
+    /// * `start` - Conditioning date on or after [`base_date`](Self::base_date).
+    /// * `end` - End date on or after `start`. Equal dates return `0.0`.
     ///
     /// # Errors
     ///
-    /// Returns a validation error for reversed dates or if the curve's
-    /// day-count convention cannot compute either date's year fraction.
+    /// Returns an error if `start < base_date()`, `end < start`, day-count
+    /// mapping fails, or local integration underflows a positive contribution.
     #[must_use = "computed conditional default probability should not be discarded"]
     pub fn conditional_default_prob(&self, start: Date, end: Date) -> crate::Result<f64> {
-        if end < start {
-            return Err(crate::Error::Validation(format!(
-                "conditional_default_prob requires end >= start (start={start}, end={end})"
-            )));
+        let (_, _, integral) = self.integrated_between_dates_classified(start, end)?;
+        match integral {
+            HazardIntegral::Finite(v) => Ok((-(-v).exp_m1()).clamp(0.0, 1.0)),
+            HazardIntegral::Overflow => Ok(1.0),
         }
-        if start == end {
-            return Ok(0.0);
-        }
-        let start_time = self.year_fraction_to(start)?.max(0.0);
-        let end_time = self.year_fraction_to(end)?.max(0.0);
-        Ok(-(-self.cumulative_hazard_between(start_time, end_time)).exp_m1())
     }
 
-    /// Instantaneous hazard rate λ(t) at time `t`.
+    /// Left-continuous piecewise-constant hazard intensity `λ(t)` at time `t >= 0`.
     ///
-    /// For piecewise-constant hazard curves, this returns the lambda value
-    /// corresponding to the interval containing `t`.
-    ///
-    /// Hazards are right-continuous at knot boundaries. λᵢ applies to the
-    /// segment *ending* at knot tᵢ (ISDA-style): `hazard_rate(tᵢ) = λᵢ` and
-    /// the next segment starts immediately after tᵢ. An explicit t≈0 knot is
-    /// ignored for this lookup except at `t <= 0`, which returns the first
-    /// stored lambda.
+    /// Intensity `λᵢ` applies on `(tᵢ₋₁, tᵢ]` (`t₀ = 0`), with `hazard_rate(0.0)
+    /// == λ₁` as the right limit at origin and constant tail `λₙ` beyond `tₙ`.
     ///
     /// # Arguments
     ///
-    /// * `t` - Year-fraction from the curve base date to the query point; values
-    ///   at or below zero return the first segment's hazard rate
-    ///
-    /// # Panics
-    ///
-    /// Panics only if the curve's internal invariant is violated and it has no
-    /// hazard-rate segment. Public constructors reject that state.
-    #[must_use]
-    pub fn hazard_rate(&self, t: f64) -> f64 {
-        // A valid hazard curve always has at least one lambda.
-        assert!(
-            !self.lambdas.is_empty(),
-            "HazardCurve invariant violated: empty lambdas"
-        );
-        if t <= 0.0 {
-            return self.lambdas[0];
-        }
-
-        let idx = self.knots.partition_point(|&k| k < t);
-        let idx = idx.min(self.lambdas.len() - 1);
-        self.lambdas[idx]
-    }
-
-    /// Survival probability on a specific calendar date using the curve's day-count.
-    ///
-    /// This is the date-based equivalent of [`sp`](Self::sp), consistent with
-    /// `DiscountCurve::df_on_date` and `ForwardCurve::df_on_date`.
+    /// * `t` - Finite non-negative year fraction from [`base_date`](Self::base_date).
     ///
     /// # Errors
     ///
-    /// Returns an error if the year fraction calculation fails.
+    /// Returns an error if `t` is non-finite or `t < 0.0`.
+    #[must_use = "computed hazard rate should not be discarded"]
+    pub fn hazard_rate(&self, t: f64) -> crate::Result<f64> {
+        if !t.is_finite() || t < 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "HazardCurve::hazard_rate requires finite non-negative time t >= 0, got {t}"
+            )));
+        }
+        Ok(Self::hazard_rate_slices(&self.knots, &self.lambdas, t))
+    }
+
+    /// Survival probability on a specific calendar date `date >= base_date()`.
+    ///
+    /// Conditioned views evaluate directly from [`base_date`](Self::base_date)
+    /// using the retained source clock and intensity schedule.
+    ///
+    /// # Arguments
+    ///
+    /// * `date` - Target calendar date on or after [`base_date`](Self::base_date).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `date < base_date()`, day-count mapping fails, or
+    /// local integration fails.
     #[inline]
     #[must_use = "computed survival probability should not be discarded"]
     pub fn sp_on_date(&self, date: Date) -> crate::Result<f64> {
+        if date < self.base {
+            return Err(crate::Error::Validation(format!(
+                "sp_on_date date {date} precedes HazardCurve base_date ({})",
+                self.base
+            )));
+        }
+        if let Some(src) = &self.source {
+            let end_t = self.source_year_fraction_to(src, date)?;
+            if !end_t.is_finite() || end_t < src.offset {
+                return Err(crate::Error::Validation(format!(
+                    "mapped date {date} must be finite and >= condition offset {}",
+                    src.offset
+                )));
+            }
+            if date == self.base || exact_f64_eq(end_t, src.offset) {
+                return Ok(1.0);
+            }
+            return Ok(match Self::integrate_source(src, src.offset, end_t)? {
+                HazardIntegral::Finite(v) => (-v).exp(),
+                HazardIntegral::Overflow => 0.0,
+            });
+        }
         let t = self.year_fraction_to(date)?;
-        Ok(self.sp(t))
+        self.sp(t)
     }
 
-    /// Hazard rate on a specific calendar date using the curve's day-count.
+    /// Hazard intensity on a specific calendar date `date >= base_date()`.
     ///
-    /// This is the date-based equivalent of [`hazard_rate`](Self::hazard_rate).
+    /// # Arguments
+    ///
+    /// * `date` - Target calendar date on or after [`base_date`](Self::base_date).
     ///
     /// # Errors
     ///
-    /// Returns an error if the year fraction calculation fails.
+    /// Returns an error if `date < base_date()` or day-count calculation fails.
     #[inline]
     #[must_use = "computed hazard rate should not be discarded"]
     pub fn hazard_rate_on_date(&self, date: Date) -> crate::Result<f64> {
+        if date < self.base {
+            return Err(crate::Error::Validation(format!(
+                "hazard_rate_on_date date {date} precedes HazardCurve base_date ({})",
+                self.base
+            )));
+        }
+        if let Some(src) = &self.source {
+            let t = self.source_year_fraction_to(src, date)?;
+            if !t.is_finite() || t < src.offset {
+                return Err(crate::Error::Validation(format!(
+                    "mapped date {date} must be finite and >= condition offset {}",
+                    src.offset
+                )));
+            }
+            if date == self.base || exact_f64_eq(t, src.offset) {
+                return Ok(self.lambdas[0]);
+            }
+            return Ok(Self::hazard_rate_in_pairs(&src.knot_points, t));
+        }
         let t = self.year_fraction_to(date)?;
-        Ok(self.hazard_rate(t))
+        self.hazard_rate(t)
     }
 
-    /// Evaluate survival probabilities at the provided calendar dates.
+    /// Evaluate survival probabilities at the provided calendar dates (`date >= base_date()`).
     ///
-    /// Each date is converted to a year fraction from [`Self::base_date`] with
-    /// this curve's [`Self::day_count`], then evaluated with [`Self::sp`].
-    /// Results preserve the input order, and dates on or before the base date
-    /// therefore return `1.0`. Values are clamped to `[0, 1]` as a final
-    /// numerical safeguard.
+    /// # Arguments
+    ///
+    /// * `dates` - Calendar dates on or after [`base_date`](Self::base_date).
     ///
     /// # Errors
     ///
-    /// Returns an error if the selected day-count convention cannot calculate
-    /// a year fraction for any supplied date. No partial vector is returned.
+    /// Returns an error if any date precedes `base_date()` or day-count
+    /// calculation fails. No partial vector is returned on error.
     #[must_use = "computed survival probabilities should not be discarded"]
     pub fn survival_at_dates(&self, dates: &[Date]) -> crate::Result<Vec<f64>> {
         dates
             .iter()
-            .map(|&date| Ok(self.sp(self.year_fraction_to(date)?).clamp(0.0, 1.0)))
+            .map(|&date| Ok(self.sp_on_date(date)?.clamp(0.0, 1.0)))
             .collect()
     }
 
@@ -388,18 +638,56 @@ impl HazardCurve {
     pub fn id(&self) -> &CurveId {
         &self.id
     }
-    /// Largest hazard rate the builder accepted for this curve; carried by
-    /// rebuilds and the wire form.
-    pub fn max_hazard_rate(&self) -> f64 {
-        self.max_hazard_rate
-    }
 
     /// Curve valuation **base date**.
     pub fn base_date(&self) -> Date {
         self.base
     }
 
-    /// Recovery rate metadata used when mapping spreads↔hazards during bootstrap.
+    /// Original unconditioned base date anchoring source hazard coordinates.
+    #[inline]
+    pub fn source_base_date(&self) -> Date {
+        self.source.as_ref().map_or(self.base, |s| s.base_date)
+    }
+
+    /// Day-count context of the curve's time axis (including holiday calendar if set).
+    #[must_use]
+    pub fn day_count_context(&self) -> crate::dates::DayCountContext<'static> {
+        crate::dates::DayCountContext {
+            calendar: self.calendar.as_ref().map(|cal| cal.calendar),
+            ..crate::dates::DayCountContext::default()
+        }
+    }
+
+    /// Canonical registered identifier of the curve's holiday calendar, if any.
+    #[must_use]
+    pub fn calendar_id(&self) -> Option<&str> {
+        self.calendar.as_ref().map(|cal| cal.id.as_str())
+    }
+
+    /// Evaluate piecewise-constant hazard intensity `λ(t)` on the curve's original source clock.
+    ///
+    /// # Arguments
+    ///
+    /// * `source_t` - Non-negative time in curve day-count years measured from
+    ///   [`Self::source_base_date`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] if `source_t` is non-finite or negative.
+    pub fn source_hazard_rate(&self, source_t: f64) -> crate::Result<f64> {
+        if !source_t.is_finite() || source_t < 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "source hazard time must be finite and non-negative, got {source_t}"
+            )));
+        }
+        if let Some(src) = &self.source {
+            return Ok(Self::hazard_rate_in_pairs(&src.knot_points, source_t));
+        }
+        self.hazard_rate(source_t)
+    }
+
+    /// Recovery rate metadata used when mapping spreads and hazards during bootstrap.
     pub fn recovery_rate(&self) -> f64 {
         self.recovery_rate
     }
@@ -409,12 +697,12 @@ impl HazardCurve {
         self.day_count
     }
 
-    /// Get the currency of the protection leg.
+    /// Currency of the protection leg.
     pub fn currency(&self) -> Option<Currency> {
         self.currency
     }
 
-    /// Get the issuer name.
+    /// Issuer name metadata.
     pub fn issuer(&self) -> Option<&str> {
         self.issuer.as_deref()
     }
@@ -426,14 +714,13 @@ impl HazardCurve {
         self.seniority
     }
 
-    /// Opaque FX policy stamp set by the curve constructor; see
-    /// [`crate::market_data::term_structures::DiscountCurve::fx_policy`] for the contract.
+    /// Opaque FX policy stamp set by the curve constructor.
     #[inline]
     pub fn fx_policy(&self) -> Option<&str> {
         self.fx_policy.as_deref()
     }
 
-    /// Access the knot points (time, lambda) for inspection or modification.
+    /// Iterate over `(time_years, hazard_rate)` knot points.
     pub fn knot_points(&self) -> impl Iterator<Item = (f64, f64)> + '_ {
         self.knots
             .iter()
@@ -441,17 +728,6 @@ impl HazardCurve {
             .map(|(&t, &lambda)| (t, lambda))
     }
 
-    /// Access the par spread points for inspection.
-    pub fn par_spread_points(&self) -> impl Iterator<Item = (f64, f64)> + '_ {
-        self.par_tenors
-            .iter()
-            .zip(self.par_spreads_bp.iter())
-            .map(|(&t, &spread)| (t, spread))
-    }
-    /// Get the default interpolation method for par spreads.
-    pub fn par_interp(&self) -> ParInterp {
-        self.par_interp
-    }
     /// Exact inputs used to calibrate this curve, when available.
     #[inline]
     #[must_use]
@@ -475,51 +751,19 @@ impl HazardCurve {
         self.knots.is_empty()
     }
 
-    /// Helper: compute year fraction from base date to target date using the curve's day-count.
+    /// Compute signed year fraction from `self.base` using the curve's calendar context.
     #[inline]
     fn year_fraction_to(&self, date: Date) -> crate::Result<f64> {
-        self.day_count.signed_year_fraction(
-            self.base,
-            date,
-            crate::dates::DayCountContext::default(),
-        )
+        signed_curve_year_fraction(self.base, date, self.day_count, self.calendar.as_ref())
     }
 
-    /// Return an interpolated par spread in basis points for reporting.
-    /// Linear interpolation in spread, with log-linear fallback when values are positive and requested.
-    ///
-    /// # Arguments
-    ///
-    /// * `t` - Year fraction from the curve base date to the quoted CDS horizon.
-    /// * `method` - Interpolation of stored par-spread quotes; log-linear falls
-    ///   back to linear when a quote is non-positive.
-    #[must_use]
-    pub fn cds_quote_bp(&self, t: f64, method: ParInterp) -> f64 {
-        if self.par_tenors.len() < 2 || self.par_tenors.len() != self.par_spreads_bp.len() {
-            let lambda = self.hazard_rate(t.max(0.0));
-            return (lambda * (1.0 - self.recovery_rate) * 10_000.0).max(0.0);
-        }
-
-        // Log-linear falls back to linear when the spreads cannot be logged.
-        if method == ParInterp::LogLinear
-            && let Ok(strat) = LogLinearStrategy::from_raw(
-                &self.par_tenors,
-                &self.par_spreads_bp,
-                ExtrapolationPolicy::FlatForward,
-            )
-        {
-            return strat.interp(
-                t,
-                &self.par_tenors,
-                &self.par_spreads_bp,
-                ExtrapolationPolicy::FlatForward,
-            );
-        }
-        LinearStrategy.interp(
-            t,
-            &self.par_tenors,
-            &self.par_spreads_bp,
-            ExtrapolationPolicy::FlatForward,
-        )
+    /// Compute signed year fraction from `src.base_date` using the curve's calendar context.
+    #[inline]
+    fn source_year_fraction_to(
+        &self,
+        src: &HazardConditionSource,
+        date: Date,
+    ) -> crate::Result<f64> {
+        signed_curve_year_fraction(src.base_date, date, self.day_count, self.calendar.as_ref())
     }
 }

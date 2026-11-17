@@ -82,10 +82,8 @@
 //!   35(3), 98-105. `docs/REFERENCES.md#whaley-2009-vix`
 //! - CBOE (2019). "VIX White Paper." CBOE Global Markets. `docs/REFERENCES.md#cboe-vix-white-paper`
 
-use super::common::{InterpRollState, roll_knots};
-use crate::dates::DateExt;
 use crate::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
-use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
+use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 use crate::{
     dates::{Date, DayCount},
     error::InputError,
@@ -177,10 +175,8 @@ pub struct PriceCurve {
     knots: Box<[f64]>,
     /// Forward prices at each knot.
     prices: Box<[f64]>,
-    /// Source interpolation; the unrolled source when `roll` is set.
+    /// Underlying interpolator.
     interp: Interp,
-    /// Source grid and origin of a rolled curve.
-    roll: Option<InterpRollState>,
 }
 
 /// Raw serializable state of PriceCurve.
@@ -210,9 +206,6 @@ struct RawPriceCurve {
     pub interp_style: InterpStyle,
     /// Extrapolation policy
     pub extrapolation: ExtrapolationPolicy,
-    /// Source interpolation and accumulated time origin for a rolled curve.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub roll_transform: Option<InterpRollState>,
 }
 
 impl From<PriceCurve> for RawPriceCurve {
@@ -237,7 +230,6 @@ impl From<PriceCurve> for RawPriceCurve {
             knot_points,
             interp_style: curve.interp.style(),
             extrapolation: curve.interp.extrapolation(),
-            roll_transform: curve.roll,
         }
     }
 }
@@ -263,7 +255,6 @@ impl TryFrom<RawPriceCurve> for PriceCurve {
             .knots(state.knot_points)
             .interp(state.interp_style)
             .extrapolation(state.extrapolation)
-            .roll_transform(state.roll_transform)
             .build()
     }
 }
@@ -285,8 +276,7 @@ impl PriceCurve {
             spot_price: None,
             points: Vec::new(),
             style: InterpStyle::Linear,
-            extrapolation: ExtrapolationPolicy::FlatZero,
-            roll_transform: None,
+            extrapolation: ExtrapolationPolicy::Flat,
         }
     }
 
@@ -310,16 +300,13 @@ impl PriceCurve {
         if t == 0.0 {
             return self.spot_price;
         }
-        InterpRollState::eval(self.roll.as_ref(), &self.interp, t)
+        self.interp.interp(t).unwrap_or(f64::NAN)
     }
 
-    /// Earliest knot time supported by this curve (including rolled source pillars).
+    /// Earliest knot time supported by this curve.
     #[inline]
     fn min_supported_time(&self) -> f64 {
-        self.roll
-            .as_ref()
-            .and_then(InterpRollState::min_supported_time)
-            .unwrap_or_else(|| self.knots.first().copied().unwrap_or(0.0))
+        self.knots.first().copied().unwrap_or(0.0)
     }
 
     /// Forward price on a specific calendar date.
@@ -425,9 +412,8 @@ impl PriceCurve {
 
     /// Create a builder pre-populated with this curve's data but a new ID.
     ///
-    /// The builder keeps the curve's pillars, spot and any roll state, so
-    /// `build()` reproduces the curve under `new_id`; supplying more pillars
-    /// through [`PriceCurveBuilder::knots`] drops the roll state.
+    /// The builder keeps the curve's pillars and spot so `build()` reproduces
+    /// the curve under `new_id`.
     ///
     /// # Arguments
     ///
@@ -436,7 +422,6 @@ impl PriceCurve {
         self.metadata_builder(new_id)
             .spot_price(self.spot_price)
             .knots(self.knots.iter().copied().zip(self.prices.iter().copied()))
-            .roll_transform(self.roll.clone())
     }
 
     /// Builder pre-populated with this curve's metadata (kind, base date,
@@ -477,48 +462,21 @@ impl PriceCurve {
     }
 
     /// Rebuild with every pillar mapped through `map(time, price)` and the given spot.
-    ///
-    /// An unrolled curve maps its pillars and takes `spot` as given. A rolled
-    /// curve shocks its source pillars with `map` instead and reads its
-    /// current pillars and spot back from the shocked source, so the shocked
-    /// and base curves share one interpolation (off-pillar levels follow the
-    /// interpolation style, as they do on an unrolled curve).
     fn shocked(
         &self,
         new_id: impl Into<CurveId>,
         spot: f64,
         map: impl Fn(f64, f64) -> f64,
     ) -> crate::Result<Self> {
-        let builder = self.metadata_builder(new_id);
-        match &self.roll {
-            Some(roll) => {
-                let (state, prices) = roll.bump(
-                    &self.interp,
-                    ValidationPolicy::AllowNegative,
-                    &self.knots,
-                    map,
-                )?;
-                let spot = self
-                    .knots
+        self.metadata_builder(new_id)
+            .spot_price(spot)
+            .knots(
+                self.knots
                     .iter()
-                    .position(|&t| t == 0.0)
-                    .map_or(spot, |origin| prices[origin]);
-                builder
-                    .spot_price(spot)
-                    .knots(self.knots.iter().copied().zip(prices))
-                    .roll_transform(Some(state))
-                    .build()
-            }
-            None => builder
-                .spot_price(spot)
-                .knots(
-                    self.knots
-                        .iter()
-                        .zip(self.prices.iter())
-                        .map(|(&t, &price)| (t, map(t, price))),
-                )
-                .build(),
-        }
+                    .zip(self.prices.iter())
+                    .map(|(&t, &price)| (t, map(t, price))),
+            )
+            .build()
     }
 
     /// Scale every pillar and the spot by `1 + pct`, preserving signed prices.
@@ -529,61 +487,6 @@ impl PriceCurve {
             self.spot_price * factor,
             |_, price| price * factor,
         )
-    }
-
-    /// Roll the curve forward by a specified number of days.
-    ///
-    /// This creates a new curve with:
-    /// - Base date advanced by `days`
-    /// - Knot times shifted backwards (t' = t - dt_years)
-    /// - Points with t' <= 0 are filtered out (expired)
-    /// - Forward prices are preserved
-    ///
-    /// # Arguments
-    /// * `days` - Non-negative calendar-day shift; `0` returns an unmodified clone and negative values are rejected.
-    ///
-    /// # Returns
-    /// A new price curve with updated base date and shifted knots.
-    ///
-    /// # Errors
-    /// Returns an error if `days < 0` or if no future knot remains after filtering expired points.
-    /// Returns a validation error if the rolled base date exceeds the supported calendar range.
-    pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
-        if days < 0 {
-            return Err(crate::Error::Validation(format!(
-                "PriceCurve::roll_forward requires non-negative days, got {days}"
-            )));
-        }
-        if days == 0 {
-            return Ok(self.clone());
-        }
-        let new_base = self.base.add_days(days)?;
-        let dt_years = self.day_count.signed_year_fraction(
-            self.base,
-            new_base,
-            crate::dates::DayCountContext::default(),
-        )?;
-
-        let mut rolled_points = roll_knots(&self.knots, &self.prices, dt_years);
-
-        if rolled_points.is_empty() {
-            return Err(crate::InputError::TooFewPoints.into());
-        }
-
-        // New spot is interpolated from old curve at dt_years
-        let new_spot = self.price(dt_years);
-        rolled_points.insert(0, (0.0, new_spot));
-
-        self.metadata_builder(self.id.clone())
-            .base_date(new_base)
-            .spot_price(new_spot)
-            .knots(rolled_points)
-            .roll_transform(InterpRollState::advance(
-                self.roll.as_ref(),
-                dt_years,
-                self.knots.iter().copied().zip(self.prices.iter().copied()),
-            )?)
-            .build()
     }
 }
 
@@ -614,7 +517,6 @@ pub struct PriceCurveBuilder {
     points: Vec<(f64, f64)>,
     style: InterpStyle,
     extrapolation: ExtrapolationPolicy,
-    roll_transform: Option<InterpRollState>,
 }
 
 impl PriceCurveBuilder {
@@ -658,9 +560,6 @@ impl PriceCurveBuilder {
 
     /// Supply knot points `(t, forward_price)`.
     ///
-    /// Supplied pillars define the curve's interpolation; any roll state
-    /// carried over from [`PriceCurve::to_builder_with_id`] is dropped.
-    ///
     /// # Arguments
     ///
     /// * `pts` - `(time, price)` pillars appended to any already supplied:
@@ -671,7 +570,6 @@ impl PriceCurveBuilder {
         I: IntoIterator<Item = (f64, f64)>,
     {
         self.points.extend(pts);
-        self.roll_transform = None;
         self
     }
 
@@ -684,11 +582,6 @@ impl PriceCurveBuilder {
     /// Set the extrapolation policy for out-of-bounds evaluation.
     pub fn extrapolation(mut self, policy: ExtrapolationPolicy) -> Self {
         self.extrapolation = policy;
-        self
-    }
-
-    fn roll_transform(mut self, state: Option<InterpRollState>) -> Self {
-        self.roll_transform = state;
         self
     }
 
@@ -775,21 +668,9 @@ impl PriceCurveBuilder {
                 "MonotoneConvex interpolation is only supported on DiscountCurve".to_string(),
             ));
         }
-        let interp = InterpRollState::build_source(
-            self.roll_transform.as_ref(),
-            self.style,
-            self.extrapolation,
-            ValidationPolicy::AllowNegative,
-            &knots,
-            &prices,
-        )?;
-        if let Some(state) = &self.roll_transform
-            && self.kind == PriceCurveKind::VolIndex
-        {
-            let (source_knots, source_levels): (Vec<f64>, Vec<f64>) =
-                state.source_points.iter().copied().unzip();
-            validate_non_negative_knots(&source_knots, &source_levels, "Volatility index level")?;
-        }
+        let interp = self
+            .style
+            .build_enum(knots.clone(), prices.clone(), self.extrapolation)?;
 
         Ok(PriceCurve {
             id: self.id,
@@ -800,7 +681,6 @@ impl PriceCurveBuilder {
             knots,
             prices,
             interp,
-            roll: self.roll_transform,
         })
     }
 }
@@ -840,8 +720,7 @@ impl Bumpable for PriceCurve {
                 (BumpMode::Additive, BumpUnits::Fraction) => {
                     let bump = spec.value;
                     let new_id = crate::market_data::bumps::id_bump_bp(id, bump * 100.0);
-                    // Spot is not bumped in a key-rate shock; neither are rolled
-                    // source pillars at or before the current origin.
+                    // Spot is not bumped in a key-rate shock.
                     self.shocked(new_id, self.spot_price, |t, price| {
                         if t <= 0.0 {
                             price
@@ -852,8 +731,7 @@ impl Bumpable for PriceCurve {
                 }
                 (BumpMode::Additive, BumpUnits::Percent) => {
                     let percentage = spec.value / 100.0;
-                    // Spot is not bumped in a key-rate shock; neither are
-                    // rolled source pillars at or before the current origin.
+                    // Spot is not bumped in a key-rate shock.
                     self.shocked(
                         spec.standard_bump_id(self.id()),
                         self.spot_price,
@@ -1219,195 +1097,6 @@ mod tests {
         assert!((curve.price(0.5) - recovered.price(0.5)).abs() < 1e-10);
     }
 
-    #[test]
-    fn rolls_preserve_source_interpolation_through_rebuilds_bumps_and_serde() {
-        let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
-        let source = PriceCurve::builder("PRICE-ROLL")
-            .base_date(base)
-            .spot_price(100.0)
-            .knots([(0.0, 100.0), (1.0, 110.0), (2.0, 130.0), (3.0, 160.0)])
-            .interp(InterpStyle::CubicHermite)
-            .build()
-            .unwrap();
-        let unchanged = source.roll_forward(0).unwrap();
-        assert_eq!(
-            serde_json::to_value(&source).unwrap(),
-            serde_json::to_value(&unchanged).unwrap()
-        );
-
-        let rolled = source.roll_forward(365).unwrap();
-        for time in [0.25, 0.5, 1.5] {
-            assert!((rolled.price(time) - source.price(time + 1.0)).abs() < 1e-12);
-        }
-        let rebuilt = rolled
-            .to_builder_with_id("PRICE-ROLL-REBUILT")
-            .build()
-            .unwrap();
-        assert!((rebuilt.price(0.5) - source.price(1.5)).abs() < 1e-12);
-
-        let restored: PriceCurve =
-            serde_json::from_str(&serde_json::to_string(&rolled).unwrap()).unwrap();
-        assert!((restored.price(0.5) - source.price(1.5)).abs() < 1e-12);
-        let twice = restored.roll_forward(180).unwrap();
-        assert!((twice.price(0.5) - source.price(1.5 + 180.0 / 365.0)).abs() < 1e-12);
-
-        let bumped = restored
-            .apply_bump(BumpSpec {
-                mode: BumpMode::Additive,
-                units: BumpUnits::Fraction,
-                value: 2.0,
-                bump_type: BumpType::Parallel,
-            })
-            .unwrap();
-        assert!((bumped.price(0.5) - (restored.price(0.5) + 2.0)).abs() < 1e-12);
-
-        // A zero shock leaves the rolled Hermite shape untouched off-pillar.
-        let flat = rolled
-            .apply_bump(BumpSpec {
-                mode: BumpMode::Additive,
-                units: BumpUnits::Fraction,
-                value: 0.0,
-                bump_type: BumpType::Parallel,
-            })
-            .unwrap();
-        for time in [0.1, 0.25, 0.75] {
-            assert_eq!(flat.price(time), rolled.price(time));
-        }
-    }
-
-    #[test]
-    fn rolled_log_linear_curve_takes_additive_and_key_rate_shocks() {
-        let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
-        let rolled = PriceCurve::builder("PRICE-LOGLIN")
-            .base_date(base)
-            .spot_price(100.0)
-            .knots([(0.0, 100.0), (1.0, 110.0), (2.0, 130.0)])
-            .interp(InterpStyle::LogLinear)
-            .build()
-            .unwrap()
-            .roll_forward(182)
-            .unwrap();
-
-        let bumped = rolled
-            .apply_bump(BumpSpec {
-                mode: BumpMode::Additive,
-                units: BumpUnits::Fraction,
-                value: 2.0,
-                bump_type: BumpType::Parallel,
-            })
-            .expect("additive shock on a rolled curve");
-        assert!((bumped.spot_price() - (rolled.spot_price() + 2.0)).abs() < 1e-12);
-        for &time in rolled.knots() {
-            assert!((bumped.price(time) - (rolled.price(time) + 2.0)).abs() < 1e-12);
-        }
-
-        // A key-rate shock leaves the spot where it is.
-        let key_rate = rolled
-            .apply_bump(BumpSpec {
-                mode: BumpMode::Additive,
-                units: BumpUnits::Fraction,
-                value: 1.0,
-                bump_type: BumpType::TriangularKeyRate {
-                    prev_bucket: None,
-                    target_bucket: 0.5,
-                    next_bucket: Some(1.5),
-                },
-            })
-            .expect("key-rate shock on a rolled curve");
-        assert!((key_rate.spot_price() - rolled.spot_price()).abs() < 1e-12);
-        assert!(key_rate.price(rolled.knots()[1]) > rolled.price(rolled.knots()[1]));
-    }
-
-    #[test]
-    fn percent_key_rate_bump_keeps_roll_state_and_matches_fraction_path() {
-        let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
-        let rolled = PriceCurve::builder("PRICE-ROLL-PCT")
-            .base_date(base)
-            .spot_price(100.0)
-            .knots([(0.0, 100.0), (1.0, 110.0), (2.0, 130.0), (3.0, 160.0)])
-            .interp(InterpStyle::CubicHermite)
-            .build()
-            .unwrap()
-            .roll_forward(182)
-            .unwrap();
-        assert!(rolled.roll.is_some());
-
-        // Bucket the pre-roll 2y pillar (now at knots()[2]) between its neighbours,
-        // so a +10% shock there equals an absolute +13.0 shock on every pillar.
-        let knots = rolled.knots();
-        let (prev, target, next) = (Some(knots[1]), knots[2], Some(knots[3]));
-        let percent = rolled
-            .apply_bump(BumpSpec {
-                mode: BumpMode::Additive,
-                units: BumpUnits::Percent,
-                value: 10.0,
-                bump_type: BumpType::TriangularKeyRate {
-                    prev_bucket: prev,
-                    target_bucket: target,
-                    next_bucket: next,
-                },
-            })
-            .expect("percent key-rate shock on a rolled curve");
-        let fraction = rolled
-            .apply_bump(BumpSpec {
-                mode: BumpMode::Additive,
-                units: BumpUnits::Fraction,
-                value: 13.0,
-                bump_type: BumpType::TriangularKeyRate {
-                    prev_bucket: prev,
-                    target_bucket: target,
-                    next_bucket: next,
-                },
-            })
-            .expect("fraction key-rate shock on a rolled curve");
-
-        assert!(percent.roll.is_some());
-        assert_eq!(percent.knots(), rolled.knots());
-        assert!((percent.price(target) - 143.0).abs() < 1e-12);
-        assert!((percent.spot_price() - rolled.spot_price()).abs() < 1e-12);
-        for time in [0.1, 0.25, knots[1], 0.75, target, 1.9, knots[3], 2.4] {
-            assert!(
-                (percent.price(time) - fraction.price(time)).abs() < 1e-12,
-                "t={time}: percent {} vs fraction {}",
-                percent.price(time),
-                fraction.price(time)
-            );
-        }
-    }
-
-    #[test]
-    fn backward_roll_is_rejected() {
-        let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
-        let curve = PriceCurve::builder("PRICE-BACK")
-            .base_date(base)
-            .spot_price(100.0)
-            .knots([(0.0, 100.0), (1.0, 110.0)])
-            .extrapolation(ExtrapolationPolicy::FlatForward)
-            .build()
-            .unwrap();
-        assert!(curve.roll_forward(-365).is_err());
-    }
-
-    #[test]
-    fn replacement_knots_drop_a_carried_roll_state() {
-        let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
-        let rolled = PriceCurve::builder("PRICE-ROLL")
-            .base_date(base)
-            .spot_price(100.0)
-            .knots([(0.0, 100.0), (1.0, 110.0), (2.0, 130.0)])
-            .interp(InterpStyle::CubicHermite)
-            .build()
-            .unwrap()
-            .roll_forward(90)
-            .unwrap();
-        let extended = rolled
-            .to_builder_with_id("PRICE-EXTENDED")
-            .knots([(3.0, 140.0)])
-            .build()
-            .expect("new pillars define a fresh interpolation");
-        assert!((extended.price(3.0) - 140.0).abs() < 1e-12);
-    }
-
     fn sample_vix_curve() -> PriceCurve {
         PriceCurve::builder("VIX")
             .kind(PriceCurveKind::VolIndex)
@@ -1456,7 +1145,7 @@ mod tests {
             "id": "X", "base": "2025-01-01", "day_count": "act_365f",
             "spot_price": 1.0, "spot_level": 1.0,
             "knot_points": [[0.0, 1.0], [1.0, 1.0]],
-            "interp_style": "linear", "extrapolation": "flat_zero"
+            "interp_style": "linear", "extrapolation": "flat"
         });
         assert!(serde_json::from_value::<PriceCurve>(both).is_err());
     }
@@ -1524,7 +1213,7 @@ mod tests {
             .spot_price(75.0)
             .knots([(-0.5, 71.0), (0.0, 75.0), (1.0, 79.0)])
             .interp(InterpStyle::Linear)
-            .extrapolation(ExtrapolationPolicy::None)
+            .extrapolation(ExtrapolationPolicy::Error)
             .build()
             .expect("pre-base price curve");
         assert!((curve.price(-0.25) - 73.0).abs() < 1e-12);

@@ -153,7 +153,7 @@ fn commodity_spread_vega_bumps_each_market_surface_once() -> finstack_quant_core
                 if !shared_surface {
                     ids.push(option.leg2_vol_surface_id.clone());
                 }
-                market.bump(ids.into_iter().map(|id| MarketBump::Curve {
+                market.bump(ids.into_iter().map(|id| MarketBump::VolSurface {
                     id,
                     spec: BumpSpec {
                         bump_type: BumpType::Parallel,

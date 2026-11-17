@@ -1,6 +1,6 @@
 {
   "expected": {
-    "dv01": -250.09562850860732,
+    "dv01": -249.38019315941477,
     "npv": -1250.7990028210245,
     "par_rate": 0.042999999999999323
   },
@@ -41,10 +41,9 @@
       "credit_indices": [],
       "curves": [
         {
-          "allow_non_monotonic": false,
           "base": "2026-04-30",
           "day_count": "act_365f",
-          "extrapolation": "flat_forward",
+          "extrapolation": "extend",
           "id": "USD-OIS",
           "interp_style": "log_linear",
           "knot_points": [
@@ -57,36 +56,30 @@
               0.30119421191220214
             ]
           ],
-          "min_forward_rate": null,
-          "min_forward_tenor": 1e-06,
           "rate_calibration": null,
           "type": "discount"
         },
         {
           "base": "2026-04-30",
-          "day_count": "act_360",
-          "extrapolation": "flat_forward",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
           "id": "USD-SOFR-3M",
-          "interp_style": "linear",
+          "index_tenor": {
+            "count": 3,
+            "unit": "months"
+          },
+          "interp_style": "log_linear",
           "knot_points": [
             [
               0.0,
-              0.043
+              1.0
             ],
             [
               30.0,
-              0.043
+              0.2723185911244534
             ]
           ],
-          "projection_grid": [
-            0.0,
-            0.2638888888888889,
-            0.5194444444444445,
-            30.0
-          ],
           "rate_calibration": null,
-          "reset_lag": 2,
-          "tenor": 0.25,
           "type": "forward"
         }
       ],

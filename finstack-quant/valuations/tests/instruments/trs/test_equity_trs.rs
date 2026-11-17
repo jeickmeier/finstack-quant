@@ -214,11 +214,14 @@ fn test_equity_trs_discrete_dividends_preserve_small_amounts_after_large_amounts
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, 1.0)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let market = MarketContext::new()
-        .insert(disc)
-        .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0));
+    let market = MarketContext::new().insert(disc).insert_price(
+        "SPX-SPOT",
+        MarketScalar::unitless(100.0).expect("valid scalar"),
+    );
 
     let mut trs = TestEquityTrsBuilder::new()
         .notional(Money::new(1.0, USD).expect("valid money fixture"))
@@ -383,7 +386,10 @@ fn test_equity_trs_sensitivity_to_spot_price() {
     // Act
     let npv_base = trs.value(&market, as_of).unwrap();
 
-    let market_bumped = market.insert_price("SPX-SPOT", MarketScalar::Unitless(spot_bumped));
+    let market_bumped = market.insert_price(
+        "SPX-SPOT",
+        MarketScalar::unitless(spot_bumped).expect("valid scalar"),
+    );
     let npv_bumped = trs.value(&market_bumped, as_of).unwrap();
 
     // Assert - With locked initial level, spot changes affect forward prices
@@ -407,7 +413,10 @@ fn test_equity_trs_sensitivity_to_dividend_yield() {
     // Act
     let npv_base = trs.value(&market, as_of).unwrap();
 
-    let market_bumped = market.insert_price("SPX-DIV-YIELD", MarketScalar::Unitless(div_higher));
+    let market_bumped = market.insert_price(
+        "SPX-DIV-YIELD",
+        MarketScalar::unitless(div_higher).expect("valid scalar"),
+    );
     let npv_bumped = trs.value(&market_bumped, as_of).unwrap();
 
     // A gross total-return swap passes through price + dividends. Higher q
@@ -449,28 +458,48 @@ fn test_equity_trs_sensitivity_to_interest_rates() {
                 (5.0, 0.800),
             ])
             .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
     market_shifted = market_shifted.insert(disc_shifted);
 
-    let fwd_shifted = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
-        "USD-SOFR-3M",
-        0.25,
-    )
-    .base_date(as_of)
-    .knots(vec![
-        (0.0, 0.03), // +100bp
-        (0.25, 0.031),
-        (0.5, 0.032),
-        (1.0, 0.033),
-        (2.0, 0.034),
-    ])
-    .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
-    .build()
-    .unwrap();
+    let fwd_shifted =
+        finstack_quant_core::market_data::term_structures::ForwardCurve::builder("USD-SOFR-3M")
+            .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .knots([
+                (0.0, 1.0),
+                (0.125, 0.996225889923667),
+                (0.25, 0.992403996566088),
+                (0.375, 0.988534980047098),
+                (0.5, 0.984619506751733),
+                (0.625, 0.980673572044391),
+                (0.75, 0.976712928203149),
+                (0.875, 0.972737881670257),
+                (1.0, 0.96874873899307),
+                (1.125, 0.964753343891434),
+                (1.25, 0.96075941495148),
+                (1.375, 0.956767070654488),
+                (1.5, 0.952776428916194),
+                (1.625, 0.948787607081793),
+                (1.75, 0.944800721920996),
+                (1.875, 0.940815889623161),
+                (2.0, 0.936833225792477),
+            ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .unwrap();
     market_shifted = market_shifted.insert(fwd_shifted);
-    market_shifted = market_shifted.insert_price("SPX-SPOT", MarketScalar::Unitless(5000.0));
-    market_shifted = market_shifted.insert_price("SPX-DIV-YIELD", MarketScalar::Unitless(0.015));
+    market_shifted = market_shifted.insert_price(
+        "SPX-SPOT",
+        MarketScalar::unitless(5000.0).expect("valid scalar"),
+    );
+    market_shifted = market_shifted.insert_price(
+        "SPX-DIV-YIELD",
+        MarketScalar::unitless(0.015).expect("valid scalar"),
+    );
 
     // Act
     let npv_base = trs.value(&market_base, as_of).unwrap();

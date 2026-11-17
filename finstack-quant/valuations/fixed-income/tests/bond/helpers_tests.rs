@@ -581,6 +581,8 @@ fn test_fixed_leg_annuity_and_par_rate_discount_helpers_cover_edge_cases() {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (2.0, 1.0)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 

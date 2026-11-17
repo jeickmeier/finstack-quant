@@ -3,6 +3,7 @@
 //! Tests the second-order sensitivity to inflation rate changes.
 
 use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::market_data::scalars::{InflationLag, SeriesInterpolation};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::MetricId;
@@ -31,6 +32,8 @@ fn test_inflation_convexity_par_swap_nonzero() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -48,6 +51,8 @@ fn test_inflation_convexity_par_swap_nonzero() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -107,6 +112,8 @@ fn test_inflation_convexity_finite_and_nonzero() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -156,6 +163,8 @@ fn test_inflation_convexity_varies_with_maturity() {
             .discount_curve_id("USD-OIS".into())
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
+            .lag(InflationLag::months(3))
+            .interpolation(SeriesInterpolation::Linear)
             .attributes(Default::default())
             .build()
             .unwrap();
@@ -218,6 +227,8 @@ fn test_inflation_convexity_scales_with_notional() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -232,6 +243,8 @@ fn test_inflation_convexity_scales_with_notional() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -294,6 +307,8 @@ fn test_inflation_convexity_finite_for_edge_cases() {
             .discount_curve_id("USD-OIS".into())
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
+            .lag(InflationLag::months(3))
+            .interpolation(SeriesInterpolation::Linear)
             .attributes(Default::default())
             .build()
             .unwrap();

@@ -81,7 +81,7 @@ fn bump_and_measure_delta(
 
             bumped_ctx = bumped_ctx.insert_price(
                 synthetic_id.as_ref(),
-                finstack_quant_core::market_data::scalars::MarketScalar::Price(
+                finstack_quant_core::market_data::scalars::MarketScalar::price(
                     Money::from_model_value(bumped_price, price.currency())?,
                 ),
             );
@@ -92,18 +92,21 @@ fn bump_and_measure_delta(
             (price.amount(), pv_bumped)
         }
         ConstituentReference::MarketData { price_id, .. } => {
-            let (current_price, new_scalar) = match bumped_ctx.get_price(price_id.as_ref())? {
-                MarketScalar::Price(money) => {
-                    let price = money.amount();
-                    let bumped =
-                        Money::from_model_value(price * (1.0 + PRICE_BUMP_PCT), money.currency())?;
-                    (price, MarketScalar::Price(bumped))
-                }
-                MarketScalar::Unitless(v) => {
-                    let price = Money::new(*v, basket.reporting_currency)?.amount();
-                    let bumped = price * (1.0 + PRICE_BUMP_PCT);
-                    (price, MarketScalar::Unitless(bumped))
-                }
+            let scalar = bumped_ctx.get_price(price_id.as_ref())?;
+            let (current_price, new_scalar) = if let Some(money) = scalar.get_price() {
+                let price = money.amount();
+                let bumped =
+                    Money::from_model_value(price * (1.0 + PRICE_BUMP_PCT), money.currency())?;
+                (price, MarketScalar::price(bumped))
+            } else {
+                let v = scalar.get_unitless().ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(
+                        "Unsupported MarketScalar variant".to_string(),
+                    )
+                })?;
+                let price = Money::new(v, basket.reporting_currency)?.amount();
+                let bumped = price * (1.0 + PRICE_BUMP_PCT);
+                (price, MarketScalar::unitless(bumped)?)
             };
             bumped_ctx = bumped_ctx.insert_price(price_id.as_ref(), new_scalar);
 
@@ -237,7 +240,7 @@ mod tests {
             .insert(flat_discount("USD-OIS", as_of, 0.02))
             .insert_price(
                 "AAPL-SPOT",
-                MarketScalar::Price(Money::from((150_i64, Currency::USD))),
+                MarketScalar::price(Money::from((150_i64, Currency::USD))),
             );
 
         let basket = basket_with_instrument_constituent();

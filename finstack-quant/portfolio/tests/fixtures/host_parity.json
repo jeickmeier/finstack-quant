@@ -87,10 +87,7 @@
             ]
           ],
           "interp_style": "monotone_convex",
-          "extrapolation": "flat_forward",
-          "min_forward_rate": -0.005,
-          "allow_non_monotonic": false,
-          "min_forward_tenor": 1e-06,
+          "extrapolation": "extend",
           "rate_calibration": null,
           "fx_policy": null
         }
@@ -133,10 +130,7 @@
             ]
           ],
           "interp_style": "monotone_convex",
-          "extrapolation": "flat_forward",
-          "min_forward_rate": -0.005,
-          "allow_non_monotonic": false,
-          "min_forward_tenor": 1e-06,
+          "extrapolation": "extend",
           "rate_calibration": null,
           "fx_policy": null
         }
@@ -457,16 +451,16 @@
         "scenario_id": "up_10bp",
         "pnl": {
           "total": {
-            "amount": "-1487.4153790392",
+            "amount": "-1487.4153790397",
             "currency": "USD"
           },
           "by_position": {
             "POS-0": {
-              "amount": "-495.8051263468",
+              "amount": "-495.8051263467",
               "currency": "USD"
             },
             "POS-1": {
-              "amount": "-991.6102526935",
+              "amount": "-991.6102526933",
               "currency": "USD"
             }
           }
@@ -525,7 +519,7 @@
         "scenario_id": "down_15bp",
         "pnl": {
           "total": {
-            "amount": "2232.5065165438",
+            "amount": "2232.5065165433",
             "currency": "USD"
           },
           "by_position": {
@@ -1113,8 +1107,8 @@
         }
       ]
     },
-    "valuation_position_value_base": 2000151.8805406075,
-    "valuation_entity_value": 3000227.8208109112,
+    "valuation_position_value_base": 2000151.8805406077,
+    "valuation_entity_value": 3000227.8208109117,
     "metrics_total_dv01": -148.77842076454544,
     "metrics_position_dv01": -99.1856138430303,
     "builder_spec": {

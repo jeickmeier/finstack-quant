@@ -211,6 +211,14 @@ pub trait HolidayCalendar: Send + Sync {
         None
     }
 
+    /// Inclusive `(from_year, to_year)` coverage bounds of the calendar, or
+    /// `None` when unbounded or unspecified by a custom implementation.
+    #[inline]
+    fn supported_years(&self) -> Option<(Option<i32>, Option<i32>)> {
+        self.metadata()
+            .and_then(|metadata| metadata.supported_years)
+    }
+
     /// Canonical identifier that reconstructs this calendar through the
     /// registered calendar resolver.
     ///
@@ -238,20 +246,28 @@ impl<T: HolidayCalendar + ?Sized> HolidayCalendar for &T {
         (**self).metadata()
     }
 
+    fn supported_years(&self) -> Option<(Option<i32>, Option<i32>)> {
+        (**self).supported_years()
+    }
+
     fn calendar_id(&self) -> Option<String> {
         (**self).calendar_id()
     }
 }
 
 /// Business days in `[start, end)` by testing each date with
-/// [`HolidayCalendar::is_business_day`]; zero when `start == end`, an error
-/// when `start > end`.
+/// [`HolidayCalendar::is_business_day`]; validates `start` before returning
+/// zero when `start == end`, and errors when `start > end`.
 pub(super) fn count_business_days_by_scan<C: HolidayCalendar + ?Sized>(
     calendar: &C,
     start: Date,
     end: Date,
 ) -> crate::Result<i32> {
     super::year_cache::reject_reversed(start, end)?;
+    if start == end {
+        calendar.is_business_day(start)?;
+        return Ok(0);
+    }
     let mut count = 0_i32;
     let mut current = start;
     while current < end {
@@ -272,6 +288,8 @@ pub struct CalendarMetadata {
     pub name: &'static str,
     /// Whether weekends are ignored when classifying holidays.
     pub ignore_weekends: bool,
+    /// Optional inclusive `(from_year, to_year)` bounds of declared calendar coverage.
+    pub supported_years: Option<(Option<i32>, Option<i32>)>,
 }
 
 /// Business day adjustment conventions per ISDA standards.
@@ -582,75 +600,65 @@ fn joint_calendar(id: &str) -> crate::Result<&'static dyn HolidayCalendar> {
     let member_slice: &'static [&'static dyn HolidayCalendar] =
         Box::leak(members.into_boxed_slice());
     let composite: &'static super::composite::CompositeCalendar<'static> = Box::leak(Box::new(
-        super::composite::CompositeCalendar::new(member_slice),
+        super::composite::CompositeCalendar::try_new(member_slice)?,
     ));
     interned.insert(key, composite);
     Ok(composite)
 }
 
-/// Resolve a calendar ID to a calendar reference.
+/// Resolve a calendar ID strictly to a calendar reference.
 ///
 /// # Errors
 ///
-/// Returns an error if the calendar ID is not recognized.
-/// If `cal_id` is `None`, returns the weekends-only calendar (does not error).
+/// Returns `InputError::CalendarNotFound` if `cal_id` (or any `+`-joined
+/// member) is not recognized. Use `"weekends_only"` explicitly when only
+/// Saturday and Sunday should close.
 ///
 /// # Examples
 ///
 /// ```
 /// # use finstack_quant_core::dates::resolve_calendar;
 /// // Valid calendar ID
-/// let cal = resolve_calendar(Some("nyse")).expect("NYSE calendar should exist");
+/// let cal = resolve_calendar("nyse").expect("NYSE calendar should exist");
 ///
-/// // Explicit None uses weekends-only calendar (no error)
-/// let weekends = resolve_calendar(None).expect("None should use weekends-only");
+/// // Explicit weekends-only calendar
+/// let weekends = resolve_calendar("weekends_only").expect("weekends_only should exist");
 ///
 /// // Unknown calendar ID errors
-/// let err = resolve_calendar(Some("unknown_cal"));
+/// let err = resolve_calendar("unknown_cal");
 /// assert!(err.is_err());
 /// ```
 ///
 /// # Arguments
 ///
-/// * `cal_id` - Optional canonical calendar ID. `None` explicitly selects the
-///   weekends-only calendar; an unrecognized ID returns an error. `+`-joined
-///   ids such as `"nyse+gblo"` resolve to a union calendar (see
-///   [`calendar_by_id_strict`]).
-pub fn resolve_calendar(cal_id: Option<&str>) -> crate::Result<&'static dyn HolidayCalendar> {
-    match cal_id {
-        Some(id) => calendar_by_id_strict(id),
-        // Only use weekends_only if explicitly None (not as fallback)
-        None => Ok(&super::WEEKENDS_ONLY),
-    }
+/// * `cal_id` - Canonical calendar ID (or `+`-joined union such as `"nyse+gblo"`),
+///   including `"weekends_only"` when no holiday table applies.
+pub fn resolve_calendar(cal_id: &str) -> crate::Result<&'static dyn HolidayCalendar> {
+    calendar_by_id_strict(cal_id)
 }
 
 /// Resolve the joint calendar of a currency pair.
 ///
-/// Both ids present resolve to the interned union calendar (`"base+quote"`,
-/// a business day only when both members are); one id resolves to that
-/// calendar alone (every built-in calendar already closes on weekends); none
-/// resolves to weekends only.
+/// Resolves both required calendar identifiers to the interned union calendar
+/// (`"base+quote"`, a business day only when both members are; pass identical IDs
+/// or `"weekends_only"` explicitly when one leg has no extra holidays).
 /// Step and adjust on the result with [`crate::dates::DateExt::add_business_days`]
 /// and [`adjust`]; FX products own their spot-date rule, and
 /// [`crate::dates::fx::fx_forward_date`] adds a forward tenor to an actual spot.
 ///
 /// # Arguments
 ///
-/// * `base_cal_id` - Base-currency calendar id, or `None` for weekends only.
-/// * `quote_cal_id` - Quote-currency calendar id, or `None` for weekends only.
+/// * `base_cal_id` - Base-currency calendar id.
+/// * `quote_cal_id` - Quote-currency calendar id.
 ///
 /// # Errors
 ///
-/// Returns `InputError::CalendarNotFound` when an id is not a built-in calendar.
+/// Returns `InputError::CalendarNotFound` when either id is not a built-in calendar.
 pub fn resolve_joint_calendar(
-    base_cal_id: Option<&str>,
-    quote_cal_id: Option<&str>,
+    base_cal_id: &str,
+    quote_cal_id: &str,
 ) -> crate::Result<&'static dyn HolidayCalendar> {
-    match (base_cal_id, quote_cal_id) {
-        (None, None) => Ok(&super::WEEKENDS_ONLY),
-        (Some(id), None) | (None, Some(id)) => calendar_by_id_strict(id),
-        (Some(base), Some(quote)) => calendar_by_id_strict(&format!("{base}+{quote}")),
-    }
+    calendar_by_id_strict(&format!("{base_cal_id}+{quote_cal_id}"))
 }
 
 #[cfg(test)]
@@ -776,7 +784,7 @@ mod serde_tests {
 
     #[test]
     fn test_resolve_calendar_unknown_id() {
-        let result = resolve_calendar(Some("unknown_calendar_id"));
+        let result = resolve_calendar("unknown_calendar_id");
         assert!(result.is_err(), "Unknown calendar ID should error");
         let err = result.err().expect("unknown calendar must error");
         assert!(
@@ -790,9 +798,9 @@ mod serde_tests {
     }
 
     #[test]
-    fn test_resolve_calendar_explicit_none() {
-        let result = resolve_calendar(None);
-        assert!(result.is_ok(), "Explicit None should not error");
+    fn test_resolve_calendar_weekends_only_explicit() {
+        let result = resolve_calendar("weekends_only");
+        assert!(result.is_ok(), "Explicit weekends_only should succeed");
         let cal = result.unwrap();
         let saturday = create_date(2024, Month::January, 13).unwrap();
         let sunday = create_date(2024, Month::January, 14).unwrap();
@@ -805,7 +813,8 @@ mod serde_tests {
     #[test]
     fn modified_following_is_evaluated_on_the_union_calendar() {
         let members: [&dyn HolidayCalendar; 2] = [&JAN_29_HOLIDAY, &JAN_30_AND_31_HOLIDAYS];
-        let joint = crate::dates::calendar::composite::CompositeCalendar::new(&members);
+        let joint = crate::dates::calendar::composite::CompositeCalendar::try_new(&members)
+            .expect("non-empty composite");
 
         let date = create_date(2025, Month::January, 29).unwrap();
         let adjusted = adjust(date, BusinessDayConvention::ModifiedFollowing, &joint)
@@ -829,7 +838,7 @@ mod joint_calendar_tests {
     fn test_joint_business_days_no_holidays() {
         // Test with weekends-only calendars (no holidays)
         let start = create_date(2024, Month::January, 15).unwrap(); // Monday
-        let result = resolve_joint_calendar(None, None)
+        let result = resolve_joint_calendar("weekends_only", "weekends_only")
             .and_then(|cal| start.add_business_days(2, cal))
             .expect("Should succeed with no holidays");
 
@@ -844,7 +853,7 @@ mod joint_calendar_tests {
         // Using NYSE (US markets closed on holidays) vs weekends-only
         let start = create_date(2024, Month::January, 12).unwrap(); // Friday before MLK day (Jan 15, 2024)
 
-        let result = resolve_joint_calendar(Some("nyse"), None)
+        let result = resolve_joint_calendar("nyse", "weekends_only")
             .and_then(|cal| start.add_business_days(3, cal))
             .expect("Should succeed");
 
@@ -864,7 +873,7 @@ mod joint_calendar_tests {
         // Using weekends-only vs UK calendar
         let start = create_date(2024, Month::December, 23).unwrap(); // Monday before Christmas
 
-        let result = resolve_joint_calendar(None, Some("gblo"))
+        let result = resolve_joint_calendar("weekends_only", "gblo")
             .and_then(|cal| start.add_business_days(3, cal))
             .expect("Should succeed");
 
@@ -885,7 +894,7 @@ mod joint_calendar_tests {
         // New Year's Day is typically closed on both NYSE and GBLO
         let start = create_date(2023, Month::December, 29).unwrap(); // Friday before New Year
 
-        let result = resolve_joint_calendar(Some("nyse"), Some("gblo"))
+        let result = resolve_joint_calendar("nyse", "gblo")
             .and_then(|cal| start.add_business_days(2, cal))
             .expect("Should succeed");
 
@@ -903,7 +912,7 @@ mod joint_calendar_tests {
         // Test T+2 spot rolling near a holiday
         let trade_date = create_date(2024, Month::January, 12).unwrap(); // Friday before MLK day
 
-        let spot_date = resolve_joint_calendar(Some("nyse"), None)
+        let spot_date = resolve_joint_calendar("nyse", "weekends_only")
             .and_then(|cal| trade_date.add_business_days(2, cal))
             .expect("Should succeed");
 
@@ -920,7 +929,7 @@ mod joint_calendar_tests {
     fn test_joint_business_days_zero_days() {
         // Edge case: adding 0 days should return the start date
         let start = create_date(2024, Month::January, 15).unwrap();
-        let result = resolve_joint_calendar(None, None)
+        let result = resolve_joint_calendar("weekends_only", "weekends_only")
             .and_then(|cal| start.add_business_days(0, cal))
             .expect("Should succeed");
 
@@ -931,7 +940,7 @@ mod joint_calendar_tests {
     fn test_joint_calendar_adjust_unknown_base() {
         // Test that adjusting on the joint calendar errors on unknown base calendar
         let date = create_date(2024, Month::January, 15).unwrap();
-        let result = resolve_joint_calendar(Some("unknown_base"), None)
+        let result = resolve_joint_calendar("unknown_base", "weekends_only")
             .and_then(|cal| adjust(date, BusinessDayConvention::Following, cal));
 
         assert!(result.is_err(), "Unknown base calendar should error");
@@ -941,7 +950,7 @@ mod joint_calendar_tests {
     fn test_joint_calendar_adjust_unknown_quote() {
         // Test that adjusting on the joint calendar errors on unknown quote calendar
         let date = create_date(2024, Month::January, 15).unwrap();
-        let result = resolve_joint_calendar(None, Some("unknown_quote"))
+        let result = resolve_joint_calendar("weekends_only", "unknown_quote")
             .and_then(|cal| adjust(date, BusinessDayConvention::Following, cal));
 
         assert!(result.is_err(), "Unknown quote calendar should error");
@@ -950,7 +959,7 @@ mod joint_calendar_tests {
     #[test]
     fn test_joint_business_days_unknown_calendar() {
         let trade_date = create_date(2024, Month::January, 15).unwrap();
-        let result = resolve_joint_calendar(Some("unknown_cal"), None)
+        let result = resolve_joint_calendar("unknown_cal", "weekends_only")
             .and_then(|cal| trade_date.add_business_days(2, cal));
 
         assert!(result.is_err(), "Unknown calendar should error");

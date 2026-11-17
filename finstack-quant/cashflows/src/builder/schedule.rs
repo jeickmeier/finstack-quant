@@ -133,29 +133,34 @@ fn compare_accrual(
             .then_with(|| left.get_end().cmp(&right.get_end()))
             .then_with(|| {
                 left.get_context()
-                    .calendar_id
-                    .cmp(&right.get_context().calendar_id)
+                    .get_calendar_id()
+                    .cmp(&right.get_context().get_calendar_id())
             })
             .then_with(|| {
                 left.get_context()
-                    .coupon_period
-                    .cmp(&right.get_context().coupon_period)
+                    .get_coupon_period()
+                    .cmp(&right.get_context().get_coupon_period())
             })
             .then_with(|| {
                 left.get_context()
-                    .end_is_termination_date
-                    .cmp(&right.get_context().end_is_termination_date)
+                    .get_end_is_termination_date()
+                    .cmp(&right.get_context().get_end_is_termination_date())
             })
             .then_with(|| {
                 left.get_context()
-                    .frequency
+                    .get_frequency()
                     .map(|tenor| tenor.to_string())
-                    .cmp(&right.get_context().frequency.map(|tenor| tenor.to_string()))
+                    .cmp(
+                        &right
+                            .get_context()
+                            .get_frequency()
+                            .map(|tenor| tenor.to_string()),
+                    )
             })
             .then_with(|| {
                 left.get_context()
-                    .bus_basis
-                    .cmp(&right.get_context().bus_basis)
+                    .get_bus_basis()
+                    .cmp(&right.get_context().get_bus_basis())
             })
             .then_with(|| {
                 day_count_rank(left.get_day_count()).cmp(&day_count_rank(right.get_day_count()))
@@ -1530,13 +1535,14 @@ mod tests {
                         end,
                         day_count,
                         None,
-                        finstack_quant_core::dates::DayCountContextState {
-                            calendar_id: Some("weekends_only".into()),
-                            coupon_period: Some((start, end)),
-                            end_is_termination_date: Some(false),
-                            frequency: None,
-                            bus_basis: None,
-                        },
+                        finstack_quant_core::dates::DayCountContextState::try_new(
+                            Some("weekends_only".into()),
+                            Some(finstack_quant_core::dates::Tenor::quarterly()),
+                            None,
+                            Some((start, end)),
+                            Some(false),
+                        )
+                        .expect("valid context"),
                     )
                     .expect("valid accrual"),
                 )
@@ -1644,13 +1650,14 @@ mod tests {
                 maturity,
                 DayCount::Thirty360,
                 None,
-                finstack_quant_core::dates::DayCountContextState {
-                    calendar_id: None,
-                    coupon_period: None,
-                    end_is_termination_date: Some(true),
-                    frequency: None,
-                    bus_basis: None,
-                },
+                finstack_quant_core::dates::DayCountContextState::try_new(
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(true),
+                )
+                .expect("valid context"),
             )
             .expect("valid accrual"),
         )
@@ -1850,13 +1857,14 @@ mod tests {
                             d2,
                             DayCount::Thirty360,
                             None,
-                            finstack_quant_core::dates::DayCountContextState {
-                                calendar_id: None,
-                                coupon_period: None,
-                                end_is_termination_date: Some(false),
-                                frequency: None,
-                                bus_basis: None,
-                            },
+                            finstack_quant_core::dates::DayCountContextState::try_new(
+                                None,
+                                None,
+                                None,
+                                None,
+                                Some(false),
+                            )
+                            .expect("valid context"),
                         )
                         .expect("valid accrual"),
                     )
@@ -1883,13 +1891,14 @@ mod tests {
                             d2,
                             DayCount::Act360,
                             None,
-                            finstack_quant_core::dates::DayCountContextState {
-                                calendar_id: None,
-                                coupon_period: None,
-                                end_is_termination_date: Some(false),
-                                frequency: None,
-                                bus_basis: None,
-                            },
+                            finstack_quant_core::dates::DayCountContextState::try_new(
+                                None,
+                                None,
+                                None,
+                                None,
+                                Some(false),
+                            )
+                            .expect("valid context"),
                         )
                         .expect("valid accrual"),
                     )
@@ -2088,13 +2097,14 @@ mod tests {
             d2,
             DayCount::Act360,
             Some(0.031),
-            finstack_quant_core::dates::DayCountContextState {
-                calendar_id: None,
-                coupon_period: None,
-                end_is_termination_date: Some(false),
-                frequency: None,
-                bus_basis: None,
-            },
+            finstack_quant_core::dates::DayCountContextState::try_new(
+                None,
+                None,
+                None,
+                None,
+                Some(false),
+            )
+            .expect("valid context"),
         )
         .expect("valid accrual");
         let schedule = CashFlowSchedule::from_flows(

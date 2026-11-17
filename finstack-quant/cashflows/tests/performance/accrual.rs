@@ -47,13 +47,14 @@ fn row(
             end,
             day_count,
             None,
-            finstack_quant_core::dates::DayCountContextState {
-                calendar_id: None,
-                coupon_period: Some((start, end)),
-                end_is_termination_date: Some(false),
-                frequency: None,
-                bus_basis: None,
-            },
+            finstack_quant_core::dates::DayCountContextState::try_new(
+                None,
+                None,
+                None,
+                Some((start, end)),
+                Some(false),
+            )
+            .expect("valid context"),
         )
         .expect("valid accrual"),
     )
@@ -510,14 +511,18 @@ fn day_count_records() -> Vec<Value> {
         1e-8,
     ));
     let icma = hand_schedule(
-        vec![row(
-            "2025-07-01",
-            "2025-01-01",
-            "2025-07-01",
-            25_000.0,
-            DayCount::ActActIsma,
-            0.5,
-        )],
+        vec![
+            CashFlowParams::new(
+                date("2025-07-01"),
+                None,
+                Money::new(25_000.0, Currency::USD).expect("row amount"),
+                CFKind::Fixed,
+                0.5,
+                None,
+            )
+            .build()
+            .expect("valid cashflow"),
+        ],
         "2025-01-01",
         1_000_000.0,
         DayCount::ActActIsma,
@@ -550,16 +555,21 @@ fn lazy_calendar_records() -> Vec<Value> {
         91.0 / 365.0,
     ));
     let accrual = future.accrual.take().expect("future accrual");
+    let accrual_ctx = accrual.get_context();
     future.accrual = Some(
         CashFlowAccrual::new(
             accrual.get_start(),
             accrual.get_end(),
             accrual.get_day_count(),
             accrual.get_projected_index_rate(),
-            finstack_quant_core::dates::DayCountContextState {
-                calendar_id: Some("CCM-NO-SUCH-CALENDAR".into()),
-                ..accrual.get_context().clone()
-            },
+            finstack_quant_core::dates::DayCountContextState::try_new(
+                Some("CCM-NO-SUCH-CALENDAR".into()),
+                accrual_ctx.get_frequency(),
+                accrual_ctx.get_bus_basis(),
+                accrual_ctx.get_coupon_period(),
+                accrual_ctx.get_end_is_termination_date(),
+            )
+            .expect("valid context"),
         )
         .expect("valid accrual"),
     );

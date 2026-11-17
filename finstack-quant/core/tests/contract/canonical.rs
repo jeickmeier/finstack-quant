@@ -200,13 +200,16 @@ fn market_state_with_tags(tags: &str) -> (Vec<u8>, MarketContextState) {
             "fx_delta_vol_surfaces": [],
             "vol_cubes": [],
             "hierarchy": {{
-                "roots": {{
-                    "Rates": {{
-                        "tags": {tags},
-                        "children": {{}},
-                        "curves": []
+                "roots": [
+                    {{
+                        "name": "Rates",
+                        "node": {{
+                            "tags": {tags},
+                            "children": [],
+                            "targets": []
+                        }}
                     }}
-                }}
+                ]
             }}
         }}"#
     );

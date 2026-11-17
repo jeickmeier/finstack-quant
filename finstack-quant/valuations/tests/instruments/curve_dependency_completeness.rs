@@ -33,6 +33,8 @@ fn build_discount_curve(id: &str, rate: f64) -> DiscountCurve {
             (5.0f64, (-rate * 5.0).exp()),
             (10.0f64, (-rate * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("Discount curve construction should succeed")
 }
@@ -43,12 +45,12 @@ fn build_hazard_curve(id: &str, hazard_rate: f64) -> HazardCurve {
     HazardCurve::builder(id)
         .base_date(as_of)
         .knots(vec![
-            (0.0, 1.0),
             (1.0, (-hazard_rate).exp()),
             (5.0, (-hazard_rate * 5.0).exp()),
             (10.0, (-hazard_rate * 10.0).exp()),
         ])
         .recovery_rate(0.40)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("Hazard curve construction should succeed")
 }

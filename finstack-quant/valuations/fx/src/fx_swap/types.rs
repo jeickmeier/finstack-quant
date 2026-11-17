@@ -220,8 +220,8 @@ impl FxSwap {
             preserve_business_eom,
         } = params;
         let calendar = finstack_quant_core::dates::resolve_joint_calendar(
-            Some(&base_calendar_id),
-            Some(&quote_calendar_id),
+            &base_calendar_id,
+            &quote_calendar_id,
         )?;
         let near_date = crate::shared::spot_date_from_lag(trade_date, settlement_days, calendar)?;
         let far_date = finstack_quant_core::dates::fx::fx_forward_date(
@@ -444,11 +444,17 @@ mod tests {
         let usd_curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots(vec![(0.0, 1.0), (1.0, 0.95)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("should build");
         let eur_curve = DiscountCurve::builder("EUR-OIS")
             .base_date(as_of)
             .knots(vec![(0.0, 1.0), (1.0, 0.97)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("should build");
 

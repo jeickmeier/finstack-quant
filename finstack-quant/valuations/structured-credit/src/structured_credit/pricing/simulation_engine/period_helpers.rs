@@ -1,36 +1,40 @@
 use super::*;
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, Tenor};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount};
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 
 /// Resolve a collateral index fixing or project its contractual term rate.
 ///
 /// # Arguments
 ///
-/// * `fwd` - Projection curve defining reset lag and tenor; its day count only
-///   maps absolute dates into projection discount-factor coordinates.
+/// * `fwd` - Projection curve providing positive factors and `index_tenor` metadata;
+///   its day count maps dates into projection factor coordinates.
 /// * `context` - Market data supplying exact historical fixings for past resets.
-/// * `accrual_start` - Coupon start date from which the curve's business-day
-///   reset lag determines the fixing date.
+/// * `accrual_start` - Coupon start date from which `reset_lag_days` business days
+///   determines the fixing date.
 /// * `day_count` - Contractual index accrual convention used to annualize the
 ///   projection discount-factor growth over the reset tenor.
+/// * `reset_lag_days` - Business-day observation lag applied prior to `accrual_start`.
 pub(crate) fn term_rate_for_period(
     fwd: &ForwardCurve,
     context: &MarketContext,
     accrual_start: Date,
     day_count: DayCount,
+    reset_lag_days: i32,
 ) -> Result<f64> {
     let calendar = finstack_quant_core::dates::calendar_by_id_strict("weekends_only")?;
-    let fixing_date = accrual_start.add_business_days(-fwd.reset_lag(), calendar)?;
+    let fixing_date = accrual_start.add_business_days(-reset_lag_days, calendar)?;
     if fixing_date < fwd.base_date() {
         let series = fixings::get_fixing_series(context, fwd.id().as_str())?;
-        return fixings::require_fixing_value_exact(
-            Some(series),
-            fwd.id().as_str(),
-            fixing_date,
-            fwd.base_date(),
-        );
+        return fixings::require_fixing_value_exact(Some(series), fwd.id().as_str(), fixing_date);
     }
-    let reset_end = try_tenor_to_period_end(fixing_date, fwd.tenor(), fwd.day_count())?;
+    let index_tenor = fwd.index_tenor().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "Forward curve '{}' requires explicit index_tenor metadata for structured-credit term projection",
+            fwd.id()
+        ))
+    })?;
+    let reset_end =
+        index_tenor.add_to_date(fixing_date, None, BusinessDayConvention::Unadjusted)?;
     let accrual_year_fraction =
         day_count.year_fraction(fixing_date, reset_end, DayCountContext::default())?;
     fwd.rate_between_dates(fixing_date, reset_end, accrual_year_fraction)
@@ -56,21 +60,23 @@ pub(crate) struct CollateralCoupon {
 ///
 /// # Arguments
 ///
-/// * `fwd` - Projection curve identifying the index and its reset lag and tenor.
+/// * `fwd` - Projection curve identifying the index and `index_tenor` metadata.
 /// * `context` - Market data supplying historical fixings for already-reset coupons.
 /// * `accrual_start` - Start date of the collateral coupon period.
 /// * `coupon` - Contractual accrual, spread, floor, and current all-in coupon terms.
 /// * `rate_shift` - Additive decimal-rate shift applied only to projected index
 ///   rates, before the index floor and contractual spread.
+/// * `reset_lag_days` - Business-day observation lag prior to `accrual_start`.
 pub(crate) fn collateral_asset_rate_for_period(
     fwd: &ForwardCurve,
     context: &MarketContext,
     accrual_start: Date,
     coupon: CollateralCoupon,
     rate_shift: f64,
+    reset_lag_days: i32,
 ) -> Result<f64> {
     let calendar = finstack_quant_core::dates::calendar_by_id_strict("weekends_only")?;
-    let fixing_date = accrual_start.add_business_days(-fwd.reset_lag(), calendar)?;
+    let fixing_date = accrual_start.add_business_days(-reset_lag_days, calendar)?;
     let spread = coupon.spread_bp.unwrap_or(0.0) / BASIS_POINTS_PER_UNIT;
     // The floor applies to the index before the spread (`FloatingRateSpec`
     // convention), so a floored loan pays `max(index, floor) + spread`.
@@ -82,12 +88,8 @@ pub(crate) fn collateral_asset_rate_for_period(
 
     if fixing_date < fwd.base_date() {
         if let Ok(series) = fixings::get_fixing_series(context, fwd.id().as_str()) {
-            let fixing = fixings::require_fixing_value_exact(
-                Some(series),
-                fwd.id().as_str(),
-                fixing_date,
-                fwd.base_date(),
-            )?;
+            let fixing =
+                fixings::require_fixing_value_exact(Some(series), fwd.id().as_str(), fixing_date)?;
             // A PAST fixing is observed, not projected: the simulated path
             // cannot retroactively change it, so no shift applies.
             return Ok(floored(fixing) + spread);
@@ -98,12 +100,16 @@ pub(crate) fn collateral_asset_rate_for_period(
     // Shift the PROJECTED forward, so a floating asset's coupon follows
     // the simulated rate path. Floored at zero — a deeply negative shift must
     // not manufacture a negative all-in coupon.
-    Ok(
-        (floored(
-            term_rate_for_period(fwd, context, accrual_start, coupon.day_count)? + rate_shift,
-        ) + spread)
-            .max(0.0),
-    )
+    Ok((floored(
+        term_rate_for_period(
+            fwd,
+            context,
+            accrual_start,
+            coupon.day_count,
+            reset_lag_days,
+        )? + rate_shift,
+    ) + spread)
+        .max(0.0))
 }
 
 /// Live collateral weighted-average coupon from the *current* pool state:
@@ -143,6 +149,7 @@ pub(super) fn current_collateral_wac(
                     index_floor_rate: state.pool_state.index_floors[i],
                 },
                 state.floating_rate_shift,
+                2,
             )?
         } else {
             state.pool_state.rates[i]
@@ -241,38 +248,3 @@ pub(super) struct SimulationPeriod {
 }
 
 // Date helpers for structured-credit floating-rate periods.
-
-/// Calculate a floating-rate period end from a tenor expressed in years.
-///
-/// Pricing callers propagate date-arithmetic failures rather than silently
-/// replacing the period end with the start date.
-#[inline]
-pub(crate) fn try_tenor_to_period_end(
-    start: Date,
-    tenor_years: f64,
-    day_count: DayCount,
-) -> finstack_quant_core::Result<Date> {
-    Tenor::from_years(tenor_years, day_count)?.add_to_date(
-        start,
-        None,
-        BusinessDayConvention::Unadjusted,
-    )
-}
-
-#[cfg(test)]
-mod rate_helpers_tests {
-    use super::*;
-    use time::macros::date;
-
-    #[test]
-    fn rolls_standard_periods() {
-        assert_eq!(
-            try_tenor_to_period_end(date!(2025 - 01 - 31), 0.25, DayCount::Act360),
-            Ok(date!(2025 - 04 - 30))
-        );
-        assert_eq!(
-            try_tenor_to_period_end(date!(2025 - 01 - 31), 1.0, DayCount::Act365F),
-            Ok(date!(2026 - 01 - 31))
-        );
-    }
-}

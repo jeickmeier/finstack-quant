@@ -1,6 +1,6 @@
 {
   "expected": {
-    "dv01": 521.7309813778902,
+    "dv01": 519.7932689949703,
     "npv": 24122.19455109777,
     "vega": 1203.3387355303194
   },
@@ -44,10 +44,9 @@
       "credit_indices": [],
       "curves": [
         {
-          "allow_non_monotonic": false,
           "base": "2026-04-30",
           "day_count": "act_365f",
-          "extrapolation": "flat_forward",
+          "extrapolation": "extend",
           "id": "USD-OIS",
           "interp_style": "log_linear",
           "knot_points": [
@@ -60,39 +59,46 @@
               0.40656965974059917
             ]
           ],
-          "min_forward_rate": null,
-          "min_forward_tenor": 1e-06,
           "rate_calibration": null,
           "type": "discount"
         },
         {
           "base": "2026-04-30",
-          "day_count": "act_360",
-          "extrapolation": "flat_forward",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
           "id": "USD-TERM-3M",
-          "interp_style": "linear",
+          "index_tenor": {
+            "count": 3,
+            "unit": "months"
+          },
+          "interp_style": "log_linear",
           "knot_points": [
             [
               0.0,
-              0.04
+              1.0
             ],
             [
-              30.0,
-              0.04
+              0.2493150684931507,
+              0.9899901000989989
+            ],
+            [
+              0.5013698630136987,
+              0.9799726023857227
+            ],
+            [
+              0.7534246575342466,
+              0.9700564695855153
+            ],
+            [
+              1.0,
+              0.9604519500846685
+            ],
+            [
+              1.2493150684931507,
+              0.9508379222045997
             ]
           ],
-          "projection_grid": [
-            0.0,
-            0.25277777777777777,
-            0.5083333333333333,
-            0.7638888888888888,
-            1.0138888888888888,
-            1.2666666666666666,
-            30.0
-          ],
           "rate_calibration": null,
-          "reset_lag": 2,
-          "tenor": 0.25,
           "type": "forward"
         }
       ],
@@ -115,7 +121,7 @@
           "interpolation_mode": "vol",
           "quote_type": "black_lognormal",
           "secondary_axis": "strike",
-          "strikes": [
+          "secondary_values": [
             0.01,
             0.04,
             0.1

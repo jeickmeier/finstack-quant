@@ -139,7 +139,7 @@ fn test_full_capital_structure_el_reproduces_pool_el() {
             finstack_quant_core::dates::DayCountContext::default(),
         )
         .unwrap();
-    let pool_pd = 1.0 - curve.sp(t_maturity);
+    let pool_pd = 1.0 - curve.sp(t_maturity).expect("sp");
     let analytic_pool_el = 10_000_000.0 * pool_pd * (1.0 - 0.40);
 
     for rho in [0.10, 0.50, 0.90] {
@@ -325,6 +325,7 @@ fn test_pricing_with_near_zero_default_probability() {
             .base_date(base_date())
             .recovery_rate(0.40)
             .knots(vec![(1.0, 0.0001), (5.0, 0.0002), (10.0, 0.0003)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .unwrap();
 

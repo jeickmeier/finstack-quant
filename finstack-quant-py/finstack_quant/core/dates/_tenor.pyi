@@ -360,43 +360,6 @@ class Tenor:
         """
         ...
 
-    @classmethod
-    def from_years(cls, years: float, day_count: Union[DayCount, str]) -> Tenor:
-        """
-        Construct from a year fraction using a day-count convention.
-
-        A year fraction that is (within a small epsilon) a whole number of
-        months gives a month-based tenor; anything else is converted to days
-        under *day_count*.
-
-        Parameters
-        ----------
-        years : float
-            Positive, finite length in years (``0.5`` gives ``6M``).
-        day_count : DayCount | str
-            Convention for the day conversion (``DayCount`` or a canonical
-            name such as ``"act_365f"``).
-
-        Returns
-        -------
-        Tenor
-            Month tenor for whole-month fractions, otherwise a day tenor.
-
-        Raises
-        ------
-        ValueError
-            If *years* is non-positive, non-finite or exceeds 200 years, or
-            *day_count* is not a recognised convention.
-
-        Examples
-        --------
-        >>> from finstack_quant.core.dates import DayCount, Tenor
-        >>> str(Tenor.from_years(0.5, DayCount.ACT_365F))
-        '6M'
-
-        """
-        ...
-
     def payments_per_year(self) -> float:
         """
         Nominal payments per year of a month or year tenor.

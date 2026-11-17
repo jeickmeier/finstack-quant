@@ -5,6 +5,7 @@ use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_valuations_test_support::inflation::*;
 use rust_decimal::Decimal;
 
+use finstack_quant_core::market_data::scalars::{InflationLag, SeriesInterpolation};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_core::metrics::MetricId;
@@ -28,6 +29,8 @@ fn test_inflation01_finite_difference_validation() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -47,7 +50,7 @@ fn test_inflation01_finite_difference_validation() {
     let pv0 = swap.value(&ctx, as_of).unwrap().amount();
 
     let ctx_bumped = ctx
-        .bump([MarketBump::Curve {
+        .bump([MarketBump::InflationCurve {
             id: "US-CPI-U".into(),
             spec: BumpSpec::parallel_bp(1.0),
         }])
@@ -85,6 +88,8 @@ fn test_inflation01_sign_pay_fixed() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -127,6 +132,8 @@ fn test_inflation01_sign_receive_fixed() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Receive)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -168,6 +175,8 @@ fn test_inflation01_scales_with_maturity() {
             .discount_curve_id("USD-OIS".into())
             .day_count(DayCount::Act365F)
             .side(PayReceive::Pay)
+            .lag(InflationLag::months(3))
+            .interpolation(SeriesInterpolation::Linear)
             .attributes(Default::default())
             .build()
             .unwrap();
@@ -211,6 +220,8 @@ fn test_inflation01_scales_with_notional() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -225,6 +236,8 @@ fn test_inflation01_scales_with_notional() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();

@@ -73,21 +73,21 @@
       ]
     },
     "ExtrapolationPolicy": {
-      "description": "Extrapolation policy for evaluation outside the knot range.\n\nEvery interpolation strategy honours this policy at both ends of the knot\nrange. Choose based on what behaviour the downstream pricer expects:\n\n- `FlatZero` (default): hold the boundary value constant.\n- `FlatForward`: extend the boundary segment's slope, measured in the\n  space the interpolation style works in (table below).\n- `None`: refuse to extrapolate; return `NaN` and require the caller to\n  detect and handle out-of-range queries explicitly. Recommended for\n  production risk systems.\n\nWhat `FlatForward` extends depends on the [`InterpStyle`]:\n\n| Style | `FlatForward` extends | On a discount-factor curve | On a rate-valued curve |\n|---|---|---|---|\n| `Linear` | the value linearly | - | rates keep trending |\n| `CubicHermite` | the value linearly, with the end-knot slope | - | rates keep trending |\n| `LogLinear` | `ln(value)` linearly | flat forward rate | - |\n| `PiecewiseQuadraticForward` | `ln(value)` linearly | flat forward rate | - |\n| `MonotoneConvex` | the boundary instantaneous forward | flat forward rate | - |\n\nThe market-standard tail for a discount-factor curve is a flat forward\nrate (`FlatForward` with a log-space style). For a curve that stores\nrates, such as [`ForwardCurve`](crate::market_data::term_structures::ForwardCurve),\nthe market-standard tail holds the last rate flat, which is `FlatZero`.\n\n`#[non_exhaustive]` so that future policies (e.g. linear-zero,\nasymptotic) can be added without breaking downstream code.",
+      "description": "Extrapolation policy for evaluation outside the knot range.\n\nEvery interpolation strategy honours this policy at both ends of the knot\nrange. Callers must choose an explicit policy:\n\n- `Flat`: hold the boundary ordinate constant outside the knot range\n  (and return derivative `0.0` strictly outside the knot range).\n- `Extend`: extend the boundary segment's slope in the interpolation style's\n  working space (table below).\n- `Error`: refuse to extrapolate; return an explicit error for queries\n  outside `[knots[0], knots[last]]`.\n\nWhat `Extend` extends depends on the [`InterpStyle`]:\n\n| Style | `Extend` extends | On a discount-factor curve | On a rate-valued curve |\n|---|---|---|---|\n| `Linear` | the value linearly | - | rates keep trending |\n| `CubicHermite` | the value linearly, with the end-knot slope | - | rates keep trending |\n| `LogLinear` | `ln(value)` linearly | flat forward rate | - |\n| `PiecewiseQuadraticForward` | `ln(value)` linearly | flat forward rate | - |\n| `MonotoneConvex` | the boundary instantaneous forward | flat forward rate | - |\n\nThe market-standard tail for a discount-factor curve is a flat forward\nrate (`Extend` with a log-space style). For a curve that stores rates or\nspreads, holding the last rate constant is `Flat`.",
       "oneOf": [
         {
-          "const": "flat_zero",
-          "description": "Hold the boundary value constant.",
+          "const": "flat",
+          "description": "Hold the boundary value constant outside `[knots[0], knots[last]]`.",
           "type": "string"
         },
         {
-          "const": "flat_forward",
+          "const": "extend",
           "description": "Extend the boundary segment's slope in the interpolation style's\nworking space; see the table on [`ExtrapolationPolicy`].",
           "type": "string"
         },
         {
-          "const": "none",
-          "description": "Return `NaN` for queries outside the knot range.\n\nUse this to prevent silent extrapolation in production risk systems\nwhere extrapolated values should be explicitly opted-in.\nCallers should check `.is_nan()` on the result and handle accordingly.\n\n# When to Use\n\n- Risk management systems where extrapolated values are unreliable\n- Validation pipelines where out-of-range queries indicate data errors\n- Any context where silent extrapolation could mask problems\n\n# Note\n\nSince interpolation returns `f64` (not `Result`), this policy returns\n`f64::NAN` rather than an error. This avoids changing the hot-path\nsignature while still making out-of-range queries detectable.",
+          "const": "error",
+          "description": "Return an error for queries outside `[knots[0], knots[last]]`.",
           "type": "string"
         }
       ]
@@ -215,12 +215,12 @@
         },
         {
           "const": "monotone_convex",
-          "description": "Monotone‐convex interpolation of positive, non-increasing values.",
+          "description": "Hagan‐West monotone‐convex interpolation of positive values.",
           "type": "string"
         },
         {
           "const": "cubic_hermite",
-          "description": "Cubic Hermite interpolation (monotone-preserving slopes).",
+          "description": "Cubic Hermite interpolation (Fritsch‐Butland / Moler PCHIP slopes).",
           "type": "string"
         },
         {
@@ -231,28 +231,25 @@
       ]
     },
     "NelsonSiegelModel": {
-      "description": "Nelson-Siegel model parameters.\n\nStores either the 4-parameter NS or 6-parameter NSS specification.",
+      "description": "Validated Nelson-Siegel or Nelson-Siegel-Svensson model parameters.",
       "oneOf": [
         {
+          "additionalProperties": false,
           "description": "Four-parameter Nelson-Siegel.",
           "properties": {
             "beta0": {
-              "description": "Long-term rate level.",
               "format": "double",
               "type": "number"
             },
             "beta1": {
-              "description": "Short-term component.",
               "format": "double",
               "type": "number"
             },
             "beta2": {
-              "description": "Medium-term hump.",
               "format": "double",
               "type": "number"
             },
             "tau": {
-              "description": "Decay factor (must be > 0).",
               "format": "double",
               "type": "number"
             },
@@ -271,35 +268,30 @@
           "type": "object"
         },
         {
+          "additionalProperties": false,
           "description": "Six-parameter Nelson-Siegel-Svensson.",
           "properties": {
             "beta0": {
-              "description": "Long-term rate level.",
               "format": "double",
               "type": "number"
             },
             "beta1": {
-              "description": "Short-term component.",
               "format": "double",
               "type": "number"
             },
             "beta2": {
-              "description": "Medium-term hump.",
               "format": "double",
               "type": "number"
             },
             "beta3": {
-              "description": "Second hump.",
               "format": "double",
               "type": "number"
             },
             "tau1": {
-              "description": "First decay factor (must be > 0).",
               "format": "double",
               "type": "number"
             },
             "tau2": {
-              "description": "Second decay factor (must be > 0, ≠ τ₁).",
               "format": "double",
               "type": "number"
             },
@@ -336,21 +328,6 @@
         }
       ]
     },
-    "ParInterp": {
-      "description": "Interpolation method for reporting par spreads stored on the curve.\n\nApplies only to *par-spread* readouts (the spreads quoted at calibration\npillars), not to the underlying hazard rates. Hazard interpolation always\nfollows piecewise-constant survival. Use `LogLinear` when spreads span\nmultiple decades (e.g. high-yield issuers) so interpolation stays in\nlog-space; otherwise the default `Linear` is fine.",
-      "oneOf": [
-        {
-          "const": "linear",
-          "description": "Linear interpolation in spread space",
-          "type": "string"
-        },
-        {
-          "const": "log_linear",
-          "description": "Log-linear interpolation when spreads are strictly positive",
-          "type": "string"
-        }
-      ]
-    },
     "RatesStepConventions": {
       "additionalProperties": false,
       "description": "Step-level conventions for rates calibration (discount and forward curves).\n\nThis is a Bloomberg/FinCad-style design: curve construction uses a small set of\n*step-level* conventions (e.g., curve time-axis day count).",
@@ -383,26 +360,26 @@
       "type": "object"
     },
     "Seniority": {
-      "description": "Seniority level for credit exposures.\n\nUsed to tag a hazard curve with the seniority of the issuer's debt\nobserved by the curve. Drives the recovery-rate prior in default\nmodelling and selects the right LGD prior in\n`finstack_quant_models::credit::lgd::seniority`.\n\nOrder is **not** total — `SeniorSecured` is strictly senior to `Senior`,\n`Subordinated`, and `Junior`, but the relative ordering of `Subordinated`\nvs. `Junior` is jurisdiction-dependent. Do not rely on `Ord` semantics.",
+      "description": "Seniority level for credit exposures.\n\nOrder is **not** total — `SeniorSecured` is strictly senior to `Senior`,\n`Subordinated`, and `Junior`, but the relative ordering of `Subordinated`\nvs. `Junior` is jurisdiction-dependent. Do not rely on `Ord` semantics.",
       "oneOf": [
         {
           "const": "senior_secured",
-          "description": "Senior secured debt",
+          "description": "Senior secured debt.",
           "type": "string"
         },
         {
           "const": "senior",
-          "description": "Senior unsecured debt",
+          "description": "Senior unsecured debt.",
           "type": "string"
         },
         {
           "const": "subordinated",
-          "description": "Subordinated debt",
+          "description": "Subordinated debt.",
           "type": "string"
         },
         {
           "const": "junior",
-          "description": "Junior/mezzanine debt",
+          "description": "Junior/mezzanine debt.",
           "type": "string"
         }
       ]
@@ -473,7 +450,7 @@
       },
       "currency": "USD",
       "curve_id": "USD-OIS",
-      "extrapolation": "flat_forward",
+      "extrapolation": "extend",
       "interpolation": "log_linear",
       "kind": "discount",
       "method": "bootstrap",
@@ -508,7 +485,7 @@
         },
         "extrapolation": {
           "$ref": "#/$defs/ExtrapolationPolicy",
-          "default": "flat_forward",
+          "default": "extend",
           "description": "Extrapolation policy for the curve."
         },
         "interpolation": {
@@ -586,10 +563,26 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Identifier for the discount curve to use."
         },
+        "extrapolation": {
+          "$ref": "#/$defs/ExtrapolationPolicy",
+          "default": "extend",
+          "description": "Policy controlling queries beyond the final calibrated pillar time."
+        },
+        "index_tenor": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual index tenor metadata attached to the calibrated forward curve."
+        },
         "interpolation": {
           "$ref": "#/$defs/InterpStyle",
-          "default": "cubic_hermite",
-          "description": "Interpolation style for the constructed forward curve.\n\nDefaults to monotone cubic Hermite (Fritsch-Carlson) interpolation for a\nsmooth, shape-preserving forward term structure that admits zero and\nnegative rates. `Linear` remains explicitly opt-in; `MonotoneConvex` is\nrejected because it is defined on discount factors, not forward rates."
+          "default": "log_linear",
+          "description": "Interpolation style for the constructed forward curve's projection factors.\n\nDefaults to log-linear factor interpolation (`log_linear`). All five\n[`InterpStyle`] variants (`linear`, `log_linear`, `cubic_hermite`,\n`piecewise_quadratic_forward`, `monotone_convex`) are supported on the\nunderlying positive projection-factor evaluator."
         },
         "kind": {
           "const": "forward",
@@ -603,11 +596,6 @@
             }
           },
           "description": "Calibration method to use.\n\nForward curves require [`CalibrationMethod::GlobalSolve`], which is the\ndefault (finite-difference Jacobian). Sequential bootstrap is rejected\nbecause contractual off-grid reset intervals couple adjacent rates\nthrough projection discount factors."
-        },
-        "tenor_years": {
-          "description": "Tenor in years for the forward curve.",
-          "format": "double",
-          "type": "number"
         }
       },
       "required": [
@@ -615,7 +603,6 @@
         "curve_id",
         "currency",
         "base_date",
-        "tenor_years",
         "discount_curve_id"
       ],
       "type": "object"
@@ -677,11 +664,6 @@
           "format": "double",
           "type": "number"
         },
-        "par_interp": {
-          "$ref": "#/$defs/ParInterp",
-          "default": "linear",
-          "description": "Interpolation method for par spreads reported by the calibrated curve.\n\nNote: this is used for *quoting/interpolation of stored par spreads* and does not affect\nsurvival no-arbitrage, which is enforced via non-negative hazards together with the\nrequired log-linear survival interpolation."
-        },
         "recovery_rate": {
           "description": "Required recovery-rate assumption as a decimal fraction in `[0, 1]`.",
           "format": "double",
@@ -709,13 +691,20 @@
       "description": "Inflation curve calibration.",
       "properties": {
         "base_cpi": {
-          "description": "Base CPI level used as the curve's reference CPI at t=0.\n\nThis is the contractual reference CPI at the start date after applying\nobservation lag and monthly interpolation. Its curve date is\n`base_date - observation_lag`. Supplied index observations must reproduce\nthis value, including seasonality; a mismatch is rejected.",
+          "description": "Explicit contractual reference CPI at the start date, after lag and interpolation.\nThis denominator is independent of the projection source's origin CPI.",
           "format": "double",
           "type": "number"
         },
         "base_date": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Valuation and calibration-instrument start date. The output curve's\nzero-time reference CPI date is this date minus `observation_lag`."
+          "description": "Valuation and calibration-instrument start date, independent of the source origin."
+        },
+        "calendar_id": {
+          "description": "Source-clock holiday calendar; required for business-day clocks.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -725,9 +714,17 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Identifier for the inflation curve being built."
         },
+        "day_count": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Complete source-clock convention used for every projected anchor."
+        },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Identifier for the discount curve to use."
+        },
+        "extrapolation": {
+          "$ref": "#/$defs/ExtrapolationPolicy",
+          "description": "Explicit scalar CPI tail policy, applied without lag or normalization."
         },
         "index": {
           "description": "Reference index (e.g. \"USA-CPI-U\").",
@@ -735,7 +732,6 @@
         },
         "interpolation": {
           "$ref": "#/$defs/InterpStyle",
-          "default": "linear",
           "description": "Interpolation style for the curve."
         },
         "kind": {
@@ -754,8 +750,17 @@
           "type": "number"
         },
         "observation_lag": {
-          "description": "Month observation lag (e.g. \"3M\"); \"none\" means zero months.\nDay-based lags are unsupported because output curves carry month lags.\n\nOverrides the quote convention's lag and must match any supplied index\nlag. The same lag determines the output curve's reference-date origin and the dates\nof the CPI observations consumed by calibration instruments.",
+          "description": "Explicit contractual month observation lag (e.g. \"3M\"); \"none\" means zero months.\nOverrides the quote convention's lag without changing the projection source origin.",
           "type": "string"
+        },
+        "source_base_cpi": {
+          "description": "Finite positive absolute CPI level at the projection source's origin.",
+          "format": "double",
+          "type": "number"
+        },
+        "source_base_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+          "description": "Explicit original date of the absolute CPI projection source."
         }
       },
       "required": [
@@ -766,7 +771,12 @@
         "discount_curve_id",
         "index",
         "observation_lag",
-        "base_cpi"
+        "base_cpi",
+        "source_base_date",
+        "source_base_cpi",
+        "day_count",
+        "interpolation",
+        "extrapolation"
       ],
       "type": "object"
     },
@@ -1375,18 +1385,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
           "description": "Base date for the curve."
         },
-        "basis_spread_curve_id": {
-          "anyOf": [
-            {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Optional ID for the byproduct basis spread curve."
-        },
         "conventions": {
           "$ref": "#/$defs/RatesStepConventions",
           "default": {
@@ -1409,7 +1407,7 @@
         },
         "extrapolation": {
           "$ref": "#/$defs/ExtrapolationPolicy",
-          "default": "flat_forward",
+          "default": "extend",
           "description": "Extrapolation policy for the foreign curve."
         },
         "fx_spot": {

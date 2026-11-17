@@ -36,7 +36,7 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::NodeId;
 use finstack_quant_valuations::recalibration::RecalibrationProvider;
-use hierarchy::{ExpansionOutcome, expand_hierarchy_operations};
+use hierarchy::{ExpansionOutcome, expand_hierarchy_operations, verify_active_target};
 use std::sync::Arc;
 
 /// Apply one rate binding, recording a warning instead of a hard error.
@@ -290,14 +290,13 @@ impl ScenarioEngine {
     ///
     /// # Atomicity
     ///
-    /// Application is **not atomic**: operations mutate `ctx.market` (and the
-    /// statement model) in place as they execute. If a later operation fails —
-    /// for example a curve id that does not exist in the market — the engine
-    /// returns `Err` with all earlier operations already applied and no
-    /// rollback. Callers that need all-or-nothing semantics should apply the
-    /// scenario to a clone of the market context and swap it in on success
-    /// (the Python and WASM bindings do exactly this by operating on
-    /// deserialized copies).
+    /// Hierarchy expansion (Phase −1), time roll-forward (Phase 0), and market
+    /// operations (Phase 1) are staged against a private clone of `ctx.market`
+    /// and a local `as_of` copy and committed back to `ctx` only after market
+    /// execution succeeds; if selection, time roll, active-target binding, or
+    /// any market shock fails, the caller's `ctx.market` and `ctx.as_of` remain
+    /// unchanged. Downstream statement operations still execute sequentially
+    /// after market commit.
     ///
     /// # Errors
     ///
@@ -305,10 +304,9 @@ impl ScenarioEngine {
     /// operations (instrument price or spread shocks, asset or prepay-default
     /// correlation shocks) and `ctx.instruments` is `None`; this check runs
     /// after spec validation and before any mutation. Returns validation
-    /// errors for an invalid spec, unsupported operation
-    /// data, missing market objects, or hierarchy-targeted operations without
-    /// an attached hierarchy. Because execution is not atomic, an error can
-    /// follow successful mutation by earlier operations.
+    /// errors for an invalid spec, unsupported operation data, hierarchy
+    /// expansion failures, missing or wrong-kind active market objects, or
+    /// hierarchy-targeted operations without an attached hierarchy.
     ///
     /// # Arguments
     ///
@@ -334,130 +332,164 @@ impl ScenarioEngine {
 
         let ExpansionOutcome {
             operations: expanded_ops,
-            warnings: expansion_warnings,
+            required_targets,
         } = expand_hierarchy_operations(&spec.operations, ctx.market, spec.resolution_mode)?;
         let expanded_operations = expanded_ops.len();
-        warnings.extend(expansion_warnings);
 
-        let time_roll = if let Some((period, apply_shocks, roll_mode)) =
-            expanded_ops.iter().find_map(|op| match op {
-                OperationSpec::TimeRollForward {
-                    period,
-                    apply_shocks,
-                    roll_mode,
-                } => Some((period, *apply_shocks, *roll_mode)),
-                _ => None,
-            }) {
-            let _span = tracing::info_span!("phase_0_time_roll", period = %period).entered();
-            let credit_ops =
-                if apply_shocks && spec.hazard_bump_mode == crate::HazardBumpMode::SolveToPar {
+        let mut candidate_market = ctx.market.clone();
+        let time_roll = {
+            let mut staged = ExecutionContext {
+                market: &mut candidate_market,
+                model: ctx.model.as_deref_mut(),
+                instruments: ctx.instruments.as_deref_mut(),
+                rate_bindings: None,
+                calendar: ctx.calendar,
+                as_of: ctx.as_of,
+            };
+
+            let time_roll = if let Some((period, apply_shocks, roll_mode)) =
+                expanded_ops.iter().find_map(|op| match op {
+                    OperationSpec::TimeRollForward {
+                        period,
+                        apply_shocks,
+                        roll_mode,
+                    } => Some((period, *apply_shocks, *roll_mode)),
+                    _ => None,
+                }) {
+                let _span = tracing::info_span!("phase_0_time_roll", period = %period).entered();
+                let credit_ops = if apply_shocks {
                     expanded_ops.as_ref()
                 } else {
                     &[]
                 };
-            let hazard_rolls = par_cds_hazard_rolls(credit_ops, ctx.market)?;
-            let roll_report = crate::adapters::time_roll::apply_time_roll_forward(
-                ctx,
-                period,
-                roll_mode,
-                &hazard_rolls,
-                &*self.recalibration_provider,
-            )?;
-            applied += 1;
-            for (instrument_id, reason) in &roll_report.failed_instruments {
-                warnings.push(Warning::TimeRollInstrumentFailed {
-                    instrument_id: instrument_id.clone(),
-                    reason: reason.clone(),
-                });
+                let hazard_rolls = par_cds_hazard_rolls(credit_ops, staged.market)?;
+                let roll_report = crate::adapters::time_roll::apply_time_roll_forward(
+                    &mut staged,
+                    period,
+                    roll_mode,
+                    &hazard_rolls,
+                    &*self.recalibration_provider,
+                )?;
+                applied += 1;
+                for (instrument_id, reason) in &roll_report.failed_instruments {
+                    warnings.push(Warning::TimeRollInstrumentFailed {
+                        instrument_id: instrument_id.clone(),
+                        reason: reason.clone(),
+                    });
+                }
+                changes.as_of_changed = staged.as_of != initial_as_of;
+                changes.all_dirty |= changes.as_of_changed;
+                if !apply_shocks {
+                    let committed_as_of = staged.as_of;
+                    drop(staged);
+                    *ctx.market = candidate_market;
+                    ctx.as_of = committed_as_of;
+                    return Ok(ApplicationReport {
+                        operations_applied: applied,
+                        user_operations,
+                        expanded_operations,
+                        changes,
+                        applied_shocks: Vec::new(),
+                        warnings,
+                        meta: Some(finstack_quant_core::config::results_meta(&self.config)),
+                        time_roll: Some(roll_report),
+                    });
+                }
+                Some(roll_report)
+            } else {
+                None
+            };
+
+            let mut pending_bumps: Vec<MarketBump> = Vec::new();
+            let mut applied_shocks: Vec<AppliedShock> = Vec::new();
+
+            // Retain each hazard's calibration market until that curve is rebuilt.
+            let initial_market = Arc::new(staged.market.clone());
+            let mut hazard_sources: indexmap::IndexMap<_, _> = staged
+                .market
+                .iter_curves()
+                .filter(|(_, curve)| {
+                    matches!(
+                        curve,
+                        finstack_quant_core::market_data::context::CurveStorage::Hazard(_)
+                    )
+                })
+                .map(|(id, _)| (id.clone(), Arc::clone(&initial_market)))
+                .collect();
+
+            {
+                let _span =
+                    tracing::info_span!("phase_1_market", ops = expanded_operations).entered();
+                let mut sink = EffectSink {
+                    pending_bumps: &mut pending_bumps,
+                    warnings: &mut warnings,
+                    applied: &mut applied,
+                    changes: &mut changes,
+                    applied_shocks: &mut applied_shocks,
+                };
+                let mut idx = 0;
+                while idx < expanded_ops.len() {
+                    if let OperationSpec::TimeRollForward { .. } = &expanded_ops[idx] {
+                        idx += 1;
+                        continue;
+                    }
+                    if StatementOp::from_operation(&expanded_ops[idx]).is_some() {
+                        idx += 1;
+                        continue;
+                    }
+
+                    flush_pending_bumps(sink.pending_bumps, staged.market)?;
+
+                    let env = HazardApplyEnv {
+                        provider: &*self.recalibration_provider,
+                        source_markets: Some(&hazard_sources),
+                    };
+                    let run_len = independent_replace_curve_run_len(&expanded_ops[idx..]);
+                    let run = &expanded_ops[idx..idx + run_len];
+                    let parallel_run = should_parallel_replace_curves(run);
+                    let check_len = if parallel_run { run_len } else { 1 };
+                    for target in required_targets
+                        .get(idx..idx + check_len)
+                        .into_iter()
+                        .flatten()
+                        .flatten()
+                    {
+                        verify_active_target(staged.market, target)?;
+                    }
+                    let processed = if parallel_run {
+                        let batches = generate_replace_curve_effects_parallel(run, &staged, &env)?;
+                        for (op, effects) in run.iter().zip(batches) {
+                            apply_generated_effects(op, effects, &mut staged, &mut sink)?;
+                        }
+                        run_len
+                    } else {
+                        process_effects(&expanded_ops[idx], &mut staged, &env, &mut sink)?;
+                        1
+                    };
+                    for op in &expanded_ops[idx..idx + processed] {
+                        if let Some((curve_id, _)) = par_cds_ids(op) {
+                            hazard_sources
+                                .insert(curve_id.clone(), Arc::new(staged.market.clone()));
+                        }
+                    }
+                    idx += processed;
+                }
+
+                flush_pending_bumps(sink.pending_bumps, staged.market)?;
             }
-            changes.as_of_changed = ctx.as_of != initial_as_of;
-            changes.all_dirty |= changes.as_of_changed;
-            if !apply_shocks {
-                return Ok(ApplicationReport {
-                    operations_applied: applied,
-                    user_operations,
-                    expanded_operations,
-                    changes,
-                    applied_shocks: Vec::new(),
-                    warnings,
-                    meta: Some(finstack_quant_core::config::results_meta(&self.config)),
-                    time_roll: Some(roll_report),
-                });
-            }
-            Some(roll_report)
-        } else {
-            None
+
+            let committed_as_of = staged.as_of;
+            (time_roll, applied_shocks, committed_as_of)
         };
+        let (time_roll, applied_shocks, committed_as_of) = time_roll;
+        *ctx.market = candidate_market;
+        ctx.as_of = committed_as_of;
 
         let has_rate_bindings = ctx.rate_bindings.is_some();
-        let mut deferred_stmts: Vec<StatementOp<'_>> = Vec::new();
-        let mut pending_bumps: Vec<MarketBump> = Vec::new();
-        let mut applied_shocks: Vec<AppliedShock> = Vec::new();
-
-        // Retain each hazard's calibration market until that curve is rebuilt.
-        let initial_market = Arc::new(ctx.market.clone());
-        let mut hazard_sources: indexmap::IndexMap<_, _> = ctx
-            .market
-            .iter_curves()
-            .filter(|(_, curve)| {
-                matches!(
-                    curve,
-                    finstack_quant_core::market_data::context::CurveStorage::Hazard(_)
-                )
-            })
-            .map(|(id, _)| (id.clone(), Arc::clone(&initial_market)))
+        let deferred_stmts: Vec<StatementOp<'_>> = expanded_ops
+            .iter()
+            .filter_map(StatementOp::from_operation)
             .collect();
-
-        {
-            let _span = tracing::info_span!("phase_1_market", ops = expanded_operations).entered();
-            let mut sink = EffectSink {
-                pending_bumps: &mut pending_bumps,
-                warnings: &mut warnings,
-                applied: &mut applied,
-                changes: &mut changes,
-                applied_shocks: &mut applied_shocks,
-            };
-            let mut idx = 0;
-            while idx < expanded_ops.len() {
-                if let OperationSpec::TimeRollForward { .. } = &expanded_ops[idx] {
-                    idx += 1;
-                    continue;
-                }
-                if let Some(statement_op) = StatementOp::from_operation(&expanded_ops[idx]) {
-                    deferred_stmts.push(statement_op);
-                    idx += 1;
-                    continue;
-                }
-
-                flush_pending_bumps(sink.pending_bumps, ctx.market)?;
-
-                let env = HazardApplyEnv {
-                    mode: spec.hazard_bump_mode,
-                    provider: &*self.recalibration_provider,
-                    source_markets: Some(&hazard_sources),
-                };
-                let run_len = independent_replace_curve_run_len(&expanded_ops[idx..]);
-                let run = &expanded_ops[idx..idx + run_len];
-                let processed = if should_parallel_replace_curves(run) {
-                    let batches = generate_replace_curve_effects_parallel(run, ctx, &env)?;
-                    for (op, effects) in run.iter().zip(batches) {
-                        apply_generated_effects(op, effects, ctx, &mut sink)?;
-                    }
-                    run_len
-                } else {
-                    process_effects(&expanded_ops[idx], ctx, &env, &mut sink)?;
-                    1
-                };
-                for op in &expanded_ops[idx..idx + processed] {
-                    if let Some((curve_id, _)) = par_cds_ids(op) {
-                        hazard_sources.insert(curve_id.clone(), Arc::new(ctx.market.clone()));
-                    }
-                }
-                idx += processed;
-            }
-
-            flush_pending_bumps(sink.pending_bumps, ctx.market)?;
-        }
 
         if let Some(bindings) = &ctx.rate_bindings {
             let _span = tracing::info_span!("phase_2_rate_bindings").entered();

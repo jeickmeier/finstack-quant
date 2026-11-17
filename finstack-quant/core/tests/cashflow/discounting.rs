@@ -85,15 +85,19 @@ impl Discounting for FlatRateCurve {
         self.base
     }
 
-    fn df(&self, t: f64) -> f64 {
+    fn df(&self, t: f64) -> finstack_quant_core::Result<f64> {
         // The t <= 0 clamp matters for the direct df() property tests below.
         // `npv` excludes flows on or before the valuation date, so those
         // calls do not request a non-positive year fraction from this curve.
         if t <= 0.0 {
-            1.0
+            Ok(1.0)
         } else {
-            (-self.rate * t).exp()
+            Ok((-self.rate * t).exp())
         }
+    }
+
+    fn instantaneous_forward(&self, _t: f64) -> finstack_quant_core::Result<f64> {
+        Ok(self.rate)
     }
 }
 
@@ -131,7 +135,7 @@ fn npv_100_cashflows_maintains_precision() {
             amt.amount() * (-0.05 * t).exp()
         })
         .collect();
-    let expected = neumaier_sum(expected_terms.iter().copied());
+    let expected = neumaier_sum(expected_terms.iter().copied()).expect("finite terms");
 
     assert!(
         (pv.amount() - expected).abs() < financial_tolerance(expected),
@@ -171,7 +175,7 @@ fn npv_500_cashflows_maintains_precision() {
             amt.amount() * (-0.05 * t).exp()
         })
         .collect();
-    let expected = neumaier_sum(expected_terms.iter().copied());
+    let expected = neumaier_sum(expected_terms.iter().copied()).expect("finite terms");
 
     assert!(
         (pv.amount() - expected).abs() < financial_tolerance(expected),
@@ -395,7 +399,7 @@ fn discount_factor_monotonically_decreases() {
     let mut prev_df = f64::MAX;
 
     for t in times {
-        let df = curve.df(t);
+        let df = curve.df(t).unwrap();
         assert!(
             df <= prev_df,
             "DF must be monotonically decreasing: DF({}) = {} > DF(prev)",
@@ -418,7 +422,7 @@ fn discount_factor_at_zero_is_one() {
     let base = d(2025, 1, 1);
     let curve = FlatRateCurve::new("TEST", base, 0.05);
 
-    let df_at_zero = curve.df(0.0);
+    let df_at_zero = curve.df(0.0).unwrap();
     assert!(
         (df_at_zero - 1.0).abs() < 1e-12,
         "DF(0) must equal 1.0, got {}",
@@ -432,7 +436,7 @@ fn discount_factor_handles_negative_time() {
     let base = d(2025, 1, 1);
     let curve = FlatRateCurve::new("TEST", base, 0.05);
 
-    let df_negative = curve.df(-1.0);
+    let df_negative = curve.df(-1.0).unwrap();
     // Should return 1.0 for t <= 0 (past cashflows at par)
     assert!(
         (df_negative - 1.0).abs() < 1e-12,

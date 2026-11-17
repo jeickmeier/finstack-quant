@@ -1,13 +1,30 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
 use finstack_quant_core::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
-use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface};
+use finstack_quant_core::market_data::surfaces::{
+    VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
+
+fn black_vol_opts() -> VolGridOpts {
+    VolGridOpts {
+        secondary_axis: VolSurfaceAxis::Strike,
+        quote_type: VolQuoteType::BlackLognormal,
+        interpolation_mode: VolInterpolationMode::Vol,
+    }
+}
+
+fn black_vol_builder(id: &str) -> finstack_quant_core::market_data::surfaces::VolSurfaceBuilder {
+    VolSurface::builder(id)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
+}
 
 #[test]
 fn test_vol_surface_builder_basic() {
-    let surface = VolSurface::builder("TEST")
+    let surface = black_vol_builder("TEST")
         .expiries(&[1.0, 2.0])
-        .strikes(&[90.0, 100.0, 110.0])
+        .secondary_values(&[90.0, 100.0, 110.0])
         .row(&[0.2, 0.21, 0.22])
         .row(&[0.19, 0.2, 0.21])
         .build()
@@ -15,14 +32,14 @@ fn test_vol_surface_builder_basic() {
 
     assert_eq!(surface.id().as_str(), "TEST");
     assert_eq!(surface.expiries(), &[1.0, 2.0]);
-    assert_eq!(surface.strikes(), &[90.0, 100.0, 110.0]);
+    assert_eq!(surface.secondary_values(), &[90.0, 100.0, 110.0]);
 }
 
 #[test]
 fn test_vol_surface_value_checked() {
-    let surface = VolSurface::builder("TEST")
+    let surface = black_vol_builder("TEST")
         .expiries(&[1.0, 2.0])
-        .strikes(&[90.0, 100.0, 110.0])
+        .secondary_values(&[90.0, 100.0, 110.0])
         .row(&[0.2, 0.21, 0.22])
         .row(&[0.19, 0.2, 0.21])
         .build()
@@ -41,9 +58,9 @@ fn test_vol_surface_value_checked() {
 
 #[test]
 fn test_vol_surface_value_clamped() {
-    let surface = VolSurface::builder("TEST")
+    let surface = black_vol_builder("TEST")
         .expiries(&[1.0, 2.0])
-        .strikes(&[90.0, 100.0, 110.0])
+        .secondary_values(&[90.0, 100.0, 110.0])
         .row(&[0.2, 0.21, 0.22])
         .row(&[0.19, 0.2, 0.21])
         .build()
@@ -62,9 +79,9 @@ fn test_vol_surface_value_clamped() {
 
 #[test]
 fn value_clamped_handles_nan_and_singleton_axes() {
-    let one_by_one = VolSurface::builder("ONE")
+    let one_by_one = black_vol_builder("ONE")
         .expiries(&[1.0])
-        .strikes(&[100.0])
+        .secondary_values(&[100.0])
         .row(&[0.25])
         .build()
         .unwrap();
@@ -81,9 +98,9 @@ fn value_clamped_handles_nan_and_singleton_axes() {
             .is_nan()
     );
 
-    let one_by_many = VolSurface::builder("ROW")
+    let one_by_many = black_vol_builder("ROW")
         .expiries(&[1.0])
-        .strikes(&[90.0, 110.0])
+        .secondary_values(&[90.0, 110.0])
         .row(&[0.20, 0.30])
         .build()
         .unwrap();
@@ -94,9 +111,9 @@ fn value_clamped_handles_nan_and_singleton_axes() {
             < 1e-12
     );
 
-    let many_by_one = VolSurface::builder("COLUMN")
+    let many_by_one = black_vol_builder("COLUMN")
         .expiries(&[1.0, 2.0])
-        .strikes(&[100.0])
+        .secondary_values(&[100.0])
         .row(&[0.20])
         .row(&[0.30])
         .build()
@@ -111,9 +128,9 @@ fn value_clamped_handles_nan_and_singleton_axes() {
 
 #[test]
 fn test_vol_surface_strike_interpolation() {
-    let surface = VolSurface::builder("TEST")
+    let surface = black_vol_builder("TEST")
         .expiries(&[1.0])
-        .strikes(&[90.0, 100.0, 110.0])
+        .secondary_values(&[90.0, 100.0, 110.0])
         .row(&[0.20, 0.25, 0.30])
         .build()
         .unwrap();
@@ -125,9 +142,9 @@ fn test_vol_surface_strike_interpolation() {
 
 #[test]
 fn test_vol_surface_expiry_interpolation() {
-    let surface = VolSurface::builder("TEST")
+    let surface = black_vol_builder("TEST")
         .expiries(&[1.0, 2.0])
-        .strikes(&[100.0])
+        .secondary_values(&[100.0])
         .row(&[0.20])
         .row(&[0.30])
         .build()
@@ -140,9 +157,9 @@ fn test_vol_surface_expiry_interpolation() {
 
 #[test]
 fn test_vol_surface_bilinear_interpolation() {
-    let surface = VolSurface::builder("TEST")
+    let surface = black_vol_builder("TEST")
         .expiries(&[1.0, 2.0])
-        .strikes(&[90.0, 110.0])
+        .secondary_values(&[90.0, 110.0])
         .row(&[0.20, 0.30])
         .row(&[0.25, 0.35])
         .build()
@@ -157,9 +174,9 @@ fn test_vol_surface_bilinear_interpolation() {
 
 #[test]
 fn test_vol_surface_exact_nodes() {
-    let surface = VolSurface::builder("TEST")
+    let surface = black_vol_builder("TEST")
         .expiries(&[1.0, 2.0, 3.0])
-        .strikes(&[90.0, 100.0, 110.0])
+        .secondary_values(&[90.0, 100.0, 110.0])
         .row(&[0.20, 0.21, 0.22])
         .row(&[0.19, 0.20, 0.21])
         .row(&[0.18, 0.19, 0.20])
@@ -187,32 +204,32 @@ fn test_vol_surface_exact_nodes() {
 #[test]
 fn test_vol_surface_builder_validation() {
     // Empty expiries
-    let result = VolSurface::builder("TEST")
+    let result = black_vol_builder("TEST")
         .expiries(&[])
-        .strikes(&[100.0])
+        .secondary_values(&[100.0])
         .build();
     assert!(result.is_err());
 
     // Empty strikes
-    let result = VolSurface::builder("TEST")
+    let result = black_vol_builder("TEST")
         .expiries(&[1.0])
-        .strikes(&[])
+        .secondary_values(&[])
         .build();
     assert!(result.is_err());
 
     // Wrong number of rows
-    let result = VolSurface::builder("TEST")
+    let result = black_vol_builder("TEST")
         .expiries(&[1.0, 2.0])
-        .strikes(&[100.0])
+        .secondary_values(&[100.0])
         .row(&[0.2])
         // Missing second row
         .build();
     assert!(result.is_err());
 
     // Wrong row length
-    let result = VolSurface::builder("TEST")
+    let result = black_vol_builder("TEST")
         .expiries(&[1.0])
-        .strikes(&[90.0, 100.0])
+        .secondary_values(&[90.0, 100.0])
         .row(&[0.2]) // Should have 2 values
         .build();
     assert!(result.is_err());
@@ -220,9 +237,9 @@ fn test_vol_surface_builder_validation() {
 
 #[test]
 fn test_vol_surface_unsorted_expiries() {
-    let result = VolSurface::builder("TEST")
+    let result = black_vol_builder("TEST")
         .expiries(&[2.0, 1.0]) // Unsorted
-        .strikes(&[100.0])
+        .secondary_values(&[100.0])
         .row(&[0.2])
         .row(&[0.2])
         .build();
@@ -231,9 +248,9 @@ fn test_vol_surface_unsorted_expiries() {
 
 #[test]
 fn test_vol_surface_unsorted_strikes() {
-    let result = VolSurface::builder("TEST")
+    let result = black_vol_builder("TEST")
         .expiries(&[1.0])
-        .strikes(&[110.0, 90.0]) // Unsorted
+        .secondary_values(&[110.0, 90.0]) // Unsorted
         .row(&[0.2, 0.2])
         .build();
     assert!(result.is_err());
@@ -243,9 +260,9 @@ fn test_vol_surface_unsorted_strikes() {
 fn test_vol_surface_negative_strikes() {
     // Unshifted Black lognormal surfaces require strictly positive strikes.
     assert!(
-        VolSurface::builder("TEST-BLACK")
+        black_vol_builder("TEST-BLACK")
             .expiries(&[1.0])
-            .strikes(&[-10.0, 0.0, 10.0])
+            .secondary_values(&[-10.0, 0.0, 10.0])
             .row(&[0.2, 0.2, 0.2])
             .build()
             .is_err()
@@ -253,9 +270,11 @@ fn test_vol_surface_negative_strikes() {
 
     // Normal (Bachelier) surfaces allow non-positive strikes (e.g. spreads or negative rates).
     let surf = VolSurface::builder("TEST")
+        .secondary_axis(VolSurfaceAxis::Strike)
         .quote_type(VolQuoteType::Normal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[1.0])
-        .strikes(&[-10.0, 0.0, 10.0])
+        .secondary_values(&[-10.0, 0.0, 10.0])
         .row(&[0.2, 0.2, 0.2])
         .build()
         .expect("normal vol surface allows non-positive strikes");
@@ -282,14 +301,14 @@ fn test_vol_surface_from_grid() {
         &[1.0, 2.0],
         &[90.0, 100.0, 110.0],
         &vols,
-        Default::default(),
+        black_vol_opts(),
         None,
     )
     .unwrap();
 
     assert_eq!(surface.id().as_str(), "TEST");
     assert_eq!(surface.expiries(), &[1.0, 2.0]);
-    assert_eq!(surface.strikes(), &[90.0, 100.0, 110.0]);
+    assert_eq!(surface.secondary_values(), &[90.0, 100.0, 110.0]);
 }
 
 #[test]
@@ -300,28 +319,41 @@ fn test_vol_surface_from_grid_wrong_size() {
         &[1.0, 2.0],
         &[90.0, 100.0, 110.0],
         &vols,
-        Default::default(),
+        black_vol_opts(),
         None,
     );
     assert!(result.is_err());
 }
 
 #[test]
-fn test_vol_surface_parallel_bump_additive_percent() {
-    let surface = VolSurface::builder("TEST")
+fn test_vol_surface_parallel_bump_additive_fraction_and_rejects_percent() {
+    let surface = black_vol_builder("TEST")
         .expiries(&[1.0, 2.0])
-        .strikes(&[90.0, 100.0])
+        .secondary_values(&[90.0, 100.0])
         .row(&[0.20, 0.21])
         .row(&[0.19, 0.20])
         .build()
         .unwrap();
 
-    // +1% additive in Percent units => +0.01 absolute vol points (not a 1% relative change)
+    // Native VolSurface additive shock uses Fraction (+0.01 absolute vol points).
+    // Ambiguous Percent and RateBp units must fail closed.
+    assert!(
+        surface
+            .apply_bump(BumpSpec {
+                mode: BumpMode::Additive,
+                units: BumpUnits::Percent,
+                value: 1.0,
+                bump_type: BumpType::Parallel,
+            })
+            .is_err()
+    );
+    assert!(surface.apply_bump(BumpSpec::parallel_bp(10.0)).is_err());
+
     let bumped = surface
         .apply_bump(BumpSpec {
             mode: BumpMode::Additive,
-            units: BumpUnits::Percent,
-            value: 1.0,
+            units: BumpUnits::Fraction,
+            value: 0.01,
             bump_type: BumpType::Parallel,
         })
         .unwrap();
@@ -335,9 +367,9 @@ fn test_vol_surface_parallel_bump_additive_percent() {
 
 #[test]
 fn test_vol_surface_parallel_bump_multiplicative_factor() {
-    let surface = VolSurface::builder("TEST")
+    let surface = black_vol_builder("TEST")
         .expiries(&[1.0, 2.0])
-        .strikes(&[90.0, 100.0])
+        .secondary_values(&[90.0, 100.0])
         .row(&[0.20, 0.21])
         .row(&[0.19, 0.20])
         .build()
@@ -351,9 +383,9 @@ fn test_vol_surface_parallel_bump_multiplicative_factor() {
 
 #[test]
 fn test_vol_surface_bump_rejects_negative_shocked_vol() {
-    let surface = VolSurface::builder("TEST")
+    let surface = black_vol_builder("TEST")
         .expiries(&[1.0])
-        .strikes(&[100.0])
+        .secondary_values(&[100.0])
         .row(&[0.005])
         .build()
         .unwrap();
@@ -388,9 +420,9 @@ fn test_vol_surface_bump_rejects_negative_shocked_vol() {
 
 #[test]
 fn test_vol_surface_rejects_key_rate_bumps() {
-    let surface = VolSurface::builder("TEST")
+    let surface = black_vol_builder("TEST")
         .expiries(&[1.0, 2.0])
-        .strikes(&[90.0, 100.0])
+        .secondary_values(&[90.0, 100.0])
         .row(&[0.20, 0.21])
         .row(&[0.19, 0.20])
         .build()
@@ -399,8 +431,8 @@ fn test_vol_surface_rejects_key_rate_bumps() {
     let err = surface
         .apply_bump(BumpSpec {
             mode: BumpMode::Additive,
-            units: BumpUnits::Percent,
-            value: 1.0,
+            units: BumpUnits::Fraction,
+            value: 0.01,
             bump_type: BumpType::TriangularKeyRate {
                 prev_bucket: Some(1.0),
                 target_bucket: 2.0,
@@ -414,9 +446,9 @@ fn test_vol_surface_rejects_key_rate_bumps() {
 
 #[test]
 fn test_vol_surface_bucket_bump_filters() {
-    let surface = VolSurface::builder("TEST")
+    let surface = black_vol_builder("TEST")
         .expiries(&[1.0, 2.0])
-        .strikes(&[90.0, 100.0])
+        .secondary_values(&[90.0, 100.0])
         .row(&[0.20, 0.21])
         .row(&[0.19, 0.20])
         .build()
@@ -424,7 +456,7 @@ fn test_vol_surface_bucket_bump_filters() {
 
     // Bump only (expiry=2.0, strike=90.0) by +10%
     let bumped = surface
-        .apply_bucket_bump(Some(&[2.0]), Some(&[90.0]), 10.0)
+        .apply_bucket_bump(Some(&[2.0]), Some(&[90.0]), BumpSpec::multiplier(1.10))
         .expect("bucket bump should succeed");
 
     // Bumped bucket
@@ -454,9 +486,9 @@ fn test_vol_surface_bucket_bump_filters() {
 
 #[test]
 fn test_vol_surface_single_point() {
-    let surface = VolSurface::builder("TEST")
+    let surface = black_vol_builder("TEST")
         .expiries(&[1.0])
-        .strikes(&[100.0])
+        .secondary_values(&[100.0])
         .row(&[0.25])
         .build()
         .unwrap();
@@ -496,8 +528,8 @@ fn test_vol_surface_large_grid() {
     let expiries: Vec<f64> = (1..=10).map(|i| i as f64).collect();
     let strikes: Vec<f64> = (80..=120).step_by(5).map(|s| s as f64).collect();
 
-    let mut builder = VolSurface::builder("LARGE");
-    builder = builder.expiries(&expiries).strikes(&strikes);
+    let mut builder = black_vol_builder("LARGE");
+    builder = builder.expiries(&expiries).secondary_values(&strikes);
 
     for _ in 0..expiries.len() {
         let row: Vec<f64> = strikes.iter().map(|_| 0.25).collect();
@@ -513,9 +545,9 @@ fn test_vol_surface_large_grid() {
 
 #[test]
 fn test_vol_surface_serde() {
-    let surface = VolSurface::builder("TEST")
+    let surface = black_vol_builder("TEST")
         .expiries(&[1.0, 2.0])
-        .strikes(&[90.0, 100.0, 110.0])
+        .secondary_values(&[90.0, 100.0, 110.0])
         .row(&[0.20, 0.21, 0.22])
         .row(&[0.19, 0.20, 0.21])
         .build()
@@ -526,7 +558,7 @@ fn test_vol_surface_serde() {
 
     assert_eq!(deser.id(), surface.id());
     assert_eq!(deser.expiries(), surface.expiries());
-    assert_eq!(deser.strikes(), surface.strikes());
+    assert_eq!(deser.secondary_values(), surface.secondary_values());
 
     // Check values match
     assert!(
@@ -543,7 +575,10 @@ fn test_vol_surface_serde_invalid() {
     let json = r#"{
         "id": "TEST",
         "expiries": [1.0, 2.0],
-        "strikes": [90.0, 100.0],
+        "secondary_values": [90.0, 100.0],
+        "secondary_axis": "strike",
+        "quote_type": "black_lognormal",
+        "interpolation_mode": "vol",
         "vols_row_major": [0.2, 0.21]
     }"#;
     let result: Result<VolSurface, _> = serde_json::from_str(json);
@@ -552,9 +587,9 @@ fn test_vol_surface_serde_invalid() {
 
 #[test]
 fn test_vol_surface_clone() {
-    let surface = VolSurface::builder("TEST")
+    let surface = black_vol_builder("TEST")
         .expiries(&[1.0, 2.0])
-        .strikes(&[90.0, 100.0])
+        .secondary_values(&[90.0, 100.0])
         .row(&[0.20, 0.21])
         .row(&[0.19, 0.20])
         .build()
@@ -564,11 +599,65 @@ fn test_vol_surface_clone() {
 
     assert_eq!(cloned.id(), surface.id());
     assert_eq!(cloned.expiries(), surface.expiries());
-    assert_eq!(cloned.strikes(), surface.strikes());
+    assert_eq!(cloned.secondary_values(), surface.secondary_values());
     assert!(
         (finstack_quant_models::volatility::get_surface_vol(&cloned, 1.5, 95.0).unwrap()
             - finstack_quant_models::volatility::get_surface_vol(&surface, 1.5, 95.0).unwrap())
         .abs()
             < 1e-12
     );
+}
+
+#[test]
+fn total_variance_preserves_exact_knots_and_scales_extreme_vols() {
+    use finstack_quant_models::volatility::{VolSource, get_surface_vol, get_surface_vol_clamped};
+    use std::sync::Arc;
+
+    let knots = VolSurface::from_grid(
+        "TV-KNOTS",
+        &[0.5, 1.5],
+        &[90.0, 110.0],
+        &[0.19, 0.23, 0.27, 0.31],
+        VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
+            interpolation_mode: VolInterpolationMode::TotalVariance,
+        },
+        None,
+    )
+    .unwrap();
+    for (ei, &t) in knots.expiries().iter().enumerate() {
+        for (si, &k) in knots.secondary_values().iter().enumerate() {
+            let expected = knots.vols()[ei * 2 + si];
+            assert_eq!(
+                get_surface_vol(&knots, t, k).unwrap().to_bits(),
+                expected.to_bits()
+            );
+        }
+    }
+
+    for &extreme in &[1e160_f64, 1e-200_f64] {
+        let surf = VolSurface::from_grid(
+            "TV-EXTREME",
+            &[1.0, 2.0],
+            &[90.0, 110.0],
+            &[extreme; 4],
+            VolGridOpts {
+                secondary_axis: VolSurfaceAxis::Strike,
+                quote_type: VolQuoteType::BlackLognormal,
+                interpolation_mode: VolInterpolationMode::TotalVariance,
+            },
+            None,
+        )
+        .unwrap();
+        let mid = get_surface_vol(&surf, 1.5, 100.0).unwrap();
+        assert!(mid.is_finite() && mid > 0.0, "extreme={extreme}, mid={mid}");
+        assert!((mid - extreme).abs() / extreme < 1e-12);
+    }
+
+    let source = VolSource::Surface(Arc::new(knots.clone()));
+    assert!(source.get_vol_clamped(0.0, 0.0, 100.0).is_err());
+    assert!(source.get_vol_clamped(-0.1, 0.0, 100.0).is_err());
+    assert!(get_surface_vol_clamped(&knots, 0.0, 100.0).is_nan());
+    assert!(get_surface_vol_clamped(&knots, -0.1, 100.0).is_nan());
 }

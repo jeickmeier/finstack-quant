@@ -83,7 +83,11 @@ pub struct LrmGreeks {
 ///
 /// The delta estimate with its standard error and 95% confidence interval
 /// over the supplied paths.
-#[must_use]
+///
+/// # Errors
+///
+/// Propagates accumulator errors if any path contribution produces non-finite
+/// intermediate statistics.
 pub fn lrm_delta(
     payoffs: &[f64],
     terminal_shocks: &[f64],
@@ -91,7 +95,7 @@ pub fn lrm_delta(
     volatility: f64,
     time_to_maturity: f64,
     discount_factor: f64,
-) -> Estimate {
+) -> finstack_quant_core::Result<Estimate> {
     let mut stats = OnlineStats::new();
     let sqrt_t = time_to_maturity.sqrt();
     let score_multiplier = 1.0 / (initial_spot * volatility * sqrt_t);
@@ -100,7 +104,7 @@ pub fn lrm_delta(
         let z_t = terminal_shocks[i];
         let score = z_t * score_multiplier;
         let delta_contribution = discount_factor * payoff * score;
-        stats.update(delta_contribution);
+        stats.update(delta_contribution)?;
     }
 
     Estimate::from_stats(&stats)
@@ -136,15 +140,19 @@ pub fn lrm_delta(
 ///   scores over all simulated transitions.
 /// * `discount_factor` - Discount factor from payoff horizon to valuation,
 ///   applied before estimating vega.
-#[must_use]
+///
+/// # Errors
+///
+/// Propagates accumulator errors if any path contribution produces non-finite
+/// intermediate statistics.
 pub fn lrm_vega_from_scores(
     payoffs: &[f64],
     path_scores: &[f64],
     discount_factor: f64,
-) -> Estimate {
+) -> finstack_quant_core::Result<Estimate> {
     let mut stats = OnlineStats::new();
     for (&payoff, &score) in payoffs.iter().zip(path_scores) {
-        stats.update(discount_factor * payoff * score * 0.01);
+        stats.update(discount_factor * payoff * score * 0.01)?;
     }
     Estimate::from_stats(&stats)
 }
@@ -177,10 +185,16 @@ mod tests {
             let z_t = terminal_shocks[i];
             let score = drift_score_multiplier * z_t - time_to_maturity;
             let rho_contribution = discount_factor * payoff * score;
-            stats.update(rho_contribution);
+            stats.update(rho_contribution).expect("finite contribution");
         }
 
-        (stats.mean(), stats.stderr())
+        (
+            stats.get_mean().expect("finite mean").unwrap_or(f64::NAN),
+            stats
+                .get_stderr()
+                .expect("finite stderr")
+                .unwrap_or(f64::NAN),
+        )
     }
 
     #[test]
@@ -189,7 +203,7 @@ mod tests {
         let payoffs = vec![10.0, 5.0, 15.0];
         let wiener = vec![0.5, -0.3, 0.8];
 
-        let delta = lrm_delta(&payoffs, &wiener, 100.0, 0.2, 1.0, 1.0);
+        let delta = lrm_delta(&payoffs, &wiener, 100.0, 0.2, 1.0, 1.0).expect("finite delta");
 
         // Delta should be finite
         assert!(delta.mean.is_finite());
@@ -218,11 +232,11 @@ mod tests {
         let payoffs = vec![0.0, 0.0, 0.0];
         let wiener = vec![0.1, 0.2, 0.3];
 
-        let delta = lrm_delta(&payoffs, &wiener, 100.0, 0.2, 1.0, 1.0);
+        let delta = lrm_delta(&payoffs, &wiener, 100.0, 0.2, 1.0, 1.0).expect("finite delta");
 
         // Zero payoffs should give zero Greeks
         assert_eq!(delta.mean, 0.0);
-        let vega = lrm_vega_from_scores(&payoffs, &wiener, 1.0);
+        let vega = lrm_vega_from_scores(&payoffs, &wiener, 1.0).expect("finite vega");
         assert_eq!(vega.mean, 0.0);
     }
 }

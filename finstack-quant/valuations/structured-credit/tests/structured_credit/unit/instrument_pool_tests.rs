@@ -139,12 +139,22 @@ pub(crate) fn totals(run: &SimulationRun) -> (f64, f64) {
 
 pub(crate) fn market_with_curves(base: Date) -> MarketContext {
     let fixings: Vec<(Date, f64)> = (0..25)
+        .rev()
         .map(|days| (base - time::Duration::days(days), 0.04))
         .collect();
     MarketContext::new()
         .insert(flat_discount_curve(0.03, base, "USD-OIS"))
         .insert(flat_forward_curve(0.04, base, "USD-SOFR-3M"))
-        .insert_series(ScalarTimeSeries::new("FIXING:USD-SOFR-3M", fixings, None).expect("fixings"))
+        .insert_series(
+            ScalarTimeSeries::new(
+                "FIXING:USD-SOFR-3M",
+                fixings,
+                None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .expect("fixings"),
+        )
 }
 
 /// A pool of one revolver, with a reserve at least equal to its commitment

@@ -38,7 +38,7 @@ fn calendar_violations(
         return Ok(Vec::new());
     }
 
-    let strikes = surface.strikes();
+    let strikes = surface.secondary_values();
     let expiries = surface.expiries();
     let (Some(&k_min), Some(&k_max)) = (strikes.first(), strikes.last()) else {
         return Ok(Vec::new());
@@ -86,7 +86,7 @@ fn butterfly_violations(
         return Ok(Vec::new());
     }
 
-    let strikes = surface.strikes();
+    let strikes = surface.secondary_values();
     let expiries = surface.expiries();
     if strikes.len() < 2 {
         return Ok(Vec::new());
@@ -161,7 +161,7 @@ fn butterfly_violations(
 /// * `config` - Validation configuration supplying the maximum permissible
 ///   annualized volatility and other surface policy controls.
 fn bounds_violations(surface: &VolSurface, config: &ValidationConfig) -> Result<Vec<String>> {
-    let strikes = surface.strikes();
+    let strikes = surface.secondary_values();
     let expiries = surface.expiries();
     let mut violations = Vec::new();
 
@@ -308,7 +308,7 @@ fn validate_inputs(
     config.validate()?;
     validate_forwards_input(surface, forwards)?;
     if surface
-        .strikes()
+        .secondary_values()
         .iter()
         .any(|v| !v.is_finite() || *v <= 0.0)
     {

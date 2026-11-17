@@ -26,6 +26,8 @@ fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> Disc
             (10.0, (-rate * 10.0).exp()),
             (30.0, (-rate * 30.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -487,14 +489,22 @@ fn test_term_forward_with_floor() {
 
     // Build forward curve with very low rates that will be affected by floor
     // Use small positive rates that become negative after subtracting margin
-    let fwd_curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let fwd_curve = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(val_date)
         .day_count(DayCount::Act360)
         .knots([
-            (0.0, 0.0001), // 1 bp (very low)
-            (0.5, 0.0001),
-            (1.0, 0.0002),
+            (0.0, 1.0),
+            (0.125, 0.999987500078125),
+            (0.25, 0.999975000312497),
+            (0.375, 0.999962500703116),
+            (0.5, 0.999950001249979),
+            (0.625, 0.999935939551958),
+            (0.75, 0.999918753300692),
+            (0.875, 0.999898442657296),
+            (1.0, 0.999875007812175),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -508,6 +518,8 @@ fn test_term_forward_with_floor() {
                 "FIXING:USD-SOFR-3M",
                 vec![(date!(2024 - 12 - 30), 0.0001)],
                 None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
             )
             .unwrap(),
         );
@@ -696,13 +708,8 @@ fn test_deterministic_with_credit_risk() {
     let hazard_curve = HazardCurve::builder("BORROWER-A")
         .base_date(val_date)
         .recovery_rate(0.40)
-        .knots(vec![
-            (0.0, 1.0),
-            (1.0, 0.99),
-            (2.0, 0.975),
-            (3.0, 0.96),
-            (5.0, 0.92),
-        ])
+        .knots(vec![(1.0, 0.99), (2.0, 0.975), (3.0, 0.96), (5.0, 0.92)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
 
@@ -827,13 +834,8 @@ fn test_deterministic_stochastic_convergence_with_credit_risk() {
     let hazard_curve = HazardCurve::builder("BORROWER-A")
         .base_date(val_date)
         .recovery_rate(0.40)
-        .knots(vec![
-            (0.0, 1.0),
-            (1.0, 0.99),
-            (2.0, 0.975),
-            (3.0, 0.96),
-            (5.0, 0.92),
-        ])
+        .knots(vec![(1.0, 0.99), (2.0, 0.975), (3.0, 0.96), (5.0, 0.92)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
 

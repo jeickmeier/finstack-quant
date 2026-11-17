@@ -22,7 +22,7 @@
 //! use finstack_quant_core::math::solver::BrentSolver;
 //! # fn main() -> finstack_quant_core::Result<()> {
 //!
-//! let root = BrentSolver::new().solve(|x| x * x - 2.0, 1.0)?;
+//! let root = BrentSolver::new(1e-9, 100)?.solve(|x| Ok(x * x - 2.0), 1.0, 0.0, 10.0, 0.5, 20)?;
 //! assert!((root - 2f64.sqrt()).abs() < 1e-9);
 //! # Ok(())
 //! # }
@@ -32,11 +32,14 @@
 //!
 //! ```rust
 //! use finstack_quant_core::math::stats::{mean, population_variance, variance};
+//! # fn main() -> finstack_quant_core::Result<()> {
 //!
 //! let data = [1.0, 2.0, 3.0, 4.0];
-//! assert_eq!(mean(&data), 2.5);
-//! assert_eq!(population_variance(&data), 1.25);
-//! assert!((variance(&data) - 5.0 / 3.0).abs() < 1e-10);
+//! assert_eq!(mean(&data)?, Some(2.5));
+//! assert_eq!(population_variance(&data)?, Some(1.25));
+//! assert!((variance(&data)?.unwrap() - 5.0 / 3.0).abs() < 1e-10);
+//! # Ok(())
+//! # }
 //! ```
 
 /// Tolerance for checking if a value is effectively zero.

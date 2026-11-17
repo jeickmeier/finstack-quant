@@ -83,6 +83,8 @@ fn build_market(as_of: Date) -> MarketContext {
             (10.0, 0.70),
         ])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("Valid curve");
 
@@ -444,6 +446,7 @@ fn bench_lmm_consumer(c: &mut Criterion) {
                 .day_count(DayCount::Act365F)
                 .knots([0.0_f64, 1.0, 3.0, 7.0, 12.0].map(|t| (t, (-0.03 * t).exp())))
                 .interp(InterpStyle::LogLinear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build().expect("single-curve LMM market");
             let market = MarketContext::new().insert(curve);
             let discount = market.get_discount("D").expect("discount curve");

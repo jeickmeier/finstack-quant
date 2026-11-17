@@ -140,41 +140,23 @@ fn parse_scenario_spec_preserves_cumulative_resolution_mode() {
 }
 
 #[wasm_bindgen_test]
-fn compose_scenarios_rejects_mixed_hazard_bump_modes_as_javascript_error() {
-    let first_order = parse_scenario_spec(JsValue::from(
+fn parse_scenario_spec_rejects_retired_hazard_bump_mode_as_javascript_error() {
+    let error = parse_scenario_spec(JsValue::from(
         serde_json::json!({
-            "id": "first-order", "operations": [], "priority": 0,
+            "id": "legacy",
+            "operations": [],
             "hazard_bump_mode": "first_order_shift",
         })
         .to_string(),
     ))
-    .expect("first-order scenario");
-    let solve_to_par = parse_scenario_spec(JsValue::from(
-        serde_json::json!({
-            "id": "solve-to-par", "operations": [], "priority": 1,
-            "hazard_bump_mode": "solve_to_par",
-        })
-        .to_string(),
-    ))
-    .expect("solve-to-par scenario");
-    let first_order: finstack_quant_scenarios::ScenarioSpec =
-        serde_wasm_bindgen::from_value(first_order).expect("typed first-order scenario");
-    let solve_to_par: finstack_quant_scenarios::ScenarioSpec =
-        serde_wasm_bindgen::from_value(solve_to_par).expect("typed solve-to-par scenario");
-    let specs =
-        serde_wasm_bindgen::to_value(&vec![first_order, solve_to_par]).expect("scenario array");
-
-    let error = compose_scenarios(specs).expect_err("mixed modes should be rejected");
+    .expect_err("retired hazard_bump_mode field should be rejected");
     let message: String = error
         .dyn_into::<js_sys::Error>()
         .expect("binding errors should be JavaScript Error objects")
         .message()
         .into();
     assert!(
-        message.contains("first-order")
-            && message.contains("first_order_shift")
-            && message.contains("solve-to-par")
-            && message.contains("solve_to_par"),
+        message.contains("unknown field") && message.contains("hazard_bump_mode"),
         "unexpected error: {message}"
     );
 }

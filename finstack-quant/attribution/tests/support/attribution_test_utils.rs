@@ -13,9 +13,7 @@ use finstack_quant_core::FxHashMap;
 use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, Tenor, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{
-    DiscountCurve, HazardCurve, ParInterp, Seniority,
-};
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve, Seniority};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::CurveId;
@@ -74,8 +72,6 @@ pub fn calibrated_hazard_curve(
                     recovery_rate,
                     notional: 1.0,
                     method: CalibrationMethod::Bootstrap,
-
-                    par_interp: ParInterp::Linear,
                     doc_clause: Some(convention.doc_clause.as_str().to_string()),
                     cds_valuation_convention: None,
                 }),
@@ -175,8 +171,9 @@ impl Instrument for TestInstrument {
         let mut amt = self.value.amount();
         for id in &self.forward_curves {
             let fwd = market.get_forward(id.as_str())?;
-            // Deterministic exposure to parallel forward moves (test-only stub).
-            amt += fwd.rate(1.0) * 1_000_000.0;
+            // Deterministic exposure to parallel forward moves (test-only stub):
+            // the 1y continuously compounded projection zero rate.
+            amt += -fwd.df(1.0)?.ln() * 1_000_000.0;
         }
         Ok(Money::new(amt, self.value.currency()).expect("valid money fixture"))
     }

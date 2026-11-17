@@ -712,7 +712,9 @@ mod tests {
         let paths = p.generate_rate_paths_with_grid(0.03, &grid).expect("paths");
         let mut stats = finstack_quant_core::math::stats::OnlineStats::new();
         for path in &paths {
-            stats.update(100.0 + 100.0 * path[1]);
+            stats
+                .update(100.0 + 100.0 * path[1])
+                .expect("finite payoff");
         }
         let estimate = p
             .price_bermudan_with_grid(
@@ -724,8 +726,20 @@ mod tests {
                 Currency::USD,
             )
             .expect("independent estimate");
-        assert!((estimate.mean.amount() - stats.mean()).abs() < 1e-12);
-        assert!((estimate.stderr - stats.stderr()).abs() < 1e-12);
+        assert!(
+            (estimate.mean.amount() - stats.get_mean().expect("finite mean").expect("64 paths"))
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (estimate.stderr
+                - stats
+                    .get_stderr()
+                    .expect("finite stderr")
+                    .expect("64 paths"))
+            .abs()
+                < 1e-12
+        );
         assert_eq!(estimate.num_paths, 64);
         assert_eq!(estimate.num_simulated_paths, 64);
     }

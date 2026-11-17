@@ -353,13 +353,13 @@ impl CommoditySwap {
             period.accrual_end,
             finstack_quant_core::dates::DayCount::Act365F,
             None,
-            finstack_quant_core::dates::DayCountContextState {
-                calendar_id: self.calendar_id.as_deref().map(str::to_owned),
-                coupon_period: None,
-                end_is_termination_date: Some(period.accrual_end == self.maturity),
-                frequency: None,
-                bus_basis: None,
-            },
+            finstack_quant_core::dates::DayCountContextState::try_new(
+                self.calendar_id.as_deref().map(str::to_owned),
+                None,
+                None,
+                None,
+                Some(period.accrual_end == self.maturity),
+            )?,
         )?)
         .build()
     }
@@ -474,6 +474,9 @@ mod tests {
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (0.5, 0.975), (1.0, 0.95), (2.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("Valid discount curve");
 
@@ -506,6 +509,9 @@ mod tests {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 1.0)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount curve"),
             )
@@ -874,6 +880,9 @@ mod tests {
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(Date::from_calendar_date(2025, Month::January, 1).expect("date"))
             .knots([(0.0, 1.0), (2.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let market = MarketContext::new().insert(disc).insert(price_curve);
@@ -931,6 +940,9 @@ mod tests {
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (2.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let market = MarketContext::new().insert(disc).insert(price_curve);
@@ -1030,6 +1042,9 @@ mod tests {
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (2.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let market = MarketContext::new().insert(disc).insert(price_curve);
@@ -1066,6 +1081,9 @@ mod tests {
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (2.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let market = MarketContext::new().insert(disc).insert(price_curve);

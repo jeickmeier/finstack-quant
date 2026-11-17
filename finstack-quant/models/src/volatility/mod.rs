@@ -12,7 +12,7 @@
 //! - **Local Volatility**: Dupire local vol surface construction
 //! - **Normal Model**: Bachelier pricing for negative rates
 //! - **FX delta quotes**: ATM DNS / risk-reversal / butterfly conversion and
-//!   smile evaluation (`FxVolSurfaceBuilder`, `get_fx_delta_vol`)
+//!   smile evaluation (`get_fx_delta_vol`, `materialize_fx_delta_surface`)
 //!
 //! # Volatility Models
 //!
@@ -63,7 +63,7 @@
 //! # See Also
 //!
 //! - [`sabr::SabrParameters`] for SABR smile interpolation
-//! - [`FxVolSurfaceBuilder`] for FX delta-quoted smile materialization
+//! - [`get_fx_delta_vol`] and [`materialize_fx_delta_surface`] for FX delta-quoted smile evaluation and grid materialization
 //! - [`crate::closed_form`] for analytical formulas
 
 pub mod arbitrage;
@@ -89,6 +89,6 @@ pub use source::{
 };
 
 pub use fx::{
-    FxVolSurfaceBuilder, delta_to_strike, get_fx_delta_pillar_vols, get_fx_delta_vol,
-    materialize_fx_delta_surface, strike_to_delta,
+    delta_to_strike, get_fx_delta_pillar_vols, get_fx_delta_vol, materialize_fx_delta_surface,
+    strike_to_delta,
 };

@@ -6,26 +6,23 @@
         "type": "forward",
         "id": "USD-LIBOR-3M",
         "base": "2025-01-02",
-        "reset_lag": 2,
         "day_count": "act_360",
-        "tenor": 0.25,
+        "index_tenor": {
+          "count": 3,
+          "unit": "months"
+        },
         "knot_points": [
           [
             0.0,
-            0.03
+            1.0
           ],
           [
-            1.0,
-            0.03
-          ],
-          [
-            20.0,
-            0.03
+            20.25,
+            0.545947095874351
           ]
         ],
-        "projection_grid": null,
-        "interp_style": "linear",
-        "extrapolation": "flat_forward",
+        "interp_style": "log_linear",
+        "extrapolation": "extend",
         "rate_calibration": null,
         "fx_policy": null
       },
@@ -49,10 +46,7 @@
           ]
         ],
         "interp_style": "monotone_convex",
-        "extrapolation": "flat_forward",
-        "min_forward_rate": -0.005,
-        "allow_non_monotonic": false,
-        "min_forward_tenor": 1e-06,
+        "extrapolation": "extend",
         "rate_calibration": null,
         "fx_policy": null
       },
@@ -77,7 +71,7 @@
           ]
         ],
         "interp_style": "linear",
-        "extrapolation": "flat_zero"
+        "extrapolation": "flat"
       }
     ],
     "fx": null,
@@ -89,7 +83,7 @@
           1.0,
           10.0
         ],
-        "strikes": [
+        "secondary_values": [
           0.01,
           0.03,
           0.1

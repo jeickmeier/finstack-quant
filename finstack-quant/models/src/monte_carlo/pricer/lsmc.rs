@@ -912,15 +912,16 @@ impl LsmcEngine {
         currency: Currency,
     ) -> finstack_quant_core::Result<MoneyEstimate> {
         let stats = independent_estimator_stats(path_pvs, self.config.antithetic)?;
-        let mut estimate = Estimate::from_stats(&stats);
-        if let Some(intrinsic) = intrinsic_floor.filter(|&value| stats.mean() < value) {
+        let mut estimate = Estimate::from_stats(&stats)?;
+        let sample_mean = stats.get_mean()?.unwrap_or(f64::NAN);
+        if let Some(intrinsic) = intrinsic_floor.filter(|&value| sample_mean < value) {
             let (lo, hi) = estimate.ci_95;
             let lower = lo.max(intrinsic);
             estimate.mean = intrinsic;
             estimate.ci_95 = (lower, hi.max(lower));
         }
         if self.config.antithetic {
-            estimate = estimate.with_num_simulated_paths(2 * stats.count());
+            estimate = estimate.with_num_simulated_paths(2 * stats.get_count());
         }
 
         MoneyEstimate::from_estimate(estimate, currency)
@@ -1227,10 +1228,12 @@ impl LsmcEngine {
             .collect();
         let mut continuation = OnlineStats::new();
         for &value in &present_values {
-            continuation.update(value);
+            continuation.update(value)?;
         }
         let exercise_at_start = self.config.exercise_dates.contains(&0)
-            && exercise.exercise_value(paths.row(0)[0]) >= continuation.mean();
+            && continuation
+                .get_mean()?
+                .is_some_and(|mean| exercise.exercise_value(paths.row(0)[0]) >= mean);
 
         Ok((
             present_values,
@@ -2038,13 +2041,13 @@ mod tests {
     fn gbm_american_prices_are_bit_stable() {
         const EXPECTED: &[u64] = &[
             0x402829f6094ad2fa,
-            0x3fcf734a4ce21bbb,
-            0x40233f08bbaf83fc,
+            0x3fcf734a4ce21bbf,
+            0x40233f08bbaf83fb,
             0x3fe096537727ca99,
-            0x402649ceac988d34,
-            0x3fcd1bc42e7f3b9a,
-            0x4020f4f4ccf63497,
-            0x3fdc7de115fa4ffb,
+            0x402649ceac988d38,
+            0x3fcd1bc42e7f3b98,
+            0x4020f4f4ccf634a0,
+            0x3fdc7de115fa4ffe,
         ];
         let pricer = LsmcPricer::new(
             Some(400),

@@ -10,7 +10,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
@@ -50,13 +52,18 @@ fn build_market(vol: f64) -> MarketContext {
             (1.0f64, (-RATE).exp()),
             (2.0f64, (-RATE * 2.0f64).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     // Flat vol surface covering the expiry used by the test option.
     let surface = VolSurface::builder("EQ-VOL")
         .expiries(&[0.5, 1.0, 2.0])
-        .strikes(&[80.0, 100.0, 120.0])
+        .secondary_values(&[80.0, 100.0, 120.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[vol, vol, vol])
         .row(&[vol, vol, vol])
         .row(&[vol, vol, vol])
@@ -68,9 +75,12 @@ fn build_market(vol: f64) -> MarketContext {
         .insert_surface(surface)
         .insert_price(
             "EQ-SPOT",
-            MarketScalar::Price(Money::new(SPOT, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(SPOT, Currency::USD).expect("valid money fixture")),
         )
-        .insert_price("EQ-DIV", MarketScalar::Unitless(DIV_YIELD))
+        .insert_price(
+            "EQ-DIV",
+            MarketScalar::unitless(DIV_YIELD).expect("valid scalar"),
+        )
 }
 
 fn build_option() -> EquityOption {
@@ -292,7 +302,10 @@ fn vol_skew_change_attributes_less_than_parallel_shift() {
     let skewed = |vol: f64, skew: f64| {
         VolSurface::builder("EQ-VOL")
             .expiries(&[0.5, 1.0, 2.0])
-            .strikes(&[80.0, 100.0, 120.0])
+            .secondary_values(&[80.0, 100.0, 120.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[vol + skew, vol, vol - skew])
             .row(&[vol + skew, vol, vol - skew])
             .row(&[vol + skew, vol, vol - skew])
@@ -305,7 +318,8 @@ fn vol_skew_change_attributes_less_than_parallel_shift() {
         m.replace_surfaces_mut([(
             finstack_quant_core::types::CurveId::new("EQ-VOL"),
             std::sync::Arc::new(skewed(VOL_BASE, 0.02)),
-        )]);
+        )])
+        .unwrap();
         m
     };
     let parallel_market = build_market(VOL_BASE + VOL_SHIFT_ABS);

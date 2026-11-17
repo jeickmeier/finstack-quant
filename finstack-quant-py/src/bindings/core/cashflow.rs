@@ -204,9 +204,15 @@ impl PyCashFlowAccrual {
     ///
     /// Raises
     /// ------
+    /// KeyError
+    ///     If ``day_count`` is ``DayCount.BUS_252`` and ``context.calendar_id``
+    ///     names an unknown holiday calendar.
     /// ValueError
     ///     If either date cannot be parsed, ``start`` is not before ``end``,
-    ///     or ``projected_index_rate`` is not finite.
+    ///     ``projected_index_rate`` is not finite, or ``context`` fails
+    ///     ``day_count`` validation (for example missing ``BUS_252`` calendar,
+    ///     missing or non-overlapping ``ACT/ACT ICMA`` coupon period, or
+    ///     out-of-bounds ``ACT/365L`` period).
     #[new]
     #[pyo3(signature = (start, end, day_count, context, projected_index_rate=None))]
     fn new(

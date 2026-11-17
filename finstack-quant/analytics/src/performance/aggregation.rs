@@ -119,9 +119,9 @@ impl Performance {
                     } else {
                         p.ln_1p() - b.ln_1p()
                     };
-                    relative_log_growth.add(log_ratio);
+                    relative_log_growth.add(log_ratio)?;
                     finite_result(
-                        relative_log_growth.total().exp_m1(),
+                        relative_log_growth.get_total()?.exp_m1(),
                         "cumulative relative wealth",
                     )
                 })

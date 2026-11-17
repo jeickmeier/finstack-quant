@@ -517,8 +517,7 @@ impl Ndf {
 
         // Settlement and fixing are separate dates: the maturity is the
         // settlement date from spot; the fixing steps back from it.
-        let joint_cal =
-            resolve_joint_calendar(Some(&base_calendar_id), Some(&settlement_calendar_id))?;
+        let joint_cal = resolve_joint_calendar(&base_calendar_id, &settlement_calendar_id)?;
         let spot_date = crate::shared::spot_date_from_lag(trade_date, settlement_days, joint_cal)?;
         let maturity = finstack_quant_core::dates::fx::fx_forward_date(
             spot_date,
@@ -957,6 +956,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots(vec![(0.0, 1.0), (1.0, 0.95)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("should build");
         let market = MarketContext::new().insert(curve);
@@ -1143,6 +1145,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots(vec![(0.0, 1.0), (1.0, 0.95)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve should build");
         let market = MarketContext::new().insert(curve);
@@ -1180,6 +1185,9 @@ mod tests {
         let usd_curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots(vec![(0.0, 1.0), (0.5, 0.9753), (1.0, 0.9512)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("should build");
 
@@ -1239,6 +1247,9 @@ mod tests {
             finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots(vec![(0.0, 1.0), (1.0, 0.95)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve should build");
         let market = MarketContext::new().insert(curve);

@@ -155,12 +155,12 @@ fn scorecard_scale_examples() -> Result<Vec<Value>> {
     use crate::rating_scales::{RatingLevel, ScorecardScale};
     example(&ScorecardScale::try_new(
         "Illustrative internal scale",
-        Some("Example utility bands; not an agency calibration".to_string()),
         vec![
             RatingLevel::try_new("A", 90.0, 80.0)?,
             RatingLevel::try_new("B", 70.0, 50.0)?,
             RatingLevel::try_new("C", 20.0, 0.0)?,
         ],
+        Some("Example utility bands; not an agency calibration".to_string()),
     )?)
 }
 
@@ -173,12 +173,12 @@ fn rating_scale_entry_examples() -> Result<Vec<Value>> {
         "Example utility bands; not an agency calibration",
         ScorecardScale::try_new(
             "Illustrative internal scale",
-            None,
             vec![
                 RatingLevel::try_new("A", 90.0, 80.0)?,
                 RatingLevel::try_new("B", 70.0, 50.0)?,
                 RatingLevel::try_new("C", 20.0, 0.0)?,
             ],
+            None,
         )?,
     )?)
 }

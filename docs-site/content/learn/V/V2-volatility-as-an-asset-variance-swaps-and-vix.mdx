@@ -305,7 +305,7 @@ The quote currency owns the cash payoff. The base and quote calendars jointly de
 from _shared.instrument_fixtures import instrument_envelope
 from finstack_quant.core.market_data import VolSurface
 fx_market=tracks.build_market("vol")
-fx_market.insert(VolSurface("EURUSD-VAR-VOL",[.25,.5,1.,2.],[1.08*math.exp(-3+i*.05) for i in range(121)],[[.10]*121]*4))
+fx_market.insert(VolSurface("EURUSD-VAR-VOL",[.25,.5,1.,2.],[1.08*math.exp(-3+i*.05) for i in range(121)],[[.10]*121]*4,secondary_axis="strike",quote_type="black_lognormal",interpolation_mode="vol"))
 fx_payload=instrument_envelope({"type":"fx_variance_swap","spec":{"id":"V2-EURUSD-VAR",
     "base_currency":"EUR","quote_currency":"USD","spot_id":"EURUSD-SPOT",
     "notional":{"amount":"1000000","currency":"USD"},"strike_variance":.01,

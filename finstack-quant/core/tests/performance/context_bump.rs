@@ -5,13 +5,13 @@
 //! production counters and makes no allocation claim from Arc identities.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::bumps::{
     BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
 };
 use finstack_quant_core::market_data::context::{MarketContext, MarketContextState};
 use finstack_quant_core::market_data::scalars::{
-    MarketScalar, ScalarTimeSeries, SeriesInterpolation,
+    MarketScalar, ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
 };
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{
@@ -87,15 +87,17 @@ fn snapshot(market: &MarketContext) -> Value {
     prices.sort_by(|a, b| a.0.cmp(b.0));
     let exact_prices: Vec<_> = prices
         .into_iter()
-        .map(|(id, value)| match value {
-            MarketScalar::Unitless(value) => {
-                json!({"id": id.as_str(), "kind": "unitless", "bits": bits(*value)})
+        .map(|(id, value)| {
+            if let Some(value) = value.get_unitless() {
+                json!({"id": id.as_str(), "kind": "unitless", "bits": bits(value)})
+            } else {
+                let value = value.get_price().expect("price scalar");
+                json!({
+                    "id": id.as_str(), "kind": "money", "currency": value.currency().to_string(),
+                    "mantissa": value.amount_decimal().mantissa().to_string(),
+                    "scale": value.amount_decimal().scale(),
+                })
             }
-            MarketScalar::Price(value) => json!({
-                "id": id.as_str(), "kind": "money", "currency": value.currency().to_string(),
-                "mantissa": value.amount_decimal().mantissa().to_string(),
-                "scale": value.amount_decimal().scale(),
-            }),
         })
         .collect();
     json!({"state": state, "exact_prices": exact_prices, "credit_bundles": credit_bundles})
@@ -108,13 +110,30 @@ fn discount_curve(id: &str) -> DiscountCurve {
             let time = f64::from(i) * 0.5;
             (time, (-0.04 * time).exp())
         }))
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount fixture")
 }
 
 fn surface(id: &str) -> VolSurface {
-    VolSurface::from_grid(id, &EXPIRIES, &STRIKES, &VOLS, Default::default(), None)
-        .expect("surface fixture")
+    use finstack_quant_core::market_data::surfaces::{
+        VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
+    };
+    VolSurface::from_grid(
+        id,
+        &EXPIRIES,
+        &STRIKES,
+        &VOLS,
+        VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
+            interpolation_mode: VolInterpolationMode::Vol,
+        },
+        None,
+    )
+    .expect("surface fixture")
 }
 
 fn series(id: &str) -> ScalarTimeSeries {
@@ -124,9 +143,10 @@ fn series(id: &str) -> ScalarTimeSeries {
             .map(|i| (base_date() + Duration::days(i), 100.0 + 0.1 * i as f64))
             .collect(),
         Some(Currency::USD),
+        SeriesInterpolation::Step,
+        SeriesExtrapolation::Error,
     )
     .expect("series fixture")
-    .with_interpolation(SeriesInterpolation::Step)
 }
 
 fn fixture(unrelated_curves: usize) -> MarketContext {
@@ -137,7 +157,7 @@ fn fixture(unrelated_curves: usize) -> MarketContext {
     market.insert_surface_mut(surface("EQ-VOL"));
     market.insert_price_mut(
         "SPX-SPOT",
-        MarketScalar::Price(Money::from((100_i64, Currency::USD))),
+        MarketScalar::price(Money::from((100_i64, Currency::USD))),
     );
     market.insert_series_mut(series("SPX-CLOSE"));
     market
@@ -152,33 +172,94 @@ fn additive(value: f64) -> BumpSpec {
     }
 }
 
-fn generic(id: &str, spec: BumpSpec) -> MarketBump {
-    MarketBump::Curve {
+fn discount_bump(id: &str, spec: BumpSpec) -> MarketBump {
+    MarketBump::DiscountCurve {
+        id: CurveId::new(id),
+        spec,
+    }
+}
+
+fn hazard_bump(id: &str, spec: BumpSpec) -> MarketBump {
+    MarketBump::HazardCurve {
+        id: CurveId::new(id),
+        spec,
+    }
+}
+
+fn base_corr_bump(id: &str, spec: BumpSpec) -> MarketBump {
+    MarketBump::BaseCorrelation {
+        id: CurveId::new(id),
+        spec,
+    }
+}
+
+fn surface_bump(id: &str, spec: BumpSpec) -> MarketBump {
+    MarketBump::VolSurface {
+        id: CurveId::new(id),
+        spec,
+    }
+}
+
+fn price_bump(id: &str, spec: BumpSpec) -> MarketBump {
+    MarketBump::PriceScalar {
+        id: CurveId::new(id),
+        spec,
+    }
+}
+
+fn unitless_bump(id: &str, spec: BumpSpec) -> MarketBump {
+    MarketBump::UnitlessScalar {
+        id: CurveId::new(id),
+        spec,
+    }
+}
+
+fn series_bump(id: &str, spec: BumpSpec) -> MarketBump {
+    MarketBump::Series {
         id: CurveId::new(id),
         spec,
     }
 }
 
 fn bump_records(bumps: &[MarketBump]) -> Vec<Value> {
-    bumps.iter().enumerate().map(|(index, bump)| match bump {
-        MarketBump::Curve { id, spec } => json!({
-            "index": index, "kind": "generic_curve", "id": id.as_str(),
-            "mode": format!("{:?}", spec.mode), "units": format!("{:?}", spec.units),
-            "value_bits": bits(spec.value), "bump_type": format!("{:?}", spec.bump_type),
-        }),
-        MarketBump::VolBucketPct { vol_surface_id, expiries, strikes, pct } => json!({
-            "index": index, "kind": "typed_vol_bucket", "id": vol_surface_id.as_str(),
-            "expiries": expiries.as_ref().map(|values| values.iter().map(|v| bits(*v)).collect::<Vec<_>>()),
-            "strikes": strikes.as_ref().map(|values| values.iter().map(|v| bits(*v)).collect::<Vec<_>>()),
-            "pct_bits": bits(*pct),
-        }),
-        MarketBump::BaseCorrBucketPts { surface_id, detachments, points } => json!({
-            "index": index, "kind": "typed_base_correlation_bucket", "id": surface_id.as_str(),
-            "detachments": detachments.as_ref().map(|values| values.iter().map(|v| bits(*v)).collect::<Vec<_>>()),
-            "points_bits": bits(*points),
-        }),
-        MarketBump::FxPct { .. } => panic!("unexpected panel FX bump"),
-    }).collect()
+    bumps
+        .iter()
+        .enumerate()
+        .map(|(index, bump)| {
+            if let Some((target, spec)) = bump.target_and_spec() {
+                json!({
+                    "index": index, "kind": target.kind_name(), "id": target.id().as_str(),
+                    "mode": format!("{:?}", spec.mode), "units": format!("{:?}", spec.units),
+                    "value_bits": bits(spec.value), "bump_type": format!("{:?}", spec.bump_type),
+                })
+            } else {
+                match bump {
+                    MarketBump::VolBucketPct {
+                        vol_surface_id,
+                        expiries,
+                        secondary_values,
+                        pct,
+                    } => json!({
+                        "index": index, "kind": "typed_vol_bucket", "id": vol_surface_id.as_str(),
+                        "expiries": expiries.as_ref().map(|values| values.iter().map(|v| bits(*v)).collect::<Vec<_>>()),
+                        "secondary_values": secondary_values.as_ref().map(|values| values.iter().map(|v| bits(*v)).collect::<Vec<_>>()),
+                        "pct_bits": bits(*pct),
+                    }),
+                    MarketBump::BaseCorrBucketPts {
+                        surface_id,
+                        detachments,
+                        points,
+                    } => json!({
+                        "index": index, "kind": "typed_base_correlation_bucket", "id": surface_id.as_str(),
+                        "detachments": detachments.as_ref().map(|values| values.iter().map(|v| bits(*v)).collect::<Vec<_>>()),
+                        "points_bits": bits(*points),
+                    }),
+                    MarketBump::FxPct { .. } => panic!("unexpected panel FX bump"),
+                    _ => panic!("unexpected typed target bump"),
+                }
+            }
+        })
+        .collect()
 }
 
 fn record(
@@ -243,9 +324,11 @@ fn assert_float(actual: f64, expected: f64) {
 }
 
 fn assert_money(market: &MarketContext, id: &str, amount: &str) {
-    let MarketScalar::Price(actual) = market.get_price(id).expect("money scalar") else {
-        panic!("wrong scalar variant")
-    };
+    let actual = market
+        .get_price(id)
+        .expect("money scalar")
+        .get_price()
+        .expect("wrong scalar variant");
     let expected = Money::from_decimal_str(amount, Currency::USD).expect("reference Decimal");
     assert_eq!(actual.currency(), Currency::USD);
     assert_eq!(actual.amount_decimal(), expected.amount_decimal());
@@ -259,7 +342,7 @@ fn ordinary_records() -> Vec<Value> {
         let (bumped, mut payload) = record(
             &id,
             &base,
-            vec![generic("SPX-SPOT", BumpSpec::multiplier(1.01))],
+            vec![price_bump("SPX-SPOT", BumpSpec::multiplier(1.01))],
             "price",
         );
         assert_money(&bumped, "SPX-SPOT", "101");
@@ -274,13 +357,13 @@ fn ordinary_records() -> Vec<Value> {
     }
     let base = fixture(256);
     for (name, bump, typed) in [
-        ("surface_abs", generic("EQ-VOL", additive(0.01)), false),
+        ("surface_abs", surface_bump("EQ-VOL", additive(0.01)), false),
         (
             "typed_vol_bucket",
             MarketBump::VolBucketPct {
                 vol_surface_id: CurveId::new("EQ-VOL"),
                 expiries: None,
-                strikes: None,
+                secondary_values: None,
                 pct: 5.0,
             },
             true,
@@ -290,7 +373,7 @@ fn ordinary_records() -> Vec<Value> {
         let (bumped, mut payload) = record(&id, &base, vec![bump], "surface");
         let after = bumped.get_surface("EQ-VOL").expect("surface");
         assert_eq!(after.expiries(), EXPIRIES);
-        assert_eq!(after.strikes(), STRIKES);
+        assert_eq!(after.secondary_values(), STRIKES);
         for (&actual, original) in after.vols().iter().zip(VOLS) {
             let expected = if typed {
                 original * (1.0 + 5.0 / 100.0)
@@ -311,7 +394,7 @@ fn ordinary_records() -> Vec<Value> {
     let (bumped, mut payload) = record(
         "context_bump_mixed/series_multiplier/curves_256",
         &base,
-        vec![generic("SPX-CLOSE", BumpSpec::multiplier(1.01))],
+        vec![series_bump("SPX-CLOSE", BumpSpec::multiplier(1.01))],
         "series",
     );
     let after = bumped.get_series("SPX-CLOSE").expect("series");
@@ -332,29 +415,31 @@ fn ordinary_records() -> Vec<Value> {
     records.push(payload);
 
     let mut base = fixture(8);
-    base.insert_price_mut("UNIT", MarketScalar::Unitless(100.0));
+    base.insert_price_mut("UNIT", MarketScalar::unitless(100.0).expect("unitless"));
     let (bumped, payload) = record(
         "semantic/unitless_multiplier",
         &base,
-        vec![generic("UNIT", BumpSpec::multiplier(1.01))],
+        vec![unitless_bump("UNIT", BumpSpec::multiplier(1.01))],
         "price",
     );
-    let MarketScalar::Unitless(actual) = bumped.get_price("UNIT").expect("unitless") else {
-        panic!("wrong variant")
-    };
+    let actual = bumped
+        .get_price("UNIT")
+        .expect("unitless")
+        .get_unitless()
+        .expect("wrong variant");
     assert_eq!(actual.to_bits(), (100.0_f64 * 1.01).to_bits());
     assert_other_content_unchanged(&base, &bumped, "price", "UNIT");
     records.push(payload);
     let (bumped, payload) = record(
         "semantic/ordinary_curve_parallel_bp",
         &base,
-        vec![generic("CURVE_0", BumpSpec::parallel_bp(1.0))],
+        vec![discount_bump("CURVE_0", BumpSpec::parallel_bp(1.0))],
         "curve",
     );
     let original = base.get_discount("CURVE_0").expect("original");
     let after = bumped.get_discount("CURVE_0").expect("after");
     for (&time, &df) in original.knots().iter().zip(original.dfs()) {
-        assert_float(after.df(time), df * (-0.0001 * time).exp());
+        assert_float(after.df(time).expect("df"), df * (-0.0001 * time).exp());
     }
     assert_other_content_unchanged(&base, &bumped, "curve", "CURVE_0");
     records.push(payload);
@@ -363,7 +448,7 @@ fn ordinary_records() -> Vec<Value> {
 
 fn precedence_records() -> Vec<Value> {
     let mut records = Vec::new();
-    for (name, has_curve, has_surface, has_price, has_series, family, spec) in [
+    for (name, has_curve, has_surface, has_price, has_series, family, bump) in [
         (
             "all_families",
             true,
@@ -371,7 +456,7 @@ fn precedence_records() -> Vec<Value> {
             true,
             true,
             "curve",
-            BumpSpec::parallel_bp(1.0),
+            discount_bump("SHARED", BumpSpec::parallel_bp(1.0)),
         ),
         (
             "curve_before_surface",
@@ -380,7 +465,7 @@ fn precedence_records() -> Vec<Value> {
             false,
             false,
             "curve",
-            BumpSpec::parallel_bp(1.0),
+            discount_bump("SHARED", BumpSpec::parallel_bp(1.0)),
         ),
         (
             "surface_before_price",
@@ -389,7 +474,7 @@ fn precedence_records() -> Vec<Value> {
             true,
             false,
             "surface",
-            additive(0.01),
+            surface_bump("SHARED", additive(0.01)),
         ),
         (
             "price_before_series",
@@ -398,7 +483,7 @@ fn precedence_records() -> Vec<Value> {
             true,
             true,
             "price",
-            BumpSpec::multiplier(1.01),
+            price_bump("SHARED", BumpSpec::multiplier(1.01)),
         ),
     ] {
         let mut base = fixture(8);
@@ -411,7 +496,7 @@ fn precedence_records() -> Vec<Value> {
         if has_price {
             base.insert_price_mut(
                 "SHARED",
-                MarketScalar::Price(Money::from((100_i64, Currency::USD))),
+                MarketScalar::price(Money::from((100_i64, Currency::USD))),
             );
         }
         if has_series {
@@ -420,12 +505,16 @@ fn precedence_records() -> Vec<Value> {
         let (bumped, payload) = record(
             &format!("semantic/precedence/{name}"),
             &base,
-            vec![generic("SHARED", spec)],
+            vec![bump],
             family,
         );
         match family {
             "curve" => assert_float(
-                bumped.get_discount("SHARED").expect("curve").df(1.0),
+                bumped
+                    .get_discount("SHARED")
+                    .expect("curve")
+                    .df(1.0)
+                    .expect("df"),
                 (-0.0401_f64).exp(),
             ),
             "surface" => {
@@ -450,8 +539,8 @@ fn precedence_records() -> Vec<Value> {
 
 fn ordered_records() -> Vec<Value> {
     let base = fixture(8);
-    let add = generic("SPX-SPOT", additive(10.0));
-    let multiply = generic("SPX-SPOT", BumpSpec::multiplier(1.1));
+    let add = price_bump("SPX-SPOT", additive(10.0));
+    let multiply = price_bump("SPX-SPOT", BumpSpec::multiplier(1.1));
     let mut records = Vec::new();
     for (name, bumps, expected) in [
         (
@@ -475,8 +564,8 @@ fn ordered_records() -> Vec<Value> {
         &base,
         vec![
             add,
-            generic("EQ-VOL", additive(0.01)),
-            generic("SPX-CLOSE", BumpSpec::multiplier(1.01)),
+            surface_bump("EQ-VOL", additive(0.01)),
+            series_bump("SPX-CLOSE", BumpSpec::multiplier(1.01)),
             multiply,
         ],
         "price_surface_series",
@@ -513,22 +602,6 @@ fn ordered_records() -> Vec<Value> {
     restored.insert_surface_mut((*base.get_surface("EQ-VOL").expect("original")).clone());
     restored.insert_series_mut(base.get_series("SPX-CLOSE").expect("original").clone());
     assert_eq!(snapshot(&restored), snapshot(&base));
-    records.push(payload);
-    let (bumped, payload) = record(
-        "semantic/surface_zero_floor",
-        &base,
-        vec![generic("EQ-VOL", additive(-0.3))],
-        "surface",
-    );
-    assert!(
-        bumped
-            .get_surface("EQ-VOL")
-            .expect("surface")
-            .vols()
-            .iter()
-            .all(|value| value.to_bits() == 0.0_f64.to_bits())
-    );
-    assert_other_content_unchanged(&base, &bumped, "surface", "EQ-VOL");
     records.push(payload);
     let (bumped, payload) = record("semantic/empty_bumps", &base, Vec::new(), "none");
     assert_eq!(snapshot(&bumped), snapshot(&base));
@@ -568,9 +641,9 @@ fn error_records() -> Vec<Value> {
             &format!("semantic/errors/first_missing_{first}"),
             &base,
             vec![
-                generic("SPX-SPOT", BumpSpec::multiplier(1.01)),
-                generic(first, additive(0.01)),
-                generic(second, additive(0.01)),
+                price_bump("SPX-SPOT", BumpSpec::multiplier(1.01)),
+                discount_bump(first, additive(0.01)),
+                discount_bump(second, additive(0.01)),
             ],
             "Input::NotFound",
         );
@@ -585,7 +658,7 @@ fn error_records() -> Vec<Value> {
         records.push(error_record(
             &format!("semantic/errors/{name}"),
             &base,
-            vec![generic("SPX-SPOT", BumpSpec::multiplier(value))],
+            vec![price_bump("SPX-SPOT", BumpSpec::multiplier(value))],
             "Validation",
         ));
     }
@@ -594,30 +667,38 @@ fn error_records() -> Vec<Value> {
     records.push(error_record(
         "semantic/errors/unsupported_price_must_not_fall_through_to_series",
         &collision,
-        vec![generic("SPX-SPOT", BumpSpec::parallel_bp(1.0))],
+        vec![price_bump("SPX-SPOT", BumpSpec::parallel_bp(1.0))],
         "Input::UnsupportedBump",
     ));
     records.push(error_record(
         "semantic/errors/unsupported_surface_key_rate",
         &base,
-        vec![generic(
+        vec![surface_bump(
             "EQ-VOL",
             BumpSpec::triangular_key_rate_bp(0.25, 1.0, 2.0, 1.0),
         )],
         "Input::UnsupportedBump",
     ));
-    let overflow = base
-        .clone()
-        .insert_price("OVERFLOW", MarketScalar::Unitless(f64::MAX));
+    // Volatility shocks never floor: a bump below zero is rejected atomically.
+    records.push(error_record(
+        "semantic/errors/negative_surface_vol",
+        &base,
+        vec![surface_bump("EQ-VOL", additive(-0.3))],
+        "Validation",
+    ));
+    let overflow = base.clone().insert_price(
+        "OVERFLOW",
+        MarketScalar::unitless(f64::MAX).expect("finite"),
+    );
     records.push(error_record(
         "semantic/errors/scalar_overflow",
         &overflow,
-        vec![generic("OVERFLOW", BumpSpec::multiplier(2.0))],
+        vec![unitless_bump("OVERFLOW", BumpSpec::multiplier(2.0))],
         "Validation",
     ));
     let overflow = base.insert_price(
         "OVERFLOW",
-        MarketScalar::Price(
+        MarketScalar::price(
             Money::from_decimal_str("10000000000000000000000000000", Currency::USD)
                 .expect("large Money"),
         ),
@@ -625,15 +706,17 @@ fn error_records() -> Vec<Value> {
     records.push(error_record(
         "semantic/errors/money_overflow",
         &overflow,
-        vec![generic("OVERFLOW", BumpSpec::multiplier(10.0))],
+        vec![price_bump("OVERFLOW", BumpSpec::multiplier(10.0))],
         "Input::ConversionOverflow",
     ));
     records
 }
 
 fn credit_fixture() -> MarketContext {
-    let hazard = HazardCurve::flat("CDX-HZD", base_date(), 0.02, 0.4).expect("index hazard");
-    let issuer = HazardCurve::flat("ISSUER-HZD", base_date(), 0.03, 0.4).expect("issuer hazard");
+    let hazard = HazardCurve::flat("CDX-HZD", base_date(), 0.02, 0.4, DayCount::Act365F)
+        .expect("index hazard");
+    let issuer = HazardCurve::flat("ISSUER-HZD", base_date(), 0.03, 0.4, DayCount::Act365F)
+        .expect("issuer hazard");
     let correlation = BaseCorrelationCurve::builder("CDX-BC")
         .knots([(3.0, 0.2), (7.0, 0.4), (10.0, 0.5)])
         .build()
@@ -658,10 +741,10 @@ fn credit_records() -> Vec<Value> {
     let base = credit_fixture();
     let mut records = Vec::new();
     let bumps = vec![
-        generic("CDX-HZD", BumpSpec::parallel_bp(6.0)),
-        generic("ISSUER-HZD", BumpSpec::parallel_bp(12.0)),
-        generic("CDX-BC", additive(0.01)),
-        generic("CDX-HZD", BumpSpec::parallel_bp(3.0)),
+        hazard_bump("CDX-HZD", BumpSpec::parallel_bp(6.0)),
+        hazard_bump("ISSUER-HZD", BumpSpec::parallel_bp(12.0)),
+        base_corr_bump("CDX-BC", additive(0.01)),
+        hazard_bump("CDX-HZD", BumpSpec::parallel_bp(3.0)),
     ];
     let (bumped, mut payload) = record(
         "semantic/credit/ordered_dependency_rebind",
@@ -687,18 +770,21 @@ fn credit_records() -> Vec<Value> {
     ));
     let mut observations = Vec::new();
     for time in [0.5, 1.0, 3.0, 5.0, 10.0] {
-        // Generic RateBp hazard bumps are par-spread shifts divided by LGD.
-        assert_float(hazard.hazard_rate(time), 0.02 + 9.0 * 1e-4 / 0.6);
-        assert_float(issuer.hazard_rate(time), 0.03 + 12.0 * 1e-4 / 0.6);
-        assert_eq!(
-            index.index_credit_curve().sp(time).to_bits(),
-            hazard.sp(time).to_bits()
-        );
-        assert_eq!(
-            index.get_issuer_curve("Issuer").sp(time).to_bits(),
-            issuer.sp(time).to_bits()
-        );
-        observations.push(json!({"time_bits": bits(time), "hazard_bits": bits(hazard.hazard_rate(time)), "issuer_bits": bits(issuer.hazard_rate(time)), "survival_bits": bits(hazard.sp(time)), "issuer_survival_bits": bits(issuer.sp(time)), "bundled_survival_bits": bits(index.index_credit_curve().sp(time)), "bundled_issuer_survival_bits": bits(index.get_issuer_curve("Issuer").sp(time))}));
+        // Generic RateBp hazard bumps shift intensity directly (bp / 1e4).
+        let hazard_rate = hazard.hazard_rate(time).expect("hazard_rate");
+        let issuer_rate = issuer.hazard_rate(time).expect("issuer hazard_rate");
+        let hazard_sp = hazard.sp(time).expect("hazard sp");
+        let issuer_sp = issuer.sp(time).expect("issuer sp");
+        let idx_sp = index.index_credit_curve().sp(time).expect("index sp");
+        let idx_issuer_sp = index
+            .get_issuer_curve("Issuer")
+            .sp(time)
+            .expect("idx issuer sp");
+        assert_float(hazard_rate, 0.02 + 9.0 * 1e-4);
+        assert_float(issuer_rate, 0.03 + 12.0 * 1e-4);
+        assert_eq!(idx_sp.to_bits(), hazard_sp.to_bits());
+        assert_eq!(idx_issuer_sp.to_bits(), issuer_sp.to_bits());
+        observations.push(json!({"time_bits": bits(time), "hazard_bits": bits(hazard_rate), "issuer_bits": bits(issuer_rate), "survival_bits": bits(hazard_sp), "issuer_survival_bits": bits(issuer_sp), "bundled_survival_bits": bits(idx_sp), "bundled_issuer_survival_bits": bits(idx_issuer_sp)}));
     }
     for (&actual, original) in correlation.correlations().iter().zip([0.2_f64, 0.4, 0.5]) {
         assert_eq!(actual.to_bits(), (original + 0.01).to_bits());
@@ -709,7 +795,7 @@ fn credit_records() -> Vec<Value> {
     let (bumped, mut payload) = record(
         "semantic/credit/noncurve_preserves_dependencies",
         &base,
-        vec![generic("SPX-SPOT", BumpSpec::multiplier(1.01))],
+        vec![price_bump("SPX-SPOT", BumpSpec::multiplier(1.01))],
         "price",
     );
     assert!(Arc::ptr_eq(

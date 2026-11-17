@@ -56,7 +56,7 @@ fn bench_df_bootstrap(c: &mut Criterion) {
         base_date,
         method: CalibrationMethod::Bootstrap,
         interpolation: Default::default(),
-        extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::FlatForward,
+        extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
         pricing_discount_id: None,
         pricing_forward_id: None,
         conventions: Default::default(),

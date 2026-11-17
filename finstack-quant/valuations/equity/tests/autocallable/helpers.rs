@@ -29,7 +29,7 @@ pub fn build_discount_curve_with_day_count(
     curve_id: &str,
     day_count: DayCount,
 ) -> DiscountCurve {
-    let mut builder = DiscountCurve::builder(curve_id)
+    let builder = DiscountCurve::builder(curve_id)
         .base_date(base_date)
         .day_count(day_count)
         .knots([
@@ -40,17 +40,9 @@ pub fn build_discount_curve_with_day_count(
             (2.0, (-rate * 2.0).exp()),
             (5.0, (-rate * 5.0).exp()),
             (10.0, (-rate * 10.0).exp()),
-        ]);
-
-    // For zero or negative rates, the curve may be flat or increasing
-    if rate.abs() < 1e-10 || rate < 0.0 {
-        builder = builder.validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        );
-    }
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend);
 
     builder.build().unwrap()
 }
@@ -62,7 +54,10 @@ pub fn build_discount_curve_with_day_count(
 pub fn build_flat_vol_surface(vol: f64, _base_date: Date, vol_surface_id: &str) -> VolSurface {
     VolSurface::builder(vol_surface_id)
         .expiries(&[0.25, 0.5, 0.75, 1.0, 2.0, 5.0])
-        .strikes(&[50.0, 80.0, 100.0, 120.0, 150.0, 200.0])
+        .secondary_values(&[50.0, 80.0, 100.0, 120.0, 150.0, 200.0])
+        .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+        .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
+        .interpolation_mode(finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol)
         .row(&[vol, vol, vol, vol, vol, vol])
         .row(&[vol, vol, vol, vol, vol, vol])
         .row(&[vol, vol, vol, vol, vol, vol])
@@ -144,7 +139,10 @@ pub fn build_market_with_day_count(
         .insert_surface(vol_surface)
         .insert_price(
             SPOT_ID,
-            MarketScalar::Price(Money::new(spot, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(spot, Currency::USD).expect("valid money fixture")),
         )
-        .insert_price(DIV_ID, MarketScalar::Unitless(div_yield))
+        .insert_price(
+            DIV_ID,
+            MarketScalar::unitless(div_yield).expect("valid scalar"),
+        )
 }

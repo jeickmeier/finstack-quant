@@ -12,8 +12,8 @@
 //! magnitude is correct, but the Greek silently degrades to a one-sided
 //! (forward) difference. This is an accepted approximation.
 //!
-//! The dividend-yield scalar may be stored as either `MarketScalar::Unitless`
-//! or `MarketScalar::Price`; both are read through `scalar_numeric_value`.
+//! The dividend-yield scalar may be stored as either a unitless [`MarketScalar`]
+//! or a price [`MarketScalar`]; both are read through `scalar_numeric_value`.
 
 use finstack_quant_core::Result;
 use finstack_quant_core::math::units::ONE_BASIS_POINT;

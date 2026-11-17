@@ -94,12 +94,57 @@ impl FxQuery {
 /// assert_eq!("GBPJPY".parse::<CurrencyPair>().expect("compact form").quote, Currency::JPY);
 /// assert!("EURUS".parse::<CurrencyPair>().is_err());
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields, try_from = "CurrencyPairFields")]
+#[cfg_attr(
+    feature = "json-schema",
+    derive(schemars::JsonSchema),
+    schemars(!try_from, deny_unknown_fields)
+)]
 pub struct CurrencyPair {
     /// Base (from) currency: one unit of it is worth `rate` quote units.
     pub base: Currency,
     /// Quote (to) currency in which the rate is expressed.
     pub quote: Currency,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CurrencyPairFields {
+    base: Currency,
+    quote: Currency,
+}
+
+impl TryFrom<CurrencyPairFields> for CurrencyPair {
+    type Error = crate::Error;
+
+    fn try_from(fields: CurrencyPairFields) -> Result<Self, Self::Error> {
+        Self::try_new(fields.base, fields.quote)
+    }
+}
+
+impl CurrencyPair {
+    /// Construct a validated [`CurrencyPair`], rejecting identical currencies (`base == quote`).
+    ///
+    /// # Arguments
+    ///
+    /// * `base` - Base (from) currency whose unit is priced in `quote` units.
+    /// * `quote` - Quote (to) currency in which the exchange rate is expressed; must differ from
+    ///   `base`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error`] when `base == quote`.
+    pub fn try_new(base: Currency, quote: Currency) -> crate::Result<Self> {
+        crate::validation::validate_distinct_currencies(base, quote, "CurrencyPair")?;
+        Ok(Self { base, quote })
+    }
+}
+
+impl std::fmt::Display for CurrencyPair {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}/{}", self.base, self.quote)
+    }
 }
 
 impl std::str::FromStr for CurrencyPair {
@@ -322,7 +367,24 @@ impl Serialize for FxMatrixState {
 
 #[cfg(test)]
 mod tests {
-    use super::{FxConversionPolicy, FxRateResult};
+    use super::{CurrencyPair, FxConversionPolicy, FxRateResult};
+    use crate::currency::Currency;
+
+    #[test]
+    fn currency_pair_try_new_display_and_serde_validate_distinct_currencies() {
+        let pair = CurrencyPair::try_new(Currency::EUR, Currency::USD).expect("distinct pair");
+        assert_eq!(pair.to_string(), "EUR/USD");
+        let json = serde_json::to_value(pair).expect("serialize pair");
+        let roundtrip: CurrencyPair = serde_json::from_value(json).expect("deserialize pair");
+        assert_eq!(roundtrip, pair);
+
+        assert!(CurrencyPair::try_new(Currency::USD, Currency::USD).is_err());
+        assert!(serde_json::from_str::<CurrencyPair>(r#"{"base":"USD","quote":"USD"}"#).is_err());
+        assert!(
+            serde_json::from_str::<CurrencyPair>(r#"{"base":"EUR","quote":"USD","extra":1}"#)
+                .is_err()
+        );
+    }
 
     #[test]
     fn fx_rate_result_deserialization_rejects_invalid_rates() {

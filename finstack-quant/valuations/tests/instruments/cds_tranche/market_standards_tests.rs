@@ -315,8 +315,8 @@ fn test_discount_curve_monotonicity() {
     let times = [0.0, 1.0, 3.0, 5.0, 10.0];
 
     for window in times.windows(2) {
-        let df1 = curve.df(window[0]);
-        let df2 = curve.df(window[1]);
+        let df1 = curve.df(window[0]).expect("df");
+        let df2 = curve.df(window[1]).expect("df");
 
         assert!(
             df1 >= df2,
@@ -338,7 +338,7 @@ fn test_hazard_curve_non_negative() {
     let times = [0.5, 1.0, 3.0, 5.0, 10.0];
 
     for &t in &times {
-        let sp = curve.sp(t);
+        let sp = curve.sp(t).expect("sp");
         assert!(
             (0.0..=1.0).contains(&sp),
             "Survival probability must be in [0,1] at t={}, got {}",

@@ -40,13 +40,12 @@ fn swap_market(forward_rate: f64) -> MarketContext {
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots([(0.0, 1.0), (5.0, 0.90)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("valid discount curve");
-    let forward = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(as_of)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, forward_rate), (5.0, forward_rate)])
-        .build()
+    let forward = ForwardCurve::flat("USD-SOFR-3M", as_of, forward_rate, DayCount::Act360)
         .expect("valid signed forward curve");
     MarketContext::new().insert(discount).insert(forward)
 }
@@ -1163,6 +1162,13 @@ fn loan_swept_after_issuance_stays_repaid_in_later_periods() {
             FinancialStatementInstrument::TermLoan(loan(date!(2025 - 01 - 15))),
         );
         model_builder.waterfall(WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Amortization,
+                PaymentPriority::Sweep,
+                PaymentPriority::Equity,
+            ],
             ecf_sweep: Some(EcfSweepSpec {
                 sweep_percentage: 1.0,
                 ..ecf_sweep()
@@ -1286,6 +1292,13 @@ fn positive_ecf_requires_sweep_even_with_other_prepayment_priorities() {
 fn ecf_sweep_priority_pays_the_sized_sweep_and_preserves_cash() {
     let (_, context, mut state, flows) = empty_debt_context();
     let spec = WaterfallSpec {
+        priority_of_payments: vec![
+            PaymentPriority::Fees,
+            PaymentPriority::Interest,
+            PaymentPriority::Amortization,
+            PaymentPriority::Sweep,
+            PaymentPriority::Equity,
+        ],
         ecf_sweep: Some(ecf_sweep()),
         ..Default::default()
     };

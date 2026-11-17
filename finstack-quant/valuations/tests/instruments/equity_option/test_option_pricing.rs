@@ -9,7 +9,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::{VolGridOpts, VolSurface};
+use finstack_quant_core::market_data::surfaces::{
+    VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
@@ -38,6 +40,8 @@ fn create_test_market(base_date: Date) -> MarketContext {
         .base_date(base_date)
         .knots([(0.0, 1.0), (0.5, 0.98), (1.0, 0.96), (2.0, 0.92)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -47,7 +51,11 @@ fn create_test_market(base_date: Date) -> MarketContext {
         &[0.25, 0.5, 1.0, 2.0],
         &[80.0, 90.0, 100.0, 110.0, 120.0],
         &[0.25; 20], // 20 = 4 expiries × 5 strikes
-        VolGridOpts::default(),
+        VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
+            interpolation_mode: VolInterpolationMode::Vol,
+        },
         None,
     )
     .unwrap();
@@ -57,9 +65,12 @@ fn create_test_market(base_date: Date) -> MarketContext {
         .insert_surface(vol_surface)
         .insert_price(
             "EQUITY-SPOT",
-            MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
         )
-        .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(0.02)) // 2% div yield
+        .insert_price(
+            "EQUITY-DIVYIELD",
+            MarketScalar::unitless(0.02).expect("valid scalar"),
+        ) // 2% div yield
 }
 
 #[test]

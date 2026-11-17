@@ -326,6 +326,9 @@ pub fn arithmetic_asian_tw_price(market: &OptionMarketParams, num_fixings: usize
 
     let df = (-rate * time).exp();
     let m1 = compute_arithmetic_mean_first_moment(spot, time, rate, div_yield, num_fixings);
+    if !m1.is_finite() {
+        return f64::NAN;
+    }
 
     // Discounted intrinsic on the expected average, and the no-arbitrage upper
     // bound. A call cannot be worth more than the discounted expected average
@@ -502,9 +505,9 @@ pub fn geometric_asian_price_times(
 
     let mut mean_acc = NeumaierAccumulator::new();
     for &t_i in fixing_times {
-        mean_acc.add(drift * t_i);
+        mean_acc.add(drift * t_i)?;
     }
-    let mu = spot.ln() + mean_acc.total() / n;
+    let mu = spot.ln() + mean_acc.get_total()? / n;
 
     // Var[ln G] = σ² ΣᵢΣⱼ min(tᵢ,tⱼ) / N². With sorted times the double sum
     // reduces to Σₖ (2(N−k)+1)·tₖ (1-based k), evaluated in O(n).
@@ -512,9 +515,9 @@ pub fn geometric_asian_price_times(
     let n_usize = fixing_times.len();
     for (k, &t_k) in fixing_times.iter().enumerate() {
         let weight = (2 * (n_usize - 1 - k) + 1) as f64;
-        var_acc.add(weight * t_k);
+        var_acc.add(weight * t_k)?;
     }
-    let var_ln_g = vol * vol * var_acc.total() / (n * n);
+    let var_ln_g = vol * vol * var_acc.get_total()? / (n * n);
 
     if var_ln_g <= 0.0 {
         let g = mu.exp();
@@ -580,7 +583,7 @@ pub fn arithmetic_asian_tw_price_times(
     let rate = -df.ln() / t_expiry;
 
     let m1 =
-        arithmetic_mean_first_moment_times(spot, rate, div_yield, fixing_times.iter().copied());
+        arithmetic_mean_first_moment_times(spot, rate, div_yield, fixing_times.iter().copied())?;
     super::vanilla::checked_closed_form_value(m1, "arithmetic Asian first moment")?;
     let upper_bound = match option_type {
         OptionType::Call => df * m1,
@@ -598,7 +601,7 @@ pub fn arithmetic_asian_tw_price_times(
         div_yield,
         vol,
         fixing_times.iter().copied(),
-    );
+    )?;
     super::vanilla::checked_closed_form_value(m2, "arithmetic Asian second moment")?;
     if m2 <= m1 * m1 {
         return Ok(degenerate(m1));
@@ -623,14 +626,14 @@ fn arithmetic_mean_first_moment_times(
     rate: f64,
     div_yield: f64,
     fixing_times: impl ExactSizeIterator<Item = f64>,
-) -> f64 {
+) -> Result<f64> {
     let n = fixing_times.len() as f64;
     let drift = rate - div_yield;
     let mut acc = NeumaierAccumulator::new();
     for t_i in fixing_times {
-        acc.add((drift * t_i).exp());
+        acc.add((drift * t_i).exp())?;
     }
-    spot * acc.total() / n
+    Ok(spot * acc.get_total()? / n)
 }
 
 /// `E[A²]` for an arithmetic average on arbitrary (sorted) fixing times.
@@ -643,7 +646,7 @@ fn arithmetic_mean_second_moment_times(
     div_yield: f64,
     vol: f64,
     fixing_times: impl ExactSizeIterator<Item = f64>,
-) -> f64 {
+) -> Result<f64> {
     let n = fixing_times.len() as f64;
     let a = 2.0 * rate - 2.0 * div_yield + vol * vol;
     let b = rate - div_yield;
@@ -654,12 +657,12 @@ fn arithmetic_mean_second_moment_times(
     let mut prefix_ab = 0.0_f64;
 
     for tk in fixing_times {
-        diag_acc.add((a * tk).exp());
-        upper_acc.add((b * tk).exp() * prefix_ab);
+        diag_acc.add((a * tk).exp())?;
+        upper_acc.add((b * tk).exp() * prefix_ab)?;
         prefix_ab += (a_minus_b * tk).exp();
     }
 
-    spot * spot * (diag_acc.total() + 2.0 * upper_acc.total()) / (n * n)
+    Ok(spot * spot * (diag_acc.get_total()? + 2.0 * upper_acc.get_total()?) / (n * n))
 }
 
 /// Deterministic geometric average of `S * exp((r - q) t_i)` over discrete
@@ -703,6 +706,7 @@ fn compute_arithmetic_mean_first_moment(
         div_yield,
         (0..num_fixings).map(|i| ((i + 1) as f64) * dt),
     )
+    .unwrap_or(f64::NAN)
 }
 
 /// Compute `E[A²]` for arithmetic average with discrete fixings using O(n) algorithm.
@@ -741,6 +745,7 @@ fn compute_arithmetic_mean_second_moment(
         vol,
         (0..num_fixings).map(|i| ((i + 1) as f64) * dt),
     )
+    .unwrap_or(f64::NAN)
 }
 
 #[cfg(test)]
@@ -1592,14 +1597,16 @@ mod tests {
                 }
                 second /= n * n;
                 let actual_first =
-                    arithmetic_mean_first_moment_times(spot, rate, div, times.iter().copied());
+                    arithmetic_mean_first_moment_times(spot, rate, div, times.iter().copied())
+                        .expect("finite first moment");
                 let actual_second = arithmetic_mean_second_moment_times(
                     spot,
                     rate,
                     div,
                     vol,
                     times.iter().copied(),
-                );
+                )
+                .expect("finite second moment");
                 assert!((actual_first - first).abs() < 1e-12);
                 assert!((actual_second - second).abs() / second < 1e-14);
             }

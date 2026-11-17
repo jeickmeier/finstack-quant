@@ -5,7 +5,9 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::ExerciseStyle;
@@ -17,12 +19,7 @@ use rust_decimal::Decimal;
 use time::macros::date;
 
 fn build_flat_forward_curve(rate: f64, base_date: Date, curve_id: &str) -> ForwardCurve {
-    ForwardCurve::builder(curve_id, 0.25)
-        .base_date(base_date)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, rate), (10.0, rate)])
-        .build()
-        .unwrap()
+    ForwardCurve::flat(curve_id, base_date, rate, DayCount::Act360).unwrap()
 }
 
 fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve {
@@ -35,14 +32,19 @@ fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> Disc
             (5.0, (-rate * 5.0).exp()),
             (10.0, (-rate * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
 
 fn build_flat_vol_surface(vol: f64, _base_date: Date, vol_surface_id: &str) -> VolSurface {
     VolSurface::builder(vol_surface_id)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[0.25, 1.0, 5.0, 10.0])
-        .strikes(&[0.01, 0.03, 0.05, 0.07, 0.10])
+        .secondary_values(&[0.01, 0.03, 0.05, 0.07, 0.10])
         .row(&[vol, vol, vol, vol, vol])
         .row(&[vol, vol, vol, vol, vol])
         .row(&[vol, vol, vol, vol, vol])
@@ -86,9 +88,11 @@ fn test_black_model_symmetry() {
         attributes: Default::default(),
     };
 
-    // Test with forward slightly above and below strike
-    let fwd1 = build_flat_forward_curve(0.0501, as_of, "USD_LIBOR_3M");
-    let fwd2 = build_flat_forward_curve(0.0499, as_of, "USD_LIBOR_3M");
+    // Test with quarterly-equivalent forward slightly above and below 5% strike
+    let fwd1 =
+        build_flat_forward_curve(4.0 * (1.0_f64 + 0.0501 * 0.25).ln(), as_of, "USD_LIBOR_3M");
+    let fwd2 =
+        build_flat_forward_curve(4.0 * (1.0_f64 + 0.0499 * 0.25).ln(), as_of, "USD_LIBOR_3M");
     let disc_curve1 = build_flat_discount_curve(0.05, as_of, "USD_OIS");
     let disc_curve2 = build_flat_discount_curve(0.05, as_of, "USD_OIS");
     let vol_surface1 = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");

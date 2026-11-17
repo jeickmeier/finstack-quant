@@ -1,6 +1,6 @@
 //! Execution context and scenario application report types.
 
-use crate::spec::{CurveKind, HazardBumpMode, RateBindingSpec};
+use crate::spec::{CurveKind, RateBindingSpec};
 use crate::warning::Warning;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::types::{CurveId, PriceId};
@@ -65,8 +65,6 @@ pub struct ExecutionContext<'a> {
 
 /// Read-only ParCDS delivery settings threaded through effect generation.
 pub(crate) struct HazardApplyEnv<'a> {
-    /// Solve-to-par versus first-order hazard-knot delivery.
-    pub mode: HazardBumpMode,
     /// Quote-recalibration service shared by this immutable scenario batch.
     pub provider: &'a dyn RecalibrationProvider,
     /// Dependency snapshots against which each current hazard recipe was calibrated.

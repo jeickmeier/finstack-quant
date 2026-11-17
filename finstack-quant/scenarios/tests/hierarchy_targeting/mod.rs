@@ -1,13 +1,13 @@
 //! Tests for hierarchy-targeted scenario operations.
 
+use finstack_quant_core::market_data::bumps::MarketDataTarget;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::CurveId;
 use finstack_quant_scenarios::{OperationSpec, ScenarioSpec};
 
 /// A tag filter that matches both a parent node and one of its children
-/// reaches the child's curves twice. Each curve is shocked once, at its
-/// deepest match, and expansion follows the core `MostSpecificWins` order:
-/// curves matched only at the parent depth come before curves whose deepest
-/// match is the child.
+/// reaches the child's targets once per selector at the child's matched depth
+/// and retains stable preorder placement order (`BANK-5Y`, then `OXY-5Y`).
 #[test]
 fn tag_filter_matching_parent_and_child_shocks_each_curve_once() {
     use finstack_quant_core::market_data::context::MarketContext;
@@ -26,9 +26,9 @@ fn tag_filter_matching_parent_and_child_shocks_each_curve_once() {
         .tag("region", "us")
         .add_node("Credit/US/Banks")
         .tag("region", "us")
-        .curve_ids(&["BANK-5Y"])
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("BANK-5Y")))
         .add_node("Credit/US/Energy")
-        .curve_ids(&["OXY-5Y"])
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("OXY-5Y")))
         .build()
         .expect("hierarchy should build");
     let base = date!(2025 - 01 - 01);
@@ -36,6 +36,9 @@ fn tag_filter_matching_parent_and_child_shocks_each_curve_once() {
         DiscountCurve::builder(id)
             .base_date(base)
             .knots([(0.0, 1.0), (5.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve should build")
     };
@@ -84,7 +87,7 @@ fn tag_filter_matching_parent_and_child_shocks_each_curve_once() {
             other => panic!("unexpected shock target {other:?}"),
         })
         .collect();
-    assert_eq!(shocked, vec!["OXY-5Y", "BANK-5Y"]);
+    assert_eq!(shocked, vec!["BANK-5Y", "OXY-5Y"]);
     assert_eq!(report.expanded_operations, 2);
 }
 
@@ -149,9 +152,9 @@ fn hierarchy_curve_parallel_bp_resolves_to_individual_bumps() {
 
     let h = MarketDataHierarchy::builder()
         .add_node("Rates/USD/OIS")
-        .curve_ids(&["USD-OIS"])
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("USD-OIS")))
         .add_node("Rates/USD/Treasury")
-        .curve_ids(&["USD-TSY"])
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("USD-TSY")))
         .build()
         .unwrap();
 
@@ -159,11 +162,17 @@ fn hierarchy_curve_parallel_bp_resolves_to_individual_bumps() {
     let ois = DiscountCurve::builder("USD-OIS")
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.78)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let tsy = DiscountCurve::builder("USD-TSY")
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -196,7 +205,6 @@ fn hierarchy_curve_parallel_bp_resolves_to_individual_bumps() {
         }],
         priority: 0,
         resolution_mode: ResolutionMode::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -240,9 +248,9 @@ fn cumulative_mode_stacks_shocks_down_tree() {
 
     let h = MarketDataHierarchy::builder()
         .add_node("Credit/US/IG/Financials")
-        .curve_ids(&["JPM-5Y"])
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("JPM-5Y")))
         .add_node("Credit/US/HY/Energy")
-        .curve_ids(&["OXY-5Y"])
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("OXY-5Y")))
         .build()
         .unwrap();
 
@@ -250,11 +258,17 @@ fn cumulative_mode_stacks_shocks_down_tree() {
     let jpm = DiscountCurve::builder("JPM-5Y")
         .base_date(base)
         .knots([(0.0, 1.0), (5.0, 0.90)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let oxy = DiscountCurve::builder("OXY-5Y")
         .base_date(base)
         .knots([(0.0, 1.0), (5.0, 0.85)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -299,7 +313,6 @@ fn cumulative_mode_stacks_shocks_down_tree() {
         ],
         priority: 0,
         resolution_mode: ResolutionMode::Cumulative,
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -364,9 +377,9 @@ fn most_specific_wins_keeps_only_deepest_shock() {
 
     let h = MarketDataHierarchy::builder()
         .add_node("Credit/US/IG/Financials")
-        .curve_ids(&["JPM-5Y"])
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("JPM-5Y")))
         .add_node("Credit/US/HY/Energy")
-        .curve_ids(&["OXY-5Y"])
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("OXY-5Y")))
         .build()
         .unwrap();
 
@@ -374,11 +387,17 @@ fn most_specific_wins_keeps_only_deepest_shock() {
     let jpm = DiscountCurve::builder("JPM-5Y")
         .base_date(base)
         .knots([(0.0, 1.0), (5.0, 0.90)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let oxy = DiscountCurve::builder("OXY-5Y")
         .base_date(base)
         .knots([(0.0, 1.0), (5.0, 0.85)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -427,7 +446,6 @@ fn most_specific_wins_keeps_only_deepest_shock() {
         ],
         priority: 0,
         resolution_mode: ResolutionMode::MostSpecificWins,
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -465,9 +483,9 @@ fn engine_works_with_resolution_mode_field() {
 
     let h = MarketDataHierarchy::builder()
         .add_node("Rates/USD/OIS")
-        .curve_ids(&["USD-OIS"])
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("USD-OIS")))
         .add_node("Rates/USD/Treasury")
-        .curve_ids(&["USD-TSY"])
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("USD-TSY")))
         .build()
         .unwrap();
 
@@ -475,11 +493,17 @@ fn engine_works_with_resolution_mode_field() {
     let ois = DiscountCurve::builder("USD-OIS")
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.78)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let tsy = DiscountCurve::builder("USD-TSY")
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -508,7 +532,6 @@ fn engine_works_with_resolution_mode_field() {
         }],
         priority: 0,
         resolution_mode: ResolutionMode::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -628,7 +651,6 @@ fn scenario_with_resolution_mode_json_round_trip() {
         }],
         priority: 0,
         resolution_mode: ResolutionMode::Cumulative,
-        hazard_bump_mode: Default::default(),
     };
 
     let json = serde_json::to_string_pretty(&scenario).unwrap();
@@ -661,7 +683,6 @@ fn compose_preserves_resolution_mode_when_inputs_agree() {
         operations: vec![],
         priority: 0,
         resolution_mode: ResolutionMode::Cumulative,
-        hazard_bump_mode: Default::default(),
     };
     let s2 = ScenarioSpec {
         id: "two".into(),
@@ -670,7 +691,6 @@ fn compose_preserves_resolution_mode_when_inputs_agree() {
         operations: vec![],
         priority: 1,
         resolution_mode: ResolutionMode::Cumulative,
-        hazard_bump_mode: Default::default(),
     };
 
     let composed = ScenarioSpec::compose(vec![s1, s2]).expect("compose should succeed");
@@ -678,7 +698,7 @@ fn compose_preserves_resolution_mode_when_inputs_agree() {
 }
 
 #[test]
-fn compose_with_mixed_resolution_modes_defaults_to_cumulative() {
+fn compose_rejects_mixed_resolution_modes() {
     use finstack_quant_core::market_data::hierarchy::ResolutionMode;
 
     let most_specific = ScenarioSpec {
@@ -688,7 +708,6 @@ fn compose_with_mixed_resolution_modes_defaults_to_cumulative() {
         operations: vec![],
         priority: 0,
         resolution_mode: ResolutionMode::MostSpecificWins,
-        hazard_bump_mode: Default::default(),
     };
     let cumulative = ScenarioSpec {
         id: "two".into(),
@@ -697,12 +716,11 @@ fn compose_with_mixed_resolution_modes_defaults_to_cumulative() {
         operations: vec![],
         priority: 1,
         resolution_mode: ResolutionMode::Cumulative,
-        hazard_bump_mode: Default::default(),
     };
 
-    let composed =
-        ScenarioSpec::compose(vec![most_specific, cumulative]).expect("compose should succeed");
-    assert_eq!(composed.resolution_mode, ResolutionMode::Cumulative);
+    let err = ScenarioSpec::compose(vec![most_specific, cumulative])
+        .expect_err("compose with mixed resolution modes must fail");
+    assert!(err.to_string().contains("resolution_mode"), "{err}");
 }
 
 #[test]
@@ -719,7 +737,7 @@ fn most_specific_wins_uses_matched_node_depth_not_target_path_depth() {
     let hierarchy = MarketDataHierarchy::builder()
         .add_node("Credit/US/IG/Financials")
         .tag("sector", "financials")
-        .curve_ids(&["JPM-5Y"])
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("JPM-5Y")))
         .build()
         .unwrap();
 
@@ -727,6 +745,9 @@ fn most_specific_wins_uses_matched_node_depth_not_target_path_depth() {
     let curve = DiscountCurve::builder("JPM-5Y")
         .base_date(base)
         .knots([(0.0, 1.0), (5.0, 0.90)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -765,7 +786,6 @@ fn most_specific_wins_uses_matched_node_depth_not_target_path_depth() {
         ],
         priority: 0,
         resolution_mode: ResolutionMode::MostSpecificWins,
-        hazard_bump_mode: Default::default(),
     };
 
     let direct_scenario = ScenarioSpec {
@@ -780,7 +800,6 @@ fn most_specific_wins_uses_matched_node_depth_not_target_path_depth() {
         }],
         priority: 0,
         resolution_mode: ResolutionMode::MostSpecificWins,
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -823,8 +842,16 @@ fn most_specific_wins_uses_matched_node_depth_not_target_path_depth() {
         .unwrap();
     engine.apply(&direct_scenario, &mut direct_ctx).unwrap();
 
-    let hierarchy_df = hierarchy_market.get_discount("JPM-5Y").unwrap().df(5.0);
-    let direct_df = direct_market.get_discount("JPM-5Y").unwrap().df(5.0);
+    let hierarchy_df = hierarchy_market
+        .get_discount("JPM-5Y")
+        .unwrap()
+        .df(5.0)
+        .unwrap();
+    let direct_df = direct_market
+        .get_discount("JPM-5Y")
+        .unwrap()
+        .df(5.0)
+        .unwrap();
     assert!(
         (hierarchy_df - direct_df).abs() < 1e-12,
         "hierarchy-targeted MostSpecificWins should match the direct +100bp outcome; got hierarchy_df={hierarchy_df}, direct_df={direct_df}"
@@ -839,20 +866,28 @@ fn most_specific_wins_deduplicates_per_operation_family_not_raw_identifier() {
         HierarchyTarget, MarketDataHierarchy, ResolutionMode,
     };
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_scenarios::{ExecutionContext, ScenarioEngine};
     use finstack_quant_statements::types::FinancialModelSpec;
     use time::macros::date;
 
     let hierarchy = MarketDataHierarchy::builder()
         .add_node("Equity/US/LargeCap")
-        .curve_ids(&["SPX"])
+        .targets([
+            MarketDataTarget::VolSurface(CurveId::from("SPX")),
+            MarketDataTarget::PriceScalar(CurveId::from("SPX")),
+        ])
         .build()
         .unwrap();
 
     let surface = VolSurface::builder("SPX")
         .expiries(&[1.0, 2.0])
-        .strikes(&[90.0, 100.0])
+        .secondary_values(&[90.0, 100.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[0.20, 0.20])
         .row(&[0.20, 0.20])
         .build()
@@ -862,13 +897,13 @@ fn most_specific_wins_deduplicates_per_operation_family_not_raw_identifier() {
         .insert_surface(surface.clone())
         .insert_price(
             "SPX",
-            MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
         );
     hierarchy_market.set_hierarchy(hierarchy);
 
     let mut direct_market = MarketContext::new().insert_surface(surface).insert_price(
         "SPX",
-        MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+        MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
     );
 
     let hierarchy_scenario = ScenarioSpec {
@@ -893,7 +928,6 @@ fn most_specific_wins_deduplicates_per_operation_family_not_raw_identifier() {
         ],
         priority: 0,
         resolution_mode: ResolutionMode::MostSpecificWins,
-        hazard_bump_mode: Default::default(),
     };
 
     let direct_scenario = ScenarioSpec {
@@ -912,7 +946,6 @@ fn most_specific_wins_deduplicates_per_operation_family_not_raw_identifier() {
         ],
         priority: 0,
         resolution_mode: ResolutionMode::MostSpecificWins,
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -956,14 +989,18 @@ fn most_specific_wins_deduplicates_per_operation_family_not_raw_identifier() {
         .unwrap();
     engine.apply(&direct_scenario, &mut direct_ctx).unwrap();
 
-    let hierarchy_spot = match hierarchy_market.get_price("SPX").unwrap() {
-        MarketScalar::Price(price) => price.amount(),
-        other @ MarketScalar::Unitless(_) => panic!("expected SPX price, got {other:?}"),
-    };
-    let direct_spot = match direct_market.get_price("SPX").unwrap() {
-        MarketScalar::Price(price) => price.amount(),
-        other @ MarketScalar::Unitless(_) => panic!("expected SPX price, got {other:?}"),
-    };
+    let hierarchy_spot = hierarchy_market
+        .get_price("SPX")
+        .unwrap()
+        .get_price()
+        .expect("expected SPX price")
+        .amount();
+    let direct_spot = direct_market
+        .get_price("SPX")
+        .unwrap()
+        .get_price()
+        .expect("expected SPX price")
+        .amount();
 
     let hierarchy_surface = hierarchy_market.get_surface("SPX").unwrap();
     let hierarchy_vol =
@@ -974,4 +1011,199 @@ fn most_specific_wins_deduplicates_per_operation_family_not_raw_identifier() {
 
     assert!((hierarchy_spot - direct_spot).abs() < 1e-12);
     assert!((hierarchy_vol - direct_vol).abs() < 1e-12);
+}
+
+#[test]
+fn mixed_family_subtree_projects_declared_family_and_errors_on_zero_compatible_targets() {
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::hierarchy::{HierarchyTarget, MarketDataHierarchy};
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+    use finstack_quant_scenarios::{CurveKind, ExecutionContext, ScenarioEngine};
+    use time::macros::date;
+
+    let base = date!(2025 - 01 - 01);
+    let hierarchy = MarketDataHierarchy::builder()
+        .add_node("Rates/USD")
+        .targets([
+            MarketDataTarget::DiscountCurve(CurveId::from("USD-OIS")),
+            MarketDataTarget::ForwardCurve(CurveId::from("USD-SOFR")),
+        ])
+        .build()
+        .unwrap();
+
+    let ois = DiscountCurve::builder("USD-OIS")
+        .base_date(base)
+        .knots([(0.0, 1.0), (5.0, 0.85)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+        .build()
+        .unwrap();
+    let sofr = ForwardCurve::flat(
+        "USD-SOFR",
+        base,
+        0.03,
+        finstack_quant_core::dates::DayCount::Act365F,
+    )
+    .unwrap();
+    let orig_ois_df = ois.df(5.0).unwrap();
+    let orig_sofr = sofr.df(2.0).unwrap();
+
+    let mut market = MarketContext::new().insert(ois).insert(sofr);
+    market.set_hierarchy(hierarchy);
+
+    // Discount bump projects out the ForwardCurve without error.
+    let ok_spec = ScenarioSpec {
+        id: "disc-only".into(),
+        operations: vec![OperationSpec::HierarchyCurveParallelBp {
+            curve_kind: CurveKind::Discount,
+            target: HierarchyTarget::unfiltered(vec!["Rates".into(), "USD".into()]).unwrap(),
+            bp: 25.0,
+            discount_curve_id: None,
+        }],
+        ..Default::default()
+    };
+    let mut ctx = ExecutionContext {
+        market: &mut market,
+        model: None,
+        instruments: None,
+        rate_bindings: None,
+        calendar: None,
+        as_of: base,
+    };
+    let report = ScenarioEngine::new().apply(&ok_spec, &mut ctx).unwrap();
+    assert_eq!(report.expanded_operations, 1);
+    assert!(market.get_discount("USD-OIS").unwrap().df(5.0).unwrap() < orig_ois_df);
+    assert!((market.get_forward("USD-SOFR").unwrap().df(2.0).unwrap() - orig_sofr).abs() < 1e-12);
+
+    // Zero-sized shock targeting a family absent from the subtree still fails explicitly.
+    let zero_mismatch_spec = ScenarioSpec {
+        id: "cds-missing".into(),
+        operations: vec![OperationSpec::HierarchyCurveParallelBp {
+            curve_kind: CurveKind::ParCDS,
+            target: HierarchyTarget::unfiltered(vec!["Rates".into(), "USD".into()]).unwrap(),
+            bp: 0.0,
+            discount_curve_id: None,
+        }],
+        ..Default::default()
+    };
+    let mut ctx = ExecutionContext {
+        market: &mut market,
+        model: None,
+        instruments: None,
+        rate_bindings: None,
+        calendar: None,
+        as_of: base,
+    };
+    assert!(
+        ScenarioEngine::new()
+            .apply(&zero_mismatch_spec, &mut ctx)
+            .is_err()
+    );
+}
+
+#[test]
+fn hierarchy_execution_rolls_back_market_and_as_of_on_missing_or_wrong_kind_active_target() {
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::hierarchy::{HierarchyTarget, MarketDataHierarchy};
+    use finstack_quant_core::market_data::scalars::MarketScalar;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_scenarios::{CurveKind, ExecutionContext, ScenarioEngine, TimeRollMode};
+    use time::macros::date;
+
+    let base = date!(2025 - 01 - 01);
+    let hierarchy = MarketDataHierarchy::builder()
+        .add_node("Rates/USD")
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("USD-OIS")))
+        .add_node("Equity/Missing")
+        .target(MarketDataTarget::PriceScalar(CurveId::from("NO-SUCH-EQ")))
+        .add_node("Equity/WrongKind")
+        .target(MarketDataTarget::UnitlessScalar(CurveId::from("SPX")))
+        .build()
+        .unwrap();
+
+    let ois = DiscountCurve::builder("USD-OIS")
+        .base_date(base)
+        .knots([(0.0, 1.0), (5.0, 0.85)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+        .build()
+        .unwrap();
+    let orig_df = ois.df(5.0).unwrap();
+
+    let mut market = MarketContext::new().insert(ois).insert_price(
+        "SPX",
+        MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid money")),
+    );
+    market.set_hierarchy(hierarchy);
+
+    // Prior TimeRollForward + USD-OIS bump must not survive failure on later active equity target.
+    let failing_missing = ScenarioSpec {
+        id: "atomic-rollback".into(),
+        operations: vec![
+            OperationSpec::TimeRollForward {
+                period: "1M".into(),
+                apply_shocks: true,
+                roll_mode: TimeRollMode::BusinessDays,
+            },
+            OperationSpec::HierarchyCurveParallelBp {
+                curve_kind: CurveKind::Discount,
+                target: HierarchyTarget::unfiltered(vec!["Rates".into(), "USD".into()]).unwrap(),
+                bp: 50.0,
+                discount_curve_id: None,
+            },
+            OperationSpec::HierarchyEquityPricePct {
+                target: HierarchyTarget::unfiltered(vec!["Equity".into(), "Missing".into()])
+                    .unwrap(),
+                pct: -5.0,
+            },
+        ],
+        ..Default::default()
+    };
+    let mut ctx = ExecutionContext {
+        market: &mut market,
+        model: None,
+        instruments: None,
+        rate_bindings: None,
+        calendar: None,
+        as_of: base,
+    };
+    assert!(
+        ScenarioEngine::new()
+            .apply(&failing_missing, &mut ctx)
+            .is_err()
+    );
+    assert_eq!(
+        ctx.as_of, base,
+        "failed scenario must not advance ctx.as_of"
+    );
+    assert!(
+        (ctx.market.get_discount("USD-OIS").unwrap().df(5.0).unwrap() - orig_df).abs() < 1e-12,
+        "failed scenario must restore base market"
+    );
+
+    // UnitlessScalar declaration against a MarketScalar::Price entry must also fail cleanly.
+    let wrong_scalar_subkind = ScenarioSpec {
+        id: "wrong-subkind".into(),
+        operations: vec![OperationSpec::HierarchyEquityPricePct {
+            target: HierarchyTarget::unfiltered(vec!["Equity".into(), "WrongKind".into()]).unwrap(),
+            pct: -5.0,
+        }],
+        ..Default::default()
+    };
+    let mut ctx = ExecutionContext {
+        market: &mut market,
+        model: None,
+        instruments: None,
+        rate_bindings: None,
+        calendar: None,
+        as_of: base,
+    };
+    assert!(
+        ScenarioEngine::new()
+            .apply(&wrong_scalar_subkind, &mut ctx)
+            .is_err()
+    );
 }

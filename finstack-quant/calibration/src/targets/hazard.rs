@@ -502,14 +502,10 @@ impl HazardCurveTarget {
         validate_hazard_recipe_bindings(params, &calibration_recipe)?;
 
         let id = curve.id().clone();
-        let mut builder = curve
+        let curve = curve
             .to_builder_with_id(id)
-            .par_interp(params.par_interp)
-            .hazard_calibration(calibration_recipe);
-        if !par_points.is_empty() {
-            builder = builder.par_spreads(par_points);
-        }
-        let curve = builder.build()?;
+            .hazard_calibration(calibration_recipe)
+            .build()?;
 
         Ok((curve, report))
     }
@@ -579,11 +575,6 @@ impl BootstrapTarget for HazardCurveTarget {
             .currency(self.params.currency)
             .recovery_rate(self.params.recovery_rate)
             .knots(knots.to_vec())
-            // Par spread interpolation is for *reporting* quoted spreads on the calibrated curve.
-            // Positivity / no-arbitrage for survival is enforced via λ>=0; the survival
-            // survival interpolation is intrinsically log-linear
-            // (default LogLinear, i.e. piecewise-constant hazard).
-            .par_interp(self.params.par_interp)
             .build()
     }
 
@@ -689,7 +680,7 @@ impl GlobalSolveTarget for HazardCurveTarget {
             }
 
             let guess = if let Some(curve) = seed_curve.as_ref() {
-                curve.hazard_rate(t)
+                curve.hazard_rate(t)?
             } else {
                 self.quote_hazard_guess(quote).unwrap_or(0.01)
             };
@@ -775,7 +766,6 @@ mod tests {
     use crate::solver::traits::BootstrapTarget;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
-    use finstack_quant_core::market_data::term_structures::ParInterp;
     use finstack_quant_core::types::CurveId;
     use time::Month;
 
@@ -791,7 +781,6 @@ mod tests {
             notional: 1.0,
             method: crate::config::CalibrationMethod::Bootstrap,
 
-            par_interp: ParInterp::Linear,
             doc_clause: None,
             cds_valuation_convention: None,
         }
@@ -885,11 +874,9 @@ mod tests {
     }
 
     #[test]
-    fn build_curve_preserves_par_interp_and_monotone_survival() {
-        let mut p = base_params();
-        p.par_interp = ParInterp::LogLinear;
+    fn build_curve_preserves_monotone_survival() {
         let target = HazardCurveTarget::new(
-            p,
+            base_params(),
             MarketContext::default(),
             CalibrationConfig::default(),
             &[],
@@ -899,11 +886,10 @@ mod tests {
         let curve = target
             .build_curve_for_solver(&[(1.0, 0.02), (5.0, 0.03)])
             .expect("curve build should succeed");
-        assert_eq!(curve.par_interp(), ParInterp::LogLinear);
 
-        let s1 = curve.sp(1.0);
-        let s5 = curve.sp(5.0);
-        let s10 = curve.sp(10.0);
+        let s1 = curve.sp(1.0).expect("s1");
+        let s5 = curve.sp(5.0).expect("s5");
+        let s10 = curve.sp(10.0).expect("s10");
         assert!((0.0..=1.0).contains(&s1));
         assert!((0.0..=1.0).contains(&s5));
         assert!((0.0..=1.0).contains(&s10));

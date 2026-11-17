@@ -9,19 +9,19 @@ fn targets_from_curves(
     steps: usize,
     horizon: f64,
 ) -> RatesCreditCalibrationTargets {
-    let discount_at_origin = disc.df(0.0);
-    let survival_at_origin = hazard.sp(0.0);
+    let discount_at_origin = disc.df(0.0).expect("df(0)");
+    let survival_at_origin = hazard.sp(0.0).expect("sp(0)");
     let times: Vec<f64> = (0..=steps)
         .map(|step| step as f64 * horizon / steps as f64)
         .collect();
     RatesCreditCalibrationTargets {
         discount_factors: times
             .iter()
-            .map(|&time| disc.df(time) / discount_at_origin)
+            .map(|&time| disc.df(time).expect("df") / discount_at_origin)
             .collect(),
         survival_probabilities: times
             .iter()
-            .map(|&time| hazard.sp(time) / survival_at_origin)
+            .map(|&time| hazard.sp(time).expect("sp") / survival_at_origin)
             .collect(),
         times,
         recovery_rate: hazard.recovery_rate(),
@@ -750,7 +750,7 @@ fn zero_volatility_factors_are_deterministic_limits() {
     // zero/zero reprices the discount curve (DummyValuator pays 1 and
     // passes continuation through, so the tree price is the ZCB price).
     let deterministic = price_at(0.0, 0.0);
-    let market_df = disc.df(ttm);
+    let market_df = disc.df(ttm).expect("valid");
     assert!(
         (deterministic - market_df).abs() * 10_000.0 < 1.0,
         "zero/zero must reprice the discount curve: tree={deterministic:.8}, \
@@ -841,6 +841,7 @@ fn test_base_date() -> finstack_quant_core::dates::Date {
 fn sloped_discount_curve() -> DiscountCurve {
     DiscountCurve::builder("USD-OIS")
         .base_date(test_base_date())
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots([
             (0.0, 1.0),
             (1.0, 0.96),
@@ -850,17 +851,17 @@ fn sloped_discount_curve() -> DiscountCurve {
             (10.0, 0.60),
         ])
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve should build")
 }
 
 fn test_hazard_curve() -> HazardCurve {
-    use finstack_quant_core::market_data::term_structures::ParInterp;
     HazardCurve::builder("TEST-HAZ")
         .base_date(test_base_date())
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .recovery_rate(0.4)
-        .knots([(0.0, 0.02), (2.0, 0.025), (5.0, 0.03), (10.0, 0.035)])
-        .par_interp(ParInterp::Linear)
+        .knots([(2.0, 0.025), (5.0, 0.03), (10.0, 0.035)])
         .build()
         .expect("hazard curve should build")
 }
@@ -868,6 +869,7 @@ fn test_hazard_curve() -> HazardCurve {
 fn near_zero_discount_curve() -> DiscountCurve {
     DiscountCurve::builder("USD-OIS")
         .base_date(test_base_date())
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots([
             (0.0, 1.0),
             (1.0, (-0.000001_f64).exp()),
@@ -875,17 +877,17 @@ fn near_zero_discount_curve() -> DiscountCurve {
             (5.0, (-0.000005_f64).exp()),
         ])
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve should build")
 }
 
 fn near_zero_hazard_curve() -> HazardCurve {
-    use finstack_quant_core::market_data::term_structures::ParInterp;
     HazardCurve::builder("LOW-HAZ")
         .base_date(test_base_date())
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .recovery_rate(0.4)
-        .knots([(0.0, 1e-8), (2.0, 1e-8), (5.0, 1e-8)])
-        .par_interp(ParInterp::Linear)
+        .knots([(1.0, 1e-8), (2.0, 1e-8), (5.0, 1e-8)])
         .build()
         .expect("hazard curve should build")
 }
@@ -930,7 +932,8 @@ fn conditional_discount_factors_match_curve_at_zero_rate_vol() {
 
     let dt = ttm / steps as f64;
     let (n, m) = (16usize, 20usize);
-    let market_fwd_df = disc.df(m as f64 * dt) / disc.df(n as f64 * dt);
+    let market_fwd_df =
+        disc.df(m as f64 * dt).expect("valid") / disc.df(n as f64 * dt).expect("valid");
     let conditional = tree
         .conditional_discount_factors(n, m)
         .expect("conditional discounting");
@@ -992,7 +995,9 @@ fn pure_forward_increment_folds_to_zero_without_correlation() {
     let dt = ttm / steps as f64;
     let (n, m) = (16usize, 20usize);
     let tau = (m - n) as f64 * dt;
-    let slice_fwd = (disc.df(n as f64 * dt) / disc.df(m as f64 * dt) - 1.0) / tau;
+    let slice_fwd =
+        (disc.df(n as f64 * dt).expect("valid") / disc.df(m as f64 * dt).expect("valid") - 1.0)
+            / tau;
 
     let coupon = NodeCoupon {
         reset_step: n,
@@ -1250,7 +1255,7 @@ fn calibration_quality_zcb_repricing() {
     let tree_price = tree
         .price_with_node_coupons(oas_bp, &val, &[])
         .expect("price");
-    let market_df = disc.df(ttm);
+    let market_df = disc.df(ttm).expect("valid");
 
     let error_bp = (tree_price - market_df).abs() * 10_000.0;
     assert!(
@@ -1307,7 +1312,7 @@ fn calibration_quality_survival_matching() {
         // Model survival probability at step k+1 = sum of state prices
         let model_sp: f64 = state_prices.iter().sum();
         let t = (k + 1) as f64 * dt;
-        let market_sp = haz.sp(t);
+        let market_sp = haz.sp(t).expect("valid");
 
         let error = (model_sp - market_sp).abs();
         assert!(
@@ -1376,7 +1381,7 @@ fn calibration_reprices_disc_curve_with_rate_mean_reversion() {
         let price = tree
             .price_with_node_coupons(0.0, &DummyValuator, &[])
             .expect("price");
-        let market_df = disc.df(ttm);
+        let market_df = disc.df(ttm).expect("valid");
         let error_bp = (price - market_df).abs() * 10_000.0;
         assert!(
             error_bp < 1.0,
@@ -1441,7 +1446,7 @@ fn calibration_reprices_survival_with_hazard_mean_reversion() {
 
             let model_sp: f64 = state_prices.iter().sum();
             let t = (k + 1) as f64 * dt;
-            let market_sp = haz.sp(t);
+            let market_sp = haz.sp(t).expect("valid");
             let error = (model_sp - market_sp).abs();
             assert!(
                 error < 1e-6,
@@ -1640,7 +1645,9 @@ fn rates_credit_tree_price_is_bit_pinned() {
     let dt = ttm / steps as f64;
     let (n, m) = (8usize, 10usize);
     let tau = (m - n) as f64 * dt;
-    let slice_fwd = (disc.df(n as f64 * dt) / disc.df(m as f64 * dt) - 1.0) / tau;
+    let slice_fwd =
+        (disc.df(n as f64 * dt).expect("valid") / disc.df(m as f64 * dt).expect("valid") - 1.0)
+            / tau;
     let coupon = NodeCoupon {
         reset_step: n,
         payment_step: m,
@@ -1666,7 +1673,7 @@ fn rates_credit_tree_price_is_bit_pinned() {
         .expect("price");
     assert_eq!(
         price.to_bits(),
-        4_604_426_879_107_543_574_u64,
+        4_604_426_879_107_543_405_u64,
         "price={price}"
     );
 }

@@ -35,7 +35,13 @@ def test_surface_report_keys_match_stub_contract() -> None:
 
 
 def _surface(vols: list[list[float]], **kwargs: str) -> VolSurface:
-    return VolSurface("SPX-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], vols, **kwargs)
+    opts = {
+        "secondary_axis": "strike",
+        "quote_type": "black_lognormal",
+        "interpolation_mode": "vol",
+        **kwargs,
+    }
+    return VolSurface("SPX-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], vols, **opts)
 
 
 def test_check_surface_passes_a_flat_surface_with_a_partial_config() -> None:

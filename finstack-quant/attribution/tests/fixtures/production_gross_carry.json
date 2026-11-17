@@ -28,7 +28,9 @@
             "payment_lag_days": 0
           }
         },
-        "quote_compounding": {"periodic": 2},
+        "quote_compounding": {
+          "periodic": 2
+        },
         "discount_curve_id": "USD-OIS",
         "credit_curve_id": null,
         "call_put": null,
@@ -75,10 +77,7 @@
           ]
         ],
         "interp_style": "log_linear",
-        "extrapolation": "flat_forward",
-        "min_forward_rate": null,
-        "allow_non_monotonic": false,
-        "min_forward_tenor": 0.000001,
+        "extrapolation": "extend",
         "rate_calibration": null,
         "fx_policy": null
       },
@@ -114,10 +113,7 @@
           ]
         ],
         "interp_style": "log_linear",
-        "extrapolation": "flat_forward",
-        "min_forward_rate": null,
-        "allow_non_monotonic": false,
-        "min_forward_tenor": 0.000001,
+        "extrapolation": "extend",
         "rate_calibration": null,
         "fx_policy": null
       }

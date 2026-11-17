@@ -54,8 +54,13 @@ fn test_surface_interpolation() {
     // Surface with specific vols
     let surface =
         finstack_quant_core::market_data::surfaces::VolSurface::builder("USD_SWAPTION_VOL")
+            .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+            .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             .expiries(&[0.5, 1.0, 2.0])
-            .strikes(&[0.03, 0.05, 0.07])
+            .secondary_values(&[0.03, 0.05, 0.07])
             .row(&[0.20, 0.18, 0.22]) // 6M
             .row(&[0.25, 0.20, 0.25]) // 1Y
             .row(&[0.30, 0.25, 0.30]) // 2Y
@@ -87,8 +92,13 @@ fn test_extrapolation_stability() {
     // Surface with limited strikes
     let surface =
         finstack_quant_core::market_data::surfaces::VolSurface::builder("USD_SWAPTION_VOL")
+            .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+            .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             .expiries(&[0.5, 1.0, 5.0])
-            .strikes(&[0.03, 0.05, 0.07])
+            .secondary_values(&[0.03, 0.05, 0.07])
             .row(&[0.25, 0.25, 0.25])
             .row(&[0.25, 0.25, 0.25])
             .row(&[0.25, 0.25, 0.25])

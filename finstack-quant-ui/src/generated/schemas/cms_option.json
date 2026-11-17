@@ -13,6 +13,7 @@
             0.25
           ],
           "attributes": {},
+          "cms_fixing_index_id": "USD-CMS-10Y",
           "cms_tenor": {
             "count": 10,
             "unit": "years"
@@ -1335,6 +1336,17 @@
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
           "default": {},
           "description": "Attributes for scenario selection and grouping"
+        },
+        "cms_fixing_index_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Explicit CMS benchmark fixing identifier used for historical fixings\n(`FIXING:<cms_fixing_index_id>`), distinct from `forward_curve_id` and `index_id`."
         },
         "cms_tenor": {
           "$ref": "#/$defs/d_47e5e74524615b78a19f",

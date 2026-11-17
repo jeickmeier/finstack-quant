@@ -250,20 +250,73 @@ fn revolving_credit_floating(maturity: Date) -> RevolvingCredit {
 
 fn revolving_credit_market(as_of: Date) -> MarketContext {
     let disc = discount_forward_curve_support::flat_discount("USD-OIS", as_of, 0.05);
-    let fwd = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
-        "USD-SOFR-3M",
-        0.25,
-    )
-    .base_date(as_of)
-    .knots([
-        (0.0, 0.04),
-        (1.0, 0.045),
-        (3.0, 0.048),
-        (5.0, 0.05),
-        (7.0, 0.052),
-    ])
-    .build()
-    .unwrap();
+    let fwd =
+        finstack_quant_core::market_data::term_structures::ForwardCurve::builder("USD-SOFR-3M")
+            .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .knots([
+                (0.0, 1.0),
+                (0.125, 0.994973612276838),
+                (0.25, 0.989895150547585),
+                (0.375, 0.984765672057704),
+                (0.5, 0.979586240541114),
+                (0.625, 0.974357925855023),
+                (0.75, 0.969081803614301),
+                (0.875, 0.963758954825533),
+                (1.0, 0.958390465520947),
+                (1.125, 0.953003484725143),
+                (1.25, 0.947624573195168),
+                (1.375, 0.942253936808714),
+                (1.5, 0.93689177969888),
+                (1.625, 0.931538304244979),
+                (1.75, 0.926193711063598),
+                (1.875, 0.920858198999918),
+                (2.0, 0.915531965119288),
+                (2.125, 0.910215204699056),
+                (2.25, 0.90490811122066),
+                (2.375, 0.899610876361968),
+                (2.5, 0.894323689989879),
+                (2.625, 0.889046740153173),
+                (2.75, 0.883780213075625),
+                (2.875, 0.878524293149362),
+                (3.0, 0.873279162928479),
+                (3.125, 0.868048393930323),
+                (3.25, 0.862835474291493),
+                (3.375, 0.857640459233966),
+                (3.5, 0.852463402810924),
+                (3.625, 0.847304357910418),
+                (3.75, 0.842163376259109),
+                (3.875, 0.837040508426073),
+                (4.0, 0.831935803826672),
+                (4.125, 0.826849310726495),
+                (4.25, 0.821781076245362),
+                (4.375, 0.816731146361392),
+                (4.5, 0.811699565915137),
+                (4.625, 0.806686378613781),
+                (4.75, 0.801691627035395),
+                (4.875, 0.79671535263326),
+                (5.0, 0.791757595740247),
+                (5.125, 0.786818395573262),
+                (5.25, 0.781897790237742),
+                (5.375, 0.77699581673222),
+                (5.5, 0.772112510952935),
+                (5.625, 0.767247907698516),
+                (5.75, 0.762402040674702),
+                (5.875, 0.757574942499135),
+                (6.0, 0.752766644706196),
+                (6.125, 0.747977177751902),
+                (6.25, 0.743206571018849),
+                (6.375, 0.738454852821215),
+                (6.5, 0.733722050409809),
+                (6.625, 0.729008189977171),
+                (6.75, 0.724313296662723),
+                (6.875, 0.719637394557969),
+                (7.0, 0.714980506711743),
+            ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .unwrap();
     let fixings = ScalarTimeSeries::new(
         "FIXING:USD-SOFR-3M",
         vec![(
@@ -271,6 +324,8 @@ fn revolving_credit_market(as_of: Date) -> MarketContext {
             0.04,
         )],
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .expect("revolver reset fixing");
     MarketContext::new()
@@ -710,6 +765,7 @@ fn bench_agency_mbs_oas_scaling(c: &mut Criterion) {
                 .day_count(DayCount::Act365F)
                 .interp(InterpStyle::LogLinear)
                 .knots([(0.0, 1.0), (40.0, (-0.05_f64 * 40.0).exp())])
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("B4 flat discount curve");
             let market = MarketContext::new().insert(discount);
@@ -779,23 +835,69 @@ fn bench_agency_mbs_oas_scaling(c: &mut Criterion) {
 /// Market context for FI TRS: discount, forward, and scalar yield/duration data.
 fn fi_trs_market(as_of: Date) -> MarketContext {
     let disc = discount_forward_curve_support::flat_discount("USD-OIS", as_of, 0.05);
-    let fwd = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
-        "USD-SOFR-3M",
-        0.25,
+    let fwd =
+        finstack_quant_core::market_data::term_structures::ForwardCurve::builder("USD-SOFR-3M")
+            .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .knots([
+                (0.0, 1.0),
+                (0.125, 0.994973612276838),
+                (0.25, 0.989895150547585),
+                (0.375, 0.984765672057704),
+                (0.5, 0.979586240541114),
+                (0.625, 0.974357925855023),
+                (0.75, 0.969081803614301),
+                (0.875, 0.963758954825533),
+                (1.0, 0.958390465520947),
+                (1.25, 0.947631976541066),
+                (1.5, 0.936921058024467),
+                (1.75, 0.926258836348441),
+                (2.0, 0.915646413767819),
+                (2.25, 0.905084868347009),
+                (2.5, 0.894575253902205),
+                (2.75, 0.884118599953674),
+                (3.0, 0.873715911688034),
+                (3.25, 0.863368169930418),
+                (3.5, 0.853076331126421),
+                (3.75, 0.842841327333738),
+                (4.0, 0.832664066223354),
+                (4.25, 0.822545431090202),
+                (4.5, 0.812486280873149),
+                (4.75, 0.802487450184198),
+                (5.0, 0.792549749346778),
+            ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .unwrap();
+    let fixings = ScalarTimeSeries::new(
+        "FIXING:USD-SOFR-3M",
+        vec![(as_of, 0.04)],
+        None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
-    .base_date(as_of)
-    .knots([(0.0, 0.04), (1.0, 0.045), (5.0, 0.05)])
-    .build()
     .unwrap();
-    let fixings = ScalarTimeSeries::new("FIXING:USD-SOFR-3M", vec![(as_of, 0.04)], None).unwrap();
     MarketContext::new()
         .insert(disc)
         .insert(fwd)
         .insert_series(fixings)
-        .insert_price("US-CORP-INDEX", MarketScalar::Unitless(100.0))
-        .insert_price("US-CORP-YIELD", MarketScalar::Unitless(0.055))
-        .insert_price("US-CORP-DURATION", MarketScalar::Unitless(5.5))
-        .insert_price("US-CORP-CONVEXITY", MarketScalar::Unitless(0.30))
+        .insert_price(
+            "US-CORP-INDEX",
+            MarketScalar::unitless(100.0).expect("valid scalar"),
+        )
+        .insert_price(
+            "US-CORP-YIELD",
+            MarketScalar::unitless(0.055).expect("valid scalar"),
+        )
+        .insert_price(
+            "US-CORP-DURATION",
+            MarketScalar::unitless(5.5).expect("valid scalar"),
+        )
+        .insert_price(
+            "US-CORP-CONVEXITY",
+            MarketScalar::unitless(0.30).expect("valid scalar"),
+        )
 }
 
 /// Scale FI TRS pricing vs tenor (1Y, 3Y, 5Y).

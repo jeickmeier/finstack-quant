@@ -204,15 +204,30 @@ mod inflation_convexity_tests {
         let discount = DiscountCurve::builder("US-CPI-DISC")
             .base_date(as_of)
             .knots([(0.0, 1.0), (10.0, 0.7)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let inflation = InflationCurve::builder("US-CPI")
             .base_date(as_of)
-            .base_cpi(100.0)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .knots([(0.0, 100.0), (5.0, 112.0), (10.0, 125.0)])
             .build()
             .expect("inflation curve");
-        MarketContext::new().insert(discount).insert(inflation)
+        MarketContext::new()
+            .insert(discount)
+            .insert(inflation)
+            .insert_inflation_index(
+                finstack_quant_valuations_test_support::inflation::simple_index(
+                    "US-CPI",
+                    as_of,
+                    100.0,
+                    finstack_quant_core::currency::Currency::USD,
+                ),
+            )
     }
 
     fn sample_bond() -> InflationLinkedBond {
@@ -241,13 +256,13 @@ mod inflation_convexity_tests {
 
         let bump = ONE_BASIS_POINT;
         let curves_up = market
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::InflationCurve {
                 id: bond.inflation_index_id.clone(),
                 spec: BumpSpec::inflation_shift_pct(bump * 100.0),
             }])
             .expect("bump up");
         let curves_down = market
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::InflationCurve {
                 id: bond.inflation_index_id.clone(),
                 spec: BumpSpec::inflation_shift_pct(-bump * 100.0),
             }])

@@ -171,7 +171,7 @@ impl PyCompounding {
         }
     }
 
-    /// Continuous compounding (default).
+    /// Continuous compounding.
     #[classmethod]
     fn continuous(_cls: &Bound<'_, PyType>) -> Self {
         Self {

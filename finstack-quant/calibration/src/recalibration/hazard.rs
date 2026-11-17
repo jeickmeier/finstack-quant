@@ -352,14 +352,50 @@ pub(crate) fn hazard_spread_risk_buckets(
         .collect())
 }
 
+fn validate_tenor_bump_targets(
+    quotes: &[ReplayQuote],
+    bump: Option<&QuoteBump>,
+) -> finstack_quant_core::Result<()> {
+    let Some(QuoteBump::TenorsBp(targets)) = bump else {
+        return Ok(());
+    };
+    let mut matched_targets: Vec<f64> = Vec::with_capacity(targets.len());
+    for &(target, bp) in targets {
+        if !target.is_finite() || target <= 0.0 || !bp.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "hazard tenor quote bump must have finite positive tenor and finite bp, got ({target}, {bp})"
+            )));
+        }
+        if matched_targets
+            .iter()
+            .any(|&seen| seen.to_bits() == target.to_bits())
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "duplicate hazard tenor quote bump target {target}"
+            )));
+        }
+        let has_exact_match = quotes
+            .iter()
+            .any(|input| input.pillar_time.to_bits() == target.to_bits());
+        if !has_exact_match {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "hazard tenor quote bump target {target} did not match any exact calibration pillar"
+            )));
+        }
+        matched_targets.push(target);
+    }
+    Ok(())
+}
+
 fn bump_for_pillar(tenor_years: f64, bump: Option<&QuoteBump>) -> f64 {
     match bump {
         Some(QuoteBump::ParallelBp(bp)) => *bp,
         Some(QuoteBump::TenorsBp(targets)) => targets
             .iter()
-            .filter(|(target, _)| (tenor_years - target).abs() < 0.1)
-            .map(|(_, bp)| *bp)
-            .sum(),
+            .find(|(target, _)| {
+                tenor_years.to_bits() == target.to_bits() || (tenor_years == 0.0 && *target == 0.0)
+            })
+            .map_or(0.0, |(_, bp)| *bp),
         None => 0.0,
     }
 }
@@ -372,6 +408,9 @@ fn replay_once(
     spread_bump: Option<&QuoteBump>,
     exact_spread_bump: Option<(usize, f64)>,
 ) -> finstack_quant_core::Result<HazardCurve> {
+    if exact_spread_bump.is_none() {
+        validate_tenor_bump_targets(quotes, spread_bump)?;
+    }
     params.recovery_rate = request.recovery_rate;
     let market_quotes = quotes
         .iter()
@@ -803,7 +842,7 @@ pub(crate) fn replay_hazard_at_horizon(
         .copied()
         .chain(times.windows(2).map(|w| (w[0] + w[1]) * 0.5))
     {
-        if (rebuilt.sp(t) - rolled.sp(t)).abs() > 1e-8 {
+        if (rebuilt.sp(t)? - rolled.sp(t)?).abs() > 1e-8 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "horizon hazard replay for '{}' changed conditional survival at t={t}",
                 source.id()
@@ -959,9 +998,9 @@ mod tests {
         .expect("valid deal quote recipe");
         HazardCurve::builder("ACME-HZD")
             .base_date(base_date)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .recovery_rate(cds.protection_leg.recovery_rate)
-            .knots([(0.0, 0.02), (pillar_time, 0.02)])
-            .par_spreads([(pillar_time, 150.0)])
+            .knots([(pillar_time, 0.02)])
             .hazard_calibration(recipe)
             .build()
             .expect("deal quote curve")
@@ -1342,6 +1381,9 @@ mod tests {
         let replacement = DiscountCurve::builder(discount_id.clone())
             .base_date(hazard.base_date())
             .knots([(0.0, 1.0), (20.0, 0.7)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount");
         let changed = market.clone().insert(replacement);

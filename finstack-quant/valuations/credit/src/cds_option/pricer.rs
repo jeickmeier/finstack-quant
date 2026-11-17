@@ -144,10 +144,8 @@ pub(crate) fn implied_vol(
         .map(f64::ln)
         .unwrap_or((ln_min + ln_max) * 0.5)
         .clamp(ln_min, ln_max);
-    let solver = BrentSolver::new()
-        .with_tolerance(1e-10)
-        .with_bracket_bounds(ln_min, ln_max);
-    let log_sigma = solver.solve_fallible(f, initial_log_guess)?;
+    let solver = BrentSolver::new(1e-10, 100)?;
+    let log_sigma = solver.solve(f, initial_log_guess, ln_min, ln_max, 0.5, 20)?;
     Ok(log_sigma.exp().max(1e-6))
 }
 
@@ -318,7 +316,9 @@ mod settlement_and_sigma_tests {
     use crate::cds_option::{CdsOptionParams, CdsOptionStrike};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DateExt};
-    use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface, VolSurfaceAxis};
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
     use finstack_quant_models::types::OptionType;
     use finstack_quant_valuations_core::instruments::{CreditParams, SettlementType};
@@ -334,18 +334,20 @@ mod settlement_and_sigma_tests {
                 (5.0, (-0.15_f64).exp()),
                 (10.0, (-0.30_f64).exp()),
             ])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("flat discount curve")
     }
 
     fn flat_hazard(base: Date) -> HazardCurve {
         let hazard_rate = 0.02;
-        let par = hazard_rate * finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT * 0.6;
         HazardCurve::builder("HZ-SN")
             .base_date(base)
             .recovery_rate(0.4)
             .knots([(1.0, hazard_rate), (5.0, hazard_rate), (10.0, hazard_rate)])
-            .par_spreads([(1.0, par), (5.0, par), (10.0, par)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("flat hazard curve")
     }
@@ -400,7 +402,10 @@ mod settlement_and_sigma_tests {
         // lognormal forward-spread model vols.
         VolSurface::builder("CDSO-VOL")
             .expiries(&[0.25, 2.0])
-            .strikes(&[100.0, 110.0])
+            .secondary_values(&[100.0, 110.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.30, 0.40])
             .row(&[0.30, 0.40])
             .build()
@@ -410,7 +415,10 @@ mod settlement_and_sigma_tests {
     fn spread_surface() -> VolSurface {
         VolSurface::builder("CDSO-VOL")
             .expiries(&[0.25, 2.0])
-            .strikes(&[0.005, 0.015])
+            .secondary_values(&[0.005, 0.015])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.32, 0.36])
             .row(&[0.32, 0.36])
             .build()
@@ -486,10 +494,12 @@ mod settlement_and_sigma_tests {
         // Wrong secondary axis.
         let tenor_surface = VolSurface::builder("CDSO-VOL")
             .expiries(&[0.25, 2.0])
-            .strikes(&[100.0, 110.0])
-            .row(&[0.30, 0.40])
-            .row(&[0.30, 0.40])
+            .secondary_values(&[100.0, 110.0])
             .secondary_axis(VolSurfaceAxis::Tenor)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
+            .row(&[0.30, 0.40])
+            .row(&[0.30, 0.40])
             .build()
             .expect("tenor surface");
         let err = resolve_sigma(&option, &market(as_of).insert_surface(tenor_surface), as_of)
@@ -499,10 +509,12 @@ mod settlement_and_sigma_tests {
         // Wrong quote type.
         let normal_surface = VolSurface::builder("CDSO-VOL")
             .expiries(&[0.25, 2.0])
-            .strikes(&[100.0, 110.0])
-            .row(&[0.30, 0.40])
-            .row(&[0.30, 0.40])
+            .secondary_values(&[100.0, 110.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
             .quote_type(VolQuoteType::Normal)
+            .interpolation_mode(VolInterpolationMode::Vol)
+            .row(&[0.30, 0.40])
+            .row(&[0.30, 0.40])
             .build()
             .expect("normal surface");
         let err = resolve_sigma(
@@ -519,7 +531,10 @@ mod settlement_and_sigma_tests {
         // Out-of-bounds expiry (surface stops before the option expiry).
         let short_surface = VolSurface::builder("CDSO-VOL")
             .expiries(&[0.05, 0.10])
-            .strikes(&[100.0, 110.0])
+            .secondary_values(&[100.0, 110.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.30, 0.40])
             .row(&[0.30, 0.40])
             .build()

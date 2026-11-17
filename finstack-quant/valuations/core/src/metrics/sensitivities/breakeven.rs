@@ -7,7 +7,7 @@ use crate::instruments::{BreakevenConfig, BreakevenMode, BreakevenTarget, Instru
 use crate::metrics::sensitivities::theta::calculate_theta_date;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::Result;
-use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::types::CurveId;
@@ -199,10 +199,14 @@ fn bump_market_for_target(
                     }
                 })?);
             }
-            base.bump(curve_ids.into_iter().map(|id| MarketBump::Curve {
-                id,
-                spec: BumpSpec::parallel_bp(delta),
-            }))
+            let bumps = curve_ids
+                .into_iter()
+                .map(|id| {
+                    base.curve_target(&id)
+                        .map(|target| target.into_bump(BumpSpec::parallel_bp(delta)))
+                })
+                .collect::<finstack_quant_core::Result<Vec<_>>>()?;
+            base.bump(bumps)
         }
         BreakevenTarget::ImpliedVol => {
             let vol_surface_ids = context
@@ -276,6 +280,12 @@ fn iterative_breakeven(
 
     // A bump or repricing failure (e.g. "no vol surface found") aborts the
     // solve and is surfaced as the real cause.
+    if !initial_guess.is_finite() {
+        return Err(finstack_quant_core::Error::Validation(
+            "breakeven initial guess is not finite (zero or invalid sensitivity)".into(),
+        ));
+    }
+
     let objective = |delta: f64| -> Result<f64> {
         let bumped_market = bump_market_for_target(context, &held_market, delta, target)?;
         let pv = context.reprice_money(&bumped_market, rolled_date)?;
@@ -285,10 +295,19 @@ fn iterative_breakeven(
     // No `BracketHint` is set deliberately. Core's hints are sized in absolute
     // rate units (`Spread` = 0.005, `Ytm` = 0.02) whereas `delta` here is in
     // basis points / vol points, so a hint would size the initial bracket ~100x
-    // too small. The adaptive default (1% of the initial guess, floored at
+    // too small. The adaptive half-width (1% of the initial guess, floored at
     // 0.01) is correctly scaled for this objective.
-    BrentSolver::new()
-        .with_tolerance(1e-8)
-        .with_max_iterations(50)
-        .solve_fallible(objective, initial_guess)
+    let half_width = (initial_guess.abs() * 0.01).max(0.01);
+    let max_bound = (initial_guess.abs() * 100.0).max(1.0e8);
+    let coord_tol = (1e-10_f64)
+        .min(1e-9 / sensitivity.abs().max(1.0))
+        .max(1e-13);
+    BrentSolver::new(coord_tol, 60)?.solve(
+        objective,
+        initial_guess,
+        -max_bound,
+        max_bound,
+        half_width,
+        30,
+    )
 }

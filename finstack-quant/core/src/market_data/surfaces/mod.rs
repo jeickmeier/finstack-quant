@@ -30,7 +30,10 @@
 //!
 //! let surface = VolSurface::builder("EQ-FLAT")
 //!     .expiries(&[1.0, 2.0])
-//!     .strikes(&[90.0, 100.0])
+//!     .secondary_values(&[90.0, 100.0])
+//!     .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+//!     .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
+//!     .interpolation_mode(finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol)
 //!     .row(&[0.2, 0.2])
 //!     .row(&[0.2, 0.2])
 //!     .build()
@@ -54,7 +57,10 @@ mod vol_cube_expiry_slice;
 mod vol_surface;
 
 pub use fx_delta_vol_surface::{
-    FxAtmConvention, FxButterflyConvention, FxDeltaConvention, FxDeltaVolSurface,
+    DEFAULT_FX_DELTA_REL_TOL, FxAtmConvention, FxButterflyConvention, FxDeltaConvention,
+    FxDeltaVolSurface, FxDeltaVolSurfaceBuilder, FxDeltaVolSurfaceParams, checked_ln_ratio,
+    fx_atm_dns_strike_checked, fx_option_delta_to_strike, fx_smile_pillars_checked,
+    interpolate_fx_wing_vols, recover_fx_wing_vols,
 };
 pub use sabr_parameter_data::SabrParameterData;
 pub use vol_cube::VolCube;

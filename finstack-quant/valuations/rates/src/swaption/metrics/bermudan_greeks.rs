@@ -100,7 +100,7 @@ fn price_bumped_pair(
     let curve_id = swaption.get_discount_curve_id();
     let mut prices = [0.0; 2];
     for (slot, sign) in prices.iter_mut().zip([1.0, -1.0]) {
-        let curves = context.curves.bump([MarketBump::Curve {
+        let curves = context.curves.bump([MarketBump::DiscountCurve {
             id: curve_id.clone(),
             spec: BumpSpec::parallel_bp(sign * bump_bp),
         }])?;
@@ -286,6 +286,8 @@ mod tests {
                 (5.0, 0.85),
             ])
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("Valid curve");
 

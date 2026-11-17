@@ -15,7 +15,7 @@ from finstack_quant.core.market_data._curves.hazard import HazardCurve
 from finstack_quant.core.market_data._curves.inflation import InflationCurve
 from finstack_quant.core.market_data._curves.price import PriceCurve
 from finstack_quant.core.market_data._curves.surfaces import FxDeltaVolSurface, VolCube, VolSurface
-from finstack_quant.core.market_data._fx import FxMatrix, FxRateResult
+from finstack_quant.core.market_data._fx import FxConversionPolicy, FxMatrix, FxRateResult
 from finstack_quant.core.market_data._scalars import InflationIndex, ScalarTimeSeries
 
 class ConvertedMoney:
@@ -34,7 +34,9 @@ class ConvertedMoney:
     >>> from finstack_quant.core.money import Money
     >>> fx = FxMatrix(None)
     >>> fx.set_quotes([("EUR", "USD", 1.1)])
-    >>> converted = MarketContext().insert_fx(fx).convert_money(Money(10.0, "EUR"), "USD", "2025-01-02")
+    >>> converted = (
+    ...     MarketContext().insert_fx(fx).convert_money(Money(10.0, "EUR"), "USD", "2025-01-02", "cashflow_date")
+    ... )
     >>> (str(converted.amount.currency), converted.rate.rate)
     ('USD', 1.1)
 
@@ -158,8 +160,8 @@ class MarketContext:
     >>> from finstack_quant.core.market_data import DiscountCurve, HazardCurve, MarketContext
     >>> ctx = (
     ...     MarketContext()
-    ...     .insert(DiscountCurve.flat("USD-OIS", "2025-01-01", 0.05))
-    ...     .insert(HazardCurve.flat("ACME", "2025-01-01", 0.02, 0.4))
+    ...     .insert(DiscountCurve.flat("USD-OIS", "2025-01-01", 0.05, "act_365f"))
+    ...     .insert(HazardCurve.flat("ACME", "2025-01-01", 0.02, 0.4, "act_365f"))
     ... )
     >>> ("USD-OIS" in ctx, len(ctx), ctx.curve_ids())
     (True, 2, ['ACME', 'USD-OIS'])
@@ -222,7 +224,7 @@ class MarketContext:
         Examples
         --------
         >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
-        >>> ctx = MarketContext().insert(DiscountCurve.flat("USD-OIS", "2025-01-01", 0.05))
+        >>> ctx = MarketContext().insert(DiscountCurve.flat("USD-OIS", "2025-01-01", 0.05, "act_365f"))
         >>> MarketContext.from_json(ctx.to_json()).get_discount("USD-OIS").id
         'USD-OIS'
 
@@ -278,9 +280,9 @@ class MarketContext:
         TypeError
             If ``curve`` is not one of the supported types.
         ValueError
-            If a volatility surface, FX delta-vol surface, or vol cube ``id`` is
-            already registered in another volatility registry, or replacing a
-            curve invalidates a bound credit index.
+            If a curve or surface ``id`` is empty or blank, replacing a curve
+            changes its curve family, or replacing a curve invalidates a bound
+            credit index.
         """
         ...
 
@@ -757,6 +759,7 @@ class MarketContext:
         amount: Money,
         target_currency: Union[Currency, str],
         as_of: DateLike,
+        policy: Union[FxConversionPolicy, str],
     ) -> ConvertedMoney:
         """
         Convert a monetary amount into another currency with the attached FX matrix.
@@ -771,6 +774,9 @@ class MarketContext:
             Destination currency.
         as_of : datetime.date or str
             Date used for the FX rate lookup.
+        policy : FxConversionPolicy or str
+            Required FX conversion policy (e.g. ``"cashflow_date"`` or
+            ``FxConversionPolicy.CASHFLOW_DATE``; no default).
 
         Returns
         -------
@@ -791,10 +797,10 @@ class MarketContext:
         >>> fx = FxMatrix(None)
         >>> fx.set_quotes([("EUR", "USD", 1.1)])
         >>> ctx = MarketContext().insert_fx(fx)
-        >>> converted = ctx.convert_money(Money(100.0, "EUR"), "USD", "2025-01-02")
+        >>> converted = ctx.convert_money(Money(100.0, "EUR"), "USD", "2025-01-02", "cashflow_date")
         >>> (round(converted.amount.amount, 6), converted.rate.triangulated)
         (110.0, False)
-        >>> ctx.convert_money(Money(5.0, "USD"), "USD", "2025-01-02").rate is None
+        >>> ctx.convert_money(Money(5.0, "USD"), "USD", "2025-01-02", "cashflow_date").rate is None
         True
         """
         ...
@@ -872,14 +878,14 @@ class MarketContext:
         """
         ...
 
-    def roll_forward(self, days: int) -> MarketContext:
+    def condition(self, reference_date: DateLike) -> MarketContext:
         """
-        Roll every dated term structure forward by ``days`` calendar days.
+        Condition dated term structures in this context to ``reference_date``.
 
         Parameters
         ----------
-        days : int
-            Non-negative 64-bit calendar days to roll (``0`` clones curves unchanged).
+        reference_date : datetime.date or str
+            Target valuation anchor date for conditioned curves.
 
         Returns
         -------
@@ -889,10 +895,9 @@ class MarketContext:
         Raises
         ------
         ValueError
-            If ``days < 0``, a rolled base date exceeds the supported date range,
-            a curve cannot be rebuilt after rolling, or a bound credit index fails to rebind.
-        OverflowError
-            If ``days`` is outside the signed 64-bit integer range.
+            If ``reference_date`` cannot be parsed, a curve rejects the anchor
+            or cannot normalize under its extrapolation policy, or a bound
+            credit index fails to rebind.
         """
         ...
 

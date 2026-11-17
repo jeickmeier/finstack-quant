@@ -1,13 +1,11 @@
-//! Time-roll helpers for [`MarketContext`](super::MarketContext).
+//! Forward/horizon conditioning helpers for [`MarketContext`](super::MarketContext).
 //!
-//! These methods advance market-data curves forward in time with
-//! **realized-forward** semantics: every curve type realizes its forwards as
-//! the base date advances (discount curves renormalize by `DF(dt)`, hazard
-//! curves preserve hazard rates via conditional survival, forward curves
-//! preserve forwards, inflation curves rebase the base CPI, and price /
-//! vol-index curves pin the rolled spot to the old forward). This makes a
-//! roll-then-reprice theta capture both carry and roll-down. Vol surfaces,
-//! FX spot rates, and historical fixings remain static across the roll.
+//! These methods re-anchor term structures to an explicit `reference_date`
+//! while preserving source timelines for curves conditioned forward or backward
+//! (`DiscountCurve`, `ForwardCurve`, `HazardCurve`, `ParametricCurve`) and
+//! keeping frozen curves (`InflationCurve`, `PriceCurve`,
+//! `BaseCorrelationCurve`) on their original anchors. Vol surfaces, FX spot
+//! rates, scalars, and historical fixings remain unchanged.
 
 use crate::FxHashMap;
 use std::sync::Arc;
@@ -15,40 +13,37 @@ use std::sync::Arc;
 use super::MarketContext;
 
 impl MarketContext {
-    // Curve Rolling (Time Roll-Forward Support)
-
-    /// Roll all curves forward by a specified number of days.
+    /// Condition all term structures in this context to `reference_date`.
     ///
-    /// This creates a new `MarketContext` with all curves rolled forward:
-    /// - Base dates advanced by `days`
-    /// - Knot times shifted backwards (expired points filtered out)
-    /// - Forwards realized on every curve type: discount curves renormalize
-    ///   by `DF(dt)`, hazard curves preserve hazard rates (conditional
-    ///   survival), forward curves preserve forwards, inflation curves rebase
-    ///   the base CPI, and price / vol-index curves set the rolled spot to
-    ///   the old curve's forward at `dt`
-    ///
-    /// A roll-then-reprice therefore captures carry plus roll-down P&L.
-    /// Vol surfaces, FX spot rates, and historical fixings remain static
-    /// (see Notes below).
+    /// Conditioning builds a private candidate `MarketContext` and only returns
+    /// it once all curve conditioning and credit-index rebinding succeed:
+    /// - `DiscountCurve`, `ForwardCurve`, `HazardCurve`, and `ParametricCurve`
+    ///   re-anchor to `reference_date` while retaining their source coordinates
+    ///   and continuous shocks.
+    /// - `InflationCurve`, `PriceCurve`, and
+    ///   `BaseCorrelationCurve` remain frozen on their original clocks and
+    ///   levels after validating day-count reachability where applicable.
+    /// - Vol surfaces, FX matrices, scalars, series, inflation indices,
+    ///   dividends, collateral, and hierarchy metadata remain unchanged.
     ///
     /// # Arguments
-    /// * `days` - Non-negative calendar-day offset for each curve base date; `0` clones curves unchanged and negative values are rejected.
+    ///
+    /// * `reference_date` - Target valuation anchor date for conditioned curves.
     ///
     /// # Returns
-    /// A new `MarketContext` with all curves rolled forward.
+    ///
+    /// A new `MarketContext` with all curves conditioned to `reference_date`
+    /// and dependent credit indices rebound.
     ///
     /// # Errors
-    /// Returns an error if `days < 0`, if any rolled curve base date exceeds the
-    /// supported calendar range, if a curve cannot be rebuilt (e.g., too few points
-    /// remain), or if any dependent credit index fails to rebind against the rolled curves.
     ///
-    /// # Notes
-    /// - Surfaces and other market data are cloned without modification
-    /// - FX matrices are preserved as-is (assumed static spot rates)
-    /// - Curves with insufficient remaining points will cause an error
+    /// Returns an error if any curve rejects `reference_date`, day-count
+    /// calculation fails, normalization fails (for example under
+    /// `ExtrapolationPolicy::None`), or any dependent credit index fails to
+    /// rebind against the conditioned curves.
     ///
     /// # Examples
+    ///
     /// ```
     /// use finstack_quant_core::market_data::context::MarketContext;
     /// use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -59,48 +54,35 @@ impl MarketContext {
     /// let curve = DiscountCurve::builder("USD_OIS")
     ///     .base_date(base_date)
     ///     .knots(vec![(1.0, 0.98), (2.0, 0.96), (5.0, 0.90)])
-    ///     .build()
-    ///     ?;
+    ///     .day_count(finstack_quant_core::dates::DayCount::Act365F)
+    ///     .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+    ///     .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+    ///     .build()?;
     ///
     /// let ctx = MarketContext::new().insert(curve);
     ///
-    /// // Roll 6 months forward
-    /// let rolled_ctx = ctx.roll_forward(182)?;
-    /// # let _ = rolled_ctx;
+    /// // Condition 6 months forward.
+    /// let conditioned_ctx = ctx.condition(date!(2025 - 07 - 02))?;
+    /// # let _ = conditioned_ctx;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
-        if days < 0 {
-            return Err(crate::Error::Validation(format!(
-                "MarketContext::roll_forward requires non-negative days, got {days}"
-            )));
-        }
+    pub fn condition(&self, reference_date: crate::dates::Date) -> crate::Result<Self> {
         tracing::debug!(
-            days,
+            %reference_date,
             curve_count = self.curves.len(),
             credit_index_count = self.credit_indices.len(),
-            "rolling MarketContext forward"
+            "conditioning MarketContext"
         );
-        // NOTE: Non-curve fields are shallow-cloned and retain pre-roll state:
-        //  - Vol surfaces: no base-date axis; expiry tenors remain relative
-        //  - FX matrices: spot rates; no temporal dimension to roll
-        //  - Prices: contain a time axis but are cloned for performance
-        //  - Series: historical fixings; unchanged by a forward roll
-        //
-        // Callers that need fully consistent rolled prices or surfaces
-        // should rebuild them from rolled curves after this call.
-        // Roll each curve forward, populating plain maps before wrapping them in
-        // `Arc` for the new context (the other maps are shared by `Arc` clone).
-        let mut rolled_curves = FxHashMap::default();
-        rolled_curves.reserve(self.curves.len());
+        let mut conditioned_curves = FxHashMap::default();
+        conditioned_curves.reserve(self.curves.len());
         for (id, storage) in self.curves.iter() {
-            let rolled_storage = storage.roll_forward_storage(days)?;
-            rolled_curves.insert(id.clone(), rolled_storage);
+            let conditioned_storage = storage.condition_storage(reference_date)?;
+            conditioned_curves.insert(id.clone(), conditioned_storage);
         }
 
         let mut new_ctx = self.clone();
-        new_ctx.curves = Arc::new(rolled_curves);
+        new_ctx.curves = Arc::new(conditioned_curves);
 
         new_ctx.rebind_all_credit_indices()?;
 

@@ -101,10 +101,9 @@
   ],
   "days_since_epoch": 20090,
   "discount_curve": {
-    "allow_non_monotonic": false,
     "base": "2025-01-02",
     "day_count": "act_365f",
-    "extrapolation": "flat_forward",
+    "extrapolation": "extend",
     "fx_policy": null,
     "id": "USD-OIS",
     "interp_style": "monotone_convex",
@@ -126,15 +125,12 @@
         0.8005101321504569
       ]
     ],
-    "min_forward_rate": -0.005,
-    "min_forward_tenor": 1e-06,
     "rate_calibration": null
   },
   "discount_curve_from_dates": {
-    "allow_non_monotonic": false,
     "base": "2025-01-02",
     "day_count": "act_365f",
-    "extrapolation": "flat_forward",
+    "extrapolation": "extend",
     "fx_policy": null,
     "id": "USD-OIS",
     "interp_style": "monotone_convex",
@@ -152,8 +148,6 @@
         0.8
       ]
     ],
-    "min_forward_rate": -0.005,
-    "min_forward_tenor": 1e-06,
     "rate_calibration": null
   },
   "discount_curve_queries": [
@@ -163,10 +157,10 @@
     0.04313220334895792,
     0.9177753577972274,
     0.9567266617574995,
-    0.0440957840826286,
+    0.04409578408262881,
     "act_365f",
     "monotone_convex",
-    "flat_forward",
+    "extend",
     [
       0.0,
       0.5,
@@ -232,12 +226,10 @@
     "metadata_id": "nyse"
   },
   "inflation_curve": {
-    "base_cpi": 300.0,
     "base_date": "2025-01-02",
     "day_count": "act_365f",
-    "extrapolation": "flat_zero",
+    "extrapolation": "flat",
     "id": "US-CPI",
-    "indexation_lag_months": 3,
     "interp_style": "log_linear",
     "knot_points": [
       [
@@ -251,94 +243,78 @@
     ]
   },
   "inflation_curve_queries": [
-    315.21421287752867,
+    315.2142128775288,
     315.18858054075855,
-    313.65869972034375,
-    1.0455289990678125,
-    0.019985069629570616,
-    3
+    0.019985069629570616
   ],
   "inflation_index": {
     "currency": "USD",
     "id": "US-CPI-U",
-    "interpolation": "linear",
-    "lag": {
-      "months": 3
-    },
+    "knowledge_date": "2025-01-15",
     "observations": [
-      [
-        "2024-10-01",
-        315.664
-      ],
-      [
-        "2024-11-01",
-        315.493
-      ],
-      [
-        "2024-12-01",
-        315.605
-      ]
-    ],
-    "seasonality": null
+      {
+        "reference_month": "2024-10-01",
+        "value": 315.664,
+        "available_on": "2024-11-13"
+      },
+      {
+        "reference_month": "2024-11-01",
+        "value": 315.493,
+        "available_on": "2024-12-11"
+      },
+      {
+        "reference_month": "2024-12-01",
+        "value": 315.605,
+        "available_on": "2025-01-15"
+      }
+    ]
   },
-  "inflation_index_publication_dates": [
+  "inflation_index_expected_releases": [
     [],
-    null,
-    [
-      [
-        "2024-10-01",
-        "2024-11-13"
-      ],
-      [
-        "2024-11-01",
-        "2024-12-11"
-      ]
-    ],
-    "2024-11-13",
     null,
     {
       "currency": "USD",
       "id": "US-CPI-U",
-      "interpolation": "linear",
-      "lag": {
-        "months": 3
-      },
+      "knowledge_date": "2025-01-15",
       "observations": [
-        [
-          "2024-10-01",
-          315.664
-        ],
-        [
-          "2024-11-01",
-          315.493
-        ],
-        [
-          "2024-12-01",
-          315.605
-        ]
-      ],
-      "publication_dates": [
         {
-          "publication_date": "2024-11-13",
-          "reference_month": "2024-10-01"
+          "reference_month": "2024-10-01",
+          "value": 315.664,
+          "available_on": "2024-11-13"
         },
         {
-          "publication_date": "2024-12-11",
-          "reference_month": "2024-11-01"
+          "reference_month": "2024-11-01",
+          "value": 315.493,
+          "available_on": "2024-12-11"
+        },
+        {
+          "reference_month": "2024-12-01",
+          "value": 315.605,
+          "available_on": "2025-01-15"
         }
       ],
-      "seasonality": null
+      "expected_releases": [
+        {
+          "expected_release": "2024-11-13",
+          "reference_month": "2024-10-01",
+          "known_on": "2024-10-01"
+        },
+        {
+          "expected_release": "2024-12-11",
+          "reference_month": "2024-11-01",
+          "known_on": "2024-11-01"
+        }
+      ]
     }
   ],
   "inflation_index_queries": [
-    0.9998130924020479,
-    315.549,
-    315.549,
+    315.664,
+    315.493,
     [
       "2024-10-01",
       "2024-12-01"
     ],
-    "3M"
+    "2025-01-15"
   ],
   "is_cds_date": [
     true,
@@ -407,19 +383,15 @@
             0.01
           ]
         ],
-        "par_interp": "linear",
-        "par_points": [],
         "recovery_rate": 0.4,
         "seniority": null,
         "type": "hazard"
       },
       {
-        "base_cpi": 300.0,
         "base_date": "2025-01-02",
         "day_count": "act_365f",
-        "extrapolation": "flat_zero",
+        "extrapolation": "flat",
         "id": "US-CPI",
-        "indexation_lag_months": 3,
         "interp_style": "log_linear",
         "knot_points": [
           [
@@ -434,10 +406,9 @@
         "type": "inflation"
       },
       {
-        "allow_non_monotonic": false,
         "base": "2025-01-02",
         "day_count": "act_365f",
-        "extrapolation": "flat_forward",
+        "extrapolation": "extend",
         "fx_policy": null,
         "id": "USD-OIS",
         "interp_style": "log_linear",
@@ -451,15 +422,13 @@
             0.9607894391523232
           ]
         ],
-        "min_forward_rate": null,
-        "min_forward_tenor": 1e-06,
         "rate_calibration": null,
         "type": "discount"
       },
       {
         "base": "2025-01-02",
         "day_count": "act_365f",
-        "extrapolation": "flat_zero",
+        "extrapolation": "flat",
         "id": "WTI",
         "interp_style": "linear",
         "knot_points": [
@@ -504,25 +473,24 @@
       {
         "currency": "USD",
         "id": "US-CPI-U",
-        "interpolation": "linear",
-        "lag": {
-          "months": 3
-        },
+        "knowledge_date": "2025-01-15",
         "observations": [
-          [
-            "2024-10-01",
-            315.664
-          ],
-          [
-            "2024-11-01",
-            315.493
-          ],
-          [
-            "2024-12-01",
-            315.605
-          ]
-        ],
-        "seasonality": null
+          {
+            "reference_month": "2024-10-01",
+            "value": 315.664,
+            "available_on": "2024-11-13"
+          },
+          {
+            "reference_month": "2024-11-01",
+            "value": 315.493,
+            "available_on": "2024-12-11"
+          },
+          {
+            "reference_month": "2024-12-01",
+            "value": 315.605,
+            "available_on": "2025-01-15"
+          }
+        ]
       }
     ],
     "prices": {
@@ -540,6 +508,7 @@
     "series": [
       {
         "currency": null,
+        "extrapolation": "flat",
         "id": "SOFR-FIXINGS",
         "interpolation": "linear",
         "observations": [
@@ -564,7 +533,7 @@
         "interpolation_mode": "vol",
         "quote_type": "black_lognormal",
         "secondary_axis": "strike",
-        "strikes": [
+        "secondary_values": [
           90.0,
           100.0,
           110.0
@@ -603,7 +572,7 @@
     ],
     "df": 0.9607894391523232,
     "fx_rate": 1.1,
-    "index_lag": "3M",
+    "index_knowledge_date": "2025-01-15",
     "is_empty": [
       false,
       true
@@ -634,7 +603,7 @@
   },
   "mean_var": [
     101.3,
-    1.981250000000001
+    1.98125
   ],
   "money": [
     {
@@ -668,7 +637,7 @@
   "price_curve": {
     "base": "2025-01-02",
     "day_count": "act_365f",
-    "extrapolation": "flat_zero",
+    "extrapolation": "flat",
     "id": "WTI",
     "interp_style": "linear",
     "knot_points": [
@@ -845,6 +814,7 @@
   ],
   "scalar_time_series": {
     "currency": null,
+    "extrapolation": "flat",
     "id": "SOFR-FIXINGS",
     "interpolation": "linear",
     "observations": [
@@ -911,15 +881,17 @@
   },
   "sifma_settlement_date": "2027-03-11",
   "sifma_settlement_date_class_b": "2026-01-20",
-  "stats_empty_is_nan": [
+  "stats_missing_is_none": [
+    true,
+    true,
     true,
     true,
     true
   ],
-  "stats_or_nan": [
+  "stats_summary": [
     101.3,
-    1.981250000000001,
-    1.4075688260259251,
+    1.98125,
+    1.4075688260259247,
     101.5,
     100.3,
     99.75,
@@ -1036,7 +1008,7 @@
     "interpolation_mode": "vol",
     "quote_type": "black_lognormal",
     "secondary_axis": "strike",
-    "strikes": [
+    "secondary_values": [
       90.0,
       100.0,
       110.0
@@ -1070,7 +1042,7 @@
       "interpolation_mode": "vol",
       "quote_type": "shifted_black_lognormal",
       "secondary_axis": "strike",
-      "strikes": [
+      "secondary_values": [
         90.0,
         100.0,
         110.0
@@ -1089,11 +1061,17 @@
   "vol_surface_queries": [
     0.20500000000000002,
     [
+      90.0,
+      100.0,
+      110.0
+    ],
+    [
       2,
       3
     ],
     "strike",
     "black_lognormal",
-    "vol"
+    "vol",
+    null
   ]
 }

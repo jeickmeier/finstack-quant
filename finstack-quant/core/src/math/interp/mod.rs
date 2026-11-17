@@ -8,17 +8,17 @@
 //!
 //! - [`LinearStrategy`]: Linear in discount factors (simple but may create arbitrage)
 //! - [`LogLinearStrategy`]: Linear in log(DF), piecewise-constant instantaneous forwards
-//! - [`MonotoneConvexStrategy`]: Hagan-West smooth, monotone, no-arbitrage
+//! - [`MonotoneConvexStrategy`]: Hagan-West regional C¹/DF-continuous forward interpolator
 //! - [`CubicHermiteStrategy`]: PCHIP shape-preserving cubic
-//! - [`PiecewiseQuadraticForwardStrategy`]: Natural cubic in log DF (C¹ forwards)
+//! - [`PiecewiseQuadraticForwardStrategy`]: Natural cubic spline in log DF (C¹ forwards)
 //!
 //! # Arbitrage Considerations
 //!
-//! Not all methods guarantee positive forward rates:
-//! - **Linear**: May produce negative forwards ❌
-//! - **LogLinear**: Guarantees positive forwards ✅
-//! - **MonotoneConvex**: Guarantees positive forwards ✅
-//! - **CubicHermite**: Shape-preserving but requires monotone input ⚠️
+//! These generic interpolators reproduce the supplied knots and boundary extension rules
+//! without silently clamping or modifying forwards:
+//! - **Linear** / **CubicHermite**: Accept arbitrary finite signed ordinates
+//! - **LogLinear** / **PiecewiseQuadraticForward** / **MonotoneConvex**: Require positive
+//!   finite ordinates; positivity of DFs does not enforce positive forward rates
 //!
 //! # References
 //!
@@ -49,11 +49,9 @@ pub use strategies::{
     CubicHermiteStrategy, LinearStrategy, LogLinearStrategy, MonotoneConvexStrategy,
     PiecewiseQuadraticForwardStrategy,
 };
-pub use types::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
+pub use types::{ExtrapolationPolicy, InterpStyle};
 
-pub(crate) use traits::InterpolationStrategy;
 pub(crate) use types::Interp;
 pub(crate) use utils::{
-    MIN_RELATIVE_KNOT_GAP, find_monotone_violation, validate_finite_series, validate_knot_spacing,
-    validate_knots,
+    exact_f64_eq, validate_finite_series, validate_knots, validate_positive_series,
 };

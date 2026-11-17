@@ -124,6 +124,8 @@ fn create_test_market() -> MarketContext {
         .base_date(test_date())
         .knots(vec![(0.0, 1.0), (0.25, 0.9875), (1.0, 0.95), (5.0, 0.78)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
     MarketContext::new().insert(discount_curve)
@@ -419,14 +421,24 @@ fn executor_allocates_floating_interest_on_the_shifted_path() {
     let tranches = TrancheStructure::new(vec![float_tranche]).expect("structure");
     let pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
 
-    let forward_curve = ForwardCurve::builder("SOFR-3M", 0.25)
+    let forward_curve = ForwardCurve::builder("SOFR-3M")
         .base_date(test_date())
-        .knots(vec![(0.0, 0.05), (5.0, 0.05)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .index_tenor(finstack_quant_core::dates::Tenor::quarterly())
+        .knots([(0.0, 1.0), (1.0, (-0.05_f64).exp())])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("forward curve");
     let market = MarketContext::new().insert(forward_curve).insert_series(
-        ScalarTimeSeries::new("FIXING:SOFR-3M", vec![(test_date(), 0.05)], None).expect("fixings"),
+        ScalarTimeSeries::new(
+            "FIXING:SOFR-3M",
+            vec![(test_date(), 0.05)],
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("fixings"),
     );
 
     let waterfall = Waterfall::builder(Currency::USD)

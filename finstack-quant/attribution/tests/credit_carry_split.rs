@@ -27,6 +27,8 @@ fn flat_discount(base: Date, r: f64) -> DiscountCurve {
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, (-r).exp()), (30.0, (-r * 30.0).exp())])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve")
 }

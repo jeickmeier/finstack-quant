@@ -27,37 +27,39 @@ pub fn validate_term_curve_tenor(
     tenor: Tenor,
     instrument: &str,
 ) -> Result<()> {
-    let expected = tenor.to_years_approx();
-    if (curve.tenor() - expected).abs() > 1e-8 {
+    if let Some(curve_tenor) = curve.index_tenor()
+        && curve_tenor != tenor
+    {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "{instrument} index_tenor {expected} does not match forward curve '{}' tenor {}",
-            curve.id(),
-            curve.tenor()
+            "{instrument} index_tenor {tenor} does not match forward curve '{}' tenor {curve_tenor}",
+            curve.id()
         )));
     }
     Ok(())
 }
 
-/// Fixed-tenor index fixing at a reset date.
+/// Project a contractual term index rate over `[start, end)`.
 ///
-/// Converts `date` to curve time with the curve's own day count (negative
-/// before the curve base date) and returns the curve's simple forward rate
-/// there, as a decimal.
+/// Uses [`ForwardCurve::rate_between_dates`] with the supplied contractual
+/// `index_accrual` year fraction.
 ///
 /// # Arguments
 ///
-/// * `curve` - Term projection curve to read the fixing from.
-/// * `date` - Reset date of the fixing.
+/// * `curve` - Forward curve supplying normalized projection factors.
+/// * `start` - Start date of the projected index period.
+/// * `end` - End date of the projected index period (`end > start`).
+/// * `index_accrual` - Positive contractual accrual year fraction for annualizing the growth factor.
 ///
 /// # Errors
 ///
-/// Returns an error when the curve day count cannot measure `date` against
-/// the curve base date.
-pub fn term_fixing_on_date(curve: &ForwardCurve, date: Date) -> Result<f64> {
-    let t = curve.day_count().signed_year_fraction(
-        curve.base_date(),
-        date,
-        DayCountContext::default(),
-    )?;
-    Ok(curve.rate(t))
+/// Returns an error when the period is non-positive, invalid, or falls outside
+/// the forward curve domain.
+pub fn term_fixing_for_period(
+    curve: &ForwardCurve,
+    start: Date,
+    end: Date,
+    index_accrual: f64,
+) -> Result<f64> {
+    let _ = DayCountContext::default();
+    curve.rate_between_dates(start, end, index_accrual)
 }

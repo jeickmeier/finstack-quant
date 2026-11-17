@@ -486,8 +486,8 @@ impl EquityOption {
         while price(upper)? < target && upper < 8.0 {
             upper *= 2.0;
         }
-        let sigma = BrentSolver::new().with_tolerance(1e-12).solve_in_bracket(
-            |sigma| Ok(price(sigma).map_or(f64::NAN, |pv| pv - target)),
+        let sigma = BrentSolver::new(1e-12, 100)?.solve_in_bracket(
+            |sigma| price(sigma).map(|pv| pv - target),
             lower,
             upper,
         )?;
@@ -834,8 +834,11 @@ mod tests {
         MarketContext::new()
             .insert(flat_discount_with_tenor(DISC_ID, as_of, rate, 5.0))
             .insert_surface(flat_vol_surface(VOL_ID, &expiries, &strikes, vol))
-            .insert_price(SPOT_ID, MarketScalar::Unitless(spot))
-            .insert_price(DIV_ID, MarketScalar::Unitless(div_yield))
+            .insert_price(SPOT_ID, MarketScalar::unitless(spot).expect("valid scalar"))
+            .insert_price(
+                DIV_ID,
+                MarketScalar::unitless(div_yield).expect("valid scalar"),
+            )
     }
 
     fn base_option(expiry: Date) -> EquityOption {
@@ -1183,6 +1186,8 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act360) // OIS convention
             .knots([(0.0, 1.0), (5.0, df_5y)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("DiscountCurve with ACT/360 should build successfully");
 
@@ -1191,8 +1196,11 @@ mod tests {
         let curves = MarketContext::new()
             .insert(act360_curve)
             .insert_surface(flat_vol_surface(VOL_ID, &expiries, &strikes, 0.20))
-            .insert_price(SPOT_ID, MarketScalar::Unitless(100.0))
-            .insert_price(DIV_ID, MarketScalar::Unitless(0.02));
+            .insert_price(
+                SPOT_ID,
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            )
+            .insert_price(DIV_ID, MarketScalar::unitless(0.02).expect("valid scalar"));
 
         let option = base_option(expiry);
 
@@ -1288,7 +1296,10 @@ mod tests {
         let curves = MarketContext::new()
             .insert(flat_discount_with_tenor(DISC_ID, as_of, 0.03, 5.0))
             .insert_surface(flat_vol_surface(VOL_ID, &expiries, &strikes, 0.25))
-            .insert_price(SPOT_ID, MarketScalar::Unitless(100.0));
+            .insert_price(
+                SPOT_ID,
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            );
         // Note: NOT inserting dividend yield
 
         // Pricing should fail with a validation error
@@ -1323,11 +1334,14 @@ mod tests {
         let curves = MarketContext::new()
             .insert(flat_discount_with_tenor(DISC_ID, as_of, 0.03, 5.0))
             .insert_surface(flat_vol_surface(VOL_ID, &expiries, &strikes, 0.25))
-            .insert_price(SPOT_ID, MarketScalar::Unitless(100.0))
+            .insert_price(
+                SPOT_ID,
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            )
             // Wrong type: Price instead of Unitless
             .insert_price(
                 DIV_ID,
-                MarketScalar::Price(Money::new(0.02, Currency::USD).expect("valid money fixture")),
+                MarketScalar::price(Money::new(0.02, Currency::USD).expect("valid money fixture")),
             );
 
         // Pricing should fail with a validation error about wrong scalar type

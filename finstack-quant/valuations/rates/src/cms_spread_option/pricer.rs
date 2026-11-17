@@ -106,17 +106,23 @@ impl CmsSpreadOptionPricer {
             inst,
             market,
             as_of,
-            inst.long_cms_tenor,
-            time_to_expiry,
-            &long_vol,
+            CmsSpreadLegRequest {
+                tenor: inst.long_cms_tenor,
+                fixing_index_id: inst.long_cms_fixing_index_id.as_ref(),
+                time_to_expiry,
+                vol_provider: &long_vol,
+            },
         )?;
         let short_leg = self.resolve_leg(
             inst,
             market,
             as_of,
-            inst.short_cms_tenor,
-            time_to_expiry,
-            &short_vol,
+            CmsSpreadLegRequest {
+                tenor: inst.short_cms_tenor,
+                fixing_index_id: inst.short_cms_fixing_index_id.as_ref(),
+                time_to_expiry,
+                vol_provider: &short_vol,
+            },
         )?;
 
         let expected_payoff = if time_to_expiry <= 0.0 {
@@ -143,10 +149,11 @@ impl CmsSpreadOptionPricer {
         inst: &CmsSpreadOption,
         market: &MarketContext,
         as_of: Date,
-        tenor: Tenor,
-        time_to_expiry: f64,
-        vol_provider: &VolSource,
+        leg: CmsSpreadLegRequest<'_>,
     ) -> Result<CmsSpreadLeg> {
+        let tenor = leg.tenor;
+        let time_to_expiry = leg.time_to_expiry;
+        let vol_provider = leg.vol_provider;
         let tenor_years = tenor.to_years_approx();
 
         // Seasoned option: both CMS rates fixed at the (past) expiry. Resolve
@@ -157,8 +164,9 @@ impl CmsSpreadOptionPricer {
         if inst.expiry < as_of {
             let observed = crate::cms_common::historical_cms_fixing(
                 market,
+                leg.fixing_index_id,
                 &inst.forward_curve_id,
-                tenor_years,
+                inst.index_id.as_ref(),
                 inst.expiry,
             )?;
             return Ok(CmsSpreadLeg {
@@ -273,6 +281,13 @@ impl CmsSpreadOptionPricer {
         let data = self.price_data(inst, market, as_of)?;
         Ok(data.expected_payoff * data.discount_factor * inst.notional.amount())
     }
+}
+
+struct CmsSpreadLegRequest<'a> {
+    tenor: Tenor,
+    fixing_index_id: Option<&'a finstack_quant_core::types::IndexId>,
+    time_to_expiry: f64,
+    vol_provider: &'a VolSource,
 }
 
 impl Default for CmsSpreadOptionPricer {
@@ -436,7 +451,7 @@ fn validate_flat_marginal(
     // expiry/tenor. For strike surfaces, every knot must agree; linear strike
     // interpolation and flat extrapolation then preserve that constant slice.
     if surface.secondary_axis() == VolSurfaceAxis::Strike {
-        for &strike in surface.strikes() {
+        for &strike in surface.secondary_values() {
             let vol = clean_volatility(provider, expiry, tenor, strike)?;
             if (vol - atm_volatility).abs() > FLAT_VOL_TOLERANCE {
                 return Err(unsupported());
@@ -474,17 +489,24 @@ mod tests {
     use super::*;
     use date_support::date;
     use discount_forward_curve_support::flat_discount_with_tenor;
-    use finstack_quant_core::market_data::fixings::cms_fixing_series_id;
-    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::fixings::fixing_series_id;
+    use finstack_quant_core::market_data::scalars::{
+        ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+    };
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface,
+    };
     use finstack_quant_core::types::CurveId;
 
     fn flat_vol_surface(id: &str, vol: f64) -> VolSurface {
         let strikes = vec![0.005, 0.02, 0.04, 0.08];
         let expiries = vec![0.25, 1.0, 5.0, 10.0];
         let mut builder = VolSurface::builder(CurveId::new(id))
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&expiries)
-            .strikes(&strikes);
+            .secondary_values(&strikes);
         for _ in 0..expiries.len() {
             builder = builder.row(&vec![vol; strikes.len()]);
         }
@@ -517,7 +539,7 @@ mod tests {
             .price_internal(&inst, &market, as_of)
             .expect_err("missing CMS fixing series must be a hard error");
         assert!(
-            err.to_string().contains("FIXING:CMS-10Y:USD-SOFR-3M"),
+            err.to_string().contains("FIXING:USD-SOFR-CMS-10Y"),
             "error must name the missing series: {err}"
         );
 
@@ -528,17 +550,21 @@ mod tests {
         let market = market
             .insert_series(
                 ScalarTimeSeries::new(
-                    cms_fixing_series_id("USD-SOFR-3M", 10.0),
+                    fixing_series_id("USD-SOFR-CMS-10Y"),
                     vec![(expiry, long_observed)],
                     None,
+                    SeriesInterpolation::Step,
+                    SeriesExtrapolation::Error,
                 )
                 .expect("long fixing series"),
             )
             .insert_series(
                 ScalarTimeSeries::new(
-                    cms_fixing_series_id("USD-SOFR-3M", 2.0),
+                    fixing_series_id("USD-SOFR-CMS-2Y"),
                     vec![(expiry, short_observed)],
                     None,
+                    SeriesInterpolation::Step,
+                    SeriesExtrapolation::Error,
                 )
                 .expect("short fixing series"),
             );
@@ -565,12 +591,7 @@ mod tests {
         MarketContext::new()
             .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.02, 30.0))
             .insert(
-                ForwardCurve::builder("USD-SOFR-3M", 0.25)
-                    .base_date(as_of)
-                    .day_count(DayCount::Act360)
-                    .knots([(0.0, 0.04), (30.0, 0.04)])
-                    .build()
-                    .expect("forward"),
+                ForwardCurve::flat("USD-SOFR-3M", as_of, 0.04, DayCount::Act360).expect("forward"),
             )
             .insert_surface(flat_vol_surface("USD-SWAPTION-VOL-10Y", 0.30))
             .insert_surface(flat_vol_surface("USD-SWAPTION-VOL-2Y", 0.20))
@@ -719,8 +740,11 @@ mod tests {
         inst.expiry = date(2026, 1, 2);
         inst.payment_date = date(2026, 1, 12);
         let smile = VolSurface::builder("USD-SWAPTION-VOL-10Y")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.5, 2.0])
-            .strikes(&[0.01, 0.04, 0.10])
+            .secondary_values(&[0.01, 0.04, 0.10])
             .row(&[0.20, 0.30, 0.20])
             .row(&[0.20, 0.30, 0.20])
             .build()
@@ -748,8 +772,10 @@ mod tests {
     fn tenor_surface_can_have_distinct_volatilities_for_distinct_cms_tenors() {
         let surface = VolSurface::builder("ATM")
             .secondary_axis(VolSurfaceAxis::Tenor)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.5, 2.0])
-            .strikes(&[2.0, 10.0])
+            .secondary_values(&[2.0, 10.0])
             .row(&[0.2, 0.3])
             .row(&[0.2, 0.3])
             .build()
@@ -762,13 +788,15 @@ mod tests {
     #[test]
     fn shifted_quotes_cannot_feed_unshifted_cms_marginals() {
         let surface = VolSurface::builder("SHIFTED")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::ShiftedBlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[1.0])
-            .strikes(&[0.03])
+            .secondary_values(&[0.03])
+            .displacements(&[0.02])
             .row(&[0.20])
             .build()
-            .expect("surface")
-            .with_displacements(&[0.02])
-            .expect("displacement");
+            .expect("surface");
         let source = VolSource::Surface(std::sync::Arc::new(surface));
         assert!(
             clean_volatility(&source, 1.0, 5.0, 0.03)

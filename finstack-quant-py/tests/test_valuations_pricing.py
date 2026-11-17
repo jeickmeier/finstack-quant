@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import json
+import math
 
 import pytest
 
@@ -136,10 +137,7 @@ def _market_json(include_discount: bool = True) -> str:
             "day_count": "act_360",
             "knot_points": [[0.0, 1.0], [5.0, 0.90]],
             "interp_style": "monotone_convex",
-            "extrapolation": "flat_forward",
-            "min_forward_rate": None,
-            "allow_non_monotonic": False,
-            "min_forward_tenor": 1e-6,
+            "extrapolation": "extend",
         })
     return json.dumps({
         "schema_version": 1,
@@ -168,21 +166,17 @@ def _tarn_market_json() -> str:
                 "day_count": "act_365f",
                 "knot_points": [[0.0, 1.0], [6.0, 0.8869204367171575]],
                 "interp_style": "linear",
-                "extrapolation": "flat_forward",
-                "min_forward_rate": None,
-                "allow_non_monotonic": False,
-                "min_forward_tenor": 1e-6,
+                "extrapolation": "extend",
             },
             {
                 "type": "forward",
                 "id": "USD-SOFR-6M",
                 "base": "2025-01-01",
-                "reset_lag": 0,
                 "day_count": "act_365f",
-                "tenor": 0.5,
-                "knot_points": [[0.0, 0.03], [6.0, 0.03]],
-                "interp_style": "linear",
-                "extrapolation": "flat_forward",
+                "index_tenor": {"count": 6, "unit": "months"},
+                "knot_points": [[0.0, 1.0], [6.0, math.exp(-0.03 * 6.0)]],
+                "interp_style": "log_linear",
+                "extrapolation": "extend",
             },
         ],
         "fx": None,
@@ -202,7 +196,7 @@ def _flat_black_surface_json(surface_id: str, vol: float) -> dict[str, object]:
     return {
         "id": surface_id,
         "expiries": [0.25, 1.0, 5.0],
-        "strikes": [0.01, 0.10],
+        "secondary_values": [0.01, 0.10],
         "secondary_axis": "strike",
         "quote_type": "black_lognormal",
         "interpolation_mode": "vol",
@@ -221,26 +215,23 @@ def _cms_spread_market_json() -> str:
                 "day_count": "act_365f",
                 "knot_points": [[0.0, 1.0], [30.0, 0.3499377491111553]],
                 "interp_style": "linear",
-                "extrapolation": "flat_forward",
-                "min_forward_rate": None,
-                "allow_non_monotonic": False,
-                "min_forward_tenor": 1e-6,
+                "extrapolation": "extend",
             },
             {
                 "type": "forward",
                 "id": "USD-SOFR-3M",
                 "base": "2025-01-01",
-                "reset_lag": 0,
                 "day_count": "act_365f",
-                "tenor": 0.25,
+                "index_tenor": {"count": 3, "unit": "months"},
+                # Piecewise-flat forwards of 2.75%, 3.75% and 5% between the knots.
                 "knot_points": [
-                    [0.0, 0.025],
-                    [2.0, 0.030],
-                    [10.0, 0.045],
-                    [30.0, 0.055],
+                    [0.0, 1.0],
+                    [2.0, math.exp(-0.055)],
+                    [10.0, math.exp(-0.355)],
+                    [30.0, math.exp(-1.355)],
                 ],
-                "interp_style": "linear",
-                "extrapolation": "flat_forward",
+                "interp_style": "log_linear",
+                "extrapolation": "extend",
             },
         ],
         "fx": None,

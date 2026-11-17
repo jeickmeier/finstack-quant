@@ -355,7 +355,7 @@ pub fn multi_factor_greeks(
         (f64::NAN, f64::NAN, if dof > 0 { 0.0 } else { f64::NAN })
     } else {
         let normalized: Vec<f64> = shifted.iter().map(|value| value / response_scale).collect();
-        let mean = neumaier_sum(normalized.iter().map(|value| value / n as f64));
+        let mean = neumaier_sum(normalized.iter().map(|value| value / n as f64))?;
         let centered: Vec<f64> = normalized.iter().map(|value| value - mean).collect();
         let residuals: Vec<f64> = normalized
             .iter()
@@ -424,15 +424,16 @@ fn stable_norm(values: &[f64]) -> finstack_quant_core::Result<f64> {
         return Ok(0.0);
     }
     finite_product3(
-        neumaier_sum(values.iter().map(|v| (v / scale).powi(2))).sqrt(),
+        neumaier_sum(values.iter().map(|v| (v / scale).powi(2)))?.sqrt(),
         scale,
         1.0,
     )
 }
 
 fn scaled_sum_product(values: &[f64], multiplier: f64) -> finstack_quant_core::Result<f64> {
-    let direct = neumaier_sum(values.iter().copied());
-    if direct.is_finite() {
+    if let Ok(direct) = neumaier_sum(values.iter().copied())
+        && direct.is_finite()
+    {
         return finite_product3(direct, 1.0, multiplier);
     }
     let scale = values.iter().map(|v| v.abs()).fold(0.0, f64::max);
@@ -440,7 +441,7 @@ fn scaled_sum_product(values: &[f64], multiplier: f64) -> finstack_quant_core::R
         return Ok(0.0);
     }
     finite_product3(
-        neumaier_sum(values.iter().map(|v| v / scale)),
+        neumaier_sum(values.iter().map(|v| v / scale))?,
         scale,
         multiplier,
     )

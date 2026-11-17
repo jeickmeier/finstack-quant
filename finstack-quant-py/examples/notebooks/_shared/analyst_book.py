@@ -301,6 +301,8 @@ def build_market(stage: str = "base", as_of: date = AS_OF) -> MarketContext:
                 (10.0, 0.72),
             ],
             day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
         )
     )
     fx = FxMatrix(None)
@@ -308,25 +310,42 @@ def build_market(stage: str = "base", as_of: date = AS_OF) -> MarketContext:
     market.insert_fx(fx)
     # Overnight observations enter with the first compounding lesson, before
     # the later term-SOFR forward curve and payer swap are introduced.
-    market.insert(ForwardCurve.flat("USD-SOFR", 1 / 360, as_of, 0.05))
+    market.insert(ForwardCurve.flat("USD-SOFR", as_of, 0.05, "act_360"))
     first_fixing = date(2024, 1, 1)
     market.insert_series(
         ScalarTimeSeries(
             "FIXING:USD-SOFR",
             [(first_fixing + timedelta(days=offset), 0.05) for offset in range((as_of - first_fixing).days + 1)],
+            "step",
+            "error",
         )
     )
     if index >= 1:
         market.insert(usd_sofr_curve(as_of))
         market.insert_series(usd_sofr_fixings(as_of))
         for surface_id in ("USD-CAP-VOL", "USD-SWPNVOL"):
-            market.insert(VolSurface(surface_id, [0.25, 0.5, 1.0, 3.0, 5.0], [0.01, 0.045, 0.08], [0.25] * 15))
+            market.insert(
+                VolSurface(
+                    surface_id,
+                    [0.25, 0.5, 1.0, 3.0, 5.0],
+                    [0.01, 0.045, 0.08],
+                    [0.25] * 15,
+                    secondary_axis="strike",
+                    quote_type="black_lognormal",
+                    interpolation_mode="vol",
+                )
+            )
     if index >= 2:
         market.insert_price("SPX-SPOT", 5200.0, "USD")
         market.insert_price("SPX-DIV", 0.015)
         market.insert(
             FxDeltaVolSurface(
-                "EURUSD-VOL", [0.5, 1.0, 2.0], [0.10, 0.11, 0.12], [0.01, 0.012, 0.012], [0.003, 0.004, 0.004]
+                "EURUSD-VOL",
+                "EUR/USD",
+                [0.5, 1.0, 2.0],
+                [0.10, 0.11, 0.12],
+                [0.01, 0.012, 0.012],
+                [0.003, 0.004, 0.004],
             )
         )
         market.insert(
@@ -340,6 +359,9 @@ def build_market(stage: str = "base", as_of: date = AS_OF) -> MarketContext:
                     [0.25, 0.20, 0.19],
                     [0.25, 0.20, 0.19],
                 ],
+                secondary_axis="strike",
+                quote_type="black_lognormal",
+                interpolation_mode="vol",
             )
         )
     return market

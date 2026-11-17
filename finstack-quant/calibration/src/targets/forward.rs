@@ -18,16 +18,17 @@ use crate::targets::util::{
 };
 use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{ForwardCurve, RateCalibrationCurveRole};
+use finstack_quant_core::math::Compounding;
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations_rates::deposit::Deposit;
 use finstack_quant_valuations_rates::fra::ForwardRateAgreement;
 use finstack_quant_valuations_rates::ir_future::InterestRateFuture;
 use finstack_quant_valuations_rates::irs::InterestRateSwap;
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 
 /// Parameters for constructing a `ForwardCurveTarget`.
 #[derive(Clone)]
@@ -38,8 +39,10 @@ pub(crate) struct ForwardCurveTargetParams {
     pub(crate) currency: Currency,
     /// Unique identifier for the forward curve being calibrated.
     pub(crate) fwd_curve_id: CurveId,
-    /// Tenor associated with the forward rates (e.g. 3M, 6M).
-    pub(crate) tenor_years: f64,
+    /// Contractual index tenor metadata attached to the calibrated curve.
+    pub(crate) index_tenor: Option<Tenor>,
+    /// Policy controlling queries beyond the final fitted pillar time.
+    pub(crate) extrapolation: ExtrapolationPolicy,
     /// Numerical interpolation style used during the solving process.
     pub(crate) solve_interp: InterpStyle,
     /// Global calibration settings (tolerances, rate bounds).
@@ -52,16 +55,14 @@ pub(crate) struct ForwardCurveTargetParams {
 
 /// Target for simultaneous forward-curve calibration.
 ///
-/// This adapter bridges calibration solvers with forward-rate pricing. It
-/// handles knot anchor insertion at t=0 and provides rate-bound-aware scanning
-/// for numerical stability.
+/// Maps each quote's projection horizon to an ordered positive pillar grid and
+/// solves for piecewise segment continuous forwards parameterizing positive
+/// normalized projection factors `P(0) = 1`, `P_i = P_{i-1} * exp(-f_i * dt_i)`.
 pub(crate) struct ForwardCurveTarget {
     /// Construction parameters (dates, ids, conventions, config).
     pub(crate) params: ForwardCurveTargetParams,
     /// Reusable scratch context (see [`ContextScratch`]).
     scratch: ContextScratch,
-    /// Actual contractual reset/end times used to build projection DFs.
-    projection_grid: RefCell<Option<Vec<f64>>>,
     /// Number of global parameters, populated when the solve grid is built.
     parameter_count: Cell<usize>,
 }
@@ -73,7 +74,6 @@ impl ForwardCurveTarget {
         Self {
             params,
             scratch,
-            projection_grid: RefCell::new(None),
             parameter_count: Cell::new(0),
         }
     }
@@ -120,7 +120,8 @@ impl ForwardCurveTarget {
                 base_date: params.base_date,
                 currency: params.currency,
                 fwd_curve_id: params.curve_id.clone(),
-                tenor_years: params.tenor_years,
+                index_tenor: params.index_tenor,
+                extrapolation: params.extrapolation,
                 solve_interp: params.interpolation,
                 config: config.clone(),
                 time_day_count: curve_day_count,
@@ -140,9 +141,8 @@ impl ForwardCurveTarget {
             )));
         }
 
-        // DF-implied term rates couple adjacent reset-date forwards whenever a
-        // contractual period has a calendar stub. Fit all reset-date rates
-        // simultaneously against a dense grid of actual contractual intervals.
+        // Fit piecewise segment continuous forwards parameterizing positive
+        // normalized projection factors simultaneously over all quote pillars.
         let (curve, mut report) = global::optimize(
             &target,
             &prepared_quotes,
@@ -161,7 +161,7 @@ impl ForwardCurveTarget {
             .build()?;
         report.metadata.insert(
             "forward_parameterization".to_string(),
-            "contractual_reset_grid".to_string(),
+            "positive_projection_factors".to_string(),
         );
 
         report.update_solver_config(config.solver);
@@ -169,48 +169,25 @@ impl ForwardCurveTarget {
         Ok((curve, report))
     }
 
-    /// Return the reset-date parameter time for quotes whose modeled rate is
-    /// derived from projection discount factors over a future accrual period.
-    fn parameter_time(&self, pq: &PreparedQuote<RateQuote>) -> Result<f64> {
-        let intervals = self.reset_intervals(pq)?;
-        let parameter_date = match pq.quote.as_ref() {
-            RateQuote::Swap { .. } => intervals.last().map(|(start, _)| *start),
-            RateQuote::Deposit { .. } => intervals.first().map(|(_, end)| *end),
-            RateQuote::Fra { .. } | RateQuote::Futures { .. } => {
-                intervals.first().map(|(start, _)| *start)
-            }
-        }
-        .ok_or_else(|| finstack_quant_core::Error::Calibration {
-            message: format!(
-                "Forward quote {} produced no reset intervals",
-                pq.quote.id()
-            ),
-            category: "global_solve".to_string(),
-        })?;
-
-        self.params.time_day_count.year_fraction(
-            self.params.base_date,
-            parameter_date,
-            DayCountContext::default(),
-        )
+    /// Return the deposit accrual interval `(start_date, maturity)`.
+    fn deposit_interval(&self, pq: &PreparedQuote<RateQuote>) -> Result<(Date, Date)> {
+        let deposit = pq
+            .instrument
+            .as_any()
+            .downcast_ref::<Deposit>()
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "Forward deposit quote {} did not build a Deposit instrument",
+                    pq.quote.id()
+                ))
+            })?;
+        Ok((deposit.start_date, deposit.maturity))
     }
 
-    /// Resolve all contractual projection intervals represented by a prepared quote.
-    fn reset_intervals(&self, pq: &PreparedQuote<RateQuote>) -> Result<Vec<(Date, Date)>> {
+    /// Return the contractual terminal projection date for a quote.
+    fn pillar_date(&self, pq: &PreparedQuote<RateQuote>) -> Result<Date> {
         match pq.quote.as_ref() {
-            RateQuote::Deposit { .. } => {
-                let deposit = pq
-                    .instrument
-                    .as_any()
-                    .downcast_ref::<Deposit>()
-                    .ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(format!(
-                            "Forward deposit quote {} did not build a Deposit instrument",
-                            pq.quote.id()
-                        ))
-                    })?;
-                Ok(vec![(deposit.start_date, deposit.maturity)])
-            }
+            RateQuote::Deposit { .. } => Ok(self.deposit_interval(pq)?.1),
             RateQuote::Fra { .. } => {
                 let fra = pq
                     .instrument
@@ -222,7 +199,7 @@ impl ForwardCurveTarget {
                             pq.quote.id()
                         ))
                     })?;
-                Ok(vec![(fra.start_date, fra.maturity)])
+                Ok(fra.maturity)
             }
             RateQuote::Futures { .. } => {
                 let future = pq
@@ -235,8 +212,7 @@ impl ForwardCurveTarget {
                             pq.quote.id()
                         ))
                     })?;
-                let (_, start, end) = future.resolve_dates()?;
-                Ok(vec![(start, end)])
+                Ok(future.resolve_dates()?.2)
             }
             RateQuote::Swap { .. } => {
                 let swap = pq
@@ -269,97 +245,18 @@ impl ForwardCurveTarget {
                         roll_rule: finstack_quant_cashflows::builder::RollRule::None,
                     },
                 )?;
-                if schedule.is_empty() {
-                    return Err(finstack_quant_core::Error::Calibration {
+                schedule
+                    .last()
+                    .map(|period| period.accrual_end.max(period.payment_date))
+                    .ok_or_else(|| finstack_quant_core::Error::Calibration {
                         message: format!(
                             "Forward swap quote {} produced an empty floating schedule",
                             pq.quote.id()
                         ),
                         category: "global_solve".to_string(),
-                    });
-                }
-                Ok(schedule
-                    .into_iter()
-                    .map(|period| (period.accrual_start, period.accrual_end))
-                    .collect())
+                    })
             }
         }
-    }
-
-    /// Build and validate the dense contractual reset boundary grid.
-    fn projection_grid(&self, quotes: &[PreparedQuote<RateQuote>]) -> Result<Vec<f64>> {
-        let mut grid = vec![0.0];
-        for pq in quotes {
-            for (start, end) in self.reset_intervals(pq)? {
-                let start_time = self.params.time_day_count.year_fraction(
-                    self.params.base_date,
-                    start,
-                    DayCountContext::default(),
-                )?;
-                let end_time = self.params.time_day_count.year_fraction(
-                    self.params.base_date,
-                    end,
-                    DayCountContext::default(),
-                )?;
-                if !start_time.is_finite()
-                    || !end_time.is_finite()
-                    || start_time < 0.0
-                    || end_time <= start_time
-                {
-                    return Err(finstack_quant_core::Error::Calibration {
-                        message: format!(
-                            "Invalid forward reset interval for {}: [{start_time}, {end_time}]",
-                            pq.quote.id()
-                        ),
-                        category: "global_solve".to_string(),
-                    });
-                }
-                grid.push(start_time);
-                grid.push(end_time);
-            }
-        }
-        grid.sort_by(f64::total_cmp);
-        grid.dedup_by(|a, b| (*a - *b).abs() <= 1e-12);
-        if grid.len() < 2 {
-            return Err(finstack_quant_core::Error::Calibration {
-                message: "Forward global solve requires at least one reset interval".to_string(),
-                category: "global_solve".to_string(),
-            });
-        }
-        Ok(grid)
-    }
-
-    /// Build a curve with an explicit contractual projection grid.
-    fn build_curve_with_projection_grid(
-        &self,
-        knots: &[(f64, f64)],
-        projection_grid: Vec<f64>,
-    ) -> Result<ForwardCurve> {
-        let mut full_knots = knots.to_vec();
-        if full_knots.is_empty() {
-            return Err(finstack_quant_core::Error::Calibration {
-                message: "Failed to build temp forward curve: need at least one knot".into(),
-                category: "global_solve".to_string(),
-            });
-        }
-        if full_knots[0].0 > 1e-12 {
-            full_knots.insert(0, (0.0, full_knots[0].1));
-        }
-        ForwardCurve::builder(self.params.fwd_curve_id.clone(), self.params.tenor_years)
-            .base_date(self.params.base_date)
-            .knots(full_knots)
-            .projection_grid(projection_grid)
-            .interp(self.params.solve_interp)
-            // Hold the last forward rate constant past the final reset: on a
-            // forward-rate curve that is the flat-forward convention, whereas
-            // `FlatForward` would extend the last segment's slope.
-            .extrapolation(ExtrapolationPolicy::FlatZero)
-            .day_count(self.params.time_day_count)
-            .build()
-            .map_err(|error| finstack_quant_core::Error::Calibration {
-                message: format!("Failed to build reset-grid forward curve: {error}"),
-                category: "global_solve".to_string(),
-            })
     }
 }
 
@@ -371,121 +268,61 @@ impl GlobalSolveTarget for ForwardCurveTarget {
         &self,
         quotes: &[Self::Quote],
     ) -> Result<TimeGridAndGuesses<Self::Quote>> {
-        let projection_grid = self.projection_grid(quotes)?;
-        let mut entries = Vec::with_capacity(quotes.len());
-        let mut deposits = Vec::new();
-        for pq in quotes {
-            let initial = pq.quote.implied_rate();
-            if matches!(pq.quote.as_ref(), RateQuote::Deposit { .. }) {
-                let (start, end) = self.reset_intervals(pq)?.first().copied().ok_or_else(|| {
-                    finstack_quant_core::Error::Calibration {
-                        message: format!(
-                            "Forward deposit quote {} produced no reset interval",
-                            pq.quote.id()
-                        ),
-                        category: "global_solve".to_string(),
-                    }
-                })?;
-                let start_time = self.params.time_day_count.year_fraction(
-                    self.params.base_date,
-                    start,
-                    DayCountContext::default(),
-                )?;
-                let end_time = self.params.time_day_count.year_fraction(
-                    self.params.base_date,
-                    end,
-                    DayCountContext::default(),
-                )?;
-                deposits.push((start_time, end_time, initial, pq.clone()));
-            } else {
-                let parameter_time = self.parameter_time(pq)?;
-                let fallback_time = if matches!(pq.quote.as_ref(), RateQuote::Swap { .. }) {
-                    let maturity = self
-                        .reset_intervals(pq)?
-                        .last()
-                        .map(|(_, end)| *end)
-                        .ok_or_else(|| finstack_quant_core::Error::Calibration {
-                            message: format!(
-                                "Forward swap quote {} produced no reset intervals",
-                                pq.quote.id()
-                            ),
-                            category: "global_solve".to_string(),
-                        })?;
-                    Some(self.params.time_day_count.year_fraction(
-                        self.params.base_date,
-                        maturity,
-                        DayCountContext::default(),
-                    )?)
-                } else {
-                    None
-                };
-                entries.push((parameter_time, fallback_time, initial, pq.clone()));
-            }
+        if quotes.is_empty() {
+            return Err(finstack_quant_core::Error::Input(
+                finstack_quant_core::InputError::TooFewPoints,
+            ));
         }
-        deposits.sort_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.1.total_cmp(&b.1)));
-        let mut previous_deposit: Option<(f64, f64)> = None;
-        for (start, end, initial, quote) in deposits {
-            let parameter_time = previous_deposit
-                .filter(|(previous_start, _)| (*previous_start - start).abs() <= 1e-12)
-                .map_or(start, |(_, previous_end)| previous_end);
-            entries.push((parameter_time, None, initial, quote));
-            previous_deposit = Some((start, end));
-        }
-        entries.sort_by(|a, b| a.0.total_cmp(&b.0));
 
-        let mut resolved_entries = Vec::with_capacity(entries.len());
-        for (primary_time, fallback_time, initial, quote) in entries {
-            let collision = resolved_entries.iter().position(
-                |(time, _, _, _): &(f64, Option<f64>, f64, Self::Quote)| {
-                    (primary_time - *time).abs() <= 1e-12
-                },
-            );
-            let time = match (collision, fallback_time) {
-                (None, _) => primary_time,
-                (Some(_), Some(fallback)) => fallback,
-                (Some(position), None) => {
-                    let existing_fallback = resolved_entries[position].1.ok_or_else(|| {
-                        finstack_quant_core::Error::Calibration {
-                            message: format!(
-                                "Forward global solve requires distinct reset parameter times; duplicate t={primary_time:.12}"
-                            ),
-                            category: "global_solve".to_string(),
-                        }
-                    })?;
-                    resolved_entries[position].0 = existing_fallback;
-                    primary_time
-                }
-            };
-            if resolved_entries.iter().any(
-                |(existing, _, _, _): &(f64, Option<f64>, f64, Self::Quote)| {
-                    (time - *existing).abs() <= 1e-12
-                },
-            ) {
+        let mut entries = Vec::with_capacity(quotes.len());
+        for pq in quotes {
+            let pillar_date = self.pillar_date(pq)?;
+            let pillar_time = self.params.time_day_count.year_fraction(
+                self.params.base_date,
+                pillar_date,
+                DayCountContext::default(),
+            )?;
+            if !pillar_time.is_finite() || pillar_time <= 0.0 {
                 return Err(finstack_quant_core::Error::Calibration {
                     message: format!(
-                        "Forward global solve could not disambiguate parameter time t={time:.12}"
+                        "Forward quote {} has non-positive pillar time {pillar_time:.12} ({pillar_date})",
+                        pq.quote.id()
                     ),
                     category: "global_solve".to_string(),
                 });
             }
-            resolved_entries.push((time, fallback_time, initial, quote));
+            entries.push((pillar_time, pillar_date, pq.quote.implied_rate()));
         }
-        resolved_entries.sort_by(|a, b| a.0.total_cmp(&b.0));
+        entries.sort_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
 
-        let mut times = Vec::with_capacity(resolved_entries.len());
-        let mut initials = Vec::with_capacity(resolved_entries.len());
-        let mut active_quotes = Vec::with_capacity(resolved_entries.len());
-        for (time, _, initial, quote) in resolved_entries {
+        let mut times: Vec<f64> = Vec::with_capacity(entries.len());
+        let mut initials: Vec<f64> = Vec::with_capacity(entries.len());
+        let mut prev_date: Option<Date> = None;
+        for (time, date, initial) in entries {
+            if let (Some(&last_time), Some(last_date)) = (times.last(), prev_date)
+                && (time - last_time).abs() <= 1e-12
+            {
+                if date != last_date {
+                    return Err(finstack_quant_core::Error::Calibration {
+                        message: format!(
+                            "Distinct forward pillar dates {last_date} and {date} map to identical time t={time:.12} under {:?}",
+                            self.params.time_day_count
+                        ),
+                        category: "global_solve".to_string(),
+                    });
+                }
+                continue;
+            }
             times.push(time);
             initials.push(initial);
-            active_quotes.push(quote);
+            prev_date = Some(date);
         }
+
         self.parameter_count.set(times.len());
-        *self.projection_grid.borrow_mut() = Some(projection_grid);
         Ok(TimeGridAndGuesses {
             times,
             initials,
-            quotes: active_quotes,
+            quotes: quotes.to_vec(),
         })
     }
 
@@ -500,36 +337,44 @@ impl GlobalSolveTarget for ForwardCurveTarget {
                 category: "global_solve".to_string(),
             });
         }
-        let control_knots = times
-            .iter()
-            .copied()
-            .zip(params.iter().copied())
-            .collect::<Vec<_>>();
-        let projection_grid = self.projection_grid.borrow().clone().ok_or_else(|| {
-            finstack_quant_core::Error::Calibration {
-                message: "Forward global solve projection grid was not initialized".to_string(),
+        if times.is_empty() {
+            return Err(finstack_quant_core::Error::Calibration {
+                message: "Forward global solve requires at least one positive pillar".to_string(),
                 category: "global_solve".to_string(),
-            }
-        })?;
-        let control_knots = if control_knots.len() == 1 {
-            let only_knot = control_knots.first().copied().ok_or_else(|| {
-                finstack_quant_core::Error::Calibration {
-                    message: "Forward global solve has no control knots".to_string(),
+            });
+        }
+
+        let mut factors = Vec::with_capacity(times.len() + 1);
+        factors.push((0.0, 1.0));
+        let mut factor = 1.0;
+        let mut prev_t = 0.0;
+        for (&t, &seg_rate) in times.iter().zip(params.iter()) {
+            let dt = t - prev_t;
+            if !t.is_finite() || !seg_rate.is_finite() || dt <= 0.0 {
+                return Err(finstack_quant_core::Error::Calibration {
+                    message: format!(
+                        "Invalid forward curve segment: prev_t={prev_t}, t={t}, rate={seg_rate}"
+                    ),
                     category: "global_solve".to_string(),
-                }
-            })?;
-            let terminal =
-                *projection_grid
-                    .last()
-                    .ok_or_else(|| finstack_quant_core::Error::Calibration {
-                        message: "Forward projection grid is empty".to_string(),
-                        category: "global_solve".to_string(),
-                    })?;
-            vec![only_knot, (terminal, only_knot.1)]
-        } else {
-            control_knots
-        };
-        self.build_curve_with_projection_grid(&control_knots, projection_grid)
+                });
+            }
+            factor *= Compounding::Continuous.df_from_rate(seg_rate, dt)?;
+            factors.push((t, factor));
+            prev_t = t;
+        }
+
+        ForwardCurve::builder(self.params.fwd_curve_id.clone())
+            .base_date(self.params.base_date)
+            .index_tenor_opt(self.params.index_tenor)
+            .knots(factors)
+            .interp(self.params.solve_interp)
+            .extrapolation(self.params.extrapolation)
+            .day_count(self.params.time_day_count)
+            .build()
+            .map_err(|error| finstack_quant_core::Error::Calibration {
+                message: format!("Failed to build forward projection factor curve: {error}"),
+                category: "global_solve".to_string(),
+            })
     }
 
     fn residual_units(&self) -> crate::report::ResidualUnits {
@@ -554,7 +399,8 @@ impl GlobalSolveTarget for ForwardCurveTarget {
         }
         self.scratch.with_curve(curve, |ctx| {
             for (residual, pq) in residuals.iter_mut().zip(quotes) {
-                if !self.params.residual_notional.is_finite() || self.params.residual_notional <= 0.0 {
+                if !self.params.residual_notional.is_finite() || self.params.residual_notional <= 0.0
+                {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "Invalid residual_notional {}: expected finite positive value",
                         self.params.residual_notional
@@ -565,26 +411,7 @@ impl GlobalSolveTarget for ForwardCurveTarget {
                 // unit notional (`τ·Δr`) so deposits share residual space with
                 // FRA / futures / swap `value_raw / notional`.
                 *residual = if let RateQuote::Deposit { rate, index, .. } = pq.quote.as_ref() {
-                    let (start, end) =
-                        self.reset_intervals(pq)?.first().copied().ok_or_else(|| {
-                            finstack_quant_core::Error::Calibration {
-                                message: format!(
-                                    "Forward deposit quote {} produced no reset interval",
-                                    pq.quote.id()
-                                ),
-                                category: "global_solve".to_string(),
-                            }
-                        })?;
-                    let start_time = self.params.time_day_count.year_fraction(
-                        self.params.base_date,
-                        start,
-                        DayCountContext::default(),
-                    )?;
-                    let end_time = self.params.time_day_count.year_fraction(
-                        self.params.base_date,
-                        end,
-                        DayCountContext::default(),
-                    )?;
+                    let (start, end) = self.deposit_interval(pq)?;
                     let idx_conv =
                         finstack_quant_valuations_core::market::conventions::ConventionRegistry::try_global()?
                             .require_rate_index(index)?;
@@ -603,10 +430,11 @@ impl GlobalSolveTarget for ForwardCurveTarget {
                         });
                     }
                     let growth =
-                        curve.rate_between(start_time, end_time)? * (end_time - start_time);
+                        curve.rate_between_dates(start, end, deposit_accrual)? * deposit_accrual;
                     growth - rate * deposit_accrual
                 } else {
-                    pq.instrument.value_raw(ctx, self.params.base_date)? / self.params.residual_notional
+                    pq.instrument.value_raw(ctx, self.params.base_date)?
+                        / self.params.residual_notional
                 };
             }
             Ok(())
@@ -742,7 +570,7 @@ mod tests {
             "curve_id": "USD-SOFR-3M",
             "currency": "USD",
             "base_date": "2025-01-15",
-            "tenor_years": 0.25,
+            "index_tenor": {"count": 3, "unit": "months"},
             "discount_curve_id": "USD-OIS",
         }))
         .expect("forward params without method parse");
@@ -765,7 +593,8 @@ mod tests {
                 base_date,
                 currency: Currency::USD,
                 fwd_curve_id: CurveId::new("fwd"),
-                tenor_years: 0.25,
+                index_tenor: Some(Tenor::quarterly()),
+                extrapolation: ExtrapolationPolicy::Extend,
                 solve_interp: InterpStyle::Linear,
                 config,
                 time_day_count: DayCount::Act360,
@@ -852,11 +681,15 @@ mod tests {
             true,
         )
         .expect("bounded global solve should return its best curve");
-        assert!(
-            curve.forwards().iter().all(|rate| *rate <= 0.10),
-            "all fitted forwards must respect configured upper bound: {:?}",
-            curve.forwards()
-        );
+        for period in curve.knots().windows(2) {
+            let rate = (curve.df(period[0]).expect("start df").ln()
+                - curve.df(period[1]).expect("end df").ln())
+                / (period[1] - period[0]);
+            assert!(
+                rate <= 0.10 + 1e-12,
+                "fitted segment continuous forward exceeds upper bound: {rate}"
+            );
+        }
         assert!(
             !report.success,
             "an unreachable 20% quote under a 10% bound must not report success"
@@ -874,7 +707,8 @@ mod tests {
                 base_date,
                 currency: Currency::USD,
                 fwd_curve_id: CurveId::new("USD-FWD"),
-                tenor_years: 0.25,
+                index_tenor: Some(Tenor::quarterly()),
+                extrapolation: ExtrapolationPolicy::Extend,
                 solve_interp: InterpStyle::Linear,
                 config: config.clone(),
                 time_day_count: DayCount::Act360,
@@ -919,13 +753,13 @@ mod tests {
         let TimeGridAndGuesses { times, .. } =
             GlobalSolveTarget::build_time_grid_and_guesses(&target, &quotes)
                 .expect("deposit parameter grid");
-        assert_eq!(times, vec![0.0, 0.25]);
+        assert_eq!(times, vec![0.25, 0.5]);
 
         let (curve, report) = global::optimize(&target, &quotes, &config, 1e-8, true)
             .expect("multi-deposit global solve");
         assert!(report.success, "{}", report.convergence_reason);
-        assert!((curve.rate_between(0.0, 0.25).expect("3M rate") - 0.04).abs() < 1e-8);
-        assert!((curve.rate_between(0.0, 0.5).expect("6M rate") - 0.05).abs() < 1e-8);
+        assert!((curve.rate_between(0.0, 0.25, 0.25).expect("3M rate") - 0.04).abs() < 1e-8);
+        assert!((curve.rate_between(0.0, 0.5, 0.5).expect("6M rate") - 0.05).abs() < 1e-8);
     }
 
     /// Regression: with a curve time axis (Act/365F) that differs from the
@@ -945,7 +779,8 @@ mod tests {
                 base_date,
                 currency: Currency::USD,
                 fwd_curve_id: CurveId::new("USD-FWD"),
-                tenor_years: 0.25,
+                index_tenor: Some(Tenor::quarterly()),
+                extrapolation: ExtrapolationPolicy::Extend,
                 solve_interp: InterpStyle::Linear,
                 config: config.clone(),
                 // Curve time axis deliberately different from the Act/360 index day_count.
@@ -995,7 +830,10 @@ mod tests {
 
         for (days, quote_rate) in [(90_f64, 0.04), (180_f64, 0.05)] {
             let t_end = days / 365.0;
-            let growth = curve.rate_between(0.0, t_end).expect("implied forward") * t_end;
+            let growth = curve
+                .rate_between(0.0, t_end, t_end)
+                .expect("implied forward")
+                * t_end;
             // Repricing on the deposit's own Act/360 accrual must recover the quote.
             let act360_rate = growth / (days / 360.0);
             assert!(
@@ -1004,7 +842,9 @@ mod tests {
             );
             // The curve-axis (Act/365F) simple rate is therefore the quote scaled
             // by 365/360 — NOT the raw quote (the old, wrong behaviour).
-            let curve_axis_rate = curve.rate_between(0.0, t_end).expect("curve-axis rate");
+            let curve_axis_rate = curve
+                .rate_between(0.0, t_end, t_end)
+                .expect("curve-axis rate");
             assert!(
                 (curve_axis_rate - quote_rate * 365.0 / 360.0).abs() < 1e-6,
                 "{days}d curve-axis rate {curve_axis_rate} should carry the 365/360 rescale"
@@ -1023,6 +863,8 @@ mod tests {
                 (0.25, (-0.04_f64 * 0.25).exp()),
                 (2.0, (-0.04_f64 * 2.0).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let quotes = [
@@ -1044,12 +886,13 @@ mod tests {
             curve_id: CurveId::new("USD-FWD"),
             currency: Currency::USD,
             base_date,
-            tenor_years: 0.25,
+            index_tenor: Some(Tenor::quarterly()),
             discount_curve_id: CurveId::new("USD-OIS"),
             method: CalibrationMethod::GlobalSolve {
                 use_analytical_jacobian: false,
             },
             interpolation: InterpStyle::Linear,
+            extrapolation: ExtrapolationPolicy::Extend,
             conventions: crate::RatesStepConventions {
                 curve_day_count: Some(DayCount::Act365F),
                 ois_compounding: None,
@@ -1107,6 +950,8 @@ mod tests {
                 .base_date(base_date)
                 .day_count(DayCount::Act365F)
                 .knots([(0.0, 1.0), (1.0, 0.96)])
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("discount curve");
             let quote = MarketQuote::Rates(RateQuote::Fra {
@@ -1120,12 +965,13 @@ mod tests {
                 curve_id: CurveId::new("USD-FWD"),
                 currency: Currency::USD,
                 base_date,
-                tenor_years: 0.25,
+                index_tenor: Some(Tenor::quarterly()),
                 discount_curve_id: CurveId::new("USD-OIS"),
                 method: CalibrationMethod::GlobalSolve {
                     use_analytical_jacobian: false,
                 },
                 interpolation: InterpStyle::Linear,
+                extrapolation: ExtrapolationPolicy::Extend,
                 conventions: crate::RatesStepConventions {
                     curve_day_count: Some(day_count),
                     ois_compounding: None,
@@ -1177,25 +1023,12 @@ mod tests {
                 if discount_curve_id.as_str() == "USD-OIS"
         ));
 
-        let grid_365 = act365f.projection_grid().expect("Act365F grid");
-        let grid_360 = act360.projection_grid().expect("Act360 grid");
-        assert!((grid_365[1] - 90.0 / 365.0).abs() < 1e-12);
-        assert!((grid_365[2] - 180.0 / 365.0).abs() < 1e-12);
-        assert!((grid_360[1] - 90.0 / 360.0).abs() < 1e-12);
-        assert!((grid_360[2] - 180.0 / 360.0).abs() < 1e-12);
-
-        assert!(
-            act365f
-                .knots()
-                .iter()
-                .any(|time| (*time - 90.0 / 365.0).abs() < 1e-12)
-        );
-        assert!(
-            act360
-                .knots()
-                .iter()
-                .any(|time| (*time - 90.0 / 360.0).abs() < 1e-12)
-        );
+        let grid_365 = act365f.knots();
+        let grid_360 = act360.knots();
+        assert_eq!(grid_365.len(), 2);
+        assert_eq!(grid_360.len(), 2);
+        assert!((grid_365[1] - 180.0 / 365.0).abs() < 1e-12);
+        assert!((grid_360[1] - 180.0 / 360.0).abs() < 1e-12);
     }
 
     #[test]
@@ -1206,6 +1039,8 @@ mod tests {
             .base_date(base_date)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (2.0, (-0.03_f64 * 2.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         for contract in ["CME:ED", "CME:SR1"] {
@@ -1221,12 +1056,13 @@ mod tests {
                     curve_id: CurveId::new("USD-FWD"),
                     currency: Currency::USD,
                     base_date,
-                    tenor_years: 0.25,
+                    index_tenor: Some(Tenor::quarterly()),
                     discount_curve_id: CurveId::new("USD-OIS"),
                     method: CalibrationMethod::GlobalSolve {
                         use_analytical_jacobian: false,
                     },
                     interpolation: InterpStyle::Linear,
+                    extrapolation: ExtrapolationPolicy::Extend,
                     conventions: crate::RatesStepConventions {
                         curve_day_count: Some(curve_day_count),
                         ois_compounding: None,
@@ -1267,12 +1103,12 @@ mod tests {
                         - 1.0)
                         / accrual
                 } else {
-                    // One quote produces a flat raw forward. Every daily term in
-                    // the arithmetic average therefore has this contractual rate.
-                    let curve_accrual = curve_day_count
-                        .year_fraction(start, end, DayCountContext::default())
-                        .expect("curve accrual");
-                    curve.rate(0.0) * curve_accrual / accrual
+                    future
+                        .model_settlement_rate(
+                            &MarketContext::new().insert(curve.clone()),
+                            base_date,
+                        )
+                        .expect("arithmetic-average settlement rate")
                 };
                 assert!(
                     (index_rate - 0.04).abs() < 1e-8,

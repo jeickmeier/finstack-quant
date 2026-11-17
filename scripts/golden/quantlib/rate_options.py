@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from itertools import pairwise
-import math
 from typing import Any
 
 import QuantLib as ql  # type: ignore[import-not-found]  # noqa: N813
@@ -12,16 +10,24 @@ from .common import (
     SCHEMA,
     VALUATION_DATE,
     central_difference,
+    chained_simple_discounts,
     constant_vol_surface,
     flat_discount_curve,
-    flat_forward_curve,
+    forward_curve,
     market_snapshot,
     metadata,
+    projection_knots,
     ql_date,
+    ql_projection_curve,
     tolerance,
 )
 
 ANALYTICAL_RATE_TOLERANCE = 1e-7
+
+
+def _optionlet_projection(forward_rate: float) -> tuple[list[ql.Date], list[float]]:
+    dates = [ql_date(VALUATION_DATE), ql.Date(30, 7, 2026), ql.Date(30, 10, 2026)]
+    return dates, chained_simple_discounts(dates, forward_rate, ql.Actual360())
 
 
 def _quantlib_optionlet(
@@ -29,31 +35,21 @@ def _quantlib_optionlet(
     rate_option_type: str,
     forward_rate: float,
     discount_rate: float,
+    rate_shift: float,
     strike: float,
     volatility: float,
     normal: bool,
 ) -> ql.CapFloor:
     evaluation_date = ql_date(VALUATION_DATE)
-    start = ql.Date(30, 7, 2026)
-    maturity = ql.Date(30, 10, 2026)
+    projection_dates, projection_discounts = _optionlet_projection(forward_rate)
+    start, maturity = projection_dates[1:]
     option_day_count = ql.Actual365Fixed()
     accrual_day_count = ql.Actual360()
     ql.Settings.instance().evaluationDate = evaluation_date
 
-    accrual = accrual_day_count.yearFraction(start, maturity)
-    time_to_start = option_day_count.yearFraction(evaluation_date, start)
-    start_df = math.exp(-forward_rate * time_to_start)
-    end_df = start_df / (1.0 + forward_rate * accrual)
-    projection = ql.YieldTermStructureHandle(
-        ql.DiscountCurve(
-            [evaluation_date, start, maturity],
-            [1.0, start_df, end_df],
-            option_day_count,
-            ql.NullCalendar(),
-        )
-    )
+    projection = ql_projection_curve(projection_dates, projection_discounts, shift=rate_shift)
     discount = ql.YieldTermStructureHandle(
-        ql.FlatForward(evaluation_date, discount_rate, option_day_count, ql.Continuous)
+        ql.FlatForward(evaluation_date, discount_rate + rate_shift, option_day_count, ql.Continuous)
     )
     index = ql.IborIndex(
         "USD-TERM-3M",
@@ -108,8 +104,9 @@ def _build_optionlet_fixture(
     def price_with_rates(rate_shift: float) -> float:
         return _quantlib_optionlet(
             rate_option_type=rate_option_type,
-            forward_rate=forward_rate + rate_shift,
-            discount_rate=discount_rate + rate_shift,
+            forward_rate=forward_rate,
+            discount_rate=discount_rate,
+            rate_shift=rate_shift,
             strike=strike,
             volatility=volatility,
             normal=normal,
@@ -119,6 +116,7 @@ def _build_optionlet_fixture(
         rate_option_type=rate_option_type,
         forward_rate=forward_rate,
         discount_rate=discount_rate,
+        rate_shift=0.0,
         strike=strike,
         volatility=volatility,
         normal=normal,
@@ -148,10 +146,10 @@ def _build_optionlet_fixture(
         "market": market_snapshot(
             [
                 flat_discount_curve("USD-OIS", discount_rate),
-                flat_forward_curve(
+                forward_curve(
                     "USD-TERM-3M",
-                    forward_rate,
-                    projection_dates=["2026-07-30", "2026-10-30"],
+                    projection_knots(*_optionlet_projection(forward_rate)),
+                    index_months=3,
                 ),
             ],
             surfaces=[
@@ -222,49 +220,41 @@ def build_bachelier_floorlet() -> dict[str, Any]:
     )
 
 
-def _quantlib_multi_period_cap(
-    *,
-    forward_rate: float,
-    discount_rate: float,
-    strike: float,
-    volatility: float,
-) -> ql.CapFloor:
-    evaluation_date = ql_date(VALUATION_DATE)
-    start = ql.Date(30, 7, 2026)
-    maturity = ql.Date(30, 7, 2027)
-    option_day_count = ql.Actual365Fixed()
-    accrual_day_count = ql.Actual360()
-    calendar = ql.WeekendsOnly()
-    ql.Settings.instance().evaluationDate = evaluation_date
-
-    schedule = ql.Schedule(
-        start,
-        maturity,
+def _cap_schedule() -> ql.Schedule:
+    return ql.Schedule(
+        ql.Date(30, 7, 2026),
+        ql.Date(30, 7, 2027),
         ql.Period(3, ql.Months),
-        calendar,
+        ql.WeekendsOnly(),
         ql.Unadjusted,
         ql.Unadjusted,
         ql.DateGeneration.Forward,
         False,
     )
-    schedule_dates = list(schedule)
-    start_time = option_day_count.yearFraction(evaluation_date, start)
-    projection_dates = [evaluation_date, *schedule_dates]
-    projection_discounts = [1.0, math.exp(-forward_rate * start_time)]
-    for period_start, period_end in pairwise(schedule_dates):
-        accrual = accrual_day_count.yearFraction(period_start, period_end)
-        projection_discounts.append(projection_discounts[-1] / (1.0 + forward_rate * accrual))
 
-    projection = ql.YieldTermStructureHandle(
-        ql.DiscountCurve(
-            projection_dates,
-            projection_discounts,
-            option_day_count,
-            ql.NullCalendar(),
-        )
-    )
+
+def _cap_projection(forward_rate: float) -> tuple[list[ql.Date], list[float]]:
+    dates = [ql_date(VALUATION_DATE), *_cap_schedule()]
+    return dates, chained_simple_discounts(dates, forward_rate, ql.Actual360())
+
+
+def _quantlib_multi_period_cap(
+    *,
+    forward_rate: float,
+    discount_rate: float,
+    rate_shift: float,
+    strike: float,
+    volatility: float,
+) -> ql.CapFloor:
+    evaluation_date = ql_date(VALUATION_DATE)
+    option_day_count = ql.Actual365Fixed()
+    accrual_day_count = ql.Actual360()
+    ql.Settings.instance().evaluationDate = evaluation_date
+
+    schedule = _cap_schedule()
+    projection = ql_projection_curve(*_cap_projection(forward_rate), shift=rate_shift)
     discount = ql.YieldTermStructureHandle(
-        ql.FlatForward(evaluation_date, discount_rate, option_day_count, ql.Continuous)
+        ql.FlatForward(evaluation_date, discount_rate + rate_shift, option_day_count, ql.Continuous)
     )
     index = ql.IborIndex(
         "USD-TERM-3M",
@@ -305,8 +295,9 @@ def build_black_cap() -> dict[str, Any]:
 
     def price_with_rates(rate_shift: float) -> float:
         return _quantlib_multi_period_cap(
-            forward_rate=forward_rate + rate_shift,
-            discount_rate=discount_rate + rate_shift,
+            forward_rate=forward_rate,
+            discount_rate=discount_rate,
+            rate_shift=rate_shift,
             strike=strike,
             volatility=volatility,
         ).NPV()
@@ -314,6 +305,7 @@ def build_black_cap() -> dict[str, Any]:
     cap = _quantlib_multi_period_cap(
         forward_rate=forward_rate,
         discount_rate=discount_rate,
+        rate_shift=0.0,
         strike=strike,
         volatility=volatility,
     )
@@ -334,16 +326,10 @@ def build_black_cap() -> dict[str, Any]:
         "market": market_snapshot(
             [
                 flat_discount_curve("USD-OIS", discount_rate),
-                flat_forward_curve(
+                forward_curve(
                     "USD-TERM-3M",
-                    forward_rate,
-                    projection_dates=[
-                        "2026-07-30",
-                        "2026-10-30",
-                        "2027-01-30",
-                        "2027-04-30",
-                        "2027-07-30",
-                    ],
+                    projection_knots(*_cap_projection(forward_rate)),
+                    index_months=3,
                 ),
             ],
             surfaces=[
@@ -390,34 +376,31 @@ def build_black_cap() -> dict[str, Any]:
     }
 
 
+def _swaption_projection(forward_rate: float) -> tuple[list[ql.Date], list[float]]:
+    dates = [ql_date(VALUATION_DATE), ql.Date(30, 4, 2027), ql.Date(30, 4, 2028)]
+    return dates, chained_simple_discounts(dates, forward_rate, ql.Actual365Fixed())
+
+
 def _quantlib_swaption(
     *,
     forward_rate: float,
     discount_rate: float,
+    rate_shift: float,
     strike: float,
     volatility: float,
     normal: bool,
 ) -> ql.Swaption:
     evaluation_date = ql_date(VALUATION_DATE)
-    swap_start = ql.Date(30, 4, 2027)
-    swap_end = ql.Date(30, 4, 2028)
+    projection_dates, projection_discounts = _swaption_projection(forward_rate)
+    swap_start, swap_end = projection_dates[1:]
     day_count = ql.Actual365Fixed()
     calendar = ql.WeekendsOnly()
     ql.Settings.instance().evaluationDate = evaluation_date
 
-    discount = ql.YieldTermStructureHandle(ql.FlatForward(evaluation_date, discount_rate, day_count, ql.Continuous))
-    start_time = day_count.yearFraction(evaluation_date, swap_start)
-    accrual = day_count.yearFraction(swap_start, swap_end)
-    start_df = math.exp(-forward_rate * start_time)
-    end_df = start_df / (1.0 + forward_rate * accrual)
-    projection = ql.YieldTermStructureHandle(
-        ql.DiscountCurve(
-            [evaluation_date, swap_start, swap_end],
-            [1.0, start_df, end_df],
-            day_count,
-            ql.NullCalendar(),
-        )
+    discount = ql.YieldTermStructureHandle(
+        ql.FlatForward(evaluation_date, discount_rate + rate_shift, day_count, ql.Continuous)
     )
+    projection = ql_projection_curve(projection_dates, projection_discounts, shift=rate_shift)
     index = ql.IborIndex(
         "USD-TERM-1Y",
         ql.Period(1, ql.Years),
@@ -473,8 +456,9 @@ def _build_swaption_fixture(
 ) -> dict[str, Any]:
     def price_with_rates(rate_shift: float) -> float:
         return _quantlib_swaption(
-            forward_rate=forward_rate + rate_shift,
-            discount_rate=discount_rate + rate_shift,
+            forward_rate=forward_rate,
+            discount_rate=discount_rate,
+            rate_shift=rate_shift,
             strike=strike,
             volatility=volatility,
             normal=normal,
@@ -483,6 +467,7 @@ def _build_swaption_fixture(
     swaption = _quantlib_swaption(
         forward_rate=forward_rate,
         discount_rate=discount_rate,
+        rate_shift=0.0,
         strike=strike,
         volatility=volatility,
         normal=normal,
@@ -512,13 +497,17 @@ def _build_swaption_fixture(
         "market": market_snapshot(
             [
                 flat_discount_curve("USD-OIS", discount_rate),
-                flat_forward_curve("USD-TERM-1Y", forward_rate, day_count="act_365f"),
+                forward_curve(
+                    "USD-TERM-1Y",
+                    projection_knots(*_swaption_projection(forward_rate)),
+                    index_months=12,
+                ),
             ],
             surfaces=[
                 {
                     "id": "USD-SWAPTION-VOL-QL",
                     "expiries": [0.5, 1.0, 2.0],
-                    "strikes": [0.5, 1.0, 2.0],
+                    "secondary_values": [0.5, 1.0, 2.0],
                     "secondary_axis": "tenor",
                     "quote_type": quote_type,
                     "interpolation_mode": "vol",
@@ -535,7 +524,6 @@ def _build_swaption_fixture(
                     "option_type": "call",
                     "notional": {"amount": "10000000", "currency": "USD"},
                     "expiry": "2027-04-30",
-                    "exercise_style": "european",
                     "settlement": "physical",
                     "cash_settlement_method": "par_yield",
                     "vol_model": vol_model,

@@ -78,6 +78,9 @@ fn create_market() -> MarketContext {
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(closing_date())
         .knots(vec![(0.0, 1.0), (5.0, 0.95)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
     MarketContext::new().insert(disc)

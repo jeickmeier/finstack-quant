@@ -127,9 +127,10 @@ pub fn validate_capital_structure_spec_json(
 
 /// Validate a `WaterfallSpec` JSON string.
 ///
-/// Performs both serde deserialization and the waterfall's internal
-/// consistency check (for example rejecting `Sweep` ordered after `Equity`
-/// when an ECF sweep is configured).
+/// Deserializes the waterfall and checks its payment order and sizing rules.
+/// When `priority_of_payments` is omitted, the order is `fees`, `interest`,
+/// `amortization`, and `equity`. Prepayments require an explicit priority
+/// before any `equity` entry and a corresponding sizing configuration.
 ///
 /// # Errors
 ///
@@ -137,7 +138,7 @@ pub fn validate_capital_structure_spec_json(
 /// payment priorities; incomplete available-cash priorities; invalid PIK,
 /// payment-class, prepay-node, or ECF-sweep settings; or failure to serialize
 /// the validated waterfall.
-/// @param json - Canonical JSON string for a `WaterfallSpec`, including `priority_of_payments`, `available_cash_node`, optional `ecf_sweep`, `pik_toggle`, `payment_classes`, `mandatory_prepay_node`, and `voluntary_prepay_node`.
+/// @param json - Canonical JSON string for a `WaterfallSpec`, including `available_cash_node` and optional `priority_of_payments`, `ecf_sweep`, `pik_toggle`, `payment_classes`, `mandatory_prepay_node`, and `voluntary_prepay_node`.
 /// @returns Canonical waterfall JSON after schema validation.
 #[wasm_bindgen(js_name = validateWaterfallSpecJson)]
 pub fn validate_waterfall_spec_json(
@@ -152,8 +153,8 @@ pub fn validate_waterfall_spec_json(
 /// Validate an `EcfSweepSpec` JSON string.
 ///
 /// Deserializes the spec, runs the Rust `EcfSweepSpec::validate`, and returns
-/// the canonical JSON. The waterfall-level rule that a positive sweep needs a
-/// prepayment priority is checked by `validateWaterfallSpecJson`.
+/// the canonical JSON. `validateWaterfallSpecJson` checks the enclosing
+/// waterfall's `sweep` priority.
 ///
 /// # Errors
 ///

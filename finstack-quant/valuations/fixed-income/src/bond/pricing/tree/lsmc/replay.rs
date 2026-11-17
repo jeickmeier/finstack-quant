@@ -673,14 +673,13 @@ impl ReplayTemplate {
                     calendar: Some(calendar_by_id_strict(
                         accrual
                             .get_context()
-                            .calendar_id
-                            .as_deref()
+                            .get_calendar_id()
                             .unwrap_or(&spec.schedule.calendar_id),
                     )?),
                     frequency: Some(spec.schedule.frequency),
                     bus_basis: None,
-                    coupon_period: accrual.get_context().coupon_period,
-                    end_is_termination_date: accrual.get_context().end_is_termination_date,
+                    coupon_period: accrual.get_context().get_coupon_period(),
+                    end_is_termination_date: accrual.get_context().get_end_is_termination_date(),
                 });
                 entry.accrual = flow.get_accrual_factor();
                 entry.base_index_rate = accrual.get_projected_index_rate();
@@ -799,7 +798,18 @@ impl ReplayTemplate {
                 );
                 let source = match forward.as_ref() {
                     Some(curve) if !known_reset => {
-                        let tenor_years = curve.tenor();
+                        let index_tenor = spec
+                            .rate_spec
+                            .index_tenor
+                            .or_else(|| curve.index_tenor())
+                            .unwrap_or(spec.rate_spec.reset_frequency);
+                        let tenor_years = index_tenor.to_years_with_context(
+                            reset,
+                            None,
+                            finstack_quant_core::dates::BusinessDayConvention::Unadjusted,
+                            curve.day_count(),
+                            curve.day_count_context(),
+                        )?;
                         let observation_end_time = reset_time + tenor_years;
                         if observation_end_time > times[terminal_step] + 1.0e-12 {
                             return Err(Error::Validation(format!(
@@ -1169,14 +1179,15 @@ impl ReplayTemplate {
                         calendar: Some(calendar_by_id_strict(
                             accrual
                                 .get_context()
-                                .calendar_id
-                                .as_deref()
+                                .get_calendar_id()
                                 .unwrap_or(&bond.cashflow_spec.schedule().calendar_id),
                         )?),
                         frequency: Some(bond.cashflow_spec.schedule().frequency),
                         bus_basis: None,
-                        coupon_period: accrual.get_context().coupon_period,
-                        end_is_termination_date: accrual.get_context().end_is_termination_date,
+                        coupon_period: accrual.get_context().get_coupon_period(),
+                        end_is_termination_date: accrual
+                            .get_context()
+                            .get_end_is_termination_date(),
                     },
                     // A PIK claim is its explicit capitalization, not its cash
                     // amount (record CORE-CONVENTIONS-015 #1, #4).

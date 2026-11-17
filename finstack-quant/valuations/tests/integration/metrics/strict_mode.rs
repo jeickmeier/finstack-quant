@@ -33,6 +33,8 @@ fn create_bond_market(as_of: Date) -> MarketContext {
             (2.0f64, 0.90f64),
             (5.0f64, 0.80f64),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 

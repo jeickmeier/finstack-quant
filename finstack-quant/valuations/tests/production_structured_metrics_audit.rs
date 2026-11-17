@@ -21,6 +21,9 @@ fn deal_and_market() -> (StructuredCredit, MarketContext) {
         DiscountCurve::builder("USD-OIS")
             .base_date(deal.closing_date)
             .knots([(0.0, 1.0), (20.0, (-0.03_f64 * 20.0).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve"),
     );
@@ -328,16 +331,18 @@ fn production_structured_metrics_discount_margin_settles_clean_price_at_quote_da
     });
     let market = market
         .insert(
-            ForwardCurve::builder("SOFR-3M", 0.25)
-                .base_date(deal.closing_date)
-                .day_count(DayCount::Act365F)
-                .knots([(0.0, 0.05), (20.0, 0.05)])
-                .build()
+            ForwardCurve::flat("SOFR-3M", deal.closing_date, 0.05, DayCount::Act365F)
                 .expect("forward"),
         )
         .insert_series(
-            ScalarTimeSeries::new("FIXING:SOFR-3M", vec![(deal.closing_date, 0.05)], None)
-                .expect("fixing"),
+            ScalarTimeSeries::new(
+                "FIXING:SOFR-3M",
+                vec![(deal.closing_date, 0.05)],
+                None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .expect("fixing"),
         );
     let id = deal.tranches.tranches[0].id.as_str();
     let flows = (deal)

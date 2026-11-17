@@ -72,10 +72,7 @@ def build_deposit() -> dict[str, Any]:
                         "day_count": "act_365f",
                         "knot_points": list(zip(CURVE_TIMES, CURVE_DISCOUNTS, strict=True)),
                         "interp_style": "log_linear",
-                        "extrapolation": "flat_forward",
-                        "min_forward_rate": None,
-                        "allow_non_monotonic": False,
-                        "min_forward_tenor": 1e-6,
+                        "extrapolation": "extend",
                         "rate_calibration": None,
                         "fx_policy": None,
                     }

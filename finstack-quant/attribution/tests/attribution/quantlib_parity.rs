@@ -69,6 +69,7 @@ fn flat_discount_curve(id: &str, base: Date, rate: f64) -> DiscountCurve {
         .day_count(DayCount::Thirty360)
         .knots(knots)
         .interp(InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("flat discount curve construction")
 }
@@ -278,12 +279,13 @@ fn flat_forward_curve(
     base: Date,
     rate: f64,
 ) -> finstack_quant_core::market_data::term_structures::ForwardCurve {
-    finstack_quant_core::market_data::term_structures::ForwardCurve::builder(id, 0.25)
-        .base_date(base)
-        .knots([(0.0_f64, rate), (40.0_f64, rate)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .expect("flat forward curve construction")
+    finstack_quant_core::market_data::term_structures::ForwardCurve::flat(
+        id,
+        base,
+        rate,
+        DayCount::Thirty360,
+    )
+    .expect("flat forward curve construction")
 }
 
 fn irs_market(as_of: Date, rate: f64) -> MarketContext {

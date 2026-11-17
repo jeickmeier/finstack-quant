@@ -202,11 +202,13 @@ test('FxMatrix.rate requires an explicit conversion policy', () => {
 test('FxDeltaVolSurface wing pairing is the Rust constructor check', () => {
   const message = 'Validation error: rr_10d and bf_10d must both be provided or both omitted';
   assert.throws(
-    () => new core.FxDeltaVolSurface('X', [1], [0.1], [0.01], [0.005], [0.02]),
+    () =>
+      new core.FxDeltaVolSurface('X', 'EUR/USD', [1], [0.1], [0.01], [0.005], { rr10d: [0.02] }),
     validation(message)
   );
   assert.throws(
-    () => new core.FxDeltaVolSurface('X', [1], [0.1], [0.01], [0.005], null, [0.01]),
+    () =>
+      new core.FxDeltaVolSurface('X', 'EUR/USD', [1], [0.1], [0.01], [0.005], { bf10d: [0.01] }),
     validation(message)
   );
 });
@@ -220,11 +222,44 @@ test('VolCube keeps the Rust from_grid interpolation default when omitted', () =
   );
 });
 
+test('VolSurface and VolCubeExpirySlice require explicit grid conventions and reject unknown options', () => {
+  const validOpts = {
+    secondaryAxis: 'strike',
+    quoteType: 'black_lognormal',
+    interpolationMode: 'vol',
+  };
+  const s = new core.VolSurface('S', [1], [100], [0.2], validOpts);
+  assert.deepEqual(Array.from(s.secondaryValues), [100]);
+  assert.equal(s.expiryClock, undefined);
+  assert.equal('withDisplacements' in s, false);
+  assert.throws(() => new core.VolSurface('S', [1], [100], [0.2]), TypeError);
+  assert.throws(
+    () =>
+      new core.VolSurface('S', [1], [100], [0.2], {
+        secondaryAxis: 'strike',
+        quoteType: 'black_lognormal',
+      }),
+    TypeError
+  );
+  assert.throws(
+    () =>
+      new core.VolSurface('S', [1], [100], [0.2], {
+        ...validOpts,
+        bogus: 1,
+      }),
+    validation(
+      'Validation error: unknown VolSurface option `bogus`; allowed keys are secondaryAxis, quoteType, interpolationMode, displacements, expiryClock'
+    )
+  );
+  assert.throws(() => new core.VolCubeExpirySlice('SLICE', 1, [5], [0.03], [0.2]), TypeError);
+});
+
 const hazardOptions = (knots, recoveryRate) => ({
   id: 'HZ',
   baseDate: '2025-01-01',
   knots,
   recoveryRate,
+  dayCount: 'act_365f',
 });
 
 test('HazardCurve recovery errors and precedence come from the Rust builder', () => {
@@ -233,7 +268,7 @@ test('HazardCurve recovery errors and precedence come from the Rust builder', ()
     validation('Validation error: Invalid recovery_rate: must be finite and in [0, 1], got 1.5')
   );
   assert.throws(
-    () => new core.HazardCurve(hazardOptions([1.0, -0.02], 1.5)),
+    () => new core.HazardCurve(hazardOptions([1.0, -0.02], 0.4)),
     validation('Values must be non-negative')
   );
 });
@@ -255,6 +290,8 @@ test('tiny annual zero rates avoid subtractive cancellation', () => {
     baseDate: '2025-01-01',
     knots: [0, 1, 1, df],
     interp: 'log_linear',
+    extrapolation: 'extend',
+    dayCount: 'act_365f',
   });
   assert.ok(Math.abs(curve.zeroRate(1, 'periodic(1)') - (1 - df) / df) < 1e-23);
   assert.throws(
@@ -294,11 +331,11 @@ test('plain-object constructor factories use Rust validation and defaults', () =
   const gap = core.ratingLevelTryNew('B', 70, 65);
   for (const ratings of [[], [high, high], [low, high], [high, gap]]) {
     assert.throws(
-      () => core.scorecardScaleTryNew('invalid', null, ratings),
+      () => core.scorecardScaleTryNew('invalid', ratings, null),
       (error) => error.kind === 'validation'
     );
   }
-  assert.equal('description' in core.scorecardScaleTryNew('valid', undefined, [high, low]), false);
+  assert.equal('description' in core.scorecardScaleTryNew('valid', [high, low]), false);
   for (const params of [
     [0, 0.5, 0.4, -0.3],
     [0.2, 1.1, 0.4, -0.3],
@@ -331,6 +368,7 @@ test('HazardCurve conditionalDefaultProb preserves tiny PD and survival underflo
       baseDate: '1900-01-01',
       knots: [100, 7, 101, rate],
       recoveryRate: 0.4,
+      dayCount: 'act_365f',
     });
     assert.ok(curve.sp('2025-01-01') < 1e-12);
     if (rate === 10) assert.equal(curve.sp('2025-01-01'), 0);
@@ -338,10 +376,52 @@ test('HazardCurve conditionalDefaultProb preserves tiny PD and survival underflo
     const expected = -Math.expm1(-rate);
     assert.ok(Math.abs(actual - expected) <= Math.abs(expected) * 1e-12);
     assert.equal(curve.conditionalDefaultProb('2025-01-01', '2025-01-01'), 0);
-    assert.equal(curve.conditionalDefaultProb('1899-01-01', '1900-01-01'), 0);
+    assert.throws(
+      () => curve.conditionalDefaultProb('1899-01-01', '1900-01-01'),
+      (error) => error.kind === 'validation' && /precedes HazardCurve base_date/.test(error.message)
+    );
     assert.throws(() => curve.conditionalDefaultProb('2026-01-01', '2025-01-01'), /end >= start/);
     assert.throws(() => curve.conditionalDefaultProb('bad', '2026-01-01'));
     assert.throws(() => curve.conditionalDefaultProb(1, '2026-01-01'), TypeError);
     curve.free();
   }
+});
+
+test('Money accepts optional borrowed FinstackConfig and exposes abs, ratio, checkedCmp', () => {
+  const usd = new core.Currency('USD');
+  const eur = new core.Currency('EUR');
+  const cfg = new core.FinstackConfig('bankers');
+  cfg.setIngestScale('USD', 2);
+
+  const m1 = new core.Money(10.125, usd, cfg);
+  const m2 = core.Money.fromDecimalStr('10.135', usd, cfg);
+  assert.equal(m1.amountDecimal, '10.12');
+  assert.equal(m2.amountDecimal, '10.14');
+
+  assert.equal(new core.Money(-5.5, usd).abs().amountDecimal, '5.5');
+  assert.equal(new core.Money(10, usd).ratio(new core.Money(4, usd)), 2.5);
+  assert.equal(m1.checkedCmp(m2), -1);
+  assert.equal(m1.checkedCmp(m1), 0);
+  assert.equal(m2.checkedCmp(m1), 1);
+
+  assert.throws(
+    () => m1.ratio(new core.Money(1, eur)),
+    (error) => error.kind === 'validation'
+  );
+  assert.throws(
+    () => m1.checkedCmp(new core.Money(1, eur)),
+    (error) => error.kind === 'validation'
+  );
+  assert.throws(
+    () => new core.Money(1, usd, {}),
+    (error) => error instanceof TypeError && error.kind === 'invalid_type'
+  );
+
+  cfg.free();
+  assert.throws(() => new core.Money(1, usd, cfg), /freed/);
+
+  m1.free();
+  m2.free();
+  eur.free();
+  usd.free();
 });

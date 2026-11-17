@@ -74,7 +74,7 @@ class ValuationResult:
     >>> bond = Bond.fixed(
     ...     "B", Money(1000.0, Currency("USD")), Rate(0.05), as_of, datetime.date(2026, 1, 15), StubKind.NONE, "USD-OIS"
     ... )
-    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
+    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04, "act_365f"))
     >>> result = price_instrument(bond, market, "2024-01-15", metrics=["ytm", "dv01"])
     >>> (result.instrument_id, round(result.price, 2), result.currency)
     ('B', 1018.16, 'USD')
@@ -122,7 +122,7 @@ class ValuationResult:
         ...     StubKind.NONE,
         ...     "USD-OIS",
         ... )
-        >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
+        >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04, "act_365f"))
         >>> result = ValuationResult.from_json(price_instrument(bond, market, "2024-01-15").to_json())
         >>> (result.instrument_id, round(result.price, 2), result.currency)
         ('B', 1018.16, 'USD')

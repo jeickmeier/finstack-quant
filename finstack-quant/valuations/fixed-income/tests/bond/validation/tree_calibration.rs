@@ -26,6 +26,9 @@ fn create_flat_curve(
     DiscountCurve::builder(curve_id)
         .base_date(base_date)
         .knots(dfs)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }

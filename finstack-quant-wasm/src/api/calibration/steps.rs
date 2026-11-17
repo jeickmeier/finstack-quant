@@ -40,7 +40,7 @@ fn step(
 ///   - `curve_id` (string, optional, default `id`): Identifier of the produced curve.
 ///   - `method` (string | object, optional, default `"bootstrap"`): Calibration method: `"bootstrap"` or `{"global_solve": {"use_analytical_jacobian": bool}}`.
 ///   - `interpolation` (string, optional, default `"log_linear"`): Discount-factor interpolation: `"linear"`, `"log_linear"`, `"monotone_convex"`, `"cubic_hermite"` or `"piecewise_quadratic_forward"`.
-///   - `extrapolation` (string, optional, default `"flat_forward"`): Extrapolation policy: `"flat_zero"`, `"flat_forward"` or `"none"`.
+///   - `extrapolation` (string, optional, default `"extend"`): Extrapolation policy: `"flat"`, `"extend"` or `"error"`.
 ///   - `pricing_discount_id` (string | null, optional, default `null`): Separate discount curve used to price the quotes; `null` uses `curve_id`.
 ///   - `pricing_forward_id` (string | null, optional, default `null`): Forward curve used to price the quotes, if any.
 ///   - `conventions` (object, optional, default both `null`): Step-level rates conventions `{"curve_day_count": ..., "ois_compounding": ...}`; both entries default to `null` (the quote conventions apply).
@@ -71,11 +71,12 @@ pub fn calibration_step_discount(
 /// @param params - Object (or JSON text) holding every wire field of the `forward` step, keyed by its snake_case serde name as in the calibration JSON schema:
 ///   - `currency` (string, required): Upper-case ISO 4217 code of the curve currency.
 ///   - `base_date` (string, required): Curve base date as an ISO-8601 date string (`"YYYY-MM-DD"`).
-///   - `tenor_years` (number, required): Index accrual tenor in years (`0.25` for a 3M index).
 ///   - `discount_curve_id` (string, required): Identifier of the discount curve solved in an earlier step.
 ///   - `curve_id` (string, optional, default `id`): Identifier of the produced curve.
+///   - `index_tenor` (object, optional, default `null`): Contractual index tenor metadata attached to the calibrated curve in serde `Tenor` form (for example `{"count": 3, "unit": "months"}`).
 ///   - `method` (object, optional, default `global_solve` with a finite-difference Jacobian): Calibration method; forward curves require `global_solve` (`"bootstrap"` is rejected).
-///   - `interpolation` (string, optional, default `"cubic_hermite"`): Forward-rate interpolation: `"linear"`, `"log_linear"`, `"monotone_convex"`, `"cubic_hermite"` or `"piecewise_quadratic_forward"`; `"monotone_convex"` is rejected.
+///   - `interpolation` (string, optional, default `"log_linear"`): Projection-factor interpolation: `"linear"`, `"log_linear"`, `"cubic_hermite"`, `"piecewise_quadratic_forward"`, or `"monotone_convex"`.
+///   - `extrapolation` (string, optional, default `"extend"`): Tail policy beyond the last calibrated pillar (`"extend"`, `"flat"`, or `"error"`).
 ///   - `conventions` (object, optional, default both `null`): Step-level rates conventions `{"curve_day_count": ..., "ois_compounding": ...}`; both entries default to `null` (the quote conventions apply).
 /// @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
 /// @returns A `CalibrationStep` object with `kind: "forward"`.
@@ -140,15 +141,21 @@ pub fn calibration_step_hazard(
 /// @param id - Step identifier; also the residual key in calibration reports and the default quote-set name and `curve_id`.
 /// @param params - Object (or JSON text) holding every wire field of the `inflation` step, keyed by its snake_case serde name as in the calibration JSON schema:
 ///   - `currency` (string, required): Upper-case ISO 4217 code of the curve currency.
-///   - `base_date` (string, required): Valuation and calibration-instrument start date as an ISO-8601 date string (`"YYYY-MM-DD"`). The curve's reference CPI date is this date minus `observation_lag`.
+///   - `base_date` (string, required): Valuation and calibration-instrument start date as an ISO-8601 date string (`"YYYY-MM-DD"`), independent of the source origin.
 ///   - `discount_curve_id` (string, required): Identifier of the discount curve solved in an earlier step.
 ///   - `index` (string, required): Inflation index identifier, for example `"USA-CPI-U"`.
 ///   - `observation_lag` (string, required): Whole-month observation lag, for example `"3M"`, up to 255 months. No lag accepts `""`, `"none"`, `"0"`, `"0M"` or `"0D"` (case-insensitive); nonzero day lags are rejected.
-///   - `base_cpi` (number, required): Contractual reference CPI at the start date in index points, after observation lag and monthly interpolation; supplied index fixings must reproduce it, including seasonality.
+///   - `base_cpi` (number, required): Contractual reference CPI denominator at the start date in index points, after observation lag and monthly interpolation.
+///   - `source_base_date` (string, required): Original unlagged CPI source anchor date as ISO-8601.
+///   - `source_base_cpi` (number, required): Finite positive absolute CPI level at that source origin.
+///   - `day_count` (string, required): Explicit source clock, for example `"act_365f"`.
+///   - `calendar_id` (string | null, optional): Registered source-clock calendar; required for Bus/252.
 ///   - `curve_id` (string, optional, default `id`): Identifier of the produced curve.
 ///   - `notional` (number, optional, default `1.0`): Notional of the synthetic inflation swaps repriced during calibration.
 ///   - `method` (string | object, optional, default `"bootstrap"`): Calibration method: `"bootstrap"` or `{"global_solve": {"use_analytical_jacobian": bool}}`.
-///   - `interpolation` (string, optional, default `"linear"`): CPI interpolation: `"linear"`, `"log_linear"`, `"monotone_convex"`, `"cubic_hermite"` or `"piecewise_quadratic_forward"`.
+///   - `interpolation` (string, required): CPI interpolation: `"linear"`, `"log_linear"` or `"cubic_hermite"`.
+///   - `extrapolation` (string, required): Source tail policy: `"flat"`, `"extend"` or `"error"`.
+/// An immutable inflation fixing snapshot keyed by `curve_id` is required in `market_data`, even for projection-only calibration.
 /// @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
 /// @returns A `CalibrationStep` object with `kind: "inflation"`.
 ///
@@ -422,10 +429,9 @@ pub fn calibration_step_svi_surface(
 ///   - `fx_spot` (number, required): T+0 cash FX rate (domestic per foreign) used when a quote omits `spot_fx`.
 ///   - `domestic_discount_id` (string, required): Domestic discount curve solved in an earlier step.
 ///   - `curve_id` (string, optional, default `id`): Identifier of the produced foreign curve.
-///   - `basis_spread_curve_id` (string | null, optional, default `null`): Identifier of the byproduct basis-spread curve.
 ///   - `method` (string, optional, default `"bootstrap"`): Sequential `"bootstrap"`; `global_solve` is rejected.
 ///   - `interpolation` (string, optional, default `"log_linear"`): Discount-factor interpolation: `"linear"`, `"log_linear"`, `"monotone_convex"`, `"cubic_hermite"` or `"piecewise_quadratic_forward"`.
-///   - `extrapolation` (string, optional, default `"flat_forward"`): Extrapolation policy: `"flat_zero"`, `"flat_forward"` or `"none"`.
+///   - `extrapolation` (string, optional, default `"extend"`): Extrapolation policy: `"flat"`, `"extend"` or `"error"`.
 ///   - `conventions` (object, optional, default both `null`): Step-level rates conventions `{"curve_day_count": ..., "ois_compounding": ...}`; both entries default to `null` (the quote conventions apply).
 /// @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
 /// @returns A `CalibrationStep` object with `kind: "xccy_basis"`.

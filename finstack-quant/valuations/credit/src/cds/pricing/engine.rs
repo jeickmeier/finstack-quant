@@ -202,7 +202,7 @@ impl CdsPricer {
             .transpose()?;
 
         // Compute survival at as_of for conditioning
-        let sp_asof = surv.sp(t_asof);
+        let sp_asof = surv.sp(t_asof)?;
 
         let grid = IsdaGrid {
             t_start,
@@ -324,7 +324,7 @@ impl CdsPricer {
         let t_start = haz_t(inp.surv, inp.start_date)?;
         let t_end = haz_t(inp.surv, inp.end_date)?;
         let t_asof = haz_t(inp.surv, inp.as_of)?;
-        let sp_asof = inp.surv.sp(t_asof);
+        let sp_asof = inp.surv.sp(t_asof)?;
         if sp_asof <= credit::SURVIVAL_PROBABILITY_FLOOR {
             return Ok(0.0);
         }
@@ -687,8 +687,8 @@ impl IsdaGrid<'_> {
                 continue;
             }
 
-            let sp1 = self.surv.sp(t1) / self.sp_asof;
-            let sp2 = self.surv.sp(t2) / self.sp_asof;
+            let sp1 = self.surv.sp(t1)? / self.sp_asof;
+            let sp2 = self.surv.sp(t2)? / self.sp_asof;
             if !(sp1 > sp2 && sp1 > 0.0) {
                 continue;
             }
@@ -788,12 +788,15 @@ mod prepared_cds_tests {
         let discount = DiscountCurve::builder("USD-OIS")
             .base_date(date!(2025 - 01 - 01))
             .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.65)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
         let hazard = HazardCurve::builder("TEST-CREDIT")
             .base_date(date!(2025 - 01 - 01))
             .recovery_rate(0.40)
             .knots([(1.0, 0.02), (3.0, 0.03), (5.0, 0.04), (10.0, 0.05)])
-            .par_spreads([(1.0, 100.0), (3.0, 150.0), (5.0, 200.0), (10.0, 250.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()?;
         let market = MarketContext::new().insert(discount).insert(hazard.clone());
         Ok((market, hazard))
@@ -908,6 +911,9 @@ mod prepared_cds_tests {
                 let replacement = DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (10.0, 0.5)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()?;
                 let changed = market.clone().insert(replacement);
                 assert_eq!(prepared.price(&hazard)?.to_bits(), original.to_bits());
@@ -1029,12 +1035,15 @@ mod prepared_cds_tests {
         let disc = DiscountCurve::builder("short")
             .base_date(base)
             .knots([(0.0, 1.0), (0.5, 0.98)])
-            .extrapolation(ExtrapolationPolicy::None)
+            .extrapolation(ExtrapolationPolicy::Error)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
             .build()?;
         let zero = HazardCurve::builder("trial")
             .base_date(base)
             .recovery_rate(0.4)
             .knots([(1.0, 0.0), (3.0, 0.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()?;
         let positive = zero.with_parallel_hazard_rate_bump_bp(100.0)?;
         let cache = super::IsdaWindowCache::default();
@@ -1091,9 +1100,13 @@ mod prepared_cds_tests {
         use finstack_quant_core::dates::DayCount;
         let (_, hazard) = create_test_market()?;
         for as_of in [date!(2025 - 01 - 01), date!(2025 - 02 - 15)] {
-            let discount=DiscountCurve::builder("USD-OIS").base_date(date!(2024-12-20)).day_count(DayCount::Act360)
-                .knots([(0.0,1.0),(0.7,1.02),(4.1,1.1),(10.0,1.2)])
-                .validation(finstack_quant_core::market_data::term_structures::ValidationMode::NegativeRateFriendly {forward_floor:-0.1}).build()?;
+            let discount = DiscountCurve::builder("USD-OIS")
+                .base_date(date!(2024 - 12 - 20))
+                .day_count(DayCount::Act360)
+                .knots([(0.0, 1.0), (0.7, 1.02), (4.1, 1.1), (10.0, 1.2)])
+                .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()?;
             let market = MarketContext::new().insert(discount.clone());
             for delay in [0, 3, 7] {
                 let mut cds = create_test_cds(CdsValuationConvention::BloombergCdswClean)?;
@@ -1159,11 +1172,15 @@ mod cds_review_regression_tests {
         let discount = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (10.0, 1.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
         let hazard = HazardCurve::builder("CREDIT")
             .base_date(as_of)
             .recovery_rate(0.4)
-            .knots([(0.0, hazard_rate), (10.0, hazard_rate)])
+            .knots([(10.0, hazard_rate)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()?;
         Ok((discount, hazard))
     }
@@ -1264,10 +1281,11 @@ mod cds_review_regression_tests {
         let surv = HazardCurve::builder("CREDIT")
             .base_date(hazard_base)
             .recovery_rate(0.4)
-            .knots([(0.0, 10.0), (10.0, 10.0)])
+            .knots([(1.0, 10.0), (10.0, 10.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()?;
         assert!(
-            surv.sp(5.0)
+            surv.sp(5.0)?
                 < finstack_quant_valuations_core::constants::credit::SURVIVAL_PROBABILITY_FLOOR
         );
         for convention in [

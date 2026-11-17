@@ -202,19 +202,19 @@ pub fn brinson_fachler(sectors: &[SectorPeriod]) -> Result<BrinsonPeriodResult> 
                 )));
             }
         }
-        sum_wp.add(s.portfolio_weight);
-        sum_wb.add(s.benchmark_weight);
-        sum_rp.add(s.portfolio_weight * s.portfolio_return);
-        sum_rb.add(s.benchmark_weight * s.benchmark_return);
+        sum_wp.add(s.portfolio_weight)?;
+        sum_wb.add(s.benchmark_weight)?;
+        sum_rp.add(s.portfolio_weight * s.portfolio_return)?;
+        sum_rb.add(s.benchmark_weight * s.benchmark_return)?;
     }
 
-    let total_wp = sum_wp.total();
-    let total_wb = sum_wb.total();
+    let total_wp = sum_wp.get_total()?;
+    let total_wb = sum_wb.get_total()?;
     check_weights_sum("Portfolio", total_wp)?;
     check_weights_sum("Benchmark", total_wb)?;
 
-    let portfolio_return = sum_rp.total();
-    let benchmark_return = sum_rb.total();
+    let portfolio_return = sum_rp.get_total()?;
+    let benchmark_return = sum_rb.get_total()?;
 
     let mut allocation = NeumaierAccumulator::new();
     let mut selection = NeumaierAccumulator::new();
@@ -236,9 +236,9 @@ pub fn brinson_fachler(sectors: &[SectorPeriod]) -> Result<BrinsonPeriodResult> 
         let inter = (s.portfolio_weight - s.benchmark_weight)
             * (s.portfolio_return - sector_benchmark_return);
 
-        allocation.add(alloc);
-        selection.add(sel);
-        interaction.add(inter);
+        allocation.add(alloc)?;
+        selection.add(sel)?;
+        interaction.add(inter)?;
 
         sector_effects.push(SectorEffect {
             sector: s.sector.clone(),
@@ -249,9 +249,9 @@ pub fn brinson_fachler(sectors: &[SectorPeriod]) -> Result<BrinsonPeriodResult> 
         });
     }
 
-    let total_allocation = allocation.total();
-    let total_selection = selection.total();
-    let total_interaction = interaction.total();
+    let total_allocation = allocation.get_total()?;
+    let total_selection = selection.get_total()?;
+    let total_interaction = interaction.get_total()?;
 
     Ok(BrinsonPeriodResult {
         sectors: sector_effects,
@@ -366,9 +366,9 @@ pub fn carino_link(periods: &[BrinsonPeriodResult]) -> Result<CarinoLinkedAttrib
     let mut sum_sel = NeumaierAccumulator::new();
     let mut sum_inter = NeumaierAccumulator::new();
     for (name, [alloc, sel, inter]) in sector_names.into_iter().zip(linked.rows) {
-        sum_alloc.add(alloc);
-        sum_sel.add(sel);
-        sum_inter.add(inter);
+        sum_alloc.add(alloc)?;
+        sum_sel.add(sel)?;
+        sum_inter.add(inter)?;
         linked_sectors.push(SectorEffect {
             sector: name,
             allocation: alloc,
@@ -383,9 +383,9 @@ pub fn carino_link(periods: &[BrinsonPeriodResult]) -> Result<CarinoLinkedAttrib
         portfolio_return_compounded: linked.portfolio_return_compounded,
         benchmark_return_compounded: linked.benchmark_return_compounded,
         linked_sectors,
-        linked_allocation: sum_alloc.total(),
-        linked_selection: sum_sel.total(),
-        linked_interaction: sum_inter.total(),
+        linked_allocation: sum_alloc.get_total()?,
+        linked_selection: sum_sel.get_total()?,
+        linked_interaction: sum_inter.get_total()?,
     })
 }
 
@@ -534,18 +534,24 @@ pub(crate) fn carino_link_effects<const N: usize>(
         let scale = k_t / big_k;
         for (row_acc, row) in acc.iter_mut().zip(period.rows.iter()) {
             for (effect_acc, value) in row_acc.iter_mut().zip(row.iter()) {
-                effect_acc.add(scale * value);
+                effect_acc.add(scale * value)?;
             }
         }
+    }
+
+    let mut rows = Vec::with_capacity(row_count);
+    for row_acc in acc {
+        let mut row = [0.0; N];
+        for (dst, value) in row.iter_mut().zip(row_acc.iter()) {
+            *dst = value.get_total()?;
+        }
+        rows.push(row);
     }
 
     Ok(CarinoLinkedEffects {
         portfolio_return_compounded: r_p_total,
         benchmark_return_compounded: r_b_total,
-        rows: acc
-            .into_iter()
-            .map(|row_acc| row_acc.map(|value| value.total()))
-            .collect(),
+        rows,
     })
 }
 
@@ -756,7 +762,7 @@ pub(crate) fn validate_link_period<const N: usize>(period: &LinkPeriod<'_, N>) -
     )?;
 
     let mut effect_l1 = ScaledL1Norm::default();
-    let mut row_totals = [NeumaierAccumulator::new(); N];
+    let mut row_totals = [Some(NeumaierAccumulator::new()); N];
     for (row_index, (label, effects, declared_total)) in period.rows.iter().enumerate() {
         let total_name = period.row_total_name;
         if !declared_total.is_finite() {
@@ -774,12 +780,26 @@ pub(crate) fn validate_link_period<const N: usize>(period: &LinkPeriod<'_, N>) -
                      must be finite (got {value})"
                 )));
             }
-            total.add(*value);
-            row_sum.add(*value);
+            if let Some(acc) = total
+                && acc.add(*value).is_err()
+            {
+                *total = None;
+            }
+            if row_sum.add(*value).is_err() {
+                return Err(Error::invalid_input(format!(
+                    "{method} Carino period[{index}].rows[{row_index}] '{label}' {total_name} \
+                     reconciliation residual must be finite"
+                )));
+            }
             row_l1.add(*value);
             effect_l1.add(*value);
         }
-        let actual = row_sum.total();
+        let Ok(actual) = row_sum.get_total() else {
+            return Err(Error::invalid_input(format!(
+                "{method} Carino period[{index}].rows[{row_index}] '{label}' {total_name} \
+                 reconciliation residual must be finite"
+            )));
+        };
         let residual = actual - declared_total;
         let row_tolerance = row_l1.tolerance();
         if !residual.is_finite() {
@@ -803,10 +823,15 @@ pub(crate) fn validate_link_period<const N: usize>(period: &LinkPeriod<'_, N>) -
     }
     let tolerance = effect_l1.tolerance();
 
-    let mut declared_sum = NeumaierAccumulator::new();
+    let mut declared_sum = Some(NeumaierAccumulator::new());
     for (index_in_totals, (name, declared)) in period.totals.into_iter().enumerate() {
         if !period.rows.is_empty() {
-            let actual = row_totals[index_in_totals].total();
+            let Some(actual) = row_totals[index_in_totals].and_then(|acc| acc.get_total().ok())
+            else {
+                return Err(Error::invalid_input(format!(
+                    "{method} Carino period[{index}] {name} reconciliation residual must be finite"
+                )));
+            };
             let residual = actual - declared;
             if !residual.is_finite() {
                 return Err(Error::invalid_input(format!(
@@ -823,10 +848,18 @@ pub(crate) fn validate_link_period<const N: usize>(period: &LinkPeriod<'_, N>) -
                 )));
             }
         }
-        declared_sum.add(declared);
+        if let Some(acc) = &mut declared_sum
+            && acc.add(declared).is_err()
+        {
+            declared_sum = None;
+        }
     }
 
-    let effect_total = declared_sum.total();
+    let Some(effect_total) = declared_sum.and_then(|acc| acc.get_total().ok()) else {
+        return Err(Error::invalid_input(format!(
+            "{method} Carino period[{index}] effect reconciliation residual must be finite"
+        )));
+    };
     let residual = effect_total - period.active_return;
     if !residual.is_finite() {
         return Err(Error::invalid_input(format!(

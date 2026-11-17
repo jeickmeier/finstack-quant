@@ -226,7 +226,7 @@ const EMPTY_MARKET = {
   dividends: [],
   fx: null,
   fx_delta_vol_surfaces: [],
-  hierarchy: { roots: {} },
+  hierarchy: { roots: [] },
   inflation_indices: [],
   prices: {},
   series: [],
@@ -257,6 +257,7 @@ test('capital-structure validators run the Rust validate()', () => {
   const invertedWaterfall = {
     priority_of_payments: ['fees', 'interest', 'amortization', 'equity', 'sweep'],
     available_cash_node: 'cash',
+    ecf_sweep: { ebitda_node: 'cash', sweep_percentage: 0.5 },
   };
   assert.throws(
     () => statements.validateCapitalStructureSpecJson({ waterfall: invertedWaterfall }),

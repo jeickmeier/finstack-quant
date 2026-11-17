@@ -59,7 +59,7 @@ def test_schedule_builder_setters_update_the_builder_in_place_and_return_it() ->
 
 def test_market_context_inserts_update_the_context_in_place_and_return_it() -> None:
     market = MarketContext()
-    curve = DiscountCurve.flat("USD-OIS", dt.date(2025, 1, 2), 0.04)
+    curve = DiscountCurve.flat("USD-OIS", dt.date(2025, 1, 2), 0.04, "act_365f")
     assert market.insert(curve) is market
     assert market.insert_price("SPX", 5900.0).insert_price("SPOT", 185.25, "USD") is market
     assert "USD-OIS" in market.curve_ids()

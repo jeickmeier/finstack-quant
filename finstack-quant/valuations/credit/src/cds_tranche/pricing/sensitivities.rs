@@ -135,7 +135,7 @@ impl CdsTranchePricer {
         index_data: &CreditIndexData,
         maturity_years: f64,
     ) -> Result<f64> {
-        let survival_prob = index_data.index_credit_curve().sp(maturity_years);
+        let survival_prob = index_data.index_credit_curve().sp(maturity_years)?;
         Ok((1.0 - survival_prob).clamp(0.0, 1.0))
     }
 

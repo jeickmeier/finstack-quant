@@ -157,10 +157,9 @@ pub struct InflationCapFloor {
     )]
     pub scenario_pricing_overrides:
         finstack_quant_valuations_core::instruments::pricing_overrides::ScenarioPricingOverrides,
-    /// Contractual CPI observation lag; when `None` the index lag, then the
-    /// curve's indexation lag, applies.
+    /// Explicit contractual CPI observation lag; missing terms fail reference resolution.
     pub lag: Option<InflationLag>,
-    /// Contractual monthly CPI interpolation; takes precedence over index metadata.
+    /// Explicit contractual monthly CPI interpolation; no source default is used.
     /// Defaults to monthly step interpolation when neither source supplies it.
     pub interpolation: Option<finstack_quant_core::market_data::scalars::SeriesInterpolation>,
     /// Clock used by the volatility surface's annualized quotes. This is
@@ -198,7 +197,8 @@ impl InflationCapFloor {
             .inflation_index_id(CurveId::new("US-CPI"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("USD-INFL-VOL"))
-            .lag(InflationLag::Months(3))
+            .lag(InflationLag::months(3))
+            .interpolation(finstack_quant_core::market_data::scalars::SeriesInterpolation::Linear)
             .attributes(Attributes::new())
             .build()
     }
@@ -226,52 +226,45 @@ impl InflationCapFloor {
         self.strike.as_f64()
     }
 
-    /// Minimum reasonable CPI value for developed market indices.
-    /// Used to catch data errors that could cause numerical instability.
-    const MIN_REASONABLE_CPI: f64 = 50.0;
-
-    fn effective_lag(&self, curves: &MarketContext) -> InflationLag {
-        finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_inflation_lag(
-            self.lag,
-            self.inflation_index_id.as_str(),
-            curves,
-        )
+    fn effective_lag(&self) -> finstack_quant_core::Result<InflationLag> {
+        self.lag.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "InflationCapFloor requires an explicit lag".into(),
+            )
+        })
     }
 
     fn lagged_fixing_date(
         &self,
-        curves: &MarketContext,
+        _curves: &MarketContext,
         date: Date,
     ) -> finstack_quant_core::Result<Date> {
         finstack_quant_valuations_core::instruments::common_impl::helpers::apply_inflation_lag(
             date,
-            self.effective_lag(curves),
+            self.effective_lag()?,
         )
     }
 
     fn cpi_value(
         &self,
         curves: &MarketContext,
-        as_of: Date,
+        _as_of: Date,
         date: Date,
     ) -> finstack_quant_core::Result<
         finstack_quant_valuations_core::instruments::common_impl::helpers::InflationReferenceValue,
     > {
-        let interpolation = self
-            .interpolation
-            .or_else(|| {
-                curves
-                    .get_inflation_index(self.inflation_index_id.as_str())
-                    .ok()
-                    .map(|index| index.interpolation())
-            })
-            .unwrap_or_default();
+        let interpolation = self.interpolation.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "InflationCapFloor requires explicit reference interpolation".into(),
+            )
+        })?;
+        let index = curves.get_inflation_index(self.inflation_index_id.as_str())?;
         let resolved = finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_reference_inflation(
             curves,
             self.inflation_index_id.as_str(),
             date,
-            as_of,
-            self.effective_lag(curves),
+            index.knowledge_date(),
+            self.effective_lag()?,
             interpolation,
         )?;
         Self::validate_cpi_value(resolved.value, date)?;
@@ -280,20 +273,11 @@ impl InflationCapFloor {
 
     /// Validate that a CPI value is reasonable and won't cause numerical issues.
     fn validate_cpi_value(value: f64, date: Date) -> finstack_quant_core::Result<f64> {
-        if value <= 0.0 {
+        if !value.is_finite() || value <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "CPI value must be positive; got {:.4} on {}",
                 value, date
             )));
-        }
-        if value < Self::MIN_REASONABLE_CPI {
-            tracing::warn!(
-                cpi = value,
-                date = %date,
-                min_reasonable = Self::MIN_REASONABLE_CPI,
-                "CPI value is below minimum reasonable threshold for developed markets; \
-                 this may indicate a data error"
-            );
         }
         Ok(value)
     }

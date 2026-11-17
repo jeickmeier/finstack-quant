@@ -686,7 +686,9 @@ mod tests {
     #[test]
     fn z_score_of_mean_is_zero() {
         let values = [10.0, 20.0, 30.0, 40.0, 50.0];
-        let m = finstack_quant_core::math::stats::mean(&values);
+        let m = finstack_quant_core::math::stats::mean(&values)
+            .unwrap()
+            .unwrap();
         let z = z_score(&values, m).expect("z-score of mean");
         assert!(z.abs() < 1e-10, "z-score of mean should be ~0, got {z}");
     }

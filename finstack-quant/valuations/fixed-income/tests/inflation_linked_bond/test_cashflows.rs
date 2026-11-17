@@ -116,7 +116,9 @@ fn test_coupon_amounts_reflect_inflation_adjustment() {
     let inflation_curve =
         finstack_quant_core::market_data::term_structures::InflationCurve::builder("US-CPI-U")
             .base_date(d(2024, 1, 1))
-            .base_cpi(300.0)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .knots([
                 (0.0, 300.0),
                 (1.0, 306.0),  // 2% inflation year 1
@@ -214,13 +216,13 @@ fn test_schedule_with_deflation_protection() {
     let (mut ctx, _) = market_context_with_index();
     // Insert deflated index
     let observations = (4..=11).map(|month| (d(2024, month, 1), 295.0)).collect(); // Lower than base across the lagged coupon window
-    let index = finstack_quant_core::market_data::scalars::InflationIndex::new(
+    let index = fixing_snapshot(
         "US-CPI-U",
         observations,
         finstack_quant_core::currency::Currency::USD,
+        d(2024, 12, 1),
     )
-    .unwrap()
-    .with_interpolation(finstack_quant_core::market_data::scalars::SeriesInterpolation::Linear);
+    .unwrap();
     ctx = ctx.insert_inflation_index(index);
 
     let as_of = d(2024, 1, 1);

@@ -500,7 +500,7 @@ impl Performance {
             }
             reward_ratio(
                 excess_reward(growth[i], risk_free_rate)?,
-                mean_episode_drawdown(self.active_drawdown_values(i), n).abs(),
+                mean_episode_drawdown(self.active_drawdown_values(i), n)?.abs(),
             )
         })
     }
@@ -536,9 +536,9 @@ impl Performance {
                 let mut normalized =
                     finstack_quant_core::math::summation::NeumaierAccumulator::new();
                 for depth in depths {
-                    normalized.add((depth / scale).powi(2));
+                    normalized.add((depth / scale).powi(2))?;
                 }
-                scale * (normalized.total() / path.len() as f64).sqrt()
+                scale * (normalized.get_total()? / path.len() as f64).sqrt()
             };
             if scale > 0.0 && risk == 0.0 {
                 return Err(Error::Internal(

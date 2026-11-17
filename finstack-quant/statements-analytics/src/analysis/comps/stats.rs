@@ -54,21 +54,21 @@ pub fn peer_stats(values: &[f64]) -> Option<PeerStats> {
     sorted.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
     let n = sorted.len();
-    let m = mean(&finite);
-    let median = quantile_sorted(&sorted, 0.50);
-    let q1 = quantile_sorted(&sorted, 0.25);
-    let q3 = quantile_sorted(&sorted, 0.75);
+    let m = mean(&finite).ok()??;
+    let median = quantile_sorted(&sorted, 0.50).ok()??;
+    let q1 = quantile_sorted(&sorted, 0.25).ok()??;
+    let q3 = quantile_sorted(&sorted, 0.75).ok()??;
 
     let mut os = OnlineStats::new();
     for &v in &finite {
-        os.update(v);
+        os.update(v).ok()?;
     }
 
     let stats = PeerStats {
         count: n,
         mean: m,
         median,
-        std_dev: os.std_dev(),
+        std_dev: os.get_std_dev().ok()?.unwrap_or(0.0),
         min: sorted[0],
         max: sorted[n - 1],
         q1,
@@ -140,17 +140,18 @@ pub fn z_score(values: &[f64], value: f64) -> Option<f64> {
     let mut os = OnlineStats::new();
     for &v in values {
         if v.is_finite() {
-            os.update(v);
+            os.update(v).ok()?;
         }
     }
-    if os.count() < 2 {
+    if os.get_count() < 2 {
         return None;
     }
-    let sd = os.std_dev();
+    let sd = os.get_std_dev().ok()??;
     if !sd.is_finite() || sd < 1e-15 {
         return None;
     }
-    let score = (value - os.mean()) / sd;
+    let m = os.get_mean().ok()??;
+    let score = (value - m) / sd;
     score.is_finite().then_some(score)
 }
 
@@ -213,19 +214,20 @@ pub fn regression_fair_value(
         return None;
     }
 
-    // OnlineCovariance.optimal_beta() returns Cov(X,Y)/Var(Y), so pass
+    // OnlineCovariance.get_optimal_beta() returns Cov(X,Y)/Var(Y), so pass
     // (y_i, x_i) to get slope = Cov(Y,X)/Var(X).
     let mut oc = OnlineCovariance::new();
     for (x, y) in x_values.iter().zip(y_values) {
-        oc.update(*y, *x);
+        oc.update(*y, *x).ok()?;
     }
 
-    if !oc.variance_y().is_finite() || oc.variance_y() <= 0.0 {
+    let var_y = oc.get_variance_y().ok()??;
+    if !var_y.is_finite() || var_y <= 0.0 {
         return None;
     }
-    let slope = oc.optimal_beta();
-    let intercept = oc.mean_x() - slope * oc.mean_y();
-    let corr = oc.correlation();
+    let slope = oc.get_optimal_beta().ok()??;
+    let intercept = oc.get_mean_x().ok()?? - slope * oc.get_mean_y().ok()??;
+    let corr = oc.get_correlation().ok()?.unwrap_or(0.0);
     let r_squared = corr * corr;
     let fitted_value = intercept + slope * subject_x;
     let residual = subject_y - fitted_value;

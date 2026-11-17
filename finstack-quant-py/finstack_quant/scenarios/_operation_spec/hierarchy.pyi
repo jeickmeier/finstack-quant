@@ -24,7 +24,8 @@ class HierarchyTarget:
     TypeError
         If ``path`` is not a list of strings or ``tag_filter`` is not JSON-serializable.
     ValueError
-        If predicates do not match the canonical TagFilter shape.
+        If ``path`` is empty, any segment is blank or contains ``'/'``, or
+        predicates do not match the canonical TagFilter shape.
 
     Examples
     --------

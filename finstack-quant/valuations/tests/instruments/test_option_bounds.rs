@@ -11,7 +11,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::{VolGridOpts, VolSurface};
+use finstack_quant_core::market_data::surfaces::{
+    VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
@@ -30,7 +32,7 @@ fn create_option_market(
 ) -> MarketContext {
     // Use log-linear interpolation so a flat continuously compounded rate is
     // represented exactly between the supplied discount factor knots.
-    let mut builder = DiscountCurve::builder("USD-OIS")
+    let builder = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
         .day_count(DayCount::Act365F)
         .interp(InterpStyle::LogLinear)
@@ -39,17 +41,8 @@ fn create_option_market(
             (0.5, (-rate * 0.5).exp()),
             (1.0, (-rate).exp()),
             (2.0, (-rate * 2.0).exp()),
-        ]);
-
-    // Allow non-monotonic for zero or negative rates (flat/increasing DFs).
-    if rate.abs() < 1e-10 || rate < 0.0 {
-        builder = builder.validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        );
-    }
+        ])
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend);
 
     let disc = builder.build().unwrap();
 
@@ -58,7 +51,11 @@ fn create_option_market(
         &[0.25, 0.5, 1.0, 2.0],
         &[50.0, 75.0, 100.0, 125.0, 150.0],
         &[vol; 20], // 4 expiries × 5 strikes
-        VolGridOpts::default(),
+        VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
+            interpolation_mode: VolInterpolationMode::Vol,
+        },
         None,
     )
     .unwrap();
@@ -68,9 +65,12 @@ fn create_option_market(
         .insert_surface(vol_surface)
         .insert_price(
             "EQUITY-SPOT",
-            MarketScalar::Price(Money::new(spot, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(spot, Currency::USD).expect("valid money fixture")),
         )
-        .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(div_yield))
+        .insert_price(
+            "EQUITY-DIVYIELD",
+            MarketScalar::unitless(div_yield).expect("valid scalar"),
+        )
 }
 
 proptest! {

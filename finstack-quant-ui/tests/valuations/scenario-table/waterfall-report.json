@@ -1,7 +1,7 @@
 {
   "instrumentSource": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
   "marketSource": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-  "marketSha256": "3ee1b64c7eb259dfa64ffbcc2d253995ca398d7c10794631a247b6f7111ee2c3",
+  "marketSha256": "91b9c85cfc0472093142fed8ccd69a008c068f3cfd8b484c7d9d09495ae91b89",
   "asOf": "2024-01-01",
   "cases": [
     {
@@ -631,9 +631,9 @@
               "coverage_tests": [
                 {
                   "test_id": "OC_CLONOTES-A",
-                  "ratio": 0.9979848225570753,
+                  "ratio": 0.9979848225570752,
                   "trigger_level": 2,
-                  "cushion": -1.0020151774429247,
+                  "cushion": -1.002015177442925,
                   "passing": false
                 }
               ],
@@ -742,7 +742,7 @@
                   }
                 ],
                 "coverage_tests": [
-                  ["OC_CLONOTES-A", 0.9979848225570753, false]
+                  ["OC_CLONOTES-A", 0.9979848225570752, false]
                 ],
                 "diverted_cash": {
                   "amount": "248320.5971140866",
@@ -1275,7 +1275,7 @@
                 "amount": "0",
                 "currency": "USD"
               },
-              "excess_spread": 0.0014430044709275315,
+              "excess_spread": 0.0014430044709275284,
               "coverage_tests": [
                 {
                   "test_id": "OC_CLONOTES-A",

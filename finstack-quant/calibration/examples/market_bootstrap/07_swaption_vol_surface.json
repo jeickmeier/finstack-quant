@@ -60,7 +60,7 @@
         "base_date": "2026-05-08",
         "method": "bootstrap",
         "interpolation": "linear",
-        "extrapolation": "flat_forward",
+        "extrapolation": "extend",
         "pricing_discount_id": null,
         "pricing_forward_id": null,
         "conventions": {
@@ -74,7 +74,10 @@
         "curve_id": "USD-SOFR-3M",
         "currency": "USD",
         "base_date": "2026-05-08",
-        "tenor_years": 0.25,
+        "index_tenor": {
+          "count": 3,
+          "unit": "months"
+        },
         "discount_curve_id": "USD-OIS",
         "method": {
           "global_solve": {

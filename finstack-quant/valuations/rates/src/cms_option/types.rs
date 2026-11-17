@@ -62,6 +62,10 @@ pub struct CmsOption {
     /// override the convention when explicitly set. Required for USD CMS.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_id: Option<IndexId>,
+    /// Explicit CMS benchmark fixing identifier used for historical fixings
+    /// (`FIXING:<cms_fixing_index_id>`), distinct from `forward_curve_id` and `index_id`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cms_fixing_index_id: Option<IndexId>,
     /// Fixed leg frequency of the underlying swap (overrides convention if set)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub swap_fixed_frequency: Option<Tenor>,
@@ -147,6 +151,14 @@ impl CmsOption {
                 )));
             }
         }
+        if let Some(fixing_id) = &self.cms_fixing_index_id {
+            crate::cms_common::validate_cms_fixing_index_id(
+                fixing_id,
+                &self.forward_curve_id,
+                self.index_id.as_ref(),
+                "CmsOption cms_fixing_index_id",
+            )?;
+        }
         Ok(())
     }
 
@@ -190,6 +202,7 @@ impl CmsOption {
             .notional(Money::from((10_000_000_i64, Currency::USD)))
             .day_count(DayCount::Act365F)
             .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
+            .cms_fixing_index_id_opt(Some(IndexId::new("USD-CMS-10Y")))
             .swap_float_day_count_opt(Some(DayCount::Act360))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .forward_curve_id(CurveId::new("USD-LIBOR-3M"))
@@ -235,6 +248,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsOption {
         &self,
     ) -> finstack_quant_core::Result<finstack_quant_valuations_core::instruments::MarketDependencies>
     {
+        self.validate()?;
         let mut deps = finstack_quant_valuations_core::instruments::MarketDependencies::new();
         deps.add_discount_curve(self.discount_curve_id.clone());
         deps.add_forward_curve(self.forward_curve_id.clone());
@@ -245,12 +259,11 @@ impl finstack_quant_valuations_core::instruments::Instrument for CmsOption {
                 Some(self.strike_f64()?),
             ),
         );
-        deps.add_series_id(
-            finstack_quant_core::market_data::fixings::cms_fixing_series_id(
-                self.forward_curve_id.as_str(),
-                self.cms_tenor.to_years_approx(),
-            ),
-        );
+        if let Some(fixing_id) = &self.cms_fixing_index_id {
+            deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+                fixing_id.as_str(),
+            ));
+        }
         Ok(deps)
     }
 

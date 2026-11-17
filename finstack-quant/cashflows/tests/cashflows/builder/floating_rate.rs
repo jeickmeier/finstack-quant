@@ -69,12 +69,16 @@ fn term_coupon_uses_the_actual_reset_date_fixing() {
     let mut spec = make_float_spec(FloatingRateFallback::Error, dec!(0.0));
     spec.rate_spec.reset_lag_days = 2;
 
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(base)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.01), (1.0, 0.21)])
-        .build()
-        .expect("ForwardCurve builder should succeed");
+    let fwd = ForwardCurve::from_zero_rates(
+        "USD-SOFR-3M",
+        base,
+        &[(0.0, 0.01), (1.0, 0.08)],
+        finstack_quant_core::math::Compounding::Continuous,
+        DayCount::Act360,
+        finstack_quant_core::math::interp::InterpStyle::LogLinear,
+        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+    )
+    .expect("ForwardCurve should succeed");
     let market = MarketContext::new().insert(fwd);
 
     let mut builder = CashFlowSchedule::builder();
@@ -99,18 +103,13 @@ fn term_coupon_uses_the_actual_reset_date_fixing() {
     let fwd = market
         .get_forward("USD-SOFR-3M")
         .expect("forward curve should exist");
-    let reset_t = fwd
+    let accrual = fwd
         .day_count()
-        .year_fraction(base, reset_date, DayCountContext::default())
-        .expect("valid reset year fraction");
-    let payment_t = fwd
-        .day_count()
-        .year_fraction(base, first_float.get_date(), DayCountContext::default())
-        .expect("valid payment year fraction");
-    let reset_fixing = fwd.rate(reset_t);
-    let integrated_average = fwd
-        .rate_period(reset_t, payment_t)
-        .expect("finite ordered period");
+        .year_fraction(issue, maturity, DayCountContext::default())
+        .expect("valid accrual year fraction");
+    let expected_rate = fwd
+        .rate_between_dates(issue, maturity, accrual)
+        .expect("factor projection over coupon period");
     let built_rate = first_float
         .get_rate()
         .expect("floating coupon should store its rate");
@@ -119,8 +118,7 @@ fn term_coupon_uses_the_actual_reset_date_fixing() {
         reset_date,
         Date::from_calendar_date(2025, Month::January, 13).expect("valid reset date")
     );
-    assert!((reset_fixing - integrated_average).abs() > 1e-6);
-    assert!((built_rate - reset_fixing).abs() < RATE_TOLERANCE);
+    assert!((built_rate - expected_rate).abs() < RATE_TOLERANCE);
 }
 
 #[test]
@@ -136,12 +134,16 @@ fn term_index_rate_is_invariant_to_payment_frequency() {
     spec.schedule.frequency = Tenor::semi_annual();
     spec.rate_spec.reset_frequency = Tenor::quarterly();
 
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(issue)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.02), (0.25, 0.03), (0.5, 0.05), (1.0, 0.07)])
-        .build()
-        .expect("ForwardCurve builder should succeed");
+    let fwd = ForwardCurve::from_zero_rates(
+        "USD-SOFR-3M",
+        issue,
+        &[(0.0, 0.02), (0.25, 0.03), (0.5, 0.05), (1.0, 0.07)],
+        finstack_quant_core::math::Compounding::Continuous,
+        DayCount::Act360,
+        finstack_quant_core::math::interp::InterpStyle::LogLinear,
+        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+    )
+    .expect("ForwardCurve should succeed");
     let market = MarketContext::new().insert(fwd);
 
     let mut b = CashFlowSchedule::builder();
@@ -156,20 +158,25 @@ fn term_index_rate_is_invariant_to_payment_frequency() {
         .find(|cf| cf.get_kind() == CFKind::Floating)
         .expect("expected at least one floating coupon");
 
-    let reset_date = first_float
+    let _reset_date = first_float
         .get_reset_date()
         .expect("floating coupon should have reset date");
     let fwd_curve = market
         .get_forward("USD-SOFR-3M")
         .expect("curve should exist");
 
-    // A term-index coupon fixes its curve tenor at the reset date. The payment
-    // frequency has no effect on that fixing.
-    let reset_t = fwd_curve
-        .day_count()
-        .year_fraction(issue, reset_date, DayCountContext::default())
-        .expect("valid reset year fraction");
-    let expected_reset_fixing = fwd_curve.rate(reset_t);
+    // A term-index coupon projects factor growth over its contractual accrual period.
+    let accrual_period = first_float
+        .get_accrual()
+        .as_ref()
+        .expect("floating coupon should carry accrual metadata");
+    let expected_reset_fixing = fwd_curve
+        .rate_between_dates(
+            accrual_period.get_start(),
+            accrual_period.get_end(),
+            first_float.get_accrual_factor(),
+        )
+        .expect("factor projection over accrual period");
 
     let built_rate = first_float
         .get_rate()
@@ -338,12 +345,16 @@ fn test_floating_rate_default_fallback_with_curve() {
 
     let spec = make_float_spec(FloatingRateFallback::Error, dec!(200.0));
 
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(issue)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.03), (1.0, 0.035), (5.0, 0.04)])
-        .build()
-        .expect("ForwardCurve builder should succeed");
+    let fwd = ForwardCurve::from_zero_rates(
+        "USD-SOFR-3M",
+        issue,
+        &[(0.0, 0.03), (1.0, 0.035), (5.0, 0.04)],
+        finstack_quant_core::math::Compounding::Continuous,
+        DayCount::Act360,
+        finstack_quant_core::math::interp::InterpStyle::LogLinear,
+        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+    )
+    .expect("ForwardCurve should succeed");
     let market = MarketContext::new().insert(fwd);
 
     let mut b = CashFlowSchedule::builder();
@@ -453,13 +464,65 @@ fn make_flat_forward_market(
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
 
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(base)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, flat_rate), (5.0, flat_rate)])
-        .build()
-        .expect("Flat ForwardCurve builder should succeed");
+    let cont_rate = 4.0 * (flat_rate * 0.25).ln_1p();
+    let fwd = ForwardCurve::flat("USD-SOFR-3M", base, cont_rate, DayCount::Act360)
+        .expect("Flat ForwardCurve should succeed");
     MarketContext::new().insert(fwd)
+}
+
+fn make_exact_quarterly_market(
+    curve_base: Date,
+    issue: Date,
+    quarters: i32,
+    simple_rate: f64,
+) -> finstack_quant_core::market_data::context::MarketContext {
+    use finstack_quant_core::dates::{DateExt, DayCountContext};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::ForwardCurve;
+    use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
+
+    let mut points = vec![(curve_base, 1.0)];
+    let mut prev = curve_base;
+    let mut factor = 1.0;
+    for q in 1..=quarters {
+        let next = issue.add_months(3 * q).expect("valid quarter date");
+        if next > prev {
+            let alpha = DayCount::Act360
+                .year_fraction(prev, next, DayCountContext::default())
+                .expect("valid Act360 year fraction");
+            factor /= 1.0 + simple_rate * alpha;
+            points.push((next, factor));
+            prev = next;
+        }
+    }
+    let fwd = ForwardCurve::from_dates(
+        "USD-SOFR-3M",
+        curve_base,
+        &points,
+        DayCount::Act360,
+        InterpStyle::LogLinear,
+        ExtrapolationPolicy::Extend,
+    )
+    .expect("Exact quarterly ForwardCurve should succeed");
+    MarketContext::new().insert(fwd)
+}
+
+fn attach_fixings(
+    mut market: finstack_quant_core::market_data::context::MarketContext,
+    fixings: &[(Date, f64)],
+) -> finstack_quant_core::market_data::context::MarketContext {
+    if !fixings.is_empty() {
+        let series = ScalarTimeSeries::new(
+            "FIXING:USD-SOFR-3M",
+            fixings.to_vec(),
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("fixing series builds");
+        market = market.insert_series(series);
+    }
+    market
 }
 
 /// Golden value: SOFR + 200bp, quarterly, Act/360, $1M notional.
@@ -474,7 +537,7 @@ fn test_floating_rate_golden_sofr_200bp() {
     let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     let spec = make_float_spec(FloatingRateFallback::Error, dec!(200.0));
-    let market = make_flat_forward_market(issue, 0.045);
+    let market = make_exact_quarterly_market(issue, issue, 4, 0.045);
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
@@ -540,7 +603,7 @@ fn test_floating_rate_golden_zero_spread() {
     let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
     let spec = make_float_spec(FloatingRateFallback::Error, dec!(0.0));
-    let market = make_flat_forward_market(issue, 0.045);
+    let market = make_exact_quarterly_market(issue, issue, 4, 0.045);
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
@@ -600,7 +663,7 @@ fn test_floating_rate_golden_gearing_includes_spread() {
     spec.rate_spec.gearing = dec!(1.5);
     spec.rate_spec.gearing_includes_spread = true;
 
-    let market = make_flat_forward_market(issue, 0.045);
+    let market = make_exact_quarterly_market(issue, issue, 4, 0.045);
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
@@ -661,7 +724,7 @@ fn test_floating_rate_golden_gearing_excludes_spread() {
     spec.rate_spec.gearing = dec!(1.5);
     spec.rate_spec.gearing_includes_spread = false;
 
-    let market = make_flat_forward_market(issue, 0.045);
+    let market = make_exact_quarterly_market(issue, issue, 4, 0.045);
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
@@ -873,7 +936,7 @@ fn test_floating_rate_negative_index_no_floor() {
 
     // No floor, negative index rate
     let spec = make_float_spec(FloatingRateFallback::Error, dec!(300.0)); // 3% spread, no floor
-    let market = make_flat_forward_market(issue, -0.004); // -0.4% flat curve
+    let market = make_exact_quarterly_market(issue, issue, 4, -0.004); // -0.4% flat curve
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
@@ -1186,14 +1249,27 @@ fn test_overnight_observation_shift_samples_pre_accrual_window() {
     let notional = 1_000_000.0;
     let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
-    // Steeply rising curve: 3% at base, 8% at 1Y. Any calendar-day shift
-    // earlier yields a strictly lower sampled rate.
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(base)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.03), (2.0, 0.13)])
-        .build()
-        .expect("rising forward curve builds");
+    // Steeply rising curve: 3% at base, rising to 13% at 2Y. Any calendar-day shift
+    // earlier yields a strictly lower projected rate.
+    let fwd = ForwardCurve::from_zero_rates(
+        "USD-SOFR-3M",
+        base,
+        &[
+            (0.0, 0.02),
+            (0.25, 0.03),
+            (0.5, 0.05),
+            (0.75, 0.075),
+            (1.0, 0.105),
+            (1.25, 0.14),
+            (1.5, 0.18),
+            (2.0, 0.25),
+        ],
+        finstack_quant_core::math::Compounding::Continuous,
+        DayCount::Act360,
+        finstack_quant_core::math::interp::InterpStyle::MonotoneConvex,
+        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+    )
+    .expect("rising forward curve builds");
     let market = MarketContext::new().insert(fwd);
 
     // Zero spread so the emitted rate is exactly the compounded index rate.
@@ -1283,12 +1359,25 @@ fn test_overnight_lookback_samples_pre_accrual_rates() {
     let notional = 1_000_000.0;
     let init = Money::new(notional, Currency::USD).expect("valid money fixture");
 
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(base)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.03), (2.0, 0.13)])
-        .build()
-        .expect("rising forward curve builds");
+    let fwd = ForwardCurve::from_zero_rates(
+        "USD-SOFR-3M",
+        base,
+        &[
+            (0.0, 0.02),
+            (0.25, 0.03),
+            (0.5, 0.05),
+            (0.75, 0.075),
+            (1.0, 0.105),
+            (1.25, 0.14),
+            (1.5, 0.18),
+            (2.0, 0.25),
+        ],
+        finstack_quant_core::math::Compounding::Continuous,
+        DayCount::Act360,
+        finstack_quant_core::math::interp::InterpStyle::MonotoneConvex,
+        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+    )
+    .expect("rising forward curve builds");
     let market = MarketContext::new().insert(fwd);
 
     let arrears_spec = make_overnight_float_spec(
@@ -1490,7 +1579,6 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
     use finstack_quant_cashflows::builder::FloatingLegCompounding;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
-    use finstack_quant_core::math::interp::InterpStyle;
 
     // Jan 4 2025 = Saturday, Jan 6 2025 = Monday.
     // Maturity is a Tuesday so the Monday-start schedule's quarterly anchor
@@ -1503,13 +1591,7 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
     let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let friday = Date::from_calendar_date(2025, Month::January, 3).unwrap();
-    let fwd = ForwardCurve::builder("USD-SOFR-ON", 1.0 / 360.0)
-        .base_date(friday)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.05), (1.0, 0.05)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap();
+    let fwd = ForwardCurve::flat("USD-SOFR-ON", friday, 0.05, DayCount::Act360).unwrap();
     let market = MarketContext::new().insert(fwd);
 
     let make_spec = |business_day_convention| FloatingCouponSpec {
@@ -1616,12 +1698,8 @@ fn test_weekend_only_stub_requires_and_carries_preceding_fixing() {
     let maturity = Date::from_calendar_date(2025, Month::January, 5).unwrap();
     let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
-    let fwd = ForwardCurve::builder("USD-SOFR-ON", 1.0 / 360.0)
-        .base_date(issue)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.05), (1.0, 0.05)])
-        .build()
-        .unwrap();
+    let cont_rate = 360.0 * (0.05_f64 / 360.0).ln_1p();
+    let fwd = ForwardCurve::flat("USD-SOFR-ON", issue, cont_rate, DayCount::Act360).unwrap();
     let market = MarketContext::new().insert(fwd);
 
     let spec = FloatingCouponSpec {
@@ -1668,12 +1746,7 @@ fn test_weekend_only_stub_requires_and_carries_preceding_fixing() {
     );
 
     let friday = Date::from_calendar_date(2025, Month::January, 3).unwrap();
-    let fwd = ForwardCurve::builder("USD-SOFR-ON", 1.0 / 360.0)
-        .base_date(friday)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.05), (1.0, 0.05)])
-        .build()
-        .unwrap();
+    let fwd = ForwardCurve::flat("USD-SOFR-ON", friday, cont_rate, DayCount::Act360).unwrap();
     let projected = b
         .build(Some(&MarketContext::new().insert(fwd)))
         .expect("Friday fixing can be projected from its base date");
@@ -1696,7 +1769,7 @@ fn test_seasoned_coupon_before_curve_base_errors_by_default() {
 
     // Curve based mid-life: the first accrual periods start strictly before it.
     let curve_base = Date::from_calendar_date(2025, Month::June, 15).unwrap();
-    let market = make_flat_forward_market(curve_base, 0.03);
+    let market = make_exact_quarterly_market(curve_base, issue, 4, 0.03);
 
     let spec = make_float_spec(FloatingRateFallback::Error, dec!(0.0));
     let mut b = CashFlowSchedule::builder();
@@ -1726,7 +1799,7 @@ fn test_seasoned_coupon_before_curve_base_uses_fixed_rate_fallback() {
     let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
     let curve_base = Date::from_calendar_date(2025, Month::June, 15).unwrap();
-    let market = make_flat_forward_market(curve_base, 0.03);
+    let market = make_exact_quarterly_market(curve_base, issue, 4, 0.03);
 
     let spec = make_float_spec(FloatingRateFallback::FixedRate(dec!(0.045)), dec!(0.0));
     let mut b = CashFlowSchedule::builder();
@@ -1777,12 +1850,25 @@ fn test_overnight_sampling_uses_fixing_calendar() {
     let maturity = Date::from_calendar_date(2025, Month::October, 15).unwrap();
     let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
 
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(base)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.03), (2.0, 0.13)])
-        .build()
-        .expect("rising forward curve builds");
+    let fwd = ForwardCurve::from_zero_rates(
+        "USD-SOFR-3M",
+        base,
+        &[
+            (0.0, 0.02),
+            (0.25, 0.03),
+            (0.5, 0.05),
+            (0.75, 0.075),
+            (1.0, 0.105),
+            (1.25, 0.14),
+            (1.5, 0.18),
+            (2.0, 0.25),
+        ],
+        finstack_quant_core::math::Compounding::Continuous,
+        DayCount::Act360,
+        finstack_quant_core::math::interp::InterpStyle::MonotoneConvex,
+        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+    )
+    .expect("rising forward curve builds");
     let market = MarketContext::new().insert(fwd);
 
     let build_with_fixing_cal = |fixing_calendar_id: Option<String>| {
@@ -1830,13 +1916,22 @@ fn make_market_with_fixings(
     flat_rate: f64,
     fixings: &[(Date, f64)],
 ) -> finstack_quant_core::market_data::context::MarketContext {
-    let mut market = make_flat_forward_market(curve_base, flat_rate);
-    if !fixings.is_empty() {
-        let series = ScalarTimeSeries::new("FIXING:USD-SOFR-3M", fixings.to_vec(), None)
-            .expect("fixing series builds");
-        market = market.insert_series(series);
-    }
-    market
+    attach_fixings(make_flat_forward_market(curve_base, flat_rate), fixings)
+}
+
+fn make_exact_overnight_market_with_fixings(
+    curve_base: Date,
+    _end: Date,
+    flat_rate: f64,
+    fixings: &[(Date, f64)],
+) -> finstack_quant_core::market_data::context::MarketContext {
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::ForwardCurve;
+
+    let cont_rate = 360.0 * (flat_rate / 360.0).ln_1p();
+    let fwd = ForwardCurve::flat("USD-SOFR-3M", curve_base, cont_rate, DayCount::Act360)
+        .expect("Exact overnight ForwardCurve should succeed");
+    attach_fixings(MarketContext::new().insert(fwd), fixings)
 }
 
 /// Helper: ISDA 2021 compounded-in-arrears expectation over `(rate, days)`
@@ -1911,7 +2006,7 @@ fn test_seasoned_overnight_coupon_mixes_fixings_and_curve() {
             0.024,
         ),
     ];
-    let market = make_market_with_fixings(curve_base, 0.05, &fixings);
+    let market = make_exact_overnight_market_with_fixings(curve_base, maturity, 0.05, &fixings);
 
     let rate = build_single_overnight_coupon(
         FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
@@ -2145,7 +2240,7 @@ fn test_seasoned_overnight_coupon_prefers_fixing_on_curve_base_date() {
             0.030,
         ),
     ];
-    let market = make_market_with_fixings(curve_base, 0.05, &fixings);
+    let market = make_exact_overnight_market_with_fixings(curve_base, maturity, 0.05, &fixings);
 
     let rate = build_single_overnight_coupon(
         FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
@@ -2204,7 +2299,7 @@ fn test_seasoned_overnight_lockout_resolves_from_fixings() {
         .expect("seasoned lockout coupon resolves from fixings");
 
     // Unseasoned reference: same flat 4% curve based at issue, no fixings.
-    let reference_market = make_flat_forward_market(issue, 0.04);
+    let reference_market = make_exact_overnight_market_with_fixings(issue, maturity, 0.04, &[]);
     let reference = build_single_overnight_coupon(method, issue, maturity, &reference_market)
         .expect("unseasoned lockout coupon projects from the curve");
 
@@ -2241,15 +2336,18 @@ fn test_seasoned_overnight_lookback_resolves_from_fixings() {
     .map(|d| (d, 0.04))
     .collect();
 
-    let seasoned_market = make_market_with_fixings(curve_base, 0.04, &fixings);
+    let seasoned_market =
+        make_exact_overnight_market_with_fixings(curve_base, maturity, 0.04, &fixings);
     let seasoned = build_single_overnight_coupon(method, issue, maturity, &seasoned_market)
         .expect("seasoned lookback coupon resolves shifted observations from fixings");
 
     // Unseasoned reference: flat 4% curve based before the first shifted
     // observation, no fixings required.
-    let reference_market = make_flat_forward_market(
+    let reference_market = make_exact_overnight_market_with_fixings(
         Date::from_calendar_date(2025, Month::May, 29).unwrap(),
+        maturity,
         0.04,
+        &[],
     );
     let reference = build_single_overnight_coupon(method, issue, maturity, &reference_market)
         .expect("unseasoned lookback coupon projects from the curve");
@@ -2282,7 +2380,10 @@ fn test_seasoned_term_reset_resolves_from_exact_fixing_with_spread_and_gearing()
             0.042,
         ),
     ];
-    let market = make_market_with_fixings(curve_base, 0.03, &fixings);
+    let market = attach_fixings(
+        make_exact_quarterly_market(curve_base, issue, 4, 0.03),
+        &fixings,
+    );
 
     // SOFR + 100 bp, 2x gearing including spread: rate = (index + 1%) * 2.
     let mut spec = make_float_spec(FloatingRateFallback::Error, dec!(100.0));
@@ -2415,7 +2516,10 @@ fn test_term_reset_on_curve_base_projects_without_same_day_fixing() {
     let maturity = Date::from_calendar_date(2025, Month::September, 16).unwrap();
     let init = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let prior_date = Date::from_calendar_date(2025, Month::June, 13).unwrap();
-    let market = make_market_with_fixings(issue, 0.03, &[(prior_date, 0.0475)]);
+    let market = attach_fixings(
+        make_exact_quarterly_market(issue, issue, 1, 0.03),
+        &[(prior_date, 0.0475)],
+    );
 
     let spec = make_float_spec(FloatingRateFallback::Error, dec!(0.0));
     let mut builder = CashFlowSchedule::builder();
@@ -2483,21 +2587,16 @@ fn overnight_projection_is_invariant_to_the_curve_day_count_clock() {
 
     let issue = Date::from_calendar_date(2025, Month::January, 6).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::January, 7).unwrap();
-    for (curve_day_count, next_day_time) in [
-        (DayCount::Act360, 1.0 / 360.0),
-        (DayCount::Act365F, 1.0 / 365.0),
-    ] {
-        // The same ACT/360 quotes have raw curve-basis values r * alpha_index / alpha_curve.
-        let quote_scale = (1.0 / 360.0) / next_day_time;
-        let curve = ForwardCurve::builder("USD-SOFR-3M", next_day_time)
-            .base_date(issue)
-            .day_count(curve_day_count)
-            .knots([
-                (0.0, 0.04 * quote_scale),
-                (next_day_time, 0.05 * quote_scale),
-            ])
-            .build()
-            .expect("same dated curve in either clock");
+    for curve_day_count in [DayCount::Act360, DayCount::Act365F] {
+        let curve = ForwardCurve::from_dates(
+            "USD-SOFR-3M",
+            issue,
+            &[(issue, 1.0), (maturity, 1.0 / (1.0 + 0.045 / 360.0))],
+            curve_day_count,
+            finstack_quant_core::math::interp::InterpStyle::LogLinear,
+            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+        )
+        .expect("same dated curve in either clock");
         let market = MarketContext::new().insert(curve);
         let mut spec = make_overnight_float_spec(
             FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },

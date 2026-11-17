@@ -137,6 +137,8 @@ fn flat_discount(base: finstack_quant_core::dates::Date) -> DiscountCurve {
             (10.0_f64, (-r * 10.0).exp()),
             (30.0_f64, (-r * 30.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve")
 }
@@ -193,23 +195,27 @@ fn standard_period() -> (
     )
 }
 
-/// Hazard curve with knots at the standard tenor grid set to the given rates,
-/// used to build a deliberately non-parallel (twisted) hazard move.
-fn twisted_hazard(base: finstack_quant_core::dates::Date, rates: &[f64]) -> HazardCurve {
-    let std_tenors = [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 30.0];
-    HazardCurve::builder("ISSUER-A-HAZ")
-        .base_date(base)
-        .day_count(DayCount::Act365F)
-        .recovery_rate(0.4)
-        .knots(
-            std_tenors
-                .iter()
-                .zip(rates.iter())
-                .map(|(&t, &r)| (t, r))
-                .collect::<Vec<_>>(),
-        )
-        .build()
-        .expect("twisted hazard curve")
+/// Twisted calibrated hazard curve whose quote deltas relative to 120 bp flat
+/// sum to zero (`+60, +20, -20, -60` bp), isolating non-parallel curve-shape risk.
+fn twisted_hazard(
+    base: finstack_quant_core::dates::Date,
+    spreads_bp: &[(u32, f64)],
+) -> HazardCurve {
+    let discount = flat_discount(base);
+    let convention = CdsConventionKey {
+        currency: Currency::USD,
+        doc_clause: CdsDocClause::IsdaNa,
+    };
+    calibrated_hazard_curve(
+        &discount,
+        base,
+        "ISSUER-A-HAZ",
+        "ISSUER-A",
+        0.4,
+        convention,
+        spreads_bp,
+    )
+    .expect("twisted calibrated hazard curve")
 }
 
 // ─────────────────────────── Tests ───────────────────────────
@@ -301,12 +307,7 @@ fn waterfall_twisted_hazard_attributes_curve_shape_not_adder() {
     let market_t0 = flat_market_state(as_of_t0, 0.02);
     let market_t1 = make_market_state(
         flat_discount(as_of_t1),
-        twisted_hazard(
-            as_of_t1,
-            &[
-                0.030, 0.030, 0.025, 0.025, 0.020, 0.015, 0.015, 0.010, 0.010,
-            ],
-        ),
+        twisted_hazard(as_of_t1, &[(1, 180.0), (3, 140.0), (5, 100.0), (10, 60.0)]),
     );
 
     let spec = AttributionSpec {
@@ -731,6 +732,8 @@ fn metrics_based_credit_factor_detail_uses_t1_cs01_baseline() {
                 (10.0_f64, (-r * 10.0).exp()),
                 (30.0_f64, (-r * 30.0).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve")
     };
@@ -839,12 +842,14 @@ fn reprice_methods_surface_the_factor_unit_mismatch_note() {
     let (as_of_t0, as_of_t1) = standard_period();
     let mut market_t0 = flat_market_state(as_of_t0, 0.01);
     let mut market_t1 = flat_market_state(as_of_t1, 0.02);
-    market_t0
-        .prices
-        .insert("cdx.ig.5y".to_string(), MarketScalar::Unitless(1.00));
-    market_t1
-        .prices
-        .insert("cdx.ig.5y".to_string(), MarketScalar::Unitless(1.10));
+    market_t0.prices.insert(
+        "cdx.ig.5y".to_string(),
+        MarketScalar::unitless(1.00).expect("valid scalar"),
+    );
+    market_t1.prices.insert(
+        "cdx.ig.5y".to_string(),
+        MarketScalar::unitless(1.10).expect("valid scalar"),
+    );
 
     for method in [
         AttributionMethod::Parallel,

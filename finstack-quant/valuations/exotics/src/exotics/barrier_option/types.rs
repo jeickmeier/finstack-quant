@@ -334,7 +334,9 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
 
@@ -383,24 +385,34 @@ mod tests {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(option.expiry)
                     .knots([(0.0, 1.0), (1.0, 1.0)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount curve"),
             )
             .insert_surface(
                 VolSurface::from_grid(
                     "SPX-VOL",
-                    &[0.0, 1.0],
+                    &[0.01, 1.0],
                     &[4000.0, 6000.0],
                     &[0.2, 0.2, 0.2, 0.2],
-                    Default::default(),
+                    VolGridOpts {
+                        secondary_axis: VolSurfaceAxis::Strike,
+                        quote_type: VolQuoteType::BlackLognormal,
+                        interpolation_mode: VolInterpolationMode::Vol,
+                    },
                     None,
                 )
                 .expect("surface"),
             )
-            .insert_price("SPX-DIV", MarketScalar::Unitless(0.0))
+            .insert_price(
+                "SPX-DIV",
+                MarketScalar::unitless(0.0).expect("valid scalar"),
+            )
             .insert_price(
                 "SPX-SPOT",
-                MarketScalar::Price(Money::from((5100_i64, Currency::USD))),
+                MarketScalar::price(Money::from((5100_i64, Currency::USD))),
             );
 
         let err = finstack_quant_valuations_core::instruments::Instrument::value(

@@ -32,7 +32,7 @@ USD = Currency("USD")
 
 
 def _market() -> MarketContext:
-    return MarketContext().insert(DiscountCurve.flat("USD-OIS", CLOSE, 0.04))
+    return MarketContext().insert(DiscountCurve.flat("USD-OIS", CLOSE, 0.04, "act_365f"))
 
 
 def _facility(drawn: float = 60_000_000.0) -> AssetBackedFacility:

@@ -945,26 +945,12 @@
         }
       ]
     },
-    "HazardBumpMode": {
-      "description": "How ParCDS operations deliver a spread shock onto a hazard curve.\n\n[`Self::SolveToPar`] is the production default: implied par CDS spreads are\nshocked and the hazard is re-bootstrapped so the curve still prices those\nquotes. [`Self::FirstOrderShift`] converts the spread shock to a hazard\nshift using `delta_hazard = delta_spread / (1 - recovery)` and emits an\napproximation warning. It does not reconcile the resulting par quotes.",
-      "oneOf": [
-        {
-          "const": "solve_to_par",
-          "description": "Shock implied par CDS spreads and re-bootstrap the hazard curve.",
-          "type": "string"
-        },
-        {
-          "const": "first_order_shift",
-          "description": "Convert spread to hazard using loss given default, without exact par repricing.",
-          "type": "string"
-        }
-      ]
-    },
     "HierarchyTarget": {
-      "description": "A target specifying a hierarchy path with optional tag filtering.",
+      "additionalProperties": false,
+      "description": "A target specifying a hierarchy path with an optional tag filter.",
       "properties": {
         "path": {
-          "description": "Path through the hierarchy (e.g., `[\"Credit\", \"US\", \"IG\"]`).",
+          "description": "Non-empty path through the hierarchy (e.g., `[\"Credit\", \"US\", \"IG\"]`).",
           "items": {
             "type": "string"
           },
@@ -979,7 +965,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional tag filter applied to nodes in the subtree."
+          "description": "Optional tag filter applied to nodes in the subtree; an empty filter\ncanonicalizes to `None`."
         }
       },
       "required": [
@@ -1706,7 +1692,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Parallel percent shift to a volatility surface.\n\nShocks are **sticky-strike** multiplicative grid moves: each stored\n`(expiry, strike)` vol is multiplied by `1 + pct/100`. This is not a\nsticky-delta re-mark. The post-shock calendar-spread check is\nfixed-strike and is a heuristic screen, not a no-arbitrage certificate.\n\n`pct` may be `<= -100`: vol-to-zero is sometimes used in degenerate\nstress (non-positive vol is a hard error; calendar-spread flags a\nwarning).\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::VolSurfaceParallelPct {\n    vol_surface_id: \"SPX\".into(),\n    pct: 10.0, // +10% volatility increase\n};\n```",
+          "description": "Parallel percent shift to a volatility surface.\n\nShocks are **sticky-strike** multiplicative grid moves: each stored\n`(expiry, secondary_value)` vol is multiplied by `1 + pct/100`. This is\nnot a sticky-delta re-mark. The post-shock fixed-strike calendar-spread\ncheck applies only to `Strike`-axis `BlackLognormal` surfaces and is a\nheuristic screen, not a no-arbitrage certificate.\n\n`pct` must satisfy `pct >= -100` (`-100%` collapses vols to `0.0`;\n`pct < -100` fails validation).\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::VolSurfaceParallelPct {\n    vol_surface_id: \"SPX\".into(),\n    pct: 10.0, // +10% volatility increase\n};\n```",
           "properties": {
             "kind": {
               "const": "vol_surface_parallel_pct",
@@ -1731,7 +1717,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Bucketed volatility surface shock.\n\nSame sticky-strike multiplicative convention as\n[`OperationSpec::VolSurfaceParallelPct`], restricted to the selected\nexpiry/strike buckets. The calendar-spread check remains fixed-strike\nand is not a no-arbitrage certificate.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::VolSurfaceBucketPct {\n    vol_surface_id: \"SPX\".into(),\n    tenors: Some(vec![\"1M\".into(), \"3M\".into()]),\n    strikes: Some(vec![90.0, 95.0, 100.0]),\n    pct: 15.0,\n};\n```",
+          "description": "Bucketed volatility surface shock.\n\nSame sticky-strike multiplicative convention as\n[`OperationSpec::VolSurfaceParallelPct`], restricted to the selected\nexpiry/strike buckets (`pct >= -100`). Tenor selection requires an\nexplicit `expiry_clock` on the target surface anchored at the execution\ndate; strike filtering requires a `Strike` secondary axis. The\ncalendar-spread check applies only to `Strike`-axis `BlackLognormal`\nsurfaces and is not a no-arbitrage certificate.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::VolSurfaceBucketPct {\n    vol_surface_id: \"SPX\".into(),\n    tenors: Some(vec![\"1M\".into(), \"3M\".into()]),\n    strikes: Some(vec![90.0, 95.0, 100.0]),\n    pct: 15.0,\n};\n```",
           "properties": {
             "kind": {
               "const": "vol_surface_bucket_pct",
@@ -2011,7 +1997,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Hierarchy-targeted vol-surface parallel shift.\n\nResolution follows the same hierarchy-expansion rules as\n[`OperationSpec::HierarchyCurveParallelBp`], but targets volatility\nsurfaces.",
+          "description": "Hierarchy-targeted vol-surface parallel shift.\n\nResolution follows the same hierarchy-expansion rules as\n[`OperationSpec::HierarchyCurveParallelBp`], expanding into\n[`OperationSpec::VolSurfaceParallelPct`] per matched surface (`pct >= -100`).",
           "properties": {
             "kind": {
               "const": "hierarchy_vol_surface_parallel_pct",
@@ -2157,16 +2143,16 @@
       "type": "object"
     },
     "ResolutionMode": {
-      "description": "Controls how shocks at multiple hierarchy levels combine for a single curve.",
+      "description": "Controls how shocks at multiple hierarchy levels combine for a single market target.",
       "oneOf": [
         {
           "const": "most_specific_wins",
-          "description": "The deepest (most specific) matching node's shock wins.\nParent-level shocks are ignored if a more specific one exists.",
+          "description": "The deepest (most specific) matching hierarchy operation wins per exact target.",
           "type": "string"
         },
         {
           "const": "cumulative",
-          "description": "Shocks accumulate walking down the tree.\nA curve gets the sum of all shocks from root to its leaf node.",
+          "description": "Matching hierarchy operations accumulate in authored and preorder placement order.",
           "type": "string"
         }
       ]
@@ -2178,7 +2164,7 @@
     },
     "ScenarioSpec": {
       "additionalProperties": false,
-      "description": "A complete scenario specification with metadata and ordered operations.\n\n# Fields\n- `id`: Stable identifier used for persistence and reporting.\n- `name`: Optional display name for UI or logs.\n- `description`: Optional text describing the intent of the scenario.\n- `operations`: Ordered list of [`OperationSpec`] values to execute.\n- `priority`: Used by [`ScenarioSpec::compose`](crate::spec::ScenarioSpec::compose)\n  to determine merge ordering (lower numbers run first).\n- `resolution_mode`: Controls how hierarchy-targeted shocks at multiple tree\n  levels combine for a single curve. Defaults to [`ResolutionMode::MostSpecificWins`].\n- `hazard_bump_mode`: ParCDS delivery. Defaults to\n  [`HazardBumpMode::SolveToPar`].\n\n# Examples\n\n```rust\nuse finstack_quant_scenarios::{HazardBumpMode, ScenarioSpec, OperationSpec, CurveKind};\nuse finstack_quant_core::market_data::hierarchy::ResolutionMode;\n\nlet scenario = ScenarioSpec {\n    id: \"stress_test\".into(),\n    name: Some(\"Q1 Stress\".into()),\n    description: Some(\"Rate shock scenario\".into()),\n    operations: vec![\n        OperationSpec::CurveParallelBp {\n            curve_kind: CurveKind::Discount,\n            curve_id: \"USD_SOFR\".into(),\n            discount_curve_id: None,\n            bp: 50.0,\n        },\n    ],\n    priority: 0,\n    resolution_mode: ResolutionMode::default(),\n    hazard_bump_mode: HazardBumpMode::default(),\n};\n```",
+      "description": "A complete scenario specification with metadata and ordered operations.\n\n# Fields\n- `id`: Stable identifier used for persistence and reporting.\n- `name`: Optional display name for UI or logs.\n- `description`: Optional text describing the intent of the scenario.\n- `operations`: Ordered list of [`OperationSpec`] values to execute.\n- `priority`: Used by [`ScenarioSpec::compose`](crate::spec::ScenarioSpec::compose)\n  to determine merge ordering (lower numbers run first).\n- `resolution_mode`: Controls how hierarchy-targeted shocks at multiple tree\n  levels combine for a single curve. Defaults to [`ResolutionMode::MostSpecificWins`].\n\n# Examples\n\n```rust\nuse finstack_quant_scenarios::{ScenarioSpec, OperationSpec, CurveKind};\nuse finstack_quant_core::market_data::hierarchy::ResolutionMode;\n\nlet scenario = ScenarioSpec {\n    id: \"stress_test\".into(),\n    name: Some(\"Q1 Stress\".into()),\n    description: Some(\"Rate shock scenario\".into()),\n    operations: vec![\n        OperationSpec::CurveParallelBp {\n            curve_kind: CurveKind::Discount,\n            curve_id: \"USD_SOFR\".into(),\n            discount_curve_id: None,\n            bp: 50.0,\n        },\n    ],\n    priority: 0,\n    resolution_mode: ResolutionMode::default(),\n};\n```",
       "properties": {
         "description": {
           "default": null,
@@ -2187,10 +2173,6 @@
             "string",
             "null"
           ]
-        },
-        "hazard_bump_mode": {
-          "$ref": "#/$defs/HazardBumpMode",
-          "description": "How ParCDS curve operations rewrite hazard curves.\n\nDefault: [`HazardBumpMode::SolveToPar`]. Omitted from JSON when left\nat that default so existing envelopes keep their wire shape."
         },
         "id": {
           "description": "Unique identifier for this scenario.",
@@ -2230,6 +2212,7 @@
       "type": "object"
     },
     "TagFilter": {
+      "additionalProperties": false,
       "description": "A filter combining multiple tag predicates (AND semantics).",
       "properties": {
         "predicates": {
@@ -2253,9 +2236,10 @@
           "description": "Tag value must exactly equal the given value.",
           "properties": {
             "equals": {
+              "additionalProperties": false,
               "properties": {
                 "key": {
-                  "description": "Tag key to match.",
+                  "description": "Non-blank tag key to match.",
                   "type": "string"
                 },
                 "value": {
@@ -2277,12 +2261,13 @@
         },
         {
           "additionalProperties": false,
-          "description": "Tag value must be one of the given values.",
+          "description": "Tag value must be one of the given values. An empty `values` list never matches.",
           "properties": {
             "in": {
+              "additionalProperties": false,
               "properties": {
                 "key": {
-                  "description": "Tag key to match.",
+                  "description": "Non-blank tag key to match.",
                   "type": "string"
                 },
                 "values": {
@@ -2310,9 +2295,10 @@
           "description": "Tag key must exist (any value).",
           "properties": {
             "exists": {
+              "additionalProperties": false,
               "properties": {
                 "key": {
-                  "description": "Tag key that must be present.",
+                  "description": "Non-blank tag key that must be present.",
                   "type": "string"
                 }
               },

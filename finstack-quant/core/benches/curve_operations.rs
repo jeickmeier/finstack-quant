@@ -5,9 +5,12 @@
 //! supplied knot-vector clone, validation, interpolation setup and curve drop.
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve, HazardCurve};
-use finstack_quant_core::math::{Compounding, interp::InterpStyle};
+use finstack_quant_core::math::{
+    Compounding,
+    interp::{ExtrapolationPolicy, InterpStyle},
+};
 use std::hint::black_box;
 use time::Month;
 
@@ -27,21 +30,25 @@ fn discount_knots(num_points: usize) -> Vec<(f64, f64)> {
 fn create_discount_curve(num_points: usize, style: InterpStyle) -> DiscountCurve {
     DiscountCurve::builder("USD-OIS")
         .base_date(base_date())
+        .day_count(DayCount::Act365F)
         .knots(discount_knots(num_points))
         .interp(style)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .build()
         .expect("valid positive discount fixture")
 }
 
-fn create_forward_curve(num_points: usize, tenor: f64) -> ForwardCurve {
+fn create_forward_curve(num_points: usize) -> ForwardCurve {
     let knots = (0..num_points).map(|i| {
         let time = i as f64 * 0.5;
-        (time, 0.03 + 0.01 * (time / 5.0))
+        (time, (-0.03 * time).exp())
     });
-    ForwardCurve::builder("USD-SOFR-3M", tenor)
+    ForwardCurve::builder("USD-SOFR-3M")
         .base_date(base_date())
+        .day_count(DayCount::Act360)
         .knots(knots)
-        .interp(InterpStyle::Linear)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("valid forward fixture")
 }
@@ -49,7 +56,8 @@ fn create_forward_curve(num_points: usize, tenor: f64) -> ForwardCurve {
 fn create_hazard_curve(num_points: usize) -> HazardCurve {
     HazardCurve::builder("CORP-AA")
         .base_date(base_date())
-        .knots((0..num_points).map(|i| (i as f64 * 0.5, 0.02)))
+        .day_count(DayCount::Act365F)
+        .knots((1..=num_points).map(|i| (i as f64 * 0.5, 0.02)))
         .recovery_rate(0.40)
         .build()
         .expect("valid constant-hazard fixture")
@@ -72,7 +80,7 @@ fn check_discount_curve(curve: &DiscountCurve, num_points: usize, style: InterpS
     for (i, (&time, &df)) in curve.knots().iter().zip(curve.dfs()).enumerate() {
         assert_eq!(time, i as f64 * 0.5);
         assert_close(df, (-0.04 * time).exp());
-        assert_close(curve.df(time), df);
+        assert_close(curve.df(time).expect("df"), df);
     }
 }
 
@@ -117,8 +125,11 @@ fn bench_discount_curve_df(c: &mut Criterion) {
     c.bench_function("curve_discount_df_single", |b| {
         let curve = create_discount_curve(20, InterpStyle::Linear);
         check_discount_curve(&curve, 20, InterpStyle::Linear);
-        assert_close(curve.df(2.5), expected_df(2.5, 20, InterpStyle::Linear));
-        b.iter(|| black_box(black_box(&curve).df(black_box(2.5))));
+        assert_close(
+            curve.df(2.5).expect("df"),
+            expected_df(2.5, 20, InterpStyle::Linear),
+        );
+        b.iter(|| black_box(black_box(&curve).df(black_box(2.5)).expect("df")));
     });
     let mut group = c.benchmark_group("curve_discount_df_batch");
     let size = 100;
@@ -127,10 +138,16 @@ fn bench_discount_curve_df(c: &mut Criterion) {
         let times = query_times(size);
         check_discount_curve(&curve, 20, InterpStyle::Linear);
         for &time in &times {
-            assert_close(curve.df(time), expected_df(time, 20, InterpStyle::Linear));
+            assert_close(
+                curve.df(time).expect("df"),
+                expected_df(time, 20, InterpStyle::Linear),
+            );
         }
         b.iter(|| {
-            let dfs: Vec<_> = black_box(&times).iter().map(|&t| curve.df(t)).collect();
+            let dfs: Vec<_> = black_box(&times)
+                .iter()
+                .map(|&t| curve.df(t).expect("df"))
+                .collect();
             black_box(dfs)
         });
     });
@@ -141,8 +158,17 @@ fn bench_discount_curve_zero(c: &mut Criterion) {
     c.bench_function("curve_discount_zero_single", |b| {
         let curve = create_discount_curve(20, InterpStyle::Linear);
         check_discount_curve(&curve, 20, InterpStyle::Linear);
-        assert_close(curve.zero_rate(2.5, Compounding::Continuous), 0.04);
-        b.iter(|| black_box(black_box(&curve).zero_rate(black_box(2.5), Compounding::Continuous)));
+        assert_close(
+            curve.zero_rate(2.5, Compounding::Continuous).expect("zero"),
+            0.04,
+        );
+        b.iter(|| {
+            black_box(
+                black_box(&curve)
+                    .zero_rate(black_box(2.5), Compounding::Continuous)
+                    .expect("zero"),
+            )
+        });
     });
     let mut group = c.benchmark_group("curve_discount_zero_batch");
     let size = 100;
@@ -151,17 +177,21 @@ fn bench_discount_curve_zero(c: &mut Criterion) {
         let times = query_times(size);
         check_discount_curve(&curve, 20, InterpStyle::Linear);
         for &time in &times {
-            let expected = if time == 0.0 {
-                0.0
-            } else {
-                -expected_df(time, 20, InterpStyle::Linear).ln() / time
-            };
-            assert_close(curve.zero_rate(time, Compounding::Continuous), expected);
+            if time > 0.0 {
+                let expected = -expected_df(time, 20, InterpStyle::Linear).ln() / time;
+                assert_close(
+                    curve
+                        .zero_rate(time, Compounding::Continuous)
+                        .expect("zero"),
+                    expected,
+                );
+            }
         }
         b.iter(|| {
             let zeros: Vec<_> = black_box(&times)
                 .iter()
-                .map(|&t| curve.zero_rate(t, Compounding::Continuous))
+                .filter(|&&t| t > 0.0)
+                .map(|&t| curve.zero_rate(t, Compounding::Continuous).expect("zero"))
                 .collect();
             black_box(zeros)
         });
@@ -219,26 +249,41 @@ fn bench_discount_curve_forward(c: &mut Criterion) {
 
 fn bench_forward_curve(c: &mut Criterion) {
     c.bench_function("curve_forward_rate_single", |b| {
-        let curve = create_forward_curve(20, 0.25);
+        let curve = create_forward_curve(20);
         assert_eq!(curve.id().as_str(), "USD-SOFR-3M");
         assert_eq!(curve.base_date(), base_date());
-        assert_eq!(curve.tenor(), 0.25);
         assert_eq!(curve.knots().len(), 20);
-        assert_close(curve.rate(2.5), 0.035);
-        b.iter(|| black_box(black_box(&curve).rate(black_box(2.5))));
+        let expected = ((0.03_f64 * 0.25).exp() - 1.0) / 0.25;
+        assert_close(
+            curve.rate_between(2.5, 2.75, 0.25).expect("rate_between"),
+            expected,
+        );
+        b.iter(|| {
+            black_box(
+                black_box(&curve)
+                    .rate_between(black_box(2.5), black_box(2.75), black_box(0.25))
+                    .expect("rate_between"),
+            )
+        });
     });
     let mut group = c.benchmark_group("curve_forward_rate_batch");
     let size = 100;
     group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
-        let curve = create_forward_curve(20, 0.25);
+        let curve = create_forward_curve(20);
         let times = query_times(size);
+        let expected = ((0.03_f64 * 0.25).exp() - 1.0) / 0.25;
         assert_eq!(curve.knots().len(), 20);
-        assert_eq!(curve.tenor(), 0.25);
         for &time in &times {
-            assert_close(curve.rate(time), 0.03 + 0.002 * time);
+            assert_close(
+                curve.rate_between(time, time + 0.25, 0.25).expect("rate"),
+                expected,
+            );
         }
         b.iter(|| {
-            let rates: Vec<_> = black_box(&times).iter().map(|&t| curve.rate(t)).collect();
+            let rates: Vec<_> = black_box(&times)
+                .iter()
+                .map(|&t| curve.rate_between(t, t + 0.25, 0.25).expect("rate"))
+                .collect();
             black_box(rates)
         });
     });
@@ -251,8 +296,8 @@ fn bench_hazard_curve(c: &mut Criterion) {
         assert_eq!(curve.id().as_str(), "CORP-AA");
         assert_eq!(curve.base_date(), base_date());
         assert_eq!(curve.recovery_rate(), 0.40);
-        assert_close(curve.sp(2.5), (-0.02_f64 * 2.5).exp());
-        b.iter(|| black_box(black_box(&curve).sp(black_box(2.5))));
+        assert_close(curve.sp(2.5).expect("sp"), (-0.02_f64 * 2.5).exp());
+        b.iter(|| black_box(black_box(&curve).sp(black_box(2.5)).expect("sp")));
     });
     c.bench_function("curve_default_prob_single", |b| {
         let curve = create_hazard_curve(20);
@@ -278,10 +323,13 @@ fn bench_hazard_curve(c: &mut Criterion) {
         let times = query_times(size);
         assert_eq!(curve.recovery_rate(), 0.40);
         for &time in &times {
-            assert_close(curve.sp(time), (-0.02 * time).exp());
+            assert_close(curve.sp(time).expect("sp"), (-0.02 * time).exp());
         }
         b.iter(|| {
-            let probabilities: Vec<_> = black_box(&times).iter().map(|&t| curve.sp(t)).collect();
+            let probabilities: Vec<_> = black_box(&times)
+                .iter()
+                .map(|&t| curve.sp(t).expect("sp"))
+                .collect();
             black_box(probabilities)
         });
     });
@@ -305,10 +353,13 @@ fn bench_curve_interp_styles(c: &mut Criterion) {
             let times = query_times(100);
             check_discount_curve(&curve, 20, style);
             for &time in &times {
-                assert_close(curve.df(time), expected_df(time, 20, style));
+                assert_close(curve.df(time).expect("df"), expected_df(time, 20, style));
             }
             b.iter(|| {
-                let dfs: Vec<_> = black_box(&times).iter().map(|&t| curve.df(t)).collect();
+                let dfs: Vec<_> = black_box(&times)
+                    .iter()
+                    .map(|&t| curve.df(t).expect("df"))
+                    .collect();
                 black_box(dfs)
             });
         });
@@ -327,8 +378,10 @@ fn bench_curve_building(c: &mut Criterion) {
             let build = || {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(base_date())
+                    .day_count(DayCount::Act365F)
                     .knots(black_box(knots.clone()))
                     .interp(InterpStyle::Linear)
+                    .extrapolation(ExtrapolationPolicy::Extend)
                     .build()
                     .expect("valid discount build")
             };

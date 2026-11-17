@@ -19,6 +19,7 @@ fn flat_curve(id: &str, zero_rate: f64) -> DiscountCurve {
         .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots([(0.0, 1.0), (10.0, (-zero_rate * 10.0).exp())])
         .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("flat curve")
 }

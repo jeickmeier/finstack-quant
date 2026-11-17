@@ -3,9 +3,8 @@
 //! boundaries, the `CorrelationError` serde shape, and the Higham
 //! `nearest_correlation` repair.
 //!
-//! The validator used to exist twice with opposite tolerances (a 1e-10
-//! diagonal/symmetry tolerance against 1e-6, a strict `[-1, 1]` bound against
-//! 1e-10 slack); the cases below span both former divergence directions.
+//! The validator enforces a 1e-10 diagonal/symmetry tolerance and exact
+//! `[-1.0, 1.0]` off-diagonal correlation bounds.
 
 use finstack_quant_core::math::linalg::{
     CorrelationError as Error, NearestCorrelationOpts, nearest_correlation,
@@ -75,19 +74,20 @@ fn diagonal_noise_above_tolerance_is_rejected() {
 }
 
 #[test]
-fn rounding_scale_overshoot_is_accepted() {
-    // A perfectly collinear pair (duplicated series, or genuinely identical
-    // instruments) computes to a few ulp above 1. Rejecting it would reject a
-    // valid input, so both validators allow rounding-scale slack.
+fn any_off_diagonal_overshoot_is_rejected() {
     let over = 1.0 + f64::EPSILON;
     let m = vec![1.0, over, over, 1.0];
-    assert!(validate(&m, 2).is_ok());
+    assert_detailed_rejection(
+        &m,
+        2,
+        |error| matches!(error, Error::OutOfBounds { i: 0, j: 1, value } if *value == over),
+    );
 }
 
 #[test]
 fn diagonal_within_tolerance_is_accepted() {
-    // This exceeds the tighter off-diagonal coefficient-bound slack. Diagonal
-    // entries must still be governed solely by DIAGONAL_TOLERANCE.
+    // Diagonal entries are governed by DIAGONAL_TOLERANCE while off-diagonal
+    // entries enforce exact [-1.0, 1.0] bounds.
     let matrix = [1.0 + 5e-11];
     assert!(validate(&matrix, 1).is_ok());
 }

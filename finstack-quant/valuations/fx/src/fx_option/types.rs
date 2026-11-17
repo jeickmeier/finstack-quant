@@ -579,33 +579,24 @@ impl FxOption {
         as_of: finstack_quant_core::dates::Date,
         requested_bump_abs: f64,
     ) -> finstack_quant_core::Result<Option<crate::shared::VolScenarios<Self>>> {
-        let t = self
-            .day_count
-            .year_fraction(
-                as_of,
-                self.expiry,
-                finstack_quant_core::dates::DayCountContext::default(),
-            )?
-            .max(0.0);
-        if t <= 0.0 {
+        if crate::shared::greeks_expired(self.day_count, as_of, self.expiry)? {
             return Ok(None);
         }
 
-        let sigma = self
+        let sigma = if let Some(iv) = self
             .instrument_pricing_overrides
             .market_quotes
             .implied_volatility
-            .map(Ok)
-            .unwrap_or_else(|| {
-                let surface = market.get_surface(self.vol_surface_id.as_str())?;
-                Ok::<_, finstack_quant_core::Error>(
-                    finstack_quant_models::volatility::get_surface_vol_clamped(
-                        &surface,
-                        t,
-                        self.strike,
-                    ),
-                )
-            })?;
+        {
+            finstack_quant_valuations_core::instruments::common_impl::vol_resolution::validate_sigma(
+                iv,
+            )?
+        } else {
+            crate::shared::collect_fx_option_inputs(crate::fx_option::pricer::input_request(
+                self, market, as_of,
+            ))?
+            .sigma
+        };
         if sigma <= 0.0 {
             return Ok(None);
         }

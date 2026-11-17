@@ -187,7 +187,7 @@ for normal_vol in [0.,.005,.01]:
     m=tracks.build_market("vol")
     # The futures convexity adjustment reads absolute (normal) rate vols; the surface must be
     # tagged as such, because the default quote type is Black lognormal and is rejected here.
-    m.insert(VolSurface("IR-NORMAL-VOL",[.25,.5,1.,2.],[0.,.03,.10],[[normal_vol]*3]*4,quote_type="normal"))
+    m.insert(VolSurface("IR-NORMAL-VOL",[.25,.5,1.,2.],[0.,.03,.10],[[normal_vol]*3]*4,secondary_axis="strike",quote_type="normal",interpolation_mode="vol"))
     future_result=price_instrument(json.dumps(instrument_envelope(ir_raw)),m,AS_OF,
         metrics=["futures_price","implied_forward","convexity_adjustment"])
     convexity_rows.append({"normal_rate_vol":normal_vol,**future_result.metrics})

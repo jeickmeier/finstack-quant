@@ -5,9 +5,12 @@ from __future__ import annotations
 from typing import Any, Optional, Sequence, Union
 import pandas as pd
 
+from finstack_quant.core.currency import Currency
+from finstack_quant.core.dates import VolatilityClock
+
 class VolSurface:
     """
-    Two-dimensional implied volatility surface on an expiry x strike grid.
+    Two-dimensional implied volatility surface on an expiry x secondary-coordinate grid.
 
     Volatilities are decimal annualised standard deviations (``0.20`` is 20%)
     stored row-major by expiry. The secondary axis is a strike, tenor or
@@ -16,7 +19,15 @@ class VolSurface:
     Examples
     --------
     >>> from finstack_quant.core.market_data import VolSurface
-    >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.22, 0.20, 0.21], [0.23, 0.21, 0.22]])
+    >>> surface = VolSurface(
+    ...     "EQ-VOL",
+    ...     [1.0, 2.0],
+    ...     [90.0, 100.0, 110.0],
+    ...     [[0.22, 0.20, 0.21], [0.23, 0.21, 0.22]],
+    ...     secondary_axis="strike",
+    ...     quote_type="black_lognormal",
+    ...     interpolation_mode="vol",
+    ... )
     >>> surface.grid_shape
     (2, 3)
     >>> from finstack_quant.models.volatility import get_surface_vol
@@ -31,16 +42,17 @@ class VolSurface:
         self,
         id: str,
         expiries: Sequence[float],
-        strikes: Sequence[float],
+        secondary_values: Sequence[float],
         vols: Any,
         *,
-        secondary_axis: str = "strike",
-        interpolation_mode: str = "vol",
-        quote_type: str = "black_lognormal",
+        secondary_axis: str,
+        quote_type: str,
+        interpolation_mode: str,
         displacements: list[float] | None = None,
+        expiry_clock: VolatilityClock | None = None,
     ) -> None:
         """
-        Construct a vol surface from an expiry x strike grid.
+        Construct a vol surface from an expiry x secondary-coordinate grid.
 
         Parameters
         ----------
@@ -48,21 +60,23 @@ class VolSurface:
             Unique surface identifier.
         expiries : Sequence[float]
             Strictly increasing expiry times in years.
-        strikes : Sequence[float]
+        secondary_values : Sequence[float]
             Strictly increasing secondary-axis coordinates.
         vols : Sequence[float], Sequence[Sequence[float]] or numpy.ndarray
             Volatilities as decimals, either flat row-major
-            (``len(expiries) * len(strikes)``) or as ``len(expiries)`` rows of
-            ``len(strikes)`` values (a 2-D array is accepted).
-        secondary_axis : str, optional
-            ``"strike"`` (default) or ``"tenor"``.
-        interpolation_mode : str, optional
-            ``"vol"`` (default, bilinear in vol) or ``"total_variance"``.
-        quote_type : str, optional
-            ``"black_lognormal"`` (default), ``"shifted_black_lognormal"``, or ``"normal"``.
+            (``len(expiries) * len(secondary_values)``) or as ``len(expiries)`` rows of
+            ``len(secondary_values)`` values (a 2-D array is accepted).
+        secondary_axis : str
+            ``"strike"`` or ``"tenor"``.
+        quote_type : str
+            ``"black_lognormal"``, ``"shifted_black_lognormal"``, or ``"normal"``.
+        interpolation_mode : str
+            ``"vol"`` (bilinear in vol) or ``"total_variance"``.
         displacements : list[float] | None, optional
             One finite rate-unit displacement per expiry for shifted Black;
             absent for other quote conventions.
+        expiry_clock : VolatilityClock | None, optional
+            Calendar/day-count clock for resolving expiry dates to year fractions.
 
         Raises
         ------
@@ -70,12 +84,21 @@ class VolSurface:
             If the grid size does not match the axes, an axis is not strictly
             increasing, a vol is non-finite or negative, or a label is unknown.
         TypeError
-            If ``vols`` is not a list, nested list or array-like.
+            If ``vols`` is not a list, nested list or array-like, or a required
+            convention keyword argument is missing or unknown.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import VolSurface
-        >>> VolSurface("EQ-VOL", [1.0], [90.0, 100.0], [0.22, 0.20]).strikes
+        >>> VolSurface(
+        ...     "EQ-VOL",
+        ...     [1.0],
+        ...     [90.0, 100.0],
+        ...     [0.22, 0.20],
+        ...     secondary_axis="strike",
+        ...     quote_type="black_lognormal",
+        ...     interpolation_mode="vol",
+        ... ).secondary_values
         [90.0, 100.0]
 
         """
@@ -104,7 +127,15 @@ class VolSurface:
         Examples
         --------
         >>> from finstack_quant.core.market_data import VolSurface
-        >>> surface = VolSurface("EQ-VOL", [1.0], [90.0, 100.0], [0.22, 0.20])
+        >>> surface = VolSurface(
+        ...     "EQ-VOL",
+        ...     [1.0],
+        ...     [90.0, 100.0],
+        ...     [0.22, 0.20],
+        ...     secondary_axis="strike",
+        ...     quote_type="black_lognormal",
+        ...     interpolation_mode="vol",
+        ... )
         >>> VolSurface.from_json(surface.to_json()) == surface
         True
 
@@ -134,8 +165,8 @@ class VolSurface:
         Returns
         -------
         pd.DataFrame
-            Columns ``expiry``, ``strike`` and ``vol``; one row per grid node,
-            expiries outer and strikes inner.
+            Columns ``expiry``, ``secondary_value`` and ``vol``; one row per grid node,
+            expiries outer and secondary values inner.
 
         Raises
         ------
@@ -177,7 +208,7 @@ class VolSurface:
         ...
 
     @property
-    def strikes(self) -> list[float]:
+    def secondary_values(self) -> list[float]:
         """
         Second grid axis of the surface.
 
@@ -195,7 +226,7 @@ class VolSurface:
     @property
     def vols(self) -> list[list[float]]:
         """
-        Quoted volatilities on the expiry/strike grid.
+        Quoted volatilities on the expiry/secondary-axis grid.
 
         Returns
         -------
@@ -257,24 +288,19 @@ class VolSurface:
         """
         ...
 
-    def with_displacements(self, displacements: list[float]) -> VolSurface:
-        """Return a surface with validated shifted-Black quote metadata.
-
-        Parameters
-        ----------
-        displacements : list[float]
-            Finite rate-unit shifts, one per expiry, compatible with the
-            stored strike coordinates.
+    @property
+    def expiry_clock(self) -> Optional[VolatilityClock]:
+        """
+        Calendar/day-count volatility clock attached to this surface, if any.
 
         Returns
         -------
-        VolSurface
-            New immutable surface with shifted-Black quote convention.
+        Optional[VolatilityClock]
+            Volatility clock used when resolving expiry dates, or ``None``.
 
-        Raises
-        ------
-        ValueError
-            If the displacement count or shifted strike domains are invalid.
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
         """
         ...
 
@@ -302,7 +328,7 @@ class VolSurface:
         Returns
         -------
         tuple[int, int]
-            ``(n_expiries, n_strikes)``: the row and column counts of the grid, useful for reshaping the flat value list.
+            ``(n_expiries, n_secondary_values)``: the row and column counts of the grid, useful for reshaping the flat value list.
 
         Notes
         -----
@@ -319,9 +345,11 @@ class FxDeltaVolSurface:
     """
     Delta-quoted FX volatility surface (ATM, 25-delta RR/BF, optional 10-delta wings).
 
-    Uses forward delta (premium-unadjusted). Quotes are decimal vols
-    (``0.08`` is 8%); risk reversals are call vol minus put vol and
-    butterflies are average wing vol minus ATM.
+    Uses explicit currency pair ordering (``"BASE/QUOTE"``), explicit quoting
+    conventions (``forward_unadjusted`` delta, ``delta_neutral_straddle`` ATM,
+    arithmetic ``smile`` butterfly), and an optional :class:`VolatilityClock`.
+    Quotes are decimal vols (``0.08`` is 8%); risk reversals are call vol minus
+    put vol and butterflies are wing average ``0.5 * (call + put) - ATM``.
 
     This type stores quotes only. Recover pillar vols with
     :func:`finstack_quant.models.volatility.get_fx_delta_pillar_vols`,
@@ -335,21 +363,27 @@ class FxDeltaVolSurface:
     Examples
     --------
     >>> from finstack_quant.core.market_data import FxDeltaVolSurface
-    >>> surface = FxDeltaVolSurface("EURUSD", [0.25, 1.0], [0.08, 0.09], [0.01, 0.015], [0.005, 0.007])
-    >>> (len(surface.expiries), surface.rr_10d)
-    (2, None)
+    >>> surface = FxDeltaVolSurface("EURUSD", "EUR/USD", [0.25, 1.0], [0.08, 0.09], [0.01, 0.015], [0.005, 0.007])
+    >>> (surface.pair, len(surface.expiries), surface.rr_10d)
+    ('EUR/USD', 2, None)
 
     """
 
     def __init__(
         self,
         id: str,
+        pair: Union[str, tuple[Union[Currency, str], Union[Currency, str]]],
         expiries: Sequence[float],
         atm_vols: Sequence[float],
         rr_25d: Sequence[float],
         bf_25d: Sequence[float],
+        *,
         rr_10d: Optional[Sequence[float]] = None,
         bf_10d: Optional[Sequence[float]] = None,
+        delta_convention: str = "forward_unadjusted",
+        atm_convention: str = "delta_neutral_straddle",
+        butterfly_convention: str = "smile",
+        expiry_clock: Optional[VolatilityClock] = None,
     ) -> None:
         """
         Construct an FX delta-quoted vol surface with 25-delta wings.
@@ -358,6 +392,9 @@ class FxDeltaVolSurface:
         ----------
         id : str
             Unique surface identifier.
+        pair : str or tuple[Currency | str, Currency | str]
+            Distinct currency pair (for example ``"EUR/USD"``, ``"EURUSD"``, or
+            ``(Currency.EUR, Currency.USD)``) defining base/quote order.
         expiries : Sequence[float]
             Strictly increasing positive expiry times in years.
         atm_vols : Sequence[float]
@@ -365,23 +402,37 @@ class FxDeltaVolSurface:
         rr_25d : Sequence[float]
             25-delta risk reversal per expiry (decimal, call vol - put vol).
         bf_25d : Sequence[float]
-            25-delta butterfly per expiry (decimal, wing average - ATM).
+            25-delta smile butterfly per expiry (decimal, wing average - ATM).
         rr_10d : Sequence[float], optional
             10-delta risk reversal per expiry; requires ``bf_10d``.
         bf_10d : Sequence[float], optional
-            10-delta butterfly per expiry; requires ``rr_10d``.
+            10-delta smile butterfly per expiry; requires ``rr_10d``.
+        delta_convention : str, default="forward_unadjusted"
+            Delta quoting convention (``"forward_unadjusted"``).
+        atm_convention : str, default="delta_neutral_straddle"
+            ATM quoting convention (``"delta_neutral_straddle"``).
+        butterfly_convention : str, default="smile"
+            Butterfly quoting convention (``"smile"``).
+        expiry_clock : VolatilityClock, optional
+            Calendar and day-count clock defining how option expiry dates map to
+            year fractions when resolving market valuations.
 
         Raises
         ------
         ValueError
-            If only one of ``rr_10d`` / ``bf_10d`` is given, any vector is
-            empty or mismatched in length, expiries are not strictly
-            increasing and positive, or a quote is non-finite.
+            If ``pair`` is invalid or has identical base and quote currencies,
+            any convention string is unrecognized, only one of ``rr_10d`` /
+            ``bf_10d`` is given, any vector is empty or mismatched in length,
+            expiries are not strictly increasing and positive, or a quote is
+            non-finite.
+        TypeError
+            If ``pair`` is not a string or 2-element currency pair, or an
+            unexpected keyword argument is passed.
 
         Examples
         --------
         >>> from finstack_quant.core.market_data import FxDeltaVolSurface
-        >>> FxDeltaVolSurface("EURUSD", [1.0], [0.09], [0.015], [0.007]).atm_vols
+        >>> FxDeltaVolSurface("EURUSD", "EUR/USD", [1.0], [0.09], [0.015], [0.007]).atm_vols
         [0.09]
 
         """
@@ -409,7 +460,7 @@ class FxDeltaVolSurface:
         Examples
         --------
         >>> from finstack_quant.core.market_data import FxDeltaVolSurface
-        >>> surface = FxDeltaVolSurface("EURUSD", [1.0], [0.09], [0.015], [0.007])
+        >>> surface = FxDeltaVolSurface("EURUSD", "EUR/USD", [1.0], [0.09], [0.015], [0.007])
         >>> FxDeltaVolSurface.from_json(surface.to_json()) == surface
         True
 
@@ -521,7 +572,9 @@ class FxDeltaVolSurface:
         Returns
         -------
         list[float]
-            Market-strangle butterfly quotes as decimals, one per expiry; they lift the 25-delta wings above the ATM level.
+            Arithmetic smile butterfly quotes ``0.5 * (call + put) - ATM`` as
+            decimals, one per expiry; positive values lift the 25-delta wings
+            above the ATM level.
 
         Notes
         -----
@@ -554,6 +607,102 @@ class FxDeltaVolSurface:
         -------
         Optional[list[float]]
             10-delta butterfly quotes as decimals, one per expiry, or ``None`` when the wings were not quoted.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def pair(self) -> str:
+        """
+        Canonical currency pair in ``"BASE/QUOTE"`` notation.
+
+        Returns
+        -------
+        str
+            Base and quote currencies formatted as ``"BASE/QUOTE"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def delta_convention(self) -> str:
+        """
+        FX option delta quoting convention.
+
+        Returns
+        -------
+        str
+            Delta convention label (``"forward_unadjusted"``).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def atm_convention(self) -> str:
+        """
+        FX option ATM quoting convention.
+
+        Returns
+        -------
+        str
+            ATM convention label (``"delta_neutral_straddle"``).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def butterfly_convention(self) -> str:
+        """
+        FX option butterfly quoting convention.
+
+        Returns
+        -------
+        str
+            Butterfly convention label (``"smile"``).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def quote_type(self) -> str:
+        """
+        Volatility quote representation stored on this surface.
+
+        Returns
+        -------
+        str
+            Quote convention label (``"black_lognormal"``).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def expiry_clock(self) -> Optional[VolatilityClock]:
+        """
+        Calendar/day-count volatility clock attached to this surface, if set.
+
+        Returns
+        -------
+        Optional[VolatilityClock]
+            Attached volatility clock, or ``None`` when none was supplied.
 
         Notes
         -----

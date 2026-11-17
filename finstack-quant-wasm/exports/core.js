@@ -58,7 +58,7 @@ wasm.Tenor.prototype.toYearsWithContext = function toYearsWithContext(
  *
  * @param curve - A `DiscountCurve`, `ForwardCurve`, `HazardCurve`, `InflationCurve`, `PriceCurve`, `BaseCorrelationCurve`, `VolSurface`, `FxDeltaVolSurface` or `VolCube` handle; its data is shared with the context, not copied.
  * @returns This context, updated in place, so calls can be chained.
- * @throws `TypeError` (kind `invalid_type`) if `curve` is not one of those handles; `FinstackError` (kind `validation`) if a volatility surface, FX delta-vol surface or vol cube `id` is already registered in another volatility registry or replacing a curve invalidates a bound credit index.
+ * @throws `TypeError` (kind `invalid_type`) if `curve` is not one of those handles; `FinstackError` (kind `validation`) if a curve or surface `id` is empty/blank, replaces a curve of a different type, or invalidates a bound credit index.
  *
  * @facadeClass MarketContext
  * @member insert(curve: MarketContextCurve): this
@@ -169,6 +169,7 @@ export const core = {
   ratingScalesExtensionKey: wasm.ratingScalesExtensionKey,
   DayCount: wasm.DayCount,
   DayCountContext: wasm.DayCountContext,
+  VolatilityClock: wasm.VolatilityClock,
   Tenor: wasm.Tenor,
   TenorUnit: wasm.TenorUnit,
   createDate: wasm.createDate,
@@ -233,13 +234,11 @@ export const core = {
   mean: wasm.mean,
   variance: wasm.variance,
   populationVariance: wasm.populationVariance,
+  stdDev: wasm.stdDev,
   meanVar: wasm.meanVar,
-  meanOrNan: wasm.meanOrNan,
-  sampleVarianceOrNan: wasm.sampleVarianceOrNan,
-  sampleStdOrNan: wasm.sampleStdOrNan,
-  medianOrNan: wasm.medianOrNan,
-  finiteMinOrNan: wasm.finiteMinOrNan,
-  finiteMaxOrNan: wasm.finiteMaxOrNan,
+  median: wasm.median,
+  finiteMin: wasm.finiteMin,
+  finiteMax: wasm.finiteMax,
   finiteCount: wasm.finiteCount,
   logReturns: wasm.logReturns,
   correlation: wasm.correlation,
@@ -264,7 +263,7 @@ export const core = {
   cashFlowWithAccrual: wasm.cashFlowWithAccrual,
   cashFlowWithPrincipal: wasm.cashFlowWithPrincipal,
   cfKindIsCashSettlement: wasm.cfKindIsCashSettlement,
-  cfKindIsInterestLike: wasm.cfKindIsInterestLike,
+  cfKindIsCoupon: wasm.cfKindIsCoupon,
   cfKindIsPrincipalLike: wasm.cfKindIsPrincipalLike,
   cfKindParse: wasm.cfKindParse,
   schema,

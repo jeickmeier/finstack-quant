@@ -28,7 +28,7 @@ impl ShortRateTree {
         let comp = self.config.compounding;
         let oas = oas_bp / 10_000.0;
         let j_max = lattice.j_max;
-        let oas_shift_at = |rate: f64| -> f64 {
+        let oas_shift_at = |rate: f64| -> Result<f64> {
             oas_compounding.continuous_spread_shift(comp.tree_to_continuous(rate, dt), oas)
         };
 
@@ -47,7 +47,7 @@ impl ShortRateTree {
 
         let mut values: Vec<f64> = Vec::with_capacity(self.rates[steps].len());
         for &r in self.rates[steps].iter() {
-            let state = state_for(steps, r, oas_shift_at(r));
+            let state = state_for(steps, r, oas_shift_at(r)?);
             values.push(valuator.value_at_maturity(&state)?);
         }
 
@@ -79,7 +79,7 @@ impl ShortRateTree {
                 }
 
                 let r = self.rates[step][j];
-                let oas_shift = oas_shift_at(r);
+                let oas_shift = oas_shift_at(r)?;
                 let continuation = expected_value * comp.tree_df(r, dt) * (-oas_shift * dt).exp();
                 let state = state_for(step, r, oas_shift);
                 scratch.push(valuator.value_at_node(&state, continuation, dt)?);
@@ -149,6 +149,24 @@ impl ShortRateTree {
         let compounding = self.config.compounding;
         let dt_pricing = self.time_steps[1] - self.time_steps[0];
         let oas = oas_bp / 10_000.0;
+        let mut discount_rates = Vec::with_capacity(rates.len());
+        let mut node_oas_bps = Vec::with_capacity(rates.len());
+        for row in rates {
+            let mut row_rates = Vec::with_capacity(row.len());
+            let mut row_oas = Vec::with_capacity(row.len());
+            for &r in row {
+                let continuous = compounding.tree_to_continuous(r, dt_pricing);
+                let oas_shift = oas_compounding.continuous_spread_shift(continuous, oas)?;
+                row_rates.push(continuous + oas_shift);
+                row_oas.push(if oas_compounding == Compounding::Continuous {
+                    oas_bp
+                } else {
+                    oas_shift * 10_000.0
+                });
+            }
+            discount_rates.push(row_rates);
+            node_oas_bps.push(row_oas);
+        }
         let state_gen = |step: usize, node: usize| -> f64 {
             rates
                 .get(step)
@@ -157,22 +175,18 @@ impl ShortRateTree {
                 .unwrap_or(0.0)
         };
         let rate_gen = |step: usize, node: usize| -> f64 {
-            let Some(&r) = rates.get(step).and_then(|row| row.get(node)) else {
-                return 0.0;
-            };
-            let continuous = compounding.tree_to_continuous(r, dt_pricing);
-            continuous + oas_compounding.continuous_spread_shift(continuous, oas)
+            discount_rates
+                .get(step)
+                .and_then(|row| row.get(node))
+                .copied()
+                .unwrap_or(0.0)
         };
         let node_oas_bp = |step: usize, node: usize| -> f64 {
-            let Some(&r) = rates.get(step).and_then(|row| row.get(node)) else {
-                return oas_bp;
-            };
-            if oas_compounding == Compounding::Continuous {
-                return oas_bp;
-            }
-            oas_compounding
-                .continuous_spread_shift(compounding.tree_to_continuous(r, dt_pricing), oas)
-                * 10_000.0
+            node_oas_bps
+                .get(step)
+                .and_then(|row| row.get(node))
+                .copied()
+                .unwrap_or(oas_bp)
         };
 
         // Ho-Lee and binomial BDT lattices are calibrated with equal

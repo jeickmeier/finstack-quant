@@ -436,10 +436,17 @@ impl ModelBuilder {
     ///
     /// # Example
     /// ```
-    /// use finstack_quant_statements::capital_structure::{WaterfallSpec, EcfSweepSpec};
+    /// use finstack_quant_statements::capital_structure::{EcfSweepSpec, PaymentPriority, WaterfallSpec};
     /// use finstack_quant_statements::builder::ModelBuilder;
     ///
     /// let waterfall = WaterfallSpec {
+    ///     priority_of_payments: vec![
+    ///         PaymentPriority::Fees,
+    ///         PaymentPriority::Interest,
+    ///         PaymentPriority::Amortization,
+    ///         PaymentPriority::Sweep,
+    ///         PaymentPriority::Equity,
+    ///     ],
     ///     ecf_sweep: Some(EcfSweepSpec {
     ///         ebitda_node: "ebitda".to_string(),
     ///         taxes_node: Some("taxes".to_string()),

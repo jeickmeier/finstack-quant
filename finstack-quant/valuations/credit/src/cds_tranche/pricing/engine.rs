@@ -427,8 +427,12 @@ impl CdsTranchePricer {
             return UNIFORM_MIDPOINT;
         }
         let curve = index_data.index_credit_curve();
-        let s0 = curve.sp(t_start.max(0.0));
-        let s1 = curve.sp(t_end);
+        let Ok(s0) = curve.sp(t_start.max(0.0)) else {
+            return UNIFORM_MIDPOINT;
+        };
+        let Ok(s1) = curve.sp(t_end) else {
+            return UNIFORM_MIDPOINT;
+        };
         // Need a genuine, ordered survival drop to define a hazard:
         // `s1 > s0` or NaN inputs all fall back to the uniform midpoint.
         let ordered_drop = is_finite_positive(s0) && is_finite_positive(s1) && s1 < s0;

@@ -88,13 +88,13 @@ from finstack_quant.core.market_data import VolSurface, FxDeltaVolSurface
 from finstack_quant.models.volatility import get_surface_vol, check_surface_grid, delta_to_strike, get_fx_delta_vol
 
 surface = VolSurface('LESSON-VOL', [0.5, 1.0], [90.0, 100.0, 110.0],
-    [[0.20, 0.20, 0.20], [0.25, 0.25, 0.25]], interpolation_mode='total_variance')
+    [[0.20, 0.20, 0.20], [0.25, 0.25, 0.25]], secondary_axis='strike', quote_type='black_lognormal', interpolation_mode='total_variance')
 interpolated = get_surface_vol(surface, 0.75, 100.0)
 broken = check_surface_grid([90.0, 100.0, 110.0], [0.5, 1.0],
     [[0.40] * 3, [0.10] * 3], forward_prices=[100.0, 100.0])
-fx_surface = FxDeltaVolSurface('EURUSD-VOL', [0.5, 1.0], [0.10, 0.11], [0.01, 0.012], [0.003, 0.004])
+fx_surface = FxDeltaVolSurface('EURUSD-VOL', 'EUR/USD', [0.5, 1.0], [0.10, 0.11], [0.01, 0.012], [0.003, 0.004])
 call_vol = 0.11 + 0.004 + 0.012 / 2
-strike = delta_to_strike(0.25, 1.08, call_vol, 1.0)
+strike = delta_to_strike(True, 0.25, 1.08, call_vol, 1.0)
 resolved = get_fx_delta_vol(fx_surface, 1.0, strike, 1.08)
 print({'interpolated_vol': interpolated, 'fx_25d_call_strike': strike, 'violations': broken.by_type})
 ```
@@ -146,7 +146,7 @@ from finstack_quant.core.market_data import HazardCurve, MarketContext, VolSurfa
 from _shared.analyst_book import build_market
 AS_OF = date(2025, 1, 15)
 world = MarketContext.from_json(build_market('foundations').to_json())
-world.insert(VolSurface('SPX-VOL', [0.25, 1.0], [4000.0, 5200.0, 6400.0], [[0.25, 0.20, 0.19], [0.25, 0.20, 0.19]]))
+world.insert(VolSurface('SPX-VOL', [0.25, 1.0], [4000.0, 5200.0, 6400.0], [[0.25, 0.20, 0.19], [0.25, 0.20, 0.19]], secondary_axis='strike', quote_type='black_lognormal', interpolation_mode='vol'))
 world.insert(HazardCurve.flat('ILLUSTRATIVE-HAZARD',AS_OF,0.02,0.4))
 hazard=world.get_hazard('ILLUSTRATIVE-HAZARD')
 rows=[{'year':year,'survival':hazard.sp(year),'cumulative_PD':1-hazard.sp(year),'conditional_year_PD':1-hazard.sp(year)/hazard.sp(year-1)} for year in range(1,6)]

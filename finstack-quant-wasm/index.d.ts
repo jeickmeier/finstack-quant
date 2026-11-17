@@ -183,7 +183,7 @@ declare module './pkg/finstack_quant_wasm.js' {
      *
      * @param curve - A `DiscountCurve`, `ForwardCurve`, `HazardCurve`, `InflationCurve`, `PriceCurve`, `BaseCorrelationCurve`, `VolSurface`, `FxDeltaVolSurface` or `VolCube` handle; its data is shared with the context, not copied.
      * @returns This context, updated in place, so calls can be chained.
-     * @throws `TypeError` (kind `invalid_type`) if `curve` is not one of those handles; `FinstackError` (kind `validation`) if a volatility surface, FX delta-vol surface or vol cube `id` is already registered in another volatility registry or replacing a curve invalidates a bound credit index.
+     * @throws `TypeError` (kind `invalid_type`) if `curve` is not one of those handles; `FinstackError` (kind `validation`) if a curve or surface `id` is empty/blank, replaces a curve of a different type, or invalidates a bound credit index.
      */
     insert(curve: MarketContextCurve): this;
     /**
@@ -496,25 +496,25 @@ export interface CoreNamespace {
    * # Arguments
    *
    * * `scale_name` - Scale name, outer whitespace trimmed; must be nonblank.
-   * * `description` - Optional description; pass `null` or `undefined` for none.
    * * `ratings` - Nonempty array (or its JSON text) of `RatingLevel` objects
    *   ordered best to worst: labels unique after trim and ASCII case folding,
    *   score and minimum strictly descending, the worst minimum `0`, and each
    *   representative score below the preceding band's minimum.
+   * * `description` - Optional description; pass `null` or `undefined` for none.
    *
    * @returns A `ScorecardScale` plain object preserving the supplied band order.
    * @throws `TypeError` (kind `invalid_type`) for mistyped string arguments;
    * `FinstackError` (kind `validation`) for a blank name or bands that are
    * empty, colliding, out of order, leave a gap below the worst band, or hold
-   * a representative outside its band. Description precedes ratings as in Rust.
+   * a representative outside its band.
    * @param scaleName - Scale name, outer whitespace trimmed; must be nonblank.
-   * @param description - Optional description; pass `null` or `undefined` for none.
    * @param ratings - Nonempty array (or its JSON text) of `RatingLevel` objects ordered best to worst: labels unique after trim and ASCII case folding, score and minimum strictly descending, the worst minimum `0`, and each representative score below the preceding band's minimum.
+   * @param description - Optional description; pass `null` or `undefined` for none.
    * @example
    * ```typescript
    * import init, { core } from "finstack-quant-wasm";
    * await init();
-   * const scale = core.scorecardScaleTryNew("custom", undefined, [
+   * const scale = core.scorecardScaleTryNew("custom", [
    *   core.ratingLevelTryNew("A", 90, 80),
    *   core.ratingLevelTryNew("B", 70, 0),
    * ]);
@@ -541,7 +541,7 @@ export interface CoreNamespace {
    * ```typescript
    * import init, { core } from "finstack-quant-wasm";
    * await init();
-   * const scale = core.scorecardScaleTryNew("custom", undefined, [
+   * const scale = core.scorecardScaleTryNew("custom", [
    *   core.ratingLevelTryNew("A", 90, 80),
    *   core.ratingLevelTryNew("B", 70, 0),
    * ]);
@@ -643,6 +643,7 @@ export interface CoreNamespace {
   readonly ratingScalesExtensionKey: typeof wasm.ratingScalesExtensionKey;
   readonly DayCount: typeof wasm.DayCount;
   readonly DayCountContext: typeof wasm.DayCountContext;
+  readonly VolatilityClock: typeof wasm.VolatilityClock;
   readonly Tenor: typeof wasm.Tenor;
   readonly TenorUnit: typeof wasm.TenorUnit;
   /**
@@ -1243,107 +1244,102 @@ export interface CoreNamespace {
   readonly ledoitWolfShrinkage: typeof wasm.ledoitWolfShrinkage;
   /**
    * Arithmetic mean over a typed numeric array.
-   * @param data - Numeric observations in input order; an empty series yields 0.0.
-   * @returns Arithmetic mean of `data`, or 0.0 when `data` is empty.
+   * @param data - Finite numeric observations in input order; empty series returns `undefined`.
+   * @returns Arithmetic mean of `data`, or `undefined` when `data` is empty.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for non-finite values; `FinstackError` (kind `computation`) on overflow.
    */
   readonly mean: typeof wasm.mean;
   /**
    * Sample variance over a typed numeric array.
-   * @param data - Sample observations in input order; fewer than two points yield 0.0.
-   * @returns Unbiased sample variance, or 0.0 when `data` has fewer than two points.
+   * @param data - Finite sample observations in input order; fewer than two points return `undefined`.
+   * @returns Unbiased sample variance, or `undefined` when `data` has fewer than two points.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for non-finite values; `FinstackError` (kind `computation`) on overflow or underflow.
    */
   readonly variance: typeof wasm.variance;
   /**
    * Population variance over a typed numeric array.
-   * @param data - Observations in input order; fewer than two points yield 0.0.
-   * @returns Population variance, or 0.0 when `data` has fewer than two points.
+   * @param data - Finite observations in input order; empty series returns `undefined`.
+   * @returns Population variance, or `undefined` when `data` is empty.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for non-finite values; `FinstackError` (kind `computation`) on overflow or underflow.
    */
   readonly populationVariance: typeof wasm.populationVariance;
+  /**
+   * Sample standard deviation with `n - 1` denominator (Rust `stats::std_dev`).
+   *
+   * Validates all observations upfront. Returns `undefined` when `data` has
+   * fewer than two observations, and `0` when `data.length >= 2` and all
+   * observations are identical.
+   *
+   * # Arguments
+   *
+   * * `data` - Sample observations.
+   *
+   * @returns The unbiased sample standard deviation, or `undefined` for fewer than two observations.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+   * `validation`) if any observation is `NaN` or infinite; `FinstackError`
+   * (kind `computation`) if non-constant sample standard deviation overflows
+   * or underflows out of the positive finite range.
+   * @param data - Sample observations.
+   */
+  readonly stdDev: typeof wasm.stdDev;
   /**
    * Mean and sample variance in one pass (Rust `stats::mean_var`).
    *
    * # Arguments
    *
-   * * `data` - Sample observations in input order.
+   * * `data` - Finite sample observations in input order.
    *
-   * @returns A two-element array `[mean, variance]`; `[0, 0]` for an empty series.
-   * @throws `TypeError` if `data` is not an array of numbers.
-   * @param data - Sample observations in input order.
+   * @returns A two-element tuple `[mean, variance]`; `[undefined, undefined]` when empty, `[mean, undefined]` for one observation.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for non-finite observations; `FinstackError` (kind `computation`) on overflow or underflow.
+   * @param data - Finite sample observations in input order.
    */
   readonly meanVar: typeof wasm.meanVar;
   /**
-   * Arithmetic mean with a NaN sentinel for missing data (Rust `stats::mean_or_nan`).
+   * Sample median using R-7 / NumPy quantile interpolation at `p = 0.5` (Rust `stats::median`).
    *
-   * # Arguments
-   *
-   * * `data` - Observations to average.
-   *
-   * @returns The mean, or `NaN` for an empty series.
-   * @throws `TypeError` if `data` is not an array of numbers.
-   * @param data - Observations to average.
-   */
-  readonly meanOrNan: typeof wasm.meanOrNan;
-  /**
-   * Sample variance with a NaN sentinel (Rust `stats::sample_variance_or_nan`).
-   *
-   * # Arguments
-   *
-   * * `data` - Sample observations.
-   *
-   * @returns The unbiased sample variance, or `NaN` for fewer than two observations.
-   * @throws `TypeError` if `data` is not an array of numbers.
-   * @param data - Sample observations.
-   */
-  readonly sampleVarianceOrNan: typeof wasm.sampleVarianceOrNan;
-  /**
-   * Sample standard deviation with a NaN sentinel (Rust `stats::sample_std_or_nan`).
-   *
-   * # Arguments
-   *
-   * * `data` - Sample observations.
-   *
-   * @returns The sample standard deviation, or `NaN` for fewer than two observations.
-   * @throws `TypeError` if `data` is not an array of numbers.
-   * @param data - Sample observations.
-   */
-  readonly sampleStdOrNan: typeof wasm.sampleStdOrNan;
-  /**
-   * Median with a NaN sentinel (Rust `stats::median_or_nan`).
+   * Validates all observations upfront without modifying the input array.
+   * Returns `undefined` for empty input.
    *
    * # Arguments
    *
    * * `data` - Observations whose median is required; the input is not modified.
    *
-   * @returns The median, or `NaN` for an empty series or when any observation is
-   * non-finite.
-   * @throws `TypeError` if `data` is not an array of numbers.
+   * @returns The median, or `undefined` for an empty series.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+   * `validation`) if any observation is `NaN` or infinite.
    * @param data - Observations whose median is required; the input is not modified.
    */
-  readonly medianOrNan: typeof wasm.medianOrNan;
+  readonly median: typeof wasm.median;
   /**
-   * Smallest finite value (Rust `stats::finite_min_or_nan`).
+   * Smallest finite value (Rust `stats::finite_min`).
+   *
+   * Ignores `NaN` and infinite entries. Returns `undefined` when `data`
+   * contains no finite values.
    *
    * # Arguments
    *
    * * `data` - Observations to inspect; NaN and infinite entries are ignored.
    *
-   * @returns The minimum finite value, or `NaN` when none is finite.
+   * @returns The minimum finite value, or `undefined` when none is finite.
    * @throws `TypeError` if `data` is not an array of numbers.
    * @param data - Observations to inspect; NaN and infinite entries are ignored.
    */
-  readonly finiteMinOrNan: typeof wasm.finiteMinOrNan;
+  readonly finiteMin: typeof wasm.finiteMin;
   /**
-   * Largest finite value (Rust `stats::finite_max_or_nan`).
+   * Largest finite value (Rust `stats::finite_max`).
+   *
+   * Ignores `NaN` and infinite entries. Returns `undefined` when `data`
+   * contains no finite values.
    *
    * # Arguments
    *
    * * `data` - Observations to inspect; NaN and infinite entries are ignored.
    *
-   * @returns The maximum finite value, or `NaN` when none is finite.
+   * @returns The maximum finite value, or `undefined` when none is finite.
    * @throws `TypeError` if `data` is not an array of numbers.
    * @param data - Observations to inspect; NaN and infinite entries are ignored.
    */
-  readonly finiteMaxOrNan: typeof wasm.finiteMaxOrNan;
+  readonly finiteMax: typeof wasm.finiteMax;
   /**
    * Number of finite observations (Rust `stats::finite_count`).
    *
@@ -1371,23 +1367,26 @@ export interface CoreNamespace {
   readonly logReturns: typeof wasm.logReturns;
   /**
    * Pearson correlation over typed numeric arrays.
-   * @param x - First numeric series; must have the same length as `y`.
-   * @param y - Second numeric series, aligned one-for-one with `x`.
-   * @returns Sample correlation in `[-1, 1]`; 0.0 when fewer than two points or either series is constant; NaN when `x` and `y` lengths differ.
+   * @param x - First finite numeric series; must have the same length as `y`.
+   * @param y - Second finite numeric series, aligned one-for-one with `x`.
+   * @returns Sample correlation in `[-1, 1]`, or `undefined` when fewer than two points exist or either series is constant.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) when lengths differ or values are non-finite; `FinstackError` (kind `computation`) on numerical failure.
    */
   readonly correlation: typeof wasm.correlation;
   /**
    * Sample covariance over typed numeric arrays.
-   * @param x - First numeric series; must have the same length as `y`.
-   * @param y - Second numeric series, aligned one-for-one with `x`.
-   * @returns Unbiased sample covariance; 0.0 when fewer than two points; NaN when `x` and `y` lengths differ.
+   * @param x - First finite numeric series; must have the same length as `y`.
+   * @param y - Second finite numeric series, aligned one-for-one with `x`.
+   * @returns Unbiased sample covariance, or `undefined` when fewer than two points exist.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) when lengths differ or values are non-finite; `FinstackError` (kind `computation`) on overflow or underflow.
    */
   readonly covariance: typeof wasm.covariance;
   /**
    * Empirical quantile over a typed numeric array.
-   * @param data - Sample observations in input order; empty or non-finite data yields NaN.
-   * @param q - Quantile probability in `[0, 1]`; values outside that range yield NaN.
-   * @returns R-7 interpolated quantile, or NaN when `data` is empty or non-finite.
+   * @param data - Finite sample observations in input order; an empty series returns `undefined`.
+   * @param q - Quantile probability in `[0, 1]`.
+   * @returns R-7 interpolated quantile, or `undefined` when `data` is empty.
+   * @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) when `q` is outside `[0, 1]` or any value is non-finite; `FinstackError` (kind `computation`) on underflow.
    */
   readonly quantile: typeof wasm.quantile;
   /**
@@ -1555,12 +1554,14 @@ export interface CoreNamespace {
    * Kahan compensated summation over a typed numeric array.
    * @param values - Finite numeric terms in summation or scan order.
    * @returns Compensated sum of `values` in input order.
+   * @throws Error with `kind: "validation"` if any element is `NaN` or infinite, or `kind: "computation"` if intermediate accumulation overflows.
    */
   readonly kahanSum: typeof wasm.kahanSum;
   /**
    * Neumaier compensated summation over a typed numeric array.
    * @param values - Finite numeric terms in summation or scan order.
    * @returns Compensated sum of `values`, robust to mixed-sign cancellation.
+   * @throws Error with `kind: "validation"` if any element is `NaN` or infinite, or `kind: "computation"` if intermediate or final accumulation overflows.
    */
   readonly neumaierSum: typeof wasm.neumaierSum;
   /**
@@ -1623,13 +1624,13 @@ export interface CoreNamespace {
    */
   readonly cfKindIsCashSettlement: typeof wasm.cfKindIsCashSettlement;
   /**
-   * Whether a cashflow kind is interest-like (fixed, floating, inflation or stub coupon).
+   * Whether a cashflow kind is a coupon flow (fixed, floating, inflation or stub coupon).
    *
    * @param kind - `CFKind` wire string.
    * @returns `true` for coupon-type kinds; fees, principal and margin kinds are `false`.
    * @throws If `kind` is not a `CFKind` wire string (kind `validation`).
    */
-  readonly cfKindIsInterestLike: typeof wasm.cfKindIsInterestLike;
+  readonly cfKindIsCoupon: typeof wasm.cfKindIsCoupon;
   /**
    * Whether a cashflow kind changes or returns principal.
    *
@@ -2667,7 +2668,7 @@ export interface CalibrationNamespace {
    *   - `curve_id` (string, optional, default `id`): Identifier of the produced curve.
    *   - `method` (string | object, optional, default `"bootstrap"`): Calibration method: `"bootstrap"` or `{"global_solve": {"use_analytical_jacobian": bool}}`.
    *   - `interpolation` (string, optional, default `"log_linear"`): Discount-factor interpolation: `"linear"`, `"log_linear"`, `"monotone_convex"`, `"cubic_hermite"` or `"piecewise_quadratic_forward"`.
-   *   - `extrapolation` (string, optional, default `"flat_forward"`): Extrapolation policy: `"flat_zero"`, `"flat_forward"` or `"none"`.
+   *   - `extrapolation` (string, optional, default `"extend"`): Extrapolation policy: `"flat"`, `"extend"` or `"error"`.
    *   - `pricing_discount_id` (string | null, optional, default `null`): Separate discount curve used to price the quotes; `null` uses `curve_id`.
    *   - `pricing_forward_id` (string | null, optional, default `null`): Forward curve used to price the quotes, if any.
    *   - `conventions` (object, optional, default both `null`): Step-level rates conventions `{"curve_day_count": ..., "ois_compounding": ...}`; both entries default to `null` (the quote conventions apply).
@@ -2691,11 +2692,12 @@ export interface CalibrationNamespace {
    * @param params - Object (or JSON text) holding every wire field of the `forward` step, keyed by its snake_case serde name as in the calibration JSON schema:
    *   - `currency` (string, required): Upper-case ISO 4217 code of the curve currency.
    *   - `base_date` (string, required): Curve base date as an ISO-8601 date string (`"YYYY-MM-DD"`).
-   *   - `tenor_years` (number, required): Index accrual tenor in years (`0.25` for a 3M index).
    *   - `discount_curve_id` (string, required): Identifier of the discount curve solved in an earlier step.
    *   - `curve_id` (string, optional, default `id`): Identifier of the produced curve.
+   *   - `index_tenor` (object, optional, default `null`): Contractual index tenor metadata attached to the calibrated curve in serde `Tenor` form (for example `{"count": 3, "unit": "months"}`).
    *   - `method` (object, optional, default `global_solve` with a finite-difference Jacobian): Calibration method; forward curves require `global_solve` (`"bootstrap"` is rejected).
-   *   - `interpolation` (string, optional, default `"cubic_hermite"`): Forward-rate interpolation: `"linear"`, `"log_linear"`, `"monotone_convex"`, `"cubic_hermite"` or `"piecewise_quadratic_forward"`; `"monotone_convex"` is rejected.
+   *   - `interpolation` (string, optional, default `"log_linear"`): Projection-factor interpolation: `"linear"`, `"log_linear"`, `"cubic_hermite"`, `"piecewise_quadratic_forward"`, or `"monotone_convex"`.
+   *   - `extrapolation` (string, optional, default `"extend"`): Tail policy beyond the last calibrated pillar (`"extend"`, `"flat"`, or `"error"`).
    *   - `conventions` (object, optional, default both `null`): Step-level rates conventions `{"curve_day_count": ..., "ois_compounding": ...}`; both entries default to `null` (the quote conventions apply).
    * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
    * @returns A `CalibrationStep` object with `kind: "forward"`.
@@ -2746,15 +2748,21 @@ export interface CalibrationNamespace {
    * @param id - Step identifier; also the residual key in calibration reports and the default quote-set name and `curve_id`.
    * @param params - Object (or JSON text) holding every wire field of the `inflation` step, keyed by its snake_case serde name as in the calibration JSON schema:
    *   - `currency` (string, required): Upper-case ISO 4217 code of the curve currency.
-   *   - `base_date` (string, required): Valuation and calibration-instrument start date as an ISO-8601 date string (`"YYYY-MM-DD"`). The curve's reference CPI date is this date minus `observation_lag`.
+   *   - `base_date` (string, required): Valuation and calibration-instrument start date as an ISO-8601 date string (`"YYYY-MM-DD"`), independent of the source origin.
    *   - `discount_curve_id` (string, required): Identifier of the discount curve solved in an earlier step.
    *   - `index` (string, required): Inflation index identifier, for example `"USA-CPI-U"`.
    *   - `observation_lag` (string, required): Whole-month observation lag, for example `"3M"`, up to 255 months. No lag accepts `""`, `"none"`, `"0"`, `"0M"` or `"0D"` (case-insensitive); nonzero day lags are rejected.
-   *   - `base_cpi` (number, required): Contractual reference CPI at the start date in index points, after observation lag and monthly interpolation; supplied index fixings must reproduce it, including seasonality.
+   *   - `base_cpi` (number, required): Contractual reference CPI denominator at the start date in index points, after observation lag and monthly interpolation.
+   *   - `source_base_date` (string, required): Original unlagged CPI source anchor date as ISO-8601.
+   *   - `source_base_cpi` (number, required): Finite positive absolute CPI level at that source origin.
+   *   - `day_count` (string, required): Explicit source clock, for example `"act_365f"`.
+   *   - `calendar_id` (string | null, optional): Registered source-clock calendar; required for Bus/252.
    *   - `curve_id` (string, optional, default `id`): Identifier of the produced curve.
    *   - `notional` (number, optional, default `1.0`): Notional of the synthetic inflation swaps repriced during calibration.
    *   - `method` (string | object, optional, default `"bootstrap"`): Calibration method: `"bootstrap"` or `{"global_solve": {"use_analytical_jacobian": bool}}`.
-   *   - `interpolation` (string, optional, default `"linear"`): CPI interpolation: `"linear"`, `"log_linear"`, `"monotone_convex"`, `"cubic_hermite"` or `"piecewise_quadratic_forward"`.
+   *   - `interpolation` (string, required): CPI interpolation: `"linear"`, `"log_linear"` or `"cubic_hermite"`.
+   *   - `extrapolation` (string, required): Source tail policy: `"flat"`, `"extend"` or `"error"`.
+   * An immutable inflation fixing snapshot keyed by `curve_id` is required in `market_data`, even for projection-only calibration.
    * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
    * @returns A `CalibrationStep` object with `kind: "inflation"`.
    *
@@ -2972,10 +2980,9 @@ export interface CalibrationNamespace {
    *   - `fx_spot` (number, required): T+0 cash FX rate (domestic per foreign) used when a quote omits `spot_fx`.
    *   - `domestic_discount_id` (string, required): Domestic discount curve solved in an earlier step.
    *   - `curve_id` (string, optional, default `id`): Identifier of the produced foreign curve.
-   *   - `basis_spread_curve_id` (string | null, optional, default `null`): Identifier of the byproduct basis-spread curve.
    *   - `method` (string, optional, default `"bootstrap"`): Sequential `"bootstrap"`; `global_solve` is rejected.
    *   - `interpolation` (string, optional, default `"log_linear"`): Discount-factor interpolation: `"linear"`, `"log_linear"`, `"monotone_convex"`, `"cubic_hermite"` or `"piecewise_quadratic_forward"`.
-   *   - `extrapolation` (string, optional, default `"flat_forward"`): Extrapolation policy: `"flat_zero"`, `"flat_forward"` or `"none"`.
+   *   - `extrapolation` (string, optional, default `"extend"`): Extrapolation policy: `"flat"`, `"extend"` or `"error"`.
    *   - `conventions` (object, optional, default both `null`): Step-level rates conventions `{"curve_day_count": ..., "ois_compounding": ...}`; both entries default to `null` (the quote conventions apply).
    * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
    * @returns A `CalibrationStep` object with `kind: "xccy_basis"`.
@@ -6117,19 +6124,27 @@ export interface ModelsVolatilityNamespace {
    */
   readonly convertAtmVolatility: typeof wasm.convertAtmVolatility;
   /**
-   * Convert premium-unadjusted forward delta to strike.
+   * Convert premium-unadjusted forward delta magnitude to strike.
    *
    * # Arguments
    *
-   * * `delta` - Forward call delta as a decimal probability in `(0, 1)`.
-   * * `forward` - Positive forward in the same units as the returned strike.
+   * * `is_call` - `true` for a call option, `false` for a put option.
+   * * `delta_abs` - Forward delta magnitude as a decimal probability in `(0, 1)`.
+   * * `forward` - Positive outright forward in quote units per base unit.
    * * `vol` - Positive annualized Black volatility as a decimal.
    * * `expiry` - Positive option expiry in years.
-   * @param delta - Forward call delta as a decimal probability in `(0, 1)`.
+   *
+   * # Errors
+   *
+   * Throws a `TypeError` for mistyped arguments or a `FinstackError` (kind `validation`)
+   * when `delta_abs` is outside `(0, 1)` or `forward`, `vol`, or `expiry` is not finite and positive.
+   * @param isCall - `true` for a call option, `false` for a put option.
+   * @param deltaAbs - Forward delta magnitude as a decimal probability strictly in `(0, 1)`.
    * @param forward - Positive forward in the same units as the returned strike.
    * @param vol - Positive annualized Black volatility as a decimal.
    * @param expiry - Positive option expiry in years.
    * @returns Strike in the same units as `forward`.
+   * @throws Error - Throws `invalid_type` for mistyped arguments or `validation` when an input is out of domain.
    */
   readonly deltaToStrike: typeof wasm.deltaToStrike;
   /**
@@ -6215,7 +6230,7 @@ export interface ModelsVolatilityNamespace {
    */
   readonly getCubeExpirySliceVolClamped: typeof wasm.getCubeExpirySliceVolClamped;
   /**
-   * Return ATM, 25-delta put, and 25-delta call vols at a stored FX expiry.
+   * Return ATM, 25-delta put/call, and optional 10-delta put/call vols at a stored FX expiry.
    *
    * # Arguments
    *
@@ -6228,7 +6243,8 @@ export interface ModelsVolatilityNamespace {
    * negative, exceeds the wasm32 integer range, or is outside the surface.
    * @param surface - Structurally validated data-only FX delta surface.
    * @param expiryIndex - Zero-based stored expiry index.
-   * @returns Three annualized decimal volatilities in ATM, put, call order.
+   * @returns Three `[atm, put25d, call25d]` annualized decimal volatilities, or five `[atm, put25d, call25d, put10d, call10d]` values when 10-delta wings are present.
+   * @throws Error - Throws `invalid_type` for a non-integer `expiryIndex` or `validation` if out of range.
    */
   readonly getFxDeltaPillarVols: typeof wasm.getFxDeltaPillarVols;
   /**
@@ -6333,6 +6349,7 @@ export interface ModelsVolatilityNamespace {
    *   [0.5, 1.0],
    *   [90, 100, 110],
    *   [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+   *   { secondaryAxis: "strike", quoteType: "black_lognormal", interpolationMode: "vol" },
    * );
    * const local = models.volatility.localVolFromImpliedVol(implied, [100, 100]);
    * console.log(local.expiries, local.strikes); // [0.5, 1] [90, 100, 110]
@@ -6369,6 +6386,7 @@ export interface ModelsVolatilityNamespace {
    *   [0.5, 1.0],
    *   [90, 100, 110],
    *   [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+   *   { secondaryAxis: "strike", quoteType: "black_lognormal", interpolationMode: "vol" },
    * );
    * const local = models.volatility.localVolFromImpliedVolSmoothed(implied, [100, 100], 5.0);
    * console.log(local.local_vols.length); // 6
@@ -6409,19 +6427,27 @@ export interface ModelsVolatilityNamespace {
    */
   readonly localVolValue: typeof wasm.localVolValue;
   /**
-   * Convert strike to premium-unadjusted forward call delta.
+   * Convert strike to premium-unadjusted forward delta magnitude.
    *
    * # Arguments
    *
+   * * `is_call` - `true` for a call option, `false` for a put option.
    * * `strike` - Positive strike in the same units as `forward`.
    * * `forward` - Positive forward in the same units as `strike`.
    * * `vol` - Positive annualized Black volatility as a decimal.
    * * `expiry` - Positive option expiry in years.
+   *
+   * # Errors
+   *
+   * Throws a `TypeError` for mistyped arguments or a `FinstackError` (kind `validation`)
+   * when any numeric input is non-finite or non-positive.
+   * @param isCall - `true` for a call option, `false` for a put option.
    * @param strike - Positive strike in the same units as `forward`.
    * @param forward - Positive forward in the same units as `strike`.
    * @param vol - Positive annualized Black volatility as a decimal.
    * @param expiry - Positive option expiry in years.
-   * @returns Forward call delta as a decimal probability.
+   * @returns Unsigned forward delta magnitude in `(0, 1)`.
+   * @throws Error - Throws `invalid_type` for mistyped arguments or `validation` when an input is non-finite or non-positive.
    */
   readonly strikeToDelta: typeof wasm.strikeToDelta;
   /**
@@ -6601,16 +6627,21 @@ export interface ModelsVolatilityNamespace {
   readonly materializeCubeExpirySlice: typeof wasm.materializeCubeExpirySlice;
   /**
    * Materialize an FX delta-quoted surface as an expiry by strike volatility surface.
-   * @param surface - `core.FxDeltaVolSurface` handle.
-   * @param spot - FX spot rate (domestic per unit of foreign); positive.
-   * @param domesticRate - Continuously compounded domestic rate, as a decimal.
-   * @param foreignRate - Continuously compounded foreign rate, as a decimal.
-   * @returns The strike-space `core.VolSurface` handle.
+   *
+   * # Arguments
+   *
+   * * `surface` - Structurally validated `core.FxDeltaVolSurface` handle.
+   * * `delivery_forwards` - Outright FX delivery forwards in quote units per base unit, one positive finite value per surface expiry.
    *
    * # Errors
    *
-   * Throws a `validation` error if an input is non-finite or out of range or a
-   * delta-to-strike conversion fails.
+   * Throws a `TypeError` for mistyped arguments or a `validation` error if
+   * `delivery_forwards` length mismatches `surface.expiries`, any forward is
+   * non-finite or non-positive, or delta-to-strike conversion fails.
+   * @param surface - `core.FxDeltaVolSurface` handle.
+   * @param deliveryForwards - Outright FX delivery forwards (quote per unit of base), one positive value per expiry.
+   * @returns The strike-space `core.VolSurface` handle.
+   * @throws Error - Throws `invalid_type` for mistyped arguments or `validation` when forwards mismatch length, are non-positive, or wing conversion fails.
    */
   readonly materializeFxDeltaSurface: typeof wasm.materializeFxDeltaSurface;
 }
@@ -7208,8 +7239,10 @@ export interface MarginNamespace {
    *   baseDate: "2025-01-01",
    *   knots: [0.0, 1.0, 5.0, 1.0],
    *   interp: "log_linear",
+   *   extrapolation: "extend",
+   *   dayCount: "act_365f",
    * });
-   * const hz = core.HazardCurve.flat("CPTY", "2025-01-01", 0.02, 0.4);
+   * const hz = core.HazardCurve.flat("CPTY", "2025-01-01", 0.02, 0.4, "act_365f");
    * const result = margin.computeBilateralXva(
    *   JSON.stringify({ times: [1, 2], mtm_values: [1e6, 1e6], epe: [1e6, 1e6], ene: [0, 0] }),
    *   hz, hz, df, 0.4, 0.4,
@@ -7222,8 +7255,8 @@ export interface MarginNamespace {
    * ```typescript
    * import init, { core, margin } from "finstack-quant-wasm";
    * await init();
-   * const df = core.DiscountCurve.flat("USD-OIS", "2025-01-01", 0.03);
-   * const hz = core.HazardCurve.flat("CPTY", "2025-01-01", 0.02, 0.4);
+   * const df = core.DiscountCurve.flat("USD-OIS", "2025-01-01", 0.03, "act_365f");
+   * const hz = core.HazardCurve.flat("CPTY", "2025-01-01", 0.02, 0.4, "act_365f");
    * const result = margin.computeBilateralXva(
    *   JSON.stringify({ times: [1, 2], mtm_values: [1e6, 1e6], epe: [1e6, 1e6], ene: [0, 0] }),
    *   hz, hz, df, 0.4, 0.4,
@@ -9510,9 +9543,10 @@ export interface StatementsNamespace {
   /**
    * Validate a `WaterfallSpec` JSON string.
    *
-   * Performs both serde deserialization and the waterfall's internal
-   * consistency check (for example rejecting `Sweep` ordered after `Equity`
-   * when an ECF sweep is configured).
+   * Deserializes the waterfall and checks its payment order and sizing rules.
+   * When `priority_of_payments` is omitted, the order is `fees`, `interest`,
+   * `amortization`, and `equity`. Prepayments require an explicit priority
+   * before any `equity` entry and a corresponding sizing configuration.
    *
    * # Errors
    *
@@ -9520,7 +9554,7 @@ export interface StatementsNamespace {
    * payment priorities; incomplete available-cash priorities; invalid PIK,
    * payment-class, prepay-node, or ECF-sweep settings; or failure to serialize
    * the validated waterfall.
-   * @param json - Canonical JSON string for a `WaterfallSpec`, including `priority_of_payments`, `available_cash_node`, optional `ecf_sweep`, `pik_toggle`, `payment_classes`, `mandatory_prepay_node`, and `voluntary_prepay_node`.
+   * @param json - Canonical JSON string for a `WaterfallSpec`, including `available_cash_node` and optional `priority_of_payments`, `ecf_sweep`, `pik_toggle`, `payment_classes`, `mandatory_prepay_node`, and `voluntary_prepay_node`.
    * @returns Canonical waterfall JSON after schema validation.
    */
   readonly validateWaterfallSpecJson: typeof wasm.validateWaterfallSpecJson;
@@ -9528,8 +9562,8 @@ export interface StatementsNamespace {
    * Validate an `EcfSweepSpec` JSON string.
    *
    * Deserializes the spec, runs the Rust `EcfSweepSpec::validate`, and returns
-   * the canonical JSON. The waterfall-level rule that a positive sweep needs a
-   * prepayment priority is checked by `validateWaterfallSpecJson`.
+   * the canonical JSON. `validateWaterfallSpecJson` checks the enclosing
+   * waterfall's `sweep` priority.
    *
    * # Errors
    *
@@ -12332,7 +12366,7 @@ export interface ScenariosNamespace {
    * Rejects malformed structured specs, any input spec that fails
    * `ScenarioSpec` validation (blank ID, non-finite numbers, invalid
    * identifiers, tenors or operations; the message names the scenario), input
-   * specs with mixed `hazard_bump_mode` values, composition that contains more
+   * specs with mixed `resolution_mode` values, composition that contains more
    * than one time-roll operation, or failure to convert the composed
    * specification.
    * @param specs - ScenarioSpec objects to validate and compose in priority order.

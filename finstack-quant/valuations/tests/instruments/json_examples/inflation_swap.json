@@ -10,7 +10,7 @@
       "fixed_rate": "0.02",
       "id": "INFLSWAP-USD-5Y",
       "inflation_index_id": "US-CPI",
-      "interpolation": null,
+      "interpolation": "linear",
       "lag": {
         "months": 3
       },

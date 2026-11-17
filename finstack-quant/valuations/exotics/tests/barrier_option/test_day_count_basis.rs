@@ -140,7 +140,9 @@ fn test_down_and_out_call_same_day_count_basis() {
 /// if the wrong time basis is being used for vol lookup.
 #[test]
 fn test_vol_lookup_uses_correct_time_basis() {
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
 
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2024 - 07 - 01); // 6M expiry
@@ -154,6 +156,9 @@ fn test_vol_lookup_uses_correct_time_basis() {
     // Create a vol surface with distinct vol levels at different expiries
     // If the wrong time basis is used, the wrong vol will be picked
     let vol_surface = VolSurface::builder(VOL_ID)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[
             0.25,  // 3M
             0.5,   // 6M (target for ACT/365F: 182/365 ≈ 0.499)
@@ -161,7 +166,7 @@ fn test_vol_lookup_uses_correct_time_basis() {
             0.51,  // Guard band
             1.0,   // 1Y
         ])
-        .strikes(&[50.0, 80.0, 100.0, 120.0, 150.0])
+        .secondary_values(&[50.0, 80.0, 100.0, 120.0, 150.0])
         .row(&[0.15, 0.15, 0.15, 0.15, 0.15]) // 3M vol = 15%
         .row(&[0.20, 0.20, 0.20, 0.20, 0.20]) // 6M vol = 20% (ACT/365F)
         .row(&[0.25, 0.25, 0.25, 0.25, 0.25]) // ~6M ACT/360 vol = 25%
@@ -178,7 +183,7 @@ fn test_vol_lookup_uses_correct_time_basis() {
         .insert_surface(vol_surface)
         .insert_price(
             SPOT_ID,
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(
+            finstack_quant_core::market_data::scalars::MarketScalar::price(
                 finstack_quant_core::money::Money::new(
                     spot,
                     finstack_quant_core::currency::Currency::USD,
@@ -188,7 +193,8 @@ fn test_vol_lookup_uses_correct_time_basis() {
         )
         .insert_price(
             DIV_ID,
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(div_yield),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(div_yield)
+                .expect("valid scalar"),
         );
 
     // Create option with ACT/365F day count (should pick 20% vol at t=0.499)
@@ -202,8 +208,11 @@ fn test_vol_lookup_uses_correct_time_basis() {
         .insert(disc_curve_365)
         .insert_surface(
             VolSurface::builder(VOL_ID)
+                .secondary_axis(VolSurfaceAxis::Strike)
+                .quote_type(VolQuoteType::BlackLognormal)
+                .interpolation_mode(VolInterpolationMode::Vol)
                 .expiries(&[0.25, 0.5, 0.505, 0.51, 1.0])
-                .strikes(&[50.0, 80.0, 100.0, 120.0, 150.0])
+                .secondary_values(&[50.0, 80.0, 100.0, 120.0, 150.0])
                 .row(&[0.15, 0.15, 0.15, 0.15, 0.15])
                 .row(&[0.20, 0.20, 0.20, 0.20, 0.20])
                 .row(&[0.25, 0.25, 0.25, 0.25, 0.25])
@@ -214,7 +223,7 @@ fn test_vol_lookup_uses_correct_time_basis() {
         )
         .insert_price(
             SPOT_ID,
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(
+            finstack_quant_core::market_data::scalars::MarketScalar::price(
                 finstack_quant_core::money::Money::new(
                     spot,
                     finstack_quant_core::currency::Currency::USD,
@@ -224,7 +233,8 @@ fn test_vol_lookup_uses_correct_time_basis() {
         )
         .insert_price(
             DIV_ID,
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(div_yield),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(div_yield)
+                .expect("valid scalar"),
         );
 
     let pv_365_market = option_365.value(&market_365, as_of).unwrap();

@@ -31,6 +31,8 @@ fn flat_discount_curve(rate: f64) -> DiscountCurve {
             (2.0, (-rate * 2.0).exp()),
             (5.0, (-rate * 5.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -192,13 +194,19 @@ mod discount_margin_tests {
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(closing())
             .knots(vec![(0.0, 1.0), (5.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
         // Floating tranches need their index forward; flat 4% SOFR-3M.
-        let sofr = ForwardCurve::builder("SOFR-3M", 0.25)
+        let sofr = ForwardCurve::builder("SOFR-3M")
             .base_date(closing())
             .day_count(DayCount::Act365F)
-            .knots([(0.25, 0.04), (1.0, 0.04), (2.5, 0.04)])
+            .index_tenor(finstack_quant_core::dates::Tenor::quarterly())
+            .knots([(0.0, 1.0), (1.0, (-0.04_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
         MarketContext::new()
@@ -212,6 +220,8 @@ mod discount_margin_tests {
                         0.04,
                     )],
                     None,
+                    finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                    finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
                 )
                 .unwrap(),
             )
@@ -486,6 +496,9 @@ mod breakeven_cdr_tests {
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(closing())
             .knots(vec![(0.0, 1.0), (5.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
         MarketContext::new().insert(disc)
@@ -602,6 +615,9 @@ mod scenario_table_tests {
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(closing())
             .knots(vec![(0.0, 1.0), (5.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
         MarketContext::new().insert(disc)
@@ -753,6 +769,9 @@ mod oas_tests {
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(closing())
             .knots(vec![(0.0, 1.0), (10.0, 0.70)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
         MarketContext::new().insert(disc)
@@ -772,6 +791,9 @@ mod oas_tests {
                 (5.0, 0.86),
                 (10.0, 0.85),
             ])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
         MarketContext::new().insert(disc)

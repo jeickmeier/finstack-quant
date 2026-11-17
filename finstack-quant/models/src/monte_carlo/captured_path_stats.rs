@@ -7,9 +7,9 @@ use finstack_quant_core::math::stats::quantile_sorted;
 pub(crate) fn apply_captured_path_statistics(
     estimate: Estimate,
     paths: &[SimulatedPath],
-) -> Estimate {
+) -> finstack_quant_core::Result<Estimate> {
     if paths.is_empty() {
-        return estimate;
+        return Ok(estimate);
     }
 
     let mut values: Vec<f64> = paths.iter().map(|path| path.final_value).collect();
@@ -19,16 +19,16 @@ pub(crate) fn apply_captured_path_statistics(
     );
     values.sort_by(|a, b| a.total_cmp(b));
 
-    let median = quantile_sorted(&values, 0.5);
-    let percentile_25 = quantile_sorted(&values, 0.25);
-    let percentile_75 = quantile_sorted(&values, 0.75);
+    let median = quantile_sorted(&values, 0.5)?.unwrap_or(f64::NAN);
+    let percentile_25 = quantile_sorted(&values, 0.25)?.unwrap_or(f64::NAN);
+    let percentile_75 = quantile_sorted(&values, 0.75)?.unwrap_or(f64::NAN);
     let min = values[0];
     let max = values[values.len() - 1];
 
-    estimate
+    Ok(estimate
         .with_median(median)
         .with_percentiles(percentile_25, percentile_75)
-        .with_range(min, max)
+        .with_range(min, max))
 }
 
 #[cfg(test)]
@@ -54,7 +54,8 @@ mod tests {
             captured_path(4, 0.25),
         ];
 
-        let estimate = apply_captured_path_statistics(estimate, &paths);
+        let estimate =
+            apply_captured_path_statistics(estimate, &paths).expect("finite sorted path values");
 
         assert_eq!(estimate.median, Some(0.375));
         assert_eq!(estimate.percentile_25, Some(0.25));
@@ -73,7 +74,8 @@ mod tests {
             captured_path(3, 2.0),
         ];
 
-        let estimate = apply_captured_path_statistics(estimate, &paths);
+        let estimate =
+            apply_captured_path_statistics(estimate, &paths).expect("finite sorted path values");
 
         assert_eq!(estimate.median, Some(2.5));
         assert_eq!(estimate.percentile_25, Some(1.75));

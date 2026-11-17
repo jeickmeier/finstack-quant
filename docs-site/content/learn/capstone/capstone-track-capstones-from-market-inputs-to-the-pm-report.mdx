@@ -327,7 +327,7 @@ calibrated=calibrate(calibration).market
 stress.insert(calibrated.get_discount("USD-OIS"))
 stress.insert(calibrated.get_hazard("ACME-HZD"))
 stress.insert_price("SPX-SPOT",4160.,"USD")
-stress.insert(VolSurface("SPX-VOL",[.25,.5,1.,2.],[4000.,5200.,6400.],[[.35,.30,.29]]*4))
+stress.insert(VolSurface("SPX-VOL",[.25,.5,1.,2.],[4000.,5200.,6400.],[[.35,.30,.29]]*4,secondary_axis="strike",quote_type="black_lognormal",interpolation_mode="vol"))
 index_calibration=tracks.credit_calibration_envelope()
 for quote in index_calibration["market_data"]:
     if quote["kind"]=="rate_quote":quote["rate"]+=.015
@@ -943,14 +943,14 @@ calibrated=calibrate(calibration).market
 stress.insert(calibrated.get_discount("USD-OIS"))
 stress.insert(calibrated.get_hazard("ACME-HZD"))
 stress.insert_price("SPX-SPOT",4160.,"USD")
-stress.insert(VolSurface("SPX-VOL",[.25,.5,1.,2.],[4000.,5200.,6400.],[[.35,.30,.29]]*4))
+stress.insert(VolSurface("SPX-VOL",[.25,.5,1.,2.],[4000.,5200.,6400.],[[.35,.30,.29]]*4,secondary_axis="strike",quote_type="black_lognormal",interpolation_mode="vol"))
 stress.insert(DiscountCurve("USD-TREASURY",AS_OF,[(t,math.exp(-.055*t)) for t in [0.,1.,5.,10.,20.]],day_count="act_365f"))
 stress.insert_price("SPX",4160.,"USD")
 strikes=[5200*math.exp(-3+i*.05) for i in range(121)]
-stress.insert(VolSurface("SPX_VOL",[.25,.5,1.,2.],strikes,[[.30]*len(strikes)]*4))
+stress.insert(VolSurface("SPX_VOL",[.25,.5,1.,2.],strikes,[[.30]*len(strikes)]*4,secondary_axis="strike",quote_type="black_lognormal",interpolation_mode="vol"))
 for ticker,levels,sigma in [("WTI",[75.,74.,72.,70.],.35),("BRENT",[78.,77.,75.,73.],.33)]:
     stress.insert(PriceCurve(f"{ticker}-FORWARD",AS_OF,list(zip([0.,.5,1.,2.],[.9*x for x in levels]))))
-    stress.insert(VolSurface(f"{ticker}-VOL",[.25,.5,1.,2.],[20.,75.,150.],[[sigma]*3]*4))
+    stress.insert(VolSurface(f"{ticker}-VOL",[.25,.5,1.,2.],[20.,75.,150.],[[sigma]*3]*4,secondary_axis="strike",quote_type="black_lognormal",interpolation_mode="vol"))
 stressed=value_portfolio(book,stress,metrics=[])
 stress_wire=json.loads(stressed.to_json())
 scenario=pd.DataFrame([{"position":iid,"base_usd":float(row["value_base"]["amount"]),

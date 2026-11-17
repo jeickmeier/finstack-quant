@@ -201,36 +201,45 @@ pub(crate) fn solve_yield(
         ));
     }
 
+    if !periods_per_year.is_finite() || periods_per_year <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "structured-credit yield requires positive finite periods_per_year, got {periods_per_year}"
+        )));
+    }
+    let min_yield = -(periods_per_year * (1.0 - 1e-6));
+    let max_yield = 10.0;
+    let initial_guess = 0.05_f64.clamp(min_yield, max_yield);
+
     // Objective function: PV(y) - target = 0
-    let objective = |y: f64| -> f64 {
+    let objective = |y: f64| -> Result<f64> {
         let base = 1.0 + y / periods_per_year;
-        if base <= 0.0 {
-            return f64::INFINITY;
+        if !base.is_finite() || base <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "structured-credit yield compounding base 1 + y/m must be positive, got {base}"
+            )));
         }
         let mut pv = finstack_quant_core::math::summation::NeumaierAccumulator::new();
         for (date, amount) in flows {
             if *date <= settlement {
                 continue;
             }
-            // A failed date conversion is a broken input, not a non-future
-            // flow: signal it with NaN, which `BrentSolver::find_bracket`
-            // rejects as `SolverConvergenceFailed` instead of solving a yield
-            // against a different bond.
-            let Ok(t) = day_count.year_fraction(settlement, *date, DayCountContext::default())
-            else {
-                return f64::NAN;
-            };
+            let t = day_count.year_fraction(settlement, *date, DayCountContext::default())?;
             if t > 0.0 {
-                pv.add(amount.amount() * base.powf(-periods_per_year * t));
+                pv.add(amount.amount() * base.powf(-periods_per_year * t))?;
             }
         }
-        pv.total() - target_value
+        Ok(pv.get_total()? - target_value)
     };
 
     // Tolerance 1e-6 = 0.01 bp; a 5% initial guess suits structured credit.
-    BrentSolver::new()
-        .with_tolerance(YTM_SOLVER_TOLERANCE)
-        .solve(objective, 0.05)
+    BrentSolver::new(YTM_SOLVER_TOLERANCE, 100)?.solve(
+        objective,
+        initial_guess,
+        min_yield,
+        max_yield,
+        0.05,
+        20,
+    )
 }
 
 #[cfg(test)]

@@ -15,7 +15,7 @@ class VolCubeExpirySlice:
     Examples
     --------
     >>> from finstack_quant.core.market_data import VolCubeExpirySlice
-    >>> grid = VolCubeExpirySlice("SLICE", 1.0, [5.0], [0.02, 0.03], [0.2, 0.21])
+    >>> grid = VolCubeExpirySlice("SLICE", 1.0, [5.0], [0.02, 0.03], [0.2, 0.21], quote_type="black_lognormal")
     >>> (grid.expiry, grid.tenors, grid.grid_shape)
     (1.0, [5.0], (1, 2))
     """
@@ -28,7 +28,7 @@ class VolCubeExpirySlice:
         strikes: list[float],
         vols: list[float],
         *,
-        quote_type: str = "black_lognormal",
+        quote_type: str,
         displacements: list[float] | None = None,
     ) -> None:
         """Construct a validated tenor-major grid at one fixed expiry.
@@ -46,7 +46,7 @@ class VolCubeExpirySlice:
         vols : list[float]
             Flat tenor-major grid with ``len(tenors) * len(strikes)`` entries,
             expressed in the declared quote convention.
-        quote_type : str, default "black_lognormal"
+        quote_type : str
             ``black_lognormal``, ``shifted_black_lognormal``, or ``normal``.
         displacements : list[float] | None, default None
             One rate-unit shift per tenor for shifted Black; absent otherwise.
@@ -232,7 +232,7 @@ class VolCubeExpirySlice:
         Examples
         --------
         >>> from finstack_quant.core.market_data import VolCubeExpirySlice
-        >>> grid = VolCubeExpirySlice("S", 1.0, [5.0], [0.03], [0.2])
+        >>> grid = VolCubeExpirySlice("S", 1.0, [5.0], [0.03], [0.2], quote_type="black_lognormal")
         >>> VolCubeExpirySlice.from_json(grid.to_json()).expiry
         1.0
         """

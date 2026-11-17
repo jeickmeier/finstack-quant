@@ -29,12 +29,8 @@ fn usd_curve() -> DiscountCurve {
         .base_date(base_date())
         .knots(vec![(0.0, 1.0), (1.0, 1.0), (5.0, 1.0)])
         .interp(InterpStyle::Linear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        )
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("flat USD curve should build")
 }
@@ -45,12 +41,8 @@ fn eur_curve() -> DiscountCurve {
         .base_date(base_date())
         .knots(vec![(0.0, 1.0), (1.0, 1.0), (5.0, 1.0)])
         .interp(InterpStyle::Linear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        )
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("flat EUR curve should build")
 }
@@ -61,26 +53,18 @@ fn eur_curve() -> DiscountCurve {
 #[allow(dead_code)]
 pub fn usd_curve_at_rate(rate_bp: f64) -> DiscountCurve {
     let rate = rate_bp / 10000.0;
-    let mut builder = DiscountCurve::builder("USD")
+    DiscountCurve::builder("USD")
         .base_date(base_date())
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots(vec![
             (0.0, 1.0),
             (1.0, (-rate * 1.0_f64).exp()),
             (5.0, (-rate * 5.0_f64).exp()),
         ])
-        .interp(InterpStyle::Linear);
-
-    // For flat or near-zero rates, discount factors may be non-monotonic
-    if rate_bp.abs() < 1.0 {
-        builder = builder.validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        );
-    }
-
-    builder.build().expect("USD curve at rate should build")
+        .interp(InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+        .build()
+        .expect("USD curve at rate should build")
 }
 
 // Market Contexts

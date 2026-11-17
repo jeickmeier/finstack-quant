@@ -46,7 +46,7 @@ pub(crate) fn bumped_inflation_market(
     id: &CurveId,
     shift_pct: f64,
 ) -> Result<MarketContext> {
-    context.curves.as_ref().bump([MarketBump::Curve {
+    context.curves.as_ref().bump([MarketBump::InflationCurve {
         id: id.clone(),
         spec: BumpSpec::inflation_shift_pct(shift_pct),
     }])
@@ -137,6 +137,9 @@ mod inflation_swap_inflation01_tests {
         let discount = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (10.0, 0.7)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         // Use an epoch-anchored inflation curve so time fractions are computed
@@ -147,11 +150,23 @@ mod inflation_swap_inflation01_tests {
                 .expect("epoch");
         let inflation = InflationCurve::builder("US-CPI")
             .base_date(epoch)
-            .base_cpi(100.0)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .knots([(0.0, 100.0), (55.0, 155.0), (60.0, 180.0)])
             .build()
             .expect("inflation curve");
-        MarketContext::new().insert(discount).insert(inflation)
+        MarketContext::new()
+            .insert(discount)
+            .insert(inflation)
+            .insert_inflation_index(
+                finstack_quant_valuations_test_support::inflation::simple_index(
+                    "US-CPI",
+                    as_of,
+                    100.0,
+                    finstack_quant_core::currency::Currency::USD,
+                ),
+            )
     }
 
     fn sample_swap() -> InflationSwap {
@@ -182,6 +197,7 @@ mod inflation_swap_inflation01_tests {
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .side(finstack_quant_valuations_core::instruments::PayReceive::Pay)
             .lag(InflationLag::None)
+            .interpolation(finstack_quant_core::market_data::scalars::SeriesInterpolation::Linear)
             .attributes(finstack_quant_core::types::Attributes::new())
             .build()
             .expect("swap")
@@ -204,13 +220,13 @@ mod inflation_swap_inflation01_tests {
         // Compute the two bumped PVs the same way the calculator does.
         let bump = ONE_BASIS_POINT;
         let curves_up = market
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::InflationCurve {
                 id: swap.inflation_index_id.clone(),
                 spec: BumpSpec::inflation_shift_pct(bump * 100.0),
             }])
             .expect("bump up");
         let curves_down = market
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::InflationCurve {
                 id: swap.inflation_index_id.clone(),
                 spec: BumpSpec::inflation_shift_pct(-bump * 100.0),
             }])

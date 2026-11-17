@@ -126,13 +126,52 @@ fn create_test_market() -> MarketContext {
         .base_date(test_date())
         .knots(vec![(0.0, 1.0), (0.25, 0.9875), (1.0, 0.95), (5.0, 0.78)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("Failed to create discount curve");
 
-    let forward_curve = ForwardCurve::builder("SOFR-3M", 0.25)
+    let forward_curve = ForwardCurve::builder("SOFR-3M")
         .base_date(test_date())
-        .knots(vec![(0.0, 0.05), (1.0, 0.051), (2.0, 0.053), (5.0, 0.055)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .index_tenor(finstack_quant_core::dates::Tenor::quarterly())
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.993761726829577),
+            (0.25, 0.987546939169827),
+            (0.375, 0.98135568375037),
+            (0.5, 0.97518800590862),
+            (0.625, 0.969043949595689),
+            (0.75, 0.962923557382358),
+            (0.875, 0.956826870465128),
+            (1.0, 0.950753928672327),
+            (1.125, 0.944697389993104),
+            (1.25, 0.938650099695679),
+            (1.375, 0.932612375318451),
+            (1.5, 0.926584531468335),
+            (1.625, 0.920566879800429),
+            (1.75, 0.914559728998251),
+            (1.875, 0.90856338475459),
+            (2.0, 0.902578149752926),
+            (2.1875, 0.893642726250994),
+            (2.375, 0.884775025292286),
+            (2.5625, 0.875974788465878),
+            (2.75, 0.867241755208159),
+            (2.9375, 0.85857566284855),
+            (3.125, 0.84997624665501),
+            (3.3125, 0.841443239879327),
+            (3.5, 0.832976373802199),
+            (3.6875, 0.824575377778082),
+            (3.875, 0.816239979279819),
+            (4.0625, 0.807969903943038),
+            (4.25, 0.799764875610314),
+            (4.4375, 0.79162461637509),
+            (4.625, 0.783548846625366),
+            (4.8125, 0.775537285087136),
+            (5.0, 0.767589648867573),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("Failed to create forward curve");
 
@@ -142,11 +181,19 @@ fn create_test_market() -> MarketContext {
         .insert_series(
             ScalarTimeSeries::new(
                 "FIXING:SOFR-3M",
-                vec![(
-                    Date::from_calendar_date(2025, Month::September, 29).unwrap(),
-                    0.05,
-                )],
+                vec![
+                    (
+                        Date::from_calendar_date(2025, Month::September, 29).unwrap(),
+                        0.05,
+                    ),
+                    (
+                        Date::from_calendar_date(2025, Month::October, 1).unwrap(),
+                        0.05,
+                    ),
+                ],
                 None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
             )
             .unwrap(),
         )

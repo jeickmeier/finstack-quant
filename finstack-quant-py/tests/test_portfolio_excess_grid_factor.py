@@ -196,7 +196,9 @@ def _flat_ust_curve() -> DiscountCurve:
         (1.25, 0.95122942),
         (1.5, 0.94176453),
     ]
-    return DiscountCurve("UST", _BASE_DATE, knots)
+    return DiscountCurve(
+        "UST", _BASE_DATE, knots, interp="monotone_convex", extrapolation="extend", day_count="act_365f"
+    )
 
 
 def test_cell_returns_from_curves_matches_rust_flat_curve_golden() -> None:
@@ -218,8 +220,22 @@ def test_cell_returns_from_curves_distinguishes_start_and_end_curves() -> None:
     above, where ``start == end`` and a ``start``/``end`` argument swap would
     be invisible). Start 4% flat, end 5% flat.
     """
-    start = DiscountCurve("UST", _BASE_DATE, [(0.0, 1.0), (0.5, 0.98019867), (1.5, 0.94176453)])
-    end = DiscountCurve("UST", _BASE_DATE, [(0.0, 1.0), (0.25, 0.98757780), (1.25, 0.93941306)])
+    start = DiscountCurve(
+        "UST",
+        _BASE_DATE,
+        [(0.0, 1.0), (0.5, 0.98019867), (1.5, 0.94176453)],
+        interp="monotone_convex",
+        extrapolation="extend",
+        day_count="act_365f",
+    )
+    end = DiscountCurve(
+        "UST",
+        _BASE_DATE,
+        [(0.0, 1.0), (0.25, 0.98757780), (1.25, 0.93941306)],
+        interp="monotone_convex",
+        extrapolation="extend",
+        day_count="act_365f",
+    )
     table = json.loads(cell_returns_from_curves(start, end, 0.25, 2.0, "UST", json.dumps({"width": 1.0})).to_json())
 
     assert table["cells"][0]["base_return"] == pytest.approx(0.0075281983, abs=1e-8)
@@ -252,7 +268,9 @@ def test_cell_returns_from_curves_rejects_malformed_config_json() -> None:
 def test_cell_returns_from_curves_rejects_cell_maturing_inside_period() -> None:
     """A cell whose midpoint sits inside the holding period fails closed."""
     knots = [(0.0, 1.0), (0.25, 0.99004983), (0.5, 0.98019867)]
-    curve = DiscountCurve("UST", _BASE_DATE, knots)
+    curve = DiscountCurve(
+        "UST", _BASE_DATE, knots, interp="monotone_convex", extrapolation="extend", day_count="act_365f"
+    )
     with pytest.raises(PortfolioError, match="mature"):
         cell_returns_from_curves(curve, curve, 0.25, 0.5, "UST", json.dumps({"width": 0.25})).to_json()
 

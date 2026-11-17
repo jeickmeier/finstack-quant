@@ -94,6 +94,9 @@ fn revolving_credit_credit_risk_export_fails_instead_of_returning_false_reconcil
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (1.0, 1.0)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("discount curve"),
         )
@@ -102,6 +105,7 @@ fn revolving_credit_credit_risk_export_fails_instead_of_returning_false_reconcil
                 .base_date(as_of)
                 .recovery_rate(0.4)
                 .knots([(1.0, 0.20), (5.0, 0.20)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .expect("hazard curve"),
         );
@@ -150,6 +154,9 @@ fn mixed_currency_fx_swap_rows_use_native_curves_and_reporting_currency_pv() {
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (1.0, 0.95)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("usd curve"),
         )
@@ -157,6 +164,9 @@ fn mixed_currency_fx_swap_rows_use_native_curves_and_reporting_currency_pv() {
             DiscountCurve::builder("EUR-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (1.0, 0.97)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("eur curve"),
         )
@@ -217,6 +227,9 @@ fn discounting_reconciles_with_schedule_pv_for_fixed_bond() {
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(issue)
         .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
     let market = MarketContext::new().insert(disc);
@@ -307,6 +320,9 @@ fn explained_price_carries_reconciling_trace_and_provenance() {
         DiscountCurve::builder("USD-OIS")
             .base_date(issue)
             .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve"),
     );
@@ -419,6 +435,9 @@ fn scenario_price_shock_scales_cashflow_rows_and_total_once() {
         DiscountCurve::builder("USD-OIS")
             .base_date(issue)
             .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve"),
     );
@@ -475,6 +494,9 @@ fn seasoned_instrument_discount_factors_use_correct_time_origin() {
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(issue)
         .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
     let market = MarketContext::new().insert(disc.clone());
@@ -618,6 +640,9 @@ fn balance_market(as_of: Date) -> MarketContext {
         DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, 0.97), (10.0, 0.70)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve"),
     )

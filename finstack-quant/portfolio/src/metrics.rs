@@ -344,7 +344,7 @@ pub fn aggregate_metrics(
         .flatten()
         .collect();
 
-    let mut metrics = aggregate_collected_metrics(collected);
+    let mut metrics = aggregate_collected_metrics(collected)?;
     metrics
         .degraded_positions
         .clone_from(&valuation.degraded_positions);
@@ -415,7 +415,7 @@ struct PositionMetricData {
 }
 
 /// Aggregate collected position metric data into portfolio metrics.
-fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioMetrics {
+fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> Result<PortfolioMetrics> {
     let n = collected.len();
     let mut by_position: IndexMap<PositionId, PositionMetrics> = IndexMap::with_capacity(n);
 
@@ -455,14 +455,14 @@ fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioM
                 metric_values
                     .entry(metric_id.clone())
                     .or_default()
-                    .add(value_base);
+                    .add(value_base)?;
 
                 entity_values
                     .entry(metric_id.clone())
                     .or_default()
                     .entry(entity_id.clone())
                     .or_default()
-                    .add(value_base);
+                    .add(value_base)?;
             }
         }
 
@@ -479,7 +479,7 @@ fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioM
         IndexMap::with_capacity(metric_values.len());
 
     for (metric_id, values) in metric_values {
-        let total = values.total();
+        let total = values.get_total()?;
 
         let by_entity: IndexMap<EntityId, f64> = entity_values
             .shift_remove(&metric_id)
@@ -487,9 +487,9 @@ fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioM
             .flat_map(|entity_map| {
                 entity_map
                     .into_iter()
-                    .map(|(eid, vals)| (eid, vals.total()))
+                    .map(|(eid, vals)| vals.get_total().map(|v| (eid, v)))
             })
-            .collect();
+            .collect::<finstack_quant_core::Result<_>>()?;
 
         let metric_string = metric_id.to_string();
         aggregated.insert(
@@ -505,13 +505,13 @@ fn aggregate_collected_metrics(collected: Vec<PositionMetricData>) -> PortfolioM
     let mut unaggregated_metrics: Vec<String> = unaggregated.into_iter().collect();
     unaggregated_metrics.sort_unstable();
 
-    PortfolioMetrics {
+    Ok(PortfolioMetrics {
         aggregated,
         by_position,
         skipped_metrics,
         degraded_positions: Vec::new(),
         unaggregated_metrics,
-    }
+    })
 }
 
 #[cfg(test)]
@@ -840,8 +840,8 @@ mod tests {
             make_data("POS_B", "ENTITY_Y"),
             make_data("POS_C", "ENTITY_X"),
         ];
-        let a = aggregate_collected_metrics(collected.clone());
-        let b = aggregate_collected_metrics(collected);
+        let a = aggregate_collected_metrics(collected.clone()).expect("finite metrics");
+        let b = aggregate_collected_metrics(collected).expect("finite metrics");
 
         let a_order: Vec<_> = a.aggregated.keys().cloned().collect();
         let b_order: Vec<_> = b.aggregated.keys().cloned().collect();
@@ -881,7 +881,7 @@ mod tests {
                 fx_rate: 1.0,
             })
             .collect();
-        let result = aggregate_collected_metrics(collected);
+        let result = aggregate_collected_metrics(collected).expect("finite metrics");
         assert_eq!(result.aggregated[&metric].total, 1.0);
         assert_eq!(
             result.aggregated[&metric].by_entity[&EntityId::new("ENTITY")],

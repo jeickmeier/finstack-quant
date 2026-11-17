@@ -920,6 +920,8 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (2.0, 0.94)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 
@@ -1048,6 +1050,8 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (2.0, 0.94)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let market = MarketContext::new().insert(disc).insert(price_curve);
@@ -1127,12 +1131,17 @@ mod tests {
         id: &str,
         vol: f64,
     ) -> finstack_quant_core::market_data::surfaces::VolSurface {
-        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::market_data::surfaces::{
+            VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+        };
         let expiries = [0.25, 0.5, 1.0, 2.0];
         let strikes = [2.0, 3.0, 3.5, 4.0, 5.0];
         let mut builder = VolSurface::builder(id)
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&expiries)
-            .strikes(&strikes);
+            .secondary_values(&strikes);
         for _ in &expiries {
             builder = builder.row(&vec![vol; strikes.len()]);
         }
@@ -1145,6 +1154,9 @@ mod tests {
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, (-rate * 5.0).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 

@@ -6629,7 +6629,7 @@ export interface WaterfallSpec {
   available_cash_node: string;
   /**
    * Excess Cash Flow (ECF) sweep specification.
-   * A positive sweep percentage requires the `Sweep` payment priority.
+   * This specification and the `Sweep` payment priority must be supplied together.
    */
   ecf_sweep?: EcfSweepSpec | null;
   /**
@@ -6653,7 +6653,8 @@ export interface WaterfallSpec {
    */
   pik_toggle?: PikToggleSpec | null;
   /**
-   * Priority order of payments (default: Fees > Interest > Amortization > Sweep > Equity)
+   * Priority order of payments (default: Fees > Interest > Amortization > Equity).
+   * Include each prepayment priority explicitly alongside its sizing configuration.
    */
   priority_of_payments?: PaymentPriority[];
   /**

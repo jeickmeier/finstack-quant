@@ -163,6 +163,8 @@ mod tests {
                 (1.0, (-0.05_f64).exp()),
                 (10.0, (-0.5_f64).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let market = MarketContext::new().insert(discount_curve);
@@ -202,6 +204,8 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, 0.97), (2.0, 0.89), (3.0, 0.83)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new().insert(curve);

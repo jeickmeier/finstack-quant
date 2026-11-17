@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from finstack_quant.core.market_data import MarketContext, ScalarTimeSeries, VolSurface
+from finstack_quant.core.money import Money
 from finstack_quant.models.correlation import validate_correlation_matrix
 from finstack_quant.models.volatility import get_surface_vol
 
@@ -14,9 +15,13 @@ from finstack_quant.models.volatility import get_surface_vol
 def test_decimal_precision_cannot_bypass_exact_float_validation() -> None:
     value = Decimal("0.50000000000000000000000000001")
     with pytest.raises(ValueError, match="exactly representable"):
-        MarketContext().insert_price("PX", value)
+        MarketContext().insert_price("PX", value, "USD")
     with pytest.raises(ValueError, match="exactly representable"):
-        ScalarTimeSeries("PX", [(date(2025, 1, 1), value)])
+        Money.from_decimal(value, "USD")
+    with pytest.raises(ValueError, match=r"(?i)infinity|finite"):
+        MarketContext().insert_price("PX", Decimal("1e400"))
+    with pytest.raises(ValueError, match=r"(?i)infinity|finite"):
+        ScalarTimeSeries("PX", [(date(2025, 1, 1), Decimal("1e400"))], "step", "flat")
 
 
 @pytest.mark.parametrize(
@@ -29,7 +34,15 @@ def test_decimal_precision_cannot_bypass_exact_float_validation() -> None:
 )
 def test_surface_rejects_wrong_row_shape_even_when_element_count_matches(values: object) -> None:
     with pytest.raises(ValueError, match="vol_rows"):
-        VolSurface("VOL", [1.0, 2.0], [90.0, 100.0], values)  # type: ignore[arg-type]
+        VolSurface(
+            "VOL",
+            [1.0, 2.0],
+            [90.0, 100.0],
+            values,  # type: ignore[arg-type]
+            secondary_axis="strike",
+            quote_type="black_lognormal",
+            interpolation_mode="vol",
+        )
 
 
 @pytest.mark.parametrize(

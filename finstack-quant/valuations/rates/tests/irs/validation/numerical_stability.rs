@@ -24,7 +24,7 @@ use finstack_quant_valuations_rates::irs::InterestRateSwap;
 use time::macros::date;
 
 fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> DiscountCurve {
-    let mut builder = DiscountCurve::builder(curve_id)
+    let builder = DiscountCurve::builder(curve_id)
         .base_date(base_date)
         .day_count(DayCount::Act360)
         .knots([
@@ -33,27 +33,15 @@ fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> Disc
             (5.0, (-rate * 5.0).exp()),
             (10.0, (-rate * 10.0).exp()),
             (30.0, (-rate * 30.0).exp()),
-        ]);
-
-    if rate.abs() < 1e-10 || rate < 0.0 {
-        builder = builder.validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        );
-    }
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend);
 
     builder.build().unwrap()
 }
 
 fn build_flat_forward_curve(rate: f64, base_date: Date, curve_id: &str) -> ForwardCurve {
-    ForwardCurve::builder(curve_id, 0.25)
-        .base_date(base_date)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, rate), (10.0, rate), (30.0, rate)])
-        .build()
-        .unwrap()
+    ForwardCurve::flat(curve_id, base_date, rate, DayCount::Act360).unwrap()
 }
 
 // Input Validation Tests
@@ -610,12 +598,11 @@ fn test_golden_dv01_approximation() {
     // DV01 approximation
     let dv01_approx = annuity * notional * 0.0001;
 
-    // Actual DV01 (from parallel bump) should be within 3% of approximation
-    // The difference is higher than bond DV01 because IRS DV01 includes
-    // floating leg forward rate changes on the parallel bump
+    // Under continuous zero-rate shocks P_b(t) = P(t) * exp(-h*t),
+    // summation by parts scales the par annuity sensitivity by ~(1 + r * alpha).
     assert!(
-        (dv01.abs() - dv01_approx).abs() / dv01_approx < 0.03,
-        "DV01 ({:.2}) should be ~{:.2} (within 3%)",
+        (dv01.abs() - dv01_approx).abs() / dv01_approx < 0.045,
+        "DV01 ({:.2}) should be ~{:.2} (within 4.5%)",
         dv01,
         dv01_approx
     );

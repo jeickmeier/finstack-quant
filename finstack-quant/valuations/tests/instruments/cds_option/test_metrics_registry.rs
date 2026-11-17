@@ -135,7 +135,6 @@ fn test_cds_option_dv01_bumps_swap_curve_quotes_and_matches_cds_convention() {
         .day_count(DayCount::Act365F)
         .recovery_rate(0.4)
         .knots([(1.0, 0.02), (5.0, 0.02), (10.0, 0.02)])
-        .par_spreads([(1.0, 120.0), (5.0, 120.0), (10.0, 120.0)])
         .build()
         .unwrap();
     let market = MarketContext::new().insert(discount).insert(hazard);
@@ -180,6 +179,9 @@ fn test_cds_option_dv01_falls_back_to_direct_bump_without_calibration() {
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.86), (10.0, 0.74)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let hazard = flat_hazard("HZ-SN", as_of, 0.4, 0.02);
@@ -274,6 +276,7 @@ fn test_cds_option_cs01_requires_replay_recipe() {
         .base_date(as_of)
         .recovery_rate(0.4)
         .knots([(1.0, 0.02), (5.0, 0.02), (10.0, 0.02)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
     let market = MarketContext::new().insert(discount).insert(hazard);

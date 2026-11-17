@@ -122,22 +122,24 @@ pub struct TrancheMetrics {
 /// Every discount and forward curve in `market` bumped `bp` basis points in
 /// parallel (hazard, price, vol and other curves untouched).
 fn bump_rate_curves(market: &MarketContext, bp: f64) -> Result<MarketContext> {
+    let spec = BumpSpec {
+        mode: BumpMode::Additive,
+        units: BumpUnits::RateBp,
+        value: bp,
+        bump_type: BumpType::Parallel,
+    };
     let bumps: Vec<MarketBump> = market
         .iter_curves()
-        .filter(|(_, storage)| {
-            matches!(
-                storage,
-                CurveStorage::Discount(_) | CurveStorage::Forward(_)
-            )
-        })
-        .map(|(id, _)| MarketBump::Curve {
-            id: id.clone(),
-            spec: BumpSpec {
-                mode: BumpMode::Additive,
-                units: BumpUnits::RateBp,
-                value: bp,
-                bump_type: BumpType::Parallel,
-            },
+        .filter_map(|(id, storage)| match storage {
+            CurveStorage::Discount(_) => Some(MarketBump::DiscountCurve {
+                id: id.clone(),
+                spec,
+            }),
+            CurveStorage::Forward(_) => Some(MarketBump::ForwardCurve {
+                id: id.clone(),
+                spec,
+            }),
+            _ => None,
         })
         .collect();
     market.bump(bumps)

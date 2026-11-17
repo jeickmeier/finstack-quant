@@ -27,6 +27,7 @@
 use crate::AttributionRequest;
 use crate::factors::{MarketRestoreFlags, MarketSnapshot};
 use crate::helpers::*;
+use crate::metrics_based::shifts::measure_credit_curve_shift_bp;
 use crate::metrics_based::shifts::{CreditKeyRateBucket, extract_credit_keyrates};
 use crate::{AttributionFactor, AttributionMethod, MoveUnit, PnlAttribution};
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
@@ -34,7 +35,6 @@ use finstack_quant_core::Result;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::diff::{TenorSamplingMethod, measure_credit_curve_shift};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_models::volatility::measure_vol_surface_shift;
@@ -827,8 +827,9 @@ struct CurveFactorInputs<'a> {
 /// (which mis-attributes non-parallel moves — a steepener averages toward zero
 /// and inflates the unexplained residual), this bumps each standard key-rate
 /// bucket with a triangular weight, measures the DV01 of that bucket, and pairs
-/// it with the realized move at that bucket's tenor (zero rate for a discount
-/// curve, forward rate for a forward curve):
+/// it with the realized move at that bucket's tenor (continuously compounded
+/// zero rate of the discount factor or projection factor, the coordinate the
+/// key-rate bump shocks):
 ///
 ///   explained = Σ_bucket  DV01_bucket × Δr_bucket
 fn compute_curve_factor(inputs: CurveFactorInputs<'_>) -> Result<TaylorFactorResult> {
@@ -853,37 +854,38 @@ fn compute_curve_factor(inputs: CurveFactorInputs<'_>) -> Result<TaylorFactorRes
             STANDARD_BUCKETS_YEARS
                 .iter()
                 .map(|&t| {
-                    (curve_t1.zero_rate(t, finstack_quant_core::math::Compounding::Continuous)
-                        - curve_t0.zero_rate(t, finstack_quant_core::math::Compounding::Continuous))
-                        * 10_000.0
+                    let z1 = curve_t1
+                        .zero_rate(t, finstack_quant_core::math::Compounding::Continuous)?;
+                    let z0 = curve_t0
+                        .zero_rate(t, finstack_quant_core::math::Compounding::Continuous)?;
+                    Ok((z1 - z0) * 10_000.0)
                 })
-                .collect()
+                .collect::<Result<Vec<f64>>>()?
         }
-        CurveKind::Forward => {
-            let (curve_t0, curve_t1) = (
-                market_t0.get_forward(curve_id.as_str())?,
-                market_t1.get_forward(curve_id.as_str())?,
-            );
-            STANDARD_BUCKETS_YEARS
-                .iter()
-                .map(|&t| (curve_t1.rate(t) - curve_t0.rate(t)) * 10_000.0)
-                .collect()
-        }
+        CurveKind::Forward => crate::metrics_based::shifts::measure_forward_curve_tenor_shifts_bp(
+            curve_id.as_str(),
+            market_t0,
+            market_t1,
+            &STANDARD_BUCKETS_YEARS,
+        )?,
     };
 
     let mut buckets: Vec<KeyRateBucket> = Vec::with_capacity(STANDARD_BUCKETS_YEARS.len());
     for (i, &move_bp) in per_tenor_move_bp.iter().enumerate() {
-        let up = market_t0.bump([MarketBump::Curve {
-            id: curve_id.clone(),
-            spec: key_rate_bump_on_grid(&STANDARD_BUCKETS_YEARS, i, config.rate_bump_bp),
-        }])?;
+        let target = market_t0.curve_target(curve_id)?;
+        let up = market_t0.bump([target.clone().into_bump(key_rate_bump_on_grid(
+            &STANDARD_BUCKETS_YEARS,
+            i,
+            config.rate_bump_bp,
+        ))])?;
         *repricings += 1;
         let pv_up = instrument.value(&up, as_of_t0)?;
 
-        let down = market_t0.bump([MarketBump::Curve {
-            id: curve_id.clone(),
-            spec: key_rate_bump_on_grid(&STANDARD_BUCKETS_YEARS, i, -config.rate_bump_bp),
-        }])?;
+        let down = market_t0.bump([target.into_bump(key_rate_bump_on_grid(
+            &STANDARD_BUCKETS_YEARS,
+            i,
+            -config.rate_bump_bp,
+        ))])?;
         *repricings += 1;
         let pv_down = instrument.value(&down, as_of_t0)?;
 
@@ -895,7 +897,7 @@ fn compute_curve_factor(inputs: CurveFactorInputs<'_>) -> Result<TaylorFactorRes
     // summation keeps the per-bucket accumulation stable.
     let explained = finstack_quant_core::math::summation::neumaier_sum(
         buckets.iter().map(|b| b.dv01 * b.move_bp),
-    );
+    )?;
     let gamma_pnl = if config.include_gamma {
         Some(directional_gamma_pnl(
             instrument,
@@ -982,7 +984,7 @@ fn bump_credit_market(
         return Ok(market.clone().insert(bumped.as_ref().clone()));
     }
     market.get_discount(curve_id.as_str())?;
-    market.bump([MarketBump::Curve {
+    market.bump([MarketBump::DiscountCurve {
         id: curve_id.clone(),
         spec: BumpSpec::parallel_bp(bump_bp),
     }])
@@ -1066,7 +1068,7 @@ fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorR
             buckets
                 .iter()
                 .map(|bucket| bucket.sensitivity * bucket.move_bp),
-        );
+        )?;
         let gamma_pnl = if config.include_gamma {
             Some(directional_gamma_pnl(
                 instrument,
@@ -1126,12 +1128,7 @@ fn compute_credit_factor(inputs: CreditFactorInputs<'_>) -> Result<TaylorFactorR
     // Central difference CS01: O(h²) accuracy, $ per bp of credit-curve move.
     let cs01 = (pv_up.amount() - pv_down.amount()) / (2.0 * config.credit_spread_bump_bp);
 
-    let spread_move_bp = measure_credit_curve_shift(
-        curve_id.as_str(),
-        market_t0,
-        market_t1,
-        TenorSamplingMethod::Standard,
-    )?;
+    let spread_move_bp = measure_credit_curve_shift_bp(curve_id.as_str(), market_t0, market_t1)?;
 
     let explained = cs01 * spread_move_bp;
 
@@ -1264,7 +1261,7 @@ fn restored_family_factor(
     factor_name: &str,
     repricings: &mut usize,
 ) -> Result<TaylorFactorResult> {
-    let market_with_t0 = MarketSnapshot::restore_market(request.market_t1, snapshot, flags);
+    let market_with_t0 = MarketSnapshot::restore_market(request.market_t1, snapshot, flags)?;
     *repricings += 1;
     let pv_with_t0 = request
         .instrument
@@ -1394,6 +1391,7 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::money::fx::FxConversionPolicy;
     use std::sync::Arc;
     use test_utils::TestInstrument;
     use time::macros::date;
@@ -1555,22 +1553,13 @@ mod tests {
     fn taylor_attribution_includes_forward_curve_factors() {
         use finstack_quant_core::dates::DayCount;
         use finstack_quant_core::market_data::term_structures::ForwardCurve;
-        use finstack_quant_core::types::CurveId;
 
         let as_of_t0 = date!(2025 - 01 - 15);
         let as_of_t1 = date!(2025 - 01 - 16);
 
-        let fwd_t0 = ForwardCurve::builder(CurveId::new("TEST-FWD"), 0.25)
-            .base_date(as_of_t0)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.03), (10.0, 0.03)])
-            .build()
+        let fwd_t0 = ForwardCurve::flat("TEST-FWD", as_of_t0, 0.03, DayCount::Act360)
             .expect("forward curve");
-        let fwd_t1 = ForwardCurve::builder(CurveId::new("TEST-FWD"), 0.25)
-            .base_date(as_of_t0)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.04), (10.0, 0.04)])
-            .build()
+        let fwd_t1 = ForwardCurve::flat("TEST-FWD", as_of_t0, 0.04, DayCount::Act360)
             .expect("forward curve");
 
         let market_t0 = MarketContext::new().insert(fwd_t0);
@@ -1668,6 +1657,7 @@ mod tests {
                     Money::new(self.eur_notional, Currency::EUR).expect("valid money fixture"),
                     Currency::USD,
                     as_of,
+                    FxConversionPolicy::CashflowDate,
                 )?
                 .amount;
             Ok(usd)
@@ -1832,6 +1822,8 @@ mod tests {
                 .base_date(base)
                 .knots(vec![(0.0, 1.0), (1.0, df1)])
                 .interp(InterpStyle::Linear)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("discount curve")
         };
@@ -1886,7 +1878,9 @@ mod tests {
     // floor, total-return unexplained basis, and FX presence on either side.
 
     use finstack_quant_core::dates::DayCount;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_valuations::instruments::VolatilityDependency;
 
@@ -2113,13 +2107,13 @@ mod tests {
                     tenor,
                     notional,
                 } => {
-                    let df = market.get_discount(curve)?.df(*tenor);
+                    let df = market.get_discount(curve)?.df(*tenor)?;
                     Ok(Money::new(notional * df, Currency::USD).expect("valid money fixture"))
                 }
                 MockPayoff::HedgedZeros { short_notional } => {
                     let curve = market.get_discount("HEDGE")?;
                     Money::new(
-                        1_000_000.0 * curve.df(1.0) - short_notional * curve.df(5.0),
+                        1_000_000.0 * curve.df(1.0)? - short_notional * curve.df(5.0)?,
                         Currency::USD,
                     )
                 }
@@ -2128,9 +2122,8 @@ mod tests {
                     tenor,
                     scale,
                 } => {
-                    let rate = market.get_forward(curve)?.rate(*tenor);
-                    Ok(Money::new(scale * (-rate * tenor).exp(), Currency::USD)
-                        .expect("valid money fixture"))
+                    let factor = market.get_forward(curve)?.df(*tenor)?;
+                    Ok(Money::new(scale * factor, Currency::USD).expect("valid money fixture"))
                 }
                 MockPayoff::VolSum { reads, scale } => {
                     let mut total = 0.0;
@@ -2150,6 +2143,7 @@ mod tests {
                                     .expect("valid money fixture"),
                                 Currency::USD,
                                 as_of,
+                                FxConversionPolicy::CashflowDate,
                             )
                             .map(|converted| converted.amount)
                     } else {
@@ -2157,12 +2151,16 @@ mod tests {
                     }
                 }
                 MockPayoff::Spot { id, scale } => {
-                    let price = match market.get_price(*id)? {
-                        finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => {
-                            money.amount()
-                        }
-                        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-                    };
+                    let s = market.get_price(*id)?;
+                    let price = s
+                        .get_price()
+                        .map(|money| money.amount())
+                        .or_else(|| s.get_unitless())
+                        .ok_or_else(|| {
+                            finstack_quant_core::Error::Validation(format!(
+                                "unsupported scalar for '{id}'"
+                            ))
+                        })?;
                     Ok(Money::new(scale * price, Currency::USD).expect("valid money fixture"))
                 }
                 MockPayoff::InflationCpi {
@@ -2170,7 +2168,7 @@ mod tests {
                     tenor,
                     scale,
                 } => {
-                    let cpi = market.get_inflation_curve(*curve)?.cpi(*tenor);
+                    let cpi = market.get_inflation_curve(*curve)?.cpi(*tenor)?;
                     Ok(Money::new(scale * cpi, Currency::USD).expect("valid money fixture"))
                 }
                 MockPayoff::Correlation {
@@ -2228,20 +2226,26 @@ mod tests {
             .base_date(base)
             .day_count(DayCount::Act365F)
             .knots(knots)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve")
     }
 
-    /// Forward curve with a flat rate `r`, knotted densely across the bucket
-    /// grid (plus 1.5y).
+    /// Forward curve with a flat continuously-compounded projection zero rate
+    /// `r`, knotted densely across the bucket grid (plus 1.5y).
     fn flat_forward_curve(id: &'static str, base: Date, r: f64) -> ForwardCurve {
         let tenors = [
-            0.0, 0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0,
+            0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0,
         ];
-        ForwardCurve::builder(CurveId::new(id), 0.25)
+        let mut knots = vec![(0.0, 1.0)];
+        knots.extend(tenors.iter().map(|&t| (t, (-r * t).exp())));
+        ForwardCurve::builder(id)
             .base_date(base)
             .day_count(DayCount::Act365F)
-            .knots(tenors.iter().map(|&t| (t, r)).collect::<Vec<_>>())
+            .knots(knots)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("forward curve")
     }
@@ -2252,7 +2256,10 @@ mod tests {
     fn two_expiry_surface(id: &'static str, front: f64, back: f64) -> VolSurface {
         VolSurface::builder(id)
             .expiries(&[0.5, 5.0])
-            .strikes(&[90.0, 110.0])
+            .secondary_values(&[90.0, 110.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[front, front])
             .row(&[back, back])
             .build()
@@ -2511,12 +2518,13 @@ mod tests {
         .unwrap();
         let delivered = bumped.get_hazard("HAZ").unwrap();
         for tenor in [0.5, 1.0, 2.0, 3.0, 4.0, 5.0] {
-            assert!((delivered.sp(tenor) - expected.sp(tenor)).abs() < 1e-9);
+            assert!((delivered.sp(tenor).unwrap() - expected.sp(tenor).unwrap()).abs() < 1e-9);
         }
         let bare = finstack_quant_core::market_data::term_structures::HazardCurve::builder("BARE")
             .base_date(start)
+            .day_count(DayCount::Act365F)
             .recovery_rate(0.4)
-            .knots([(0.0, 0.02), (5.0, 0.02)])
+            .knots([(1.0, 0.02), (5.0, 0.02)])
             .build()
             .unwrap();
         let missing = market.insert(bare);
@@ -2798,6 +2806,8 @@ mod tests {
             .base_date(as_of_t0)
             .knots(vec![(0.0, 1.0), (30.0, 0.5)])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let market_t0 = MarketContext::new().insert(curve);
@@ -3070,11 +3080,11 @@ mod tests {
         ));
         let market_t0 = MarketContext::new().insert_price(
             "AAPL",
-            MarketScalar::Price(Money::from((180_i64, Currency::USD))),
+            MarketScalar::price(Money::from((180_i64, Currency::USD))),
         );
         let market_t1 = MarketContext::new().insert_price(
             "AAPL",
-            MarketScalar::Price(Money::from((185_i64, Currency::USD))),
+            MarketScalar::price(Money::from((185_i64, Currency::USD))),
         );
 
         let attribution = crate::attribute_pnl(
@@ -3115,7 +3125,9 @@ mod tests {
         let infl = |cpi_5y| {
             InflationCurve::builder("US-CPI")
                 .base_date(as_of_t0)
-                .base_cpi(300.0)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
                 .knots([(0.0, 300.0), (5.0, cpi_5y)])
                 .build()
                 .expect("inflation curve")

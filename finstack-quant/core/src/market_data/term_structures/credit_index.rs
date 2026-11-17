@@ -202,7 +202,8 @@ impl CreditIndexData {
 ///     HazardCurve::builder("CDX")
 ///         .base_date(base)
 ///         .recovery_rate(0.40)
-///         .knots([(0.0, 0.01), (5.0, 0.015)])
+///         .knots([(1.0, 0.01), (5.0, 0.015)])
+///         .day_count(finstack_quant_core::dates::DayCount::Act365F)
 ///         .build()
 ///         .expect("HazardCurve builder should succeed"),
 /// );
@@ -476,6 +477,7 @@ mod production_credit_audit {
                 .base_date(base)
                 .recovery_rate(0.4)
                 .knots([(1.0, 0.02)])
+                .day_count(crate::dates::DayCount::Act365F)
                 .build()
                 .expect("hazard"),
         );

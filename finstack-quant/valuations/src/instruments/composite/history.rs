@@ -281,7 +281,7 @@ fn composite_cashflows_between(
             )
         })
         .collect::<Result<Vec<_>>>()?;
-    Ok(neumaier_sum(amounts))
+    neumaier_sum(amounts)
 }
 
 #[cfg(test)]
@@ -374,8 +374,8 @@ mod tests {
         .into_iter()
         .map(|(date, a, b)| {
             let market = MarketContext::new()
-                .insert_price("A", MarketScalar::Unitless(a))
-                .insert_price("B", MarketScalar::Unitless(b));
+                .insert_price("A", MarketScalar::unitless(a).expect("valid scalar"))
+                .insert_price("B", MarketScalar::unitless(b).expect("valid scalar"));
             CompositeMarketObservation::new(date, &market)
         })
         .collect::<Result<Vec<_>>>()?;

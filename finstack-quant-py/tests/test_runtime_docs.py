@@ -100,7 +100,13 @@ CONVERTED: dict[str, tuple[str, ...] | None] = {
         "sortino",
         "volatility",
     ),
-    "finstack_quant.core.dates": ("PeriodKind",),
+    "finstack_quant.core.dates": ("PeriodKind", "VolatilityClock"),
+    "finstack_quant.core.market_data": (
+        "InflationCurve",
+        "InflationIndex",
+        "InflationObservation",
+        "InflationExpectedRelease",
+    ),
     "finstack_quant.statements_analytics": (
         "CorkscrewReport.to_dataframe",
         "ScorecardReport.to_dataframe",

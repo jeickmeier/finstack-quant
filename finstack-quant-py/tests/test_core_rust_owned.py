@@ -123,7 +123,7 @@ def test_fx_delta_vol_wing_pairing_is_the_rust_constructor_check(
     rr_10d: list[float] | None, bf_10d: list[float] | None
 ) -> None:
     with _raises_exactly("Validation error: rr_10d and bf_10d must both be provided or both omitted"):
-        FxDeltaVolSurface("X", [1.0], [0.1], [0.01], [0.005], rr_10d, bf_10d)
+        FxDeltaVolSurface("X", "EUR/USD", [1.0], [0.1], [0.01], [0.005], rr_10d=rr_10d, bf_10d=bf_10d)
 
 
 def test_vol_cube_node_dicts_use_the_rust_serde_shape() -> None:
@@ -139,19 +139,35 @@ def test_vol_cube_node_dicts_use_the_rust_serde_shape() -> None:
 
 def test_hazard_curve_recovery_errors_come_from_the_rust_builder() -> None:
     with _raises_exactly("Validation error: Invalid recovery_rate: must be finite and in [0, 1], got 1.5"):
-        HazardCurve("HZ", "2025-01-01", [(1.0, 0.01), (5.0, 0.02)], recovery_rate=1.5)
-    # Knots are validated before recovery, exactly as in WASM.
+        HazardCurve("HZ", "2025-01-01", [(1.0, 0.01), (5.0, 0.02)], recovery_rate=1.5, day_count="act_365f")
+    # Knots are validated against non-negative intensity when recovery_rate is valid.
     with _raises_exactly("Values must be non-negative"):
-        HazardCurve("HZ", "2025-01-01", [(1.0, -0.02)], recovery_rate=1.5)
+        HazardCurve("HZ", "2025-01-01", [(1.0, -0.02)], recovery_rate=0.4, day_count="act_365f")
 
 
-def test_discount_curve_validation_mode_defaults_in_rust() -> None:
+def test_discount_curve_requires_explicit_conventions_and_rejects_obsolete_flags() -> None:
     knots = [(0.0, 1.0), (1.0, 0.98), (5.0, 0.88)]
-    default = DiscountCurve("USD-OIS", "2025-01-01", knots)
-    explicit = DiscountCurve("USD-OIS", "2025-01-01", knots, validation_mode="market_standard")
-    assert default.df(2.5) == explicit.df(2.5)
-    with pytest.raises(ValueError, match="forward_floor is only valid"):
-        DiscountCurve("USD-OIS", "2025-01-01", knots, forward_floor=-0.01)
+    curve = DiscountCurve(
+        "USD-OIS",
+        "2025-01-01",
+        knots,
+        interp="monotone_convex",
+        extrapolation="extend",
+        day_count="act_365f",
+    )
+    assert curve.df(2.5) > 0.0
+    with pytest.raises(TypeError, match=r"missing .*required keyword.*argument: 'interp'"):
+        DiscountCurve("USD-OIS", "2025-01-01", knots, extrapolation="extend", day_count="act_365f")  # type: ignore[call-arg]
+    with pytest.raises(TypeError, match="forward_floor"):
+        DiscountCurve(
+            "USD-OIS",
+            "2025-01-01",
+            knots,
+            interp="monotone_convex",
+            extrapolation="extend",
+            day_count="act_365f",
+            forward_floor=-0.01,  # type: ignore[call-arg]
+        )
 
 
 def test_fx_matrix_from_dict_uses_the_rust_currency_pair_parser() -> None:

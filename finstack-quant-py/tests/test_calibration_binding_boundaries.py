@@ -67,6 +67,11 @@ def test_inflation_step_rejects_removed_seasonal_factors(seasonal_factors: objec
                 "index": "USA-CPI-U",
                 "observation_lag": "3M",
                 "base_cpi": 320.0,
+                "source_base_date": "2026-06-01",
+                "source_base_cpi": 320.0,
+                "day_count": "act_365f",
+                "interpolation": "linear",
+                "extrapolation": "extend",
                 "seasonal_factors": seasonal_factors,
             },
             quote_set="cpi-quotes",
@@ -162,7 +167,15 @@ def test_hull_white_quote_flags_are_required() -> None:
 
 
 def _surface(vols: list[list[float]]) -> VolSurface:
-    return VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], vols)
+    return VolSurface(
+        "EQ-VOL",
+        [1.0, 2.0],
+        [90.0, 100.0, 110.0],
+        vols,
+        secondary_axis="strike",
+        quote_type="black_lognormal",
+        interpolation_mode="vol",
+    )
 
 
 def test_typed_market_data_feeds_the_envelope() -> None:
@@ -382,7 +395,15 @@ def test_surface_validation_requires_forward_inputs(check_arbitrage: bool, forwa
 
 
 def test_surface_calendar_uses_forward_moneyness() -> None:
-    surface = VolSurface("MONEYNESS", [1.0, 2.0], [100.0, 200.0], [[0.4, 0.1], [0.3, 0.2]])
+    surface = VolSurface(
+        "MONEYNESS",
+        [1.0, 2.0],
+        [100.0, 200.0],
+        [[0.4, 0.1], [0.3, 0.2]],
+        secondary_axis="strike",
+        quote_type="black_lognormal",
+        interpolation_mode="vol",
+    )
     config = ValidationConfig()
     validate_calendar_spread(surface, config, [100.0, 100.0])
     with pytest.raises(ValueError, match="fixed forward-moneyness"):

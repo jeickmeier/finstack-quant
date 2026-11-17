@@ -54,13 +54,14 @@ fn explain_opts_roundtrip() {
 
 #[test]
 fn daycount_ctx_state_roundtrip() {
-    let state = DayCountContextState {
-        calendar_id: Some("target2".to_string()),
-        frequency: Some(Tenor::quarterly()),
-        bus_basis: Some(260),
-        coupon_period: None,
-        end_is_termination_date: Some(false),
-    };
+    let state = DayCountContextState::try_new(
+        Some("target2".to_string()),
+        Some(Tenor::quarterly()),
+        Some(260),
+        None,
+        Some(false),
+    )
+    .expect("valid state");
     let ctx = state.to_ctx().expect("calendar state hydrates");
     let start = Date::from_calendar_date(2025, Month::January, 2).unwrap();
     let end = Date::from_calendar_date(2025, Month::February, 2).unwrap();
@@ -68,9 +69,9 @@ fn daycount_ctx_state_roundtrip() {
     assert!(yf > 0.0);
 
     let roundtrip_state = DayCountContextState::try_from(ctx).expect("snapshot context");
-    assert_eq!(roundtrip_state.calendar_id.as_deref(), Some("target2"));
-    assert_eq!(roundtrip_state.frequency, Some(Tenor::quarterly()));
-    assert_eq!(roundtrip_state.bus_basis, Some(260));
+    assert_eq!(roundtrip_state.get_calendar_id(), Some("target2"));
+    assert_eq!(roundtrip_state.get_frequency(), Some(Tenor::quarterly()));
+    assert_eq!(roundtrip_state.get_bus_basis(), Some(260));
 }
 
 #[test]

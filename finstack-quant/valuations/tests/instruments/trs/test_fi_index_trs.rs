@@ -295,9 +295,10 @@ fn test_fi_index_trs_sensitivity_to_yield() {
         .build();
 
     // Higher yield scenario
-    let market_high_yield = market_base
-        .clone()
-        .insert_price("HY-INDEX-YIELD", MarketScalar::Unitless(0.065)); // +100bp
+    let market_high_yield = market_base.clone().insert_price(
+        "HY-INDEX-YIELD",
+        MarketScalar::unitless(0.065).expect("valid scalar"),
+    ); // +100bp
 
     // Act
     let npv_base = trs.value(&market_base, as_of).unwrap();
@@ -322,9 +323,10 @@ fn test_fi_index_trs_sensitivity_to_duration() {
         .build();
 
     // Higher duration scenario
-    let market_high_duration = market_base
-        .clone()
-        .insert_price("HY-INDEX-DURATION", MarketScalar::Unitless(6.0)); // +1.5 years
+    let market_high_duration = market_base.clone().insert_price(
+        "HY-INDEX-DURATION",
+        MarketScalar::unitless(6.0).expect("valid scalar"),
+    ); // +1.5 years
 
     // Act
     let npv_base = trs.value(&market_base, as_of).unwrap();
@@ -363,22 +365,40 @@ fn test_fi_index_trs_sensitivity_to_interest_rates() {
                 (5.0, 0.850),
             ])
             .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
     market_shifted = market_shifted.insert(disc_shifted);
 
-    let fwd_shifted = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
-        "USD-SOFR-3M",
-        0.25,
-    )
-    .base_date(as_of)
-    .knots(vec![(0.0, 0.03), (0.25, 0.031), (0.5, 0.032), (1.0, 0.033)])
-    .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
-    .build()
-    .unwrap();
+    let fwd_shifted =
+        finstack_quant_core::market_data::term_structures::ForwardCurve::builder("USD-SOFR-3M")
+            .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .knots([
+                (0.0, 1.0),
+                (0.125, 0.996225889923667),
+                (0.25, 0.992403996566088),
+                (0.375, 0.988534980047098),
+                (0.5, 0.984619506751733),
+                (0.625, 0.980673572044391),
+                (0.75, 0.976712928203149),
+                (0.875, 0.972737881670257),
+                (1.0, 0.96874873899307),
+            ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .unwrap();
     market_shifted = market_shifted.insert(fwd_shifted);
-    market_shifted = market_shifted.insert_price("HY-INDEX-YIELD", MarketScalar::Unitless(0.055));
-    market_shifted = market_shifted.insert_price("HY-INDEX-DURATION", MarketScalar::Unitless(4.5));
+    market_shifted = market_shifted.insert_price(
+        "HY-INDEX-YIELD",
+        MarketScalar::unitless(0.055).expect("valid scalar"),
+    );
+    market_shifted = market_shifted.insert_price(
+        "HY-INDEX-DURATION",
+        MarketScalar::unitless(4.5).expect("valid scalar"),
+    );
 
     // Act
     let npv_base = trs.value(&market_base, as_of).unwrap();
@@ -572,23 +592,24 @@ fn test_fi_index_trs_analytical_flat_rate_flat_yield() {
             (1.00, (-0.02_f64 * 1.00).exp()),
         ])
         .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     // Build flat forward curve at the same rate
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(as_of)
-        .day_count(DayCount::Act360)
-        .knots(vec![(0.0, flat_rate), (1.0, flat_rate)])
-        .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
-        .build()
-        .unwrap();
+    let fwd = ForwardCurve::flat("USD-SOFR-3M", as_of, flat_rate, DayCount::Act360).unwrap();
 
     let market = MarketContext::new()
         .insert(disc)
         .insert(fwd)
-        .insert_price("HY-INDEX-YIELD", MarketScalar::Unitless(index_yield))
-        .insert_price("HY-INDEX-DURATION", MarketScalar::Unitless(4.5));
+        .insert_price(
+            "HY-INDEX-YIELD",
+            MarketScalar::unitless(index_yield).expect("valid scalar"),
+        )
+        .insert_price(
+            "HY-INDEX-DURATION",
+            MarketScalar::unitless(4.5).expect("valid scalar"),
+        );
 
     let trs = TestFIIndexTrsBuilder::new()
         .side(PayReceive::Receive)
@@ -672,18 +693,18 @@ fn test_fi_index_trs_errors_on_missing_configured_yield() {
                 .base_date(as_of)
                 .knots(vec![(0.0, 1.0), (1.0, 0.98)])
                 .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .unwrap(),
         )
         .insert(
-            finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
+            finstack_quant_core::market_data::term_structures::ForwardCurve::flat(
                 "USD-SOFR-3M",
-                0.25,
+                as_of,
+                0.02,
+                finstack_quant_core::dates::DayCount::Act365F,
             )
-            .base_date(as_of)
-            .knots(vec![(0.0, 0.02), (1.0, 0.02)])
-            .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
-            .build()
             .unwrap(),
         );
     // NOTE: "MISSING-YIELD" is NOT inserted into the market context
@@ -786,7 +807,7 @@ fn test_fi_index_trs_errors_on_price_scalar_for_yield() {
 
     let market = create_market_context().insert_price(
         "BAD-YIELD",
-        MarketScalar::Price(
+        MarketScalar::price(
             Money::new(100.0, finstack_quant_core::currency::Currency::USD)
                 .expect("valid money fixture"),
         ),
@@ -819,7 +840,7 @@ fn test_fi_index_trs_errors_on_price_scalar_for_duration() {
 
     let market = create_market_context().insert_price(
         "BAD-DURATION",
-        MarketScalar::Price(
+        MarketScalar::price(
             Money::new(5.0, finstack_quant_core::currency::Currency::USD)
                 .expect("valid money fixture"),
         ),
@@ -889,12 +910,21 @@ fn seasoned_fi_trs(
     let disc = DiscountCurve::builder("USD-FLAT")
         .base_date(d(2025, 1, 2))
         .knots([(0.0, 1.0), (5.0, 1.0)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
     let market = MarketContext::new()
         .insert(disc)
-        .insert_price("HY-INDEX-YIELD", MarketScalar::Unitless(0.05))
-        .insert_price("HY-INDEX", MarketScalar::Unitless(101.0));
+        .insert_price(
+            "HY-INDEX-YIELD",
+            MarketScalar::unitless(0.05).expect("valid scalar"),
+        )
+        .insert_price(
+            "HY-INDEX",
+            MarketScalar::unitless(101.0).expect("valid scalar"),
+        );
     (trs, market)
 }
 
@@ -917,7 +947,10 @@ fn fi_trs_prices_period_in_progress_from_reset_level() {
     // If the index followed carry exactly since the reset (44 days),
     // the seasoned value equals the full-period carry e^{y·90/360} − 1.
     let on_carry = 100.0 * (0.05_f64 * 44.0 / 360.0).exp();
-    let market = market.insert_price("HY-INDEX", MarketScalar::Unitless(on_carry));
+    let market = market.insert_price(
+        "HY-INDEX",
+        MarketScalar::unitless(on_carry).expect("valid scalar"),
+    );
     let pv = trs
         .pv_total_return_leg(&market, as_of)
         .expect("seasoned pv");
@@ -946,13 +979,17 @@ fn fi_trs_keeps_completed_unpaid_period_in_pv() {
     let mut params = ScheduleParams::quarterly_act360();
     params.payment_lag_days = 2;
     trs.schedule = TrsScheduleSpec::from_params(d(2025, 1, 2), d(2025, 4, 2), params);
-    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+    use finstack_quant_core::market_data::scalars::{
+        ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+    };
     trs.fixing_series_id = Some("HY-HISTORY".into());
     let market = market.insert_series(
         ScalarTimeSeries::new(
             "HY-HISTORY",
             vec![(d(2025, 1, 2), 100.0), (d(2025, 4, 2), 108.0)],
             None,
+            SeriesInterpolation::Step,
+            SeriesExtrapolation::Error,
         )
         .expect("levels"),
     );
@@ -961,9 +998,10 @@ fn fi_trs_keeps_completed_unpaid_period_in_pv() {
         .expect("completed-unpaid pv");
     let expected = 800_000.0;
     assert!((pv.amount() - expected).abs() < 1e-6, "pv {}", pv.amount());
-    let changed = market
-        .clone()
-        .insert_price("HY-INDEX-YIELD", MarketScalar::Unitless(0.20));
+    let changed = market.clone().insert_price(
+        "HY-INDEX-YIELD",
+        MarketScalar::unitless(0.20).expect("valid scalar"),
+    );
     assert_eq!(
         trs.pv_total_return_leg(&changed, d(2025, 4, 3))
             .expect("fixed")
@@ -986,7 +1024,10 @@ fn fi_trs_keeps_completed_unpaid_period_in_pv() {
 /// the rolled period in progress values on carry alone.
 #[test]
 fn test_fi_index_trs_theta_across_a_financing_reset() {
-    let market = create_market_context().insert_price("HY-INDEX", MarketScalar::Unitless(100.0));
+    let market = create_market_context().insert_price(
+        "HY-INDEX",
+        MarketScalar::unitless(100.0).expect("valid scalar"),
+    );
     let as_of = as_of_date();
     for compounding in [
         finstack_quant_cashflows::builder::FloatingLegCompounding::Simple,

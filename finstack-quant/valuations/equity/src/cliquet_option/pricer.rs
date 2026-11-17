@@ -330,11 +330,18 @@ mod tests {
             .base_date(as_of)
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, 0.97), (2.0, 0.94)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let surface = VolSurface::builder("SPX-VOL")
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&[80.0, 100.0, 120.0, 140.0])
+            .secondary_values(&[80.0, 100.0, 120.0, 140.0])
+            .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+            .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             .row(&[0.20, 0.20, 0.20, 0.20])
             .row(&[0.20, 0.20, 0.20, 0.20])
             .row(&[0.20, 0.20, 0.20, 0.20])
@@ -345,8 +352,14 @@ mod tests {
         MarketContext::new()
             .insert(curve)
             .insert_surface(surface)
-            .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0))
-            .insert_price("SPX-DIV", MarketScalar::Unitless(0.01))
+            .insert_price(
+                "SPX-SPOT",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "SPX-DIV",
+                MarketScalar::unitless(0.01).expect("valid scalar"),
+            )
     }
 
     fn live_option() -> CliquetOption {
@@ -398,7 +411,7 @@ mod tests {
         let unitless_market = market(as_of);
         let price_market = unitless_market.clone().insert_price(
             "SPX-SPOT",
-            MarketScalar::Price(Money::from((100_i64, Currency::USD))),
+            MarketScalar::price(Money::from((100_i64, Currency::USD))),
         );
 
         let pv_unitless = compute_pv(&option, &unitless_market, as_of).expect("unitless pv");
@@ -421,13 +434,24 @@ mod tests {
                     .base_date(as_of)
                     .day_count(finstack_quant_core::dates::DayCount::Act365F)
                     .knots([(0.0, 1.0), (1.0, 0.97), (2.0, 0.94)])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("curve"),
             )
             .insert_surface(
                 VolSurface::builder("SPX-VOL")
                     .expiries(&[0.25, 0.5, 1.0, 2.0])
-                    .strikes(&[80.0, 100.0, 120.0, 140.0])
+                    .secondary_values(&[80.0, 100.0, 120.0, 140.0])
+                    .secondary_axis(
+                        finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+                    )
+                    .quote_type(
+                        finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+                    )
+                    .interpolation_mode(
+                        finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+                    )
                     .row(&[0.20, 0.20, 0.20, 0.20])
                     .row(&[0.20, 0.20, 0.20, 0.20])
                     .row(&[0.20, 0.20, 0.20, 0.20])
@@ -435,7 +459,10 @@ mod tests {
                     .build()
                     .expect("surface"),
             )
-            .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0));
+            .insert_price(
+                "SPX-SPOT",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            );
 
         let err =
             compute_pv(&option, &missing_div_market, as_of).expect_err("missing div should error");
@@ -450,7 +477,7 @@ mod tests {
 
         let bad_market = market(as_of).insert_price(
             "SPX-DIV",
-            MarketScalar::Price(Money::from((1_i64, Currency::USD))),
+            MarketScalar::price(Money::from((1_i64, Currency::USD))),
         );
         let err = compute_pv(&option, &bad_market, as_of).expect_err("price div should error");
         assert!(err.to_string().contains("unitless scalar"));
@@ -481,7 +508,12 @@ mod tests {
 
         let inverted_surface = VolSurface::builder("SPX-VOL")
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&[80.0, 100.0, 120.0, 140.0])
+            .secondary_values(&[80.0, 100.0, 120.0, 140.0])
+            .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+            .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             .row(&[0.80, 0.80, 0.80, 0.80])
             .row(&[0.60, 0.60, 0.60, 0.60])
             .row(&[0.20, 0.20, 0.20, 0.20])
@@ -492,13 +524,21 @@ mod tests {
             .base_date(as_of)
             .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, 0.97), (2.0, 0.94)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new()
             .insert(curve)
             .insert_surface(inverted_surface)
-            .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0))
-            .insert_price("SPX-DIV", MarketScalar::Unitless(0.01));
+            .insert_price(
+                "SPX-SPOT",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "SPX-DIV",
+                MarketScalar::unitless(0.01).expect("valid scalar"),
+            );
 
         // Reset dates at ~0.5y and ~1.0y exercise the non-monotone period.
         let option = CliquetOption::builder()

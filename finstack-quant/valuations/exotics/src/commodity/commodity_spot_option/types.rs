@@ -1212,6 +1212,9 @@ mod tests {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 0.97)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount curve"),
             )
@@ -1225,8 +1228,17 @@ mod tests {
             )
             .insert_surface(
                 VolSurface::builder("WTI-VOL")
+                    .secondary_axis(
+                        finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+                    )
+                    .quote_type(
+                        finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+                    )
+                    .interpolation_mode(
+                        finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+                    )
                     .expiries(&[0.25, 0.5, 1.0])
-                    .strikes(&[60.0, 75.0, 90.0])
+                    .secondary_values(&[60.0, 75.0, 90.0])
                     .row(&[0.25, 0.25, 0.25])
                     .row(&[0.25, 0.25, 0.25])
                     .row(&[0.25, 0.25, 0.25])
@@ -1280,6 +1292,9 @@ mod tests {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 0.97)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount curve"),
             )
@@ -1293,8 +1308,17 @@ mod tests {
             )
             .insert_surface(
                 VolSurface::builder("WTI-VOL")
+                    .secondary_axis(
+                        finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+                    )
+                    .quote_type(
+                        finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+                    )
+                    .interpolation_mode(
+                        finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+                    )
                     .expiries(&[0.25, 0.5, 1.0])
-                    .strikes(&[60.0, 75.0, 90.0])
+                    .secondary_values(&[60.0, 75.0, 90.0])
                     .row(&[0.25, 0.25, 0.25])
                     .row(&[0.25, 0.25, 0.25])
                     .row(&[0.25, 0.25, 0.25])
@@ -1357,11 +1381,17 @@ mod tests {
         option.spot_id = Some("WTI-SPOT".into());
         let as_of = Date::from_calendar_date(2025, time::Month::January, 15).unwrap();
         let market = MarketContext::new()
-            .insert_price("WTI-SPOT", MarketScalar::Unitless(75.0))
+            .insert_price(
+                "WTI-SPOT",
+                MarketScalar::unitless(75.0).expect("valid scalar"),
+            )
             .insert(
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (5.0, 0.9)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .unwrap(),
             );
@@ -1416,6 +1446,9 @@ mod tests {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 1.0)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .unwrap(),
             )
@@ -1473,13 +1506,25 @@ mod tests {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (1.0, 0.97)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount curve"),
             )
             .insert_surface(
                 VolSurface::builder("WTI-VOL")
+                    .secondary_axis(
+                        finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+                    )
+                    .quote_type(
+                        finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+                    )
+                    .interpolation_mode(
+                        finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+                    )
                     .expiries(&[0.25, 0.5, 1.0])
-                    .strikes(&[60.0, 75.0, 90.0])
+                    .secondary_values(&[60.0, 75.0, 90.0])
                     .row(&[0.25, 0.25, 0.25])
                     .row(&[0.25, 0.25, 0.25])
                     .row(&[0.25, 0.25, 0.25])
@@ -1494,12 +1539,13 @@ mod tests {
         };
         let mut american = option.clone();
         american.exercise_style = ExerciseStyle::American;
-        let numeric = market
-            .clone()
-            .insert_price("WTI-SPOT", MarketScalar::Unitless(80.0));
+        let numeric = market.clone().insert_price(
+            "WTI-SPOT",
+            MarketScalar::unitless(80.0).expect("valid scalar"),
+        );
         let matching = market.clone().insert_price(
             "WTI-SPOT",
-            MarketScalar::Price(Money::new(80.0, Currency::USD).expect("USD spot")),
+            MarketScalar::price(Money::new(80.0, Currency::USD).expect("USD spot")),
         );
         assert_eq!(
             option
@@ -1517,7 +1563,7 @@ mod tests {
         );
         let mismatched = market.insert_price(
             "WTI-SPOT",
-            MarketScalar::Price(Money::new(80.0, Currency::EUR).expect("EUR spot")),
+            MarketScalar::price(Money::new(80.0, Currency::EUR).expect("EUR spot")),
         );
         for error in [
             option
@@ -1548,10 +1594,15 @@ mod tests {
         use finstack_quant_core::market_data::scalars::MarketScalar;
         let mut option = CommoditySpotOption::example().expect("option");
         option.spot_id = Some("WTI-SPOT".into());
-        for value in [0.0, -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-            let market =
-                MarketContext::new().insert_price("WTI-SPOT", MarketScalar::Unitless(value));
+        for value in [0.0, -1.0] {
+            let market = MarketContext::new().insert_price(
+                "WTI-SPOT",
+                MarketScalar::unitless(value).expect("valid scalar"),
+            );
             assert!(option.required_spot(&market).is_err());
+        }
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(MarketScalar::unitless(bad).is_err());
         }
     }
 }

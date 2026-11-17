@@ -458,7 +458,9 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, DayCountContext};
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::types::Attributes;
     use finstack_quant_core::types::InstrumentId;
@@ -477,11 +479,16 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (5.0, (-rate * 5.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let surface = VolSurface::builder("SPX_VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
+            .secondary_values(&[80.0, 90.0, 100.0, 110.0, 120.0])
             .row(&[vol, vol, vol, vol, vol])
             .row(&[vol, vol, vol, vol, vol])
             .row(&[vol, vol, vol, vol, vol])
@@ -494,9 +501,12 @@ mod tests {
             .insert_surface(surface)
             .insert_price(
                 "SPX",
-                MarketScalar::Price(Money::new(spot, Currency::USD).expect("valid money fixture")),
+                MarketScalar::price(Money::new(spot, Currency::USD).expect("valid money fixture")),
             )
-            .insert_price("SPX_DIV", MarketScalar::Unitless(div_yield))
+            .insert_price(
+                "SPX_DIV",
+                MarketScalar::unitless(div_yield).expect("valid scalar"),
+            )
     }
 
     fn down_and_out_call(expiry: Date, strike: f64, barrier: f64) -> BarrierOption {
@@ -536,6 +546,8 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (182.0 / 365.0, 0.99), (1.0, 0.8)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("nonflat curve");
         let mut market = market(as_of, 100.0, 0.0, 0.0, 0.0).insert(curve);
@@ -557,7 +569,7 @@ mod tests {
             ("HESTON_RHO", 0.0),
             ("HESTON_V0", 1e-24),
         ] {
-            market = market.insert_price(id, MarketScalar::Unitless(value));
+            market = market.insert_price(id, MarketScalar::unitless(value).expect("valid scalar"));
         }
         let pv = super::super::heston_mc_pricer::BarrierOptionHestonMcPricer::new()
             .price_dyn(&inst, &market, as_of)
@@ -662,7 +674,8 @@ mod tests {
 
     #[test]
     fn expired_barrier_paths_cover_knock_in_and_knock_out_matrix() {
-        let curves = MarketContext::new().insert_price("SPX", MarketScalar::Unitless(120.0));
+        let curves = MarketContext::new()
+            .insert_price("SPX", MarketScalar::unitless(120.0).expect("valid scalar"));
         let base = down_and_out_call(date(2024, 7, 1), 100.0, 80.0);
 
         let knocked_out = BarrierOption {
@@ -764,11 +777,16 @@ mod tests {
                 .base_date(as_of)
                 .day_count(DayCount::Act365F)
                 .knots([(0.0, 1.0), (t_365, df_at_expiry)])
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("disc curve 365");
             let surface = VolSurface::builder("SPX_VOL")
+                .secondary_axis(VolSurfaceAxis::Strike)
+                .quote_type(VolQuoteType::BlackLognormal)
+                .interpolation_mode(VolInterpolationMode::Vol)
                 .expiries(&[0.25, 0.5, 1.0, 2.0])
-                .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
+                .secondary_values(&[80.0, 90.0, 100.0, 110.0, 120.0])
                 .row(&[vol; 5])
                 .row(&[vol; 5])
                 .row(&[vol; 5])
@@ -780,22 +798,30 @@ mod tests {
                 .insert_surface(surface)
                 .insert_price(
                     "SPX",
-                    MarketScalar::Price(
+                    MarketScalar::price(
                         Money::new(spot, Currency::USD).expect("valid money fixture"),
                     ),
                 )
-                .insert_price("SPX_DIV", MarketScalar::Unitless(div_yield))
+                .insert_price(
+                    "SPX_DIV",
+                    MarketScalar::unitless(div_yield).expect("valid scalar"),
+                )
         };
         let market_360 = {
             let disc = DiscountCurve::builder("USD_DISC")
                 .base_date(as_of)
                 .day_count(DayCount::Act360)
                 .knots([(0.0, 1.0), (t_360, df_at_expiry)])
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("disc curve 360");
             let surface = VolSurface::builder("SPX_VOL")
+                .secondary_axis(VolSurfaceAxis::Strike)
+                .quote_type(VolQuoteType::BlackLognormal)
+                .interpolation_mode(VolInterpolationMode::Vol)
                 .expiries(&[0.25, 0.5, 1.0, 2.0])
-                .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
+                .secondary_values(&[80.0, 90.0, 100.0, 110.0, 120.0])
                 .row(&[vol; 5])
                 .row(&[vol; 5])
                 .row(&[vol; 5])
@@ -807,11 +833,14 @@ mod tests {
                 .insert_surface(surface)
                 .insert_price(
                     "SPX",
-                    MarketScalar::Price(
+                    MarketScalar::price(
                         Money::new(spot, Currency::USD).expect("valid money fixture"),
                     ),
                 )
-                .insert_price("SPX_DIV", MarketScalar::Unitless(div_yield))
+                .insert_price(
+                    "SPX_DIV",
+                    MarketScalar::unitless(div_yield).expect("valid scalar"),
+                )
         };
 
         // Use the MC pricer explicitly so the drift branch is exercised.
@@ -1087,7 +1116,7 @@ mod tests {
         let expiry = date(2024, 7, 1);
         let curves = MarketContext::new().insert_price(
             "SPX",
-            MarketScalar::Price(Money::new(120.0, Currency::EUR).expect("valid money fixture")),
+            MarketScalar::price(Money::new(120.0, Currency::EUR).expect("valid money fixture")),
         );
         let alive_knock_out = BarrierOption {
             observed_barrier_breached: Some(false),

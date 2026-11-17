@@ -469,10 +469,12 @@ fn test_breakeven_inflation_metric_consistency() {
             finstack_quant_core::dates::DayCountContext::default(),
         )
         .unwrap();
-    let nominal_yield = disc.zero_rate(
-        t,
-        finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN),
-    ); // annual convention, matching the calculator
+    let nominal_yield = disc
+        .zero_rate(
+            t,
+            finstack_quant_core::math::Compounding::Periodic(std::num::NonZeroU32::MIN),
+        )
+        .unwrap(); // annual convention, matching the calculator
     let breakeven_direct = ilb.breakeven_inflation(nominal_yield, as_of).unwrap();
 
     // Assert - should be identical since both use the same calculation path
@@ -562,18 +564,30 @@ fn test_breakeven_inflation_metric_non_flat_nominal_curve() {
             (5.0, 1.02_f64.powi(-5)),
             (t_mat, (1.0 + nominal_annual).powf(-t_mat)),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     // Flat CPI so the real-yield leg is unaffected by inflation.
     let inflation = InflationCurve::builder("US-CPI")
         .base_date(as_of)
-        .base_cpi(100.0)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Flat)
         .knots([(0.0, 100.0), (11.0, 100.0)])
         .build()
         .unwrap();
     let ctx = MarketContext::new()
         .insert(discount)
         .insert(inflation)
+        .insert_inflation_index(
+            finstack_quant_valuations_test_support::inflation::simple_index(
+                "US-CPI",
+                as_of,
+                100.0,
+                Currency::USD,
+            ),
+        )
         .insert_surface(zero_floor_vol());
 
     let result = bond

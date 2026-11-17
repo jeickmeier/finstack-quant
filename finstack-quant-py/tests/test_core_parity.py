@@ -35,7 +35,9 @@ from finstack_quant.core.market_data import (
     FxMatrix,
     FxPairConvention,
     HazardCurve,
+    InflationExpectedRelease,
     InflationIndex,
+    InflationObservation,
     MarketContext,
     ScalarTimeSeries,
     VolSurface,
@@ -46,13 +48,33 @@ from finstack_quant.core.types import Bps, CreditRating, Rate
 from finstack_quant.models.credit import moodys_warf_factor
 
 
-def test_quantile_nan_probability_and_out_of_range_returns_nan() -> None:
+def test_quantile_invalid_probability_raises_and_empty_returns_none() -> None:
     from finstack_quant.core.math.stats import quantile
 
+    assert quantile([], 0.5) is None
     for values in ([], [1.0], [1.0, 2.0, 3.0]):
-        assert math.isnan(quantile(values, math.nan))
-    assert math.isnan(quantile([1.0, 2.0, 3.0], -1.0))
-    assert math.isnan(quantile([1.0, 2.0, 3.0], 2.0))
+        with pytest.raises(ValueError, match="Quantile probability"):
+            quantile(values, math.nan)
+        with pytest.raises(ValueError, match="Quantile probability"):
+            quantile(values, -1.0)
+        with pytest.raises(ValueError, match="Quantile probability"):
+            quantile(values, 2.0)
+
+
+def test_stats_exact_contracts_and_subnormal_correlation() -> None:
+    from finstack_quant.core.math import stats
+
+    assert stats.mean([]) is None
+    assert stats.variance([1.0]) is None
+    assert stats.std_dev([1.0]) is None
+    assert stats.mean_var([]) == (None, None)
+    assert stats.mean_var([2.0]) == (2.0, None)
+    assert stats.correlation([5.0, 5.0, 5.0], [1.0, 2.0, 3.0]) is None
+    assert stats.correlation([1e-200, 2e-200], [1e-200, 2e-200]) == pytest.approx(1.0)
+    with pytest.raises(ValueError, match="finite"):
+        stats.mean([1.0, math.nan])
+    with pytest.raises(ValueError, match="dimensions do not match"):
+        stats.correlation([1.0, 2.0], [1.0])
 
 
 @pytest.mark.parametrize(
@@ -77,17 +99,26 @@ def test_icma_reference_period_preserves_february_coupon_tenor() -> None:
     assert DayCount.ACT_ACT_ISMA.year_fraction(start, end, ctx) == pytest.approx(0.5)
 
 
-@pytest.mark.parametrize("interpolation", ["step", "linear"])
-def test_reference_cpi_requires_exact_monthly_fixings(interpolation: str) -> None:
+def test_reference_cpi_requires_exact_monthly_fixings() -> None:
     index = InflationIndex(
         "US-CPI",
-        [(date(2025, 2, 1), 303.0), (date(2025, 4, 1), 315.0)],
+        [
+            InflationObservation("2025-02-01", 303.0, "2025-03-12"),
+            InflationObservation("2025-04-01", 315.0, "2025-05-13"),
+        ],
         Currency("USD"),
-        interpolation=interpolation,
+        "2025-06-01",
     )
     with pytest.raises(KeyError, match="2025-03-01"):
-        index.ref_cpi_months_lag(date(2025, 5, 15), 3)
-    assert index.ref_cpi_months_lag(date(2025, 5, 1), 3) == 303.0
+        index.get_observation("2025-03-01")
+    assert index.get_observation("2025-02-01").value == 303.0
+    with pytest.raises(ValueError, match="first-of-month"):
+        index.get_observation("2025-02-15")
+    with pytest.raises(ValueError, match="unavailable"):
+        index.qualified_monthly_observation(2025, 2, "2025-03-11")
+    assert index.qualified_monthly_observation(2025, 2, "2025-03-12") == 303.0
+    with pytest.raises(ValueError, match="exceeds"):
+        index.qualified_monthly_observation(2025, 2, "2025-06-02")
 
 
 def test_tenor_constructor_uses_checked_rust_validation() -> None:
@@ -218,7 +249,7 @@ class TestMoneyParity:
 
     def test_nonzero_scalar_right_subtraction_rejected(self, usd: Currency) -> None:
         """Money rejects nonzero scalar - Money just like nonzero scalar + Money."""
-        with pytest.raises(TypeError, match="unsupported right operand"):
+        with pytest.raises(TypeError, match="unsupported operand"):
             5.0 - Money(1.0, usd)
 
     def test_bool_amount_rejected(self, usd: Currency) -> None:
@@ -470,6 +501,8 @@ class TestDiscountCurveParity:
             date(2024, 1, 1),
             [(0.0, 1.0), (1.0, 0.95), (5.0, 0.75), (10.0, 0.50)],
             day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
         )
 
     def test_construction(self, curve: DiscountCurve) -> None:
@@ -488,6 +521,8 @@ class TestDiscountCurveParity:
             date(2024, 1, 1),
             [(0.0, 1.0), (1.0, 0.95), (2.0, 0.90)],
             day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
         )
         df = curve.df(1.5)
         assert 0.89 < df < 0.96
@@ -496,7 +531,7 @@ class TestDiscountCurveParity:
         """exp(-z * t) recovers the discount factor."""
         t = 1.0
         df = curve.df(t)
-        z = curve.zero_rate(t)
+        z = curve.zero_rate(t, "continuous")
         assert df == pytest.approx(math.exp(-z * t), abs=1e-8)
 
     def test_df_at_time_zero(self, curve: DiscountCurve) -> None:
@@ -509,6 +544,9 @@ class TestDiscountCurveParity:
             "USD-OIS",
             date(2024, 1, 1),
             [(0.0, 1.0), (1.0, 0.95)],
+            interp="monotone_convex",
+            extrapolation="extend",
+            day_count="act_365f",
         )
         context = MarketContext()
         context.insert(curve)
@@ -523,6 +561,8 @@ class TestDiscountCurveParity:
             date(2024, 1, 1),
             [(0.0, 1.0), (1.0, 0.95)],
             day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
         )
         context = MarketContext()
         context.insert(curve)
@@ -531,170 +571,126 @@ class TestDiscountCurveParity:
         assert state["curves"][0]["day_count"] == "act_365f"
 
     def test_flat_uses_continuous_compounding(self) -> None:
-        curve = DiscountCurve.flat("USD-OIS", date(2024, 1, 1), 0.04)
+        curve = DiscountCurve.flat("USD-OIS", date(2024, 1, 1), 0.04, "act_365f")
 
         for t in [0.0, 0.25, 1.0, 5.0, 30.0]:
             assert curve.df(t) == pytest.approx(math.exp(-0.04 * t), abs=1e-12)
         assert curve.forward(2.0, 9.0) == pytest.approx(0.04, abs=1e-12)
 
-    def test_negative_rate_validation_mode_accepts_increasing_discount_factors(self) -> None:
+    def test_negative_rate_curve_accepts_increasing_discount_factors(self) -> None:
         knots = [(0.0, 1.0), (1.0, 1.002), (2.0, 1.004)]
-        with pytest.raises(ValueError, match="non-increasing"):
-            DiscountCurve("CHF-OIS", date(2024, 1, 1), knots)
-
         curve = DiscountCurve(
             "CHF-OIS",
             date(2024, 1, 1),
             knots,
-            validation_mode="negative_rate_friendly",
-            forward_floor=-0.01,
+            interp="linear",
+            extrapolation="extend",
+            day_count="act_365f",
         )
         assert curve.df(2.0) == pytest.approx(1.004)
         assert curve.forward(0.0, 1.0) < 0.0
 
-    def test_negative_rate_validation_mode_enforces_forward_floor(self) -> None:
-        with pytest.raises(ValueError, match="below minimum"):
-            DiscountCurve(
-                "CHF-OIS",
-                date(2024, 1, 1),
-                [(0.0, 1.0), (1.0, 1.02)],
-                validation_mode="negative_rate_friendly",
-                forward_floor=-0.01,
-            )
-
-    @pytest.mark.parametrize("forward_floor", [float("nan"), float("inf"), -float("inf")])
-    def test_negative_rate_validation_mode_requires_finite_floor(self, forward_floor: float) -> None:
-        with pytest.raises(ValueError, match="forward_floor must be finite"):
-            DiscountCurve(
-                "CHF-OIS",
-                date(2024, 1, 1),
-                [(0.0, 1.0), (1.0, 1.002)],
-                validation_mode="negative_rate_friendly",
-                forward_floor=forward_floor,
-            )
+        with pytest.raises(TypeError, match="interp"):
+            DiscountCurve("CHF-OIS", date(2024, 1, 1), knots)  # type: ignore[call-arg]
+        for legacy_kw in (
+            {"validation_mode": "negative_rate_friendly"},
+            {"forward_floor": -0.01},
+        ):
+            with pytest.raises(TypeError):
+                DiscountCurve(  # type: ignore[call-arg]
+                    "CHF-OIS",
+                    date(2024, 1, 1),
+                    knots,
+                    interp="linear",
+                    extrapolation="extend",
+                    day_count="act_365f",
+                    **legacy_kw,
+                )
 
 
 class TestForwardCurveParity:
     """Forward curve operations match Rust."""
 
-    def test_construction(self) -> None:
-        """ID and base_date survive construction."""
-        curve = ForwardCurve(
+    @staticmethod
+    def _curve(**overrides: object) -> ForwardCurve:
+        kwargs: dict[str, object] = {
+            "interp": "log_linear",
+            "extrapolation": "extend",
+            "day_count": "act_360",
+            "index_tenor": "3M",
+        }
+        kwargs.update(overrides)
+        return ForwardCurve(
             "USD-SOFR",
-            0.25,
-            knots=[(0.0, 0.04), (1.0, 0.045), (5.0, 0.05)],
-            base_date=date(2024, 1, 1),
-            day_count="act_360",
+            date(2024, 1, 1),
+            [(1.0, math.exp(-0.045)), (5.0, math.exp(-0.25))],
+            **kwargs,  # type: ignore[arg-type]
         )
+
+    def test_construction(self) -> None:
+        """ID, base date, index tenor and the prepended unit factor survive construction."""
+        curve = self._curve()
         assert curve.id == "USD-SOFR"
         assert curve.base_date == date(2024, 1, 1)
+        assert str(curve.index_tenor) == "3M"
+        assert curve.knots == pytest.approx([0.0, 1.0, 5.0])
+        assert curve.factors == pytest.approx([1.0, math.exp(-0.045), math.exp(-0.25)])
 
-    def test_rate_at_knot(self) -> None:
-        """Forward rate at an exact knot matches input."""
-        curve = ForwardCurve(
-            "USD-SOFR",
-            0.25,
-            knots=[(0.0, 0.04), (1.0, 0.045)],
-            base_date=date(2024, 1, 1),
-            day_count="act_360",
-        )
-        assert curve.rate(1.0) == pytest.approx(0.045, abs=1e-10)
+    def test_df_at_knot(self) -> None:
+        """The projection factor at an exact knot matches input."""
+        assert self._curve().df(1.0) == pytest.approx(math.exp(-0.045), abs=1e-15)
 
-    def test_optional_arguments_are_keyword_only(self) -> None:
-        """Everything after ``knots`` is keyword-only.
-
-        Positional order is ``(id, tenor, base_date, knots)``; options such as
-        ``day_count`` must be named so a reordering can never be silent.
-        """
-        curve = ForwardCurve(
-            "USD-SOFR",
-            0.25,
-            date(2024, 1, 1),
-            [(0.0, 0.04), (1.0, 0.045)],
-            day_count="act_360",
-            interp="linear",
-            extrapolation="flat_forward",
-        )
-        assert curve.rate(1.0) == pytest.approx(0.045, abs=1e-10)
-        assert curve.projection_grid is None
+    def test_conventions_are_keyword_only(self) -> None:
+        """Conventions are keyword-only so a reordering can never be silent."""
         with pytest.raises(TypeError):
             ForwardCurve(  # type: ignore[misc]
                 "USD-SOFR",
-                0.25,
                 date(2024, 1, 1),
-                [(0.0, 0.04), (1.0, 0.045)],
+                [(1.0, 0.96)],
+                "log_linear",
+                "extend",
                 "act_360",
             )
 
-    def test_reset_lag_is_constructible_and_readonly(self) -> None:
-        curve = ForwardCurve(
-            "USD-SOFR",
-            0.25,
-            date(2024, 1, 1),
-            [(0.0, 0.04), (1.0, 0.045)],
-            day_count="act_360",
-            interp="linear",
-            extrapolation="flat_forward",
-            reset_lag=3,
-        )
-        assert curve.reset_lag == 3
+    def test_index_tenor_is_optional_and_readonly(self) -> None:
+        assert self._curve(index_tenor=None).index_tenor is None
+        curve = self._curve()
         with pytest.raises(AttributeError):
-            curve.reset_lag = 2
+            curve.index_tenor = "6M"  # type: ignore[misc]
 
-    def test_keyword_constructor_avoids_positional_order_ambiguity(self) -> None:
+    def test_rate_between_uses_contractual_accrual(self) -> None:
+        """Factors built from simple period rates reproduce those rates."""
+        t_3m = 91.0 / 360.0
+        t_6m = 183.0 / 360.0
+        p_3m = 1.0 / (1.0 + 0.04 * t_3m)
+        p_6m = p_3m / (1.0 + 0.045 * (t_6m - t_3m))
         curve = ForwardCurve(
             "USD-SOFR",
-            tenor=0.25,
-            base_date=date(2024, 1, 1),
-            knots=[(0.0, 0.04), (1.0, 0.045)],
+            date(2024, 1, 1),
+            [(t_3m, p_3m), (t_6m, p_6m)],
+            interp="log_linear",
+            extrapolation="extend",
             day_count="act_360",
         )
-        assert curve.rate(1.0) == pytest.approx(0.045, abs=1e-10)
-
-    def test_explicit_projection_grid_is_constructible_and_exposed(self) -> None:
-        """Contractual boundaries round-trip through the canonical Rust curve."""
-        last_reset = 91.0 / 360.0
-        projection_grid = [0.0, last_reset, 183.0 / 360.0]
-        curve = ForwardCurve(
-            "USD-SOFR",
-            0.25,
-            knots=[(0.0, 0.04), (last_reset, 0.045)],
-            base_date=date(2024, 1, 1),
-            day_count="act_360",
-            projection_grid=projection_grid,
-        )
-        assert curve.projection_grid == pytest.approx(projection_grid, abs=1e-14)
-        assert curve.rate_between(0.0, last_reset) == pytest.approx(0.04, abs=1e-14)
-        assert curve.rate_between(last_reset, projection_grid[-1]) == pytest.approx(0.045, abs=1e-14)
-
-    @pytest.mark.parametrize(
-        ("t1", "t2"),
-        [(0.0, 0.0), (0.5, 0.25), (math.nan, 0.25), (0.0, math.inf)],
-    )
-    def test_rate_between_rejects_invalid_intervals(self, t1: float, t2: float) -> None:
-        curve = ForwardCurve(
-            "USD-SOFR",
-            0.25,
-            knots=[(0.0, 0.04), (1.0, 0.045)],
-            base_date=date(2024, 1, 1),
-        )
-        with pytest.raises(ValueError, match=r"rate_between (requires|interval endpoints must be finite)"):
-            curve.rate_between(t1, t2)
+        assert curve.rate_between(0.0, t_3m, t_3m) == pytest.approx(0.04, abs=1e-14)
+        assert curve.rate_between(t_3m, t_6m, t_6m - t_3m) == pytest.approx(0.045, abs=1e-14)
 
     def test_constructor_runtime_signature_matches_stub(self) -> None:
         assert str(signature(ForwardCurve)) == (
-            "(id, tenor, base_date, knots, *, day_count=None, interp=None, "
-            "extrapolation=None, projection_grid=None, reset_lag=None)"
+            "(id, base_date, knots, *, interp, extrapolation, day_count, index_tenor=None)"
         )
 
-    def test_projection_grid_defaults_to_legacy_numeric_tenor_mode(self) -> None:
-        curve = ForwardCurve(
-            "USD-SOFR",
-            0.25,
-            knots=[(0.0, 0.04), (1.0, 0.05), (5.0, 0.06)],
-            base_date=date(2024, 1, 1),
-        )
-        assert curve.projection_grid is None
+    def test_from_discount_curve_shares_factors(self) -> None:
+        discount = DiscountCurve.flat("USD-OIS", date(2024, 1, 1), 0.04, "act_365f")
+        curve = ForwardCurve.from_discount_curve("USD-SOFR-3M", discount, "3M")
+        assert str(curve.index_tenor) == "3M"
+        assert curve.day_count == discount.day_count
+        for t in (0.5, 2.0, 7.5):
+            assert curve.df(t) == discount.df(t)
+
+    def test_instantaneous_forward_of_flat_curve(self) -> None:
+        curve = ForwardCurve.flat("USD-SOFR", date(2024, 1, 1), 0.04, "act_360")
+        assert curve.instantaneous_forward(3.0) == pytest.approx(0.04, abs=1e-12)
 
 
 class TestFxMatrixParity:
@@ -816,12 +812,14 @@ class TestMarketContextParity:
             date(2024, 1, 1),
             [(0.0, 1.0), (1.0, 0.95)],
             day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
         )
         mc.insert(curve)
         retrieved = mc.get_discount("USD-OIS")
         assert retrieved.id == "USD-OIS"
 
-    def test_cross_vol_registry_id_collision_and_negative_roll_forward_raise_value_error(
+    def test_namespace_local_vol_registries_and_curve_validation(
         self,
     ) -> None:
         mc = MarketContext()
@@ -831,28 +829,38 @@ class TestMarketContextParity:
                 date(2024, 1, 1),
                 [(0.0, 1.0), (1.0, 0.95)],
                 day_count="act_365f",
+                interp="monotone_convex",
+                extrapolation="extend",
             )
         )
         mc.insert_price("SHARED", 100.0)
-        mc.insert_series(ScalarTimeSeries("SHARED", [(date(2024, 1, 1), 1.0)]))
-        mc.insert(VolSurface("SHARED", [1.0], [100.0], [0.2]))
+        mc.insert_series(ScalarTimeSeries("SHARED", [(date(2024, 1, 1), 1.0)], "step", "flat"))
+        mc.insert(
+            VolSurface(
+                "SHARED",
+                [1.0],
+                [100.0],
+                [0.2],
+                secondary_axis="strike",
+                quote_type="black_lognormal",
+                interpolation_mode="vol",
+            )
+        )
         assert mc.get_discount("SHARED").id == "SHARED"
         assert mc.get_series("SHARED").id == "SHARED"
-        with pytest.raises(ValueError, match="already registered"):
-            mc.insert(FxDeltaVolSurface("SHARED", [1.0], [0.12], [0.01], [0.002]))
-        with pytest.raises(ValueError, match="non-negative"):
-            mc.roll_forward(-1)
+        mc.insert(FxDeltaVolSurface("SHARED", "EUR/USD", [1.0], [0.12], [0.01], [0.002]))
+        assert mc.get_fx_delta_vol_surface("SHARED").id == "SHARED"
+        with pytest.raises(ValueError, match="Cannot replace curve"):
+            mc.insert(ForwardCurve.flat("SHARED", date(2024, 1, 1), 0.04, "act_360"))
+        conditioned = mc.condition(date(2024, 7, 1))
+        assert conditioned.get_discount("SHARED").base_date == date(2024, 7, 1)
+        with pytest.raises(ValueError, match="Invalid date"):
+            mc.condition("not-a-date")
 
     def test_insert_and_get_forward(self) -> None:
         """Insert a forward curve and retrieve by ID."""
         mc = MarketContext()
-        curve = ForwardCurve(
-            "USD-SOFR",
-            0.25,
-            knots=[(0.0, 0.04), (1.0, 0.045)],
-            base_date=date(2024, 1, 1),
-            day_count="act_360",
-        )
+        curve = ForwardCurve.flat("USD-SOFR", date(2024, 1, 1), 0.04, "act_360")
         mc.insert(curve)
         retrieved = mc.get_forward("USD-SOFR")
         assert retrieved.id == "USD-SOFR"
@@ -871,8 +879,9 @@ class TestMarketContextParity:
         hazard = HazardCurve(
             "CDX-IG-HAZARD",
             date(2024, 1, 1),
-            [(0.0, 0.01), (5.0, 0.015)],
+            [(1.0, 0.01), (5.0, 0.015)],
             recovery_rate=0.40,
+            day_count="act_365f",
         )
         correlation = BaseCorrelationCurve("CDX-IG-CORR", [(3.0, 0.20), (10.0, 0.45)])
         index = CreditIndexData(125, 0.40, hazard, correlation)
@@ -889,7 +898,8 @@ class TestMarketContextParity:
             HazardCurve(  # type: ignore[call-arg]
                 "MISSING-RECOVERY",
                 date(2024, 1, 1),
-                [(0.0, 0.01), (5.0, 0.015)],
+                [(1.0, 0.01), (5.0, 0.015)],
+                day_count="act_365f",
             )
 
     @pytest.mark.parametrize("recovery", [0.0, 1.0])
@@ -897,8 +907,9 @@ class TestMarketContextParity:
         curve = HazardCurve(
             "BOUNDARY-RECOVERY",
             date(2024, 1, 1),
-            [(0.0, 0.01), (5.0, 0.015)],
+            [(1.0, 0.01), (5.0, 0.015)],
             recovery_rate=recovery,
+            day_count="act_365f",
         )
         assert curve.recovery_rate == recovery
 
@@ -959,8 +970,9 @@ class TestMarketContextParity:
         series = ScalarTimeSeries(
             "EQUITY-HISTORY",
             observations,
-            currency="USD",
             interpolation="linear",
+            extrapolation="error",
+            currency="USD",
         )
         mc = MarketContext()
 
@@ -970,15 +982,19 @@ class TestMarketContextParity:
         assert retrieved.id == "EQUITY-HISTORY"
         assert retrieved.currency == Currency("USD")
         assert retrieved.interpolation == "linear"
+        assert retrieved.extrapolation == "error"
         assert retrieved.observations == observations
-        assert retrieved.value_on(date(2024, 1, 2)) == pytest.approx(102.0)
+        assert retrieved.get_value(date(2024, 1, 2)) == pytest.approx(102.0)
+        assert retrieved.get_value_exact(date(2024, 1, 1)) == pytest.approx(100.0)
+        with pytest.raises(KeyError):
+            retrieved.get_value(date(2024, 1, 4))
 
     @pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
     def test_scalar_time_series_rejects_non_finite_observations(self, value: float) -> None:
         with pytest.raises(ValueError, match="time-series observation values must be finite"):
-            ScalarTimeSeries("INVALID", [(date(2024, 1, 1), value)])
-        with pytest.raises(ValueError, match="time-series observation values must be finite"):
-            InflationIndex("INVALID", [(date(2024, 1, 1), value)], "USD")
+            ScalarTimeSeries("INVALID", [(date(2024, 1, 1), value)], "step", "flat")
+        with pytest.raises(ValueError, match="finite"):
+            InflationIndex("INVALID", [InflationObservation("2024-01-01", value, "2024-02-13")], "USD", "2024-03-01")
 
     @pytest.mark.parametrize(
         "text",
@@ -989,8 +1005,9 @@ class TestMarketContextParity:
         observations = [(date(2024, 1, 1), value)]
         expected = [(date(2024, 1, 1), float(value))]
 
-        assert ScalarTimeSeries("S", observations).observations == expected
-        assert InflationIndex("I", observations, "USD").observations == expected
+        assert ScalarTimeSeries("S", observations, "step", "flat").observations == expected
+        index = InflationIndex("I", [InflationObservation("2024-01-01", value, "2024-02-13")], "USD", "2024-03-01")
+        assert index.get_observation("2024-01-01").value == float(value)
         context = MarketContext().insert_price("P", value)
         assert context.get_price("P") == (float(value), None)
 
@@ -999,6 +1016,7 @@ class TestMarketContextParity:
             "EQUITY-HISTORY",
             [(date(2024, 1, 1), 100.0), (date(2024, 1, 3), 104.0)],
             interpolation="linear",
+            extrapolation="flat",
         )
 
         restored = ScalarTimeSeries.from_json(series.to_json())
@@ -1006,10 +1024,14 @@ class TestMarketContextParity:
         assert restored.id == series.id
         assert restored.observations == series.observations
         assert restored.interpolation == series.interpolation
+        assert restored.extrapolation == series.extrapolation
 
     def test_inflation_index_typed_context_and_json_roundtrip(self) -> None:
-        observations = [(date(2024, 1, 1), 300.0), (date(2024, 2, 1), 301.5)]
-        index = InflationIndex("US-CPI", observations, Currency("USD"), interpolation="linear")
+        observations = [
+            InflationObservation("2024-01-01", 300.0, "2024-02-13"),
+            InflationObservation("2024-02-01", 301.5, "2024-03-12"),
+        ]
+        index = InflationIndex("US-CPI", observations, Currency("USD"), "2024-04-01")
         mc = MarketContext()
 
         mc.insert_inflation_index(index)
@@ -1019,36 +1041,46 @@ class TestMarketContextParity:
 
         assert restored.id == "US-CPI"
         assert restored.currency == Currency("USD")
-        assert restored.interpolation == "linear"
-        assert restored.observations == observations
-        assert restored.value_on(date(2024, 1, 16)) == pytest.approx(300.7258064516129)
+        assert restored.knowledge_date == date(2024, 4, 1)
+        assert [obs.value for obs in restored.observations] == [300.0, 301.5]
+        assert restored.get_observation("2024-01-01").available_on == date(2024, 2, 13)
         assert len(restored) == 2
         assert restored_directly.to_json() == index.to_json()
 
-    def test_inflation_publication_schedule_roundtrip(self) -> None:
-        original = InflationIndex("US-CPI", [("2026-01-01", 300.0)], "USD")
-        index = original.with_publication_dates([("2026-01-01", "2026-02-13")])
-        assert original.get_publication_dates() == []
-        assert index.get_publication_date("2026-01-31") == date(2026, 2, 13)
-        assert index.get_publication_date("2026-02-01") is None
+    def test_inflation_expected_release_schedule_roundtrip(self) -> None:
+        original = InflationIndex("US-CPI", [], "USD", "2026-02-01")
+        release = InflationExpectedRelease("2026-01-01", "2026-02-13", "2026-01-01")
+        index = original.with_expected_releases([release])
+        assert original.date_range() is None
+        assert original.get_expected_releases() == []
+        assert index.get_expected_release("2026-01-01").expected_release == date(2026, 2, 13)
+        assert index.get_expected_release("2026-02-01") is None
         market = MarketContext().insert_inflation_index(index)
         restored = MarketContext.from_json(market.to_json()).get_inflation_index("US-CPI")
-        assert restored.get_publication_dates() == [(date(2026, 1, 1), date(2026, 2, 13))]
-        assert InflationIndex.from_json(index.to_json()).get_publication_dates() == index.get_publication_dates()
-        with pytest.raises(ValueError, match="duplicate"):
-            original.with_publication_dates([("2026-01-01", "2026-02-13"), ("2026-01-01", "2026-02-14")])
+        assert restored.get_expected_release("2026-01-01").known_on == date(2026, 1, 1)
+        assert InflationIndex.from_json(index.to_json()).to_json() == index.to_json()
+        with pytest.raises(ValueError, match="strictly increasing"):
+            original.with_expected_releases([release, release])
+        with pytest.raises(ValueError, match="exceeds"):
+            original.with_expected_releases([InflationExpectedRelease("2026-01-01", "2026-02-13", "2026-02-02")])
+        with pytest.raises(ValueError, match="outside"):
+            InflationIndex("US-CPI", [InflationObservation("2026-01-01", 300.0, "2026-02-13")], "USD", "2026-02-01")
 
     @pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
     def test_inflation_index_rejects_non_finite_observations(self, value: float) -> None:
         with pytest.raises(ValueError, match="finite"):
-            InflationIndex("INVALID", [(date(2024, 1, 1), value)], "USD")
+            InflationIndex("INVALID", [InflationObservation("2024-01-01", value, "2024-02-13")], "USD", "2024-03-01")
 
     def test_inflation_index_rejects_duplicate_observation_dates(self) -> None:
         with pytest.raises(ValueError, match="strictly increasing"):
             InflationIndex(
                 "INVALID",
-                [(date(2024, 1, 1), 300.0), (date(2024, 1, 1), 301.0)],
+                [
+                    InflationObservation("2024-01-01", 300.0, "2024-02-13"),
+                    InflationObservation("2024-01-01", 301.0, "2024-02-13"),
+                ],
                 "USD",
+                "2024-03-01",
             )
 
     def test_getter_surface(self) -> None:
@@ -1153,14 +1185,17 @@ class TestScheduleParity:
 
 @pytest.mark.parametrize("rate", [0.0, 1e-18, 0.02, 10.0])
 def test_hazard_conditional_default_prob_survives_low_unconditional_survival(rate: float) -> None:
-    curve = HazardCurve("CONDITIONAL", "1900-01-01", [(100.0, 7.0), (101.0, rate)], recovery_rate=0.4)
+    curve = HazardCurve(
+        "CONDITIONAL", "1900-01-01", [(100.0, 7.0), (101.0, rate)], recovery_rate=0.4, day_count="act_365f"
+    )
     start, end = date(2025, 1, 1), date(2026, 1, 1)
     assert curve.sp(start) < 1e-12
     if rate == 10.0:
         assert curve.sp(start) == 0.0
     assert curve.conditional_default_prob(start, "2026-01-01") == pytest.approx(-math.expm1(-rate), rel=1e-12, abs=0.0)
     assert curve.conditional_default_prob(start, start) == 0.0
-    assert curve.conditional_default_prob("1899-01-01", "1900-01-01") == 0.0
+    with pytest.raises(ValueError, match="precedes HazardCurve base_date"):
+        curve.conditional_default_prob("1899-01-01", "1900-01-01")
     with pytest.raises(ValueError, match="end >= start"):
         curve.conditional_default_prob(end, start)
     with pytest.raises(ValueError, match="Invalid date 'not-a-date'"):
@@ -1197,10 +1232,9 @@ def test_core_bindings_reject_bool_as_numeric_input() -> None:
 
     rate = Rate(0.05)
     bps = Bps(25)
-    curve = DiscountCurve.flat("USD-OIS", "2025-01-01", 0.04)
+    curve = DiscountCurve.flat("USD-OIS", "2025-01-01", 0.04, "act_365f")
     fx = FxMatrix(None)
     conv = FxPairConvention("EUR", "USD", 0.0001)
-    cpi = InflationIndex("US-CPI", [("2025-01-01", 300.0)], "USD")
 
     for call in (
         lambda: rate * True,  # type: ignore[operator]
@@ -1217,9 +1251,8 @@ def test_core_bindings_reject_bool_as_numeric_input() -> None:
         lambda: conv.rate_points(True),  # type: ignore[arg-type]
         lambda: invert_fx_rate(True),  # type: ignore[arg-type]
         lambda: curve.df(True),  # type: ignore[arg-type]
-        lambda: ScalarTimeSeries("S", [("2025-01-01", True)]),  # type: ignore[list-item]
-        lambda: InflationIndex("CPI", [("2025-01-01", 300.0)], "USD", lag=True),  # type: ignore[arg-type]
-        lambda: cpi.ref_cpi_months_lag("2025-04-01", True),  # type: ignore[arg-type]
+        lambda: ScalarTimeSeries("S", [("2025-01-01", True)], "step", "flat"),  # type: ignore[list-item]
+        lambda: InflationObservation("2025-01-01", True, "2025-02-12"),
         lambda: linalg.cholesky_decomposition([[True, False], [False, True]]),  # type: ignore[list-item]
         lambda: linalg.cholesky_decomposition(np.array([[True, False], [False, True]])),  # type: ignore[arg-type]
         lambda: linalg.cholesky_decomposition([["bad"]]),  # type: ignore[list-item]
@@ -1229,3 +1262,130 @@ def test_core_bindings_reject_bool_as_numeric_input() -> None:
     ):
         with pytest.raises(TypeError):
             call()
+
+
+def test_slice2_money_radd_and_rsub_strictness() -> None:
+    """``Money.__radd__`` admits only ``Money`` and exact int ``0``; ``__rsub__`` is absent."""
+    from decimal import Decimal
+
+    usd = Currency("USD")
+    m1 = Money(10.0, usd)
+    m2 = Money(5.0, usd)
+
+    assert 0 + m1 == m1
+    assert sum([m1, m2]) == Money(15.0, usd)
+    assert m2 + m1 == Money(15.0, usd)
+
+    for bad in (0.0, False, True, Decimal(0), "0"):
+        with pytest.raises(TypeError):
+            _ = bad + m1  # type: ignore[operator]
+
+    for lhs in (0, 5.0, False):
+        with pytest.raises(TypeError):
+            _ = lhs - m1  # type: ignore[operator]
+
+
+def test_slice2_scalar_time_series_decimal_range_and_overflow() -> None:
+    """``ScalarTimeSeries`` converts Python ``Decimal`` via ``float`` without i128 truncation."""
+    from decimal import Decimal
+
+    series = ScalarTimeSeries(
+        "EXTREME",
+        [
+            (date(2025, 1, 1), Decimal("1e-30")),
+            (date(2025, 1, 2), Decimal("1e35")),
+        ],
+        "step",
+        "flat",
+    )
+    assert series.get_value(date(2025, 1, 1)) == pytest.approx(1e-30)
+    assert series.get_value(date(2025, 1, 2)) == pytest.approx(1e35)
+
+    with pytest.raises(ValueError, match=r"(?i)infinity|finite"):
+        ScalarTimeSeries("OVERFLOW", [(date(2025, 1, 1), Decimal("1e400"))], "step", "flat")
+
+
+def test_slice2_fx_matrix_pinned_and_provider_quotes_and_repr() -> None:
+    """``FxMatrix`` exposes ``pinned_quotes``, ``provider_quotes``, and ``provider_pinned_quotes``."""
+    import json
+
+    from finstack_quant.core.market_data import FxConversionPolicy, MarketContext
+
+    fx = FxMatrix(None)
+    assert repr(fx) == "FxMatrix(quotes=0, pinned_quotes=0)"
+
+    fx.set_quotes([("EUR", "USD", 1.10)])
+    d_fix = date(2025, 1, 15)
+    fx.set_quote_on("EUR", "USD", d_fix, FxConversionPolicy.CASHFLOW_DATE, 1.15)
+    assert fx.rate("EUR", "USD", d_fix, FxConversionPolicy.CASHFLOW_DATE).rate == pytest.approx(1.15)
+    assert fx.rate("EUR", "USD", date(2025, 1, 16), FxConversionPolicy.CASHFLOW_DATE).rate == pytest.approx(1.10)
+
+    pinned_df = fx.pinned_quotes()
+    assert list(pinned_df.columns) == ["base", "quote", "date", "policy", "rate"]
+    assert pinned_df.to_dict(orient="records") == [
+        {"base": "EUR", "quote": "USD", "date": d_fix, "policy": "cashflow_date", "rate": 1.15}
+    ]
+    assert list(fx.provider_quotes().columns) == ["base", "quote", "rate"]
+    assert list(fx.provider_pinned_quotes().columns) == [
+        "base",
+        "quote",
+        "date",
+        "policy",
+        "rate",
+    ]
+    assert repr(fx) == "FxMatrix(quotes=1, pinned_quotes=1)"
+
+    ctx = MarketContext()
+    ctx.insert_fx(fx)
+    state = json.loads(ctx.to_json())
+    state["fx"]["provider_quotes"] = [["GBP", "USD", 1.25]]
+    state["fx"]["provider_pinned_quotes"] = [["GBP", "USD", "2025-01-15", "period_end", 1.26]]
+    restored = MarketContext.from_json(json.dumps(state)).fx
+    assert restored is not None
+    assert list(restored.provider_quotes().to_dict(orient="records")) == [{"base": "GBP", "quote": "USD", "rate": 1.25}]
+    assert list(restored.provider_pinned_quotes().to_dict(orient="records")) == [
+        {"base": "GBP", "quote": "USD", "date": d_fix, "policy": "period_end", "rate": 1.26}
+    ]
+    assert repr(restored) == ("FxMatrix(quotes=1, pinned_quotes=1, provider_quotes=1, provider_pinned_quotes=1)")
+
+
+def test_slice2_rating_scale_entry_wire_methods() -> None:
+    """``RatingScaleEntry`` exposes canonical ``to_json``, ``from_json``, and pickle support."""
+    import pickle
+
+    from finstack_quant.core.rating_scales import RatingLevel, RatingScaleEntry, ScorecardScale
+
+    scale = ScorecardScale("Internal", [RatingLevel("A", 90.0, 80.0), RatingLevel("B", 70.0, 0.0)])
+    entry = RatingScaleEntry("internal", "credit policy 2026", scale)
+    raw = entry.to_json()
+    assert RatingScaleEntry.from_json(raw) == entry
+    assert pickle.loads(pickle.dumps(entry)) == entry  # noqa: S301 - trusted in-process round trip
+
+
+def test_slice2_cholesky_error_kind_split() -> None:
+    """Validation failures raise ``CholeskyError`` while computation failures raise ``RuntimeError``."""
+    from finstack_quant.core import FinstackError
+    from finstack_quant.core.math import linalg
+
+    for bad in (
+        [[1.0, 0.5], [0.4, 1.0]],
+        [[float("nan"), 0.0], [0.0, 1.0]],
+    ):
+        with pytest.raises(linalg.CholeskyError) as excinfo:
+            linalg.cholesky_decomposition(bad)
+        assert isinstance(excinfo.value, ValueError)
+        assert isinstance(excinfo.value, FinstackError)
+
+        with pytest.raises(linalg.CholeskyError) as excinfo:
+            linalg.symmetric_eigen(bad)
+        assert isinstance(excinfo.value, ValueError)
+        assert isinstance(excinfo.value, FinstackError)
+
+    for non_spd in (
+        [[1.0, 2.0], [2.0, 1.0]],
+        [[0.0, 0.0], [0.0, 1.0]],
+    ):
+        with pytest.raises(RuntimeError) as excinfo:
+            linalg.cholesky_decomposition(non_spd)
+        assert not isinstance(excinfo.value, linalg.CholeskyError)
+        assert not isinstance(excinfo.value, ValueError)

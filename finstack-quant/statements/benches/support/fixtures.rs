@@ -43,6 +43,9 @@ pub fn usd_ois_market(base: Date) -> MarketContext {
             (10.0, 0.640),
             (30.0, 0.375),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     MarketContext::new().insert(disc)

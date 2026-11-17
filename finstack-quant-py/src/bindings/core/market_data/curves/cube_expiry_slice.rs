@@ -47,7 +47,7 @@ impl PyVolCubeExpirySlice {
     ///     Increasing strike coordinates in forward-rate units.
     /// vols : list[float]
     ///     Tenor-major flat grid; decimal Black or absolute normal volatilities.
-    /// quote_type : str, optional
+    /// quote_type : str
     ///     ``black_lognormal``, ``shifted_black_lognormal``, or ``normal``.
     /// displacements : list[float] | None, optional
     ///     Shifted-Black displacements in rate units, one per tenor; otherwise absent.
@@ -57,7 +57,7 @@ impl PyVolCubeExpirySlice {
     /// ValueError
     ///     If axes, grid shape, quote convention, shifts, or values are invalid.
     #[new]
-    #[pyo3(signature = (id, expiry, tenors, strikes, vols, *, quote_type="black_lognormal", displacements=None))]
+    #[pyo3(signature = (id, expiry, tenors, strikes, vols, *, quote_type, displacements=None))]
     fn new(
         id: &str,
         expiry: f64,

@@ -10,12 +10,12 @@ use crate::api::core::market_curves::{
 };
 use crate::api::core::market_discount::JsDiscountCurve;
 use crate::api::core::market_forward::JsForwardCurve;
-use crate::api::core::market_fx::{JsFxMatrix, JsFxRateResult};
+use crate::api::core::market_fx::{JsFxConversionPolicy, JsFxMatrix, JsFxRateResult};
 use crate::api::core::market_hazard::JsHazardCurve;
 use crate::api::core::market_scalars::{JsInflationIndex, JsScalarTimeSeries};
 use crate::api::core::money::JsMoney;
 use crate::api::core::surfaces::{JsFxDeltaVolSurface, JsVolCube, JsVolSurface};
-use crate::utils::input::{from_js_json, js_f64, js_int, js_opt_currency, js_string, json_text};
+use crate::utils::input::{from_js_json, js_f64, js_opt_currency, js_string, json_text};
 use crate::utils::wire::js_date;
 use crate::utils::{contract_to_js_err, to_js_err, to_js_value};
 use finstack_quant_core::contract::LoadLimits;
@@ -38,7 +38,7 @@ use wasm_bindgen::prelude::*;
 /// import init, { core } from "finstack-quant-wasm";
 /// await init();
 /// const market = new core.MarketContext();
-/// market.insert(core.DiscountCurve.flat("USD-OIS", "2025-01-02", 0.04));
+/// market.insert(core.DiscountCurve.flat("USD-OIS", "2025-01-02", 0.04, "act_365f"));
 /// market.insertPrice("SPX", 5900.0);
 /// market.curveIds(); // ["USD-OIS"]
 /// market.getDiscount("USD-OIS").df(1.0); // exp(-0.04)
@@ -264,7 +264,7 @@ impl JsMarketContext {
             ))));
         }
         self.context_mut()
-            .insert_price_mut(id, MarketScalar::Price(value.inner));
+            .insert_price_mut(id, MarketScalar::price(value.inner));
         Ok(())
     }
 
@@ -287,7 +287,7 @@ impl JsMarketContext {
                 ));
             };
             finstack_quant_core::money::Money::from_decimal_str(&text, ccy)
-                .map(MarketScalar::Price)
+                .map(MarketScalar::price)
                 .map_err(to_js_err)?
         } else {
             MarketScalar::from_parts(js_f64(&value, "value")?, currency).map_err(to_js_err)?
@@ -680,6 +680,7 @@ impl JsMarketContext {
     /// * `target_currency` - Destination `Currency` object; an amount already
     ///   in it is returned unchanged.
     /// * `as_of` - ISO-8601 date of the FX rate lookup.
+    /// * `policy` - Required FX conversion policy (`FxConversionPolicy`).
     ///
     /// @returns A `ConvertedMoney` holding the converted `amount` in
     /// `targetCurrency` and the applied FX `rate` lookup (`undefined` for a
@@ -691,16 +692,18 @@ impl JsMarketContext {
     /// @param amount - Monetary amount to convert.
     /// @param targetCurrency - Destination `Currency` object; an amount already in it is returned unchanged.
     /// @param asOf - ISO-8601 date of the FX rate lookup.
+    /// @param policy - Required FX conversion policy handle.
     #[wasm_bindgen(js_name = convertMoney)]
     pub fn convert_money(
         &self,
         amount: &JsMoney,
         #[wasm_bindgen(js_name = "targetCurrency")] target_currency: &JsCurrency,
         #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+        policy: &JsFxConversionPolicy,
     ) -> Result<JsConvertedMoney, JsValue> {
         let as_of = js_date(&as_of, "asOf")?;
         self.inner
-            .convert_money(amount.inner, target_currency.inner, as_of)
+            .convert_money(amount.inner, target_currency.inner, as_of, policy.inner)
             .map(|inner| JsConvertedMoney { inner })
             .map_err(to_js_err)
     }
@@ -766,27 +769,32 @@ impl JsMarketContext {
         to_js_value(&self.inner.stats())
     }
 
-    /// A copy of the context with every curve rolled forward in time (Rust
-    /// `MarketContext::roll_forward`).
+    /// A copy of the context with term structures conditioned to
+    /// `referenceDate` (Rust `MarketContext::condition`).
+    ///
+    /// Re-anchors discount, forward, hazard and parametric curves onto
+    /// `referenceDate` while keeping frozen inflation/price/basis/correlation
+    /// curves, FX matrices, surfaces, scalars, series and indices intact.
     ///
     /// # Arguments
     ///
-    /// * `days` - Non-negative calendar days to advance each curve's base date;
-    ///   the curves keep their shape and drop expired pillars.
+    /// * `reference_date` - ISO-8601 valuation anchor date.
     ///
     /// @returns A new `MarketContext`; this context is unchanged.
-    /// @throws `TypeError` if `days` is not an integer; `FinstackError` (kind
-    /// `validation`) if `days < 0`, a curve cannot be rolled (for example no pillar
-    /// remains), or a bound credit index fails to rebind.
-    /// @param days - Non-negative calendar days to advance each curve's base date; the curves keep their shape and drop expired pillars.
-    #[wasm_bindgen(js_name = rollForward)]
-    pub fn roll_forward(
+    /// @throws `TypeError` if `referenceDate` is not a string; `FinstackError`
+    /// (kind `validation`) for a malformed date, if a curve rejects the anchor
+    /// or cannot normalize under its extrapolation policy, or a bound credit
+    /// index fails to rebind.
+    /// @param referenceDate - ISO-8601 valuation anchor date for conditioned curves.
+    #[wasm_bindgen(js_name = condition)]
+    pub fn condition(
         &self,
-        #[wasm_bindgen(unchecked_param_type = "number")] days: JsValue,
+        #[wasm_bindgen(js_name = "referenceDate", unchecked_param_type = "string")]
+        reference_date: JsValue,
     ) -> Result<JsMarketContext, JsValue> {
-        let days: i64 = js_int(&days, "days")?;
+        let reference_date = js_date(&reference_date, "referenceDate")?;
         self.inner
-            .roll_forward(days)
+            .condition(reference_date)
             .map(|context| JsMarketContext {
                 inner: Arc::new(context),
             })
@@ -820,7 +828,7 @@ impl JsMarketContext {
 /// const market = new core.MarketContext();
 /// market.insertFx(fx);
 /// const usd = new core.Currency("USD");
-/// const converted = market.convertMoney(new core.Money(100, new core.Currency("EUR")), usd, "2025-01-02");
+/// const converted = market.convertMoney(new core.Money(100, new core.Currency("EUR")), usd, "2025-01-02", core.FxConversionPolicy.cashflowDate());
 /// converted.rate?.triangulated; // false
 /// ```
 ///
@@ -833,7 +841,7 @@ impl JsMarketContext {
 /// const market = new core.MarketContext();
 /// market.insertFx(fx);
 /// const usd = new core.Currency("USD");
-/// const converted = market.convertMoney(new core.Money(100, new core.Currency("EUR")), usd, "2025-01-02");
+/// const converted = market.convertMoney(new core.Money(100, new core.Currency("EUR")), usd, "2025-01-02", core.FxConversionPolicy.cashflowDate());
 /// console.log(converted.amount.amount, converted.rate?.triangulated);
 /// ```
 #[wasm_bindgen(js_name = ConvertedMoney)]

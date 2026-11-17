@@ -6,7 +6,7 @@
     "description": "Bloomberg DES/YAS/OAS/ASW BHCCN USD 10% 2032 callable 1st-lien corporate bond captured from screens on 2026-05-03.",
     "valuation_date": "2026-05-01",
     "source": "bloomberg-screen",
-    "source_detail": "Bloomberg DES/YAS/OAS/ASW for BHCCN 10 04/15/32 Corp, USD 144A 1st-lien callable corporate bond, settlement 2026-05-05, price 103.3975, curve 490 SOFR OIS for ASW, OAS curve S23, Treasury benchmark T 3 7/8 04/15/29. The canonical typed market inputs are supplied with no calibration steps. Pricing tolerance contracts preserved. The ASW cashflow screen's 91,813.19 first floating interest amount over 2026-04-15 to 2027-04-19 (Act/360) and displayed 5.334% spread imply a 3.6234% reset; the fixture records that historical fixing instead of projecting it from the 2026-05-03 curve. The Bloomberg ASW target remains authoritative and the fixture is temporarily listed in known_non_executable pending an independent benchmark refresh.",
+    "source_detail": "Bloomberg DES/YAS/OAS/ASW for BHCCN 10 04/15/32 Corp, USD 144A 1st-lien callable corporate bond, settlement 2026-05-05, price 103.3975, curve 490 SOFR OIS for ASW, OAS curve S23, Treasury benchmark T 3 7/8 04/15/29. The canonical typed market inputs are supplied with no calibration steps. Pricing tolerance contracts preserved. The ASW cashflow screen's 91,813.19 first floating interest amount over the 2026-04-15 to 2027-04-15 accrual (365 days Act/360, paid 2027-04-19 after the 2-business-day payment lag) and displayed 5.334% spread imply a 3.7215% reset; the fixture records that historical fixing instead of projecting it from the 2026-05-03 curve. Bloomberg projects each later SOFR reset as the compounded discount-factor-ratio forward on curve 490 (the screen's 3.7192%, 3.6184% and 3.6974% resets reproduce from its listed discount factors), so the USD-SOFRRATE projection factors equal the curve 490 discount factors on the same pillar dates. The Bloomberg ASW target remains authoritative and the fixture is temporarily listed in known_non_executable pending an independent benchmark refresh.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-03",
     "last_reviewed_by": "jeickmeier",
@@ -120,10 +120,11 @@
           "observations": [
             [
               "2026-04-15",
-              0.03623418536585366
+              0.03721547506849315
             ]
           ],
-          "interpolation": "step"
+          "interpolation": "step",
+          "extrapolation": "flat"
         }
       ],
       "prior_market": [
@@ -315,10 +316,7 @@
             ]
           ],
           "interp_style": "log_linear",
-          "extrapolation": "flat_forward",
-          "min_forward_rate": null,
-          "allow_non_monotonic": false,
-          "min_forward_tenor": 1e-06,
+          "extrapolation": "extend",
           "rate_calibration": {
             "currency": "USD",
             "method": "bootstrap",
@@ -766,193 +764,199 @@
           "kind": "forward_curve",
           "id": "USD-SOFRRATE",
           "base": "2026-05-03",
-          "reset_lag": 0,
           "day_count": "act_360",
-          "tenor": 0.002777777777777778,
+          "index_tenor": {
+            "count": 1,
+            "unit": "days"
+          },
           "knot_points": [
             [
               0.0,
-              0.0366
+              1.0
             ],
             [
               0.025,
-              0.03635300853174428
+              0.999092
             ],
             [
               0.044444444444444446,
-              0.036315720113683066
+              0.998387
             ],
             [
               0.06388888888888888,
-              0.03623821341655415
+              0.997684
             ],
             [
               0.09166666666666666,
-              0.036553650549026706
+              0.996672
             ],
             [
               0.17777777777777778,
-              0.03646739985880501
+              0.993552
             ],
             [
               0.2611111111111111,
-              0.03639197696628659
+              0.990548
             ],
             [
               0.35555555555555557,
-              0.03637182928587253
+              0.987157
             ],
             [
               0.4305555555555556,
-              0.03635109004174334
+              0.984473
             ],
             [
               0.4583333333333333,
-              0.029021633051404417
+              0.98368
             ],
             [
               0.5166666666666667,
-              0.03975645387336963
+              0.981404
             ],
             [
               0.6055555555555555,
-              0.03639831370452544
+              0.978239
             ],
             [
               0.6861111111111111,
-              0.036808120243535386
+              0.975347
             ],
             [
               0.7722222222222223,
-              0.03676401914391056
+              0.972269
             ],
             [
               0.85,
-              0.03688102821872456
+              0.969488
             ],
             [
               0.9361111111111111,
-              0.037107455671865054
+              0.9664
             ],
             [
               0.9638888888888889,
-              0.029863328358872274
+              0.965599
             ],
             [
               0.975,
-              0.037204724409447686
+              0.9652
             ],
             [
               1.0194444444444444,
-              0.041734437878667194
+              0.963413
             ],
             [
               1.4722222222222223,
-              0.03695518154467618
+              0.947558
             ],
             [
               1.5305555555555554,
-              0.040257709789664066
+              0.945338
             ],
             [
               1.9805555555555556,
-              0.035637545076861135
+              0.930417
             ],
             [
               1.9916666666666667,
-              0.035417412593519285
+              0.930051
             ],
             [
               2.036111111111111,
-              0.040012386902196356
+              0.9284
             ],
             [
               2.488888888888889,
-              0.03527732907404434
+              0.913804
             ],
             [
               2.9944444444444445,
-              0.035950732157494954
+              0.897492
             ],
             [
               3.0027777777777778,
-              0.035843891826328314
+              0.897224
             ],
             [
               3.0555555555555554,
-              0.039466674378950066
+              0.895359
             ],
             [
               3.5027777777777778,
-              0.035920403927203304
+              0.881203
             ],
             [
               4.008333333333334,
-              0.03690281494004648
+              0.865064
             ],
             [
               4.013888888888889,
-              0.03683718219840162
+              0.864887
             ],
             [
               4.066666666666666,
-              0.04076945547419724
+              0.86303
             ],
             [
               5.0777777777777775,
-              0.03836515337450576
+              0.830802
             ],
             [
               6.094444444444444,
-              0.0399004140462567
+              0.798414
             ],
             [
               7.108333333333333,
-              0.041108544077043875
+              0.766468
             ],
             [
               8.122222222222222,
-              0.042159952875316944
+              0.735048
             ],
             [
               9.141666666666667,
-              0.04317962198263341
+              0.704056
             ],
             [
               10.152777777777779,
-              0.044221473568743064
+              0.673923
             ],
             [
               12.180555555555555,
-              0.04681579566387925
+              0.615493
             ],
             [
               15.230555555555556,
-              0.04952746898562522
+              0.534719
             ],
             [
               20.302777777777777,
-              0.05086635816711465
+              0.425053
             ],
             [
               25.369444444444444,
-              0.04621347109244033
+              0.34441
             ],
             [
               30.444444444444443,
-              0.04148855856243643
+              0.284506
             ],
             [
               40.58888888888889,
-              0.03807054323276713
+              0.205241
             ],
             [
               50.736111111111114,
-              0.030155523174736295
+              0.157153
+            ],
+            [
+              50.73888888889793,
+              0.157141515514709
             ]
           ],
-          "interp_style": "linear",
-          "extrapolation": "flat_forward",
+          "interp_style": "log_linear",
+          "extrapolation": "extend",
           "rate_calibration": {
             "currency": "USD",
             "method": "bootstrap",
@@ -1451,10 +1455,7 @@
             ]
           ],
           "interp_style": "log_linear",
-          "extrapolation": "flat_forward",
-          "min_forward_rate": null,
-          "allow_non_monotonic": false,
-          "min_forward_tenor": 1e-06,
+          "extrapolation": "extend",
           "rate_calibration": null,
           "fx_policy": null
         },
@@ -1502,10 +1503,7 @@
             ]
           ],
           "interp_style": "log_linear",
-          "extrapolation": "flat_forward",
-          "min_forward_rate": null,
-          "allow_non_monotonic": false,
-          "min_forward_tenor": 1e-06,
+          "extrapolation": "extend",
           "rate_calibration": null,
           "fx_policy": null
         }
@@ -1536,7 +1534,9 @@
             "calendar_id": "weekends_only"
           }
         },
-        "quote_compounding": {"periodic": 2},
+        "quote_compounding": {
+          "periodic": 2
+        },
         "discount_curve_id": "USD-SWAP-490",
         "instrument_pricing_overrides": {
           "market_quotes": {

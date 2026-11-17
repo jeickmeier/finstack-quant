@@ -10,8 +10,7 @@ use finstack_quant_core::{
     money::Money,
 };
 use finstack_quant_scenarios::{
-    CurveKind, ExecutionContext, HazardBumpMode, OperationSpec, ScenarioEngine, ScenarioSpec,
-    TimeRollMode,
+    CurveKind, ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec, TimeRollMode,
 };
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::{
@@ -29,6 +28,7 @@ fn production_history_requires_quote_recalibration_for_credit_spreads() {
             .base_date(origin)
             .recovery_rate(0.4)
             .knots([(1.0, 0.02), (5.0, 0.02)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard"),
     );
@@ -53,7 +53,8 @@ fn production_history_requires_quote_recalibration_for_credit_spreads() {
         market
             .get_hazard("ACME-HZD")
             .expect("source")
-            .hazard_rate(5.0),
+            .hazard_rate(5.0)
+            .expect("hazard_rate"),
         0.02
     );
 }
@@ -155,20 +156,32 @@ fn production_history_reuses_the_pricing_boundary_recalibration_provider() {
 }
 
 #[test]
-fn production_first_order_spread_shock_converts_by_loss_given_default() {
+fn production_par_cds_spread_shock_rejects_uncalibrated_hazard_curve() {
+    use finstack_quant_core::market_data::bumps::{BumpSpec, Bumpable};
     let origin = date!(2025 - 01 - 02);
     for recovery in [0.0, 0.4, 0.8] {
-        let mut market = MarketContext::new().insert(
-            HazardCurve::builder("ACME-HZD")
-                .base_date(origin)
-                .recovery_rate(recovery)
-                .knots([(1.0, 0.02), (5.0, 0.02)])
-                .build()
-                .expect("hazard"),
+        let curve = HazardCurve::builder("ACME-HZD")
+            .base_date(origin)
+            .day_count(DayCount::Act365F)
+            .recovery_rate(recovery)
+            .knots([(1.0, 0.02), (5.0, 0.02)])
+            .build()
+            .expect("hazard");
+
+        // Direct intensity bumps shift hazard intensity directly (+10bp = +0.001)
+        // independent of recovery rate, never scaling by 1/(1-R).
+        let direct = curve
+            .apply_bump(BumpSpec::parallel_bp(10.0))
+            .expect("direct intensity bump");
+        let direct_rate = direct.hazard_rate(5.0).expect("hazard rate");
+        assert!(
+            (direct_rate - 0.021).abs() < 1e-12,
+            "R={recovery}: direct intensity bump should add 0.001, got {direct_rate}"
         );
+
+        let mut market = MarketContext::new().insert(curve);
         let spec = ScenarioSpec {
             id: "spread-units".into(),
-            hazard_bump_mode: HazardBumpMode::FirstOrderShift,
             operations: vec![OperationSpec::CurveParallelBp {
                 curve_kind: CurveKind::ParCDS,
                 curve_id: "ACME-HZD".into(),
@@ -185,17 +198,9 @@ fn production_first_order_spread_shock_converts_by_loss_given_default() {
             calendar: None,
             as_of: origin,
         };
-        ScenarioEngine::new()
-            .apply(&spec, &mut ctx)
-            .expect("first-order scenario");
-        let actual = market
-            .get_hazard("ACME-HZD")
-            .expect("bumped hazard")
-            .hazard_rate(5.0);
-        let expected = 0.02 + 0.001 / (1.0 - recovery);
         assert!(
-            (actual - expected).abs() < 1e-12,
-            "R={recovery}: {actual} vs {expected}"
+            ScenarioEngine::new().apply(&spec, &mut ctx).is_err(),
+            "R={recovery}: ParCDS spread shock must fail closed without a calibration recipe"
         );
     }
 }
@@ -245,17 +250,20 @@ fn production_time_roll_materializes_raw_index_fixings_before_curve_roll() {
             DiscountCurve::builder("USD-OIS")
                 .base_date(origin)
                 .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.9)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("discount"),
         )
         .insert(
-            ForwardCurve::builder("USD-SOFR-3M", 0.25)
-                .base_date(origin)
-                .day_count(DayCount::Act360)
-                .knots([(0.0, 0.03), (1.0, 0.03), (2.0, 0.03)])
-                .build()
-                .expect("forward"),
+            ForwardCurve::flat("USD-SOFR-3M", origin, 0.03, DayCount::Act360).expect("forward"),
         );
+    let expected_index = market
+        .get_forward("USD-SOFR-3M")
+        .expect("forward")
+        .rate_between_dates(reset, date!(2025 - 04 - 03), 90.0 / 360.0)
+        .expect("projected index");
     let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(bond)];
     let mut ctx = ExecutionContext {
         market: &mut market,
@@ -275,17 +283,17 @@ fn production_time_roll_materializes_raw_index_fixings_before_curve_roll() {
         .market
         .get_series("FIXING:USD-SOFR-3M")
         .expect("crossed fixing");
-    let fixing = series.value_on_exact(reset).expect("reset observation");
+    let fixing = series.get_value_exact(reset).expect("reset observation");
     assert!(
-        (fixing - 0.03).abs() < 1e-12,
-        "raw index must exclude the 150bp coupon spread"
+        (fixing - expected_index).abs() < 1e-12,
+        "raw index must exclude the 150bp coupon spread: {fixing} vs {expected_index}"
     );
     roll(&mut ctx, "1D");
     assert_eq!(
         ctx.market
             .get_series("FIXING:USD-SOFR-3M")
             .expect("retained series")
-            .value_on_exact(reset)
+            .get_value_exact(reset)
             .expect("retained fixing"),
         fixing
     );

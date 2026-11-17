@@ -167,14 +167,8 @@ fn hw1f_cap_floor_price(
     let forward = std::sync::Arc::clone(&forward_curve.inner);
     let discount_df = |t: f64| discount.df(t);
     let forward_df = |t: f64| forward.df(t);
-    Ok(hull_white::hw1f_cap_floor_price(
-        params,
-        &discount_df,
-        &forward_df,
-        &periods,
-        strike,
-        is_cap,
-    ))
+    hull_white::hw1f_cap_floor_price(params, &discount_df, &forward_df, &periods, strike, is_cap)
+        .map_err(core_to_py)
 }
 
 /// Build the `finstack_quant.models.rates.hull_white` submodule.

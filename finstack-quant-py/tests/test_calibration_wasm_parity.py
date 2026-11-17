@@ -96,7 +96,8 @@ STEPS = {
         "d2", {**RATES, "curve_id": "USD-OIS", "interpolation": "linear"}, quote_set="qs"
     ),
     "forward": lambda: CalibrationStep.forward(
-        "USD-SOFR-3M", {**RATES, "tenor_years": 0.25, "discount_curve_id": "USD-OIS"}
+        "USD-SOFR-3M",
+        {**RATES, "index_tenor": {"count": 3, "unit": "months"}, "discount_curve_id": "USD-OIS"},
     ),
     "hazard": lambda: CalibrationStep.hazard(
         "ACME", {**RATES, "entity": "ACME", "discount_curve_id": "USD-OIS", "recovery_rate": 0.4}
@@ -109,6 +110,11 @@ STEPS = {
             "index": "USA-CPI-U",
             "observation_lag": "3M",
             "base_cpi": 310.0,
+            "source_base_date": "2024-10-01",
+            "source_base_cpi": 310.0,
+            "day_count": "act_365f",
+            "interpolation": "linear",
+            "extrapolation": "extend",
         },
     ),
     "vol_surface": lambda: CalibrationStep.vol_surface("AAPL-VOL", {"base_date": BASE, "underlying_ticker": "AAPL"}),
@@ -151,7 +157,14 @@ def discount_curve() -> DiscountCurve:
     spec = HW["curve"]
     flat = spec["knots"]
     knots = list(zip(flat[0::2], flat[1::2], strict=True))
-    return DiscountCurve(spec["id"], datetime.date.fromisoformat(spec["base_date"]), knots, day_count=spec["day_count"])
+    return DiscountCurve(
+        spec["id"],
+        datetime.date.fromisoformat(spec["base_date"]),
+        knots,
+        day_count=spec["day_count"],
+        interp="monotone_convex",
+        extrapolation="extend",
+    )
 
 
 def cap_floor_quotes() -> list[CapFloorQuote]:

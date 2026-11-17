@@ -98,8 +98,8 @@ impl MetricCalculator for CdsIndexBucketedCs01Calculator {
             let request = Cs01Request::generic(bump_bp, discount_id.clone());
             total.add(compute_key_rate_cs01_series_with_context_raw(
                 context, &credit_id, series_id, &request, reval,
-            )?);
+            )?)?;
         }
-        Ok(total.total())
+        total.get_total()
     }
 }

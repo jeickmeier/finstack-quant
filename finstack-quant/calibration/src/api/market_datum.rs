@@ -182,7 +182,7 @@ mod tests {
     fn roundtrip_price_datum() {
         let datum = MarketDatum::Price(PriceDatum {
             id: "AAPL".into(),
-            scalar: MarketScalar::Unitless(175.42),
+            scalar: MarketScalar::unitless(175.42).expect("valid scalar"),
         });
         let json = serde_json::to_string(&datum).expect("price datum should serialize");
         assert!(json.contains(r#""kind":"price""#));
@@ -192,7 +192,11 @@ mod tests {
             unreachable!("round-tripped price datum should retain the Price variant");
         };
         assert_eq!(p.id, "AAPL");
-        assert!(matches!(p.scalar, MarketScalar::Unitless(v) if (v - 175.42).abs() < 1e-12));
+        assert!(
+            p.scalar
+                .get_unitless()
+                .is_some_and(|v| (v - 175.42).abs() < 1e-12)
+        );
     }
 
     #[test]
@@ -219,7 +223,7 @@ mod tests {
     fn price_is_not_a_quote() {
         let datum = MarketDatum::Price(PriceDatum {
             id: "AAPL".into(),
-            scalar: MarketScalar::Unitless(175.42),
+            scalar: MarketScalar::unitless(175.42).expect("valid scalar"),
         });
         assert_eq!(datum.id(), "AAPL");
         assert_eq!(datum.kind_name(), "price");

@@ -13,7 +13,7 @@ use finstack_quant_core::dates::{
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_statements::builder::ModelBuilder;
-use finstack_quant_statements::capital_structure::{EcfSweepSpec, WaterfallSpec};
+use finstack_quant_statements::capital_structure::{EcfSweepSpec, PaymentPriority, WaterfallSpec};
 use finstack_quant_statements::evaluator::{Evaluator, MonteCarloConfig};
 use finstack_quant_statements::types::FinancialStatementInstrument;
 use finstack_quant_statements::types::{AmountOrScalar, FinancialModelSpec, ForecastSpec};
@@ -97,6 +97,13 @@ fn levered_model(
         .expect("valid formula");
     builder.add_debt("TL-001", term_loan());
     builder.waterfall(WaterfallSpec {
+        priority_of_payments: vec![
+            PaymentPriority::Fees,
+            PaymentPriority::Interest,
+            PaymentPriority::Amortization,
+            PaymentPriority::Sweep,
+            PaymentPriority::Equity,
+        ],
         ecf_sweep: Some(EcfSweepSpec {
             ebitda_node: "ebitda".to_string(),
             taxes_node: None,

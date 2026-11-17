@@ -145,6 +145,9 @@ fn create_market() -> MarketContext {
             (20.0, 0.3920),
             (30.0, 0.2710),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 

@@ -135,11 +135,11 @@ test('typed quanto theta preserves configured period P&L and the capped horizon'
     };
     const surface = state.surfaces[0];
     state.surfaces = [
-      { ...surface, id: 'NKY-VOL', strikes: [25000, 35000, 45000] },
+      { ...surface, id: 'NKY-VOL', secondary_values: [25000, 35000, 45000] },
       {
         ...surface,
         id: 'JPYUSD-VOL',
-        strikes: [0.005, 1 / 140, 0.01],
+        secondary_values: [0.005, 1 / 140, 0.01],
         vols_row_major: surface.vols_row_major.map(() => 0.1),
       },
     ];

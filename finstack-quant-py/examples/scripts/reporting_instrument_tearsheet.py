@@ -66,6 +66,8 @@ def main() -> None:
                 (30.0, 0.30),
             ],
             day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
         )
     )
     as_of = "2026-06-19"

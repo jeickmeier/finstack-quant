@@ -304,8 +304,8 @@ pub struct MvaResult {
 ///
 /// # Errors
 ///
-/// Returns an error if the profile or spread curve fails validation, or if any
-/// curve evaluation returns a non-finite value.
+/// Returns an error if the profile or spread curve fails validation, or if a
+/// discount or survival curve evaluation fails at an IM grid time.
 ///
 /// # Relationship to `compute_bilateral_xva`
 ///
@@ -352,8 +352,7 @@ pub(crate) fn compute_mva_internal(
         >::new(
             times.into_boxed_slice(),
             spreads.into_boxed_slice(),
-            finstack_quant_core::math::interp::ExtrapolationPolicy::FlatZero,
-            finstack_quant_core::math::interp::ValidationPolicy::AllowNegative,
+            finstack_quant_core::math::interp::ExtrapolationPolicy::Flat,
         )?)
     } else {
         None
@@ -373,34 +372,13 @@ pub(crate) fn compute_mva_internal(
         let t = im_profile.times[i];
         let im_t = im_profile.im_values[i];
 
-        let df_t = discount_curve.df(t);
-        if !df_t.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "MVA: non-finite discount factor at t={t}: DF(t)={df_t}"
-            )));
-        }
+        let df_t = discount_curve.df(t)?;
         let own_sp_t = match survival_curve {
-            Some(curve) => {
-                let sp = curve.sp(t);
-                if !sp.is_finite() {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "MVA: non-finite survival probability at t={t}: S(t)={sp}"
-                    )));
-                }
-                sp
-            }
+            Some(curve) => curve.sp(t)?,
             None => 1.0,
         };
         let counterparty_sp_t = match counterparty_survival_curve {
-            Some(curve) => {
-                let sp = curve.sp(t);
-                if !sp.is_finite() {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "MVA: non-finite counterparty survival probability at t={t}: S_c(t)={sp}"
-                    )));
-                }
-                sp
-            }
+            Some(curve) => curve.sp(t)?,
             None => 1.0,
         };
 
@@ -412,7 +390,7 @@ pub(crate) fn compute_mva_internal(
         let sp_mid =
             0.5 * (prev_own_sp + own_sp_t) * 0.5 * (prev_counterparty_sp + counterparty_sp_t);
         let spread_bp = match &spread_interp {
-            Some(interp) => interp.interp(0.5 * (prev_t + t)),
+            Some(interp) => interp.interp(0.5 * (prev_t + t))?,
             None => funding_spread_curve[0].1,
         };
         let spread_mid = spread_bp / BASIS_POINTS_PER_UNIT;
@@ -489,6 +467,8 @@ mod tests {
             .base_date(base)
             .knots(knots)
             .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("DiscountCurve should build")
     }
@@ -497,8 +477,9 @@ mod tests {
         let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
         HazardCurve::builder("BANK-SELF")
             .base_date(base)
-            .knots([(0.0, lambda), (30.0, lambda)])
+            .knots([(30.0, lambda)])
             .recovery_rate(0.40)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("HazardCurve should build")
     }

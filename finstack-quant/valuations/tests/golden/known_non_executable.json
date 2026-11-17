@@ -47,6 +47,27 @@
           "evidence": "Flat 53.6264 bp curve measurement: Finstack 23966.54950855 versus preserved target 25352.02; unchanged tolerance USD 650. See docs/audits/2026-09-09-cdso-reconciliation.md (2026-10-08 section)."
         }
       ]
+    },
+    {
+      "path": "pricing/bloomberg/fra/usd_fra_3x6.json",
+      "description": "Bloomberg SWPM BR01 versus the factor-native projection-curve bump",
+      "metrics": [
+        {
+          "metric": "pv01",
+          "reason": "Bloomberg BR01 moves the 3M Term SOFR forward by 1bp. Finstack bumps a forward curve by a continuous 1bp parallel shift of its projection factors on the curve's ACT/360 clock, which moves the simple 92-day forward by (1 + F*tau) bp. The convention gap is not a pricing defect, so the Bloomberg target and its tolerance are preserved.",
+          "evidence": "Finstack -253.9589 versus Bloomberg -251.51 (ratio 1.00974). Scaling Bloomberg by 1 + 0.036437 * 92/360 = 1.009312 gives -253.852; the remaining 0.107 is inside the fixture's unchanged USD 0.15 calibrated-discount-curve tolerance."
+        },
+        {
+          "metric": "forward_pv01",
+          "reason": "Same projection-curve bump as pv01: Bloomberg BR01 moves the simple forward by 1bp, while the Finstack continuous factor shift moves it by (1 + F*tau) bp. The Bloomberg target and its tolerance are preserved.",
+          "evidence": "Finstack -253.9589 versus Bloomberg -251.51; the (1 + F*tau) = 1.009312 scaled target -253.852 leaves 0.107, inside the unchanged USD 0.15 tolerance."
+        },
+        {
+          "metric": "dv01",
+          "reason": "The par FRA has no material discount-curve sensitivity, so DV01 equals the projection-curve bump in pv01 and inherits its (1 + F*tau) convention gap against Bloomberg BR01. The Bloomberg target and its tolerance are preserved.",
+          "evidence": "Finstack -253.9589 versus Bloomberg -251.51; the (1 + F*tau) = 1.009312 scaled target -253.852 leaves 0.107, inside the unchanged USD 0.15 tolerance."
+        }
+      ]
     }
   ]
 }

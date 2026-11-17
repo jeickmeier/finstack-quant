@@ -325,7 +325,7 @@ impl StochasticPricer {
             self.tracks_option_cost(prepared),
         )?;
         for output in outputs {
-            collector.record_output(output);
+            collector.record_output(output)?;
         }
 
         collector.finalize(StructuredCreditPricingMode::MonteCarlo {
@@ -1209,16 +1209,17 @@ impl TrancheScenarioStats {
         }
     }
 
-    fn record(&mut self, metrics: PathTrancheMetrics) {
-        self.pv_stats.update(metrics.pv);
-        self.loss_stats.update(metrics.loss);
+    fn record(&mut self, metrics: PathTrancheMetrics) -> Result<()> {
+        self.pv_stats.update(metrics.pv)?;
+        self.loss_stats.update(metrics.loss)?;
         self.losses.push(metrics.loss);
         if metrics.principal > 0.0 {
             self.wal_sum += metrics.wal;
             self.paths_with_principal += 1;
         }
         self.duration_sum += metrics.duration;
-        self.option_cost_stats.update(metrics.option_cost);
+        self.option_cost_stats.update(metrics.option_cost)?;
+        Ok(())
     }
 
     fn finalize(
@@ -1227,11 +1228,15 @@ impl TrancheScenarioStats {
         num_paths: usize,
     ) -> Result<TranchePricingResult> {
         let paths = num_paths.max(1) as f64;
-        let mean_pv = self.pv_stats.mean();
-        let mean_loss = self.loss_stats.mean();
+        let mean_pv = self.pv_stats.get_mean()?.unwrap_or(0.0);
+        let mean_loss = self.loss_stats.get_mean()?.unwrap_or(0.0);
         // Use population variance (n denominator), the established convention
         // for these Monte Carlo loss estimators.
-        let loss_std = self.loss_stats.population_variance().sqrt();
+        let loss_std = self
+            .loss_stats
+            .get_population_variance()?
+            .unwrap_or(0.0)
+            .sqrt();
         let es = expected_shortfall(&mut self.losses, ES_CONFIDENCE);
 
         let price_pct = if self.current_balance > f64::EPSILON {
@@ -1259,7 +1264,10 @@ impl TrancheScenarioStats {
         })
         .with_paths_with_principal(self.paths_with_principal)
         .with_credit_duration(self.duration_sum / paths)
-        .with_draw_option_cost(Money::new(self.option_cost_stats.mean(), currency)?))
+        .with_draw_option_cost(Money::new(
+            self.option_cost_stats.get_mean()?.unwrap_or(0.0),
+            currency,
+        )?))
     }
 }
 
@@ -1318,30 +1326,33 @@ impl ScenarioCollector {
         })
     }
 
-    fn record_tranche(&mut self, idx: usize, metrics: PathTrancheMetrics) {
+    fn record_tranche(&mut self, idx: usize, metrics: PathTrancheMetrics) -> Result<()> {
         if let Some(stats) = self.tranche_stats.get_mut(idx) {
-            stats.record(metrics);
+            stats.record(metrics)?;
         }
+        Ok(())
     }
 
-    fn record_deal(&mut self, pv: f64, loss: f64) {
-        self.deal_loss_stats.update(loss);
+    fn record_deal(&mut self, pv: f64, loss: f64) -> Result<()> {
+        self.deal_loss_stats.update(loss)?;
         self.deal_losses.push(loss);
         self.deal_pvs.push(pv);
+        Ok(())
     }
 
-    fn record_output(&mut self, output: PathScenarioOutput) {
+    fn record_output(&mut self, output: PathScenarioOutput) -> Result<()> {
         for (idx, metrics) in output.tranches {
-            self.record_tranche(idx, metrics);
+            self.record_tranche(idx, metrics)?;
         }
-        self.record_deal(output.deal_pv, output.deal_loss);
+        self.record_deal(output.deal_pv, output.deal_loss)?;
         if output.unfunded_draws {
             self.unfunded_paths += 1;
         }
-        self.draw_stats.update(output.collateral_draws);
+        self.draw_stats.update(output.collateral_draws)?;
         if let Some(paths) = self.option_cost_paths.as_mut() {
             paths.push(output.draw_option_cost);
         }
+        Ok(())
     }
 
     fn finalize(
@@ -1349,11 +1360,14 @@ impl ScenarioCollector {
         pricing_mode: StructuredCreditPricingMode,
     ) -> Result<StochasticPricingResult> {
         let pv_stats = independent_estimator_stats(&self.deal_pvs, self.antithetic)?;
-        let mean_pv = pv_stats.mean();
-        let mean_loss = self.deal_loss_stats.mean();
+        let mean_pv = pv_stats.get_mean()?.unwrap_or(0.0);
+        let mean_loss = self.deal_loss_stats.get_mean()?.unwrap_or(0.0);
         // Welford population variance avoids catastrophic cancellation when
         // tranche PVs are large (≥ 1e7) and relative dispersion is small.
-        let loss_pop_var = self.deal_loss_stats.population_variance();
+        let loss_pop_var = self
+            .deal_loss_stats
+            .get_population_variance()?
+            .unwrap_or(0.0);
         let es = expected_shortfall(&mut self.deal_losses, ES_CONFIDENCE);
 
         let mut result = StochasticPricingResult::new(
@@ -1390,11 +1404,25 @@ impl ScenarioCollector {
             result.dirty_price = mean_pv / notional * 100.0;
             result.clean_price = result.dirty_price;
         }
-        result.pv_std_error = pv_stats.stderr();
-        result.pv_confidence_interval = pv_stats.confidence_interval(0.05);
+        result.pv_std_error = pv_stats.get_stderr()?.unwrap_or(f64::NAN);
+        result.pv_confidence_interval =
+            match (pv_stats.get_mean()?, pv_stats.get_ci_half_width(0.05)?) {
+                (Some(m), Some(h)) => {
+                    let lo = m - h;
+                    let hi = m + h;
+                    if !lo.is_finite() || !hi.is_finite() {
+                        return Err(finstack_quant_core::Error::Internal(
+                            "PV 95% confidence interval bounds overflowed".into(),
+                        ));
+                    }
+                    (lo, hi)
+                }
+                _ => (f64::NAN, f64::NAN),
+            };
         result.unfunded_draw_path_fraction =
             self.unfunded_paths as f64 / self.num_paths.max(1) as f64;
-        result.expected_collateral_draws = Money::new(self.draw_stats.mean(), self.currency)?;
+        result.expected_collateral_draws =
+            Money::new(self.draw_stats.get_mean()?.unwrap_or(0.0), self.currency)?;
         if let Some(paths) = self.option_cost_paths.take() {
             let mean = if paths.is_empty() {
                 0.0
@@ -1504,6 +1532,9 @@ mod tests {
             DiscountCurve::builder("USD-OIS")
                 .base_date(test_date())
                 .knots([(0.0, 1.0), (1.0, 0.98), (5.0, 0.90)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
         )
@@ -1624,7 +1655,7 @@ mod tests {
             let mut collector = ScenarioCollector::new(&instrument, pvs.len(), antithetic, false)
                 .expect("collector");
             for &pv in pvs {
-                collector.record_deal(pv, 0.0);
+                collector.record_deal(pv, 0.0).expect("finite test pv");
             }
             let result = collector
                 .finalize(StructuredCreditPricingMode::MonteCarlo {
@@ -1688,7 +1719,7 @@ mod tests {
                 mean_pv - delta
             };
             // Feed as deal-level output (no tranche sub-paths needed here).
-            collector.record_deal(pv, 0.0);
+            collector.record_deal(pv, 0.0).expect("finite test pv");
         }
 
         // Extract the deal-level variance directly via the finalize path.
@@ -1747,7 +1778,9 @@ mod tests {
         // sees per-path population variance = 25 and reports a non-zero SE.
         let iid_se = independent_estimator_stats(&pvs, false)
             .expect("valid observations")
-            .stderr();
+            .get_stderr()
+            .expect("finite stderr")
+            .expect("1000 samples");
         assert!(
             iid_se > 0.0,
             "i.i.d. estimator should see per-path dispersion (got {iid_se})"
@@ -1757,7 +1790,9 @@ mod tests {
         // pair-mean variance — and therefore the SE — is zero.
         let pair_se = independent_estimator_stats(&pvs, true)
             .expect("complete pairs")
-            .stderr();
+            .get_stderr()
+            .expect("finite stderr")
+            .expect("500 pairs");
         assert!(
             pair_se.abs() < 1e-9,
             "antithetic SE must be ~0 when every pair averages identically; \
@@ -1792,7 +1827,9 @@ mod tests {
 
         let reported = independent_estimator_stats(&pvs, true)
             .expect("complete pairs")
-            .stderr();
+            .get_stderr()
+            .expect("finite stderr")
+            .expect("500 pairs");
 
         // Independent recomputation: collapse each pair to its mean, then take
         // the plain SE over the n/2 pair means.
@@ -1812,7 +1849,9 @@ mod tests {
         // far larger SE; antithetic mode must NOT inflate variance beyond it.
         let iid = independent_estimator_stats(&pvs, false)
             .expect("valid observations")
-            .stderr();
+            .get_stderr()
+            .expect("finite stderr")
+            .expect("1000 samples");
         assert!(
             reported <= iid,
             "antithetic SE {reported} must not exceed the i.i.d. SE {iid}"
@@ -2030,6 +2069,9 @@ mod per_name_copula_tests {
             DiscountCurve::builder("USD-OIS")
                 .base_date(close())
                 .knots([(0.0, 1.0), (1.0, 0.97), (3.0, 0.91), (5.0, 0.85)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
         )

@@ -14,7 +14,6 @@ use finstack_quant_core::Result;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::dividends::DividendKind;
-use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -134,10 +133,16 @@ pub(crate) fn resolve_equity_spot(
     if let Some(spot) = spot_override {
         return Ok(spot);
     }
-    match context.get_price(underlying_ticker)? {
-        MarketScalar::Price(money) => Ok(money.amount()),
-        MarketScalar::Unitless(value) => Ok(*value),
-    }
+    let scalar = context.get_price(underlying_ticker)?;
+    scalar
+        .get_price()
+        .map(|money| money.amount())
+        .or_else(|| scalar.get_unitless())
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "unsupported scalar for '{underlying_ticker}'"
+            ))
+        })
 }
 
 pub(crate) fn resolve_continuous_dividend_yield(
@@ -151,12 +156,11 @@ pub(crate) fn resolve_continuous_dividend_yield(
         None => {
             let scalar_key = format!("{ticker}-DIVYIELD");
             match context.get_price(&scalar_key) {
-                Ok(MarketScalar::Unitless(value)) => Some(*value),
-                Ok(MarketScalar::Price(_)) => {
-                    return Err(finstack_quant_core::Error::Validation(format!(
+                Ok(scalar) => Some(scalar.get_unitless().ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(format!(
                         "equity carry scalar '{scalar_key}' must be unitless"
-                    )));
-                }
+                    ))
+                })?),
                 Err(_) => None,
             }
         }
@@ -447,7 +451,7 @@ impl ContextScratch {
         // single curve entry, so a panic mid-insert cannot leave an empty context
         // behind for subsequent calls.
         let mut ctx = self.scratch.borrow_mut();
-        ctx.insert_mut(curve.clone());
+        ctx.try_insert_mut(curve.clone())?;
         after_insert(&mut ctx)?;
         op(&ctx)
     }
@@ -649,6 +653,8 @@ mod tests {
             .base_date(date!(2025 - 01 - 01))
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (2.0, (-0.06_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve")
     }
@@ -694,6 +700,8 @@ mod tests {
                         (0.0, 1.0),
                         (days / denominator, (-0.05 * days / 365.0).exp()),
                     ])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("curve");
                 let inputs = resolve_equity_forward_inputs(
@@ -748,7 +756,8 @@ mod tests {
         let event_time = DayCount::Act365F
             .year_fraction(date!(2025 - 01 - 01), ex_date, DayCountContext::default())
             .expect("event time");
-        let expected = (100.0 - 5.0 * discount.df(event_time)) / discount.df(1.0);
+        let expected = (100.0 - 5.0 * discount.df(event_time).expect("valid"))
+            / discount.df(1.0).expect("valid");
         let actual = inputs.forward(&discount, 1.0).expect("forward");
         assert!((actual - expected).abs() < 1e-12);
     }

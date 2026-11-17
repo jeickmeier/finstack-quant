@@ -5,8 +5,9 @@ use finstack_quant_calibration::validation::{
     CurveValidator, validate_butterfly_spread, validate_calendar_spread, validate_surface,
     validate_vol_bounds,
 };
-use finstack_quant_core::dates::Date;
-use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::math::Compounding;
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use time::Month;
 
 #[test]
@@ -27,6 +28,8 @@ fn test_discount_curve_validation() {
                 (5.0, 0.9000),
             ])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("should build valid curve");
 
@@ -45,12 +48,9 @@ fn test_discount_curve_validation() {
                 (5.0, 0.90),
             ])
             .interp(InterpStyle::Linear)
-            .validation(
-                finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                    allow_non_monotonic: true,
-                    forward_floor: None,
-                },
-            ) // Allow construction of invalid curve for testing validation
+            // Allow construction of invalid curve for testing validation
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("should build invalid curve for testing");
 
@@ -71,6 +71,7 @@ fn test_hazard_curve_validation() {
         .recovery_rate(0.40)
         .seniority(Seniority::Senior)
         .knots(vec![(1.0, 0.01), (2.0, 0.015), (5.0, 0.02)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("should build valid hazard curve");
 
@@ -88,40 +89,22 @@ fn test_forward_curve_validation() {
     let config = ValidationConfig::default();
 
     // Valid forward curve
-    let valid_curve = ForwardCurve::builder("TEST-FWD", 0.25)
-        .base_date(base_date)
-        .knots(vec![
-            (0.25, 0.045),
-            (0.5, 0.046),
-            (1.0, 0.047),
-            (2.0, 0.048),
-        ])
-        .build()
-        .expect("should build valid forward curve");
+    let valid_curve = ForwardCurve::from_zero_rates(
+        "TEST-FWD",
+        base_date,
+        &[(0.25, 0.045), (0.5, 0.046), (1.0, 0.047), (2.0, 0.048)],
+        Compounding::Continuous,
+        DayCount::Act365F,
+        InterpStyle::LogLinear,
+        ExtrapolationPolicy::Extend,
+    )
+    .expect("should build valid forward curve");
 
     assert!(valid_curve.validate(&config).is_ok());
 
-    // Curve with negative forward rates (should fail if too negative)
-    let negative_curve = ForwardCurve::builder("TEST-NEG-FWD", 0.25)
-        .base_date(base_date)
-        .knots(vec![
-            (0.25, -0.08), // -8% forward rate (builder may fail on very negative)
-            (0.5, 0.02),
-            (1.0, 0.03),
-        ])
-        .build();
-
-    // The curve builder itself might reject very negative rates,
-    // or if it accepts them, our validation should reject them
-    match negative_curve {
-        Ok(curve) => {
-            // If builder accepts it, our validation should reject it
-            assert!(curve.validate_bounds(&config).is_err());
-        }
-        Err(_) => {
-            // Builder rejected it, which is also a valid outcome
-        }
-    }
+    let negative_curve = ForwardCurve::flat("TEST-NEG-FWD", base_date, -0.08, DayCount::Act365F)
+        .expect("negative rates are valid curve inputs");
+    assert!(negative_curve.validate_bounds(&config).is_err());
 }
 
 #[test]
@@ -169,17 +152,14 @@ fn test_non_monotone_positive_rate_curve_rejected() {
             (5.0, 0.90),
         ])
         .interp(InterpStyle::Linear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        )
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("should build non-monotone curve for testing");
 
-    let short_rate =
-        non_monotone_curve.zero_rate(0.25, finstack_quant_core::math::Compounding::Continuous);
+    let short_rate = non_monotone_curve
+        .zero_rate(0.25, finstack_quant_core::math::Compounding::Continuous)
+        .expect("valid");
     assert!(
         short_rate > 0.0,
         "Expected positive short-end rate, got {}",
@@ -210,17 +190,14 @@ fn test_negative_rate_environment_opt_in() {
             (5.0, 0.99),
         ])
         .interp(InterpStyle::Linear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        )
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("should build negative rate curve for testing");
 
-    let short_rate =
-        negative_rate_curve.zero_rate(0.25, finstack_quant_core::math::Compounding::Continuous);
+    let short_rate = negative_rate_curve
+        .zero_rate(0.25, finstack_quant_core::math::Compounding::Continuous)
+        .expect("valid");
     assert!(
         short_rate < 0.0,
         "Expected negative short-end rate, got {}",
@@ -245,7 +222,7 @@ fn test_negative_rate_environment_opt_in() {
 
 #[test]
 fn negative_rate_opt_in_preserves_the_configured_forward_floor() {
-    use finstack_quant_core::market_data::term_structures::{DiscountCurve, ValidationMode};
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
 
     let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let config = ValidationConfig {
@@ -259,10 +236,8 @@ fn negative_rate_opt_in_preserves_the_configured_forward_floor() {
                 .base_date(base_date)
                 .knots(times.iter().map(|&time| (time, (-rate * time).exp())))
                 .interp(InterpStyle::LogLinear)
-                .validation(ValidationMode::Raw {
-                    allow_non_monotonic: true,
-                    forward_floor: None,
-                })
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("structurally valid discount curve");
 
@@ -290,7 +265,7 @@ fn negative_rate_opt_in_preserves_the_configured_forward_floor() {
 
 #[test]
 fn discount_forward_floor_checks_knots_between_standard_sampling_tenors() {
-    use finstack_quant_core::market_data::term_structures::{DiscountCurve, ValidationMode};
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
 
     let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let curve = DiscountCurve::builder("INTERIOR-FORWARD-FLOOR")
@@ -302,10 +277,8 @@ fn discount_forward_floor_checks_knots_between_standard_sampling_tenors() {
             (1.0, (-0.03_f64).exp()),
         ])
         .interp(InterpStyle::LogLinear)
-        .validation(ValidationMode::Raw {
-            allow_non_monotonic: true,
-            forward_floor: None,
-        })
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("structurally valid discount curve");
     let config = ValidationConfig {
@@ -339,7 +312,12 @@ fn test_butterfly_arbitrage_detected_and_fails() {
         &expiries,
         &strikes,
         &vol_grid,
-        Default::default(),
+        finstack_quant_core::market_data::surfaces::VolGridOpts {
+            secondary_axis: finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+            quote_type: finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+            interpolation_mode:
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+        },
         None,
     )
     .expect("should build vol surface for testing");
@@ -379,7 +357,13 @@ fn test_call_convexity_rejects_vertical_spread_above_strike_width() {
             &[1.0],
             &strikes[..point_count],
             &vols[..point_count],
-            Default::default(),
+            finstack_quant_core::market_data::surfaces::VolGridOpts {
+                secondary_axis: finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+                quote_type:
+                    finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+                interpolation_mode:
+                    finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            },
             None,
         )
         .expect("surface should build");
@@ -405,7 +389,12 @@ fn test_call_convexity_checks_two_strike_monotonicity() {
         &[1.0],
         &[90.0, 100.0],
         &[0.01, 0.80],
-        Default::default(),
+        finstack_quant_core::market_data::surfaces::VolGridOpts {
+            secondary_axis: finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+            quote_type: finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+            interpolation_mode:
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+        },
         None,
     )
     .expect("surface should build");
@@ -426,7 +415,13 @@ fn test_call_convexity_accepts_valid_two_strike_spreads() {
             &[1.0],
             &[80.0, 90.0],
             &vols,
-            Default::default(),
+            finstack_quant_core::market_data::surfaces::VolGridOpts {
+                secondary_axis: finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+                quote_type:
+                    finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+                interpolation_mode:
+                    finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            },
             None,
         )
         .expect("surface should build");
@@ -445,7 +440,12 @@ fn test_call_convexity_still_rejects_butterfly_with_valid_vertical_spreads() {
         &[1.0],
         &[90.0, 100.0, 110.0],
         &[0.20, 0.25, 0.20],
-        Default::default(),
+        finstack_quant_core::market_data::surfaces::VolGridOpts {
+            secondary_axis: finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+            quote_type: finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+            interpolation_mode:
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+        },
         None,
     )
     .expect("surface should build");
@@ -474,7 +474,12 @@ fn test_calendar_arbitrage_detected_and_fails() {
         &expiries,
         &strikes,
         &vol_grid,
-        Default::default(),
+        finstack_quant_core::market_data::surfaces::VolGridOpts {
+            secondary_axis: finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+            quote_type: finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+            interpolation_mode:
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+        },
         None,
     )
     .expect("should build vol surface for testing");
@@ -512,7 +517,12 @@ fn test_valid_surface_passes_arbitrage_checks() {
         &expiries,
         &strikes,
         &vol_grid,
-        Default::default(),
+        finstack_quant_core::market_data::surfaces::VolGridOpts {
+            secondary_axis: finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+            quote_type: finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+            interpolation_mode:
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+        },
         None,
     )
     .expect("should build valid vol surface");
@@ -535,12 +545,8 @@ fn test_discount_curve_bounds_rejects_excessive_df() {
         .base_date(base_date)
         .knots(vec![(0.0, 1.0), (0.25, 1.10), (1.0, 0.95)])
         .interp(InterpStyle::Linear)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        )
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve should build");
 
@@ -557,11 +563,16 @@ fn test_forward_curve_bounds_rejects_excessive_rate() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let config = ValidationConfig::default();
 
-    let curve = ForwardCurve::builder("TEST-FWD-HIGH", 0.25)
-        .base_date(base_date)
-        .knots(vec![(0.25, 0.02), (1.0, 0.75), (2.0, 0.03)])
-        .build()
-        .expect("forward curve");
+    let curve = ForwardCurve::from_zero_rates(
+        "TEST-FWD-HIGH",
+        base_date,
+        &[(0.25, 0.02), (1.0, 0.75), (2.0, 0.03)],
+        Compounding::Continuous,
+        DayCount::Act365F,
+        InterpStyle::LogLinear,
+        ExtrapolationPolicy::Extend,
+    )
+    .expect("forward curve");
 
     let err = curve
         .validate_bounds(&config)
@@ -578,8 +589,10 @@ fn test_inflation_curve_hyperinflation_rejected() {
 
     let curve = InflationCurve::builder("TEST-INFL-HYPER")
         .base_date(base_date)
-        .base_cpi(100.0)
-        .knots(vec![(1.0, 200.0), (2.0, 300.0)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
+        .knots(vec![(0.0, 100.0), (1.0, 200.0), (2.0, 300.0)])
         .build()
         .expect("inflation curve");
 
@@ -597,7 +610,12 @@ fn surface_validators_require_valid_forwards_even_when_disabled() {
         &[1.0, 2.0],
         &[90.0, 100.0],
         &[0.2; 4],
-        Default::default(),
+        finstack_quant_core::market_data::surfaces::VolGridOpts {
+            secondary_axis: finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+            quote_type: finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+            interpolation_mode:
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+        },
         None,
     )
     .expect("surface");
@@ -637,7 +655,12 @@ fn calendar_checks_fixed_forward_moneyness_and_respects_tolerance() {
         &[1.0, 2.0],
         &[100.0, 200.0],
         &[0.4, 0.1, 0.3, 0.2],
-        Default::default(),
+        finstack_quant_core::market_data::surfaces::VolGridOpts {
+            secondary_axis: finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+            quote_type: finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+            interpolation_mode:
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+        },
         None,
     )
     .expect("surface");
@@ -662,7 +685,12 @@ fn surface_evaluation_failure_is_an_error() {
         &[1.0, 2.0],
         &[90.0, 100.0],
         &[1e200; 4],
-        Default::default(),
+        finstack_quant_core::market_data::surfaces::VolGridOpts {
+            secondary_axis: finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+            quote_type: finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal,
+            interpolation_mode:
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+        },
         None,
     )
     .expect("finite input surface");
@@ -672,17 +700,36 @@ fn surface_evaluation_failure_is_an_error() {
 }
 
 #[test]
-fn surface_validation_preserves_zero_expiry_nodes() {
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+fn surface_validation_rejects_zero_expiry_and_preserves_small_positive_expiry_nodes() {
+    use finstack_quant_core::market_data::surfaces::{
+        VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
+    let opts = VolGridOpts {
+        secondary_axis: VolSurfaceAxis::Strike,
+        quote_type: VolQuoteType::BlackLognormal,
+        interpolation_mode: VolInterpolationMode::Vol,
+    };
+    assert!(
+        VolSurface::from_grid(
+            "EXPIRING",
+            &[0.0, 1.0],
+            &[90.0, 100.0],
+            &[0.2; 4],
+            opts,
+            None
+        )
+        .is_err(),
+        "zero-expiry surface must be rejected"
+    );
     let surface = VolSurface::from_grid(
         "EXPIRING",
-        &[0.0, 1.0],
+        &[1e-6, 1.0],
         &[90.0, 100.0],
         &[0.2; 4],
-        Default::default(),
+        opts,
         None,
     )
-    .expect("zero-expiry surface");
+    .expect("small positive-expiry surface");
     validate_surface(&surface, &ValidationConfig::default(), &[100.0, 105.0])
-        .expect("zero expiry has zero variance and intrinsic calls");
+        .expect("small positive expiry preserves exact variance and call monotonicity");
 }

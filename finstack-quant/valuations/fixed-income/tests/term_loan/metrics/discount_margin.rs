@@ -80,11 +80,13 @@ fn build_floating_loan(
 fn build_market() -> MarketContext {
     let as_of = date!(2025 - 01 - 01);
     let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
-    let fwd_curve = ForwardCurve::builder("USD-SOFR", 0.25)
-        .base_date(as_of)
-        .knots([(0.0, 0.045), (3.0, 0.045), (10.0, 0.045)])
-        .build()
-        .expect("forward curve");
+    let fwd_curve = ForwardCurve::flat(
+        "USD-SOFR",
+        as_of,
+        0.045,
+        finstack_quant_core::dates::DayCount::Act365F,
+    )
+    .expect("forward curve");
     MarketContext::new().insert(disc_curve).insert(fwd_curve)
 }
 
@@ -211,13 +213,10 @@ fn flat_consistent_market(as_of: finstack_quant_core::dates::Date, rate: f64) ->
         .day_count(DayCount::Act360)
         .interp(InterpStyle::LogLinear)
         .knots([(0.0, 1.0), (10.0, df_10y)])
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("flat discount curve should build");
-    let fwd = ForwardCurve::builder("USD-SOFR", 0.25)
-        .base_date(as_of)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, rate), (10.0, rate)])
-        .build()
+    let fwd = ForwardCurve::flat("USD-SOFR", as_of, rate, DayCount::Act360)
         .expect("flat forward curve should build");
     MarketContext::new().insert(disc).insert(fwd)
 }

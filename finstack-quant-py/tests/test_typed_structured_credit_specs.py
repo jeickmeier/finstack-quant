@@ -198,7 +198,7 @@ def test_typed_specs_are_accepted_by_pool_asset_and_the_deal_prices() -> None:
         .recovery_spec(RecoveryModelSpec(0.5, 0))
         .build()
     )
-    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", CLOSE, 0.04))
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", CLOSE, 0.04, "act_365f"))
     diagnostics = deal.run_simulation(market, CLOSE).diagnostics
     frame = diagnostics.to_dataframe()
     assert len(frame) > 12
@@ -231,6 +231,6 @@ def test_typed_facility_terms_are_accepted_by_the_facility_builder() -> None:
     )
     assert [event["kind"] for event in facility.amortization_events] == ["cumulative_loss", "excess_spread"]
     assert facility.borrowing_base_rules["advance_rates"][0]["rate"] == 0.8
-    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", CLOSE, 0.04))
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", CLOSE, 0.04, "act_365f"))
     projection = facility.project(market, CLOSE)
     assert projection.facility.total_principal.amount > 0.0

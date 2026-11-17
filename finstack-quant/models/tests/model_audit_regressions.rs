@@ -162,12 +162,18 @@ fn local_density_uses_log_moneyness_derivatives_and_is_price_scale_invariant() {
 
 #[test]
 fn arbitrage_checks_reject_missing_or_invalid_forwards_and_tolerance() {
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
+    };
     let strikes = [90.0, 100.0, 110.0];
     let expiries = [1.0, 2.0];
     let vols = [vec![0.3; 3], vec![0.1; 3]];
     let surface = VolSurface::builder("bad-calendar")
         .expiries(&expiries)
-        .strikes(&strikes)
+        .secondary_values(&strikes)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .rows(&vols)
         .build()
         .unwrap();
@@ -241,12 +247,20 @@ fn arbitrage_check_config_fills_omitted_fields_from_default_and_rejects_unknown_
     assert_eq!(config.tolerance, DEFAULT_ARBITRAGE_TOLERANCE);
     assert_eq!(config.min_severity, ArbitrageSeverity::Negligible);
 
-    let surface = VolSurface::builder("flat")
-        .expiries(&[1.0, 2.0])
-        .strikes(&[90.0, 100.0, 110.0])
-        .rows(&[vec![0.2; 3], vec![0.2; 3]])
-        .build()
-        .unwrap();
+    let surface = {
+        use finstack_quant_core::market_data::surfaces::{
+            VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
+        };
+        VolSurface::builder("flat")
+            .expiries(&[1.0, 2.0])
+            .secondary_values(&[90.0, 100.0, 110.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
+            .rows(&[vec![0.2; 3], vec![0.2; 3]])
+            .build()
+            .unwrap()
+    };
     assert!(check_surface(&surface, &config).unwrap().passed);
 
     assert!(serde_json::from_str::<ArbitrageCheckConfig>(r#"{"forwards":[100.0]}"#).is_err());

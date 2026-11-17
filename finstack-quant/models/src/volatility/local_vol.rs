@@ -51,7 +51,7 @@ fn validate_implied_surface(surface: &VolSurface, forwards: &[f64]) -> Result<()
     surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
     surface.require_quote_type(VolQuoteType::BlackLognormal)?;
     let expiries = surface.expiries();
-    let strikes = surface.strikes();
+    let strikes = surface.secondary_values();
     if expiries.len() < 2 || strikes.len() < 3 {
         return Err(InputError::TooFewPoints.into());
     }
@@ -93,14 +93,21 @@ fn validate_implied_surface(surface: &VolSurface, forwards: &[f64]) -> Result<()
 /// # Examples
 ///
 /// ```rust
-/// use finstack_quant_core::market_data::surfaces::VolSurface;
+/// use finstack_quant_core::market_data::surfaces::{
+///     VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+/// };
 /// use finstack_quant_models::volatility::local_vol::LocalVolSurface;
 ///
 /// // Implied vol skewed in strike and flat in expiry.
 /// let expiries = [0.25, 0.5, 1.0, 2.0];
 /// let strikes = [80.0, 90.0, 100.0, 110.0, 120.0];
 /// let smile = [0.24, 0.22, 0.20, 0.19, 0.185];
-/// let mut builder = VolSurface::builder("SKEW").expiries(&expiries).strikes(&strikes);
+/// let mut builder = VolSurface::builder("SKEW")
+///     .expiries(&expiries)
+///     .secondary_values(&strikes)
+///     .secondary_axis(VolSurfaceAxis::Strike)
+///     .quote_type(VolQuoteType::BlackLognormal)
+///     .interpolation_mode(VolInterpolationMode::Vol);
 /// for _ in &expiries {
 ///     builder = builder.row(&smile);
 /// }
@@ -243,7 +250,7 @@ impl LocalVolSurface {
     pub fn from_implied_vol(surface: &VolSurface, forwards: &[f64]) -> Result<Self> {
         validate_implied_surface(surface, forwards)?;
         let expiries = surface.expiries().to_vec();
-        let strikes = surface.strikes().to_vec();
+        let strikes = surface.secondary_values().to_vec();
 
         let mut local_vols = Vec::with_capacity(expiries.len() * strikes.len());
         for (ei, &t) in expiries.iter().enumerate() {
@@ -323,7 +330,7 @@ impl LocalVolSurface {
         }
 
         let expiries = surface.expiries();
-        let strikes = surface.strikes();
+        let strikes = surface.secondary_values();
         let mut smoothed_vols = Vec::with_capacity(expiries.len() * strikes.len());
         for &t in expiries {
             let raw: Vec<f64> = strikes
@@ -487,14 +494,29 @@ pub(crate) mod test_support {
             strikes: &[f64],
             forwards: &[f64],
         ) -> VolSurface {
+            use finstack_quant_core::market_data::surfaces::{
+                VolGridOpts, VolQuoteType, VolSurfaceAxis,
+            };
             let mut vols = Vec::with_capacity(expiries.len() * strikes.len());
             for (&t, &forward) in expiries.iter().zip(forwards) {
                 for &strike in strikes {
                     vols.push(self.implied_vol((strike / forward).ln(), t));
                 }
             }
-            VolSurface::from_grid("SSVI", expiries, strikes, &vols, Default::default(), None)
-                .expect("SSVI surface builds")
+            VolSurface::from_grid(
+                "SSVI",
+                expiries,
+                strikes,
+                &vols,
+                VolGridOpts {
+                    secondary_axis: VolSurfaceAxis::Strike,
+                    quote_type: VolQuoteType::BlackLognormal,
+                    interpolation_mode:
+                        finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+                },
+                None,
+            )
+            .expect("SSVI surface builds")
         }
     }
 
@@ -516,6 +538,7 @@ mod tests {
     use super::test_support::{SKEWED, forwards, linspace};
     use super::*;
     use crate::volatility::arbitrage::{ArbitrageCheckConfig, check_surface};
+    use finstack_quant_core::market_data::surfaces::VolInterpolationMode;
 
     const EXPIRIES: [f64; 4] = [0.25, 0.5, 1.0, 2.0];
     const STRIKES: [f64; 7] = [70.0, 80.0, 90.0, 100.0, 110.0, 120.0, 130.0];
@@ -532,7 +555,11 @@ mod tests {
             expiries,
             strikes,
             &vec![vol; expiries.len() * strikes.len()],
-            Default::default(),
+            VolGridOpts {
+                secondary_axis: VolSurfaceAxis::Strike,
+                quote_type: VolQuoteType::BlackLognormal,
+                interpolation_mode: VolInterpolationMode::Vol,
+            },
             None,
         )
         .expect("flat surface should build")
@@ -555,15 +582,28 @@ mod tests {
     #[test]
     fn local_vol_rejects_unsupported_conventions_before_smoothing() {
         let (base, forwards) = test_surface();
-        let shifted = base.clone().with_displacements(&[20.0; 4]).unwrap();
+        let shifted = VolSurface::from_grid(
+            base.id(),
+            base.expiries(),
+            base.secondary_values(),
+            base.vols(),
+            VolGridOpts {
+                secondary_axis: VolSurfaceAxis::Strike,
+                quote_type: VolQuoteType::ShiftedBlackLognormal,
+                interpolation_mode: VolInterpolationMode::Vol,
+            },
+            Some(&[20.0; 4]),
+        )
+        .expect("shifted surface");
         let normal = VolSurface::from_grid(
             base.id(),
             base.expiries(),
-            base.strikes(),
+            base.secondary_values(),
             base.vols(),
             VolGridOpts {
+                secondary_axis: VolSurfaceAxis::Strike,
                 quote_type: VolQuoteType::Normal,
-                ..VolGridOpts::default()
+                interpolation_mode: VolInterpolationMode::Vol,
             },
             None,
         )
@@ -571,11 +611,12 @@ mod tests {
         let tenor_grid = VolSurface::from_grid(
             base.id(),
             base.expiries(),
-            base.strikes(),
+            base.secondary_values(),
             base.vols(),
             VolGridOpts {
                 secondary_axis: VolSurfaceAxis::Tenor,
-                ..VolGridOpts::default()
+                quote_type: VolQuoteType::BlackLognormal,
+                interpolation_mode: VolInterpolationMode::Vol,
             },
             None,
         )
@@ -817,7 +858,10 @@ mod tests {
         let strikes = [80.0, 90.0, 100.0, 110.0, 120.0];
         let mut builder = VolSurface::builder("SKEW")
             .expiries(&EXPIRIES)
-            .strikes(&strikes);
+            .secondary_values(&strikes)
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol);
         for _ in &EXPIRIES {
             builder = builder.row(&smile);
         }
@@ -844,7 +888,10 @@ mod tests {
     fn local_vol_rejects_calendar_arbitrage_naming_the_node() {
         let surface = VolSurface::builder("CALENDAR-BAD")
             .expiries(&[0.5, 1.0, 2.0])
-            .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
+            .secondary_values(&[80.0, 90.0, 100.0, 110.0, 120.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.25, 0.25, 0.25, 0.25, 0.25])
             .row(&[0.25, 0.25, 0.25, 0.25, 0.25])
             .row(&[0.15, 0.15, 0.15, 0.15, 0.15])
@@ -865,7 +912,10 @@ mod tests {
     fn local_vol_rejects_butterfly_arbitrage_naming_the_node() {
         let surface = VolSurface::builder("BUTTERFLY-BAD")
             .expiries(&[0.5, 1.0, 2.0])
-            .strikes(&[70.0, 85.0, 100.0, 115.0, 130.0])
+            .secondary_values(&[70.0, 85.0, 100.0, 115.0, 130.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.20, 0.45, 0.20, 0.45, 0.20])
             .row(&[0.21, 0.46, 0.21, 0.46, 0.21])
             .row(&[0.22, 0.47, 0.22, 0.47, 0.22])

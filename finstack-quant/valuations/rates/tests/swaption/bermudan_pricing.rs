@@ -36,6 +36,8 @@ fn test_discount_curve() -> DiscountCurve {
             (10.0, 0.70),
         ])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("Valid curve")
 }
@@ -394,8 +396,14 @@ fn build_market_context() -> MarketContext {
     let (kappa_key, sigma_key) = hw1f_scalar_keys("USD-OIS");
     MarketContext::new()
         .insert(curve)
-        .insert_price(&kappa_key, MarketScalar::Unitless(0.05))
-        .insert_price(&sigma_key, MarketScalar::Unitless(0.012))
+        .insert_price(
+            &kappa_key,
+            MarketScalar::unitless(0.05).expect("valid scalar"),
+        )
+        .insert_price(
+            &sigma_key,
+            MarketScalar::unitless(0.012).expect("valid scalar"),
+        )
 }
 
 /// Test LSMC vs Tree: prices should be in same ballpark.

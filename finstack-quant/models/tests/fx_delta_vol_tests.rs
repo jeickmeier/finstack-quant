@@ -1,286 +1,315 @@
-//! FX delta-quoted volatility surface tests.
-//!
-//! Regression coverage for merged-strike-grid behavior ("Merged global strike
-//! grid flattens short-expiry FX smiles"): each expiry's smile must be built
-//! from its *own* pillar strikes
-//! (derived from that expiry's forward and vol scale), and queries at a
-//! short expiry must reproduce that expiry's own 3/5-point smile exactly —
-//! never flat-extrapolated wing vol injected by long-expiry strikes.
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::market_data::surfaces::{
+    FxAtmConvention, FxButterflyConvention, FxDeltaConvention, FxDeltaVolSurface,
+    VolInterpolationMode, interpolate_fx_wing_vols,
+};
+use finstack_quant_core::money::fx::CurrencyPair;
+use finstack_quant_models::volatility::{
+    VolSource, delta_to_strike, get_fx_delta_pillar_vols, get_fx_delta_vol,
+    get_surface_vol_clamped, materialize_fx_delta_surface, strike_to_delta,
+};
+use std::sync::Arc;
 
-use finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;
-use finstack_quant_models::volatility::FxVolSurfaceBuilder;
-
-const SPOT: f64 = 1.10;
-const R_F: f64 = 0.0;
-const T_SHORT: f64 = 1.0 / 52.0; // 1W
-const T_LONG: f64 = 2.0; // 2Y
-
-/// Domestic rate chosen so the 2Y forward is 1.25 while the 1W forward is
-/// ~1.10 — forwards and vol scales differ strongly across pillars, which is
-/// exactly the configuration where the old merged grid placed long-expiry
-/// strikes far outside the short expiry's smile.
-fn r_d() -> f64 {
-    (1.25_f64 / SPOT).ln() / T_LONG
+fn eurusd_pair() -> CurrencyPair {
+    CurrencyPair::try_new(Currency::EUR, Currency::USD).expect("EUR/USD pair must be valid")
 }
 
-fn fwd(t: f64) -> f64 {
-    SPOT * ((r_d() - R_F) * t).exp()
-}
-
-// Market-realistic EUR/USD-style quotes: short ATM 8%, long ATM 12%,
-// negative risk reversals (put skew), positive butterflies.
-const ATM: [f64; 2] = [0.08, 0.12];
-const RR25: [f64; 2] = [-0.005, -0.02];
-const BF25: [f64; 2] = [0.0015, 0.004];
-const RR10: [f64; 2] = [-0.009, -0.036];
-const BF10: [f64; 2] = [0.005, 0.013];
-
-/// Hand-computed 5-point pillar smile (strikes, vols) for expiry index `i`,
-/// using only the public delta/strike conversion and the documented smile
-/// (broker) strangle convention `sigma_wing = ATM + BF ± RR/2`.
-fn pillar_smile_5pt(i: usize) -> ([f64; 5], [f64; 5]) {
-    let t = [T_SHORT, T_LONG][i];
-    let f = fwd(t);
-    let atm = ATM[i];
-    let sp25 = atm + BF25[i] - 0.5 * RR25[i];
-    let sc25 = atm + BF25[i] + 0.5 * RR25[i];
-    let sp10 = atm + BF10[i] - 0.5 * RR10[i];
-    let sc10 = atm + BF10[i] + 0.5 * RR10[i];
-    // Put strike at |delta| = d corresponds to call delta 1 - d under the
-    // premium-unadjusted forward-delta convention.
-    let k_p10 = finstack_quant_models::volatility::delta_to_strike(0.90, f, sp10, t);
-    let k_p25 = finstack_quant_models::volatility::delta_to_strike(0.75, f, sp25, t);
-    let k_atm = f * (0.5 * atm * atm * t).exp();
-    let k_c25 = finstack_quant_models::volatility::delta_to_strike(0.25, f, sc25, t);
-    let k_c10 = finstack_quant_models::volatility::delta_to_strike(0.10, f, sc10, t);
-    (
-        [k_p10, k_p25, k_atm, k_c25, k_c10],
-        [sp10, sp25, atm, sc25, sc10],
-    )
-}
-
-fn built_surface_5pt() -> finstack_quant_core::market_data::surfaces::VolSurface {
-    FxVolSurfaceBuilder::new("EURUSD-VOL")
-        .spot(SPOT)
-        .domestic_rate(r_d())
-        .foreign_rate(R_F)
-        .expiries(&[T_SHORT, T_LONG])
-        .atm_vols(&ATM)
-        .rr_25d(&RR25)
-        .bf_25d(&BF25)
-        .rr_10d(&RR10)
-        .bf_10d(&BF10)
+fn build_surface_3pt(
+    id: &str,
+    expiries: &[f64],
+    atm_vols: &[f64],
+    rr_25d: &[f64],
+    bf_25d: &[f64],
+) -> FxDeltaVolSurface {
+    FxDeltaVolSurface::builder(id, eurusd_pair())
+        .delta_convention(FxDeltaConvention::ForwardUnadjusted)
+        .atm_convention(FxAtmConvention::DeltaNeutralStraddle)
+        .butterfly_convention(FxButterflyConvention::Smile)
+        .expiries(expiries)
+        .atm_vols(atm_vols)
+        .rr_25d(rr_25d)
+        .bf_25d(bf_25d)
         .build()
-        .expect("5-point FX delta surface should build")
+        .expect("3-point FX delta surface must validate")
 }
 
 fn delta_surface_5pt() -> FxDeltaVolSurface {
-    FxDeltaVolSurface::new(
-        "EURUSD-DELTA-VOL",
-        vec![T_SHORT, T_LONG],
-        ATM.to_vec(),
-        RR25.to_vec(),
-        BF25.to_vec(),
-        Some(RR10.to_vec()),
-        Some(BF10.to_vec()),
-    )
-    .expect("5-point delta surface should build")
-}
-
-/// Hand linear interpolation on sorted knots with flat extrapolation —
-/// the documented intra-smile scheme.
-fn lin_interp(xs: &[f64], ys: &[f64], x: f64) -> f64 {
-    if x <= xs[0] {
-        return ys[0];
-    }
-    let n = xs.len();
-    if x >= xs[n - 1] {
-        return ys[n - 1];
-    }
-    let i = xs.partition_point(|&xi| xi < x);
-    let t = (x - xs[i - 1]) / (xs[i] - xs[i - 1]);
-    ys[i - 1] + t * (ys[i] - ys[i - 1])
-}
-
-// Regression: short-expiry smile is its own 3/5-point smile, not flattened
-// wing vol from long-expiry strikes (merged strike grid).
-
-#[test]
-fn short_expiry_smile_not_flattened_by_long_expiry_strikes() {
-    let surface = built_surface_5pt();
-    let (ks, vs) = pillar_smile_5pt(0);
-
-    // The grid contains strikes from the 2Y smile (around F=1.25, sigma 12%)
-    // that lie far outside the 1W smile (around F=1.10, sigma 8%).
-    assert!(
-        surface.strikes().last().copied().unwrap_or(0.0) > 1.3,
-        "test setup: long-expiry strikes should extend the grid well beyond \
-         the short smile"
-    );
-
-    // The 25Δ-put vol must differ from the 10Δ-put wing vol: the smile has
-    // structure between the wings.
-    assert!(
-        (vs[1] - vs[0]).abs() > 1e-4,
-        "test setup: 25Δ-put vol should differ from the 10Δ wing vol"
-    );
-
-    // Querying the short expiry at moderate deltas reproduces the short
-    // expiry's OWN 5-point linear smile exactly — not flat wing vol.
-    let k_25dp = ks[1];
-    let v = finstack_quant_models::volatility::get_surface_vol_clamped(&surface, T_SHORT, k_25dp);
-    assert!(
-        (v - vs[1]).abs() < 1e-12,
-        "25Δ-put vol should be the pillar vol {}, got {v}",
-        vs[1]
-    );
-    assert!(
-        (v - vs[0]).abs() > 1e-4,
-        "25Δ-put vol must not collapse to the 10Δ wing vol"
-    );
-
-    // Strikes strictly between the short expiry's pillars match the hand
-    // interpolation of its own smile to 1e-12.
-    for k in [
-        0.5 * (ks[0] + ks[1]),
-        0.5 * (ks[1] + ks[2]),
-        0.5 * (ks[2] + ks[3]),
-        0.5 * (ks[3] + ks[4]),
-        0.25 * ks[1] + 0.75 * ks[2],
-    ] {
-        let got = finstack_quant_models::volatility::get_surface_vol_clamped(&surface, T_SHORT, k);
-        let want = lin_interp(&ks, &vs, k);
-        assert!(
-            (got - want).abs() < 1e-12,
-            "short-expiry smile at strike {k}: got {got}, want {want} \
-             (per-expiry 5-point interpolation)"
-        );
-    }
-
-    // Beyond the short expiry's own wings the smile is flat at the wing vol
-    // (delta-space flat extrapolation), even at strikes contributed by the
-    // long expiry.
-    let got = finstack_quant_models::volatility::get_surface_vol_clamped(&surface, T_SHORT, 1.30);
-    assert!(
-        (got - vs[4]).abs() < 1e-12,
-        "beyond the 10Δ call wing the short smile is flat at the wing vol"
-    );
-}
-
-// Pillar reproduction: exact pillar strikes return pillar vols to 1e-12 at
-// every expiry, on both the materialized surface and the delta-quote query
-// path.
-
-#[test]
-fn pillar_strikes_reproduce_pillar_vols_exactly() {
-    let surface = built_surface_5pt();
-    let delta_surface = delta_surface_5pt();
-
-    for i in 0..2 {
-        let t = [T_SHORT, T_LONG][i];
-        let f = fwd(t);
-        let (ks, vs) = pillar_smile_5pt(i);
-        for (k, v) in ks.iter().zip(vs.iter()) {
-            let got = finstack_quant_models::volatility::get_surface_vol_clamped(&surface, t, *k);
-            assert!(
-                (got - v).abs() < 1e-12,
-                "materialized surface, expiry {t}, pillar strike {k}: got {got}, want {v}"
-            );
-
-            let got = finstack_quant_models::volatility::get_fx_delta_vol(&delta_surface, t, *k, f)
-                .expect("implied_vol at pillar should succeed");
-            assert!(
-                (got - v).abs() < 1e-12,
-                "implied_vol, expiry {t}, pillar strike {k}: got {got}, want {v}"
-            );
-        }
-    }
-}
-
-#[test]
-fn pillar_strikes_reproduce_pillar_vols_three_point_smile() {
-    // 3-point (25Δ-only) variant of the pillar-reproduction check.
-    let surface = FxVolSurfaceBuilder::new("EURUSD-VOL-3PT")
-        .spot(SPOT)
-        .domestic_rate(r_d())
-        .foreign_rate(R_F)
-        .expiries(&[T_SHORT, T_LONG])
-        .atm_vols(&ATM)
-        .rr_25d(&RR25)
-        .bf_25d(&BF25)
+    FxDeltaVolSurface::builder("EURUSD-VOL", eurusd_pair())
+        .delta_convention(FxDeltaConvention::ForwardUnadjusted)
+        .atm_convention(FxAtmConvention::DeltaNeutralStraddle)
+        .butterfly_convention(FxButterflyConvention::Smile)
+        .expiries(&[0.5, 1.0])
+        .atm_vols(&[0.10, 0.11])
+        .rr_25d(&[0.01, 0.015])
+        .bf_25d(&[0.002, 0.003])
+        .rr_10d(&[0.02, 0.028])
+        .bf_10d(&[0.004, 0.006])
         .build()
-        .expect("3-point FX delta surface should build");
-
-    for i in 0..2 {
-        let t = [T_SHORT, T_LONG][i];
-        let f = fwd(t);
-        let atm = ATM[i];
-        let sp25 = atm + BF25[i] - 0.5 * RR25[i];
-        let sc25 = atm + BF25[i] + 0.5 * RR25[i];
-        let k_p25 = finstack_quant_models::volatility::delta_to_strike(0.75, f, sp25, t);
-        let k_atm = f * (0.5 * atm * atm * t).exp();
-        let k_c25 = finstack_quant_models::volatility::delta_to_strike(0.25, f, sc25, t);
-
-        for (k, v) in [(k_p25, sp25), (k_atm, atm), (k_c25, sc25)] {
-            let got = finstack_quant_models::volatility::get_surface_vol_clamped(&surface, t, k);
-            assert!(
-                (got - v).abs() < 1e-12,
-                "3-point surface, expiry {t}, pillar strike {k}: got {got}, want {v}"
-            );
-        }
-    }
+        .expect("5-point FX delta surface must validate")
 }
 
-// Off-pillar expiries: the delta-quote query path rebuilds the smile at the
-// query expiry's forward (smile-faithful), while the materialized rectangular
-// grid blends rows at fixed strike — a documented limitation of the
-// materialization, not of the query path.
+#[test]
+fn five_point_smile_evaluates_and_clamps_wings() {
+    let delta_surface = delta_surface_5pt();
+    let spot: f64 = 1.10;
+    let r_dom: f64 = 0.03;
+    let r_for: f64 = 0.01;
+    let fwd_05 = spot * ((r_dom - r_for) * 0.5).exp();
+    let fwd_10 = spot * ((r_dom - r_for) * 1.0).exp();
+    let materialized = materialize_fx_delta_surface(&delta_surface, &[fwd_05, fwd_10])
+        .expect("materialization must succeed");
+    assert_eq!(materialized.expiries(), &[0.5, 1.0]);
+    assert_eq!(materialized.interpolation_mode(), VolInterpolationMode::Vol);
+
+    let pillars_1y = get_fx_delta_pillar_vols(&delta_surface, 1).expect("pillar vols at t=1");
+    let atm = pillars_1y[0];
+    let sp25 = pillars_1y[1];
+    let sc25 = pillars_1y[2];
+    let sp10 = pillars_1y[3];
+    let sc10 = pillars_1y[4];
+    assert!((atm - 0.11).abs() < 1e-12);
+    assert!((sp25 - (0.11 + 0.003 - 0.0075)).abs() < 1e-12);
+    assert!((sc25 - (0.11 + 0.003 + 0.0075)).abs() < 1e-12);
+    assert!((sp10 - (0.11 + 0.006 - 0.014)).abs() < 1e-12);
+    assert!((sc10 - (0.11 + 0.006 + 0.014)).abs() < 1e-12);
+
+    let k_p10 = delta_to_strike(false, 0.10, fwd_10, sp10, 1.0).expect("put 10d strike");
+    let k_p25 = delta_to_strike(false, 0.25, fwd_10, sp25, 1.0).expect("put 25d strike");
+    let k_atm = fwd_10 * (0.5 * atm * atm * 1.0).exp();
+    let k_c25 = delta_to_strike(true, 0.25, fwd_10, sc25, 1.0).expect("call 25d strike");
+    let k_c10 = delta_to_strike(true, 0.10, fwd_10, sc10, 1.0).expect("call 10d strike");
+
+    for &(k, expected) in &[
+        (k_p10, sp10),
+        (k_p25, sp25),
+        (k_atm, atm),
+        (k_c25, sc25),
+        (k_c10, sc10),
+    ] {
+        let got = get_fx_delta_vol(&delta_surface, 1.0, k, fwd_10).expect("direct vol at pillar");
+        assert!((got - expected).abs() < 1e-12);
+        let mat_got = get_surface_vol_clamped(&materialized, 1.0, k);
+        assert!((mat_got - expected).abs() < 1e-12);
+    }
+
+    // Flat wing extrapolation outside extreme 10d strikes.
+    let far_down =
+        get_fx_delta_vol(&delta_surface, 1.0, k_p10 * 0.5, fwd_10).expect("downside wing");
+    let far_up = get_fx_delta_vol(&delta_surface, 1.0, k_c10 * 1.8, fwd_10).expect("upside wing");
+    assert!((far_down - sp10).abs() < 1e-12);
+    assert!((far_up - sc10).abs() < 1e-12);
+}
 
 #[test]
-fn implied_vol_rebuilds_smile_at_intermediate_expiry() {
-    let delta_surface = delta_surface_5pt();
-    let t = 0.5;
-    let f = fwd(t);
+fn three_point_smile_evaluates_and_roundtrips_delta() {
+    let delta_surface = build_surface_3pt("EURUSD-VOL-3PT", &[1.0], &[0.12], &[0.01], &[0.002]);
+    let forward = 1.12;
+    let pillars = get_fx_delta_pillar_vols(&delta_surface, 0).expect("3-pt pillars");
+    assert_eq!(pillars.len(), 3);
+    let atm = pillars[0];
+    let sp25 = pillars[1];
+    let sc25 = pillars[2];
 
-    // Quote-space linear interpolation by hand.
-    let w = (t - T_SHORT) / (T_LONG - T_SHORT);
-    let atm = ATM[0] + w * (ATM[1] - ATM[0]);
-    let rr25 = RR25[0] + w * (RR25[1] - RR25[0]);
-    let bf25 = BF25[0] + w * (BF25[1] - BF25[0]);
-    let k_atm = f * (0.5 * atm * atm * t).exp();
+    let k_p25 = delta_to_strike(false, 0.25, forward, sp25, 1.0).expect("put 25d strike");
+    let k_atm = forward * (0.5 * atm * atm).exp();
+    let k_c25 = delta_to_strike(true, 0.25, forward, sc25, 1.0).expect("call 25d strike");
 
-    let got = finstack_quant_models::volatility::get_fx_delta_vol(&delta_surface, t, k_atm, f)
-        .expect("intermediate-expiry implied_vol should succeed");
     assert!(
-        (got - atm).abs() < 1e-12,
-        "ATM vol at intermediate expiry should be the quote-interpolated ATM \
-         {atm}, got {got}"
-    );
-
-    // The intermediate smile has genuine put skew around its own forward.
-    let sp25 = atm + bf25 - 0.5 * rr25;
-    let k_p25 = finstack_quant_models::volatility::delta_to_strike(0.75, f, sp25, t);
-    let got_put = finstack_quant_models::volatility::get_fx_delta_vol(&delta_surface, t, k_p25, f)
-        .expect("intermediate-expiry 25Δ-put implied_vol should succeed");
-    assert!(
-        (got_put - sp25).abs() < 1e-12,
-        "25Δ-put vol at intermediate expiry should be {sp25}, got {got_put}"
+        (strike_to_delta(false, k_p25, forward, sp25, 1.0).expect("put delta") - 0.25).abs() < 1e-9
     );
     assert!(
-        got_put > got,
-        "negative RR implies put vol above ATM at the intermediate expiry"
+        (strike_to_delta(true, k_c25, forward, sc25, 1.0).expect("call delta") - 0.25).abs() < 1e-9
     );
 
-    // Documented limitation of the rectangular materialization (core quant
-    // convention): off-pillar queries blend rows at fixed strike, so
-    // the intermediate ATM vol differs from the smile-faithful query path.
-    let surface = built_surface_5pt();
-    let grid_atm = finstack_quant_models::volatility::get_surface_vol_clamped(&surface, t, k_atm);
-    assert!(
-        (grid_atm - got).abs() > 1e-4,
-        "expected the fixed-strike grid blend ({grid_atm}) to differ from the \
-         quote-interpolated smile ({got}); if these now agree, the \
-         materialization gained quote-space expiry interpolation and this \
-         assertion (and the module docs) should be updated"
+    let vol_put = get_fx_delta_vol(&delta_surface, 1.0, k_p25, forward).expect("put 25d vol");
+    let vol_atm = get_fx_delta_vol(&delta_surface, 1.0, k_atm, forward).expect("atm vol");
+    let vol_call = get_fx_delta_vol(&delta_surface, 1.0, k_c25, forward).expect("call 25d vol");
+    assert!((vol_put - sp25).abs() < 1e-12);
+    assert!((vol_atm - atm).abs() < 1e-12);
+    assert!((vol_call - sc25).abs() < 1e-12);
+}
+
+#[test]
+fn strict_expiry_bounds_and_singleton_expiry_behavior() {
+    let multi = build_surface_3pt(
+        "EURUSD-BOUNDS",
+        &[0.5, 1.0],
+        &[0.10, 0.12],
+        &[0.01, 0.015],
+        &[0.002, 0.003],
     );
+    let forward = 1.10;
+    assert!(get_fx_delta_vol(&multi, 0.5, 1.10, forward).is_ok());
+    assert!(get_fx_delta_vol(&multi, 1.0, 1.10, forward).is_ok());
+    assert!(get_fx_delta_vol(&multi, 0.49, 1.10, forward).is_err());
+    assert!(get_fx_delta_vol(&multi, 1.01, 1.10, forward).is_err());
+
+    let vol_source = VolSource::FxDelta(Arc::new(multi));
+    // Clamped lookup extrapolates strike flat beyond wings, but still enforces strict expiry bounds.
+    assert!(vol_source.get_fx_vol_clamped(0.5, 0.10, forward).is_ok());
+    assert!(vol_source.get_fx_vol_clamped(0.49, 1.10, forward).is_err());
+    assert!(vol_source.get_fx_vol_clamped(1.01, 1.10, forward).is_err());
+
+    let single = build_surface_3pt("EURUSD-SINGLE", &[1.0], &[0.12], &[0.01], &[0.002]);
+    assert!(get_fx_delta_vol(&single, 1.0, 1.10, forward).is_ok());
+    assert!(get_fx_delta_vol(&single, 0.99, 1.10, forward).is_err());
+    assert!(get_fx_delta_vol(&single, 1.01, 1.10, forward).is_err());
+}
+
+#[test]
+fn midpoint_cancellation_and_extreme_scalar_delta_checks() {
+    // 5 * 2^-55 cancellation test across tight bracket around 0.125 (= 2^-3, ulp = 2^-55).
+    let step = 2.0_f64.powi(-55);
+    let t0 = 0.125;
+    let t1 = t0 + 8.0 * step;
+    let t_query = t0 + 5.0 * step;
+    let atm0 = 0.10;
+    let atm1 = 0.18;
+    let surface = build_surface_3pt(
+        "EURUSD-CANCEL",
+        &[t0, t1],
+        &[atm0, atm1],
+        &[0.0, 0.0],
+        &[0.0, 0.0],
+    );
+    let expected_atm = 0.375 * atm0 + 0.625 * atm1;
+    let forward = 1.25;
+    let k_dns = forward * (0.5 * expected_atm * expected_atm * t_query).exp();
+    let got = get_fx_delta_vol(&surface, t_query, k_dns, forward).expect("tight bracket interp");
+    assert!((got - expected_atm).abs() < 1e-15);
+
+    // Extreme put tail (|delta_p| = 1e-20) round-trips cleanly within tolerance.
+    let k_tail = delta_to_strike(false, 1e-20, 1.0, 0.2, 1.0).expect("deep tail put strike");
+    let d_tail = strike_to_delta(false, k_tail, 1.0, 0.2, 1.0).expect("deep tail put delta");
+    assert!((d_tail - 1e-20).abs() / 1e-20 < 1e-3);
+
+    // Tiny vol*sqrt(T) = 1e-17 fails delta-roundtrip tolerance when K collapses to F.
+    assert!(delta_to_strike(true, 0.25, 1.0, 1e-17, 1.0).is_err());
+
+    // Extreme small forward & large std dev (F = 1e-300, w = 40, put 0.50) avoids overflow/underflow.
+    let k_scaled = delta_to_strike(false, 0.5, 1e-300, 40.0, 1.0).expect("extreme forward strike");
+    assert!(k_scaled.is_finite() && k_scaled > 0.0);
+    let d_scaled =
+        strike_to_delta(false, k_scaled, 1e-300, 40.0, 1.0).expect("extreme forward delta");
+    assert!((d_scaled - 0.5).abs() < 1e-12);
+}
+
+#[test]
+fn crossed_interior_bracket_fails_smile_monotonicity() {
+    // At t0 = 1.0: 0.5*(1.08^2 - 0.60^2)*1 = 0.3888 < 0.67449*0.60 = 0.4047 (monotone).
+    // At t1 = 3.0: 0.5*(0.28^2 - 0.10^2)*3 = 0.1026 < 0.67449*0.10*sqrt(3) = 0.1168 (monotone).
+    // At t  = 2.0: 0.5*(0.68^2 - 0.35^2)*2 = 0.3399 > 0.67449*0.35*sqrt(2) = 0.3338 (K_c25 <= K_atm crossed).
+    let surface = build_surface_3pt(
+        "EURUSD-CROSSED-MID",
+        &[1.0, 3.0],
+        &[1.08, 0.28],
+        &[0.0, 0.0],
+        &[-0.48, -0.18],
+    );
+    let fwd = 1.0;
+    assert!(get_fx_delta_vol(&surface, 1.0, 1.0, fwd).is_ok());
+    assert!(get_fx_delta_vol(&surface, 3.0, 1.0, fwd).is_ok());
+    assert!(get_fx_delta_vol(&surface, 2.0, 1.0, fwd).is_err());
+}
+
+#[test]
+fn materialized_strike_union_does_not_coalesce_close_strikes() {
+    let surface = build_surface_3pt(
+        "EURUSD-UNION",
+        &[1.0, 2.0],
+        &[0.10, 0.10],
+        &[0.0, 0.0],
+        &[0.0, 0.0],
+    );
+    let fwd0 = 1.0;
+    // Choose fwd1 so K_atm(2.0) differs from K_atm(1.0) by ~1e-12 (relative),
+    // verifying exact IEEE-754 strike union without tolerance coalescing.
+    let k_atm_0 = fwd0 * (0.5 * 0.10 * 0.10 * 1.0_f64).exp();
+    let target_k_atm_1 = k_atm_0 * (1.0 + 1e-12);
+    let fwd1 = target_k_atm_1 * (-0.5 * 0.10 * 0.10 * 2.0_f64).exp();
+    let materialized =
+        materialize_fx_delta_surface(&surface, &[fwd0, fwd1]).expect("materialization succeeds");
+    let strikes = materialized.secondary_values();
+    let near_k0 = strikes
+        .iter()
+        .filter(|&&k| (k - k_atm_0).abs() / k_atm_0 < 1e-10)
+        .count();
+    assert_eq!(
+        near_k0, 2,
+        "1e-12-separated strikes must both survive union: {strikes:?}"
+    );
+}
+
+#[test]
+fn materialized_vol_grid_diverges_off_knot_from_direct_delta_eval() {
+    let surface = build_surface_3pt(
+        "EURUSD-DIVERGE",
+        &[0.5, 1.5],
+        &[0.08, 0.22],
+        &[-0.02, 0.03],
+        &[0.005, 0.015],
+    );
+    let fwd0 = 1.10;
+    let fwd1 = 1.20;
+    let materialized =
+        materialize_fx_delta_surface(&surface, &[fwd0, fwd1]).expect("materialization succeeds");
+    assert_eq!(materialized.interpolation_mode(), VolInterpolationMode::Vol);
+
+    // Exact match on stored expiry knot with matching delivery forward.
+    let k_on_knot = 1.14;
+    let on_knot_direct = get_fx_delta_vol(&surface, 0.5, k_on_knot, fwd0).expect("knot direct");
+    let on_knot_grid = get_surface_vol_clamped(&materialized, 0.5, k_on_knot);
+    assert!((on_knot_direct - on_knot_grid).abs() < 1e-12);
+
+    // Off-knot linear quote interpolation diverges from bilinear Vol-grid interpolation.
+    let t_mid = 1.0;
+    let fwd_mid = 1.15;
+    let k_mid = 1.25;
+    let direct_mid = get_fx_delta_vol(&surface, t_mid, k_mid, fwd_mid).expect("direct mid");
+    let grid_mid = get_surface_vol_clamped(&materialized, t_mid, k_mid);
+    assert!((direct_mid - grid_mid).abs() > 1e-4);
+}
+
+#[test]
+fn models_analytic_17_table_fixtures_hold() {
+    // Fixture 1: exact compensated wing recovery avoids cancellation to zero.
+    let (atm, put_wing, call_wing) = interpolate_fx_wing_vols(
+        0.5,
+        (1.0, -2.5, 0.25_f64.next_up()),
+        0.5,
+        (1.0_f64.next_up(), -2.5, 0.25),
+    )
+    .expect("exact compensated wing recovery succeeds");
+    assert!((atm - 1.0).abs() <= 2.0_f64.powi(-52));
+    assert!((put_wing - 2.5).abs() <= 1e-15);
+    assert_eq!(call_wing, 5.0 * 2.0_f64.powi(-55));
+
+    // Fixture 2: endpoint smiles are ordered at T=1 and T=3, but K_put > K_DNS at T=2.
+    let crossed = build_surface_3pt(
+        "EURUSD-ADR-FIXTURE2",
+        &[1.0, 3.0],
+        &[0.1, 0.2],
+        &[-1.0, -0.6],
+        &[0.6, 0.3],
+    );
+    assert!(get_fx_delta_vol(&crossed, 1.0, 1.0, 1.0).is_ok());
+    assert!(get_fx_delta_vol(&crossed, 3.0, 1.0, 1.0).is_ok());
+    assert!(get_fx_delta_vol(&crossed, 2.0, 1.0, 1.0).is_err());
+
+    // Fixture 3: direct quote interpolation at (T=2, K=exp(0.04)) returns flat ATM 0.20,
+    // while the materialized strike grid returns ~0.20473735.
+    let div_surface = build_surface_3pt(
+        "EURUSD-ADR-FIXTURE3",
+        &[1.0, 3.0],
+        &[0.2, 0.2],
+        &[0.0, 0.0],
+        &[0.05, 0.05],
+    );
+    let query_k = 0.04_f64.exp();
+    let direct = get_fx_delta_vol(&div_surface, 2.0, query_k, 1.0).expect("direct eval at T=2");
+    assert!((direct - 0.20).abs() < 1e-12);
+    let mat = materialize_fx_delta_surface(&div_surface, &[1.0, 1.0])
+        .expect("materialization for ADR fixture 3 succeeds");
+    let grid = get_surface_vol_clamped(&mat, 2.0, query_k);
+    assert!((grid - 0.20473735).abs() < 1e-6);
 }

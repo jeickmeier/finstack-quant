@@ -1,72 +1,70 @@
 //! Fluent discount-curve builder and construction validation.
 
-use super::validation::{validate_forward_rates, validate_monotonic_df};
-use super::{DiscountCurve, ValidationMode};
+use super::super::common::factor::{validate_origin_only, validate_positive_factor_points};
+use super::super::common::validate_curve_clock;
+use super::DiscountCurve;
 use crate::dates::{Date, DayCount};
-use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
+use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 use crate::types::CurveId;
 
 /// Fluent builder for [`DiscountCurve`].
 ///
-/// Typical usage chains `base_date`, `knots`, and `interp` (optional)
-/// before calling [`DiscountCurveBuilder::build`].
+/// Requires explicit `base_date`, `day_count` (plus `calendar_id` for `Bus/252`),
+/// `knots`, `interp`, and `extrapolation` before calling
+/// [`DiscountCurveBuilder::build`].
 ///
 /// # Examples
 /// ```rust
+/// use finstack_quant_core::dates::{Date, DayCount};
 /// use finstack_quant_core::market_data::term_structures::DiscountCurve;
-/// use finstack_quant_core::math::interp::InterpStyle;
-/// use finstack_quant_core::dates::Date;
+/// use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 /// use time::Month;
 ///
 /// let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
 /// let curve = DiscountCurve::builder("USD-OIS")
 ///     .base_date(base)
+///     .day_count(DayCount::Act365F)
 ///     .knots([(0.0, 1.0), (5.0, 0.9)])
 ///     .interp(InterpStyle::Linear)
+///     .extrapolation(ExtrapolationPolicy::Extend)
 ///     .build()
 ///     .expect("DiscountCurve builder should succeed");
-/// assert!(curve.df(2.0) < 1.0);
+/// assert!(curve.df(2.0).expect("valid df") < 1.0);
 /// ```
 pub struct DiscountCurveBuilder {
     pub(super) id: CurveId,
-    /// Valuation / base date. `None` until [`Self::base_date`] is called;
-    /// [`Self::build`] requires `Some(_)` and errors on `None`.
     pub(super) base: Option<Date>,
-    pub(super) day_count: DayCount,
+    pub(super) day_count: Option<DayCount>,
     pub(super) calendar_id: Option<String>,
-    pub(super) points: Vec<(f64, f64)>, // (t, df)
-    pub(super) style: InterpStyle,
-    pub(super) extrapolation: ExtrapolationPolicy,
-    pub(super) min_forward_rate: Option<f64>,
-    pub(super) allow_non_monotonic: bool,
-    pub(super) min_forward_tenor: f64,
+    pub(super) points: Vec<(f64, f64)>,
+    pub(super) style: Option<InterpStyle>,
+    pub(super) extrapolation: Option<ExtrapolationPolicy>,
     pub(super) rate_calibration: Option<super::super::RateCalibrationRecipe>,
     pub(super) fx_policy: Option<String>,
     pub(super) transform: Option<super::evaluation::CurveTransform>,
 }
 
 impl DiscountCurveBuilder {
-    /// Override the default **base date** (valuation date).
+    /// Set the **base date** (valuation anchor date).
     pub fn base_date(mut self, d: Date) -> Self {
         self.base = Some(d);
         self
     }
+
     /// Choose the day-count basis for discount time mapping.
     ///
     /// # Arguments
     ///
-    /// * `day_count` - Day-count convention used to convert calendar dates into year fractions.
+    /// * `day_count` - Supported complete day-count convention used to convert
+    ///   calendar dates into curve year fractions.
     pub fn day_count(mut self, day_count: DayCount) -> Self {
-        self.day_count = day_count;
+        self.day_count = Some(day_count);
         self
     }
 
     /// Set the registered holiday calendar of the curve's time axis.
     ///
-    /// Required for business-day day counts such as Bus/252, where the year
-    /// fraction from the base date counts business days. The calendar belongs
-    /// to the curve (for example `"brbd"` for a BRL CDI curve), so every
-    /// date-based query uses it.
+    /// Required for business-day day counts such as Bus/252.
     ///
     /// # Arguments
     ///
@@ -88,8 +86,8 @@ impl DiscountCurveBuilder {
         self
     }
 
-    /// Supply knot points `(t, df)` where *t* is the year fraction and *df*
-    /// the discount factor.
+    /// Supply strictly ordered knot points `(t, df)` where `t >= 0` is the year
+    /// fraction and `df > 0` is the discount factor.
     pub fn knots<I>(mut self, pts: I) -> Self
     where
         I: IntoIterator<Item = (f64, f64)>,
@@ -97,79 +95,16 @@ impl DiscountCurveBuilder {
         self.points.extend(pts);
         self
     }
+
     /// Select interpolation style for this curve.
     pub fn interp(mut self, style: InterpStyle) -> Self {
-        self.style = style;
+        self.style = Some(style);
         self
     }
 
     /// Set the extrapolation policy for out-of-bounds evaluation.
     pub fn extrapolation(mut self, policy: ExtrapolationPolicy) -> Self {
-        self.extrapolation = policy;
-        self
-    }
-
-    /// Select the validation policy for the curve.
-    ///
-    /// # Arguments
-    ///
-    /// * `mode` - Execution or interpolation mode selecting the documented algorithm branch.
-    pub fn validation(mut self, mode: ValidationMode) -> Self {
-        match mode {
-            ValidationMode::MarketStandard => {
-                self.allow_non_monotonic = false;
-                self.min_forward_rate = Some(-0.005);
-            }
-            ValidationMode::NegativeRateFriendly { forward_floor } => {
-                self.allow_non_monotonic = true;
-                self.min_forward_rate = Some(forward_floor);
-            }
-            ValidationMode::Raw {
-                allow_non_monotonic,
-                forward_floor,
-            } => {
-                self.allow_non_monotonic = allow_non_monotonic;
-                self.min_forward_rate = forward_floor;
-            }
-        }
-        self
-    }
-
-    /// Set a custom minimum tenor for forward rate calculations.
-    ///
-    /// The forward rate calculation `f(t1, t2) = (z2*t2 - z1*t1) / (t2 - t1)` suffers
-    /// from catastrophic cancellation when `(t2 - t1)` is very small. This threshold
-    /// prevents such precision issues.
-    ///
-    /// # Default
-    ///
-    /// The default value is `1e-6` years (~30 seconds).
-    ///
-    /// # Use Cases
-    ///
-    /// - Set to a smaller value (e.g., `1e-8`) for high-frequency intraday operations
-    /// - Set to a larger value (e.g., `1e-4`) for daily curve operations with coarse data
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    /// # use time::macros::date;
-    /// # fn main() -> finstack_quant_core::Result<()> {
-    /// let curve = DiscountCurve::builder("USD")
-    ///     .base_date(date!(2025-01-01))
-    ///     .knots([(0.0, 1.0), (1.0, 0.95)])
-    ///     .min_forward_tenor(1e-8)  // Allow sub-second tenors
-    ///     .build()?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// # Arguments
-    ///
-    /// * `tenor` - Market tenor label or period length used to locate the quote or rate
-    pub fn min_forward_tenor(mut self, tenor: f64) -> Self {
-        self.min_forward_tenor = tenor;
+        self.extrapolation = Some(policy);
         self
     }
 
@@ -189,17 +124,12 @@ impl DiscountCurveBuilder {
     }
 
     /// Stamp an opaque FX policy on the curve.
-    ///
-    /// Use when the bootstrap involved an FX-sensitive assumption (XCCY basis
-    /// adjustment, FX matrix triangulation, etc.) and the policy must be
-    /// surfaced on downstream valuation result envelopes.
     pub fn fx_policy(mut self, policy: impl Into<String>) -> Self {
         self.fx_policy = Some(policy.into());
         self
     }
 
-    /// Optionally stamp an FX policy. `None` is a no-op (the field stays
-    /// unset). Used by the serde round-trip path.
+    /// Optionally stamp an FX policy. `None` leaves the field unset.
     pub fn fx_policy_opt(mut self, policy: Option<String>) -> Self {
         self.fx_policy = policy;
         self
@@ -207,129 +137,82 @@ impl DiscountCurveBuilder {
 
     /// Validate input and create the [`DiscountCurve`].
     ///
-    /// If the first knot time is `> 0.0`, automatically prepends `(0.0, 1.0)` to
-    /// ensure the round-trip invariant `DF(0) = 1.0` (ISDA/QuantLib standard).
-    /// An explicitly supplied zero-time discount factor must equal one, and
-    /// negative maturity times are rejected.
+    /// When the first supplied knot has `t > 0.0`, prepends `(0.0, 1.0)` as
+    /// normalization anchor; when `t = 0.0` is supplied, requires exact
+    /// `df == 1.0`. At least one positive-time pillar is required.
     ///
     /// # Errors
     ///
-    /// Returns an error when the base date is missing, fewer than two knots are
-    /// supplied after zero-time anchoring, a discount factor is non-positive,
-    /// knots are invalid, the configured monotonicity, forward-rate, or
-    /// interpolation constraints are violated, the calendar id is unknown, or a
-    /// Bus/252 curve has no calendar.
+    /// Returns an error when any required field (`base_date`, `day_count`,
+    /// `interp`, `extrapolation`) is missing, the day-count clock is unsupported
+    /// or lacks its `Bus/252` calendar, pillars are not strictly increasing or
+    /// contain non-finite / non-positive discount factors, or fewer than two
+    /// points remain after normalization.
     pub fn build(mut self) -> crate::Result<DiscountCurve> {
         let base = self.base.ok_or_else(|| {
             crate::Error::Validation("DiscountCurve requires base_date".to_string())
         })?;
-        let (knots, dfs) = validate_points(
-            std::mem::take(&mut self.points),
-            self.allow_non_monotonic,
-            self.min_forward_rate,
-        )?;
-        self.finish(base, knots, dfs)
-    }
+        let day_count = self.day_count.ok_or_else(|| {
+            crate::Error::Validation("DiscountCurve requires day_count".to_string())
+        })?;
+        let style = self.style.ok_or_else(|| {
+            crate::Error::Validation("DiscountCurve requires interp style".to_string())
+        })?;
+        let extrapolation = self.extrapolation.ok_or_else(|| {
+            crate::Error::Validation("DiscountCurve requires extrapolation policy".to_string())
+        })?;
 
-    fn finish(
-        mut self,
-        base: Date,
-        knots: Vec<f64>,
-        dfs: Vec<f64>,
-    ) -> crate::Result<DiscountCurve> {
-        let calendar = self
-            .calendar_id
-            .as_deref()
-            .map(super::CurveCalendar::resolve)
-            .transpose()?;
-        if self.day_count == DayCount::Bus252 && calendar.is_none() {
-            return Err(crate::Error::Validation(format!(
-                "Bus/252 discount curve '{}' requires a holiday calendar",
-                self.id
-            )));
-        }
-        // A transformed curve evaluates its original source interpolation;
-        // visible pillars are independently validated samples of that source.
+        let calendar = validate_curve_clock(
+            "DiscountCurve",
+            self.id.as_str(),
+            day_count,
+            self.calendar_id.as_deref(),
+        )?;
+
+        let points = std::mem::take(&mut self.points);
+        let (knots, dfs) = if self.transform.is_some()
+            && points.len() == 1
+            && extrapolation == ExtrapolationPolicy::Error
+        {
+            validate_origin_only(&points, "DiscountCurve")?;
+            (vec![0.0], vec![1.0])
+        } else {
+            validate_positive_factor_points(points, "DiscountCurve")?
+        };
+
         let (interp_knots, interp_dfs) = match &self.transform {
-            Some(transform) => validate_points(transform.source_points().to_vec(), true, None)?,
+            Some(transform) => validate_positive_factor_points(
+                transform.source_points().to_vec(),
+                "DiscountCurve",
+            )?,
             None => (knots.clone(), dfs.clone()),
         };
-        let interp = self.style.build_enum(
+
+        let interp = style.build_enum(
             interp_knots.into_boxed_slice(),
             interp_dfs.into_boxed_slice(),
-            self.extrapolation,
-            ValidationPolicy::AllowNegative,
+            extrapolation,
         )?;
 
         if let Some(transform) = &mut self.transform {
-            transform.validate(&interp, &knots, &dfs)?;
+            let ctx = crate::dates::DayCountContext {
+                calendar: calendar.as_ref().map(|cal| cal.calendar),
+                ..crate::dates::DayCountContext::default()
+            };
+            transform.validate(base, day_count, ctx, &interp, &knots, &dfs)?;
         }
+
         Ok(DiscountCurve {
             id: self.id,
             base,
-            day_count: self.day_count,
+            day_count,
             calendar,
             knots: knots.into_boxed_slice(),
             dfs: dfs.into_boxed_slice(),
             interp,
             transform: self.transform,
-            min_forward_rate: self.min_forward_rate,
-            allow_non_monotonic: self.allow_non_monotonic,
-            min_forward_tenor: self.min_forward_tenor,
             rate_calibration: self.rate_calibration,
             fx_policy: self.fx_policy,
         })
     }
-}
-
-/// Validate visible or source pillars without constructing an interpolator.
-fn validate_points(
-    mut points: Vec<(f64, f64)>,
-    allow_non_monotonic: bool,
-    min_forward_rate: Option<f64>,
-) -> crate::Result<(Vec<f64>, Vec<f64>)> {
-    if !points.is_empty() {
-        points.sort_by(|a, b| a.0.total_cmp(&b.0));
-        if points[0].0 > 0.0 {
-            points.insert(0, (0.0, 1.0));
-        }
-    }
-    if points.len() < 2 {
-        return Err(crate::InputError::TooFewPoints.into());
-    }
-    if points.iter().any(|&(_, df)| df <= 0.0) {
-        return Err(crate::InputError::NonPositiveValue.into());
-    }
-    validate_origin(&points)?;
-    let (knots, dfs): (Vec<f64>, Vec<f64>) = points.into_iter().unzip();
-    crate::math::interp::validate_knots(&knots)?;
-    crate::math::interp::validate_finite_series(&dfs)?;
-    if !allow_non_monotonic {
-        validate_monotonic_df(&knots, &dfs)?;
-    }
-    if let Some(floor) = min_forward_rate {
-        validate_forward_rates(&knots, &dfs, floor)?;
-    }
-    crate::math::interp::validate_knot_spacing(&knots, crate::math::interp::MIN_RELATIVE_KNOT_GAP)?;
-    Ok((knots, dfs))
-}
-
-fn validate_origin(points: &[(f64, f64)]) -> crate::Result<()> {
-    if points
-        .iter()
-        .any(|&(time, _)| !time.is_finite() || time < 0.0)
-    {
-        return Err(crate::Error::Validation(
-            "discount-curve times must be finite and non-negative".into(),
-        ));
-    }
-    if points
-        .first()
-        .is_none_or(|&(time, df)| time != 0.0 || !df.total_cmp(&1.0).is_eq())
-    {
-        return Err(crate::Error::Validation(
-            "discount curve must start at (time = 0, discount factor = 1)".into(),
-        ));
-    }
-    Ok(())
 }

@@ -442,13 +442,14 @@ fn accrual_metadata_round_trips() {
         d(2025, 6, 15),
         DayCount::Act360,
         Some(0.031),
-        finstack_quant_core::dates::DayCountContextState {
-            calendar_id: None,
-            coupon_period: Some((d(2025, 3, 15), d(2025, 9, 15))),
-            end_is_termination_date: Some(true),
-            frequency: None,
-            bus_basis: None,
-        },
+        finstack_quant_core::dates::DayCountContextState::try_new(
+            None,
+            None,
+            None,
+            Some((d(2025, 3, 15), d(2025, 9, 15))),
+            Some(true),
+        )
+        .expect("valid context"),
     )
     .expect("valid accrual");
     let flow = CashFlowParams::new(
@@ -492,4 +493,209 @@ fn monetary_representation_is_validated_at_construction() {
     for amount in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
         assert!(Money::new(amount, Currency::USD).is_err());
     }
+}
+
+#[test]
+fn accrual_validate_enforces_day_count_context_without_eager_non_bus252_calendar_lookup() {
+    use finstack_quant_core::dates::{DayCountContextState, Tenor};
+
+    let start = d(2025, 3, 15);
+    let end = d(2025, 6, 15);
+
+    // Non-Bus252 conventions defer calendar_id lookup to evaluation time.
+    let lazy_act365f = CashFlowAccrual::new(
+        start,
+        end,
+        DayCount::Act365F,
+        None,
+        DayCountContextState::try_new(Some("not_a_calendar".into()), None, None, None, None)
+            .expect("state"),
+    );
+    assert!(lazy_act365f.is_ok());
+
+    // Bus252 requires calendar_id present and valid in the registry.
+    assert!(
+        CashFlowAccrual::new(
+            start,
+            end,
+            DayCount::Bus252,
+            None,
+            DayCountContextState::default(),
+        )
+        .is_err()
+    );
+    assert!(
+        CashFlowAccrual::new(
+            start,
+            end,
+            DayCount::Bus252,
+            None,
+            DayCountContextState::try_new(Some("not_a_calendar".into()), None, None, None, None)
+                .expect("state"),
+        )
+        .is_err()
+    );
+    assert!(
+        CashFlowAccrual::new(
+            start,
+            end,
+            DayCount::Bus252,
+            None,
+            DayCountContextState::try_new(Some("usny".into()), None, None, None, None)
+                .expect("state"),
+        )
+        .is_ok()
+    );
+
+    // ActActIsma requires frequency, nominal-grid coupon_period, and overlapping period,
+    // while admitting multi-period long stubs alongside one regular reference interval.
+    assert!(
+        CashFlowAccrual::new(
+            start,
+            end,
+            DayCount::ActActIsma,
+            None,
+            DayCountContextState::try_new(None, None, None, Some((start, end)), None)
+                .expect("state"),
+        )
+        .is_err()
+    );
+    assert!(
+        CashFlowAccrual::new(
+            start,
+            end,
+            DayCount::ActActIsma,
+            None,
+            DayCountContextState::try_new(None, Some(Tenor::quarterly()), None, None, None)
+                .expect("state"),
+        )
+        .is_err()
+    );
+    assert!(
+        CashFlowAccrual::new(
+            start,
+            end,
+            DayCount::ActActIsma,
+            None,
+            DayCountContextState::try_new(
+                None,
+                Some(Tenor::quarterly()),
+                None,
+                Some((d(2025, 4, 1), end)),
+                None,
+            )
+            .expect("state"),
+        )
+        .is_err()
+    );
+    assert!(
+        CashFlowAccrual::new(
+            start,
+            end,
+            DayCount::ActActIsma,
+            None,
+            DayCountContextState::try_new(
+                None,
+                Some(Tenor::quarterly()),
+                None,
+                Some((d(2025, 6, 15), d(2025, 9, 15))),
+                None,
+            )
+            .expect("state"),
+        )
+        .is_err()
+    );
+    assert!(
+        serde_json::from_str::<CashFlowAccrual>(
+            r#"{
+                "start": "2025-03-15",
+                "end": "2025-06-15",
+                "day_count": "act_act_isma",
+                "context": {
+                    "frequency": { "count": 3, "unit": "months" },
+                    "coupon_period": ["2025-06-15", "2025-09-15"]
+                }
+            }"#,
+        )
+        .is_err()
+    );
+    assert!(
+        CashFlowAccrual::new(
+            start,
+            end,
+            DayCount::ActActIsma,
+            None,
+            DayCountContextState::try_new(
+                None,
+                Some(Tenor::quarterly()),
+                None,
+                Some((start, end)),
+                None,
+            )
+            .expect("state"),
+        )
+        .is_ok()
+    );
+    assert!(
+        CashFlowAccrual::new(
+            d(2025, 1, 15),
+            d(2025, 10, 15),
+            DayCount::ActActIsma,
+            None,
+            DayCountContextState::try_new(
+                None,
+                Some(Tenor::semi_annual()),
+                None,
+                Some((d(2025, 1, 15), d(2025, 7, 15))),
+                None,
+            )
+            .expect("state"),
+        )
+        .is_ok()
+    );
+
+    // Act365L requires enclosing coupon_period and slice containment.
+    assert!(
+        CashFlowAccrual::new(
+            start,
+            end,
+            DayCount::Act365L,
+            None,
+            DayCountContextState::default(),
+        )
+        .is_err()
+    );
+    assert!(
+        CashFlowAccrual::new(
+            start,
+            end,
+            DayCount::Act365L,
+            None,
+            DayCountContextState::try_new(None, None, None, Some((start, d(2025, 5, 1))), None)
+                .expect("state"),
+        )
+        .is_err()
+    );
+
+    // ThirtyE360Isda requires explicit termination status.
+    assert!(
+        CashFlowAccrual::new(
+            start,
+            end,
+            DayCount::ThirtyE360Isda,
+            None,
+            DayCountContextState::default(),
+        )
+        .is_err()
+    );
+    assert!(
+        CashFlowAccrual::new(
+            start,
+            end,
+            DayCount::ThirtyE360Isda,
+            None,
+            DayCountContextState::try_new(None, None, None, None, Some(false)).expect("state"),
+        )
+        .is_ok()
+    );
 }

@@ -1,6 +1,6 @@
 //! Discount curve bindings.
 
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, ValidationMode};
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::traits::Discounting;
 
 use std::sync::Arc;
@@ -10,7 +10,6 @@ use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::math::interp::InterpStyle;
 use pyo3::prelude::*;
 
-use super::forward::PyForwardCurve;
 use super::helpers::{TimePoint, columns_to_dataframe, extract_time_point};
 use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
@@ -28,7 +27,14 @@ use crate::errors::core_to_py;
 /// -------
 /// >>> import datetime
 /// >>> from finstack_quant.core.market_data import DiscountCurve
-/// >>> curve = DiscountCurve("USD-OIS", datetime.date(2025, 1, 1), [(0.0, 1.0), (1.0, 0.95), (5.0, 0.80)])
+/// >>> curve = DiscountCurve(
+/// ...     "USD-OIS",
+/// ...     datetime.date(2025, 1, 1),
+/// ...     [(0.0, 1.0), (1.0, 0.95), (5.0, 0.80)],
+/// ...     interp="monotone_convex",
+/// ...     extrapolation="extend",
+/// ...     day_count="act_365f",
+/// ... )
 /// >>> round(curve.df(1.0), 4)
 /// 0.95
 /// >>> round(curve.df("2026-01-01"), 4)
@@ -64,34 +70,27 @@ impl PyDiscountCurve {
     ///     Valuation date anchoring ``t = 0``; ISO ``"YYYY-MM-DD"`` strings are accepted.
     /// knots : list[tuple[float, float]]
     ///     ``(time_years, discount_factor)`` pairs; discount factors are unitless
-    ///     and must be positive. A ``(0.0, 1.0)`` anchor is conventional.
-    /// interp : str, optional
+    ///     and must be strictly positive. A ``(0.0, 1.0)`` anchor is conventional.
+    /// interp : str
     ///     Interpolation style (``"monotone_convex"``, ``"linear"``,
     ///     ``"log_linear"``, ``"cubic_hermite"``,
-    ///     ``"piecewise_quadratic_forward"``). Default ``"monotone_convex"``.
-    /// extrapolation : str, optional
-    ///     Extrapolation policy (``"flat_forward"``, ``"flat_zero"``, or
-    ///     ``"none"``, which returns NaN outside the pillar range). Default
-    ///     ``"flat_forward"``.
-    /// day_count : DayCount | str, optional
+    ///     ``"piecewise_quadratic_forward"``). Keyword-only and required.
+    /// extrapolation : str
+    ///     Extrapolation policy (``"extend"``, ``"flat"``, or
+    ///     ``"error"``, which raises outside the pillar range). Keyword-only and required.
+    /// day_count : DayCount | str
     ///     Day-count convention used to convert query dates to curve time.
-    ///     Default is fixed at ``"act_365f"`` (not inferred from the ID).
+    ///     Keyword-only and required (never inferred from ``id``).
     /// calendar_id : str, optional
     ///     Registered holiday calendar of the curve's time axis (for example
     ///     ``"brbd"``), or a ``+``-joined union. Required when ``day_count`` is
     ///     ``"bus_252"``; every date-based query counts business days on it.
-    /// validation_mode : str, optional
-    ///     ``"market_standard"`` (default: monotonic DFs, -50bp forward floor)
-    ///     or ``"negative_rate_friendly"``.
-    /// forward_floor : float | None, optional
-    ///     Required minimum implied forward (decimal) for ``"negative_rate_friendly"``.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If a knot is non-finite or duplicated, discount factors violate the
-    ///     validation mode, an enum label is unknown, or a ``"bus_252"`` curve
-    ///     has no ``calendar_id``.
+    ///     If a knot is non-finite, non-positive, or duplicated, an enum label is
+    ///     unknown, or a ``"bus_252"`` curve has no ``calendar_id``.
     /// KeyError
     ///     If ``calendar_id`` names no registered calendar.
     ///
@@ -99,50 +98,39 @@ impl PyDiscountCurve {
     /// -------
     /// >>> import datetime
     /// >>> from finstack_quant.core.market_data import DiscountCurve
-    /// >>> curve = DiscountCurve("USD-OIS", datetime.date(2025, 1, 1), [(0.0, 1.0), (1.0, 0.95)], day_count="act_360")
+    /// >>> curve = DiscountCurve(
+    /// ...     "USD-OIS",
+    /// ...     datetime.date(2025, 1, 1),
+    /// ...     [(0.0, 1.0), (1.0, 0.95)],
+    /// ...     interp="monotone_convex",
+    /// ...     extrapolation="extend",
+    /// ...     day_count="act_360",
+    /// ... )
     /// >>> curve.day_count
     /// 'act_360'
     #[new]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "keyword-only curve options mirror the Rust builder setters"
-    )]
-    #[pyo3(signature = (id, base_date, knots, *, interp=None, extrapolation=None, day_count=None, calendar_id=None, validation_mode=None, forward_floor=None))]
+    #[pyo3(signature = (id, base_date, knots, *, interp, extrapolation, day_count, calendar_id=None))]
     fn new(
         id: &str,
         base_date: &Bound<'_, PyAny>,
         knots: Vec<(f64, f64)>,
-        interp: Option<&str>,
-        extrapolation: Option<&str>,
-        day_count: Option<&Bound<'_, PyAny>>,
+        interp: &str,
+        extrapolation: &str,
+        day_count: &Bound<'_, PyAny>,
         calendar_id: Option<String>,
-        validation_mode: Option<&str>,
-        forward_floor: Option<f64>,
     ) -> PyResult<Self> {
         let base = py_to_date(base_date)?;
-
-        let mut builder = DiscountCurve::builder(id)
+        DiscountCurve::builder(id)
             .base_date(base)
             .knots(knots)
-            .calendar_id_opt(calendar_id);
-        if let Some(interp) = interp {
-            builder = builder.interp(interp.parse::<InterpStyle>().map_err(core_to_py)?);
-        }
-        if let Some(extrapolation) = extrapolation {
-            builder = builder.extrapolation(
+            .calendar_id_opt(calendar_id)
+            .interp(interp.parse::<InterpStyle>().map_err(core_to_py)?)
+            .extrapolation(
                 extrapolation
                     .parse::<ExtrapolationPolicy>()
                     .map_err(core_to_py)?,
-            );
-        }
-        if let Some(day_count) = day_count {
-            builder = builder.day_count(extract_day_count(day_count)?);
-        }
-        builder = builder.validation(
-            ValidationMode::from_preset(validation_mode, forward_floor).map_err(core_to_py)?,
-        );
-
-        builder
+            )
+            .day_count(extract_day_count(day_count)?)
             .build()
             .map(|curve| Self::from_inner(Arc::new(curve)))
             .map_err(core_to_py)
@@ -158,6 +146,8 @@ impl PyDiscountCurve {
     ///     Valuation date anchoring ``t = 0``.
     /// continuous_rate : float
     ///     Continuously-compounded zero rate as a decimal (``0.05`` is 5%).
+    /// day_count : DayCount | str
+    ///     Explicit supported day-count convention label or object.
     ///
     /// Returns
     /// -------
@@ -167,20 +157,30 @@ impl PyDiscountCurve {
     /// Raises
     /// ------
     /// ValueError
-    ///     If the rate is non-finite or has magnitude greater than ``1.0``
-    ///     (a percentage passed where a decimal was expected).
+    ///     If the rate is non-finite or ``|rate| > 1``, or ``day_count`` is
+    ///     unknown or requires an absent calendar.
     ///
     /// Example
     /// -------
     /// >>> from finstack_quant.core.market_data import DiscountCurve
-    /// >>> round(DiscountCurve.flat("USD-OIS", "2025-01-01", 0.05).df(2.0), 6)
+    /// >>> round(DiscountCurve.flat("USD-OIS", "2025-01-01", 0.05, "act_365f").df(2.0), 6)
     /// 0.904837
     #[staticmethod]
-    #[pyo3(text_signature = "(id, base_date, continuous_rate)")]
-    fn flat(id: &str, base_date: &Bound<'_, PyAny>, continuous_rate: f64) -> PyResult<Self> {
-        DiscountCurve::flat(id, py_to_date(base_date)?, continuous_rate)
-            .map(|curve| Self::from_inner(Arc::new(curve)))
-            .map_err(core_to_py)
+    #[pyo3(text_signature = "(id, base_date, continuous_rate, day_count)")]
+    fn flat(
+        id: &str,
+        base_date: &Bound<'_, PyAny>,
+        continuous_rate: f64,
+        day_count: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        DiscountCurve::flat(
+            id,
+            py_to_date(base_date)?,
+            continuous_rate,
+            extract_day_count(day_count)?,
+        )
+        .map(|curve| Self::from_inner(Arc::new(curve)))
+        .map_err(core_to_py)
     }
 
     /// Construct a discount curve from zero-rate pillars.
@@ -194,9 +194,15 @@ impl PyDiscountCurve {
     /// points : list[tuple[float, float]]
     ///     ``(time_years, zero_rate)`` pillars with rates as decimals; a
     ///     ``(0, 1.0)`` discount-factor anchor is added when no ``t = 0`` pillar is given.
-    /// compounding : str, optional
-    ///     Convention of the zero rates: ``"continuous"`` (default), ``"simple"``,
+    /// compounding : str
+    ///     Convention of the zero rates: ``"continuous"``, ``"simple"``,
     ///     ``"periodic(1)"``, ``"semi_annual"``, ``"quarterly"`` or ``"monthly"``.
+    /// day_count : DayCount | str
+    ///     Explicit curve day-count convention.
+    /// interp : str
+    ///     Explicit interpolation style.
+    /// extrapolation : str
+    ///     Explicit tail extrapolation policy (``"flat"``, ``"extend"``, or ``"error"``).
     ///
     /// Returns
     /// -------
@@ -205,28 +211,41 @@ impl PyDiscountCurve {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``points`` is empty, a pillar is non-finite, or the implied
-    ///     discount factors fail market-standard validation.
+    ///     If ``points`` is empty, a pillar or label is invalid, or discount
+    ///     factors fail curve construction.
     ///
     /// Example
     /// -------
     /// >>> from finstack_quant.core.market_data import DiscountCurve
-    /// >>> curve = DiscountCurve.from_zero_rates("USD-OIS", "2025-01-01", [(1.0, 0.05), (2.0, 0.05)], compounding="periodic(1)")
+    /// >>> curve = DiscountCurve.from_zero_rates(
+    /// ...     "USD-OIS", "2025-01-01", [(1.0, 0.05), (2.0, 0.05)],
+    /// ...     "periodic(1)", "act_365f", "monotone_convex", "extend",
+    /// ... )
     /// >>> round(curve.df(2.0), 6)
     /// 0.907029
     #[staticmethod]
-    #[pyo3(signature = (id, base_date, points, compounding="continuous"))]
+    #[pyo3(
+        text_signature = "(id, base_date, points, compounding, day_count, interp, extrapolation)"
+    )]
     fn from_zero_rates(
         id: &str,
         base_date: &Bound<'_, PyAny>,
         points: Vec<(f64, f64)>,
         compounding: &str,
+        day_count: &Bound<'_, PyAny>,
+        interp: &str,
+        extrapolation: &str,
     ) -> PyResult<Self> {
         DiscountCurve::from_zero_rates(
             id,
             py_to_date(base_date)?,
             &points,
             compounding.parse::<Compounding>().map_err(core_to_py)?,
+            extract_day_count(day_count)?,
+            interp.parse::<InterpStyle>().map_err(core_to_py)?,
+            extrapolation
+                .parse::<ExtrapolationPolicy>()
+                .map_err(core_to_py)?,
         )
         .map(|curve| Self::from_inner(Arc::new(curve)))
         .map_err(core_to_py)
@@ -242,8 +261,12 @@ impl PyDiscountCurve {
     ///     Valuation date anchoring ``t = 0``.
     /// points : list[tuple[datetime.date | str, float]]
     ///     ``(date, discount_factor)`` pillars on or after ``base_date``.
-    /// day_count : DayCount | str, optional
-    ///     Day count used to convert pillar dates to years; default ``"act_365f"``.
+    /// day_count : DayCount | str
+    ///     Explicit day count used to convert pillar dates to years.
+    /// interp : str
+    ///     Explicit interpolation style.
+    /// extrapolation : str
+    ///     Explicit tail extrapolation policy (``"flat"``, ``"extend"``, or ``"error"``).
     ///
     /// Returns
     /// -------
@@ -252,31 +275,44 @@ impl PyDiscountCurve {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``points`` is empty, a pillar precedes ``base_date``, or the
-    ///     discount factors fail validation.
+    ///     If ``points`` is empty, a pillar precedes ``base_date``, or an
+    ///     enum label or discount factor is invalid.
     ///
     /// Example
     /// -------
     /// >>> from finstack_quant.core.market_data import DiscountCurve
-    /// >>> curve = DiscountCurve.from_dates("USD-OIS", "2025-01-01", [("2026-01-01", 0.95)])
+    /// >>> curve = DiscountCurve.from_dates(
+    /// ...     "USD-OIS", "2025-01-01", [("2026-01-01", 0.95)],
+    /// ...     "act_365f", "monotone_convex", "extend",
+    /// ... )
     /// >>> round(curve.df("2026-01-01"), 4)
     /// 0.95
     #[staticmethod]
-    #[pyo3(signature = (id, base_date, points, day_count=None))]
+    #[pyo3(text_signature = "(id, base_date, points, day_count, interp, extrapolation)")]
     fn from_dates(
         id: &str,
         base_date: &Bound<'_, PyAny>,
         points: Vec<(Bound<'_, PyAny>, f64)>,
-        day_count: Option<&Bound<'_, PyAny>>,
+        day_count: &Bound<'_, PyAny>,
+        interp: &str,
+        extrapolation: &str,
     ) -> PyResult<Self> {
         let points = points
             .iter()
             .map(|(date, df)| Ok((py_to_date(date)?, *df)))
             .collect::<PyResult<Vec<_>>>()?;
-        let day_count = day_count.map(extract_day_count).transpose()?;
-        DiscountCurve::from_dates(id, py_to_date(base_date)?, &points, day_count)
-            .map(|curve| Self::from_inner(Arc::new(curve)))
-            .map_err(core_to_py)
+        DiscountCurve::from_dates(
+            id,
+            py_to_date(base_date)?,
+            &points,
+            extract_day_count(day_count)?,
+            interp.parse::<InterpStyle>().map_err(core_to_py)?,
+            extrapolation
+                .parse::<ExtrapolationPolicy>()
+                .map_err(core_to_py)?,
+        )
+        .map(|curve| Self::from_inner(Arc::new(curve)))
+        .map_err(core_to_py)
     }
 
     /// Discount factor at a year fraction or date.
@@ -284,7 +320,8 @@ impl PyDiscountCurve {
     /// Parameters
     /// ----------
     /// t : float | datetime.date | str
-    ///     Year fraction from ``base_date``, or a date converted with the curve day count.
+    ///     Non-negative year fraction from ``base_date``, or a date on or after
+    ///     ``base_date`` converted with the curve day count.
     ///
     /// Returns
     /// -------
@@ -294,11 +331,12 @@ impl PyDiscountCurve {
     /// Raises
     /// ------
     /// ValueError
-    ///     If a date precedes ``base_date`` or is not a valid date.
+    ///     If ``t < 0``, a date precedes ``base_date`` or is not valid, or
+    ///     the tail policy rejects out-of-range queries.
     #[pyo3(text_signature = "(self, t)")]
     fn df(&self, t: &Bound<'_, PyAny>) -> PyResult<f64> {
         match extract_time_point(t)? {
-            TimePoint::Years(t) => Ok(self.inner.df(t)),
+            TimePoint::Years(t) => self.inner.df(t).map_err(core_to_py),
             TimePoint::Date(d) => self.inner.df_on_date(d).map_err(core_to_py),
         }
     }
@@ -308,9 +346,10 @@ impl PyDiscountCurve {
     /// Parameters
     /// ----------
     /// t : float | datetime.date | str
-    ///     Year fraction from ``base_date``, or a date converted with the curve day count.
-    /// compounding : str, optional
-    ///     ``"continuous"`` (default), ``"simple"``, ``"periodic(1)"``, ``"semi_annual"``,
+    ///     Strictly positive year fraction from ``base_date``, or a date
+    ///     strictly after ``base_date`` converted with the curve day count.
+    /// compounding : str
+    ///     ``"continuous"``, ``"simple"``, ``"periodic(1)"``, ``"semi_annual"``,
     ///     ``"quarterly"`` or ``"monthly"``.
     ///
     /// Returns
@@ -321,12 +360,13 @@ impl PyDiscountCurve {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``t`` is a date preceding ``base_date`` or ``compounding`` is not a recognised label.
-    #[pyo3(signature = (t, compounding="continuous"))]
+    ///     If ``t <= 0``, ``t`` is a date on or before ``base_date``, or
+    ///     ``compounding`` is not a recognised label.
+    #[pyo3(text_signature = "(self, t, compounding)")]
     fn zero_rate(&self, t: &Bound<'_, PyAny>, compounding: &str) -> PyResult<f64> {
         let comp = compounding.parse::<Compounding>().map_err(core_to_py)?;
         match extract_time_point(t)? {
-            TimePoint::Years(t) => Ok(self.inner.zero_rate(t, comp)),
+            TimePoint::Years(t) => self.inner.zero_rate(t, comp).map_err(core_to_py),
             TimePoint::Date(d) => self.inner.zero_rate_on_date(d, comp).map_err(core_to_py),
         }
     }
@@ -382,43 +422,6 @@ impl PyDiscountCurve {
     #[pyo3(text_signature = "(self, t1, t2)")]
     fn forward(&self, t1: f64, t2: f64) -> PyResult<f64> {
         self.inner.forward(t1, t2).map_err(core_to_py)
-    }
-
-    /// Derive a simple forward-rate curve for a fixed tenor from this curve.
-    ///
-    /// Parameters
-    /// ----------
-    /// forward_id : str
-    ///     Identifier for the resulting forward curve.
-    /// tenor : float
-    ///     Forward tenor in years (``0.25`` for 3M); must be positive.
-    /// interp : str, optional
-    ///     Interpolation style of the forward curve; default ``"linear"``.
-    ///
-    /// Returns
-    /// -------
-    /// ForwardCurve
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``tenor`` is non-positive, the curve has fewer than two knots,
-    ///     or a derived forward is non-finite.
-    #[pyo3(signature = (forward_id, tenor, interp=None))]
-    fn to_forward_curve(
-        &self,
-        forward_id: &str,
-        tenor: f64,
-        interp: Option<&str>,
-    ) -> PyResult<PyForwardCurve> {
-        let style = interp
-            .map(str::parse::<InterpStyle>)
-            .transpose()
-            .map_err(core_to_py)?;
-        self.inner
-            .to_forward_curve(forward_id, tenor, style)
-            .map(|curve| PyForwardCurve::from_inner(Arc::new(curve)))
-            .map_err(core_to_py)
     }
 
     /// Export knots as a pandas ``DataFrame`` with columns ``t`` (years) and ``df``.
@@ -481,7 +484,7 @@ impl PyDiscountCurve {
         self.inner.interp_style().to_string()
     }
 
-    /// Extrapolation policy label (e.g. ``"flat_forward"``).
+    /// Extrapolation policy label (e.g. ``"extend"``).
     #[getter]
     fn extrapolation(&self) -> String {
         self.inner.extrapolation().to_string()

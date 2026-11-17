@@ -260,11 +260,15 @@ mod tests {
         let curve = DiscountCurve::builder(option.discount_curve_id.clone())
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, (-0.05_f64).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-        let market = MarketContext::new()
-            .insert(curve)
-            .insert_price(option.spot_id.as_str(), MarketScalar::Unitless(100.0));
+        let market = MarketContext::new().insert(curve).insert_price(
+            option.spot_id.as_str(),
+            MarketScalar::unitless(100.0).expect("valid scalar"),
+        );
         for volatility in [0.04, 0.02, 0.01] {
             option.instrument_pricing_overrides = option
                 .instrument_pricing_overrides

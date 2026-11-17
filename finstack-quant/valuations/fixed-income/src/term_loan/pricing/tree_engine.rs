@@ -292,12 +292,12 @@ impl TermLoanValuator {
         // `step_time`, its PV equals the cashflow's PV at its true time.
         // Without this the floor/ceil linear split silently mis-times
         // discounting.
-        let value_at_step_time = |amount: f64, event_time: f64, step_time: f64| -> f64 {
-            let step_df = disc.df(step_time);
+        let value_at_step_time = |amount: f64, event_time: f64, step_time: f64| -> Result<f64> {
+            let step_df = disc.df(step_time)?;
             if step_df <= f64::EPSILON {
-                return amount;
+                return Ok(amount);
             }
-            amount * disc.df(event_time) / step_df
+            Ok(amount * disc.df(event_time)? / step_df)
         };
 
         let schedule =
@@ -350,26 +350,28 @@ impl TermLoanValuator {
                     amount: f64,
                     t: f64,
                     raw_clamped: f64,
-                    snap: bool| {
+                    snap: bool|
+         -> Result<()> {
             if snap {
                 let step = (raw_clamped.ceil() as usize).clamp(0, num_steps - 1);
-                let adjusted = value_at_step_time(amount, t, time_steps[step]);
+                let adjusted = value_at_step_time(amount, t, time_steps[step])?;
                 vec[step] += adjusted;
                 components[step].push((adjusted, t - time_steps[step]));
             } else {
                 let lo = raw_clamped.floor() as usize;
                 let weight = raw_clamped - lo as f64;
                 if lo < num_steps {
-                    let adjusted = value_at_step_time(amount * (1.0 - weight), t, time_steps[lo]);
+                    let adjusted = value_at_step_time(amount * (1.0 - weight), t, time_steps[lo])?;
                     vec[lo] += adjusted;
                     components[lo].push((adjusted, t - time_steps[lo]));
                 }
                 if lo + 1 < num_steps {
-                    let adjusted = value_at_step_time(amount * weight, t, time_steps[lo + 1]);
+                    let adjusted = value_at_step_time(amount * weight, t, time_steps[lo + 1])?;
                     vec[lo + 1] += adjusted;
                     components[lo + 1].push((adjusted, t - time_steps[lo + 1]));
                 }
             }
+            Ok(())
         };
 
         for cf in schedule.get_flows() {
@@ -402,7 +404,7 @@ impl TermLoanValuator {
                         t,
                         raw_clamped,
                         is_exercise,
-                    );
+                    )?;
                 }
                 // Signed principal cashflows: positive repayments/redemption
                 // and negative future DDTL funding legs.
@@ -414,7 +416,7 @@ impl TermLoanValuator {
                         t,
                         raw_clamped,
                         is_exercise,
-                    );
+                    )?;
                 }
                 _ => {}
             }
@@ -505,7 +507,7 @@ impl TermLoanValuator {
                     clean + accrued,
                     event_time,
                     time_steps[step],
-                ));
+                )?);
                 call_time_offset_vec[step] = Some(event_time - time_steps[step]);
                 call_outstanding_vec[step] = Some(out);
             }
@@ -987,35 +989,18 @@ impl TermLoanTreePricer {
         )?
         .amount();
 
-        let pricing_error: std::cell::RefCell<Option<finstack_quant_core::Error>> =
-            std::cell::RefCell::new(None);
-        let record_error = |e: finstack_quant_core::Error| -> f64 {
-            let mut slot = pricing_error.borrow_mut();
-            if slot.is_none() {
-                *slot = Some(e);
-            }
-            1.0e12
+        let objective_fn = |oas_bp: f64| -> Result<f64> {
+            Ok(Self::price_on_tree(&prepared, oas_bp)? - dirty_target)
         };
 
-        let objective_fn = |oas_bp: f64| -> f64 {
-            match Self::price_on_tree(&prepared, oas_bp) {
-                Ok(model_price) => model_price - dirty_target,
-                Err(e) => record_error(e),
-            }
-        };
-
-        BrentSolver::new()
-            .with_tolerance(OAS_TOLERANCE_BP)
-            .with_initial_bracket_size(Some(OAS_INITIAL_BRACKET_BP))
-            .with_max_iterations(OAS_MAX_ITERATIONS)
-            .solve(objective_fn, 0.0)
-            .map_err(|e| match pricing_error.borrow_mut().take() {
-                Some(tree_err) => finstack_quant_core::Error::Validation(format!(
-                    "TermLoan OAS tree solve failed: {e}; first underlying \
-                     tree-pricing error: {tree_err}"
-                )),
-                None => e,
-            })
+        BrentSolver::new(OAS_TOLERANCE_BP, OAS_MAX_ITERATIONS)?.solve(
+            objective_fn,
+            0.0,
+            -10_000.0,
+            20_000.0,
+            OAS_INITIAL_BRACKET_BP,
+            20,
+        )
     }
 }
 

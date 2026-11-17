@@ -1,241 +1,198 @@
-//! Curve transformations and market bumps.
+//! Forward-curve bumping and forward/backward conditioning transformations.
 
-use super::*;
-use crate::dates::DateExt;
-use crate::market_data::bumps::{BumpSpec, BumpType, Bumpable};
+use super::super::common::factor::{roll_positive_factor_points, verify_triangular_breakpoints};
+use super::super::common::signed_curve_year_fraction;
+use super::{ForwardCurve, ForwardCurveBuilder};
+use crate::dates::Date;
+use crate::market_data::bumps::{BumpSpec, Bumpable};
+use crate::math::interp::exact_f64_eq;
+use crate::types::CurveId;
 
 impl ForwardCurve {
-    /// Create a builder pre-populated with this curve's data but a new ID.
+    /// Create a builder pre-populated with this curve's data under a new ID.
     pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> ForwardCurveBuilder {
-        let mut builder = self.metadata_builder(new_id).knots(
-            self.knots
-                .iter()
-                .copied()
-                .zip(self.forwards.iter().copied()),
-        );
+        let mut builder = self
+            .metadata_builder(new_id)
+            .knots(self.knots.iter().copied().zip(self.factors.iter().copied()));
         builder.transform = self.transform.clone();
         builder
     }
 
     /// Rebuild this curve with replacement knots while preserving structural metadata.
     ///
-    /// This retains the id, tenor, reset lag, day count, interpolation,
-    /// extrapolation, projection grid, and FX policy, while clearing stale
-    /// calibration provenance (`rate_calibration`) because replacement pillars
-    /// no longer match the original calibration quotes. Previous roll and shock
-    /// transformations are not reapplied to them.
-    ///
-    /// When the replacement pillars reach past the end of the projection grid,
-    /// the grid is extended in index-tenor steps until it covers the last
-    /// pillar. Those are the boundaries projection-discount-factor chaining
-    /// already uses beyond the grid, so the extension changes no projected
-    /// rate.
-    ///
     /// # Arguments
     ///
-    /// * `knots` - Replacement `(time, forward_rate)` pillars: times in year
-    ///   fractions from the base date under the curve's day count, rates as
-    ///   decimals (0.05 = 5%).
+    /// * `knots` - Replacement strictly increasing `(time, factor)` pillars in years
+    ///   from [`base_date`](Self::base_date) under [`day_count`](Self::day_count).
     ///
     /// # Errors
     ///
-    /// Returns an error when the replacement knots violate the curve's
-    /// validation or interpolation constraints.
+    /// Returns an error when replacement knots violate curve or interpolation invariants.
     pub fn rebuild_with_knots<I>(&self, knots: I) -> crate::Result<Self>
     where
         I: IntoIterator<Item = (f64, f64)>,
     {
-        let knots: Vec<(f64, f64)> = knots.into_iter().collect();
-        let last_knot = knots.iter().map(|&(time, _)| time).fold(0.0, f64::max);
-        let projection_grid = self.projection_grid.as_deref().map(|grid| {
-            let mut grid = grid.to_vec();
-            while let Some(&end) = grid.last() {
-                if end >= last_knot {
-                    break;
-                }
-                grid.push(end + self.tenor);
-            }
-            grid
-        });
         self.metadata_builder(self.id.clone())
             .rate_calibration_opt(None)
-            .projection_grid_opt(projection_grid)
             .knots(knots)
             .build()
     }
 
-    /// Builder pre-populated with this curve's full metadata but **no** knots.
-    /// Shared by all rebuild-style operations (bumps, rolls) so that no
-    /// metadata field (reset lag, day-count, interpolation, extrapolation,
-    /// rate_calibration, fx_policy) is dropped.
+    /// Builder pre-populated with this curve's metadata and no knots.
     pub(crate) fn metadata_builder(&self, new_id: impl Into<CurveId>) -> ForwardCurveBuilder {
-        ForwardCurve::builder(new_id, self.tenor)
+        ForwardCurve::builder(new_id)
             .base_date(self.base)
-            .reset_lag(self.reset_lag)
             .day_count(self.day_count)
+            .calendar_id_opt(self.calendar.as_ref().map(|calendar| calendar.id.clone()))
+            .index_tenor_opt(self.index_tenor)
             .interp(self.interp.style())
             .extrapolation(self.interp.extrapolation())
-            .projection_grid_opt(self.projection_grid.as_deref().map(<[f64]>::to_vec))
             .rate_calibration_opt(self.rate_calibration.clone())
             .fx_policy_opt(self.fx_policy.clone())
     }
 
-    /// Apply a continuous rate shock while preserving the source interpolator.
+    /// Apply a bump specification in-place, retaining the original interpolation.
+    ///
+    /// Additive bumps are **continuously compounded zero-space** shocks
+    /// (`P_b(t) = P(t) * exp(-delta_r * t * w(t))`), not quote re-bootstraps.
+    /// Triangular shocks act continuously in maturity, including between and
+    /// beyond stored pillars. Multiplicative/factor shocks are rejected.
     pub(crate) fn bump_in_place(&mut self, spec: &BumpSpec) -> crate::Result<()> {
-        let (val, is_multiplicative) = spec.resolve_standard_values_or_error(
-            "ForwardCurve",
-            "bump requires Additive or Multiplicative values",
-        )?;
-
-        if is_multiplicative && matches!(spec.bump_type, BumpType::TriangularKeyRate { .. }) {
-            return Err(crate::InputError::UnsupportedBump {
-                reason: "ForwardCurve key-rate shocks require additive rate units".into(),
-            }
-            .into());
-        }
-        if (!is_multiplicative && val == 0.0) || (is_multiplicative && val.total_cmp(&1.0).is_eq())
-        {
+        let val = spec.resolve_additive_or_error("ForwardCurve")?;
+        if exact_f64_eq(val, 0.0) {
             return Ok(());
         }
         let mut transform = self
             .transform
             .clone()
             .unwrap_or_else(|| super::evaluation::CurveTransform::from_curve(self));
-        transform.bump(val, is_multiplicative, spec.bump_type)?;
-        let forwards: Box<[f64]> = self
-            .knots
-            .iter()
-            .map(|&time| transform.rate(&self.interp, time))
-            .collect();
-        if forwards.iter().any(|value| !value.is_finite()) {
-            return Err(crate::Error::Validation(
-                "forward-curve shock produced non-finite rates".into(),
-            ));
+        transform.bump(val, spec.bump_type)?;
+
+        let mut factors = Vec::with_capacity(self.knots.len());
+        for &time in self.knots.iter() {
+            factors.push(transform.df(&self.interp, time)?);
         }
-        if let BumpType::TriangularKeyRate { target_bucket, .. } = spec.bump_type
-            && !transform.rate(&self.interp, target_bucket).is_finite()
-        {
-            return Err(crate::Error::Validation(
-                "forward-curve shock produced a non-finite peak rate".into(),
-            ));
-        }
-        self.forwards = forwards;
+
+        let min_src = self
+            .transform
+            .as_ref()
+            .map_or(self.knots[0], |tr| tr.source_first_knot());
+        let max_src = self.transform.as_ref().map_or_else(
+            || self.knots[self.knots.len() - 1],
+            |tr| tr.source_points()[tr.source_points().len() - 1].0,
+        );
+        verify_triangular_breakpoints(
+            spec,
+            &self.interp,
+            min_src,
+            max_src,
+            transform.offset(),
+            |src_t| transform.df_at_source_time(&self.interp, src_t),
+        )?;
+
+        self.factors = factors.into_boxed_slice();
         self.transform = Some(transform);
         self.rate_calibration = None;
         Ok(())
     }
 
-    /// Roll the curve forward by a specified number of days.
+    /// Condition the curve forward or backward to `reference_date`.
     ///
-    /// This creates a new curve with:
-    /// - Base date advanced by `days`
-    /// - Knot times shifted backwards (t' = t - dt_years)
-    /// - Points with t' <= 0 are filtered out (expired)
-    /// - Forward rates are preserved (no carry/theta adjustment)
-    ///
-    /// This is the "constant curves" or "pure roll-down" scenario where forward
-    /// rates at each calendar date remain the same, but maturity times are
-    /// re-measured from the new base date.
+    /// Re-anchors the curve at `reference_date` using the original source time
+    /// coordinate measured from [`source_base_date`](Self::source_base_date)
+    /// while preserving source interpolation, tails, index tenor, and
+    /// accumulated shocks.
     ///
     /// # Arguments
-    /// * `days` - Non-negative calendar-day shift; `0` returns an unmodified clone and negative values are rejected.
     ///
-    /// # Returns
-    /// A new forward curve with updated base date and shifted knots.
+    /// * `reference_date` - Target valuation anchor date on or after
+    ///   [`source_base_date`](Self::source_base_date).
     ///
     /// # Errors
-    /// Returns an error if `days < 0` or if fewer than 2 knot points remain after filtering expired points.
+    ///
+    /// Returns an error if `reference_date < source_base_date()`, computing the
+    /// year fraction to `reference_date` fails, or the current factor at
+    /// `reference_date` cannot be admitted.
     ///
     /// # Examples
-    /// ```
+    ///
+    /// ```rust
+    /// use finstack_quant_core::dates::DayCount;
     /// use finstack_quant_core::market_data::term_structures::ForwardCurve;
+    /// use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
     /// use time::macros::date;
     /// # fn main() -> finstack_quant_core::Result<()> {
     ///
     /// let base_date = date!(2025 - 01 - 01);
-    /// let curve = ForwardCurve::builder("USD_SOFR_3M", 0.25)
+    /// let curve = ForwardCurve::builder("USD_SOFR_3M")
     ///     .base_date(base_date)
-    ///     .knots(vec![(0.5, 0.045), (1.0, 0.048), (2.0, 0.050), (5.0, 0.052)])
-    ///     .build()
-    ///     ?;
+    ///     .day_count(DayCount::Act360)
+    ///     .knots([(0.5, 0.98), (1.0, 0.96), (2.0, 0.92), (5.0, 0.80)])
+    ///     .interp(InterpStyle::MonotoneConvex)
+    ///     .extrapolation(ExtrapolationPolicy::Extend)
+    ///     .build()?;
     ///
-    /// // Roll 6 months forward.
-    /// let rolled = curve.roll_forward(182)?;
-    /// assert_eq!(rolled.base_date(), date!(2025 - 07 - 02));
-    ///
-    /// // The rolled curve is re-anchored at t = 0, and every surviving knot
-    /// // has moved half a year closer to the new base date.
-    /// assert!(rolled.knots()[0].abs() < 1e-12);
-    /// assert!(rolled.knots().last().is_some_and(|&t| t < 5.0));
+    /// let conditioned = curve.condition(date!(2025 - 07 - 02))?;
+    /// assert_eq!(conditioned.base_date(), date!(2025 - 07 - 02));
+    /// assert!(conditioned.knots().len() < curve.knots().len());
     /// # Ok(())
     /// # }
     /// ```
-    /// Returns a validation error if the rolled base date exceeds the supported calendar range.
-    pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
-        if days < 0 {
+    pub fn condition(&self, reference_date: Date) -> crate::Result<Self> {
+        let src_base = self.source_base_date();
+        if reference_date < src_base {
             return Err(crate::Error::Validation(format!(
-                "ForwardCurve::roll_forward requires non-negative days, got {days}"
+                "ForwardCurve::condition requires reference_date ({reference_date}) on or after source base date ({src_base})"
             )));
         }
-        if days == 0 {
+        let _ = signed_curve_year_fraction(
+            src_base,
+            reference_date,
+            self.day_count,
+            self.calendar.as_ref(),
+        )?;
+        let c_w = self.df_on_date(reference_date)?;
+        if !c_w.is_finite() || c_w <= 0.0 {
+            return Err(crate::InputError::NonPositiveValue.into());
+        }
+        if reference_date == self.base {
             return Ok(self.clone());
         }
-        let new_base = self.base.add_days(days)?;
-        let dt_years = self.day_count.signed_year_fraction(
-            self.base,
-            new_base,
-            crate::dates::DayCountContext::default(),
-        )?;
-
-        // Preserve the live forward at the new origin. Merely shifting and
-        // dropping expired knots loses the interpolation segment containing
-        // `dt_years` and can materially change the rolled curve at t=0.
-        let mut rolled_points = Vec::with_capacity(self.knots.len() + 1);
-        rolled_points.push((0.0, self.rate(dt_years)));
-        rolled_points.extend(roll_knots(&self.knots, &self.forwards, dt_years));
-
-        if rolled_points.len() < 2 {
-            return Err(crate::InputError::TooFewPoints.into());
-        }
-
-        let last_rolled_knot = rolled_points
-            .iter()
-            .map(|&(time, _)| time)
-            .fold(0.0, f64::max);
-        let projection_grid = self.projection_grid.as_ref().map(|grid| {
-            let mut rolled = Vec::with_capacity(grid.len());
-            rolled.push(0.0);
-            rolled.extend(
-                grid.iter()
-                    .copied()
-                    .filter(|time| *time - dt_years > super::super::common::MIN_ROLLED_KNOT_GAP)
-                    .map(|time| time - dt_years),
-            );
-            while rolled.last().is_none_or(|&end| end < last_rolled_knot) {
-                let next = rolled.last().copied().unwrap_or(0.0) + self.tenor;
-                rolled.push(next);
-            }
-            rolled
-        });
 
         let mut transform = self
             .transform
             .clone()
             .unwrap_or_else(|| super::evaluation::CurveTransform::from_curve(self));
-        transform.offset += dt_years;
-        transform.validate()?;
-        let mut builder = self
-            .metadata_builder(self.id.clone())
-            .rate_calibration_opt(None)
-            .base_date(new_base)
-            .projection_grid_opt(projection_grid)
-            .knots(rolled_points);
-        builder.transform = Some(transform);
-        builder.build()
+        transform.condition(
+            &self.interp,
+            reference_date,
+            self.day_count,
+            self.day_count_context(),
+        )?;
+        let new_offset = transform.offset();
+
+        let (knots, factors) = roll_positive_factor_points(
+            transform.source_points(),
+            &self.interp,
+            new_offset,
+            |source_t| transform.df_at_source_time(&self.interp, source_t),
+        )?;
+
+        let mut conditioned = self.clone();
+        conditioned.base = reference_date;
+        conditioned.knots = knots.into_boxed_slice();
+        conditioned.factors = factors.into_boxed_slice();
+        conditioned.transform = Some(transform);
+        conditioned.rate_calibration = None;
+        Ok(conditioned)
     }
 }
 
 impl Bumpable for ForwardCurve {
+    /// Apply a continuously compounded zero-space shock.
+    ///
+    /// Additive `RateBp` / `Percent` / `Fraction` bumps shift factors via
+    /// `P_bumped(t) = P(t) * exp(-delta_r * t * w(t))`.
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
         let mut bumped = self.clone();
         bumped.id = spec.standard_bump_id(self.id());

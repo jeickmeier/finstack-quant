@@ -38,6 +38,8 @@ pub fn standard_discount_curve() -> DiscountCurve {
         .base_date(base_date())
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.60)])
         .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -48,7 +50,7 @@ pub fn standard_hazard_curve() -> HazardCurve {
         .base_date(base_date())
         .recovery_rate(0.40)
         .knots(vec![(1.0, 0.01), (3.0, 0.015), (5.0, 0.02), (10.0, 0.025)])
-        .par_spreads(vec![(1.0, 60.0), (3.0, 80.0), (5.0, 100.0), (10.0, 140.0)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap()
 }
@@ -130,6 +132,9 @@ pub fn market_context_with_issuers(n: usize) -> MarketContext {
     let discount_curve = DiscountCurve::builder("USD-OIS")
         .base_date(base_date())
         .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.84), (10.0, 0.68)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -143,7 +148,7 @@ pub fn market_context_with_issuers(n: usize) -> MarketContext {
                 (5.0, 0.022),
                 (10.0, 0.028),
             ])
-            .par_spreads(vec![(1.0, 65.0), (3.0, 85.0), (5.0, 105.0), (10.0, 145.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .unwrap(),
     );
@@ -167,6 +172,7 @@ pub fn market_context_with_issuers(n: usize) -> MarketContext {
                 (5.0, (0.022 + bump).min(0.2)),
                 (10.0, (0.028 + bump).min(0.2)),
             ])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .unwrap();
         market = market.insert(hz.clone());

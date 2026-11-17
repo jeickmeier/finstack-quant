@@ -1012,10 +1012,10 @@ fn single_curve_float_leg_pv(
             as_of,
             period.payment_date,
         )?;
-        float_leg.add((df_start / df_end - 1.0 + spread * tau) * df_pay);
-        annuity.add(tau * df_pay);
+        float_leg.add((df_start / df_end - 1.0 + spread * tau) * df_pay)?;
+        annuity.add(tau * df_pay)?;
     }
-    Ok((float_leg.total(), annuity.total()))
+    Ok((float_leg.get_total()?, annuity.get_total()?))
 }
 
 /// Pre-computed inputs for Greek calculations.

@@ -95,6 +95,7 @@ fn create_test_discount_curve(base_date: Date) -> DiscountCurve {
             (10.0, 0.75),
         ])
         .interp(InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve")
 }
@@ -121,7 +122,7 @@ fn run_discount_plan(base_date: Date, quotes: Vec<MarketQuote>) -> DiscountCurve
                 base_date,
                 method: CalibrationMethod::Bootstrap,
                 interpolation: Default::default(),
-                extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::FlatForward,
+                extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
                 pricing_discount_id: None,
                 pricing_forward_id: None,
                 conventions: Default::default(),
@@ -178,7 +179,6 @@ fn run_hazard_plan(
                 notional: 1.0,
                 method: CalibrationMethod::Bootstrap,
 
-                par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                 doc_clause: None,
                 cds_valuation_convention: None,
             }),
@@ -298,7 +298,7 @@ fn discount_curve_global_solve_smoke() {
                     use_analytical_jacobian: false,
                 },
                 interpolation: Default::default(),
-                extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::FlatForward,
+                extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
                 pricing_discount_id: None,
                 pricing_forward_id: None,
                 conventions: Default::default(),
@@ -359,7 +359,7 @@ fn global_solve_residuals_are_keyed_by_quote_id() {
             base_date,
             method: global.clone(),
             interpolation: Default::default(),
-            extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::FlatForward,
+            extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
             pricing_discount_id: None,
             pricing_forward_id: None,
             conventions: Default::default(),
@@ -386,7 +386,6 @@ fn global_solve_residuals_are_keyed_by_quote_id() {
             recovery_rate: 0.40,
             notional: 1.0,
             method: global,
-            par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
             doc_clause: None,
             cds_valuation_convention: None,
         }),

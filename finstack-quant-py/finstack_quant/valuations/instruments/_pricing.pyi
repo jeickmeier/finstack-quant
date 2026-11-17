@@ -165,7 +165,7 @@ def price_instrument(
     >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
     >>> from finstack_quant.valuations.instruments import TermLoan
     >>> loan = TermLoan.example()
-    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 1), 0.04))
+    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 1), 0.04, "act_365f"))
     >>> from finstack_quant.valuations.instruments import price_instrument
     >>> result = price_instrument(loan, market, "2024-01-01", metrics=["all_in_rate"])
     >>> (list(result.metrics), round(result.get_metric("all_in_rate"), 4))
@@ -1296,7 +1296,7 @@ def instrument_cashflows(
     >>> bond = Bond.fixed(
     ...     "B", Money(1000.0, Currency("USD")), Rate(0.05), as_of, datetime.date(2026, 1, 1), StubKind.NONE, "USD-OIS"
     ... )
-    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
+    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04, "act_365f"))
     >>> envelope = instrument_cashflows(bond, market, as_of, "discounting")
     >>> (envelope.instrument_id, len(envelope.to_dataframe()))
     ('B', 6)

@@ -44,22 +44,28 @@ impl MetricCalculator for IrConvexityCalculator {
         let mut bumps_down: Vec<MarketBump> = Vec::new();
 
         for (curve_id, kind) in deps.all_with_kind() {
-            let exists = match kind {
-                RatesCurveKind::Discount => context.curves.get_discount(curve_id.as_str()).is_ok(),
-                RatesCurveKind::Forward => context.curves.get_forward(curve_id.as_str()).is_ok(),
-                RatesCurveKind::Credit | RatesCurveKind::Inflation => false,
+            let target = match kind {
+                RatesCurveKind::Discount
+                    if context.curves.get_discount(curve_id.as_str()).is_ok() =>
+                {
+                    finstack_quant_core::market_data::bumps::MarketDataTarget::DiscountCurve(
+                        curve_id.clone(),
+                    )
+                }
+                RatesCurveKind::Forward
+                    if context.curves.get_forward(curve_id.as_str()).is_ok() =>
+                {
+                    finstack_quant_core::market_data::bumps::MarketDataTarget::ForwardCurve(
+                        curve_id.clone(),
+                    )
+                }
+                RatesCurveKind::Discount
+                | RatesCurveKind::Forward
+                | RatesCurveKind::Credit
+                | RatesCurveKind::Inflation => continue,
             };
-            if !exists {
-                continue;
-            }
-            bumps_up.push(MarketBump::Curve {
-                id: curve_id.clone(),
-                spec: BumpSpec::parallel_bp(bump_bp),
-            });
-            bumps_down.push(MarketBump::Curve {
-                id: curve_id.clone(),
-                spec: BumpSpec::parallel_bp(-bump_bp),
-            });
+            bumps_up.push(target.clone().into_bump(BumpSpec::parallel_bp(bump_bp)));
+            bumps_down.push(target.into_bump(BumpSpec::parallel_bp(-bump_bp)));
         }
 
         if bumps_up.is_empty() {
@@ -73,7 +79,7 @@ impl MetricCalculator for IrConvexityCalculator {
 
         let mut tokens_up = Vec::with_capacity(bumps_up.len());
         for bump in &bumps_up {
-            if let MarketBump::Curve { id, .. } = bump {
+            if let Some(id) = bump.curve_id() {
                 tokens_up.push(scratch.apply_curve_bump_in_place(id, spec_up)?);
             }
         }
@@ -84,7 +90,7 @@ impl MetricCalculator for IrConvexityCalculator {
 
         let mut tokens_down = Vec::with_capacity(bumps_down.len());
         for bump in &bumps_down {
-            if let MarketBump::Curve { id, .. } = bump {
+            if let Some(id) = bump.curve_id() {
                 tokens_down.push(scratch.apply_curve_bump_in_place(id, spec_down)?);
             }
         }
@@ -128,19 +134,19 @@ impl MetricCalculator for CrossGammaCalculator {
             return Ok(0.0);
         }
 
-        let bump_disc_up = vec![MarketBump::Curve {
+        let bump_disc_up = vec![MarketBump::DiscountCurve {
             id: disc_id.clone(),
             spec: BumpSpec::parallel_bp(bump_bp),
         }];
-        let bump_disc_down = vec![MarketBump::Curve {
+        let bump_disc_down = vec![MarketBump::DiscountCurve {
             id: disc_id.clone(),
             spec: BumpSpec::parallel_bp(-bump_bp),
         }];
-        let bump_fwd_up = MarketBump::Curve {
+        let bump_fwd_up = MarketBump::ForwardCurve {
             id: fwd_id.clone(),
             spec: BumpSpec::parallel_bp(bump_bp),
         };
-        let bump_fwd_down = MarketBump::Curve {
+        let bump_fwd_down = MarketBump::ForwardCurve {
             id: fwd_id.clone(),
             spec: BumpSpec::parallel_bp(-bump_bp),
         };

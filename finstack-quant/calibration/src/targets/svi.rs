@@ -31,9 +31,13 @@ use crate::targets::util::{
 };
 use crate::validation::attach_validation_result;
 use finstack_quant_core::Result;
-use finstack_quant_core::dates::{DayCount, DayCountContext};
+use finstack_quant_core::dates::{
+    DayCount, DayCountContext, DayCountContextState, VolatilityClock,
+};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::{VolGridOpts, VolInterpolationMode, VolSurface};
+use finstack_quant_core::market_data::surfaces::{
+    VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use std::collections::BTreeMap;
 
 use crate::validation::surfaces::{surface_violations, violations_result};
@@ -143,9 +147,7 @@ pub(crate) fn solve(
     }
 
     let mut params_by_expiry = BTreeMap::new();
-    let solver = finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver::new()
-        .with_tolerance(global_config.solver.tolerance())
-        .with_max_iterations(global_config.solver.max_iterations());
+    let solver = global_config.create_lm_solver()?;
     let mut solver_iterations = 0;
     let mut fitted_slices = Vec::new();
 
@@ -201,11 +203,17 @@ pub(crate) fn solve(
         &params.target_strikes,
         &grid,
         VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
             interpolation_mode: VolInterpolationMode::TotalVariance,
-            ..VolGridOpts::default()
         },
         None,
-    )?;
+    )?
+    .with_expiry_clock(VolatilityClock::try_new(
+        params.base_date,
+        DayCount::Act365F,
+        DayCountContextState::default(),
+    )?);
 
     let residuals = surface_quote_residuals(
         &surface,

@@ -14,12 +14,17 @@ pyo3::create_exception!(
     finstack_quant.core.math.linalg,
     CholeskyError,
     crate::errors::FinstackError,
-    "Cholesky decomposition failure (inherits FinstackError, ValueError)."
+    "Cholesky/eigen input validation failure (inherits FinstackError, ValueError); non-SPD/singular failures raise RuntimeError."
 );
 
-/// Map a core linear-algebra error to a Python `CholeskyError` exception.
-fn cholesky_err(e: impl std::fmt::Display) -> PyErr {
-    CholeskyError::new_err(e.to_string())
+/// Map a core Cholesky/eigen error to ``CholeskyError`` for input validation
+/// failures, or the standard kinded Python exception (``RuntimeError`` for
+/// non-positive-definite / singular computation failures) otherwise.
+fn cholesky_err(e: finstack_quant_core::math::linalg::CholeskyError) -> PyErr {
+    match e.kind() {
+        finstack_quant_core::ErrorKind::Validation => CholeskyError::new_err(e.to_string()),
+        kind => crate::errors::kind_to_py(kind, e.to_string()),
+    }
 }
 
 /// Extract a numeric scalar as `f64`, rejecting Python `bool` and NumPy `bool_`.
@@ -181,9 +186,10 @@ fn square_matrix(matrix: &Bound<'_, PyAny>) -> PyResult<(Vec<f64>, usize)> {
 /// # Errors
 ///
 /// Raises ``CholeskyError`` (a ``ValueError`` subclass) when the matrix is not
-/// symmetric, not positive-definite, is numerically singular, or contains
-/// non-finite entries. Raises ``ValueError`` when the input cannot be read as a
-/// square matrix.
+/// symmetric, has mismatched dimensions, or contains non-finite entries.
+/// Raises ``RuntimeError`` when a symmetric matrix is not positive-definite or
+/// is numerically singular. Raises ``ValueError`` when the input cannot be read
+/// as a square matrix, and ``TypeError`` for non-numeric or ``bool`` entries.
 #[pyfunction]
 #[pyo3(text_signature = "(matrix)")]
 fn cholesky_decomposition(py: Python<'_>, matrix: &Bound<'_, PyAny>) -> PyResult<Vec<Vec<f64>>> {
@@ -313,7 +319,8 @@ fn ledoit_wolf_shrinkage(
     let result = py
         .detach(|| linalg::ledoit_wolf_shrinkage(&flat, t, n))
         .map_err(core_to_py)?;
-    let covariance = linalg::unflatten_square(&result.covariance, n).map_err(cholesky_err)?;
+    let covariance = linalg::unflatten_square(&result.covariance, n)
+        .map_err(|e| crate::errors::value_error(e.to_string()))?;
     Ok((covariance, result.shrinkage))
 }
 

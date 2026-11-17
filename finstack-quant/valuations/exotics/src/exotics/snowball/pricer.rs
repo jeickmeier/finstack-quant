@@ -233,10 +233,14 @@ impl SnowballDiscountingPricer {
             let discount_factor = discount_curve.as_ref().df_between_dates(as_of, end)?;
 
             let projection_start = start.max(as_of);
-            let floating_rate = finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_on_date(
-                forward_curve.as_ref(),
-                projection_start,
-            )?;
+            let proj_accrual = coupon_accrual_fraction(inst, projection_start, end)?;
+            let floating_rate =
+                finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_for_period(
+                    forward_curve.as_ref(),
+                    projection_start,
+                    end,
+                    proj_accrual,
+                )?;
             let coupon_rate = spec.compute_coupon(floating_rate, prev_coupon);
             pv += coupon_rate * accrual_fraction * inst.notional.amount() * discount_factor;
             prev_coupon = coupon_rate;
@@ -473,19 +477,27 @@ fn coupon_events(
             let tenor = inst.index_tenor.to_years_approx();
             let coeffs = term_forward.period_coeffs(fixing_time, tenor)?;
             let discount_forward = term_forward.curve_forward(fixing_time, tenor)?;
-            let basis = finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_on_date(
-                forward_curve.as_ref(),
-                start,
-            )? - discount_forward;
+            let basis =
+                finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_for_period(
+                    forward_curve.as_ref(),
+                    start,
+                    end,
+                    accrual_fraction,
+                )? - discount_forward;
             (coeffs.with_additive_spread(basis), true)
         } else {
             // At inception the first fixing is projected from the explicit
             // projection curve. Do not substitute the discount-curve short
             // rate, which would remove the index/discount basis.
-            let seasoned_rate = finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_on_date(
-                forward_curve.as_ref(),
-                start,
-            )?;
+            let proj_start = start.max(as_of);
+            let proj_accrual = coupon_accrual_fraction(inst, proj_start, end)?;
+            let seasoned_rate =
+                finstack_quant_valuations_core::instruments::pricing::term_fixings::term_fixing_for_period(
+                    forward_curve.as_ref(),
+                    proj_start,
+                    end,
+                    proj_accrual,
+                )?;
             (
                 PeriodForwardCoeffs::from_flat_rate(seasoned_rate, accrual_fraction),
                 false,
@@ -561,7 +573,7 @@ fn deterministic_estimate(
 mod tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{Date, DayCount, Tenor};
+    use finstack_quant_core::dates::{Date, DateExt, DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -643,27 +655,46 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots(knots)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        let forward = ForwardCurve::builder("USD-SOFR-6M", 0.5)
+        let mut fwd_points = vec![(0.0, 1.0)];
+        let mut prev = as_of;
+        let mut factor = 1.0;
+        for months in [6, 12, 18, 24, 30, 36] {
+            let next = as_of.add_months(months).expect("valid semi-annual date");
+            let yf = DayCount::Act365F
+                .year_fraction(prev, next, DayCountContext::default())
+                .expect("valid yf");
+            let t = DayCount::Act365F
+                .year_fraction(as_of, next, DayCountContext::default())
+                .expect("valid t");
+            factor /= 1.0 + forward_rate * yf;
+            fwd_points.push((t, factor));
+            prev = next;
+        }
+        let forward = ForwardCurve::builder("USD-SOFR-6M")
             .base_date(as_of)
             .day_count(DayCount::Act365F)
-            .knots([(0.0, forward_rate), (3.0, forward_rate)])
+            .index_tenor(Tenor::semi_annual())
+            .knots(fwd_points)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("forward curve");
+        let _ = (forward_rate, &forward);
         MarketContext::new().insert(discount).insert(forward)
     }
 
     /// Test market whose projection curve is consistent with the discount curve.
     ///
     /// Both curves are built from the same sloped zero rate: the discount curve
-    /// holds `P(0,t)`; the projection curve's knot rates are the discount
-    /// curve's **instantaneous forward** `f(0,t) = R(t) + t·R'(t)`. With
-    /// consistent curves the discounting pricer (which projects in-advance from
-    /// the projection curve) and the HW1F MC pricer (which reconstructs the
-    /// in-advance forward from the discount curve) must price the *same*
-    /// instrument to within a small simple-vs-continuous-compounding gap — the
-    /// basis for the cross-pricer consistency check.
+    /// holds `P(0,t)`; the projection curve derives its normalized factors
+    /// directly from `discount`. With consistent curves the discounting pricer
+    /// (which projects in-advance from the projection curve) and the HW1F MC
+    /// pricer (which reconstructs the in-advance forward from the discount curve)
+    /// must price the *same* instrument within numerical tolerance.
     fn consistent_market(as_of: Date, base_rate: f64) -> MarketContext {
         let knots: Vec<(f64, f64)> = (0..=16)
             .map(|i| {
@@ -675,25 +706,12 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots(knots)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        // Instantaneous forward of the sloped zero: with
-        // R(t) = base + 0.03·(1 − e^{−0.6t}), R'(t) = 0.03·0.6·e^{−0.6t}, so
-        // f(0,t) = R(t) + t·R'(t).
-        let fwd_knots: Vec<(f64, f64)> = (0..=16)
-            .map(|i| {
-                let t = i as f64 * 0.25;
-                let r = sloped_zero(base_rate, t);
-                let r_prime = 0.03 * 0.6 * (-0.6 * t).exp();
-                (t, r + t * r_prime)
-            })
-            .collect();
-        let forward = ForwardCurve::builder("USD-SOFR-6M", 0.5)
-            .base_date(as_of)
-            .day_count(DayCount::Act365F)
-            .knots(fwd_knots)
-            .build()
-            .expect("forward curve");
+        let forward =
+            ForwardCurve::from_discount_curve("USD-SOFR-6M", &discount, Some(Tenor::semi_annual()));
         MarketContext::new().insert(discount).insert(forward)
     }
 

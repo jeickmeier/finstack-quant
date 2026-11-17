@@ -270,8 +270,8 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "250615.751208322", "currency": "USD" },
-        "edited": { "amount": "275677.326329154", "currency": "USD" }
+        "baseline": { "amount": "250621.8511144237", "currency": "USD" },
+        "edited": { "amount": "275684.036225866", "currency": "USD" }
       }
     },
     {
@@ -493,8 +493,8 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "493110.00123153598", "currency": "USD" },
-        "edited": { "amount": "542421.00135468960", "currency": "USD" }
+        "baseline": { "amount": "493103.3424869091", "currency": "USD" },
+        "edited": { "amount": "542413.6767355999", "currency": "USD" }
       }
     },
     {
@@ -655,8 +655,8 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "147738.4488021919", "currency": "USD" },
-        "edited": { "amount": "162512.2936824111", "currency": "USD" }
+        "baseline": { "amount": "147739.45717150686", "currency": "USD" },
+        "edited": { "amount": "162513.40288865755", "currency": "USD" }
       }
     },
     {
@@ -685,8 +685,8 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "14329.01531811941", "currency": "USD" },
-        "edited": { "amount": "15761.91684993135", "currency": "USD" }
+        "baseline": { "amount": "14329.171454284997", "currency": "USD" },
+        "edited": { "amount": "15762.088599713496", "currency": "USD" }
       }
     },
     {
@@ -715,8 +715,8 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "-99606.9359312007", "currency": "USD" },
-        "edited": { "amount": "-109567.6295243207", "currency": "USD" }
+        "baseline": { "amount": "-99607.96611350501", "currency": "USD" },
+        "edited": { "amount": "-109568.76272485545", "currency": "USD" }
       }
     },
     {
@@ -1317,8 +1317,8 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "13776.07680118625", "currency": "USD" },
-        "edited": { "amount": "15153.68448130488", "currency": "USD" }
+        "baseline": { "amount": "13774.892753729444", "currency": "USD" },
+        "edited": { "amount": "15152.382029102388", "currency": "USD" }
       }
     },
     {
@@ -1673,7 +1673,7 @@
         "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
         "pointer": []
       },
-      "marketPatches": [{ "path": ["inflation_indices"], "value": [] }],
+      "marketPatches": [],
       "request": {
         "asOf": "2023-12-28",
         "model": "discounting",
@@ -1754,8 +1754,8 @@
         "description": "Change terms.contracts from 1.0 to 1.1; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "1387.013524110294", "currency": "USD" },
-        "edited": { "amount": "1525.714876521324", "currency": "USD" }
+        "baseline": { "amount": "1387.1209617942527", "currency": "USD" },
+        "edited": { "amount": "1525.8330579736778", "currency": "USD" }
       }
     },
     {
@@ -1814,8 +1814,8 @@
         "description": "Change notional.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "8912.21632401529", "currency": "USD" },
-        "edited": { "amount": "9803.43795641675", "currency": "USD" }
+        "baseline": { "amount": "8922.36176020559", "currency": "USD" },
+        "edited": { "amount": "9814.59793622652", "currency": "USD" }
       }
     },
     {
@@ -2087,8 +2087,8 @@
         "description": "Change drawn.amount from 10000000 to 11000000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "1691943.088976571", "currency": "USD" },
-        "edited": { "amount": "1787458.245415196", "currency": "USD" }
+        "baseline": { "amount": "1691949.3960817233", "currency": "USD" },
+        "edited": { "amount": "1787465.0911072847", "currency": "USD" }
       }
     },
     {
@@ -2129,8 +2129,8 @@
         "description": "Change notional.amount from 1000000 to 1100000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "1000019.046674638", "currency": "USD" },
-        "edited": { "amount": "1100020.951342102", "currency": "USD" }
+        "baseline": { "amount": "1003218.3915453077", "currency": "USD" },
+        "edited": { "amount": "1103540.2306998384", "currency": "USD" }
       }
     },
     {
@@ -2246,8 +2246,8 @@
         "description": "Change notional.amount from 1000000 to 1100000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "885144.104968204", "currency": "USD" },
-        "edited": { "amount": "973658.515465024", "currency": "USD" }
+        "baseline": { "amount": "886354.6098896886", "currency": "USD" },
+        "edited": { "amount": "974990.0708786575", "currency": "USD" }
       }
     },
     {
@@ -2312,8 +2312,8 @@
         "description": "Change notional.amount from 5000000 to 5500000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "-84275.0537253775", "currency": "USD" },
-        "edited": { "amount": "-92702.5590979153", "currency": "USD" }
+        "baseline": { "amount": "-84272.66218295554", "currency": "USD" },
+        "edited": { "amount": "-92699.92840125109", "currency": "USD" }
       }
     },
     {
@@ -2342,8 +2342,8 @@
         "description": "Change notional.amount from 5000000 to 5500000; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "4317.5712041354", "currency": "USD" },
-        "edited": { "amount": "4749.3283245491", "currency": "USD" }
+        "baseline": { "amount": "4319.96274655752", "currency": "USD" },
+        "edited": { "amount": "4751.95902121326", "currency": "USD" }
       }
     },
     {
@@ -2468,8 +2468,8 @@
         "description": "Change leg2.leg.spread_bp from 10 to 20; native present value must change."
       },
       "reference": {
-        "baseline": { "amount": "415230.53614508373", "currency": "USD" },
-        "edited": { "amount": "367773.0719061626", "currency": "USD" }
+        "baseline": { "amount": "415227.02919234283", "currency": "USD" },
+        "edited": { "amount": "367769.5649534219", "currency": "USD" }
       }
     },
     {

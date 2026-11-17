@@ -9,7 +9,6 @@ Covers ``Rate``/``Bps`` conversions and string parsing,
 from __future__ import annotations
 
 from decimal import Decimal
-import math
 import pickle
 
 import pytest
@@ -240,8 +239,8 @@ class TestMathAdditions:
         from finstack_quant.core.math import stats
 
         assert stats.mean_var([1.0, 2.0, 3.0]) == (2.0, 1.0)
-        assert math.isnan(stats.mean_or_nan([]))
-        assert stats.median_or_nan([3.0, 1.0, 2.0, 4.0]) == 2.5
+        assert stats.mean([]) is None
+        assert stats.median([3.0, 1.0, 2.0, 4.0]) == 2.5
         assert stats.finite_count([1.0, float("nan")]) == 1
         assert len(stats.log_returns([1.0, 2.0, 4.0])) == 2
         assert stats.realized_variance([100.0, 101.0, 100.0], annualization_factor=1.0) > 0.0
@@ -331,19 +330,19 @@ class TestConvertedMoney:
         return MarketContext().insert_fx(fx)
 
     def test_convert_money_reports_the_applied_rate(self) -> None:
-        converted = self._market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02")
+        converted = self._market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02", "cashflow_date")
         assert converted.amount == Money(110.0, "USD")
         assert converted.rate is not None
         assert converted.rate.rate == 1.1
         assert converted.rate.triangulated is False
-        same = self._market().convert_money(Money(5.0, "USD"), "USD", "2025-01-02")
+        same = self._market().convert_money(Money(5.0, "USD"), "USD", "2025-01-02", "cashflow_date")
         assert same.rate is None
         assert same.amount == Money(5.0, "USD")
 
     def test_wire_pickle_and_frame(self) -> None:
         from finstack_quant.core.market_data import ConvertedMoney
 
-        converted = self._market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02")
+        converted = self._market().convert_money(Money(100.0, "EUR"), "USD", "2025-01-02", "cashflow_date")
         assert ConvertedMoney.from_json(converted.to_json()) == converted
         assert pickle.loads(pickle.dumps(converted)) == converted  # noqa: S301
         frame = converted.to_dataframe()

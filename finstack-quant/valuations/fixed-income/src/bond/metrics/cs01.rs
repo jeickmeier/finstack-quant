@@ -584,8 +584,9 @@ mod tests {
             .quoted_clean_price_pct = Some(98.0);
         let hazard = HazardCurve::builder("ISSUER-HZD")
             .base_date(as_of)
-            .knots([(0.0, 0.02), (10.0, 0.02)])
+            .knots([(10.0, 0.02)])
             .recovery_rate(0.4)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard curve");
         let market = MarketContext::new().insert(hazard);

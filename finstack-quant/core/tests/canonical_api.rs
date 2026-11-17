@@ -13,7 +13,7 @@
 use finstack_quant_core::cashflow::{irr, npv, xirr};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, ValidationMode};
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::integration::GaussHermiteQuadrature;
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::money::Money;
@@ -36,11 +36,7 @@ fn flat_curve(id: &str, base: Date, continuous_rate: f64, day_count: DayCount) -
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, (-continuous_rate).exp())])
         .interp(InterpStyle::LogLinear)
-        .extrapolation(ExtrapolationPolicy::FlatForward)
-        .validation(ValidationMode::Raw {
-            allow_non_monotonic: continuous_rate < 0.0,
-            forward_floor: None,
-        })
+        .extrapolation(ExtrapolationPolicy::Extend)
         .day_count(day_count)
         .build()
         .unwrap()

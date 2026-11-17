@@ -4,7 +4,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
@@ -29,7 +31,10 @@ fn flat_surface(id: &str, level: f64) -> VolSurface {
     let row = vec![level; strikes.len()];
     let mut b = VolSurface::builder(CurveId::new(id))
         .expiries(&tenors)
-        .strikes(&strikes);
+        .secondary_values(&strikes)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol);
     for _ in 0..tenors.len() {
         b = b.row(&row);
     }
@@ -42,7 +47,10 @@ fn flat_fx_surface(id: &str, level: f64) -> VolSurface {
     let row = vec![level; strikes.len()];
     let mut b = VolSurface::builder(CurveId::new(id))
         .expiries(&tenors)
-        .strikes(&strikes);
+        .secondary_values(&strikes)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol);
     for _ in 0..tenors.len() {
         b = b.row(&row);
     }
@@ -54,12 +62,16 @@ fn build_market(equity_vol: f64, fx_vol: f64) -> MarketContext {
         .base_date(AS_OF)
         .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.85)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("usd disc");
     let jpy = DiscountCurve::builder("JPY-OIS")
         .base_date(AS_OF)
         .knots([(0.0, 1.0), (1.0, 0.999), (5.0, 0.995)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("jpy disc");
     let provider = Arc::new(SimpleFxProvider::new());
@@ -76,10 +88,19 @@ fn build_market(equity_vol: f64, fx_vol: f64) -> MarketContext {
         .insert_fx(fx)
         // Dividend yield is read as a unitless price scalar by
         // `resolve_optional_dividend_yield`, not a discount curve.
-        .insert_price("NKY-DIV", MarketScalar::Unitless(0.01))
-        .insert_price("NKY-SPOT", MarketScalar::Unitless(35_000.0))
+        .insert_price(
+            "NKY-DIV",
+            MarketScalar::unitless(0.01).expect("valid scalar"),
+        )
+        .insert_price(
+            "NKY-SPOT",
+            MarketScalar::unitless(35_000.0).expect("valid scalar"),
+        )
         // Quote-per-base direction (USD per JPY), matching the JPYUSD id.
-        .insert_price("JPYUSD-SPOT", MarketScalar::Unitless(1.0 / 150.0))
+        .insert_price(
+            "JPYUSD-SPOT",
+            MarketScalar::unitless(1.0 / 150.0).expect("valid scalar"),
+        )
 }
 
 fn build_option(correlation: f64) -> QuantoOption {
@@ -291,11 +312,11 @@ fn vanna_is_reported_per_vol_point() {
         let base = build_market(vol_level, fx_vol);
         let up = base.clone().insert_price(
             "NKY-SPOT",
-            MarketScalar::Unitless(spot * (1.0 + spot_bump_decimal)),
+            MarketScalar::unitless(spot * (1.0 + spot_bump_decimal)).expect("valid scalar"),
         );
         let dn = base.insert_price(
             "NKY-SPOT",
-            MarketScalar::Unitless(spot * (1.0 - spot_bump_decimal)),
+            MarketScalar::unitless(spot * (1.0 - spot_bump_decimal)).expect("valid scalar"),
         );
         let pv_up = option.value(&up, AS_OF).expect("pv spot up").amount();
         let pv_dn = option.value(&dn, AS_OF).expect("pv spot dn").amount();

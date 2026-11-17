@@ -148,7 +148,7 @@ pub(crate) fn compute_pv(
             inst.option_type,
             hist_prod_log,
             total_fixings,
-        ),
+        )?,
         AveragingMethod::Arithmetic => price_arithmetic_tw_commodity(
             &future_forwards,
             inst.strike,
@@ -157,7 +157,7 @@ pub(crate) fn compute_pv(
             inst.option_type,
             hist_sum,
             total_fixings,
-        ),
+        )?,
     };
 
     Money::from_model_value(price * inst.quantity, inst.underlying.currency)
@@ -165,7 +165,10 @@ pub(crate) fn compute_pv(
 
 /// Return `(mean, variance)` for a nonempty projection in nondecreasing time.
 /// Forwards are validated positive prices; variance has squared price units.
-fn arithmetic_moments(future_forwards: &[(f64, f64)], sigma: f64) -> (f64, f64) {
+fn arithmetic_moments(
+    future_forwards: &[(f64, f64)],
+    sigma: f64,
+) -> finstack_quant_core::Result<(f64, f64)> {
     let mut suffix = NeumaierAccumulator::new();
     let mut covariance = NeumaierAccumulator::new();
     let sigma_sq = sigma * sigma;
@@ -173,11 +176,15 @@ fn arithmetic_moments(future_forwards: &[(f64, f64)], sigma: f64) -> (f64, f64) 
         // The suffix excludes the current fixing: its diagonal is counted once.
         // Accumulate covariance directly; subtracting M1^2 from M2 would lose
         // genuine small variance or turn moment rounding into spurious variance.
-        covariance.add((sigma_sq * time).exp_m1() * forward * (forward + 2.0 * suffix.total()));
-        suffix.add(forward);
+        covariance
+            .add((sigma_sq * time).exp_m1() * forward * (forward + 2.0 * suffix.get_total()?))?;
+        suffix.add(forward)?;
     }
     let count = future_forwards.len() as f64;
-    (suffix.total() / count, covariance.total() / (count * count))
+    Ok((
+        suffix.get_total()? / count,
+        covariance.get_total()? / (count * count),
+    ))
 }
 
 struct GeometricMoments {
@@ -193,7 +200,7 @@ fn geometric_moments(
     sigma: f64,
     hist_prod_log: f64,
     total_fixings: usize,
-) -> GeometricMoments {
+) -> finstack_quant_core::Result<GeometricMoments> {
     let count = future_forwards.len();
     let m = count as f64;
     let n = total_fixings as f64;
@@ -209,7 +216,7 @@ fn geometric_moments(
             .iter()
             .enumerate()
             .map(|(index, (time, _))| (2.0 * (count - index) as f64 - 1.0) * time),
-    );
+    )?;
     let vol_adj_sq = sigma * sigma * weighted_times / (m * m);
     let sum_t: f64 = future_forwards.iter().map(|(time, _)| *time).sum();
     let mean_log_drift = -0.5 * sigma * sigma * sum_t / m;
@@ -219,11 +226,11 @@ fn geometric_moments(
     let forward = realized_factor
         * geo_mean_fwd.powf(ratio)
         * (ratio * mean_log_drift + 0.5 * log_variance).exp();
-    GeometricMoments {
+    Ok(GeometricMoments {
         log_sum,
         forward,
         log_variance,
-    }
+    })
 }
 
 /// Seasoned geometric Asian pricing on commodity forwards.
@@ -257,19 +264,19 @@ fn price_geometric_commodity(
     option_type: OptionType,
     hist_prod_log: f64,
     total_fixings: usize,
-) -> f64 {
+) -> finstack_quant_core::Result<f64> {
     let n = total_fixings as f64;
     let m = future_forwards.len() as f64;
 
     if m == 0.0 || n <= 0.0 {
-        return 0.0;
+        return Ok(0.0);
     }
 
     let GeometricMoments {
         log_sum,
         forward: fwd_x,
         log_variance: var_x,
-    } = geometric_moments(future_forwards, sigma, hist_prod_log, total_fixings);
+    } = geometric_moments(future_forwards, sigma, hist_prod_log, total_fixings)?;
 
     let t_last = future_forwards
         .iter()
@@ -284,7 +291,7 @@ fn price_geometric_commodity(
             OptionType::Call => (geo_avg_all - strike).max(0.0),
             OptionType::Put => (strike - geo_avg_all).max(0.0),
         };
-        return payoff * df;
+        return Ok(payoff * df);
     }
 
     // Black-76 on X against the ORIGINAL strike K.
@@ -302,7 +309,7 @@ fn price_geometric_commodity(
         }
     };
 
-    price * df
+    Ok(price * df)
 }
 
 /// Arithmetic Asian pricing with commodity forwards (Turnbull-Wakeman adapted).
@@ -324,12 +331,12 @@ fn price_arithmetic_tw_commodity(
     option_type: OptionType,
     hist_sum: f64,
     total_fixings: usize,
-) -> f64 {
+) -> finstack_quant_core::Result<f64> {
     let n = total_fixings as f64;
     let m = future_forwards.len() as f64;
 
     if m == 0.0 {
-        return 0.0;
+        return Ok(0.0);
     }
 
     // Effective strike adjustment for seasoned options
@@ -344,20 +351,20 @@ fn price_arithmetic_tw_commodity(
             OptionType::Call => (avg_fwd - strike).max(0.0),
             OptionType::Put => 0.0,
         };
-        return payoff * df;
+        return Ok(payoff * df);
     }
 
-    let (m1, variance) = arithmetic_moments(future_forwards, sigma);
+    let (m1, variance) = arithmetic_moments(future_forwards, sigma)?;
     // Match the lognormal variance without subtracting nearly equal moments.
     // expm1 above and log1p here also make exact zero volatility deterministic.
     let var = (variance / m1 / m1).ln_1p();
     if var <= 0.0 {
-        return df
+        return Ok(df
             * scale
             * match option_type {
                 OptionType::Call => (m1 - k_eff).max(0.0),
                 OptionType::Put => (k_eff - m1).max(0.0),
-            };
+            });
     }
 
     let sigma_star = var.sqrt();
@@ -377,7 +384,7 @@ fn price_arithmetic_tw_commodity(
         }
     };
 
-    (price * df * scale).max(0.0)
+    Ok((price * df * scale).max(0.0))
 }
 
 /// Commodity Asian option analytical pricer (Turnbull-Wakeman / Kemna-Vorst).
@@ -415,7 +422,9 @@ mod tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, PriceCurve};
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use finstack_quant_valuations_core::instruments::CommodityUnderlyingParams;
@@ -427,7 +436,12 @@ mod tests {
     }
 
     fn flat_vol_surface(id: &str, expiries: &[f64], strikes: &[f64], vol: f64) -> VolSurface {
-        let mut builder = VolSurface::builder(id).expiries(expiries).strikes(strikes);
+        let mut builder = VolSurface::builder(id)
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
+            .expiries(expiries)
+            .secondary_values(strikes);
         for _ in expiries {
             builder = builder.row(&vec![vol; strikes.len()]);
         }
@@ -446,6 +460,9 @@ mod tests {
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, (-rate * 5.0).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 
@@ -475,6 +492,9 @@ mod tests {
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, (-rate * 5.0).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 
@@ -806,7 +826,8 @@ mod tests {
         let (strike, sigma, df) = (83.0_f64, 0.30_f64, 0.97_f64);
 
         let analytic =
-            price_geometric_commodity(&fwds, strike, sigma, df, OptionType::Call, 0.0, fwds.len());
+            price_geometric_commodity(&fwds, strike, sigma, df, OptionType::Call, 0.0, fwds.len())
+                .expect("finite geometric commodity price");
 
         // Kemna-Vorst lognormal moments of G.
         let m = fwds.len() as f64;
@@ -872,7 +893,8 @@ mod tests {
             OptionType::Call,
             hist_prod_log,
             total_fixings,
-        );
+        )
+        .expect("finite seasoned geometric price");
 
         // Reconstruct the lognormal moments of G_fut used by the pricer.
         let m = fwds.len() as f64;
@@ -916,7 +938,8 @@ mod tests {
         // The corrected price must differ materially from the old naive transform.
         let k_adj = ((n * strike.ln() - hist_prod_log) / m).exp();
         let old_naive =
-            price_geometric_commodity(&fwds, k_adj, sigma, df, OptionType::Call, 0.0, fwds.len());
+            price_geometric_commodity(&fwds, k_adj, sigma, df, OptionType::Call, 0.0, fwds.len())
+                .expect("finite geometric price");
         assert!(
             (analytic - old_naive).abs() / numeric.max(1.0) > 0.05,
             "fix must materially change the price vs the naive transform: \
@@ -944,7 +967,8 @@ mod tests {
                         kind,
                         historical_log,
                         total_count,
-                    );
+                    )
+                    .expect("finite zero-vol price");
                     assert!((value - 0.96 * payoff).abs() < 1e-10);
                 }
             }
@@ -976,7 +1000,8 @@ mod tests {
                         OptionType::Call,
                         historical_sum,
                         total_count,
-                    );
+                    )
+                    .expect("finite call price");
                     let put = price_arithmetic_tw_commodity(
                         &forwards,
                         strike,
@@ -985,7 +1010,8 @@ mod tests {
                         OptionType::Put,
                         historical_sum,
                         total_count,
-                    );
+                    )
+                    .expect("finite put price");
                     // At ATM, positive sigma retains a small time value.
                     let tolerance = if strike == average && sigma > 0.0 {
                         0.001

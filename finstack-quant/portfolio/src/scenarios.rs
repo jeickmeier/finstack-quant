@@ -735,7 +735,6 @@ mod tests {
             }],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         };
 
         let mut config = FinstackConfig::default();
@@ -780,7 +779,6 @@ mod tests {
             }],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         };
 
         let err = apply_scenario(
@@ -845,7 +843,6 @@ mod tests {
             operations: vec![],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         };
 
         let result = apply_scenario_and_revalue(&portfolio, &scenario, &market, &config);
@@ -941,7 +938,6 @@ mod tests {
             operations,
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         }
     }
 
@@ -998,7 +994,6 @@ mod tests {
                 operations: Vec::new(),
                 priority: 0,
                 resolution_mode: Default::default(),
-                hazard_bump_mode: Default::default(),
             })
             .collect();
 

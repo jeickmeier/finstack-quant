@@ -95,7 +95,6 @@ fn test_instrument_type_price_shock_matching() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -188,7 +187,6 @@ fn test_instrument_type_spread_shock_matching() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -243,6 +241,9 @@ fn test_instrument_spread_shock_moves_bond_pv() {
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
         .knots(vec![(0.0, 1.0), (1.0, 0.96), (5.0, 0.82)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let mut market = MarketContext::new().insert(curve);
@@ -294,7 +295,6 @@ fn test_instrument_spread_shock_moves_bond_pv() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -416,7 +416,6 @@ fn test_instrument_attr_price_shock_matching() {
         operations: vec![OperationSpec::InstrumentPricePctByAttr { attrs, pct: -4.0 }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -495,7 +494,6 @@ fn test_instrument_attr_price_shock_no_matches() {
         operations: vec![OperationSpec::InstrumentPricePctByAttr { attrs, pct: -4.0 }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -543,7 +541,6 @@ fn test_instrument_shock_empty_list() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -612,7 +609,6 @@ fn test_instrument_shock_no_matching_types() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -652,7 +648,6 @@ fn test_instrument_shock_without_instruments_provided() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -756,7 +751,6 @@ fn test_instrument_shock_multiple_types() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -800,7 +794,6 @@ fn test_empty_attr_filter_is_rejected() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -871,7 +864,6 @@ fn test_attr_filter_ignores_tags_uses_meta_only() {
         operations: vec![OperationSpec::InstrumentPricePctByAttr { attrs, pct: -3.0 }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();

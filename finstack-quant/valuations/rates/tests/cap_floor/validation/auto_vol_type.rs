@@ -9,7 +9,9 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::ExerciseStyle;
@@ -19,12 +21,7 @@ use rust_decimal::Decimal;
 use time::macros::date;
 
 fn flat_fwd(rate: f64, base: Date, id: &str) -> ForwardCurve {
-    ForwardCurve::builder(id, 0.25)
-        .base_date(base)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, rate), (5.0, rate)])
-        .build()
-        .unwrap()
+    ForwardCurve::flat(id, base, rate, DayCount::Act360).unwrap()
 }
 
 fn flat_disc(rate: f64, base: Date, id: &str) -> DiscountCurve {
@@ -32,14 +29,19 @@ fn flat_disc(rate: f64, base: Date, id: &str) -> DiscountCurve {
         .base_date(base)
         .day_count(DayCount::Act360)
         .knots([(0.0, 1.0), (1.0, (-rate).exp()), (5.0, (-rate * 5.0).exp())])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
 
 fn flat_vol_surface(sigma: f64, id: &str) -> VolSurface {
     VolSurface::builder(id)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[0.25, 0.5, 1.0, 2.0])
-        .strikes(&[0.01, 0.02, 0.03, 0.05])
+        .secondary_values(&[0.01, 0.02, 0.03, 0.05])
         .row(&[sigma; 4])
         .row(&[sigma; 4])
         .row(&[sigma; 4])

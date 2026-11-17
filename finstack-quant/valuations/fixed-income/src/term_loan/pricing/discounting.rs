@@ -461,7 +461,6 @@ impl TermLoanDiscountingPricer {
                 Some(fixing_series),
                 float_spec.forward_curve_id.as_str(),
                 reset_date,
-                as_of,
             )?;
             let accrual_start = flow
                 .accrual
@@ -525,7 +524,6 @@ mod tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
-    use finstack_quant_core::math::interp::InterpStyle;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use finstack_quant_valuations_core::instruments::pricing_overrides::InstrumentPricingOverrides;
@@ -542,6 +540,9 @@ mod tests {
         let disc = DiscountCurve::builder(CurveId::new("USD-OIS"))
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.85)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let market = MarketContext::new().insert(disc.clone());
@@ -647,17 +648,15 @@ mod tests {
         let disc = DiscountCurve::builder(CurveId::new("USD-OIS"))
             .base_date(base)
             .knots([(0.0, 1.0), (5.0, 0.85)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 
         // Base the (flat) forward curve at the loan issue date: seasoned resets
         // strictly before the curve base now error under the default fallback.
-        let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-            .base_date(date(2024, 1, 1))
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.05), (0.25, 0.05), (5.0, 0.05)])
-            .interp(InterpStyle::Linear)
-            .build()
+        let fwd = ForwardCurve::flat("USD-SOFR-3M", date(2024, 1, 1), 0.05, DayCount::Act360)
             .expect("forward curve");
 
         MarketContext::new().insert(disc).insert(fwd)
@@ -681,6 +680,8 @@ mod tests {
                 (date(2025, 4, 1), 0.02),  // Q2 2025 reset
             ],
             None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .expect("fixing series");
 
@@ -819,6 +820,8 @@ mod tests {
                 (date(2025, 4, 1), 0.01),
             ],
             None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .expect("fixing series");
         let market_low = market_base.clone().insert_series(fixing_series_low);
@@ -836,6 +839,8 @@ mod tests {
                 (date(2025, 4, 1), 0.10),
             ],
             None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .expect("fixing series");
         let market_high = market_base.insert_series(fixing_series_high);

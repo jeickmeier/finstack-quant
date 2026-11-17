@@ -135,6 +135,8 @@ pub fn market_with_curves() -> MarketContext {
         .base_date(as_of)
         .knots([(0.0, 1.0), (10.0, 0.98)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -142,6 +144,8 @@ pub fn market_with_curves() -> MarketContext {
         .base_date(as_of)
         .knots([(0.0, 1.0), (10.0, 0.975)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -158,6 +162,8 @@ pub fn market_full() -> MarketContext {
         .base_date(as_of)
         .knots([(0.0, 1.0), (1.0, 0.998), (10.0, 0.98)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -165,6 +171,8 @@ pub fn market_full() -> MarketContext {
         .base_date(as_of)
         .knots([(0.0, 1.0), (1.0, 0.9975), (10.0, 0.975)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 

@@ -87,7 +87,7 @@ fn centered(values: &[f64]) -> Result<Centered> {
     } else {
         values.iter().map(|x| x / scale).collect()
     };
-    let mean_normalized = neumaier_sum(normalized.iter().map(|x| x / values.len() as f64));
+    let mean_normalized = neumaier_sum(normalized.iter().map(|x| x / values.len() as f64))?;
     let mean = if use_shift {
         origin + scale * mean_normalized
     } else {
@@ -96,10 +96,12 @@ fn centered(values: &[f64]) -> Result<Centered> {
     let mean = if mean.is_finite() {
         mean
     } else {
-        finite(neumaier_sum(values.iter().map(|x| x / values.len() as f64)))?
+        finite(neumaier_sum(
+            values.iter().map(|x| x / values.len() as f64),
+        )?)?
     };
     let deviations: Vec<f64> = normalized.iter().map(|x| x - mean_normalized).collect();
-    let sum_squares = neumaier_sum(deviations.iter().map(|x| x * x));
+    let sum_squares = neumaier_sum(deviations.iter().map(|x| x * x))?;
     if sum_squares <= 0.0 || !sum_squares.is_finite() {
         return Err(calculation("nonconstant centered variation collapsed"));
     }
@@ -115,7 +117,7 @@ fn centered_r_squared(p: &Centered, b: &Centered) -> Result<f64> {
     if p.scale == 0.0 || b.scale == 0.0 {
         return Ok(f64::NAN);
     }
-    let cross = neumaier_sum(p.values.iter().zip(&b.values).map(|(x, y)| x * y));
+    let cross = neumaier_sum(p.values.iter().zip(&b.values).map(|(x, y)| x * y))?;
     let correlation = (cross / b.sum_squares.sqrt()) / p.sum_squares.sqrt();
     let result = correlation * correlation;
     if !result.is_finite() || result > 1.0 + 32.0 * f64::EPSILON || (result == 0.0 && cross != 0.0)
@@ -148,8 +150,8 @@ fn fit(portfolio: &[f64], benchmark: &[f64], uncertainty: bool, fit_stats: bool)
     }
     let b = centered(benchmark)?;
     let p = centered(portfolio)?;
-    let cross = neumaier_sum(p.values.iter().zip(&b.values).map(|(x, y)| x * y));
-    let cross_size = neumaier_sum(p.values.iter().zip(&b.values).map(|(x, y)| (x * y).abs()));
+    let cross = neumaier_sum(p.values.iter().zip(&b.values).map(|(x, y)| x * y))?;
+    let cross_size = neumaier_sum(p.values.iter().zip(&b.values).map(|(x, y)| (x * y).abs()))?;
     if cross.abs() <= f64::EPSILON.sqrt() * cross_size {
         return exact_fit(portfolio, benchmark, uncertainty, fit_stats);
     }
@@ -163,7 +165,7 @@ fn fit(portfolio: &[f64], benchmark: &[f64], uncertainty: bool, fit_stats: bool)
         neumaier_sum(p.values.iter().zip(&b.values).map(|(x, y)| {
             let residual = (-normalized_slope).mul_add(*y, *x);
             residual * residual
-        }))
+        }))?
     } else {
         0.0
     };
@@ -375,8 +377,8 @@ pub(crate) fn r_squared(returns: &[f64], benchmark: &[f64]) -> Result<f64> {
     if p.scale == 0.0 || b.scale == 0.0 {
         return Ok(f64::NAN);
     }
-    let cross = neumaier_sum(p.values.iter().zip(&b.values).map(|(x, y)| x * y));
-    let size = neumaier_sum(p.values.iter().zip(&b.values).map(|(x, y)| (x * y).abs()));
+    let cross = neumaier_sum(p.values.iter().zip(&b.values).map(|(x, y)| x * y))?;
+    let size = neumaier_sum(p.values.iter().zip(&b.values).map(|(x, y)| (x * y).abs()))?;
     if cross.abs() <= f64::EPSILON.sqrt() * size {
         let pair = exact_pair(returns, benchmark)?;
         return rational_output(&((&pair.sxy * &pair.sxy) / (&pair.sxx * &pair.syy)));
@@ -630,24 +632,25 @@ fn recompute_rolling_greeks_sums(
     benchmark: &[f64],
     shift_r: f64,
     shift_b: f64,
-) -> (f64, f64, f64, f64) {
-    (
-        neumaier_sum(returns.iter().map(|r| r - shift_r)),
-        neumaier_sum(benchmark.iter().map(|b| b - shift_b)),
+) -> Option<(f64, f64, f64, f64)> {
+    Some((
+        neumaier_sum(returns.iter().map(|r| r - shift_r)).ok()?,
+        neumaier_sum(benchmark.iter().map(|b| b - shift_b)).ok()?,
         neumaier_sum(
             returns
                 .iter()
                 .zip(benchmark)
                 .map(|(r, b)| (r - shift_r) * (b - shift_b)),
-        ),
-        neumaier_sum(benchmark.iter().map(|b| (b - shift_b) * (b - shift_b))),
-    )
+        )
+        .ok()?,
+        neumaier_sum(benchmark.iter().map(|b| (b - shift_b) * (b - shift_b))).ok()?,
+    ))
 }
 
-fn seeded_accumulator(value: f64) -> NeumaierAccumulator {
+fn seeded_accumulator(value: f64) -> Option<NeumaierAccumulator> {
     let mut sum = NeumaierAccumulator::new();
-    sum.add(value);
-    sum
+    sum.add(value).ok()?;
+    Some(sum)
 }
 
 pub(crate) fn rolling_greeks(
@@ -706,12 +709,16 @@ pub(crate) fn rolling_greeks(
     let w = window as f64;
     let mut shift_r = returns[0];
     let mut shift_b = benchmark[0];
-    let (seed_sr, seed_sb, seed_srb, seed_sb2) =
-        recompute_rolling_greeks_sums(&returns[..window], &benchmark[..window], shift_r, shift_b);
-    let mut acc_sr = seeded_accumulator(seed_sr);
-    let mut acc_sb = seeded_accumulator(seed_sb);
-    let mut acc_srb = seeded_accumulator(seed_srb);
-    let mut acc_sb2 = seeded_accumulator(seed_sb2);
+    let mut accs =
+        recompute_rolling_greeks_sums(&returns[..window], &benchmark[..window], shift_r, shift_b)
+            .and_then(|(sr, sb, srb, sb2)| {
+                Some((
+                    seeded_accumulator(sr)?,
+                    seeded_accumulator(sb)?,
+                    seeded_accumulator(srb)?,
+                    seeded_accumulator(sb2)?,
+                ))
+            });
     let mut steps_since_recompute = 0usize;
     let mut variance_scale = 0.0_f64;
     let mut cov_scale = 0.0_f64;
@@ -720,12 +727,17 @@ pub(crate) fn rolling_greeks(
 
     for i in window..=n {
         // Shifted sums: correct for beta (shift-invariant) as they stand.
-        let (mut sr, mut sb, mut srb, mut sb2) = (
-            acc_sr.total(),
-            acc_sb.total(),
-            acc_srb.total(),
-            acc_sb2.total(),
-        );
+        let (mut sr, mut sb, mut srb, mut sb2) = accs
+            .as_ref()
+            .and_then(|(a, b, c, d)| {
+                Some((
+                    a.get_total().ok()?,
+                    b.get_total().ok()?,
+                    c.get_total().ok()?,
+                    d.get_total().ok()?,
+                ))
+            })
+            .unwrap_or((f64::NAN, f64::NAN, f64::NAN, f64::NAN));
         let mut denom = w * sb2 - sb * sb;
         // Remember the largest power-sum scale since the last rebuild:
         // removing an outlier can leave rounding residue even when the
@@ -752,16 +764,21 @@ pub(crate) fn rolling_greeks(
             let start = i - window;
             shift_r = returns[start];
             shift_b = benchmark[start];
-            (sr, sb, srb, sb2) = recompute_rolling_greeks_sums(
+            let rebuilt = recompute_rolling_greeks_sums(
                 &returns[start..i],
                 &benchmark[start..i],
                 shift_r,
                 shift_b,
             );
-            acc_sr = seeded_accumulator(sr);
-            acc_sb = seeded_accumulator(sb);
-            acc_srb = seeded_accumulator(srb);
-            acc_sb2 = seeded_accumulator(sb2);
+            (sr, sb, srb, sb2) = rebuilt.unwrap_or((f64::NAN, f64::NAN, f64::NAN, f64::NAN));
+            accs = rebuilt.and_then(|(r, b, rb, b2)| {
+                Some((
+                    seeded_accumulator(r)?,
+                    seeded_accumulator(b)?,
+                    seeded_accumulator(rb)?,
+                    seeded_accumulator(b2)?,
+                ))
+            });
             steps_since_recompute = 0;
             variance_scale = (w * sb2).abs() + sb * sb;
             cov_scale = (w * srb).abs() + (sb * sr).abs();
@@ -830,10 +847,17 @@ pub(crate) fn rolling_greeks(
             // same footing as the seeded sums.
             let (old_r, old_b) = (old_r - shift_r, old_b - shift_b);
             let (new_r, new_b) = (new_r - shift_r, new_b - shift_b);
-            acc_sr.add(new_r - old_r);
-            acc_sb.add(new_b - old_b);
-            acc_srb.add(new_r * new_b - old_r * old_b);
-            acc_sb2.add(new_b * new_b - old_b * old_b);
+            let step_ok = if let Some((acc_sr, acc_sb, acc_srb, acc_sb2)) = accs.as_mut() {
+                acc_sr.add(new_r - old_r).is_ok()
+                    && acc_sb.add(new_b - old_b).is_ok()
+                    && acc_srb.add(new_r * new_b - old_r * old_b).is_ok()
+                    && acc_sb2.add(new_b * new_b - old_b * old_b).is_ok()
+            } else {
+                false
+            };
+            if !step_ok {
+                accs = None;
+            }
             steps_since_recompute += 1;
         }
     }
@@ -923,12 +947,12 @@ fn capture_logs(
     let p_log = if p_terminal {
         0.0
     } else {
-        neumaier_sum(selected.iter().map(|(p, _)| p.ln_1p()))
+        neumaier_sum(selected.iter().map(|(p, _)| p.ln_1p()))?
     };
     let b_log = if b_terminal {
         0.0
     } else {
-        neumaier_sum(selected.iter().map(|(_, b)| b.ln_1p()))
+        neumaier_sum(selected.iter().map(|(_, b)| b.ln_1p()))?
     };
     Ok(Some((
         growth_log(p_log, n, p_terminal, ann_factor),
@@ -1000,8 +1024,8 @@ pub(crate) fn capture_ratio(returns: &[f64], benchmark: &[f64], ann_factor: f64)
     if up_b.sign == 0.0 || down_b.sign == 0.0 {
         return Err(calculation("strict-regime benchmark growth collapsed"));
     }
-    let slope = neumaier_sum([up_p.slope, -up_b.slope, -down_p.slope, down_b.slope]);
-    let offset = neumaier_sum([up_p.offset, -up_b.offset, -down_p.offset, down_b.offset]);
+    let slope = neumaier_sum([up_p.slope, -up_b.slope, -down_p.slope, down_b.slope])?;
+    let offset = neumaier_sum([up_p.offset, -up_b.offset, -down_p.offset, down_b.offset])?;
     let result = slope
         .mul_add(ann_factor, offset)
         .exp()
@@ -1129,7 +1153,7 @@ pub(crate) fn m_squared_from_returns(
         b.scale.ln(),
         -p.scale.ln(),
         0.5 * (b.sum_squares.ln() - p.sum_squares.ln()),
-    ]);
+    ])?;
     let adjustment = exponent.exp().copysign(excess);
     if adjustment == 0.0 {
         return Err(calculation("nonzero M-squared risk allocation underflowed"));
@@ -1556,16 +1580,18 @@ mod tests {
             for end in window..=n {
                 let rs = &returns[end - window..end];
                 let bs = &benchmark[end - window..end];
-                let mean_r = neumaier_sum(rs.iter().copied()) / w;
-                let mean_b = neumaier_sum(bs.iter().copied()) / w;
-                let sr: f64 = neumaier_sum(rs.iter().map(|&r| r - mean_r));
-                let sb: f64 = neumaier_sum(bs.iter().map(|&b| b - mean_b));
+                let mean_r = neumaier_sum(rs.iter().copied()).unwrap() / w;
+                let mean_b = neumaier_sum(bs.iter().copied()).unwrap() / w;
+                let sr: f64 = neumaier_sum(rs.iter().map(|&r| r - mean_r)).unwrap();
+                let sb: f64 = neumaier_sum(bs.iter().map(|&b| b - mean_b)).unwrap();
                 let srb: f64 = neumaier_sum(
                     rs.iter()
                         .zip(bs.iter())
                         .map(|(&r, &b)| (r - mean_r) * (b - mean_b)),
-                );
-                let sb2: f64 = neumaier_sum(bs.iter().map(|&b| (b - mean_b) * (b - mean_b)));
+                )
+                .unwrap();
+                let sb2: f64 =
+                    neumaier_sum(bs.iter().map(|&b| (b - mean_b) * (b - mean_b))).unwrap();
                 let denom = w * sb2 - sb * sb;
                 let (alpha, beta) = if denom.abs() < 1e-30 {
                     (f64::NAN, f64::NAN)

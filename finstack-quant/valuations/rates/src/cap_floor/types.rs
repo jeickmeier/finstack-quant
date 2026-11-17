@@ -915,7 +915,9 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DateExt;
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations_core::instruments::Instrument;
@@ -930,21 +932,47 @@ mod tests {
         let disc = DiscountCurve::builder(CurveId::new("TEST-DISC"))
             .base_date(base_date)
             .knots(vec![(0.0, 1.0), (0.5, 0.975), (1.0, 0.95), (2.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve should build");
 
-        let fwd = ForwardCurve::builder(CurveId::new("USD-SOFR-3M"), 0.25)
+        let fwd = ForwardCurve::builder(CurveId::new("USD-SOFR-3M"))
             .base_date(base_date)
             .day_count(DayCount::Act360)
-            .knots(vec![(0.0, 0.04), (0.5, 0.042), (1.0, 0.045), (2.0, 0.05)])
+            .knots([
+                (0.0, 1.0),
+                (0.125, 0.994981385538548),
+                (0.25, 0.989926085254391),
+                (0.375, 0.984834915828344),
+                (0.5, 0.979708696474518),
+                (0.625, 0.974533021525606),
+                (0.75, 0.969293813446572),
+                (0.875, 0.963992393464224),
+                (1.0, 0.958630093089525),
+                (1.125, 0.953215700532),
+                (1.25, 0.947757842271036),
+                (1.375, 0.942257617495343),
+                (1.5, 0.936716128957958),
+                (1.625, 0.931134482611967),
+                (1.75, 0.925513787247119),
+                (1.875, 0.919855154127475),
+                (2.0, 0.914159696630276),
+            ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("forward curve should build");
 
         // Create a flat vol surface at 20%
         let vol = 0.20;
         let vol_surface = VolSurface::builder(CurveId::new("TEST-VOL"))
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&[0.01, 0.03, 0.05, 0.07, 0.10])
+            .secondary_values(&[0.01, 0.03, 0.05, 0.07, 0.10])
             .row(&[vol, vol, vol, vol, vol])
             .row(&[vol, vol, vol, vol, vol])
             .row(&[vol, vol, vol, vol, vol])
@@ -1148,15 +1176,30 @@ mod tests {
         let notional = Money::from((1_000_000_i64, Currency::USD));
 
         let mut ctx = test_market_context(base_date);
-        let neg_fwd = ForwardCurve::builder(CurveId::new("USD-SOFR-3M"), 0.25)
+        let neg_fwd = ForwardCurve::builder(CurveId::new("USD-SOFR-3M"))
             .base_date(base_date)
             .day_count(DayCount::Act360)
-            .knots(vec![
-                (0.0, -0.01),
-                (0.5, -0.008),
-                (1.0, -0.006),
-                (2.0, -0.004),
+            .knots([
+                (0.0, 1.0),
+                (0.125, 1.00121949297759),
+                (0.25, 1.00237782254657),
+                (0.375, 1.00347477307545),
+                (0.5, 1.0045101402046),
+                (0.625, 1.00548373090978),
+                (0.75, 1.00639536356207),
+                (0.875, 1.00724486798436),
+                (1.0, 1.00803208550427),
+                (1.125, 1.00877263095282),
+                (1.25, 1.00948217362832),
+                (1.375, 1.01016064736297),
+                (1.5, 1.01080798885712),
+                (1.625, 1.01142413768911),
+                (1.75, 1.01200903632469),
+                (1.875, 1.01256263012593),
+                (2.0, 1.01308486735981),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("negative forward curve should build");
         ctx = ctx.insert(neg_fwd);
@@ -1164,9 +1207,11 @@ mod tests {
         // Build a flat vol surface at 50bp normal vol for the normal model test
         let normal_vol = 0.005;
         let normal_vol_surface = VolSurface::builder(CurveId::new("TEST-VOL-NORMAL"))
-            .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal)
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::Normal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&[-0.02, -0.01, 0.0, 0.01, 0.02])
+            .secondary_values(&[-0.02, -0.01, 0.0, 0.01, 0.02])
             .row(&[normal_vol, normal_vol, normal_vol, normal_vol, normal_vol])
             .row(&[normal_vol, normal_vol, normal_vol, normal_vol, normal_vol])
             .row(&[normal_vol, normal_vol, normal_vol, normal_vol, normal_vol])
@@ -1395,22 +1440,39 @@ mod tests {
                 .base_date(as_of)
                 .day_count(DayCount::Act365F)
                 .knots([(0.0, 1.0), (3.0, 1.0)])
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("flat discount curve");
-            let forward = ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 365.0)
-                .base_date(as_of)
-                .day_count(DayCount::Act365F)
-                // The analytical coupon below assumes a 5% ACT/365L index;
-                // raw curve rates must represent it on their ACT/365F basis.
-                .knots([
-                    (0.0, 0.05 * 365.0 / denominator),
-                    (3.0, 0.05 * 365.0 / denominator),
-                ])
-                .build()
-                .expect("flat overnight curve");
+            let forward = {
+                let mut pts = vec![(as_of, 1.0), (start, 1.0)];
+                let mut day = start;
+                let mut fac = 1.0;
+                // Extend beyond `end` so weekend-rolled coupon end dates are covered on exact weekday pillars.
+                let horizon = end + time::Duration::days(7);
+                while day < horizon {
+                    let next = <finstack_quant_core::dates::Date as finstack_quant_core::dates::DateExt>::add_weekdays(day, 1)
+                        .expect("next overnight interval");
+                    fac /= 1.0 + 0.05 * (next - day).whole_days() as f64 / denominator;
+                    pts.push((next, fac));
+                    day = next;
+                }
+                ForwardCurve::from_dates(
+                    "USD-SOFR-OIS",
+                    as_of,
+                    &pts,
+                    DayCount::Act365F,
+                    finstack_quant_core::math::interp::InterpStyle::LogLinear,
+                    finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+                )
+                .expect("flat overnight curve")
+            };
             let vol = VolSurface::builder("TEST-VOL")
+                .secondary_axis(VolSurfaceAxis::Strike)
+                .quote_type(VolQuoteType::BlackLognormal)
+                .interpolation_mode(VolInterpolationMode::Vol)
                 .expiries(&[0.01, 3.0])
-                .strikes(&[0.01, 0.1])
+                .secondary_values(&[0.01, 0.1])
                 .row(&[0.0, 0.0])
                 .row(&[0.0, 0.0])
                 .build()

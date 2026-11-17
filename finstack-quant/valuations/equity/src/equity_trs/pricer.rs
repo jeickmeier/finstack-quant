@@ -138,7 +138,7 @@ impl TrsReturnModel for EquityReturnModel<'_> {
                     values.push(*amount * df);
                 }
             }
-            Ok(neumaier_sum(values))
+            neumaier_sum(values)
         };
 
         // Price return component. Completed-but-unpaid periods use both
@@ -203,7 +203,7 @@ impl TrsReturnModel for EquityReturnModel<'_> {
                 std::iter::once(fwd_end)
                     .chain(std::iter::once(-fwd_start))
                     .chain(net_dividends),
-            ) / fwd_start)
+            )? / fwd_start)
         } else {
             let dividend_return = self.div_yield * dt * (1.0 - tax_rate);
             let price_return = if !has_locked_start {
@@ -370,6 +370,9 @@ mod tests {
         let curve = DiscountCurve::builder("DISC")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, 1.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new().insert(curve);
@@ -406,6 +409,8 @@ mod tests {
             .base_date(period_start)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, 1.0)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let context = MarketContext::new().insert(disc);
@@ -460,6 +465,8 @@ mod tests {
             .base_date(period_start)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, (-0.05_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let context = MarketContext::new().insert(disc.clone());
@@ -538,11 +545,14 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (2.0, 1.0)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        MarketContext::new()
-            .insert(disc)
-            .insert_price("SPX-SPOT", MarketScalar::Unitless(spot))
+        MarketContext::new().insert(disc).insert_price(
+            "SPX-SPOT",
+            MarketScalar::unitless(spot).expect("valid scalar"),
+        )
     }
 
     fn mid_period_trs() -> EquityTotalReturnSwap {

@@ -1,156 +1,96 @@
 //! Credit hazard rate curves for default probability modeling.
 //!
-//! A hazard curve represents the instantaneous probability of default (credit
-//! event) for a corporate or sovereign issuer. These curves are fundamental
-//! for pricing credit default swaps (CDS), corporate bonds, and credit derivatives.
-//!
-//! # Financial Concept
-//!
-//! The hazard rate λ(t) represents the instantaneous default intensity:
-//! ```text
-//! Survival probability: S(t) = P(τ > t) = exp(-∫₀ᵗ λ(s)ds)
-//! Default probability: Q(t) = 1 - S(t)
-//!
-//! For piecewise-constant λ:
-//! S(t) = exp(-Σ λᵢ * Δtᵢ)
-//! ```
-//!
-//! # Market Construction
-//!
-//! Hazard curves are typically bootstrapped from:
-//! - **CDS spreads**: Single-name CDS par spreads (market standard)
-//! - **Bond spreads**: Credit spread over risk-free benchmark
-//! - **Loan spreads**: Primary or secondary market loan pricing
-//! - **Recovery assumptions**: Typically 40% for senior unsecured
-//!
-//! # Piecewise-Constant Model
-//!
-//! This implementation assumes constant hazard rates between knots, which:
-//! - Provides analytical survival probabilities (no numerical integration)
-//! - Ensures positive default probabilities (λ ≥ 0)
-//! - Matches ISDA Standard CDS Model convention
-//!
-//! # Use Cases
-//!
-//! - **CDS pricing**: Protection and premium leg valuation
-//! - **Corporate bond pricing**: Credit spread decomposition
-//! - **CVA calculation**: Counterparty credit risk adjustment
-//! - **CDO/CLO pricing**: Constituent credit curves for tranches
+//! A hazard curve represents the piecewise-constant default intensity `λ(t)`
+//! on ending intervals `(tᵢ₋₁, tᵢ]` with `t₀ = 0` and constant tail intensity
+//! `λₙ` beyond `tₙ`.
 //!
 //! # Examples
 //!
 //! ```rust
+//! use finstack_quant_core::dates::{Date, DayCount};
 //! use finstack_quant_core::market_data::term_structures::HazardCurve;
-//! use finstack_quant_core::dates::Date;
 //! use time::Month;
 //!
 //! let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
 //! let hc = HazardCurve::builder("USD-CREDIT")
 //!     .base_date(base)
+//!     .day_count(DayCount::Act365F)
 //!     .recovery_rate(0.40)
 //!     .knots([(1.0, 0.01), (10.0, 0.015)])
 //!     .build()
 //!     .expect("HazardCurve builder should succeed");
-//! assert!(hc.sp(5.0) < 1.0); // Survival probability < 1
+//! assert!(hc.sp(5.0).expect("valid survival") < 1.0);
 //! ```
 //!
 //! # References
 //!
-//! - **CDS Pricing**:
 //! - O'Kane, D. (2008). *Modelling Single-name and Multi-name Credit Derivatives*.
 //!   Wiley Finance. Chapters 3-5. `docs/REFERENCES.md#o-kane-2008`
-//! - ISDA (2009). "ISDA CDS Standard Model." Version 1.8.2. `docs/REFERENCES.md#isda-cds-standard-model`
-//!
-//! - **Hazard Rate Models**:
-//!   - Duffie, D., & Singleton, K. J. (1999). "Modeling Term Structures of Defaultable
-//!   Bonds." *Review of Financial Studies*, 12(4), 687-720. `docs/REFERENCES.md#duffie-singleton-1999`
-//!   - Lando, D. (1998). "On Cox Processes and Credit Risky Securities."
-//!   *Review of Derivatives Research*, 2(2-3), 99-120. `docs/REFERENCES.md#lando-1998`
+//! - ISDA (2009). "ISDA CDS Standard Model." Version 1.8.2.
+//!   `docs/REFERENCES.md#isda-cds-standard-model`
 
+use super::common::CurveCalendar;
 use crate::{
     currency::Currency,
     dates::{Date, DayCount},
     error::InputError,
-    math::interp::{ExtrapolationPolicy, InterpolationStrategy, LinearStrategy, LogLinearStrategy},
+    math::interp::exact_f64_eq,
     types::CurveId,
 };
 
+/// Source coordinate anchor and original piecewise-constant hazard schedule
+/// retained across [`HazardCurve::condition`] transformations so dated survival
+/// integrates directly on the retained source timeline.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub(super) struct HazardConditionSource {
+    /// Original untransformed curve base date.
+    #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
+    pub(super) base_date: Date,
+    /// Original `(time_years, hazard_rate)` pillars from `base_date`.
+    pub(super) knot_points: Vec<(f64, f64)>,
+    /// Offset in curve day-count years from `base_date` to the conditioned `base`.
+    #[serde(skip)]
+    pub(super) offset: f64,
+}
+
 /// Piecewise-constant credit hazard curve for default probability modeling.
 ///
-/// Represents the instantaneous default intensity λ(t) for a credit issuer.
-/// Assumes constant hazard rate between knots, providing analytical survival
-/// probabilities without numerical integration.
-///
-/// # Mathematical Model
-///
-/// ```text
-/// λ(t) = piecewise-constant hazard rate
-/// S(t) = exp(-∫₀ᵗ λ(s)ds) = exp(-Σ λᵢ * Δtᵢ)
-/// Q(t) = 1 - S(t) = cumulative default probability
-/// ```
-///
-/// # Invariants
-///
-/// - All hazard rates λᵢ ≥ 0 (enforced at construction)
-/// - Survival probability S(t) is monotonically decreasing
-/// - Recovery rate ∈ [0, 1] (typically 40% for senior unsecured)
-///
-/// # Thread Safety
-///
-/// Immutable after construction; safe to share via `Arc<HazardCurve>`.
+/// Stores non-negative intensities `λᵢ ≥ 0` on strictly positive ending knots
+/// `0 < t₁ < ... < tₙ` with left-continuous intervals `(tᵢ₋₁, tᵢ]` (`λ(0) = λ₁`)
+/// and constant tail `λₙ` beyond `tₙ`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "RawHazardCurve", into = "RawHazardCurve")]
 pub struct HazardCurve {
     id: CurveId,
     base: Date,
-    /// Time grid in years from base date; strictly increasing and non-negative.
+    /// Strictly positive strictly increasing ending knot times in source-clock years.
     knots: Box<[f64]>,
-    /// Piecewise-constant hazard rates λ ≥ 0; same length as `knots`.
+    /// Piecewise-constant non-negative hazard intensities `λ ≥ 0`; same length as `knots`.
     lambdas: Box<[f64]>,
-    /// Recovery rate used during calibration/reporting (metadata)
+    /// Recovery rate used during calibration/reporting metadata (`[0, 1]`).
     recovery_rate: f64,
-    /// Optional issuer metadata
+    /// Optional issuer metadata.
     issuer: Option<String>,
-    /// Debt seniority
+    /// Debt seniority metadata.
     seniority: Option<Seniority>,
-    /// Currency of protection leg (metadata)
+    /// Currency of protection leg (metadata).
     currency: Option<Currency>,
-    /// Day count convention for converting dates→times (metadata)
+    /// Day count convention for converting dates to source-clock years.
     day_count: DayCount,
-    /// Stored market par spreads used to bootstrap this curve (for reporting)
-    par_tenors: Box<[f64]>,
-    /// Par spreads in basis points at `par_tenors`
-    par_spreads_bp: Box<[f64]>,
-    /// Default interpolation for par spreads
-    par_interp: ParInterp,
+    /// Business-day calendar of the time axis; required by `Bus252`.
+    calendar: Option<CurveCalendar>,
     /// Exact typed recipe used to replay calibration after quote shocks.
     hazard_calibration: Option<crate::market_data::term_structures::HazardCalibrationRecipe>,
-    /// Largest hazard rate the builder accepts; rebuilds and the wire form keep it.
-    max_hazard_rate: f64,
     /// Opaque FX policy stamp; see [`crate::market_data::term_structures::DiscountCurve::fx_policy`].
     fx_policy: Option<String>,
+    /// Source coordinate anchor when conditioned in time.
+    source: Option<HazardConditionSource>,
 }
-
-/// What a hazard-curve bump shifts.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum HazardBumpTarget {
-    /// The CDS par spread: the hazard shift is `s / (1 - R)` (credit triangle).
-    ParSpread,
-    /// The hazard intensity itself, in the bump's rate units.
-    HazardRate,
-}
-
-/// Default cap on hazard rates accepted by [`HazardCurveBuilder::max_hazard_rate`]:
-/// a rate above 10 implies more than 99.995% one-year default probability.
-pub const DEFAULT_MAX_HAZARD_RATE: f64 = 10.0;
 
 /// Seniority level for credit exposures.
-///
-/// Used to tag a hazard curve with the seniority of the issuer's debt
-/// observed by the curve. Drives the recovery-rate prior in default
-/// modelling and selects the right LGD prior in
-/// `finstack_quant_models::credit::lgd::seniority`.
 ///
 /// Order is **not** total — `SeniorSecured` is strictly senior to `Senior`,
 /// `Subordinated`, and `Junior`, but the relative ordering of `Subordinated`
@@ -159,13 +99,13 @@ pub const DEFAULT_MAX_HAZARD_RATE: f64 = 10.0;
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum Seniority {
-    /// Senior secured debt
+    /// Senior secured debt.
     SeniorSecured,
-    /// Senior unsecured debt
+    /// Senior unsecured debt.
     Senior,
-    /// Subordinated debt
+    /// Subordinated debt.
     Subordinated,
-    /// Junior/mezzanine debt
+    /// Junior/mezzanine debt.
     Junior,
 }
 
@@ -195,24 +135,6 @@ impl core::str::FromStr for Seniority {
             ))),
         }
     }
-}
-
-/// Interpolation method for reporting par spreads stored on the curve.
-///
-/// Applies only to *par-spread* readouts (the spreads quoted at calibration
-/// pillars), not to the underlying hazard rates. Hazard interpolation always
-/// follows piecewise-constant survival. Use `LogLinear` when spreads span
-/// multiple decades (e.g. high-yield issuers) so interpolation stays in
-/// log-space; otherwise the default `Linear` is fine.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum ParInterp {
-    /// Linear interpolation in spread space
-    #[default]
-    Linear,
-    /// Log-linear interpolation when spreads are strictly positive
-    LogLinear,
 }
 
 mod builder;

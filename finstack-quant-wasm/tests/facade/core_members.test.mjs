@@ -86,7 +86,6 @@ test('Tenor members pass through the Rust Tenor', () => {
   assert.equal(core.Tenor.biweekly().days, 14);
   assert.equal(core.Tenor.bimonthly().months, 2);
   assert.equal(core.Tenor.fromPaymentsPerYear(4).toString(), '3M');
-  assert.equal(core.Tenor.fromYears(0.5, core.DayCount.act365f()).toString(), '6M');
   const oneMonth = new core.Tenor(1, core.TenorUnit.months());
   // Month-end clamp; no calendar means no roll.
   assert.deepEqual(
@@ -122,15 +121,16 @@ test('Tenor members pass through the Rust Tenor', () => {
 });
 
 test('ForwardCurve flat, queries, getters and JSON round trip', () => {
-  const curve = core.ForwardCurve.flat('USD-3M', 0.25, '2025-01-02', 0.04);
-  assert.equal(curve.tenor, 0.25);
-  assert.equal(typeof curve.dayCount, 'string');
-  assert.equal(typeof curve.interpStyle, 'string');
-  assert.equal(typeof curve.extrapolation, 'string');
+  const curve = core.ForwardCurve.flat('USD-3M', '2025-01-02', 0.04, 'act_360');
+  assert.equal(curve.dayCount, 'act_360');
+  assert.equal(curve.interpStyle, 'log_linear');
+  assert.equal(curve.extrapolation, 'extend');
+  assert.equal(curve.indexTenor, undefined);
   assert.ok(curve.knots instanceof Float64Array);
-  assert.ok(curve.forwards.every((f) => f === 0.04));
-  assert.ok(Math.abs(curve.ratePeriod(0.5, 1.0) - 0.04) < 1e-12);
-  assert.ok(curve.df(1.0) > 0 && curve.df(1.0) < 1);
+  assert.ok(curve.factors instanceof Float64Array);
+  assert.equal(curve.factors[0], 1);
+  assert.ok(Math.abs(curve.rateBetween(0.5, 1.0, 0.5) - Math.expm1(0.02) / 0.5) < 1e-12);
+  assert.ok(Math.abs(curve.df(1.0) - Math.exp(-0.04)) < 1e-15);
   assert.equal(curve.df('2025-01-02'), 1);
   const back = core.ForwardCurve.fromJson(curve.toJson());
   assert.equal(back.toJson(), curve.toJson());
@@ -169,16 +169,37 @@ test('VolCube round trips JSON and exposes its nodes', () => {
 });
 
 test('FxDeltaVolSurface round trips JSON and exposes its quotes', () => {
-  const three = new core.FxDeltaVolSurface('EURUSD', [1], [0.12], [0.01], [0.002]);
+  const clock = new core.VolatilityClock(core.createDate(2025, 1, 15), core.DayCount.act365f());
+  const roundTrippedClock = core.VolatilityClock.fromJson(clock.toJson());
+  assert.equal(roundTrippedClock.referenceDate, clock.referenceDate);
+  assert.equal(roundTrippedClock.dayCount.toString(), 'act_365f');
+  assert.ok(Math.abs(clock.expiryTime(core.createDate(2026, 1, 15)) - 1.0) < 1e-12);
+
+  const three = new core.FxDeltaVolSurface('EURUSD', 'EUR/USD', [1], [0.12], [0.01], [0.002]);
+  assert.equal(three.pair, 'EUR/USD');
+  assert.equal(three.deltaConvention, 'forward_unadjusted');
+  assert.equal(three.atmConvention, 'delta_neutral_straddle');
+  assert.equal(three.butterflyConvention, 'smile');
+  assert.equal(three.quoteType, 'black_lognormal');
+  assert.equal(three.expiryClock, undefined);
   assert.deepEqual([...three.atmVols], [0.12]);
   assert.deepEqual([...three.rr25d], [0.01]);
   assert.deepEqual([...three.bf25d], [0.002]);
   assert.equal(three.rr10d, undefined);
   assert.equal(three.bf10d, undefined);
-  const five = new core.FxDeltaVolSurface('EURUSD', [1], [0.12], [0.01], [0.002], [0.02], [0.005]);
+
+  const five = new core.FxDeltaVolSurface('EURUSD', ['EUR', 'USD'], [1], [0.12], [0.01], [0.002], {
+    rr10d: [0.02],
+    bf10d: [0.005],
+    expiryClock: clock,
+  });
+  assert.equal(five.pair, 'EUR/USD');
+  assert.equal(five.expiryClock.referenceDate, clock.referenceDate);
   assert.deepEqual([...five.rr10d], [0.02]);
   assert.deepEqual([...five.bf10d], [0.005]);
   assert.equal(core.FxDeltaVolSurface.fromJson(five.toJson()).toJson(), five.toJson());
+  roundTrippedClock.free();
+  clock.free();
 });
 
 test('FxRateResult round trips its JSON', () => {

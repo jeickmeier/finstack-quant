@@ -20,6 +20,8 @@ fn flat_discount_curve(
         .base_date(base_date)
         .knots([(0.0, 1.0), (10.0, 0.9)])
         .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("DiscountCurve should build with valid test data")
 }
@@ -35,6 +37,8 @@ fn flat_discount_curve_with_fx_policy(
         .knots([(0.0, 1.0), (10.0, 0.9)])
         .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
         .fx_policy(policy)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("DiscountCurve should build with valid test data")
 }
@@ -56,6 +60,8 @@ fn multi_knot_discount_curve(
             (10.0, 0.70),
         ])
         .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("Multi-knot DiscountCurve should build with valid test data")
 }
@@ -68,7 +74,8 @@ fn flat_hazard_curve(
     finstack_quant_core::market_data::term_structures::HazardCurve::builder(id)
         .base_date(base_date)
         .recovery_rate(0.40)
-        .knots([(0.0, 0.02), (10.0, 0.02)])
+        .knots([(10.0, 0.02)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("HazardCurve should build with valid test data")
 }
@@ -93,8 +100,11 @@ fn flat_vol_surface(id: &str, vol: f64) -> finstack_quant_core::market_data::sur
     let expiries = [0.25, 0.5, 1.0, 2.0];
     let strikes = [2.5, 3.0, 3.5, 4.0, 4.5];
     let mut builder = finstack_quant_core::market_data::surfaces::VolSurface::builder(id)
+        .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+        .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
+        .interpolation_mode(finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol)
         .expiries(&expiries)
-        .strikes(&strikes);
+        .secondary_values(&strikes);
     for _ in &expiries {
         builder = builder.row(&vec![vol; strikes.len()]);
     }
@@ -110,6 +120,9 @@ fn commodity_swaption_market(
     let disc = finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots([(0.0, 1.0), (5.0, (-rate * 5.0).exp())])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
     let price_curve =

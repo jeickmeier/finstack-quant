@@ -63,17 +63,28 @@ fn cholesky_solve_rejects_wrong_rhs_length() {
 #[wasm_bindgen_test]
 fn statistics_of_known_values() {
     let data = [1.0, 2.0, 3.0, 4.0, 5.0];
-    assert!((mean(JsValue::from(data.to_vec())).unwrap() - 3.0).abs() < 1e-10);
-    assert!(variance(JsValue::from(data.to_vec())).unwrap() > 0.0);
-    assert!(population_variance(JsValue::from(data.to_vec())).unwrap() > 0.0);
+    assert!((mean(JsValue::from(data.to_vec())).unwrap().unwrap() - 3.0).abs() < 1e-10);
+    assert!(variance(JsValue::from(data.to_vec())).unwrap().unwrap() > 0.0);
     assert!(
-        (quantile(JsValue::from(data.to_vec()), JsValue::from(0.5)).unwrap() - 3.0).abs() < 1e-10
+        population_variance(JsValue::from(data.to_vec()))
+            .unwrap()
+            .unwrap()
+            > 0.0
+    );
+    assert!(
+        (quantile(JsValue::from(data.to_vec()), JsValue::from(0.5))
+            .unwrap()
+            .unwrap()
+            - 3.0)
+            .abs()
+            < 1e-10
     );
     assert!(
         (correlation(
             JsValue::from(data.to_vec()),
             JsValue::from([2.0, 4.0, 6.0, 8.0, 10.0].to_vec())
         )
+        .unwrap()
         .unwrap()
             - 1.0)
             .abs()
@@ -84,6 +95,7 @@ fn statistics_of_known_values() {
             JsValue::from(data.to_vec()),
             JsValue::from([1.0, 2.0, 3.0, 4.0, 5.0].to_vec())
         )
+        .unwrap()
         .unwrap()
             > 0.0
     );
@@ -100,6 +112,11 @@ fn compensated_summation() {
         (neumaier_sum(JsValue::from([1e16, 1.0, -1e16, 1.0].to_vec())).unwrap() - 2.0).abs()
             < 1e-10
     );
+    assert_eq!(kahan_sum(JsValue::from(Vec::<f64>::new())).unwrap(), 0.0);
+    assert_eq!(neumaier_sum(JsValue::from(Vec::<f64>::new())).unwrap(), 0.0);
+    assert!(kahan_sum(JsValue::from([1.0, f64::NAN].to_vec())).is_err());
+    assert!(neumaier_sum(JsValue::from([1.0, f64::INFINITY].to_vec())).is_err());
+    assert!(neumaier_sum(JsValue::from([f64::MAX, f64::MAX, -f64::MAX].to_vec())).is_err());
 }
 
 #[wasm_bindgen_test]
@@ -175,20 +192,35 @@ fn symmetric_eigen_returns_values_and_flat_vectors() {
 }
 
 #[wasm_bindgen_test]
-fn nan_sentinel_statistics_return_nan_for_missing_data() {
+fn statistics_return_none_on_insufficient_data_and_err_on_non_finite() {
     let empty = || JsValue::from(Vec::<f64>::new());
-    assert!(mean_or_nan(empty()).unwrap().is_nan());
-    assert!(
-        sample_variance_or_nan(JsValue::from(vec![1.0]))
-            .unwrap()
-            .is_nan()
+    assert_eq!(mean(empty()).unwrap(), None);
+    assert_eq!(variance(JsValue::from(vec![1.0])).unwrap(), None);
+    assert_eq!(std_dev(JsValue::from(vec![1.0])).unwrap(), None);
+    assert_eq!(median(empty()).unwrap(), None);
+    assert_eq!(finite_min(JsValue::from(vec![f64::NAN])).unwrap(), None);
+    assert_eq!(
+        finite_max(JsValue::from(vec![f64::INFINITY])).unwrap(),
+        None
     );
-    assert!(median_or_nan(empty()).unwrap().is_nan());
     assert_eq!(
         finite_count(JsValue::from(vec![1.0, f64::NAN, f64::INFINITY])).unwrap(),
         1
     );
-    assert_eq!(mean_var(empty()).unwrap().as_ref(), [0.0, 0.0]);
+    let mv = mean_var(empty()).unwrap();
+    assert_eq!(mv.length(), 2);
+    assert!(mv.get(0).is_undefined());
+    assert!(mv.get(1).is_undefined());
+    assert!(mean(JsValue::from(vec![1.0, f64::NAN])).is_err());
+    assert!(correlation(JsValue::from(vec![1.0, 2.0]), JsValue::from(vec![1.0])).is_err());
+    assert_eq!(
+        correlation(
+            JsValue::from(vec![1e-200, 2e-200]),
+            JsValue::from(vec![1e-200, 2e-200]),
+        )
+        .unwrap(),
+        Some(1.0)
+    );
 }
 
 #[wasm_bindgen_test]

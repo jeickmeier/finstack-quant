@@ -64,6 +64,7 @@ fn flat_discount_curve(id: &str, base: Date, rate: f64) -> DiscountCurve {
         .day_count(DayCount::Thirty360)
         .knots(knots)
         .interp(InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("flat discount curve construction")
 }
@@ -238,18 +239,24 @@ struct IrsQlSnapshot {
     dv01: Option<f64>,
 }
 
-fn flat_forward_curve(id: &str, base: Date, rate: f64) -> ForwardCurve {
-    ForwardCurve::builder(id, 0.25)
+fn flat_irs_discount_curve(id: &str, base: Date, rate: f64) -> DiscountCurve {
+    DiscountCurve::builder(id)
         .base_date(base)
-        .knots([(0.0_f64, rate), (40.0_f64, rate)])
-        .interp(InterpStyle::Linear)
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 1.0), (40.0, (-rate * 40.0).exp())])
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
-        .expect("flat forward curve construction")
+        .expect("flat IRS discount curve construction")
+}
+
+fn flat_forward_curve(id: &str, base: Date, rate: f64) -> ForwardCurve {
+    ForwardCurve::flat(id, base, rate, DayCount::Act360).expect("flat forward curve construction")
 }
 
 fn irs_market(as_of: Date, rate: f64) -> MarketContext {
     MarketContext::new()
-        .insert(flat_discount_curve("USD-OIS", as_of, rate))
+        .insert(flat_irs_discount_curve("USD-OIS", as_of, rate))
         .insert(flat_forward_curve("USD-SOFR-3M", as_of, rate))
 }
 

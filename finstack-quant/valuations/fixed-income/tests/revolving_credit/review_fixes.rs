@@ -288,23 +288,35 @@ fn stochastic_facility_with_credit_curve_requires_market_anchored_process() {
 #[test]
 fn intra_period_resets_refix_the_coupon_in_both_engines() {
     let as_of = COMMITMENT;
-    // Knots placed exactly on the Act/360 year fractions of the monthly reset
-    // dates so the expected coupon is exact.
+    // Knots placed on the monthly reset dates using chained simple-rate factors
+    // so each monthly reset projects 2%, 4%, 6% respectively.
+    let d_jan = COMMITMENT;
+    let d_feb = date!(2025 - 02 - 01);
+    let d_mar = date!(2025 - 03 - 01);
+    let d_apr = date!(2025 - 04 - 01);
+    let d_end = date!(2028 - 01 - 01);
     let t_feb = 31.0 / 360.0;
     let t_mar = 59.0 / 360.0;
     let t_apr = 90.0 / 360.0;
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(as_of)
-        .day_count(DayCount::Act360)
-        .knots([
-            (0.0, 0.02),
-            (t_feb, 0.04),
-            (t_mar, 0.06),
-            (t_apr, 0.08),
-            (3.0, 0.08),
-        ])
-        .build()
-        .expect("forward curve");
+    let f_feb = 1.0 / (1.0 + 0.02 * t_feb);
+    let f_mar = f_feb / (1.0 + 0.04 * (t_mar - t_feb));
+    let f_apr = f_mar / (1.0 + 0.06 * (t_apr - t_mar));
+    let f_end = f_apr * (-0.08_f64 * ((d_end - d_apr).whole_days() as f64 / 360.0)).exp();
+    let fwd = ForwardCurve::from_dates(
+        "USD-SOFR-3M",
+        as_of,
+        &[
+            (d_jan, 1.0),
+            (d_feb, f_feb),
+            (d_mar, f_mar),
+            (d_apr, f_apr),
+            (d_end, f_end),
+        ],
+        DayCount::Act360,
+        finstack_quant_core::math::interp::InterpStyle::LogLinear,
+        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+    )
+    .expect("forward curve");
     let market = MarketContext::new()
         .insert(flat_discount_curve(0.03, as_of, "USD-OIS"))
         .insert(fwd);
@@ -400,11 +412,9 @@ fn intra_period_resets_refix_the_coupon_in_both_engines() {
 #[test]
 fn stochastic_hull_white_rates_keep_the_index_basis() {
     let as_of = COMMITMENT;
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(as_of)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.05), (1.0, 0.05), (5.0, 0.05)])
-        .build()
+    // Continuous forward rate chosen so the 90-day Act/360 simple forward equals 5%.
+    let curve_rate = (1.0_f64 + 0.05 * 0.25).ln() / 0.25;
+    let fwd = ForwardCurve::flat("USD-SOFR-3M", as_of, curve_rate, DayCount::Act360)
         .expect("forward curve");
     let market = MarketContext::new()
         .insert(flat_discount_curve(0.03, as_of, "USD-OIS"))
@@ -477,12 +487,15 @@ fn leq_prices_the_draw_at_default() {
         .base_date(start)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, 1.0), (5.0, 1.0)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("flat unit curve");
     let hazard = HazardCurve::builder("USD-HZ")
         .base_date(start)
         .knots([(1.0, 0.20), (5.0, 0.20)])
         .recovery_rate(0.40)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("hazard");
     let market = MarketContext::new().insert(disc).insert(hazard);
@@ -602,6 +615,8 @@ fn recovery_exposure_changes_after_each_deterministic_event() {
                 .base_date(start)
                 .day_count(DayCount::Act365F)
                 .knots([(0.0, 1.0), (1.0, 1.0)])
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("discount"),
         )
@@ -610,6 +625,7 @@ fn recovery_exposure_changes_after_each_deterministic_event() {
                 .base_date(start)
                 .knots([(1.0, 0.12), (5.0, 0.12)])
                 .recovery_rate(0.4)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .expect("hazard"),
         );

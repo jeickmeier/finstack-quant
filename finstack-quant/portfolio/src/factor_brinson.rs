@@ -274,9 +274,9 @@ pub fn factor_brinson_attribution(
     ] {
         let mut acc = NeumaierAccumulator::new();
         for &w in weights {
-            acc.add(w);
+            acc.add(w)?;
         }
-        check_weights_sum(side_name, acc.total())?;
+        check_weights_sum(side_name, acc.get_total()?)?;
     }
 
     // Portfolio / benchmark total returns: r_p = h_p'r, r_b = h_b'r.
@@ -288,11 +288,11 @@ pub fn factor_brinson_attribution(
         .zip(input.benchmark_weights.iter())
         .zip(input.asset_returns.iter())
     {
-        acc_rp.add(hp_i * r_i);
-        acc_rb.add(hb_i * r_i);
+        acc_rp.add(hp_i * r_i)?;
+        acc_rb.add(hb_i * r_i)?;
     }
-    let portfolio_return = acc_rp.total();
-    let benchmark_return = acc_rb.total();
+    let portfolio_return = acc_rp.get_total()?;
+    let benchmark_return = acc_rb.get_total()?;
     let active_return = portfolio_return - benchmark_return;
 
     // Active weight h_p - h_b, per asset.
@@ -309,17 +309,20 @@ pub fn factor_brinson_attribution(
         .zip(active_weight.iter())
     {
         for (acc, &x_ij) in acc_w.iter_mut().zip(row.iter()) {
-            acc.add(x_ij * aw_i);
+            acc.add(x_ij * aw_i)?;
         }
     }
-    let w: Vec<f64> = acc_w.into_iter().map(NeumaierAccumulator::total).collect();
+    let w: Vec<f64> = acc_w
+        .into_iter()
+        .map(|acc| acc.get_total())
+        .collect::<finstack_quant_core::Result<_>>()?;
 
     // Factor (allocation) contribution FC = w'f_b.
     let mut acc_fc = NeumaierAccumulator::new();
     for (&w_j, &f_j) in w.iter().zip(factor_returns.iter()) {
-        acc_fc.add(w_j * f_j);
+        acc_fc.add(w_j * f_j)?;
     }
-    let allocation = acc_fc.total();
+    let allocation = acc_fc.get_total()?;
 
     // Per-asset specific returns implied by f_b: eps_b,i = r_i - (X f_b)_i.
     let specific_return: Vec<f64> = (0..n_assets)
@@ -327,19 +330,19 @@ pub fn factor_brinson_attribution(
             let row = &input.exposures[i * n_factors..(i + 1) * n_factors];
             let mut acc_xf = NeumaierAccumulator::new();
             for (j, &x_ij) in row.iter().enumerate() {
-                acc_xf.add(x_ij * factor_returns[j]);
+                acc_xf.add(x_ij * factor_returns[j])?;
             }
-            input.asset_returns[i] - acc_xf.total()
+            Ok(input.asset_returns[i] - acc_xf.get_total()?)
         })
-        .collect();
+        .collect::<Result<_>>()?;
 
     // Completeness condition: h_b'eps_b must be ~0 for f_b to be a valid
     // benchmark-return-explaining fit (see module docs).
     let mut acc_completeness = NeumaierAccumulator::new();
     for (&hb_i, &eps_i) in input.benchmark_weights.iter().zip(specific_return.iter()) {
-        acc_completeness.add(hb_i * eps_i);
+        acc_completeness.add(hb_i * eps_i)?;
     }
-    let completeness_residual = acc_completeness.total();
+    let completeness_residual = acc_completeness.get_total()?;
     let completeness_bound = COMPLETENESS_TOLERANCE * benchmark_return.abs().max(1.0);
     if completeness_residual.abs() > completeness_bound {
         return Err(Error::invalid_input(format!(
@@ -360,9 +363,9 @@ pub fn factor_brinson_attribution(
     // conditioned than the subtraction form (see module docs).
     let mut acc_sc = NeumaierAccumulator::new();
     for (&aw_i, &eps_i) in active_weight.iter().zip(specific_return.iter()) {
-        acc_sc.add(aw_i * eps_i);
+        acc_sc.add(aw_i * eps_i)?;
     }
-    let selection = acc_sc.total();
+    let selection = acc_sc.get_total()?;
 
     let factor_contributions = (0..n_factors)
         .map(|j| FactorBrinsonContribution {

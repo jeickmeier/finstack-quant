@@ -165,7 +165,7 @@ impl_repr_html_via_dataframe!(PyBaseCorrelationCurve);
 /// Example
 /// -------
 /// >>> from finstack_quant.core.market_data import BaseCorrelationCurve, CreditIndexData, HazardCurve
-/// >>> hazard = HazardCurve.flat("CDX-IG", "2025-01-01", 0.01, 0.4)
+/// >>> hazard = HazardCurve.flat("CDX-IG", "2025-01-01", 0.01, 0.4, "act_365f")
 /// >>> base_corr = BaseCorrelationCurve("CDX-IG-BC", [(3.0, 0.25), (10.0, 0.55)])
 /// >>> data = CreditIndexData(125, 0.4, hazard, base_corr)
 /// >>> data.num_constituents
@@ -233,13 +233,13 @@ impl PyCreditIndexData {
     /// Example
     /// -------
     /// >>> from finstack_quant.core.market_data import BaseCorrelationCurve, CreditIndexData, HazardCurve
-    /// >>> hazard = HazardCurve.flat("CDX-IG", "2025-01-01", 0.01, 0.4)
+    /// >>> hazard = HazardCurve.flat("CDX-IG", "2025-01-01", 0.01, 0.4, "act_365f")
     /// >>> base_corr = BaseCorrelationCurve("CDX-IG-BC", [(3.0, 0.25), (10.0, 0.55)])
     /// >>> CreditIndexData(125, 0.4, hazard, base_corr).recovery_rate
     /// 0.4
     /// >>> data = CreditIndexData(
     /// ...     2, 0.4, hazard, base_corr,
-    /// ...     issuer_curves={"A": HazardCurve.flat("A", "2025-01-01", 0.02, 0.3), "B": hazard},
+    /// ...     issuer_curves={"A": HazardCurve.flat("A", "2025-01-01", 0.02, 0.3, "act_365f"), "B": hazard},
     /// ...     issuer_recovery_rates={"A": 0.3},
     /// ...     issuer_weights={"A": 0.25, "B": 0.75},
     /// ... )

@@ -381,10 +381,10 @@ where
 
             let cs01 = sensitivity_central_diff(pv_bumped_up, pv_bumped_down, bump_bp);
             series.push((label, cs01));
-            total_acc.add(cs01);
+            total_acc.add(cs01)?;
         }
 
-        Ok((series, total_acc.total()))
+        Ok((series, total_acc.get_total()?))
     })?;
 
     context.store_bucketed_series(series_id, series);
@@ -569,9 +569,9 @@ mod tests {
 
         let mut acc = NeumaierAccumulator::new();
         for v in &values {
-            acc.add(*v);
+            acc.add(*v).expect("finite test term");
         }
-        let compensated = acc.total();
+        let compensated = acc.get_total().expect("finite compensated total");
 
         assert!(
             (compensated - n as f64).abs() < 1e-6,

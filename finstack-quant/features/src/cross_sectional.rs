@@ -250,18 +250,18 @@ impl ResolvedCrossSectionalOp {
         output: &mut [Option<f64>],
     ) -> Result<()> {
         match self {
-            Self::Zscore => zscore(values, indices, output),
+            Self::Zscore => zscore(values, indices, output)?,
             Self::Rank => ranked(values, indices, output, RankMode::ClosedPercentile),
             Self::PercentileRank => ranked(values, indices, output, RankMode::OpenPercentile),
             Self::QuantileBucket { buckets } => quantile_bucket(values, indices, buckets, output),
-            Self::Demean => demean(values, indices, output),
+            Self::Demean => demean(values, indices, output)?,
             Self::RobustZscore => robust_zscore(values, indices, output),
             Self::MinmaxScale => minmax_scale(values, indices, output),
             Self::Clip { lower, upper } => clip(values, indices, lower, upper, output),
             Self::ClipBySigma { sigma } => clip_by_sigma(values, indices, sigma, output)?,
             Self::Winsorize { lower, upper } => winsorize(values, indices, lower, upper, output),
             Self::NormalScoreTransform => normal_score_transform(values, indices, output),
-            Self::LongShortWeights => long_short_weights(values, indices, output),
+            Self::LongShortWeights => long_short_weights(values, indices, output)?,
             Self::CapWeights { max_abs } => cap_weights(values, indices, max_abs, output)?,
             Self::FillMissing { value } => fill_missing(values, indices, value, output),
             Self::IsFinite => is_finite(values, indices, output),
@@ -278,15 +278,15 @@ fn finite_partition(values: &[Option<f64>], indices: &[usize]) -> Vec<(usize, f6
         .collect()
 }
 
-fn zscore(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>]) {
+fn zscore(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>]) -> Result<()> {
     let finite_values = finite_partition(values, indices);
     let sample = finite_values
         .iter()
         .map(|(_, value)| *value)
         .collect::<Vec<_>>();
-    let (_, centered) = scaled_centered(&sample);
-    let Some(std) = population_std(&centered) else {
-        return;
+    let (_, centered) = scaled_centered(&sample)?;
+    let Some(std) = population_std(&centered)? else {
+        return Ok(());
     };
     for ((idx, _), value) in finite_values.iter().zip(centered) {
         output[*idx] = if std <= 0.0 {
@@ -295,20 +295,22 @@ fn zscore(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>])
             Some(value / std)
         };
     }
+    Ok(())
 }
 
-fn demean(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>]) {
+fn demean(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>]) -> Result<()> {
     let finite_values = finite_partition(values, indices);
     let sample = finite_values
         .iter()
         .map(|(_, value)| *value)
         .collect::<Vec<_>>();
-    let Some(mean) = mean(&sample) else {
-        return;
+    let Some(mean) = mean(&sample)? else {
+        return Ok(());
     };
     for (idx, value) in finite_values {
         output[idx] = Some(value - mean);
     }
+    Ok(())
 }
 
 #[derive(Clone, Copy)]
@@ -461,10 +463,10 @@ fn clip_by_sigma(
         .iter()
         .map(|(_, value)| *value)
         .collect::<Vec<_>>();
-    let Some(center) = mean(&sample) else {
+    let Some(center) = mean(&sample)? else {
         return Ok(());
     };
-    let Some(std) = population_std(&sample) else {
+    let Some(std) = population_std(&sample)? else {
         return Ok(());
     };
     let lower = center - sigma * std;
@@ -484,14 +486,19 @@ fn normal_score_transform(values: &[Option<f64>], indices: &[usize], output: &mu
     }
 }
 
-fn long_short_weights(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>]) {
+fn long_short_weights(
+    values: &[Option<f64>],
+    indices: &[usize],
+    output: &mut [Option<f64>],
+) -> Result<()> {
     let finite_values = finite_partition(values, indices);
     let sample: Vec<_> = finite_values.iter().map(|(_, value)| *value).collect();
-    let (_, centered) = scaled_centered(&sample);
+    let (_, centered) = scaled_centered(&sample)?;
     let gross = centered.iter().map(|value| value.abs()).sum::<f64>();
     for ((idx, _), weight) in finite_values.iter().zip(centered) {
         output[*idx] = Some(if gross > 0.0 { weight / gross } else { 0.0 });
     }
+    Ok(())
 }
 
 fn cap_weights(
@@ -502,7 +509,7 @@ fn cap_weights(
 ) -> Result<()> {
     let finite_values = finite_partition(values, indices);
     let sample: Vec<_> = finite_values.iter().map(|(_, value)| *value).collect();
-    let (_, centered) = scaled_centered(&sample);
+    let (_, centered) = scaled_centered(&sample)?;
     let mut long = Vec::new();
     let mut short = Vec::new();
     for ((idx, _), value) in finite_values.iter().zip(centered) {

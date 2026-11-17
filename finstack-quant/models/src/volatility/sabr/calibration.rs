@@ -441,10 +441,19 @@ fn deterministic_sabr_starts(alpha: f64) -> Vec<[f64; 3]> {
     starts
 }
 
-/// A start is acceptable on its final residual alone; the LM termination
-/// reason (converged, step too small, max iterations) does not change that.
-fn sabr_termination_is_acceptable(final_residual_norm: f64, residual_tolerance: f64) -> bool {
-    final_residual_norm.is_finite() && final_residual_norm <= residual_tolerance
+/// A start is acceptable only when LM converged or stopped on a small step
+/// with a finite residual norm within `residual_tolerance`.
+fn sabr_termination_is_acceptable(
+    termination_reason: finstack_quant_core::math::solver_multi::LmTerminationReason,
+    final_residual_norm: f64,
+    residual_tolerance: f64,
+) -> bool {
+    matches!(
+        termination_reason,
+        finstack_quant_core::math::solver_multi::LmTerminationReason::ConvergedResidualNorm
+            | finstack_quant_core::math::solver_multi::LmTerminationReason::StepTooSmall
+    ) && final_residual_norm.is_finite()
+        && final_residual_norm <= residual_tolerance
 }
 
 #[derive(Default)]
@@ -538,7 +547,11 @@ where
         };
         total_iterations += solution.stats.iterations;
         let score = solution.stats.final_residual_norm;
-        if !sabr_termination_is_acceptable(score, residual_tolerance) {
+        if !sabr_termination_is_acceptable(
+            solution.stats.termination_reason.clone(),
+            score,
+            residual_tolerance,
+        ) {
             rejected.record_rejected(&solution);
             continue;
         }
@@ -573,35 +586,29 @@ where
     })
 }
 
-struct SabrJacobian<'a> {
-    strikes: &'a [super::expansion::PreparedSabrStrike],
-    weights: &'a [f64],
+fn compute_sabr_jacobian(
+    strikes: &[super::expansion::PreparedSabrStrike],
+    weights: &[f64],
     beta: f64,
-}
-
-impl finstack_quant_core::math::solver_multi::AnalyticalDerivatives for SabrJacobian<'_> {
-    fn residual_count(&self) -> usize {
-        self.strikes.len()
-    }
-
-    fn jacobian(&self, coordinates: &[f64], output: &mut [Vec<f64>]) -> Option<()> {
-        let alpha = coordinates[0].exp();
-        let nu = unconstrained_to_bounded(coordinates[1], 0.001, 2.0);
-        let rho = unconstrained_to_bounded(coordinates[2], -0.99, 0.99);
-        let parameters = SabrParameters::new(alpha, self.beta, nu, rho).ok()?;
-        let chain = [
-            alpha,
-            (nu - 0.001) * (2.0 - nu) / (2.0 - 0.001),
-            (rho + 0.99) * (0.99 - rho) / 1.98,
-        ];
-        for ((strike, weight), row) in self.strikes.iter().zip(self.weights).zip(output) {
-            let physical = strike.gradient(&parameters).ok()?;
-            for j in 0..3 {
-                row[j] = weight * physical[j] * chain[j];
-            }
+    coordinates: &[f64],
+    output: &mut [f64],
+) -> finstack_quant_core::Result<()> {
+    let alpha = coordinates[0].exp();
+    let nu = unconstrained_to_bounded(coordinates[1], 0.001, 2.0);
+    let rho = unconstrained_to_bounded(coordinates[2], -0.99, 0.99);
+    let parameters = SabrParameters::new(alpha, beta, nu, rho)?;
+    let chain = [
+        alpha,
+        (nu - 0.001) * (2.0 - nu) / (2.0 - 0.001),
+        (rho + 0.99) * (0.99 - rho) / 1.98,
+    ];
+    for (i, (strike, weight)) in strikes.iter().zip(weights).enumerate() {
+        let physical = strike.gradient(&parameters)?;
+        for j in 0..3 {
+            output[i * 3 + j] = weight * physical[j] * chain[j];
         }
-        Some(())
     }
+    Ok(())
 }
 
 impl SabrCalibrator {
@@ -816,9 +823,11 @@ impl SabrCalibrator {
             normalized_quote_weights(forward, strikes, market_vols, time_to_expiry, beta)?;
         self.validate_settings()?;
         let residual_tolerance = self.tolerance;
-        let solver = LevenbergMarquardtSolver::new()
-            .with_tolerance(residual_tolerance.min(1e-10))
-            .with_max_iterations(self.max_iterations);
+        let solver = LevenbergMarquardtSolver::new(
+            residual_tolerance.min(1e-10),
+            1e-12,
+            self.max_iterations,
+        )?;
         let atm_vol = self.find_atm_vol(forward, strikes, market_vols)?;
         let alpha_start = initial_alpha_guess(atm_vol, forward, beta);
         let starts = deterministic_sabr_starts(alpha_start);
@@ -846,31 +855,33 @@ impl SabrCalibrator {
                     bounded_to_unconstrained(physical_start[2], -0.99, 0.99),
                 ];
                 let calls = std::cell::Cell::new(0);
-                let residuals = |unconstrained: &[f64], output: &mut [f64]| {
+                let residuals = |unconstrained: &[f64],
+                                 output: &mut [f64]|
+                 -> finstack_quant_core::Result<()> {
                     calls.set(calls.get() + 1);
                     let alpha = unconstrained[0].exp();
                     let nu = unconstrained_to_bounded(unconstrained[1], 0.001, 2.0);
                     let rho = unconstrained_to_bounded(unconstrained[2], -0.99, 0.99);
-                    let Ok(parameters) = SabrParameters::new(alpha, beta, nu, rho) else {
-                        output.fill(1e6);
-                        return;
-                    };
+                    let parameters = SabrParameters::new(alpha, beta, nu, rho)?;
                     for (index, (strike, &market_vol)) in
                         prepared.iter().zip(market_vols).enumerate()
                     {
                         let weight = weights[index];
-                        output[index] = strike
-                            .evaluate(&parameters)
-                            .map_or(1e6, |model_vol| weight * (model_vol - market_vol));
+                        let model_vol = strike.evaluate(&parameters)?;
+                        output[index] = weight * (model_vol - market_vol);
                     }
+                    Ok(())
                 };
-                let derivatives = SabrJacobian {
-                    strikes: &prepared,
-                    weights: &weights,
-                    beta,
-                };
-                let solution =
-                    solver.solve_least_squares_with_jacobian(residuals, &derivatives, &initial);
+                let jacobian =
+                    |coordinates: &[f64], output: &mut [f64]| -> finstack_quant_core::Result<()> {
+                        compute_sabr_jacobian(&prepared, &weights, beta, coordinates, output)
+                    };
+                let solution = solver.solve_least_squares_with_jacobian(
+                    residuals,
+                    jacobian,
+                    &initial,
+                    prepared.len(),
+                );
                 (solution, calls.get())
             },
             |solution| {
@@ -1008,9 +1019,11 @@ impl SabrCalibrator {
             })
             .collect::<Result<_>>()?;
         let residual_tolerance = self.tolerance;
-        let solver = LevenbergMarquardtSolver::new()
-            .with_tolerance(residual_tolerance.min(1e-10))
-            .with_max_iterations(self.max_iterations);
+        let solver = LevenbergMarquardtSolver::new(
+            residual_tolerance.min(1e-10),
+            1e-12,
+            self.max_iterations,
+        )?;
         let outcome = run_deterministic_sabr_starts(
             starts,
             residual_tolerance,
@@ -1022,11 +1035,13 @@ impl SabrCalibrator {
                     bounded_to_unconstrained(physical_start[2], -0.99, 0.99),
                 ];
                 let calls = std::cell::Cell::new(0);
-                let residuals = |unconstrained: &[f64], output: &mut [f64]| {
+                let residuals = |unconstrained: &[f64],
+                                 output: &mut [f64]|
+                 -> finstack_quant_core::Result<()> {
                     calls.set(calls.get() + 1);
                     let nu = unconstrained_to_bounded(unconstrained[0], 0.001, 2.0);
                     let rho = unconstrained_to_bounded(unconstrained[1], -0.99, 0.99);
-                    let Ok(alpha) = solve_alpha_for_atm(
+                    let alpha = solve_alpha_for_atm(
                         forward,
                         atm_vol,
                         time_to_expiry,
@@ -1034,21 +1049,15 @@ impl SabrCalibrator {
                         nu,
                         rho,
                         self.tolerance.min(1e-10),
-                    ) else {
-                        output.fill(1e6);
-                        return;
-                    };
-                    let Ok(parameters) = SabrParameters::new(alpha, beta, nu, rho) else {
-                        output.fill(1e6);
-                        return;
-                    };
+                    )?;
+                    let parameters = SabrParameters::new(alpha, beta, nu, rho)?;
                     for (index, (strike, &market_vol)) in
                         prepared.iter().zip(market_vols).enumerate()
                     {
-                        output[index] = strike
-                            .evaluate(&parameters)
-                            .map_or(1e6, |model_vol| weights[index] * (model_vol - market_vol));
+                        let model_vol = strike.evaluate(&parameters)?;
+                        output[index] = weights[index] * (model_vol - market_vol);
                     }
+                    Ok(())
                 };
                 let solution = solver.solve_least_squares(residuals, &initial, market_vols.len());
                 (solution, calls.get())
@@ -1229,9 +1238,36 @@ mod acceptance_tests {
     #[test]
     fn sabr_acceptance_requires_finite_residual_within_tolerance() {
         let tolerance = 1.0e-4;
-        assert!(!sabr_termination_is_acceptable(1.0e-3, tolerance));
-        assert!(!sabr_termination_is_acceptable(f64::NAN, tolerance));
-        assert!(sabr_termination_is_acceptable(1.0e-5, tolerance));
+        assert!(!sabr_termination_is_acceptable(
+            LmTerminationReason::ConvergedResidualNorm,
+            1.0e-3,
+            tolerance
+        ));
+        assert!(!sabr_termination_is_acceptable(
+            LmTerminationReason::ConvergedResidualNorm,
+            f64::NAN,
+            tolerance
+        ));
+        assert!(sabr_termination_is_acceptable(
+            LmTerminationReason::ConvergedResidualNorm,
+            1.0e-5,
+            tolerance
+        ));
+        assert!(sabr_termination_is_acceptable(
+            LmTerminationReason::StepTooSmall,
+            1.0e-5,
+            tolerance
+        ));
+        assert!(!sabr_termination_is_acceptable(
+            LmTerminationReason::MaxIterations,
+            1.0e-5,
+            tolerance
+        ));
+        assert!(!sabr_termination_is_acceptable(
+            LmTerminationReason::DampingLimit,
+            1.0e-5,
+            tolerance
+        ));
     }
 
     #[test]
@@ -1253,12 +1289,13 @@ mod acceptance_tests {
                         params: vec![0.02, start[1], start[2]],
                         stats: LmStats {
                             iterations,
+                            accepted_steps: iterations,
                             residual_evals: iterations + 1,
                             jacobian_evals: iterations,
                             termination_reason: reason,
                             final_residual_norm: score,
-                            final_step_norm: 0.0,
-                            lambda_final: 1.0,
+                            last_step_norm: Some(0.0),
+                            last_lambda: Some(1.0),
                         },
                     }),
                     iterations + 1,
@@ -1292,7 +1329,6 @@ mod acceptance_tests {
 
     #[test]
     fn sabr_jacobian_matches_transformed_residuals() {
-        use finstack_quant_core::math::solver_multi::AnalyticalDerivatives;
         for beta in [0.0, 0.5, 1.0] {
             let template = SabrParameters::new(0.3, beta, 0.5, 0.0).expect("parameters");
             let strikes: Vec<_> = [0.005, 0.009999999, 0.01, 0.010000001, 0.02]
@@ -1303,19 +1339,16 @@ mod acceptance_tests {
                 })
                 .collect();
             let weights = [0.25, 0.5, 1.0, 0.5, 0.25];
-            let derivative = SabrJacobian {
-                strikes: &strikes,
-                weights: &weights,
-                beta,
-            };
             for coordinates in [
                 [-2.0, -2.0, -2.0],
                 [-2.0, 2.0, 2.0],
                 [-2.0, -20.0, 20.0],
                 [-2.0, 20.0, -20.0],
             ] {
-                let mut jacobian = vec![vec![0.0; 3]; strikes.len()];
-                if derivative.jacobian(&coordinates, &mut jacobian).is_none() {
+                let mut jacobian = vec![0.0; strikes.len() * 3];
+                if compute_sabr_jacobian(&strikes, &weights, beta, &coordinates, &mut jacobian)
+                    .is_err()
+                {
                     let parameters = SabrParameters::new(
                         coordinates[0].exp(),
                         beta,
@@ -1341,8 +1374,9 @@ mod acceptance_tests {
                     .expect("transformed parameters");
                     weights[i] * strikes[i].evaluate(&parameters).expect("vol")
                 };
-                for (i, row) in jacobian.iter().enumerate() {
+                for i in 0..strikes.len() {
                     for j in 0..3 {
+                        let analytic = jacobian[i * 3 + j];
                         let mut matches = 0;
                         for h in [1e-3, 3e-4, 1e-4, 3e-5] {
                             let mut up = coordinates;
@@ -1350,15 +1384,15 @@ mod acceptance_tests {
                             up[j] += h;
                             down[j] -= h;
                             let finite = (residual(&up, i) - residual(&down, i)) / (2.0 * h);
-                            if (finite - row[j]).abs()
-                                < 2e-6 * finite.abs().max(row[j].abs()) + 2e-8
+                            if (finite - analytic).abs()
+                                < 2e-6 * finite.abs().max(analytic.abs()) + 2e-8
                             {
                                 matches += 1;
                             }
                         }
                         assert!(
                             matches >= 2,
-                            "beta={beta} x={coordinates:?} i={i} j={j} analytic={row:?}"
+                            "beta={beta} x={coordinates:?} i={i} j={j} analytic={analytic}"
                         );
                     }
                 }
@@ -1490,12 +1524,13 @@ mod acceptance_tests {
                         params: start.to_vec(),
                         stats: LmStats {
                             iterations: 2,
+                            accepted_steps: 2,
                             residual_evals: 999,
                             jacobian_evals: 1,
                             termination_reason: LmTerminationReason::ConvergedResidualNorm,
                             final_residual_norm: 1e-5,
-                            final_step_norm: 0.0,
-                            lambda_final: 1.0,
+                            last_step_norm: Some(0.0),
+                            last_lambda: Some(1.0),
                         },
                     }),
                     attempt * 3,

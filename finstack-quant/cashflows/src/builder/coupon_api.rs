@@ -547,9 +547,10 @@ impl CashFlowBuilder {
     ///
     /// ```
     /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_core::dates::{Date, Tenor};
+    /// use finstack_quant_core::dates::{Date, DayCount, Tenor};
     /// use finstack_quant_core::market_data::context::MarketContext;
     /// use finstack_quant_core::market_data::term_structures::ForwardCurve;
+    /// use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_core::types::CurveId;
     /// use finstack_quant_cashflows::builder::{
@@ -596,9 +597,12 @@ impl CashFlowBuilder {
     ///
     /// // Projecting the floating leg needs a forward curve for the index.
     /// let market = MarketContext::new().insert(
-    ///     ForwardCurve::builder("USD-SOFR", 0.25)
+    ///     ForwardCurve::builder("USD-SOFR")
     ///         .base_date(issue)
-    ///         .knots([(0.0, 0.04), (10.0, 0.04)])
+    ///         .day_count(DayCount::Act360)
+    ///         .knots([(0.0, 1.0), (10.0, 0.67)])
+    ///         .interp(InterpStyle::LogLinear)
+    ///         .extrapolation(ExtrapolationPolicy::Extend)
     ///         .build()?,
     /// );
     ///

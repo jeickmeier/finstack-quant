@@ -142,17 +142,17 @@
       "oneOf": [
         {
           "const": "black_lognormal",
-          "description": "Black (lognormal) implied volatility, relative units (the default).",
+          "description": "Black (lognormal) implied volatility in relative units per square-root source year.",
           "type": "string"
         },
         {
           "const": "shifted_black_lognormal",
-          "description": "Displaced Black volatility; per-expiry displacements accompany the grid.",
+          "description": "Displaced Black volatility; one per-expiry displacement accompanies the grid.",
           "type": "string"
         },
         {
           "const": "normal",
-          "description": "Normal (Bachelier) implied volatility, absolute rate units.",
+          "description": "Normal (Bachelier) implied volatility in underlying units per square-root source year.",
           "type": "string"
         }
       ]

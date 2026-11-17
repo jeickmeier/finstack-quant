@@ -1,6 +1,6 @@
 //! Observed volatility by tenor and strike at one fixed option expiry.
 
-use super::VolQuoteType;
+use super::{VolQuoteType, VolSurfaceAxis};
 use crate::{Error, Result, types::CurveId};
 
 /// A fixed-expiry slice of a volatility cube with truthful tenor and strike axes.
@@ -100,6 +100,12 @@ impl VolCubeExpirySlice {
         // truthful tenor/strike fields are retained or serialized.
         super::vol_surface::validate_grid(tenors, strikes, vols_row_major)?;
         super::vol_surface::validate_displacements(quote_type, displacements, tenors.len())?;
+        super::vol_surface::validate_secondary_domain(
+            VolSurfaceAxis::Strike,
+            quote_type,
+            strikes,
+            displacements,
+        )?;
         Ok(Self {
             id: CurveId::new(id.as_ref()),
             expiry,
@@ -213,5 +219,43 @@ mod tests {
                 .is_err()
             );
         }
+        for bad_strike in [0.0, -0.02] {
+            assert!(
+                VolCubeExpirySlice::from_grid(
+                    "BAD-BLACK-K",
+                    1.0,
+                    &[5.0],
+                    &[bad_strike],
+                    &[0.2],
+                    VolQuoteType::BlackLognormal,
+                    None,
+                )
+                .is_err()
+            );
+        }
+        assert!(
+            VolCubeExpirySlice::from_grid(
+                "BAD-SHIFT-K",
+                1.0,
+                &[5.0],
+                &[-0.02],
+                &[0.2],
+                VolQuoteType::ShiftedBlackLognormal,
+                Some(&[0.02]),
+            )
+            .is_err()
+        );
+        assert!(
+            VolCubeExpirySlice::from_grid(
+                "OK-NORMAL-K",
+                1.0,
+                &[5.0],
+                &[-0.02],
+                &[0.005],
+                VolQuoteType::Normal,
+                None,
+            )
+            .is_ok()
+        );
     }
 }

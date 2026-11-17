@@ -260,55 +260,6 @@ impl Tenor {
         }
     }
 
-    /// Create a Tenor from a year fraction using a day count convention.
-    ///
-    /// If the year fraction corresponds to an integer number of months (within a small epsilon),
-    /// it returns a Month-based tenor. Otherwise, it converts to days using the provided
-    /// day count convention.
-    ///
-    /// # Arguments
-    /// * `years` - The time period in years
-    /// * `day_count` - The day count convention to use for day conversion
-    ///
-    /// # Errors
-    ///
-    /// Returns `InputError::InvalidTenor` when `years` is non-positive,
-    /// non-finite, or converts to a tenor outside the supported range.
-    pub fn from_years(years: f64, day_count: DayCount) -> crate::Result<Self> {
-        if years <= 0.0 || !years.is_finite() {
-            return Err(InputError::InvalidTenor {
-                tenor: format!("{years}Y"),
-                reason: "year fraction must be positive and finite".to_string(),
-            }
-            .into());
-        }
-        let months = years * 12.0;
-        let rounded_months = months.round();
-
-        if (months - rounded_months).abs() < 1e-4 {
-            // It's effectively an integer number of months
-            let m = rounded_months as u32;
-            if m > 0 && m.is_multiple_of(12) {
-                Self::new(m / 12, TenorUnit::Years)
-            } else {
-                Self::new(m, TenorUnit::Months)
-            }
-        } else {
-            // Convert to days
-            let days = match day_count {
-                DayCount::Thirty360
-                | DayCount::ThirtyE360
-                | DayCount::ThirtyE360Isda
-                | DayCount::Thirty360It
-                | DayCount::Act360 => (years * 360.0).round(),
-                DayCount::Act365F | DayCount::Nl365 | DayCount::Act365L => (years * 365.0).round(),
-                DayCount::Bus252 => (years * 252.0).round(),
-                _ => (years * 365.25).round(),
-            };
-            Self::new(days as u32, TenorUnit::Days)
-        }
-    }
-
     /// Parse a tenor string like "1D", "1W", "3M", "5Y".
     ///
     /// # Format
@@ -897,24 +848,6 @@ mod tests {
         assert!((Tenor::parse("6M").expect("valid").to_years_approx() - 0.5).abs() < 1e-10);
         assert!((Tenor::parse("1Y").expect("valid").to_years_approx() - 1.0).abs() < 1e-10);
         assert!((Tenor::parse("5Y").expect("valid").to_years_approx() - 5.0).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_from_years_prefers_months_and_handles_invalid_values() {
-        assert_eq!(
-            Tenor::from_years(1.0, DayCount::Act365F).expect("valid"),
-            Tenor::new(1, TenorUnit::Years).expect("valid tenor fixture")
-        );
-        assert_eq!(
-            Tenor::from_years(0.25, DayCount::Act365F).expect("valid"),
-            Tenor::new(3, TenorUnit::Months).expect("valid tenor fixture")
-        );
-        assert_eq!(
-            Tenor::from_years(10.0 / 365.0, DayCount::Act365F).expect("valid"),
-            Tenor::new(10, TenorUnit::Days).expect("valid tenor fixture")
-        );
-        assert!(Tenor::from_years(-1.0, DayCount::Act365F).is_err());
-        assert!(Tenor::from_years(f64::NAN, DayCount::Act365F).is_err());
     }
 
     #[test]

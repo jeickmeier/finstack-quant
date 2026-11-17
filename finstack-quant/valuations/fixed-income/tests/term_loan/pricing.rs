@@ -189,6 +189,9 @@ fn pv_is_discounted_to_as_of_and_includes_flows_before_settlement() {
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(issue)
         .knots((0..=5).map(|i| (f64::from(i), (-0.03 * f64::from(i)).exp())))
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let market = MarketContext::new().insert(curve);

@@ -5,14 +5,20 @@
       "type": "bond",
       "spec": {
         "id": "ICMA-HOST",
-        "notional": { "amount": "100", "currency": "USD" },
+        "notional": {
+          "amount": "100",
+          "currency": "USD"
+        },
         "issue_date": "2024-02-29",
         "maturity": "2025-02-28",
         "cashflow_spec": {
           "fixed": {
             "coupon_type": "cash",
             "rate": "0.04",
-            "frequency": { "count": 6, "unit": "months" },
+            "frequency": {
+              "count": 6,
+              "unit": "months"
+            },
             "day_count": "act_act_isma",
             "business_day_convention": "unadjusted",
             "calendar_id": "weekends_only",
@@ -21,12 +27,16 @@
             "payment_lag_days": 0
           }
         },
-        "quote_compounding": {"periodic": 2},
+        "quote_compounding": {
+          "periodic": 2
+        },
         "discount_curve_id": "FLAT",
         "attributes": {},
         "settlement_days": 0,
         "instrument_pricing_overrides": {
-          "market_quotes": { "quoted_clean_price_pct": 100.0 }
+          "market_quotes": {
+            "quoted_clean_price_pct": 100.0
+          }
         }
       }
     }
@@ -40,14 +50,17 @@
         "base": "2024-02-29",
         "day_count": "act_365f",
         "knot_points": [
-          [0.0, 1.0],
-          [2.0, 1.0]
+          [
+            0.0,
+            1.0
+          ],
+          [
+            2.0,
+            1.0
+          ]
         ],
         "interp_style": "log_linear",
-        "extrapolation": "flat_forward",
-        "min_forward_rate": null,
-        "allow_non_monotonic": false,
-        "min_forward_tenor": 0.000001
+        "extrapolation": "extend"
       }
     ],
     "fx": null,

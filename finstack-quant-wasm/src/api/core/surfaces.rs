@@ -2,16 +2,23 @@
 //! `finstack_quant_core::market_data::surfaces`: `VolSurface`, `VolCube`,
 //! `VolCubeExpirySlice` and `FxDeltaVolSurface`.
 
+use crate::api::core::currency::JsCurrency;
+use crate::api::core::dates::{JsVolatilityClock, js_opt_volatility_clock};
 use crate::utils::input::{
-    from_js_json, js_f64, js_f64_seq, js_opt_f64, js_opt_f64_seq, js_opt_string, js_string, js_uint,
+    from_js_json, invalid_type, is_plain_object, js_f64, js_f64_seq, js_opt_f64, js_opt_f64_seq,
+    js_opt_string, js_string, js_uint, wasm_handle_string,
 };
 use crate::utils::wire::{label, parse_label};
 use crate::utils::{to_js_err, to_js_value};
+use finstack_quant_core::currency::Currency as RustCurrency;
 use finstack_quant_core::market_data::surfaces::{
-    FxDeltaVolSurface as RustFxDeltaVolSurface, SabrParameterData, VolCube as RustVolCube,
-    VolCubeExpirySlice as RustVolCubeExpirySlice, VolGridOpts, VolInterpolationMode,
-    VolSurface as RustVolSurface,
+    FxAtmConvention, FxButterflyConvention, FxDeltaConvention,
+    FxDeltaVolSurface as RustFxDeltaVolSurface, FxDeltaVolSurfaceParams, SabrParameterData,
+    VolCube as RustVolCube, VolCubeExpirySlice as RustVolCubeExpirySlice, VolGridOpts,
+    VolInterpolationMode, VolQuoteType, VolSurface as RustVolSurface, VolSurfaceAxis,
 };
+use finstack_quant_core::money::fx::CurrencyPair;
+use finstack_quant_core::types::CurveId;
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 
@@ -295,13 +302,139 @@ impl JsVolCube {
     }
 }
 
+thread_local! {
+    static CURRENCY_PROTOTYPE: std::cell::OnceCell<js_sys::Object> = const { std::cell::OnceCell::new() };
+}
+
+fn currency_arg(value: &JsValue, label_name: &str) -> Result<RustCurrency, JsValue> {
+    if let Some(code) = value.as_string() {
+        return code.parse::<RustCurrency>().map_err(to_js_err);
+    }
+    if let Some(code) = wasm_handle_string(
+        value,
+        label_name,
+        &CURRENCY_PROTOTYPE,
+        || {
+            Ok(JsCurrency {
+                inner: RustCurrency::USD,
+            })
+        },
+        "toString",
+    )? {
+        return code.parse::<RustCurrency>().map_err(to_js_err);
+    }
+    Err(invalid_type(
+        label_name,
+        "expected a Currency handle or ISO-4217 currency code string",
+    ))
+}
+
+fn parse_currency_pair(value: &JsValue) -> Result<CurrencyPair, JsValue> {
+    if let Some(text) = value.as_string() {
+        let parsed = text.parse::<CurrencyPair>().map_err(to_js_err)?;
+        return CurrencyPair::try_new(parsed.base, parsed.quote).map_err(to_js_err);
+    }
+    if js_sys::Array::is_array(value) {
+        let array = js_sys::Array::from(value);
+        if array.length() != 2 {
+            return Err(invalid_type(
+                "pair",
+                "expected a [base, quote] array of length 2",
+            ));
+        }
+        let base = currency_arg(&array.get(0), "pair[0]")?;
+        let quote = currency_arg(&array.get(1), "pair[1]")?;
+        return CurrencyPair::try_new(base, quote).map_err(to_js_err);
+    }
+    if is_plain_object(value) {
+        let parsed = from_js_json::<CurrencyPair>(value, "pair")?;
+        return CurrencyPair::try_new(parsed.base, parsed.quote).map_err(to_js_err);
+    }
+    Err(invalid_type(
+        "pair",
+        "expected a currency pair string (\"EUR/USD\"), [base, quote] pair, or CurrencyPair object",
+    ))
+}
+
+struct ParsedFxSurfaceOptions {
+    rr10d: Option<Vec<f64>>,
+    bf10d: Option<Vec<f64>>,
+    delta_convention: FxDeltaConvention,
+    atm_convention: FxAtmConvention,
+    butterfly_convention: FxButterflyConvention,
+    expiry_clock: Option<finstack_quant_core::dates::VolatilityClock>,
+}
+
+fn parse_fx_surface_options(value: Option<&JsValue>) -> Result<ParsedFxSurfaceOptions, JsValue> {
+    const ALLOWED_KEYS: [&str; 6] = [
+        "rr10d",
+        "bf10d",
+        "deltaConvention",
+        "atmConvention",
+        "butterflyConvention",
+        "expiryClock",
+    ];
+    let mut parsed = ParsedFxSurfaceOptions {
+        rr10d: None,
+        bf10d: None,
+        delta_convention: FxDeltaConvention::ForwardUnadjusted,
+        atm_convention: FxAtmConvention::DeltaNeutralStraddle,
+        butterfly_convention: FxButterflyConvention::Smile,
+        expiry_clock: None,
+    };
+    let Some(opts_val) = value.filter(|v| !v.is_undefined() && !v.is_null()) else {
+        return Ok(parsed);
+    };
+    if !is_plain_object(opts_val) {
+        return Err(invalid_type(
+            "options",
+            "expected a plain FxDeltaVolSurfaceOptions object or null",
+        ));
+    }
+    let obj = js_sys::Object::from(opts_val.clone());
+    for key_val in js_sys::Object::keys(&obj).iter() {
+        let Some(key) = key_val.as_string() else {
+            continue;
+        };
+        if !ALLOWED_KEYS.contains(&key.as_str()) {
+            return Err(to_js_err(finstack_quant_core::Error::Validation(format!(
+                "unknown FxDeltaVolSurface option `{key}`; allowed keys are {}",
+                ALLOWED_KEYS.join(", ")
+            ))));
+        }
+    }
+    let field = |name: &str| {
+        js_sys::Reflect::get(&obj, &JsValue::from(name))
+            .map_err(|_| invalid_type(&format!("options.{name}"), "could not read property"))
+    };
+    parsed.rr10d = js_opt_f64_seq(Some(&field("rr10d")?), "options.rr10d")?;
+    parsed.bf10d = js_opt_f64_seq(Some(&field("bf10d")?), "options.bf10d")?;
+    if let Some(s) = js_opt_string(Some(&field("deltaConvention")?), "options.deltaConvention")? {
+        parsed.delta_convention = parse_label::<FxDeltaConvention>(&s)?;
+    }
+    if let Some(s) = js_opt_string(Some(&field("atmConvention")?), "options.atmConvention")? {
+        parsed.atm_convention = parse_label::<FxAtmConvention>(&s)?;
+    }
+    if let Some(s) = js_opt_string(
+        Some(&field("butterflyConvention")?),
+        "options.butterflyConvention",
+    )? {
+        parsed.butterfly_convention = parse_label::<FxButterflyConvention>(&s)?;
+    }
+    parsed.expiry_clock =
+        js_opt_volatility_clock(Some(&field("expiryClock")?), "options.expiryClock")?;
+    Ok(parsed)
+}
+
 /// FX vol surface quoted in **delta space** (ATM, 25-delta RR/BF, optional
 /// 10-delta wings).
 ///
-/// Stores market-standard FX delta quotes (Wystup 2006, Clark 2011). Use
-/// `models.volatility` (`getFxDeltaVol`, `getFxDeltaPillarVols`) for
-/// evaluation; this type does not convert quotes to strikes itself.
-/// The delta convention is **forward delta (premium-unadjusted)**.
+/// Stores market-standard FX delta quotes (Wystup 2006, Clark 2011) on an
+/// explicit `BASE/QUOTE` currency pair under the closed profile
+/// (`forward_unadjusted`, `delta_neutral_straddle`, `smile`). Use
+/// `models.volatility` (`getFxDeltaVol`, `getFxDeltaPillarVols`,
+/// `materializeFxDeltaSurface`) for evaluation; this type does not convert
+/// quotes to strikes itself.
 ///
 /// @example
 /// ```typescript
@@ -309,12 +442,13 @@ impl JsVolCube {
 /// await init();
 /// const surface = new core.FxDeltaVolSurface(
 ///   "EURUSD-VOL",
+///   "EUR/USD",
 ///   [1],
 ///   [0.12],
 ///   [0.01],
 ///   [0.002]
 /// );
-/// console.log(surface.id, surface.expiries.length);
+/// console.log(surface.id, surface.pair, surface.quoteType, surface.expiries.length);
 /// surface.free();
 /// ```
 #[wasm_bindgen(js_name = FxDeltaVolSurface)]
@@ -324,55 +458,70 @@ pub struct JsFxDeltaVolSurface {
 
 #[wasm_bindgen(js_class = FxDeltaVolSurface)]
 impl JsFxDeltaVolSurface {
-    /// Construct an FX delta-quoted vol surface with 25-delta wings.
+    /// Construct an FX delta-quoted vol surface with 25-delta wings and
+    /// explicit pair and convention options (Rust `FxDeltaVolSurface::from_params`).
     ///
-    /// Optional `rr10d` / `bf10d` add 10-delta wings for richer wing
-    /// interpolation. Omit both (`undefined`/`null`) for a three-point smile;
-    /// the Rust constructor rejects one without the other.
+    /// Optional `options` supplies 10-delta wings (`rr10d`/`bf10d`, which must
+    /// appear together), explicit closed-profile convention labels, or an
+    /// optional `expiryClock`. Unknown option keys are rejected.
     ///
     /// # Arguments
-    /// * `id`        - Stable surface identifier.
-    /// * `expiries`  - Strictly increasing positive expiry times (years).
-    /// * `atm_vols`  - ATM delta-neutral straddle vols per expiry.
-    /// * `rr25d`     - 25-delta risk reversal per expiry (call vol − put vol).
-    /// * `bf25d`     - 25-delta butterfly per expiry (wing avg − ATM).
-    /// * `rr10d`     - Optional 10-delta risk reversal per expiry.
-    /// * `bf10d`     - Optional 10-delta butterfly per expiry.
+    /// * `id`       - Non-empty stable surface identifier.
+    /// * `pair`     - Currency pair `BASE/QUOTE` (string such as `"EUR/USD"`, `[base, quote]` pair, or `{ base, quote }` object; `base != quote`).
+    /// * `expiries` - Strictly increasing positive expiry times (years).
+    /// * `atm_vols` - Positive ATM delta-neutral straddle vols per expiry (decimal).
+    /// * `rr25d`    - 25-delta risk reversal per expiry (call vol − put vol, decimal).
+    /// * `bf25d`    - 25-delta butterfly per expiry (wing avg − ATM, decimal).
+    /// * `options`  - Optional `FxDeltaVolSurfaceOptions` bag (`rr10d`, `bf10d`, `deltaConvention`, `atmConvention`, `butterflyConvention`, `expiryClock`).
     ///
     /// # Errors
     ///
-    /// Throws a JavaScript exception if `rr10d` and `bf10d` are not both present
-    /// or both absent; quote arrays are empty or have mismatched lengths;
-    /// expiries are not finite, positive, and strictly increasing; ATM vols are
-    /// not finite and positive; or any risk reversal or butterfly is non-finite.
-    /// @param id - Stable surface identifier.
+    /// Throws a `TypeError` for mistyped arguments or a `FinstackError` (kind
+    /// `validation`) if `id` is empty, `pair` has identical currencies or an
+    /// invalid ISO code, `options` contains unknown keys or unpaired
+    /// `rr10d`/`bf10d`, expiry/quote lengths mismatch, or any value violates
+    /// domain constraints.
+    /// @param id - Non-empty stable surface identifier.
+    /// @param pair - Ordered currency pair (`"EUR/USD"`, `[base, quote]`, or `CurrencyPair`).
     /// @param expiries - Strictly increasing positive expiry times (years).
-    /// @param atmVols - ATM delta-neutral straddle vols per expiry.
-    /// @param rr25d - 25-delta risk reversal per expiry (call vol − put vol).
-    /// @param bf25d - 25-delta butterfly per expiry (wing avg − ATM).
-    /// @param rr10d - Optional 10-delta risk reversal per expiry.
-    /// @param bf10d - Optional 10-delta butterfly per expiry.
+    /// @param atmVols - ATM delta-neutral straddle vols per expiry (decimal).
+    /// @param rr25d - 25-delta risk reversal per expiry (call vol − put vol, decimal).
+    /// @param bf25d - 25-delta butterfly per expiry (wing avg − ATM, decimal).
+    /// @param options - Optional 10-delta wings, closed conventions, and expiry clock.
     #[wasm_bindgen(constructor)]
     pub fn new(
         #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "CurrencyPairInput")] pair: JsValue,
         #[wasm_bindgen(unchecked_param_type = "NumericArray")] expiries: JsValue,
         #[wasm_bindgen(js_name = "atmVols", unchecked_param_type = "NumericArray")]
         atm_vols: JsValue,
         #[wasm_bindgen(unchecked_param_type = "NumericArray")] rr25d: JsValue,
         #[wasm_bindgen(unchecked_param_type = "NumericArray")] bf25d: JsValue,
-        #[wasm_bindgen(unchecked_optional_param_type = "NumericArray")] rr10d: Option<JsValue>,
-        #[wasm_bindgen(unchecked_optional_param_type = "NumericArray")] bf10d: Option<JsValue>,
+        #[wasm_bindgen(unchecked_optional_param_type = "FxDeltaVolSurfaceOptions | null")]
+        options: Option<JsValue>,
     ) -> Result<JsFxDeltaVolSurface, JsValue> {
+        let id = js_string(&id, "id")?;
+        let pair = parse_currency_pair(&pair)?;
         let expiries = js_f64_seq(&expiries, "expiries")?;
         let atm_vols = js_f64_seq(&atm_vols, "atmVols")?;
         let rr25d = js_f64_seq(&rr25d, "rr25d")?;
         let bf25d = js_f64_seq(&bf25d, "bf25d")?;
-        let rr10d = js_opt_f64_seq(rr10d.as_ref(), "rr10d")?;
-        let bf10d = js_opt_f64_seq(bf10d.as_ref(), "bf10d")?;
-        let id: &str = &js_string(&id, "id")?;
-        let surface =
-            RustFxDeltaVolSurface::new(id, expiries, atm_vols, rr25d, bf25d, rr10d, bf10d)
-                .map_err(to_js_err)?;
+        let opts = parse_fx_surface_options(options.as_ref())?;
+        let surface = RustFxDeltaVolSurface::from_params(FxDeltaVolSurfaceParams {
+            id: CurveId::new(id),
+            pair,
+            delta_convention: opts.delta_convention,
+            atm_convention: opts.atm_convention,
+            butterfly_convention: opts.butterfly_convention,
+            expiries,
+            atm_vols,
+            rr_25d: rr25d,
+            bf_25d: bf25d,
+            rr_10d: opts.rr10d,
+            bf_10d: opts.bf10d,
+            expiry_clock: opts.expiry_clock,
+        })
+        .map_err(to_js_err)?;
         Ok(Self {
             inner: Arc::new(surface),
         })
@@ -382,12 +531,13 @@ impl JsFxDeltaVolSurface {
     ///
     /// # Arguments
     ///
-    /// * `json` - Canonical FxDeltaVolSurface JSON with expiries in years and
-    ///   annualized decimal ATM, risk-reversal, and butterfly quotes. Optional
-    ///   10-delta wings must occur together; unknown fields are rejected.
+    /// * `json` - Canonical FxDeltaVolSurface JSON with `pair`, conventions,
+    ///   expiries in years, and annualized decimal ATM, risk-reversal, and
+    ///   butterfly quotes. Optional 10-delta wings must occur together; unknown
+    ///   fields are rejected.
     /// @returns A validated FxDeltaVolSurface handle owned by the caller; release it with free().
     /// @throws Error - Throws when JSON is malformed, fields are unknown, or native expiry, quote, or wing validation fails.
-    /// @param json - Canonical FxDeltaVolSurface JSON with expiries in years and annualized decimal ATM, risk-reversal, and butterfly quotes. Optional 10-delta wings must occur together; unknown fields are rejected.
+    /// @param json - Canonical FxDeltaVolSurface JSON with `pair`, conventions, expiries in years, and annualized decimal ATM, risk-reversal, and butterfly quotes. Optional 10-delta wings must occur together; unknown fields are rejected.
     ///
     /// @example
     /// ```typescript
@@ -396,15 +546,20 @@ impl JsFxDeltaVolSurface {
     /// const surface = core.FxDeltaVolSurface.fromJson(
     ///   JSON.stringify({
     ///     id: "EURUSD",
+    ///     pair: { base: "EUR", quote: "USD" },
+    ///     delta_convention: "forward_unadjusted",
+    ///     atm_convention: "delta_neutral_straddle",
+    ///     butterfly_convention: "smile",
     ///     expiries: [1],
     ///     atm_vols: [0.12],
     ///     rr_25d: [0.01],
     ///     bf_25d: [0.002],
     ///     rr_10d: null,
     ///     bf_10d: null,
+    ///     expiry_clock: null,
     ///   })
     /// );
-    /// console.log(surface.id);
+    /// console.log(surface.id, surface.pair);
     /// surface.free();
     /// ```
     #[wasm_bindgen(js_name = fromJson)]
@@ -421,6 +576,12 @@ impl JsFxDeltaVolSurface {
     #[wasm_bindgen(getter, js_name = id)]
     pub fn id(&self) -> String {
         self.inner.id().as_str().to_string()
+    }
+
+    /// Ordered currency pair (`"BASE/QUOTE"`).
+    #[wasm_bindgen(getter, js_name = pair)]
+    pub fn pair(&self) -> String {
+        self.inner.pair().to_string()
     }
 
     /// Expiry axis in years.
@@ -467,9 +628,42 @@ impl JsFxDeltaVolSurface {
     pub fn bf_10d(&self) -> Option<Box<[f64]>> {
         self.inner.bf_10d().map(Into::into)
     }
+
+    /// Forward delta convention (`"forward_unadjusted"`).
+    #[wasm_bindgen(getter, js_name = deltaConvention)]
+    pub fn delta_convention(&self) -> Result<String, JsValue> {
+        label(&self.inner.delta_convention())
+    }
+
+    /// ATM strike convention (`"delta_neutral_straddle"`).
+    #[wasm_bindgen(getter, js_name = atmConvention)]
+    pub fn atm_convention(&self) -> Result<String, JsValue> {
+        label(&self.inner.atm_convention())
+    }
+
+    /// Butterfly quote convention (`"smile"`).
+    #[wasm_bindgen(getter, js_name = butterflyConvention)]
+    pub fn butterfly_convention(&self) -> Result<String, JsValue> {
+        label(&self.inner.butterfly_convention())
+    }
+
+    /// Output volatility quote type (`"black_lognormal"`).
+    #[wasm_bindgen(getter, js_name = quoteType)]
+    pub fn quote_type(&self) -> String {
+        self.inner.quote_type().to_string()
+    }
+
+    /// Optional volatility expiry clock, or `undefined` when not configured.
+    #[wasm_bindgen(getter, js_name = expiryClock)]
+    pub fn expiry_clock(&self) -> Option<JsVolatilityClock> {
+        self.inner
+            .expiry_clock()
+            .cloned()
+            .map(|inner| JsVolatilityClock { inner })
+    }
 }
 
-/// Implied-volatility surface on an expiry × strike (or expiry × tenor) grid.
+/// Implied-volatility surface on an expiry × secondary-coordinate (strike or tenor) grid.
 ///
 /// Volatilities are decimals (`0.20` is 20%); expiries are year fractions.
 /// Lookups inside the grid interpolate bilinearly in volatility or in total
@@ -484,6 +678,11 @@ impl JsFxDeltaVolSurface {
 ///   [0.5, 1.0],
 ///   [90, 100, 110],
 ///   [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
+///   {
+///     secondaryAxis: "strike",
+///     quoteType: "black_lognormal",
+///     interpolationMode: "vol",
+///   },
 /// );
 /// models.volatility.getSurfaceVol(surface, 0.75, 100); // 0.205
 /// surface.gridShape; // [2, 3]
@@ -499,14 +698,65 @@ impl JsVolSurface {
     }
 }
 
-/// Optional keys of the `VolSurface` constructor's options bag.
-#[derive(Default, serde::Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct VolSurfaceOptions {
-    secondary_axis: Option<String>,
-    interpolation_mode: Option<String>,
-    quote_type: Option<String>,
+struct ParsedVolSurfaceOptions {
+    secondary_axis: VolSurfaceAxis,
+    quote_type: VolQuoteType,
+    interpolation_mode: VolInterpolationMode,
     displacements: Option<Vec<f64>>,
+    expiry_clock: Option<finstack_quant_core::dates::VolatilityClock>,
+}
+
+fn parse_vol_surface_options(value: &JsValue) -> Result<ParsedVolSurfaceOptions, JsValue> {
+    const ALLOWED_KEYS: [&str; 5] = [
+        "secondaryAxis",
+        "quoteType",
+        "interpolationMode",
+        "displacements",
+        "expiryClock",
+    ];
+    if !is_plain_object(value) {
+        return Err(invalid_type(
+            "options",
+            "expected a plain VolSurfaceOptions object",
+        ));
+    }
+    let obj = js_sys::Object::from(value.clone());
+    for key_val in js_sys::Object::keys(&obj).iter() {
+        let Some(key) = key_val.as_string() else {
+            continue;
+        };
+        if !ALLOWED_KEYS.contains(&key.as_str()) {
+            return Err(to_js_err(finstack_quant_core::Error::Validation(format!(
+                "unknown VolSurface option `{key}`; allowed keys are {}",
+                ALLOWED_KEYS.join(", ")
+            ))));
+        }
+    }
+    let field = |name: &str| {
+        js_sys::Reflect::get(&obj, &JsValue::from(name))
+            .map_err(|_| invalid_type(&format!("options.{name}"), "could not read property"))
+    };
+    let secondary_axis = parse_label::<VolSurfaceAxis>(&js_string(
+        &field("secondaryAxis")?,
+        "options.secondaryAxis",
+    )?)?;
+    let quote_type = js_string(&field("quoteType")?, "options.quoteType")?
+        .parse::<VolQuoteType>()
+        .map_err(to_js_err)?;
+    let interpolation_mode = parse_label::<VolInterpolationMode>(&js_string(
+        &field("interpolationMode")?,
+        "options.interpolationMode",
+    )?)?;
+    let displacements = js_opt_f64_seq(Some(&field("displacements")?), "options.displacements")?;
+    let expiry_clock =
+        js_opt_volatility_clock(Some(&field("expiryClock")?), "options.expiryClock")?;
+    Ok(ParsedVolSurfaceOptions {
+        secondary_axis,
+        quote_type,
+        interpolation_mode,
+        displacements,
+        expiry_clock,
+    })
 }
 
 #[wasm_bindgen(js_class = VolSurface)]
@@ -518,71 +768,65 @@ impl JsVolSurface {
     ///
     /// * `id` - Surface identifier, the `MarketContext` lookup key.
     /// * `expiries` - Option expiries in years, strictly increasing.
-    /// * `strikes` - Secondary-axis coordinates (strikes, or swap tenors in
-    ///   years), strictly increasing.
+    /// * `secondary_values` - Secondary-axis coordinates (strikes, or swap
+    ///   tenors in years), strictly increasing.
     /// * `vols` - Decimal volatilities as a flat row-major (expiry-major) grid
-    ///   of `expiries.length * strikes.length` entries, finite and non-negative.
-    /// * `options` - Optional `{ secondaryAxis, interpolationMode, quoteType,
-    ///   displacements }`: `secondaryAxis` is `"strike"` or `"tenor"`,
-    ///   `interpolationMode` is `"vol"` or `"total_variance"`, `quoteType` is
-    ///   `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`, and
-    ///   `displacements` holds one shifted-Black displacement per expiry
-    ///   (required for `"shifted_black_lognormal"` quotes). Every omitted key
-    ///   takes the Rust default.
+    ///   of `expiries.length * secondaryValues.length` entries, finite and
+    ///   non-negative.
+    /// * `options` - `{ secondaryAxis, quoteType, interpolationMode,
+    ///   displacements?, expiryClock? }`: required `secondaryAxis` (`"strike"`
+    ///   or `"tenor"`), `quoteType` (`"black_lognormal"`,
+    ///   `"shifted_black_lognormal"` or `"normal"`), and `interpolationMode`
+    ///   (`"vol"` or `"total_variance"`); optional `displacements` (one
+    ///   shifted-Black shift per expiry) and `expiryClock` (optional
+    ///   calendar/day-count clock).
     ///
     /// @returns The validated `VolSurface`.
-    /// @throws `TypeError` (kind `invalid_type`) for a mistyped argument;
-    /// `FinstackError` (kind `validation`) for an empty or unsorted axis, a
-    /// grid of the wrong length, a negative or non-finite volatility, an
-    /// unknown axis, mode or quote-type name, or displacements that do not
-    /// match the quote convention and the expiry count.
+    /// @throws `TypeError` (kind `invalid_type`) for a mistyped argument or
+    /// missing required option; `FinstackError` (kind `validation`) for an
+    /// empty or unsorted axis, a grid of the wrong length, a negative or
+    /// non-finite volatility, an unknown option key, an unknown axis, mode or
+    /// quote-type name, or displacements that do not match the quote convention
+    /// and the expiry count.
     /// @param id - Surface identifier, the `MarketContext` lookup key.
     /// @param expiries - Option expiries in years, strictly increasing.
-    /// @param strikes - Secondary-axis coordinates (strikes, or swap tenors in years), strictly increasing.
-    /// @param vols - Decimal volatilities as a flat row-major (expiry-major) grid of `expiries.length * strikes.length` entries, finite and non-negative.
-    /// @param options - Optional `{ secondaryAxis, interpolationMode, quoteType, displacements }`: `secondaryAxis` is `"strike"` or `"tenor"`, `interpolationMode` is `"vol"` or `"total_variance"`, `quoteType` is `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`, and `displacements` holds one shifted-Black displacement per expiry (required for `"shifted_black_lognormal"` quotes). Every omitted key takes the Rust default.
+    /// @param secondaryValues - Secondary-axis coordinates (strikes, or swap tenors in years), strictly increasing.
+    /// @param vols - Decimal volatilities as a flat row-major (expiry-major) grid of `expiries.length * secondaryValues.length` entries, finite and non-negative.
+    /// @param options - `{ secondaryAxis, quoteType, interpolationMode, displacements?, expiryClock? }` with required `secondaryAxis`, `quoteType`, and `interpolationMode`, plus optional `displacements` and `expiryClock`.
     #[wasm_bindgen(constructor)]
     pub fn new(
         #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
         #[wasm_bindgen(unchecked_param_type = "NumericArray")] expiries: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
+        #[wasm_bindgen(js_name = "secondaryValues", unchecked_param_type = "NumericArray")]
+        secondary_values: JsValue,
         #[wasm_bindgen(unchecked_param_type = "NumericArray")] vols: JsValue,
-        #[wasm_bindgen(unchecked_optional_param_type = "VolSurfaceOptions | null")] options: Option<
-            JsValue,
-        >,
+        #[wasm_bindgen(unchecked_param_type = "VolSurfaceOptions")] options: JsValue,
     ) -> Result<JsVolSurface, JsValue> {
         let id = js_string(&id, "id")?;
         let expiries = js_f64_seq(&expiries, "expiries")?;
-        let strikes = js_f64_seq(&strikes, "strikes")?;
-        let options = match options
-            .as_ref()
-            .filter(|value| !value.is_undefined() && !value.is_null())
-        {
-            Some(value) => from_js_json::<VolSurfaceOptions>(value, "options")?,
-            None => VolSurfaceOptions::default(),
-        };
-        let mut opts = VolGridOpts::default();
-        if let Some(axis) = options.secondary_axis.as_deref() {
-            opts.secondary_axis = parse_label(axis)?;
-        }
-        if let Some(mode) = options.interpolation_mode.as_deref() {
-            opts.interpolation_mode = parse_label(mode)?;
-        }
-        if let Some(quote) = options.quote_type.as_deref() {
-            opts.quote_type = quote.parse().map_err(to_js_err)?;
-        }
+        let secondary_values = js_f64_seq(&secondary_values, "secondaryValues")?;
+        let options = parse_vol_surface_options(&options)?;
         let vols = js_f64_seq(&vols, "vols")?;
-        let surface = RustVolSurface::from_grid(
+        let opts = VolGridOpts {
+            secondary_axis: options.secondary_axis,
+            quote_type: options.quote_type,
+            interpolation_mode: options.interpolation_mode,
+        };
+        RustVolSurface::from_grid(
             id,
             &expiries,
-            &strikes,
+            &secondary_values,
             &vols,
             opts,
             options.displacements.as_deref(),
-        );
-        surface
-            .map(|surface| Self::from_inner(Arc::new(surface)))
-            .map_err(to_js_err)
+        )
+        .map(|surface| match options.expiry_clock {
+            Some(clock) => surface.with_expiry_clock(clock),
+            None => surface,
+        })
+        .map(Arc::new)
+        .map(|inner| Self { inner })
+        .map_err(to_js_err)
     }
 
     /// Deserialize from the canonical JSON wire form shared with Python `VolSurface.to_json`.
@@ -627,9 +871,9 @@ impl JsVolSurface {
     }
 
     /// Secondary axis (strikes, or swap tenors in years), strictly increasing.
-    #[wasm_bindgen(getter, js_name = strikes)]
-    pub fn strikes(&self) -> Box<[f64]> {
-        self.inner.strikes().into()
+    #[wasm_bindgen(getter, js_name = secondaryValues)]
+    pub fn secondary_values(&self) -> Box<[f64]> {
+        self.inner.secondary_values().into()
     }
 
     /// Flat row-major grid of decimal volatilities (`gridShape[0]` rows of `gridShape[1]`).
@@ -659,31 +903,13 @@ impl JsVolSurface {
         self.inner.displacements().map(Into::into)
     }
 
-    /// A shifted-Black copy of this surface carrying one displacement per
-    /// expiry (Rust `VolSurface::with_displacements`).
-    ///
-    /// # Arguments
-    ///
-    /// * `displacements` - Finite additive shifts in strike/rate units, one
-    ///   per expiry, in expiry-axis order.
-    ///
-    /// @returns A new validated `VolSurface` whose quote type is
-    /// `"shifted_black_lognormal"`; this surface is unchanged.
-    /// @throws `TypeError` (kind `invalid_type`) if `displacements` is not a
-    /// numeric array; `FinstackError` (kind `validation`) if the count differs
-    /// from the expiry count or a shift is non-finite.
-    /// @param displacements - Finite additive shifts in strike/rate units, one per expiry, in expiry-axis order.
-    #[wasm_bindgen(js_name = withDisplacements)]
-    pub fn with_displacements(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "NumericArray")] displacements: JsValue,
-    ) -> Result<JsVolSurface, JsValue> {
+    /// Optional volatility expiry clock, or `undefined` when not configured.
+    #[wasm_bindgen(getter, js_name = expiryClock)]
+    pub fn expiry_clock(&self) -> Option<JsVolatilityClock> {
         self.inner
-            .as_ref()
-            .clone()
-            .with_displacements(&js_f64_seq(&displacements, "displacements")?)
-            .map(|surface| Self::from_inner(Arc::new(surface)))
-            .map_err(to_js_err)
+            .expiry_clock()
+            .cloned()
+            .map(|inner| JsVolatilityClock { inner })
     }
 
     /// Interpolation across the expiry axis: `"vol"` or `"total_variance"`.
@@ -692,11 +918,11 @@ impl JsVolSurface {
         label(&self.inner.interpolation_mode())
     }
 
-    /// Grid dimensions as `[expiryCount, strikeCount]`.
+    /// Grid dimensions as `[expiryCount, secondaryValueCount]`.
     #[wasm_bindgen(getter, js_name = gridShape)]
     pub fn grid_shape(&self) -> Box<[usize]> {
-        let (expiries, strikes) = self.inner.grid_shape();
-        Box::new([expiries, strikes])
+        let (expiries, secondary_values) = self.inner.grid_shape();
+        Box::new([expiries, secondary_values])
     }
 }
 
@@ -716,6 +942,7 @@ impl JsVolSurface {
 ///   [2.0, 5.0],
 ///   [0.02, 0.03, 0.04],
 ///   [0.3, 0.25, 0.27, 0.28, 0.24, 0.26],
+///   "black_lognormal",
 /// );
 /// slice.gridShape; // [2, 3]
 /// slice.quoteType; // "black_lognormal"
@@ -738,8 +965,8 @@ impl JsVolCubeExpirySlice {
     /// * `strikes` - Strike coordinates in forward-rate units, strictly increasing.
     /// * `vols` - Flat tenor-major grid, `tenors.length * strikes.length`
     ///   entries: decimal Black volatilities or absolute normal volatilities.
-    /// * `quote_type` - `"black_lognormal"`, `"shifted_black_lognormal"` or
-    ///   `"normal"`; omitted uses `"black_lognormal"`.
+    /// * `quote_type` - Required convention: `"black_lognormal"`,
+    ///   `"shifted_black_lognormal"`, or `"normal"`.
     /// * `displacements` - Shifted-Black displacements in rate units, one per
     ///   tenor; required for shifted quotes and omitted otherwise.
     ///
@@ -753,7 +980,7 @@ impl JsVolCubeExpirySlice {
     /// @param tenors - Underlying tenors in years, positive and strictly increasing.
     /// @param strikes - Strike coordinates in forward-rate units, strictly increasing.
     /// @param vols - Flat tenor-major grid, `tenors.length * strikes.length` entries: decimal Black volatilities or absolute normal volatilities.
-    /// @param quoteType - `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`; omitted uses `"black_lognormal"`.
+    /// @param quoteType - Required convention: `"black_lognormal"`, `"shifted_black_lognormal"`, or `"normal"`.
     /// @param displacements - Shifted-Black displacements in rate units, one per tenor; required for shifted quotes and omitted otherwise.
     #[wasm_bindgen(constructor)]
     pub fn new(
@@ -762,15 +989,13 @@ impl JsVolCubeExpirySlice {
         #[wasm_bindgen(unchecked_param_type = "NumericArray")] tenors: JsValue,
         #[wasm_bindgen(unchecked_param_type = "NumericArray")] strikes: JsValue,
         #[wasm_bindgen(unchecked_param_type = "NumericArray")] vols: JsValue,
-        #[wasm_bindgen(js_name = "quoteType", unchecked_optional_param_type = "string | null")]
-        quote_type: Option<JsValue>,
+        #[wasm_bindgen(js_name = "quoteType", unchecked_param_type = "string")] quote_type: JsValue,
         #[wasm_bindgen(unchecked_optional_param_type = "NumericArray | null")]
         displacements: Option<JsValue>,
     ) -> Result<JsVolCubeExpirySlice, JsValue> {
-        let quote_type = js_opt_string(quote_type.as_ref(), "quoteType")?
-            .map(|quote| quote.parse().map_err(to_js_err))
-            .transpose()?
-            .unwrap_or_default();
+        let quote_type = js_string(&quote_type, "quoteType")?
+            .parse()
+            .map_err(to_js_err)?;
         let displacements = js_opt_f64_seq(displacements.as_ref(), "displacements")?;
         RustVolCubeExpirySlice::from_grid(
             js_string(&id, "id")?,

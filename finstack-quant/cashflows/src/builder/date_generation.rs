@@ -289,9 +289,9 @@ pub(crate) fn icma_sliced_year_fraction(
             coupon_period: Some((p_start, p_end)),
             ..context
         };
-        total.add(DayCount::ActActIsma.year_fraction(slice_start, slice_end, slice_ctx)?);
+        total.add(DayCount::ActActIsma.year_fraction(slice_start, slice_end, slice_ctx)?)?;
         if end <= p_end {
-            return Ok(total.total());
+            return total.get_total();
         }
         k += 1;
     }

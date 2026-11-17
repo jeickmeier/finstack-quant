@@ -74,18 +74,28 @@ fn collect_quanto_inputs(
             "QuantoOption",
         )?;
         let atm_fwd_fx = s_fx * ((r_dom - r_for) * t).exp();
-        debug_assert!(
-            atm_fwd_fx.is_finite() && atm_fwd_fx > 0.0,
-            "ATM forward FX must be positive finite, got {atm_fwd_fx} \
-             (spot={s_fx}, r_dom={r_dom}, r_for={r_for}, t={t})"
-        );
-        finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_fx_sigma_at(
-            &Default::default(),
-            curves,
-            fx_vol_surface_id.as_str(),
-            t,
+        finstack_quant_core::validation::validate_f64_positive(
             atm_fwd_fx,
-            atm_fwd_fx,
+            "QuantoOption ATM forward FX",
+        )?;
+        let fx_pair = finstack_quant_core::money::fx::CurrencyPair::try_new(
+            inst.base_currency,
+            inst.quote_currency,
+        )?;
+        let fx_overrides =
+            finstack_quant_valuations_core::instruments::pricing_overrides::MarketQuoteOverrides::default();
+        finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_fx_sigma(
+            finstack_quant_valuations_core::instruments::common_impl::vol_resolution::FxVolatilityRequest {
+                overrides: &fx_overrides,
+                curves,
+                vol_surface_id: fx_vol_surface_id.as_str(),
+                pair: fx_pair,
+                as_of,
+                expiry: inst.expiry,
+                model_time: t,
+                strike: atm_fwd_fx,
+                forward: atm_fwd_fx,
+            },
         )?
     } else {
         return Err(finstack_quant_core::Error::from(
@@ -215,7 +225,9 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::Attributes;
@@ -245,6 +257,8 @@ mod tests {
                 (1.5, (-0.09_f64).exp()),
                 (3.0, (-0.30_f64).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("usd curve");
         let jpy = DiscountCurve::builder("JPY-OIS")
@@ -256,17 +270,25 @@ mod tests {
                 (1.5, (-0.012_f64).exp()),
                 (3.0, (-0.045_f64).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("jpy curve");
         let eq_vol = VolSurface::builder("NKY-VOL")
             .expiries(&[2.0])
-            .strikes(&[35000.0])
+            .secondary_values(&[35000.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.22])
             .build()
             .expect("equity vol");
         let fx_vol = VolSurface::builder("JPYUSD-VOL")
             .expiries(&[2.0])
-            .strikes(&[1.0])
+            .secondary_values(&[1.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.10])
             .build()
             .expect("fx vol");
@@ -277,9 +299,12 @@ mod tests {
             .insert_surface(fx_vol)
             .insert_price(
                 "NKY-SPOT",
-                MarketScalar::Price(Money::from((34000_i64, Currency::JPY))),
+                MarketScalar::price(Money::from((34000_i64, Currency::JPY))),
             )
-            .insert_price("JPYUSD-SPOT", MarketScalar::Unitless(0.0068));
+            .insert_price(
+                "JPYUSD-SPOT",
+                MarketScalar::unitless(0.0068).expect("valid scalar"),
+            );
 
         let quanto = QuantoOption::builder()
             .id(InstrumentId::new("QUANTO-DISC"))
@@ -335,7 +360,8 @@ mod tests {
         let bug_r_dom = market
             .get_discount("USD-OIS")
             .expect("usd")
-            .zero_rate(t, finstack_quant_core::math::Compounding::Continuous);
+            .zero_rate(t, finstack_quant_core::math::Compounding::Continuous)
+            .expect("zero_rate");
         assert!(
             ((-bug_r_dom * t).exp() - df_dom).abs() > 1e-4,
             "fixture must expose the curve-axis bug for the domestic rate"
@@ -355,23 +381,33 @@ mod tests {
             .base_date(curve_base)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (3.0, (-0.09_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("usd curve");
         let jpy = DiscountCurve::builder("JPY-OIS")
             .base_date(curve_base)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (3.0, (-0.03_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("jpy curve");
         let eq_vol = VolSurface::builder("NKY-VOL")
             .expiries(&[2.0])
-            .strikes(&[35000.0])
+            .secondary_values(&[35000.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.22])
             .build()
             .expect("equity vol");
         let fx_vol = VolSurface::builder("JPYUSD-VOL")
             .expiries(&[2.0])
-            .strikes(&[1.0])
+            .secondary_values(&[1.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.10])
             .build()
             .expect("fx vol");
@@ -382,7 +418,7 @@ mod tests {
             .insert_surface(fx_vol)
             .insert_price(
                 "NKY-SPOT",
-                MarketScalar::Price(Money::from((36_000_i64, Currency::JPY))),
+                MarketScalar::price(Money::from((36_000_i64, Currency::JPY))),
             );
 
         let quanto = QuantoOption::builder()
@@ -452,26 +488,36 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (2.0, 1.0)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("usd flat curve");
         let eur = DiscountCurve::builder("EUR-OIS")
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (2.0, 1.0)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("eur flat curve");
 
         // Smile / skew surface: vol = 0.05 at 1.00, 0.20 at 1.10, 0.05 at 1.20.
         let fx_vol = VolSurface::builder("EURUSD-VOL")
             .expiries(&[1.0])
-            .strikes(&[1.00, 1.10, 1.20])
+            .secondary_values(&[1.00, 1.10, 1.20])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.05, 0.20, 0.05])
             .build()
             .expect("smile fx vol");
 
         let eq_vol = VolSurface::builder("AAPL-VOL")
             .expiries(&[1.0])
-            .strikes(&[100.0])
+            .secondary_values(&[100.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.30])
             .build()
             .expect("equity vol");
@@ -485,9 +531,12 @@ mod tests {
             .insert_surface(fx_vol)
             .insert_price(
                 "AAPL-SPOT",
-                MarketScalar::Price(Money::from((100_i64, Currency::EUR))),
+                MarketScalar::price(Money::from((100_i64, Currency::EUR))),
             )
-            .insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.10));
+            .insert_price(
+                "EURUSD-SPOT",
+                MarketScalar::unitless(1.10).expect("valid scalar"),
+            );
 
         let quanto = QuantoOption::builder()
             .id(InstrumentId::new("QUANTO-ATM"))

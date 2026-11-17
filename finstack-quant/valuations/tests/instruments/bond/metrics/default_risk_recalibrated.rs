@@ -45,6 +45,9 @@ fn discount_only() -> MarketContext {
         DiscountCurve::builder("USD-OIS")
             .base_date(AS_OF)
             .knots([(0.0, 1.0), (5.0, 0.86), (10.0, 0.74)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount"),
     )

@@ -90,9 +90,8 @@ class EcfSweepSpec:
         """
         Validate the sweep on its own (the Rust ``EcfSweepSpec::validate``).
 
-        The waterfall-level rule that a positive sweep needs a prepayment
-        priority is checked by :meth:`WaterfallSpec.validate`. Twin of the WASM
-        ``statements.validateEcfSweepSpecJson``.
+        :meth:`WaterfallSpec.validate` checks the pairing between this
+        configuration and the ``sweep`` priority.
 
         Raises
         ------
@@ -551,17 +550,17 @@ class WaterfallSpec:
     """
     Waterfall specification for dynamic cash flow allocation.
 
-    Combines priority-of-payments with optional ECF sweep, PIK toggle,
-    payment classes, and separate mandatory / voluntary prepay nodes.
+    The default order pays fees, interest, scheduled principal, and equity.
+    Prepayments require an explicit priority and sizing configuration.
     Call :meth:`validate` before passing to a builder to surface inconsistent
-    configurations (for example ``Sweep`` ordered after ``Equity``).
+    configurations (for example ``sweep`` ordered after ``equity``).
 
     Examples
     --------
     >>> from finstack_quant.statements import WaterfallSpec
     >>> waterfall = WaterfallSpec()
-    >>> waterfall.priority_of_payments[-1]
-    'equity'
+    >>> waterfall.priority_of_payments
+    ['fees', 'interest', 'amortization', 'equity']
 
     """
 
@@ -581,13 +580,15 @@ class WaterfallSpec:
         Parameters
         ----------
         priority_of_payments : list[str] or None, default None
-            Ordered payment labels, from highest to lowest priority; ``None``
-            applies the builder's default debt-before-equity sequence.
+            Ordered payment labels, from highest to lowest priority. ``None``
+            selects ``fees``, ``interest``, ``amortization``, and ``equity``.
         available_cash_node : str or None, default None
             Pre-waterfall cash-pool node or formula; ``None`` uses ``"cash"``.
             Do not deduct ``cs`` debt-service tokens here.
         ecf_sweep : EcfSweepSpec or None, default None
             Optional excess-cash-flow sweep applied within the waterfall.
+            List ``sweep`` explicitly before any ``equity`` priority to
+            allocate excess cash to principal.
         pik_toggle : PikToggleSpec or None, default None
             Optional liquidity-driven PIK versus cash-interest configuration.
         payment_classes : list[PaymentClassSpec] or None, default None
@@ -657,12 +658,10 @@ class WaterfallSpec:
         Validate the spec against internal consistency rules.
 
         Rejects duplicate priorities, a non-terminal ``equity`` entry, a
-        sweep percentage outside [0, 1], an empty PIK target list, a positive
-        ECF sweep without the ``sweep`` priority, mismatched prepayment
-        node/priority pairs in either direction, and — when
-        ``available_cash_node`` is set — a stack missing ``fees``,
-        ``interest`` or ``amortization``. It does not confirm that referenced
-        nodes or instruments exist; that needs the enclosing model.
+        sweep percentage outside [0, 1], an empty PIK target list, mismatched
+        prepayment priority and sizing configuration pairs, and a stack missing
+        ``fees``, ``interest``, or ``amortization``. Model evaluation resolves
+        node and instrument references.
 
         Raises
         ------
@@ -797,7 +796,8 @@ class WaterfallSpec:
         Returns
         -------
         EcfSweepSpec | None
-            Sweep configuration, or None when no ECF sweep was configured; a positive percentage requires the sweep priority.
+            Sweep configuration paired with the ``sweep`` priority, or ``None``
+            when no ECF sweep was configured.
 
         Notes
         -----

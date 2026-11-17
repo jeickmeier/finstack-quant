@@ -164,9 +164,9 @@ test('market re-ingestion rejects hierarchy nesting beyond canonical limits', ()
   const state = result.result.final_market;
   let node = {};
   for (let level = 0; level < 50; level += 1) {
-    node = { children: { [`Level${level}`]: node } };
+    node = { children: [{ name: `Level${level}`, node }] };
   }
-  state.hierarchy = { roots: { Rates: node } };
+  state.hierarchy = { roots: [{ name: 'Rates', node }] };
   assert.throws(
     () => core.MarketContext.fromJson(JSON.stringify(state)),
     (error) => {

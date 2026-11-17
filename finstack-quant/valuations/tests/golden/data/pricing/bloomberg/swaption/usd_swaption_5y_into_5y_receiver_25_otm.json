@@ -72,7 +72,7 @@
       "schema": "finstack_quant.calibration/1",
       "plan": {
         "id": "swaption_5y5y_market",
-        "description": "Snapshot-only calibration envelope: the swaption is a Bloomberg-parity test where the screen NPV (155,363.65) is the assertion target with tight 0.15% tolerance. Calibrating USD-SOFR-DISC from synthetic or even Bloomberg-transcribed quotes introduces ~1bp curve drift that shifts the swaption's NPV by tens of thousands — well outside the parity tolerance. The envelope wrap routes the fixture through engine::calibrate without changing pricing math, preserving the Bloomberg-parity contract.",
+        "description": "Snapshot-only calibration envelope: the swaption is a Bloomberg-parity test where the screen NPV (155,363.65) is the assertion target with tight 0.15% tolerance. Calibrating USD-SOFR-DISC from synthetic or even Bloomberg-transcribed quotes introduces ~1bp curve drift that shifts the swaption's NPV by tens of thousands \u2014 well outside the parity tolerance. The envelope wrap routes the fixture through engine::calibrate without changing pricing math, preserving the Bloomberg-parity contract.",
         "quote_sets": {},
         "steps": [],
         "settings": {
@@ -200,10 +200,7 @@
             ]
           ],
           "interp_style": "log_linear",
-          "extrapolation": "flat_forward",
-          "min_forward_rate": null,
-          "allow_non_monotonic": false,
-          "min_forward_tenor": 1e-06,
+          "extrapolation": "extend",
           "rate_calibration": null,
           "fx_policy": null
         },
@@ -213,7 +210,7 @@
           "expiries": [
             1.0
           ],
-          "strikes": [
+          "secondary_values": [
             5.0
           ],
           "secondary_axis": "tenor",

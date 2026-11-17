@@ -6,28 +6,22 @@ import json
 import math
 
 import pytest
+import QuantLib as ql  # type: ignore[import-not-found]  # noqa: N813
 
-from .common import SCHEMA, flat_forward_curve
+from .common import SCHEMA, chained_simple_discounts, projection_knots
 from .generate import generate
 
 
-@pytest.mark.parametrize(("day_count", "year_days"), [("act_360", 360.0), ("act_365f", 365.0)])
-def test_flat_forward_curve_records_contractual_projection_dates(day_count: str, year_days: float) -> None:
-    """Term-forward fixtures preserve their contractual reset grid."""
-    curve = flat_forward_curve(
-        "USD-SOFR-3M",
-        0.043,
-        day_count=day_count,
-        projection_dates=["2026-08-03", "2026-11-03"],
-    )
+def test_projection_knots_quote_the_contractual_forward_and_shift_continuously() -> None:
+    """Knots reproduce the quoted simple forward; the DV01 shift is a continuous factor shock."""
+    dates = [ql.Date(30, 4, 2026), ql.Date(3, 8, 2026), ql.Date(3, 11, 2026)]
+    accrual = 92.0 / 360.0
+    knots = projection_knots(dates, chained_simple_discounts(dates, 0.043, ql.Actual360()))
+    shifted = projection_knots(dates, chained_simple_discounts(dates, 0.043, ql.Actual360()), shift=1e-4)
 
-    assert curve["projection_grid"] == [
-        0.0,
-        95.0 / year_days,
-        187.0 / year_days,
-        30.0,
-    ]
-    assert curve["day_count"] == day_count
+    assert [time for time, _ in knots] == [0.0, 95.0 / 365.0, 187.0 / 365.0]
+    assert (knots[1][1] / knots[2][1] - 1.0) / accrual == pytest.approx(0.043, abs=1e-15)
+    assert shifted[1][1] / shifted[2][1] == pytest.approx(knots[1][1] / knots[2][1] * math.exp(1e-4 * 92.0 / 365.0))
 
 
 def test_generate_fra_is_deterministic_and_complete(tmp_path) -> None:

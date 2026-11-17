@@ -226,11 +226,13 @@ fn test_floating_rate_term_loan_yield_and_dm() {
 
     // Market: flat SOFR = 4.5%, flat discount = 5%
     let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
-    let fwd_curve = ForwardCurve::builder("USD-SOFR", 0.25)
-        .base_date(as_of)
-        .knots([(0.0, 0.045), (3.0, 0.045), (10.0, 0.045)])
-        .build()
-        .expect("forward curve");
+    let fwd_curve = ForwardCurve::flat(
+        "USD-SOFR",
+        as_of,
+        0.045,
+        finstack_quant_core::dates::DayCount::Act365F,
+    )
+    .expect("forward curve");
 
     let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
 

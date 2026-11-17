@@ -31,7 +31,7 @@
 //! `rate = cap( max( all_in_floor, (gearing * max(index, floor)) + spread ) )`
 
 use finstack_quant_core::Result;
-use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::fixings::require_fixing_value_exact;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
@@ -279,18 +279,23 @@ pub fn apply_bp_bounds(rate: f64, floor_bp: Option<f64>, cap_bp: Option<f64>) ->
 /// ```rust
 /// use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 /// use finstack_quant_core::market_data::term_structures::ForwardCurve;
+/// use finstack_quant_core::math::Compounding;
+/// use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 /// use finstack_quant_cashflows::builder::{project_floating_rate, FloatingRateParams};
 /// use time::Month;
 ///
 /// let reset = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
 /// let period_end = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
 ///
-/// let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-///     .base_date(reset)
-///     .day_count(DayCount::Act360)
-///     .knots([(0.0, 0.03), (1.0, 0.04)])
-///     .build()
-///     .expect("curve");
+/// let fwd = ForwardCurve::from_zero_rates(
+///     "USD-SOFR-3M",
+///     reset,
+///     &[(0.0, 0.03), (1.0, 0.04)],
+///     Compounding::Continuous,
+///     DayCount::Act360,
+///     InterpStyle::LogLinear,
+///     ExtrapolationPolicy::Extend,
+/// )?;
 ///
 /// let params = FloatingRateParams {
 ///     spread_bp: 200.0, // SOFR + 200 bp
@@ -347,11 +352,14 @@ pub fn observed_index_fixing(
     as_of: Date,
 ) -> Result<Option<f64>> {
     if observation_date < as_of {
-        return require_fixing_value_exact(fixings, forward_curve_id, observation_date, as_of)
-            .map(Some);
+        return require_fixing_value_exact(fixings, forward_curve_id, observation_date)
+            .map(Some)
+            .map_err(|err| {
+                finstack_quant_core::Error::Validation(format!("{err} (valuation date: {as_of})"))
+            });
     }
     if observation_date == as_of {
-        return Ok(fixings.and_then(|series| series.value_on_exact(observation_date).ok()));
+        return Ok(fixings.and_then(|series| series.get_value_exact(observation_date).ok()));
     }
     Ok(None)
 }
@@ -379,13 +387,14 @@ pub fn project_overnight_rate(
     observation_date: Date,
     day_count_basis: f64,
 ) -> Result<f64> {
-    let fwd_base = fwd.base_date();
-    let fwd_day_count = fwd.day_count();
-    let t = if observation_date == fwd_base {
-        0.0
-    } else {
-        fwd_day_count.year_fraction(fwd_base, observation_date, DayCountContext::default())?
-    };
+    if observation_date < fwd.base_date() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "overnight observation date {} is before the '{}' curve base date {}",
+            observation_date,
+            fwd.id(),
+            fwd.base_date(),
+        )));
+    }
     let observation_end = observation_date
         .checked_add(time::Duration::days(1))
         .ok_or_else(|| {
@@ -393,56 +402,41 @@ pub fn project_overnight_rate(
                 "overnight projection endpoint exceeds the date range for {observation_date}"
             ))
         })?;
-    let t_end =
-        fwd_day_count.year_fraction(fwd_base, observation_end, DayCountContext::default())?;
-    // Published fixings already use the contractual index convention. Curve
-    // observations use the curve clock, so convert their annualization.
     let index_year_fraction = 1.0 / day_count_basis;
-    let curve_year_fraction = t_end - t;
-    if !index_year_fraction.is_finite()
+    if !day_count_basis.is_finite()
+        || day_count_basis <= 0.0
+        || !index_year_fraction.is_finite()
         || index_year_fraction <= 0.0
-        || !curve_year_fraction.is_finite()
-        || curve_year_fraction <= 0.0
     {
         return Err(finstack_quant_core::Error::Validation(
             "overnight projection requires finite positive curve and index accrual fractions"
                 .into(),
         ));
     }
-    let rate = fwd.rate_period(t, t_end)? * (curve_year_fraction / index_year_fraction);
-    if !rate.is_finite() {
-        return Err(finstack_quant_core::Error::Validation(
-            "overnight projection produced a non-finite index rate".into(),
-        ));
-    }
-    Ok(rate)
+    fwd.rate_between_dates(observation_date, observation_end, index_year_fraction)
 }
 
-/// Project a term-index fixing in the contractual accrual convention.
+/// Project a term-index fixing in the contractual accrual convention from projection factors.
 ///
-/// [`ForwardCurve::rate`] stores annualized decimal rates on the curve's own
-/// day-count basis. This function preserves the reset-date observation and
-/// converts only its annualization: `curve_rate * curve_accrual / contract_accrual`.
-/// The coupon's index floor, cap, gearing and spread are applied afterward.
+/// Evaluates `(P(accrual_start) / P(accrual_end) - 1) / accrual_year_fraction`
+/// via [`ForwardCurve::rate_between_dates`], after rejecting historical
+/// resets before [`ForwardCurve::base_date`].
 ///
 /// # Arguments
 ///
 /// * `reset_date` - Contractual reset-effective date on or after the forward
 ///   curve base date; past resets require recorded observations instead.
-/// * `fwd` - Term-index forward curve. Its day count supplies the reset-time
-///   coordinate and the quoted rate's annualization basis.
-/// * `accrual_start` - Full contractual coupon start, including a past start for
-///   a future reset inside a running coupon. Notional or margin segmentation
-///   does not alter this annualization window.
-/// * `accrual_end` - Exclusive full coupon end after `accrual_start`.
-/// * `accrual_year_fraction` - Finite positive coupon accrual in the contractual
-///   index convention, calculated with any required schedule context.
+/// * `fwd` - Term-index forward projection factor curve.
+/// * `accrual_start` - Full contractual index period start.
+/// * `accrual_end` - Exclusive full index period end after `accrual_start`.
+/// * `accrual_year_fraction` - Finite positive accrual year fraction in the
+///   contractual index convention.
 ///
 /// # Errors
 ///
-/// Returns a validation error for a past reset, an empty or reversed period,
-/// a non-finite or non-positive accrual, or a non-finite projection. Day-count
-/// errors propagate when the curve clock cannot be evaluated.
+/// Returns a validation error for a past reset (`reset_date < fwd.base_date()`),
+/// an empty or reversed period, a non-finite or non-positive accrual, or factor
+/// evaluation failure.
 pub fn project_index_rate(
     reset_date: Date,
     fwd: &ForwardCurve,
@@ -450,7 +444,6 @@ pub fn project_index_rate(
     accrual_end: Date,
     accrual_year_fraction: f64,
 ) -> Result<f64> {
-    let fwd_day_count = fwd.day_count();
     let fwd_base = fwd.base_date();
 
     // Strictly-past resets are realized fixings; the curve must not clamp them
@@ -467,38 +460,13 @@ pub fn project_index_rate(
             fwd.id(),
         )));
     }
-    if accrual_end <= accrual_start {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "term index projection requires an accrual end after its start; \
-             got {accrual_start} to {accrual_end}"
-        )));
-    }
-    if !accrual_year_fraction.is_finite() || accrual_year_fraction <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(
-            "term index projection requires a finite positive contractual accrual fraction".into(),
-        ));
-    }
-    let t0 = if reset_date == fwd_base {
-        0.0
-    } else {
-        fwd_day_count.signed_year_fraction(fwd_base, reset_date, DayCountContext::default())?
-    };
-    let curve_accrual =
-        fwd_day_count.year_fraction(accrual_start, accrual_end, DayCountContext::default())?;
-    // Keep the tenor fixing at the reset date; only its annualization changes.
-    let index_rate = fwd.rate(t0) * (curve_accrual / accrual_year_fraction);
-    if !curve_accrual.is_finite() || curve_accrual <= 0.0 || !index_rate.is_finite() {
-        return Err(finstack_quant_core::Error::Validation(
-            "term index projection produced an invalid curve accrual or non-finite rate".into(),
-        ));
-    }
-    Ok(index_rate)
+    fwd.rate_between_dates(accrual_start, accrual_end, accrual_year_fraction)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use finstack_quant_core::dates::{Date, DateExt, DayCount};
+    use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use time::Month;
@@ -512,13 +480,21 @@ mod tests {
             "FIXING:TEST",
             vec![(past, 0.041), (as_of, 0.042), (future, 0.99)],
             None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .expect("complete series with a future observation");
-        let incomplete = ScalarTimeSeries::new("FIXING:TEST", vec![(future, 0.99)], None)
-            .expect("no historical or valuation-day observation");
+        let incomplete = ScalarTimeSeries::new(
+            "FIXING:TEST",
+            vec![(future, 0.99)],
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("no historical or valuation-day observation");
         for history in [None, Some(&incomplete), Some(&complete)] {
             let past_result = observed_index_fixing(past, history, "TEST", as_of);
-            if history.is_some_and(|series| series.value_on_exact(past).is_ok()) {
+            if history.is_some_and(|series| series.get_value_exact(past).is_ok()) {
                 assert_eq!(past_result.expect("recorded fixing"), Some(0.041));
             } else {
                 assert!(matches!(
@@ -528,7 +504,7 @@ mod tests {
             }
             assert_eq!(
                 observed_index_fixing(as_of, history, "TEST", as_of).expect("same-day policy"),
-                history.and_then(|series| series.value_on_exact(as_of).ok()),
+                history.and_then(|series| series.get_value_exact(as_of).ok()),
             );
             assert_eq!(
                 observed_index_fixing(future, history, "TEST", as_of).expect("future projection"),
@@ -560,12 +536,16 @@ mod tests {
     }
 
     fn create_test_market(base_date: Date) -> MarketContext {
-        let fwd_curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-            .base_date(base_date)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.03), (1.0, 0.035), (5.0, 0.04)])
-            .build()
-            .expect("ForwardCurve builder should succeed with valid test data");
+        let fwd_curve = ForwardCurve::from_zero_rates(
+            "USD-SOFR-3M",
+            base_date,
+            &[(0.0, 0.03), (1.0, 0.035), (5.0, 0.04)],
+            finstack_quant_core::math::Compounding::Continuous,
+            DayCount::Act360,
+            finstack_quant_core::math::interp::InterpStyle::LogLinear,
+            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+        )
+        .expect("ForwardCurve builder should succeed with valid test data");
         MarketContext::new().insert(fwd_curve)
     }
 
@@ -588,12 +568,8 @@ mod tests {
     fn test_project_floating_rate_with_floor() {
         let reset = Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
 
-        let fwd_curve = ForwardCurve::builder("USD-LIBOR-3M", 0.25)
-            .base_date(reset)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.001), (1.0, 0.001), (5.0, 0.001)]) // 0.1% < 1% floor
-            .build()
-            .expect("ForwardCurve builder should succeed with valid test data");
+        let fwd_curve = ForwardCurve::flat("USD-LIBOR-3M", reset, 0.001, DayCount::Act360)
+            .expect("ForwardCurve flat should succeed with valid test data");
         let market = MarketContext::new().insert(fwd_curve);
 
         let params = FloatingRateParams {
@@ -616,12 +592,8 @@ mod tests {
     fn test_project_floating_rate_with_cap() {
         let reset = Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
 
-        let fwd_curve = ForwardCurve::builder("USD-LIBOR-3M", 0.25)
-            .base_date(reset)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.08), (1.0, 0.08), (5.0, 0.08)]) // 8% index
-            .build()
-            .expect("ForwardCurve builder should succeed with valid test data");
+        let fwd_curve = ForwardCurve::flat("USD-LIBOR-3M", reset, 0.08, DayCount::Act360)
+            .expect("ForwardCurve flat should succeed with valid test data");
         let market = MarketContext::new().insert(fwd_curve);
 
         let params = FloatingRateParams {
@@ -644,12 +616,8 @@ mod tests {
     fn test_floor_applied_before_spread() {
         let reset = Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
 
-        let fwd_curve = ForwardCurve::builder("TEST-INDEX", 0.25)
-            .base_date(reset)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.0001), (1.0, 0.0001)]) // 0.01% index (below 1% floor)
-            .build()
-            .expect("ForwardCurve builder should succeed with valid test data");
+        let fwd_curve = ForwardCurve::flat("TEST-INDEX", reset, 0.0001, DayCount::Act360)
+            .expect("ForwardCurve flat should succeed with valid test data");
         let market = MarketContext::new().insert(fwd_curve);
 
         let params = FloatingRateParams {
@@ -672,12 +640,8 @@ mod tests {
     fn test_cap_applied_after_gearing() {
         let reset = Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
 
-        let fwd_curve = ForwardCurve::builder("TEST-INDEX", 0.25)
-            .base_date(reset)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.03), (1.0, 0.03)]) // 3% index
-            .build()
-            .expect("ForwardCurve builder should succeed with valid test data");
+        let fwd_curve = ForwardCurve::flat("TEST-INDEX", reset, 0.03, DayCount::Act360)
+            .expect("ForwardCurve flat should succeed with valid test data");
         let market = MarketContext::new().insert(fwd_curve);
 
         let params = FloatingRateParams {
@@ -701,12 +665,8 @@ mod tests {
     fn test_gearing_multiplies_all_in_rate() {
         let reset = Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
 
-        let fwd_curve = ForwardCurve::builder("TEST-INDEX", 0.25)
-            .base_date(reset)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.02), (1.0, 0.02)]) // 2% index
-            .build()
-            .expect("ForwardCurve builder should succeed with valid test data");
+        let fwd_curve = ForwardCurve::flat("TEST-INDEX", reset, 0.02, DayCount::Act360)
+            .expect("ForwardCurve flat should succeed with valid test data");
         let market = MarketContext::new().insert(fwd_curve);
 
         let params = FloatingRateParams {
@@ -729,12 +689,8 @@ mod tests {
     fn test_direct_curve_projection() {
         let reset = Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
 
-        let fwd_curve = ForwardCurve::builder("TEST-INDEX", 0.25)
-            .base_date(reset)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.03), (1.0, 0.03)])
-            .build()
-            .expect("ForwardCurve builder should succeed with valid test data");
+        let fwd_curve = ForwardCurve::flat("TEST-INDEX", reset, 0.03, DayCount::Act360)
+            .expect("ForwardCurve flat should succeed with valid test data");
 
         let params = FloatingRateParams {
             spread_bp: 150.0,
@@ -753,50 +709,43 @@ mod tests {
     }
 
     #[test]
-    fn term_projection_uses_the_reset_date_fixing_not_the_period_average() {
+    fn term_projection_projects_factor_growth_over_contractual_period() {
         let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
         let reset = Date::from_calendar_date(2025, Month::April, 1).expect("Valid test date");
         let period_end = Date::from_calendar_date(2025, Month::July, 1).expect("Valid test date");
-        let fwd_curve = ForwardCurve::builder("TEST-INDEX", 0.25)
-            .base_date(base)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.01), (1.0, 0.21)])
-            .build()
-            .expect("ForwardCurve builder should succeed with valid test data");
+        let fwd_curve = ForwardCurve::from_zero_rates(
+            "TEST-INDEX",
+            base,
+            &[(0.0, 0.01), (1.0, 0.05)],
+            finstack_quant_core::math::Compounding::Continuous,
+            DayCount::Act360,
+            finstack_quant_core::math::interp::InterpStyle::LogLinear,
+            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+        )
+        .expect("ForwardCurve should build with valid test data");
         let params = FloatingRateParams::default();
-        let reset_t = fwd_curve
-            .day_count()
-            .year_fraction(base, reset, DayCountContext::default())
-            .expect("valid reset year fraction");
-        let period_end_t = fwd_curve
-            .day_count()
-            .year_fraction(base, period_end, DayCountContext::default())
-            .expect("valid period-end year fraction");
-        let reset_fixing = fwd_curve.rate(reset_t);
-        let integrated_average = fwd_curve
-            .rate_period(reset_t, period_end_t)
-            .expect("finite ordered period");
-
         let accrual = (period_end - reset).whole_days() as f64 / 360.0;
+        let expected = fwd_curve
+            .rate_between_dates(reset, period_end, accrual)
+            .expect("factor interval rate");
+
         let projected =
             project_floating_rate(reset, &fwd_curve, &params, reset, period_end, accrual)
                 .expect("term projection should succeed");
 
-        assert!((reset_fixing - integrated_average).abs() > 1e-6);
-        assert!((projected - reset_fixing).abs() < 1e-14);
+        assert!((projected - expected).abs() < 1e-14);
     }
 
     #[test]
     fn term_projection_converts_curve_basis_before_coupon_constraints() {
         let reset = Date::from_calendar_date(2025, Month::April, 2).expect("reset");
         let period_end = Date::from_calendar_date(2025, Month::July, 2).expect("period end");
-        let fwd = ForwardCurve::builder("USD-TERM", 0.25)
-            .base_date(reset)
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, 0.04), (1.0, 0.04)])
-            .build()
+        let days = (period_end - reset).whole_days() as f64;
+        let t_period = days / 365.0;
+        let simple_365_cont_equiv = (0.04 * t_period).ln_1p() / t_period;
+        let fwd = ForwardCurve::flat("USD-TERM", reset, simple_365_cont_equiv, DayCount::Act365F)
             .expect("curve");
-        let accrual = (period_end - reset).whole_days() as f64 / 360.0;
+        let accrual = days / 360.0;
         let index = project_index_rate(reset, &fwd, reset, period_end, accrual)
             .expect("contractual index rate");
         assert!((index - 0.04 * 360.0 / 365.0).abs() < 1e-14);
@@ -817,11 +766,7 @@ mod tests {
     fn term_projection_rejects_invalid_contractual_periods() {
         let reset = Date::from_calendar_date(2025, Month::April, 2).expect("reset");
         let period_end = Date::from_calendar_date(2025, Month::July, 2).expect("period end");
-        let fwd = ForwardCurve::builder("USD-TERM", 0.25)
-            .base_date(reset)
-            .knots([(0.0, 0.04), (1.0, 0.04)])
-            .build()
-            .expect("curve");
+        let fwd = ForwardCurve::flat("USD-TERM", reset, 0.04, DayCount::Act360).expect("curve");
         for accrual in [0.0, -0.25, f64::NAN, f64::INFINITY] {
             assert!(project_index_rate(reset, &fwd, reset, period_end, accrual).is_err());
         }
@@ -969,12 +914,8 @@ mod tests {
     fn test_projection_fails_on_invalid_params() {
         let reset = Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
 
-        let fwd_curve = ForwardCurve::builder("TEST-INDEX", 0.25)
-            .base_date(reset)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.03), (1.0, 0.03)])
-            .build()
-            .expect("ForwardCurve builder should succeed");
+        let fwd_curve = ForwardCurve::flat("TEST-INDEX", reset, 0.03, DayCount::Act360)
+            .expect("ForwardCurve flat should succeed");
 
         let params = FloatingRateParams {
             all_in_floor_bp: Some(500.0),

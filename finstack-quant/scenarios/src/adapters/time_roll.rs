@@ -75,8 +75,8 @@ pub(crate) fn resolve_roll_dates(
 /// theta/carry for each instrument (if a portfolio is supplied). Theta is
 /// realized-forward: carry is `PV_rolled(t1) - PV(t0) + CF_(t0,t1]`, where
 /// `t1` is valued on the market after
-/// [`MarketContext::roll_forward`](finstack_quant_core::market_data::context::MarketContext::roll_forward)
-/// (curves realize their forwards). It is not a frozen-knot lookup of the
+/// [`MarketContext::condition`](finstack_quant_core::market_data::context::MarketContext::condition)
+/// (discount, forward, parametric, and hazard curves condition onto `new_date`). It is not a frozen-knot lookup of the
 /// unrolled market at a shifted `as_of`. Before rolling curves, raw coupon
 /// observations crossed in `[t0, t1]` on advancing rolls are materialized from the canonical
 /// pre-roll schedules. Existing exact-date observations retain priority. A
@@ -161,12 +161,9 @@ pub(crate) fn apply_time_roll_forward(
         ));
     }
 
-    // Roll all curves forward (adjusts base dates, shifts knots, filters expired).
-    // Realized-forward semantics: every curve realizes its forwards as the
-    // base date advances (discount curves renormalize by DF(dt), hazard
-    // curves preserve hazard rates, forward curves preserve forwards,
-    // inflation rebases CPI, price/vol-index curves set spot to the old
-    // forward). Vol surfaces, FX spot, and fixings stay static.
+    // Condition curves onto `new_date` (`discount`, `forward`, `parametric`, and
+    // `hazard` condition onto `new_date`, while `inflation`, `price`, and `basis_spread`
+    // remain frozen per CORE-MARKET-20). Vol surfaces, FX spot, and fixings stay static.
     let schedules = ctx.instruments.as_ref().map_or_else(
         || Ok(Vec::new()),
         |instruments| {
@@ -188,7 +185,7 @@ pub(crate) fn apply_time_roll_forward(
     let projected_market = finstack_quant_cashflows::fixings::materialize_fixings(
         ctx.market, &schedules, old_date, new_date,
     )?;
-    let mut rolled_market = projected_market.roll_forward(day_shift)?;
+    let mut rolled_market = projected_market.condition(new_date)?;
     for (hazard_id, discount_id) in &hazard_rolls {
         use finstack_quant_valuations::recalibration::{
             HazardRecalibrationAction, HazardRecalibrationRequest,
@@ -500,6 +497,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(origin)
             .knots([(0.0, 1.0), (1.0, 0.98)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
         let mut market = MarketContext::new().insert(curve).insert_series(
@@ -507,6 +507,8 @@ mod tests {
                 "FIXING:USD-SOFR",
                 vec![(origin, 0.035)],
                 Some(Currency::USD),
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
             )
             .unwrap(),
         );
@@ -593,6 +595,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(base_date)
             .knots(vec![(0.0, 1.0), (1.0, 0.98), (5.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid discount curve");
 
@@ -697,6 +702,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(base_date)
             .knots(vec![(0.0, 1.0), (1.0, 0.98), (5.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid discount curve");
 
@@ -747,8 +755,8 @@ mod tests {
         }
 
         let rolled = market
-            .roll_forward(31)
-            .expect("roll market for expected t1");
+            .condition(new_date)
+            .expect("condition market for expected t1");
         let pv_new = instrument
             .value(&rolled, new_date)
             .expect("pv at t1 on rolled market");
@@ -924,6 +932,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(base_date)
             .knots(vec![(0.0, 1.0), (1.0, 0.98), (2.0, 0.955), (5.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid discount curve");
         let old_curve = curve.clone();
@@ -953,11 +964,11 @@ mod tests {
             .day_count()
             .year_fraction(base_date, report.new_date, DayCountContext::default())
             .expect("year fraction");
-        let df_dt = old_curve.df(dt);
+        let df_dt = old_curve.df(dt).expect("df");
 
         for t_old in [1.0_f64, 2.0, 5.0] {
-            let expected = old_curve.df(t_old) / df_dt;
-            let actual = rolled_curve.df(t_old - dt);
+            let expected = old_curve.df(t_old).expect("df") / df_dt;
+            let actual = rolled_curve.df(t_old - dt).expect("df");
             assert!(
                 (actual - expected).abs() < 1e-12,
                 "DF_rolled({}) should equal DF_old({t_old})/DF_old(dt): {actual} vs {expected}",

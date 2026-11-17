@@ -110,12 +110,22 @@ fn coupon_schedule_reconciles_with_priced_pv_with_reset_lag_and_fixing() {
 
     // Off-curve fixings for the first period's lagged reset (2024-12-30 both
     // calendars): 4% USD / 3% EUR against 2% / 1.5% curve forwards.
-    let usd_fixing =
-        ScalarTimeSeries::new("FIXING:USD-SOFR-3M", vec![(d(2024, 12, 30), 0.04)], None)
-            .expect("usd fixing series");
-    let eur_fixing =
-        ScalarTimeSeries::new("FIXING:EUR-EURIBOR-3M", vec![(d(2024, 12, 30), 0.03)], None)
-            .expect("eur fixing series");
+    let usd_fixing = ScalarTimeSeries::new(
+        "FIXING:USD-SOFR-3M",
+        vec![(d(2024, 12, 30), 0.04)],
+        None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+    )
+    .expect("usd fixing series");
+    let eur_fixing = ScalarTimeSeries::new(
+        "FIXING:EUR-EURIBOR-3M",
+        vec![(d(2024, 12, 30), 0.03)],
+        None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+    )
+    .expect("eur fixing series");
     let market = market_with_fx()
         .insert_series(usd_fixing)
         .insert_series(eur_fixing);

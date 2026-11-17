@@ -175,13 +175,13 @@ fn quote_carry(
     let mut detached_pv_as_of = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     for (date, amount) in detached_by_date {
         if amount != 0.0 {
-            detached_pv_as_of.add(amount * curve.df_between_dates(as_of, date)?);
+            detached_pv_as_of.add(amount * curve.df_between_dates(as_of, date)?)?;
         }
     }
 
     Ok(QuoteCarry {
         settlement_df,
-        detached_pv_as_of: detached_pv_as_of.total(),
+        detached_pv_as_of: detached_pv_as_of.get_total()?,
     })
 }
 
@@ -278,6 +278,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.80)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new().insert(curve);
@@ -379,6 +382,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.80)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new().insert(curve);

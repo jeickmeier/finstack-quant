@@ -13,8 +13,42 @@ use crate::market_data::term_structures::{
 use crate::types::CurveId;
 
 use super::{CurveStorage, MarketContext};
+use crate::market_data::bumps::MarketDataTarget;
 
 impl MarketContext {
+    /// Resolve the typed [`MarketDataTarget`] for an existing curve in `self.curves`.
+    ///
+    /// Inspects only the curve store (`curves`) so bare identifiers never
+    /// probe unrelated stores such as surfaces, prices, or time series.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Curve identifier to inspect inside the curve registry.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InputError::NotFound`](crate::InputError::NotFound) if no
+    /// curve with `id` exists in `self.curves`.
+    pub fn curve_target(&self, id: impl AsRef<str>) -> Result<MarketDataTarget> {
+        let id_str = id.as_ref();
+        let storage = self
+            .curves
+            .get(id_str)
+            .ok_or_else(|| self.missing_curve_error(id_str))?;
+        let target = match storage {
+            CurveStorage::Discount(c) => MarketDataTarget::DiscountCurve(c.id().clone()),
+            CurveStorage::Forward(c) => MarketDataTarget::ForwardCurve(c.id().clone()),
+            CurveStorage::Parametric(c) => MarketDataTarget::ParametricCurve(c.id().clone()),
+            CurveStorage::Hazard(c) => MarketDataTarget::HazardCurve(c.id().clone()),
+            CurveStorage::Inflation(c) => MarketDataTarget::InflationCurve(c.id().clone()),
+            CurveStorage::Price(c) if c.kind() == PriceCurveKind::VolIndex => {
+                MarketDataTarget::VolIndexCurve(c.id().clone())
+            }
+            CurveStorage::Price(c) => MarketDataTarget::PriceCurve(c.id().clone()),
+            CurveStorage::BaseCorrelation(c) => MarketDataTarget::BaseCorrelation(c.id().clone()),
+        };
+        Ok(target)
+    }
     #[inline]
     fn not_found_error(id: &str) -> crate::Error {
         crate::InputError::NotFound { id: id.to_string() }.into()
@@ -221,11 +255,16 @@ impl MarketContext {
     /// # Examples
     /// ```rust
     /// # use finstack_quant_core::market_data::context::MarketContext;
-    /// # use finstack_quant_core::market_data::surfaces::VolSurface;
+    /// # use finstack_quant_core::market_data::surfaces::{
+    /// #     VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    /// # };
     /// # use finstack_quant_core::types::CurveId;
     /// # let surface = VolSurface::builder("IR-Swaption")
     /// #     .expiries(&[1.0, 2.0])
-    /// #     .strikes(&[90.0, 100.0])
+    /// #     .secondary_values(&[90.0, 100.0])
+    /// #     .secondary_axis(VolSurfaceAxis::Strike)
+    /// #     .quote_type(VolQuoteType::BlackLognormal)
+    /// #     .interpolation_mode(VolInterpolationMode::Vol)
     /// #     .row(&[0.2, 0.2])
     /// #     .row(&[0.2, 0.2])
     /// #     .build()
@@ -256,8 +295,8 @@ impl MarketContext {
     /// use finstack_quant_core::currency::Currency;
     ///
     /// let ctx = MarketContext::new()
-    ///     .insert_price("AAPL", MarketScalar::Price(Money::from((180_i64, Currency::USD))));
-    /// if let MarketScalar::Price(price) = ctx.get_price("AAPL").expect("Price should exist") {
+    ///     .insert_price("AAPL", MarketScalar::price(Money::from((180_i64, Currency::USD))));
+    /// if let Some(price) = ctx.get_price("AAPL").expect("Price should exist").get_price() {
     ///     assert_eq!(price.currency(), Currency::USD);
     /// }
     /// ```
@@ -277,7 +316,7 @@ impl MarketContext {
     /// # Examples
     /// ```rust
     /// # use finstack_quant_core::market_data::context::MarketContext;
-    /// # use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+    /// # use finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation};
     /// # use finstack_quant_core::dates::Date;
     /// # use time::Month;
     /// # let series = ScalarTimeSeries::new(
@@ -287,6 +326,8 @@ impl MarketContext {
     /// #         (Date::from_calendar_date(2024, Month::February, 1).expect("Valid date"), 0.25),
     /// #     ],
     /// #     None,
+    /// #     SeriesInterpolation::Step,
+    /// #     SeriesExtrapolation::Error,
     /// # ).expect("... creation should succeed");
     /// # let ctx = MarketContext::new().insert_series(series);
     /// let series = ctx.get_series("VOL-TS").expect("Series should exist");
@@ -308,17 +349,29 @@ impl MarketContext {
     /// # Examples
     /// ```rust
     /// # use finstack_quant_core::market_data::context::MarketContext;
-    /// # use finstack_quant_core::market_data::scalars::{InflationIndex, SeriesInterpolation};
+    /// # use finstack_quant_core::market_data::scalars::{InflationIndex, InflationObservation};
     /// # use finstack_quant_core::currency::Currency;
     /// # use finstack_quant_core::dates::Date;
     /// # use time::Month;
     /// # let observations = vec![
-    /// #     (Date::from_calendar_date(2024, Month::January, 31).expect("Valid date"), 100.0),
-    /// #     (Date::from_calendar_date(2024, Month::February, 29).expect("Valid date"), 101.0),
+    /// #     InflationObservation {
+    /// #         reference_month: Date::from_calendar_date(2024, Month::January, 1).expect("Valid date"),
+    /// #         value: 100.0,
+    /// #         available_on: Date::from_calendar_date(2024, Month::February, 13).expect("Valid date"),
+    /// #     },
+    /// #     InflationObservation {
+    /// #         reference_month: Date::from_calendar_date(2024, Month::February, 1).expect("Valid date"),
+    /// #         value: 101.0,
+    /// #         available_on: Date::from_calendar_date(2024, Month::March, 12).expect("Valid date"),
+    /// #     },
     /// # ];
-    /// # let index = InflationIndex::new("US-CPI", observations, Currency::USD)
-    /// #     .expect("... creation should succeed")
-    /// #     .with_interpolation(SeriesInterpolation::Linear);
+    /// # let index = InflationIndex::new(
+    /// #     "US-CPI",
+    /// #     observations,
+    /// #     Currency::USD,
+    /// #     Date::from_calendar_date(2024, Month::April, 1).expect("Valid date"),
+    /// # )
+    /// #     .expect("... creation should succeed");
     /// # let ctx = MarketContext::new().insert_inflation_index(index);
     /// let idx = ctx.get_inflation_index("US-CPI").expect("Inflation index should exist");
     /// assert_eq!(idx.id(), "US-CPI");
@@ -332,16 +385,22 @@ impl MarketContext {
     /// # Examples
     /// ```rust
     /// # use finstack_quant_core::market_data::context::MarketContext;
-    /// # use finstack_quant_core::market_data::surfaces::FxDeltaVolSurface;
-    /// # let surface = FxDeltaVolSurface::new(
-    /// #     "EURUSD-DELTA-VOL",
-    /// #     vec![0.25, 0.5, 1.0],
-    /// #     vec![0.08, 0.085, 0.09],
-    /// #     vec![0.01, 0.012, 0.015],
-    /// #     vec![0.005, 0.006, 0.007],
-    /// #     None,
-    /// #     None,
-    /// # ).expect("surface should build");
+    /// # use finstack_quant_core::currency::Currency;
+    /// # use finstack_quant_core::market_data::surfaces::{
+    /// #     FxAtmConvention, FxButterflyConvention, FxDeltaConvention, FxDeltaVolSurface,
+    /// # };
+    /// # use finstack_quant_core::money::fx::CurrencyPair;
+    /// # let pair = CurrencyPair::try_new(Currency::EUR, Currency::USD).expect("valid pair");
+    /// # let surface = FxDeltaVolSurface::builder("EURUSD-DELTA-VOL", pair)
+    /// #     .delta_convention(FxDeltaConvention::ForwardUnadjusted)
+    /// #     .atm_convention(FxAtmConvention::DeltaNeutralStraddle)
+    /// #     .butterfly_convention(FxButterflyConvention::Smile)
+    /// #     .expiries(&[0.25, 0.5, 1.0])
+    /// #     .atm_vols(&[0.08, 0.085, 0.09])
+    /// #     .rr_25d(&[0.01, 0.012, 0.015])
+    /// #     .bf_25d(&[0.005, 0.006, 0.007])
+    /// #     .build()
+    /// #     .expect("surface should build");
     /// # let mut ctx = MarketContext::new();
     /// # ctx.insert_fx_delta_vol_surface_mut(surface);
     /// let surf = ctx.get_fx_delta_vol_surface("EURUSD-DELTA-VOL")
@@ -368,7 +427,8 @@ impl MarketContext {
     /// # let hazard = Arc::new(HazardCurve::builder("CDX")
     /// #     .base_date(Date::from_calendar_date(2024, Month::January, 1).expect("Valid date"))
     /// #     .recovery_rate(0.40)
-    /// #     .knots([(0.0, 0.01), (5.0, 0.015)])
+    /// #     .knots([(1.0, 0.01), (5.0, 0.015)])
+    /// .day_count(finstack_quant_core::dates::DayCount::Act365F)
     /// #     .build()
     /// #     .expect("... creation should succeed"));
     /// # let base_corr = Arc::new(BaseCorrelationCurve::builder("CDX-BC")

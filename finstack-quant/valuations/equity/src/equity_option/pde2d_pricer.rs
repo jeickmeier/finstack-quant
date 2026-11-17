@@ -252,18 +252,28 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (10.0, (-0.03_f64 * 10.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let surface = VolSurface::builder("SPX-VOL")
             .expiries(&[1.0])
-            .strikes(&[100.0])
+            .secondary_values(&[100.0])
+            .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+            .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             .row(&[0.20])
             .build()
             .expect("surface");
         MarketContext::new()
             .insert(curve)
             .insert_surface(surface)
-            .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0))
+            .insert_price(
+                "SPX-SPOT",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            )
     }
 
     fn option(expiry: Date) -> EquityOption {
@@ -327,7 +337,8 @@ mod tests {
             ("HESTON_RHO", -0.7),
             ("HESTON_V0", v0),
         ] {
-            market = market.insert_price(name, MarketScalar::Unitless(value));
+            market =
+                market.insert_price(name, MarketScalar::unitless(value).expect("valid scalar"));
         }
         market
     }
@@ -373,8 +384,10 @@ mod tests {
         // Include attainable-zero-variance dynamics (sigma=.6 violates the
         // Feller condition) as well as a high-initial-variance stress.
         for (v0, sigma) in [(0.0001, 0.3), (0.0001, 0.6), (2.0, 0.3)] {
-            let market =
-                variance_market(v0).insert_price("HESTON_SIGMA_V", MarketScalar::Unitless(sigma));
+            let market = variance_market(v0).insert_price(
+                "HESTON_SIGMA_V",
+                MarketScalar::unitless(sigma).expect("valid scalar"),
+            );
             let evaluate = |nx, nv, nt| {
                 EquityOptionHestonPdePricer {
                     space_points_x: nx,

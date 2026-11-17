@@ -90,6 +90,7 @@ mod tests {
             .day_count(DayCount::Act365F)
             .knots(knots)
             .interp(InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("flat discount curve")
     }
@@ -506,6 +507,7 @@ mod tests {
                 (2.0, (-0.06_f64).exp()),
                 (3.0, (-0.15_f64).exp()),
             ])
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("repo curve");
         let t_start = DayCount::Act365F

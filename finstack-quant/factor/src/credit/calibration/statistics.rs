@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use finstack_quant_core::Result;
-use finstack_quant_core::math::stats::{OnlineCovariance, mean};
+use finstack_quant_core::math::stats::{correlation, mean};
 use finstack_quant_core::types::IssuerId;
 
 use super::config::VolModelChoice;
@@ -140,15 +140,15 @@ pub(super) fn assign_adder_vol(
     bucket_paths: &BTreeMap<IssuerId, Vec<String>>,
     idiosyncratic_overrides: &BTreeMap<IssuerId, f64>,
     num_levels: usize,
-) -> (f64, AdderVolSource) {
+) -> finstack_quant_core::Result<(f64, AdderVolSource)> {
     // 1. Caller override wins for any mode.
     if let Some(&override_vol) = idiosyncratic_overrides.get(issuer_id) {
-        return (override_vol, AdderVolSource::CallerSupplied);
+        return Ok((override_vol, AdderVolSource::CallerSupplied));
     }
 
     // 2. Successful FromHistory fit (any mode).
     if let Some(&vol) = from_history_vols.get(issuer_id) {
-        return (vol, AdderVolSource::FromHistory);
+        return Ok((vol, AdderVolSource::FromHistory));
     }
 
     // 3. Bucket-peer proxy cascade: walk from deepest level to broadest.
@@ -159,12 +159,12 @@ pub(super) fn assign_adder_vol(
                 if let Some(peer_vols) = peer_proxy_index[k].get(bucket)
                     && !peer_vols.is_empty()
                 {
-                    return (
-                        mean(peer_vols),
+                    return Ok((
+                        mean(peer_vols)?.unwrap_or(0.0),
                         AdderVolSource::BucketPeerProxy {
                             peer_bucket: bucket.clone(),
                         },
-                    );
+                    ));
                 }
             }
         }
@@ -173,11 +173,11 @@ pub(super) fn assign_adder_vol(
     // 4. Global mean of all IssuerBeta FromHistory vols.
     if !from_history_vols.is_empty() {
         let global_vols: Vec<f64> = from_history_vols.values().copied().collect();
-        return (mean(&global_vols), AdderVolSource::Default);
+        return Ok((mean(&global_vols)?.unwrap_or(0.0), AdderVolSource::Default));
     }
 
     // 5. No IssuerBeta data anywhere: hardcoded 0.0.
-    (0.0, AdderVolSource::Default)
+    Ok((0.0, AdderVolSource::Default))
 }
 
 /// Annualized unbiased sample variance over the `Some` entries of a sparse
@@ -269,14 +269,15 @@ pub(crate) fn factor_variances(
 /// its row/column are set to 0.0 (i.e. the factor is treated as uncorrelated).
 ///
 /// Means, covariance, and both variances are all formed over the same
-/// pairwise-overlap window (see the inline comment in the loop body), so each
-/// entry is a proper sample correlation in `[-1, 1]`.
+/// pairwise-overlap window (see the inline comment in the loop body) via
+/// [`finstack_quant_core::math::stats::correlation`], so each entry is a proper
+/// finite sample correlation in `[-1, 1]`.
 ///
 /// # PSD guarantee
 ///
-/// Off-diagonal entries are clamped to `[-1, 1]` but the resulting matrix is
-/// **not guaranteed to be positive semi-definite** (e.g. when the number of
-/// factors exceeds the number of observations). Callers that require a PSD
+/// The raw pairwise-overlap correlation matrix is **not guaranteed to be
+/// positive semi-definite** (e.g. when the number of factors exceeds the number
+/// of observations or pairwise overlaps differ). Callers that require a PSD
 /// matrix must use [`CovarianceStrategy::Ridge`][super::CovarianceStrategy] or
 /// [`CovarianceStrategy::FullSampleRepaired`][super::CovarianceStrategy], both
 /// of which apply nearest-correlation repair when the raw sample matrix is not
@@ -284,10 +285,10 @@ pub(crate) fn factor_variances(
 pub(super) fn sample_correlation_flat(
     factor_id_order: &[FactorId],
     factor_returns: &BTreeMap<FactorId, Vec<Option<f64>>>,
-) -> Vec<f64> {
+) -> finstack_quant_core::Result<Vec<f64>> {
     let n = factor_id_order.len();
     if n == 0 {
-        return vec![];
+        return Ok(vec![]);
     }
 
     // Materialise each factor's series (missing factors get an empty series).
@@ -303,6 +304,8 @@ pub(super) fn sample_correlation_flat(
         rho[i * n + i] = 1.0;
     }
 
+    let mut overlap_i = Vec::new();
+    let mut overlap_j = Vec::new();
     for i in 0..n {
         for j in (i + 1)..n {
             // Pairwise: use only dates where both factors are observed.
@@ -311,25 +314,23 @@ pub(super) fn sample_correlation_flat(
             // over the same pairwise-overlap window. A factor's marginal mean
             // (over its full valid history) generally differs from its mean on
             // the subset of dates where the *other* factor is also observed; on
-            // a sparse panel the two windows can be wildly different. Demeaning
-            // with the marginal mean while summing over the overlap yields a
-            // ratio that is not a Pearson correlation (it can even exceed 1
-            // before the clamp). Compute the overlap mean for each factor here
-            // so the assembled entry is a proper sample correlation.
-            let mut overlap = OnlineCovariance::new();
+            // a sparse panel the two windows can be wildly different.
+            overlap_i.clear();
+            overlap_j.clear();
             for (vi_opt, vj_opt) in series[i].iter().zip(series[j].iter()) {
                 if let (Some(vi), Some(vj)) = (*vi_opt, *vj_opt) {
-                    overlap.update(vi, vj);
+                    overlap_i.push(vi);
+                    overlap_j.push(vj);
                 }
             }
             // Fewer than two overlapping dates, or a constant series, give 0.
-            let corr = overlap.correlation();
+            let corr = correlation(&overlap_i, &overlap_j)?.unwrap_or(0.0);
             rho[i * n + j] = corr;
             rho[j * n + i] = corr;
         }
     }
 
-    rho
+    Ok(rho)
 }
 
 /// Compute `Σ = D · ρ · D` from standard deviations and flat correlation matrix.

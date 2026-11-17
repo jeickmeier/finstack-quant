@@ -170,6 +170,8 @@ mod tests {
                     (5.0, 0.78),
                 ])
                 .interp(InterpStyle::LogLinear)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("Valid curve"),
         )

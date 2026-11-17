@@ -59,22 +59,53 @@ pub fn create_market_context() -> MarketContext {
             (5.0, 0.900),
         ])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     context = context.insert(disc_curve);
 
     // USD forward curve (SOFR 3M)
-    let fwd_curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let fwd_curve = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(as_of_date())
-        .knots(vec![
-            (0.0, 0.02),
-            (0.25, 0.021),
-            (0.5, 0.022),
-            (1.0, 0.023),
-            (2.0, 0.024),
-            (5.0, 0.025),
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.997471950911942),
+            (0.25, 0.994888110405994),
+            (0.375, 0.992248945555301),
+            (0.5, 0.989554932567899),
+            (0.625, 0.98682197561651),
+            (0.75, 0.984065814019865),
+            (0.875, 0.981286684604636),
+            (1.0, 0.978484825682528),
+            (1.125, 0.975668099393593),
+            (1.25, 0.972844280694656),
+            (1.375, 0.970013478228807),
+            (1.5, 0.967175800650738),
+            (1.625, 0.964331356619928),
+            (1.75, 0.961480254793845),
+            (1.875, 0.958622603821178),
+            (2.0, 0.955758512335073),
+            (2.1875, 0.951461686598083),
+            (2.375, 0.947173078450782),
+            (2.5625, 0.942892751140432),
+            (2.75, 0.938620767338384),
+            (2.9375, 0.934357189139748),
+            (3.125, 0.9301020780631),
+            (3.3125, 0.925855495050225),
+            (3.5, 0.921617500465892),
+            (3.6875, 0.917388154097666),
+            (3.875, 0.913167515155755),
+            (4.0625, 0.908955642272887),
+            (4.25, 0.904752593504231),
+            (4.4375, 0.900558426327339),
+            (4.625, 0.896373197642133),
+            (4.8125, 0.892196963770921),
+            (5.0, 0.888029780458446),
         ])
-        .interp(InterpStyle::Linear)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     context = context.insert(fwd_curve);
@@ -83,6 +114,8 @@ pub fn create_market_context() -> MarketContext {
             "FIXING:USD-SOFR-3M",
             vec![(d(2025, 1, 1), 0.02), (d(2025, 1, 2), 0.02)],
             None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .expect("valid SOFR fixing series"),
     );
@@ -98,34 +131,67 @@ pub fn create_market_context() -> MarketContext {
             (2.0, 0.980),
         ])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     context = context.insert(eur_disc);
 
-    let eur_fwd = ForwardCurve::builder("EUR-EURIBOR-3M", 0.25)
+    let eur_fwd = ForwardCurve::builder("EUR-EURIBOR-3M")
         .base_date(as_of_date())
-        .knots(vec![
-            (0.0, 0.015),
-            (0.25, 0.016),
-            (0.5, 0.017),
-            (1.0, 0.018),
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.998095565740596),
+            (0.25, 0.996132498124296),
+            (0.375, 0.994111157606445),
+            (0.5, 0.992031914837061),
+            (0.625, 0.989910617780149),
+            (0.75, 0.987762988692325),
+            (0.875, 0.985589218780527),
+            (1.0, 0.983389501281869),
         ])
-        .interp(InterpStyle::Linear)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     context = context.insert(eur_fwd);
 
     // Equity market data
-    context = context.insert_price("SPX-SPOT", MarketScalar::Unitless(5000.0));
-    context = context.insert_price("SPX-DIV-YIELD", MarketScalar::Unitless(0.015)); // 1.5%
-    context = context.insert_price("NDX-SPOT", MarketScalar::Unitless(18000.0));
-    context = context.insert_price("NDX-DIV-YIELD", MarketScalar::Unitless(0.005)); // 0.5%
+    context = context.insert_price(
+        "SPX-SPOT",
+        MarketScalar::unitless(5000.0).expect("valid scalar"),
+    );
+    context = context.insert_price(
+        "SPX-DIV-YIELD",
+        MarketScalar::unitless(0.015).expect("valid scalar"),
+    ); // 1.5%
+    context = context.insert_price(
+        "NDX-SPOT",
+        MarketScalar::unitless(18000.0).expect("valid scalar"),
+    );
+    context = context.insert_price(
+        "NDX-DIV-YIELD",
+        MarketScalar::unitless(0.005).expect("valid scalar"),
+    ); // 0.5%
 
     // Fixed income index market data
-    context = context.insert_price("HY-INDEX-YIELD", MarketScalar::Unitless(0.055)); // 5.5%
-    context = context.insert_price("HY-INDEX-DURATION", MarketScalar::Unitless(4.5)); // 4.5 years
-    context = context.insert_price("IG-INDEX-YIELD", MarketScalar::Unitless(0.035)); // 3.5%
-    context = context.insert_price("IG-INDEX-DURATION", MarketScalar::Unitless(7.0)); // 7 years
+    context = context.insert_price(
+        "HY-INDEX-YIELD",
+        MarketScalar::unitless(0.055).expect("valid scalar"),
+    ); // 5.5%
+    context = context.insert_price(
+        "HY-INDEX-DURATION",
+        MarketScalar::unitless(4.5).expect("valid scalar"),
+    ); // 4.5 years
+    context = context.insert_price(
+        "IG-INDEX-YIELD",
+        MarketScalar::unitless(0.035).expect("valid scalar"),
+    ); // 3.5%
+    context = context.insert_price(
+        "IG-INDEX-DURATION",
+        MarketScalar::unitless(7.0).expect("valid scalar"),
+    ); // 7 years
 
     context
 }

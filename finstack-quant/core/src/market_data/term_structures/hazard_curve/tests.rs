@@ -1,9 +1,8 @@
 use super::*;
-use crate::market_data::bumps::BumpSpec;
-use crate::math::interp::InterpStyle;
-
+use crate::dates::{Date, DayCount};
+use crate::market_data::bumps::{BumpSpec, Bumpable};
 use crate::market_data::term_structures::{HazardCalibrationInput, HazardCalibrationRecipe};
-use time::Month;
+use time::{Duration, Month};
 
 fn test_hazard_recipe(base: Date) -> HazardCalibrationRecipe {
     let input = HazardCalibrationInput {
@@ -11,7 +10,7 @@ fn test_hazard_recipe(base: Date) -> HazardCalibrationRecipe {
             "type": "cds_par_spread",
             "id": "CDS-5Y"
         }),
-        pillar_date: base + time::Duration::days(365),
+        pillar_date: base + Duration::days(365),
         pillar_time: 1.0,
     };
     HazardCalibrationRecipe::new(
@@ -24,27 +23,49 @@ fn test_hazard_recipe(base: Date) -> HazardCalibrationRecipe {
 }
 
 #[test]
-fn hazard_recipe_invalidation_covers_synthetic_transformations() {
-    use BumpSpec;
-
+fn hazard_recipe_invalidation_and_exact_noop_preservation() {
     let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let source = HazardCurve::builder("RECIPE")
         .base_date(base)
+        .day_count(DayCount::Act365F)
         .recovery_rate(0.4)
         .knots([(1.0, 0.01), (5.0, 0.02), (10.0, 0.03)])
         .hazard_calibration(test_hazard_recipe(base))
         .build()
         .expect("recipe-backed curve");
 
+    let unchanged_rec = source
+        .with_recovery_rate(0.4)
+        .expect("exact recovery preserves calibration");
+    assert_eq!(
+        unchanged_rec.hazard_calibration(),
+        source.hazard_calibration()
+    );
+
     let recovery = source.with_recovery_rate(0.35).expect("recovery override");
     assert!(recovery.hazard_calibration().is_none());
+
+    let zero_parallel = source
+        .with_parallel_hazard_rate_bump_bp(0.0)
+        .expect("zero bump");
+    assert_eq!(
+        zero_parallel.hazard_calibration(),
+        source.hazard_calibration()
+    );
 
     let parallel = source
         .with_parallel_hazard_rate_bump_bp(1.0)
         .expect("parallel bump");
     assert!(parallel.hazard_calibration().is_none());
 
-    let rolled = source.roll_forward(30).expect("curve roll");
+    let zero_tenor = source
+        .with_tenor_hazard_rate_bumps_bp(&[(5.0, 0.0)])
+        .expect("zero exact tenor bump");
+    assert_eq!(zero_tenor.hazard_calibration(), source.hazard_calibration());
+
+    let rolled = source
+        .condition(base + Duration::days(30))
+        .expect("curve condition");
     assert!(rolled.hazard_calibration().is_none());
 
     let rebuilt = source
@@ -55,130 +76,103 @@ fn hazard_recipe_invalidation_covers_synthetic_transformations() {
 
     let mut in_place = source;
     in_place
-        .bump_in_place(&BumpSpec::parallel_bp(1.0), HazardBumpTarget::ParSpread)
+        .bump_in_place(&BumpSpec::parallel_bp(1.0))
         .expect("in-place bump");
     assert!(in_place.hazard_calibration().is_none());
 }
 
 #[test]
-fn survival_at_dates_is_one_on_or_before_the_base_date() {
+fn dates_before_base_date_and_invalid_numeric_queries_are_rejected() {
     let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let curve = HazardCurve::builder("HZ")
         .base_date(base)
+        .day_count(DayCount::Act365F)
         .knots([(1.0, 0.02), (5.0, 0.03)])
         .recovery_rate(0.4)
         .build()
         .expect("valid hazard curve");
-    let dates = [
-        base - time::Duration::days(400),
-        base,
-        base + time::Duration::days(365),
-    ];
-    let survival = curve
-        .survival_at_dates(&dates)
-        .expect("signed year fractions");
-    assert_eq!(survival[0], 1.0);
-    assert_eq!(survival[1], 1.0);
-    assert!(survival[2] < 1.0);
+
+    let pre = base - Duration::days(1);
+    assert!(curve.sp_on_date(pre).is_err());
+    assert!(curve.hazard_rate_on_date(pre).is_err());
+    assert!(curve.conditional_default_prob(pre, base).is_err());
+    assert!(curve.integrated_hazard_between_dates(pre, base).is_err());
+    assert!(curve.survival_at_dates(&[pre, base]).is_err());
+
+    assert!(curve.sp(-0.1).is_err());
+    assert!(curve.sp(f64::NAN).is_err());
+    assert!(curve.sp(f64::INFINITY).is_err());
+    assert!(curve.hazard_rate(-1.0).is_err());
+    assert!(curve.hazard_rate(f64::NAN).is_err());
+    assert!(curve.hazard_rate(f64::INFINITY).is_err());
+    assert!(curve.default_prob(-0.1, 1.0).is_err());
+    assert!(curve.default_prob(2.0, 1.0).is_err());
+    assert!(curve.sp_between(-0.1, 1.0).is_err());
+    assert!(curve.sp_between(2.0, 1.0).is_err());
 }
 
 #[test]
-fn hazard_cap_round_trips_through_json_and_rebuilds() {
+fn construction_rejects_zero_time_unsorted_and_missing_clock_without_cap() {
     let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-    let capped = HazardCurve::builder("CAPPED")
-        .base_date(base)
-        .recovery_rate(0.4)
-        .knots([(1.0, 12.0), (5.0, 15.0)])
-        .max_hazard_rate(40.0)
-        .build()
-        .expect("cap admits lambda above 10");
-    let json = serde_json::to_string(&capped).expect("serialize");
-    assert!(json.contains("\"max_hazard_rate\":40.0"));
-    let restored: HazardCurve = serde_json::from_str(&json).expect("deserialize with cap");
-    assert_eq!(restored.max_hazard_rate(), 40.0);
-    assert!(capped.with_parallel_hazard_rate_bump_bp(10.0).is_ok());
-    assert!(capped.to_builder_with_id("AGAIN").build().is_ok());
 
-    let default_cap = HazardCurve::builder("DEFAULT")
-        .base_date(base)
-        .recovery_rate(0.4)
-        .knots([(1.0, 0.02)])
-        .build()
-        .expect("default cap");
+    // t = 0 rejected
     assert!(
-        !serde_json::to_string(&default_cap)
-            .expect("serialize")
-            .contains("max_hazard_rate")
-    );
-}
-
-#[test]
-fn survival_interpolation_preserves_hazard_consistency() {
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-    let builder = || {
-        HazardCurve::builder("HZ")
+        HazardCurve::builder("ZERO-KNOT")
             .base_date(base)
-            .knots([(1.0, 0.02), (2.0, 1.0)])
+            .day_count(DayCount::Act365F)
             .recovery_rate(0.4)
-    };
-    let curve = builder().build().expect("valid hazard curve");
-    for t in [0.5, 1.5, 3.0] {
-        let eps = 1e-5;
-        let implied = -(curve.sp(t + eps).ln() - curve.sp(t - eps).ln()) / (2.0 * eps);
-        assert!((implied - curve.hazard_rate(t)).abs() < 1e-9);
-    }
-    let mut state = serde_json::to_value(&curve).expect("serialize");
-    state["survival_interp"] = serde_json::to_value(InterpStyle::Linear).expect("style");
-    assert!(serde_json::from_value::<HazardCurve>(state).is_err());
-}
+            .knots([(0.0, 0.01), (5.0, 0.02)])
+            .build()
+            .is_err()
+    );
+    // Unsorted rejected (no silent sort)
+    assert!(
+        HazardCurve::builder("UNSORTED")
+            .base_date(base)
+            .day_count(DayCount::Act365F)
+            .recovery_rate(0.4)
+            .knots([(5.0, 0.02), (1.0, 0.01)])
+            .build()
+            .is_err()
+    );
+    // Missing day_count rejected
+    assert!(
+        HazardCurve::builder("NO-DC")
+            .base_date(base)
+            .recovery_rate(0.4)
+            .knots([(1.0, 0.01)])
+            .build()
+            .is_err()
+    );
+    // Calendarless Bus252 rejected
+    assert!(
+        HazardCurve::builder("NO-CAL")
+            .base_date(base)
+            .day_count(DayCount::Bus252)
+            .recovery_rate(0.4)
+            .knots([(1.0, 0.01)])
+            .build()
+            .is_err()
+    );
 
-#[test]
-fn survival_monotone_decreasing() {
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let hc = HazardCurve::builder("USD-CREDIT")
-        .base_date(base)
-        .knots([(1.0, 0.01), (5.0, 0.02)])
-        .recovery_rate(0.40)
-        .build()
-        .expect("HazardCurve builder should succeed with valid test data");
-    assert!(hc.sp(1.0) < 1.0);
-    assert!(hc.sp(6.0) < hc.sp(1.0));
-}
-
-#[test]
-fn default_prob_positive() {
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let hc = HazardCurve::builder("USD")
-        .base_date(base)
-        .knots([(1.0, 0.01), (10.0, 0.015)])
-        .recovery_rate(0.40)
-        .build()
-        .expect("HazardCurve builder should succeed with valid test data");
-    let dp = hc
-        .default_prob(2.0, 4.0)
-        .expect("default_prob should succeed with valid inputs");
-    assert!(dp >= 0.0);
-}
-
-#[test]
-fn zero_anchored_tail_uses_last_hazard() {
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let curve = HazardCurve::builder("TAIL")
+    // High intensity without artificial cap succeeds and round-trips via JSON
+    let high = HazardCurve::builder("HIGH")
         .base_date(base)
         .day_count(DayCount::Act365F)
-        .knots([(0.0, 0.01), (5.0, 0.02), (10.0, 0.03)])
-        .recovery_rate(0.40)
+        .recovery_rate(1.0)
+        .knots([(1.0, 40.0), (5.0, 50.0)])
         .build()
-        .expect("valid hazard curve");
-
-    let implied_tail_hazard = -(curve.sp(11.0) / curve.sp(10.0)).ln();
-    assert!((implied_tail_hazard - 0.03).abs() < 1e-12);
-    assert!((curve.hazard_rate(10.0) - 0.03).abs() < 1e-12);
+        .expect("unbounded finite intensity and R=1.0 accepted");
+    let json = serde_json::to_string(&high).expect("serialize");
+    assert!(!json.contains("max_hazard_rate"));
+    let restored: HazardCurve = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(restored.recovery_rate(), 1.0);
+    assert_eq!(restored.hazard_rate(1.0).expect("rate"), 40.0);
 }
 
 #[test]
-fn unanchored_hazard_changes_immediately_after_end_knot() {
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+fn left_continuous_intervals_and_origin_right_limit() {
+    let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let curve = HazardCurve::builder("BOUNDARY")
         .base_date(base)
         .day_count(DayCount::Act365F)
@@ -187,376 +181,124 @@ fn unanchored_hazard_changes_immediately_after_end_knot() {
         .build()
         .expect("valid hazard curve");
 
-    assert!((curve.hazard_rate(1.0) - 0.01).abs() < 1e-12);
-    assert!((curve.hazard_rate(1.0 + 1e-12) - 0.02).abs() < 1e-12);
+    assert_eq!(curve.hazard_rate(0.0).expect("t=0"), 0.01);
+    assert_eq!(curve.hazard_rate(0.5).expect("0.5"), 0.01);
+    assert_eq!(curve.hazard_rate(1.0).expect("1.0"), 0.01);
+    assert_eq!(curve.hazard_rate(1.0 + 1e-12).expect("1+eps"), 0.02);
+    assert_eq!(curve.hazard_rate(2.0).expect("2.0"), 0.02);
+    assert_eq!(curve.hazard_rate(3.0).expect("3.0"), 0.03);
+    assert_eq!(curve.hazard_rate(10.0).expect("tail"), 0.03);
 }
 
 #[test]
-fn roll_forward_preserves_conditional_survival() {
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+fn conditioning_preserves_conditional_survival_and_handles_exact_and_tail_horizons() {
+    let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let curve = HazardCurve::builder("ROLL")
         .base_date(base)
         .day_count(DayCount::Act365F)
-        .knots([(0.0, 0.01), (5.0, 0.02), (10.0, 0.03)])
+        .knots([(1.0, 0.01), (5.0, 0.02), (10.0, 0.03)])
         .recovery_rate(0.40)
         .build()
         .expect("valid hazard curve");
 
-    let rolled = curve
-        .roll_forward(365)
-        .expect("one-year roll should succeed");
-    for t in [0.5, 1.0, 4.0, 5.0, 8.0] {
-        let expected = curve.sp(t + 1.0) / curve.sp(1.0);
+    let rolled_1y = curve
+        .condition(base + Duration::days(365))
+        .expect("exact-pillar conditioning succeeds");
+    // Exact pillar conditioning at t_1 = 1.0 transitions immediately to lambda_2 = 0.02.
+    assert_eq!(rolled_1y.hazard_rate(0.0).expect("t=0"), 0.02);
+    for days in [180_i64, 365, 1460, 3285, 4000] {
+        let target = base + Duration::days(365 + days);
+        let expected = curve.sp_on_date(target).expect("base") / curve.sp(1.0).expect("s1");
         assert!(
-            (rolled.sp(t) - expected).abs() < 1e-12,
-            "t={t}: rolled={}, expected={expected}",
-            rolled.sp(t)
+            (rolled_1y.sp_on_date(target).expect("rolled") - expected).abs() < 1e-12,
+            "days={days}"
         );
     }
+
+    // Multi-knot conditioning past t_last retains constant tail
+    let beyond = base + Duration::days(365 * 12);
+    let rolled_tail = curve
+        .condition(beyond)
+        .expect("conditioning past final knot succeeds");
+    let target = beyond + Duration::days(730);
+    assert!((rolled_tail.sp_on_date(target).expect("tail sp") - (-0.06_f64).exp()).abs() < 1e-12);
+    // Re-conditioning retains the original source timeline without offset drift
+    let back_within = rolled_tail
+        .condition(base + Duration::days(730))
+        .expect("backward condition in original domain");
+    assert_eq!(back_within.hazard_rate(0.0).expect("rate"), 0.02);
 }
 
 #[test]
-fn quoted_spread_interpolation_linear() {
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let hc = HazardCurve::builder("TEST")
-        .base_date(base)
-        .knots([(1.0, 0.02)])
-        .par_spreads([(1.0, 100.0), (3.0, 200.0)])
-        .recovery_rate(0.40)
-        .build()
-        .expect("HazardCurve builder should succeed with valid test data");
-    assert!((hc.cds_quote_bp(2.0, ParInterp::Linear) - 150.0).abs() < 1e-9);
-}
-
-#[test]
-fn roll_forward_works() {
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let _hc = HazardCurve::builder("TEST-ROLL")
-        .base_date(base)
-        .day_count(DayCount::Act365F) // Use Act365F for simple math
-        .knots([(0.5, 0.01), (1.5, 0.02)])
-        .recovery_rate(0.40)
-        .build()
-        .expect("Builder works");
-
-    let hc = HazardCurve::builder("TEST-ROLL")
+fn bumps_apply_direct_intensity_atomically_and_require_exact_knots() {
+    let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+    let curve = HazardCurve::builder("DIRECT")
         .base_date(base)
         .day_count(DayCount::Act365F)
-        .knots([(0.5, 0.01), (1.5, 0.02), (2.5, 0.03)])
-        .recovery_rate(0.40)
-        .build()
-        .expect("Builder works");
-
-    let rolled = hc.roll_forward(183).expect("Roll should succeed"); // > 0.5 years
-
-    assert_eq!(rolled.base_date(), base + time::Duration::days(183));
-
-    let knots: Vec<f64> = rolled.knot_points().map(|(t, _)| t).collect();
-    assert_eq!(knots.len(), 3);
-    assert!(
-        knots[0].abs() < 1e-12,
-        "rolled curve must be anchored at zero"
-    );
-    // 1.5 - (183/365) = 1.5 - 0.50137 = 0.9986
-    // 2.5 - (183/365) = 1.9986
-    assert!(knots[1] < 1.0 && knots[1] > 0.99);
-}
-
-#[test]
-fn builder_allows_explicit_zero_time_knot() {
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let result = HazardCurve::builder("USD-CREDIT")
-        .base_date(base)
-        .knots([(0.0, 0.01), (5.0, 0.02)])
-        .recovery_rate(0.40)
-        .build();
-
-    assert!(result.is_ok(), "t=0 hazard knots should be accepted");
-}
-
-#[test]
-fn hazard_rate_is_available_for_valid_built_curves() {
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let hc = HazardCurve::builder("USD-CREDIT")
-        .base_date(base)
-        .knots([(0.0, 0.01), (5.0, 0.02)])
-        .recovery_rate(0.40)
-        .build()
-        .expect("HazardCurve builder should succeed with valid test data");
-
-    assert_eq!(hc.hazard_rate(-1.0), 0.01);
-    assert_eq!(hc.hazard_rate(0.0), 0.01);
-    assert_eq!(hc.hazard_rate(10.0), 0.02);
-}
-
-/// Regression test (2026-06-09 "Major — market data"
-/// item 2): `build()` and `rebuild_interp` (the `MarketContext::bump` /
-/// CS01 path via `bump_in_place`) must share one λ-segment attribution
-/// convention. A zero-size bump must be an exact no-op even for curves
-/// with an explicit t=0 anchor knot.
-#[test]
-fn zero_size_bump_in_place_is_noop_for_zero_anchored_curve() {
-    use BumpSpec;
-
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let curve = HazardCurve::builder("ZERO-ANCHORED")
-        .base_date(base)
-        .recovery_rate(0.40)
-        .knots([(0.0, 0.01), (1.0, 0.02), (5.0, 0.015)])
-        .build()
-        .expect("zero-anchored hazard curve builds");
-
-    let mut bumped = curve.clone();
-    bumped
-        .bump_in_place(&BumpSpec::parallel_bp(0.0), HazardBumpTarget::ParSpread)
-        .expect("zero bump succeeds");
-
-    for t in [0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 7.0] {
-        assert!(
-            (bumped.sp(t) - curve.sp(t)).abs() < 1e-15,
-            "zero bump must not change survival at t={t}: \
-             bumped {} vs base {}",
-            bumped.sp(t),
-            curve.sp(t)
-        );
-    }
-}
-
-/// A small parallel spread bump on a zero-anchored curve must shift the
-/// average hazard −ln(S(t))/t by exactly spread/(1−R) at every t inside
-/// the knot range — with no spurious re-attribution of base hazards.
-#[test]
-fn small_bump_in_place_shifts_average_hazard_uniformly() {
-    use BumpSpec;
-
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let recovery = 0.40;
-    let curve = HazardCurve::builder("ZERO-ANCHORED-SMALL")
-        .base_date(base)
-        .recovery_rate(recovery)
-        .knots([(0.0, 0.01), (1.0, 0.02), (5.0, 0.015)])
-        .build()
-        .expect("zero-anchored hazard curve builds");
-
-    let spread_bp = 10.0;
-    let expected_shift = (spread_bp / 10_000.0) / (1.0 - recovery);
-
-    let mut bumped = curve.clone();
-    bumped
-        .bump_in_place(
-            &BumpSpec::parallel_bp(spread_bp),
-            HazardBumpTarget::ParSpread,
-        )
-        .expect("small bump succeeds");
-
-    for t in [0.5, 1.0, 2.0, 3.0, 5.0] {
-        let base_avg = -curve.sp(t).ln() / t;
-        let bumped_avg = -bumped.sp(t).ln() / t;
-        assert!(
-            (bumped_avg - base_avg - expected_shift).abs() < 1e-12,
-            "average hazard change at t={t} must equal the bump: \
-             got {}, expected {}",
-            bumped_avg - base_avg,
-            expected_shift
-        );
-    }
-}
-
-/// `bump_in_place` clears stored par-spread quotes (they were calibrated
-/// to the unbumped hazards); `cds_quote_bp` then falls back to the
-/// hazard-based approximation λ·(1−R)·1e4 reflecting the bumped curve.
-#[test]
-fn bump_in_place_clears_stale_par_spread_quotes() {
-    use BumpSpec;
-
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let recovery = 0.40;
-    let mut curve = HazardCurve::builder("QUOTED")
-        .base_date(base)
-        .recovery_rate(recovery)
-        .knots([(1.0, 0.01), (5.0, 0.01)])
-        .par_spreads([(1.0, 60.0), (5.0, 60.0)])
-        .build()
-        .expect("quoted hazard curve builds");
-
-    curve
-        .bump_in_place(&BumpSpec::parallel_bp(10.0), HazardBumpTarget::ParSpread)
-        .expect("bump succeeds");
-
-    assert_eq!(
-        curve.par_spread_points().count(),
-        0,
-        "stale par quotes must be cleared on bump"
-    );
-    // Fallback quote reflects the bumped hazard: (0.01 + 0.001/0.6)·0.6·1e4 = 70bp.
-    let quote = curve.cds_quote_bp(3.0, ParInterp::Linear);
-    assert!(
-        (quote - 70.0).abs() < 1e-9,
-        "fallback quote must reflect bumped hazards, got {quote}"
-    );
-}
-
-#[test]
-fn direct_hazard_rate_parallel_bump_is_additive() {
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-    let curve = HazardCurve::builder("DIRECT-PARALLEL")
-        .base_date(base)
-        .recovery_rate(0.40)
-        .knots([(1.0, 0.010), (3.0, 0.015), (5.0, 0.020)])
-        .par_spreads([(1.0, 60.0), (3.0, 90.0), (5.0, 120.0)])
-        .build()
-        .expect("valid hazard curve");
-
-    let up = curve
-        .with_parallel_hazard_rate_bump_bp(25.0)
-        .expect("parallel direct shock");
-    let round_trip = up
-        .with_parallel_hazard_rate_bump_bp(-25.0)
-        .expect("reverse direct shock");
-
-    for (tenor, base_rate) in curve.knot_points() {
-        assert!((up.hazard_rate(tenor) - base_rate - 25e-4).abs() < 1e-12);
-        assert!((round_trip.hazard_rate(tenor) - base_rate).abs() < 1e-12);
-    }
-    assert_eq!(up.id(), curve.id());
-    assert_eq!(up.par_spread_points().count(), 0);
-    assert!(up.hazard_calibration().is_none());
-}
-
-#[test]
-fn direct_hazard_rate_tenor_bumps_preserve_segment_matching_and_additivity() {
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-    let curve = HazardCurve::builder("DIRECT-TENORS")
-        .base_date(base)
         .recovery_rate(0.40)
         .knots([(1.0, 0.010), (3.0, 0.015), (5.0, 0.020), (10.0, 0.025)])
         .build()
         .expect("valid hazard curve");
 
-    let bumped = curve
-        .with_tenor_hazard_rate_bumps_bp(&[(4.0, 3.0), (4.0, 5.0), (3.0, 2.0)])
-        .expect("tenor direct shocks");
-    let expected = [0.010, 0.0152, 0.0208, 0.025];
-    for ((tenor, rate), expected_rate) in bumped.knot_points().zip(expected) {
-        assert!(
-            (rate - expected_rate).abs() < 1e-12,
-            "unexpected direct hazard rate at {tenor}: {rate}"
-        );
+    // Direct parallel apply_bump shifts intensity directly without 1 / (1 - R)
+    let parallel = curve
+        .apply_bump(BumpSpec::parallel_bp(10.0))
+        .expect("parallel direct shift");
+    for ((_, base_l), (_, bumped_l)) in curve.knot_points().zip(parallel.knot_points()) {
+        assert!((bumped_l - base_l - 0.0010).abs() < 1e-15);
     }
+
+    // Exact tenor targeting succeeds for valid unique knots and rejects off-grid/duplicates
+    let tenor_bumped = curve
+        .with_tenor_hazard_rate_bumps_bp(&[(3.0, 2.0), (5.0, 8.0)])
+        .expect("exact unique knots");
+    let rates: Vec<f64> = tenor_bumped.knot_points().map(|(_, r)| r).collect();
+    assert!((rates[0] - 0.010).abs() < 1e-15);
+    assert!((rates[1] - 0.0152).abs() < 1e-15);
+    assert!((rates[2] - 0.0208).abs() < 1e-15);
+    assert!((rates[3] - 0.025).abs() < 1e-15);
+
     assert!(
         curve
-            .with_tenor_hazard_rate_bumps_bp(&[(10.0 + 2e-6, 100.0)])
+            .with_tenor_hazard_rate_bumps_bp(&[(4.0, 5.0)])
             .is_err(),
-        "tenor beyond final knot must return Err instead of silently no-oping"
+        "off-grid tenor must error"
     );
     assert!(
         curve
-            .with_tenor_hazard_rate_bumps_bp(&[(0.0, 10.0)])
+            .with_tenor_hazard_rate_bumps_bp(&[(3.0, 2.0), (3.0, 3.0)])
             .is_err(),
-        "non-positive tenor bump must return Err"
+        "duplicate tenor must error"
     );
-}
-
-#[test]
-fn tenor_hazard_bump_changes_only_the_containing_segment() {
-    let curve = HazardCurve::builder("SEGMENTS")
-        .base_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
-        .recovery_rate(0.4)
-        .knots([(1.0, 0.01), (3.0, 0.015), (5.0, 0.02), (10.0, 0.025)])
-        .build()
-        .unwrap();
-    let bumped = curve
-        .with_tenor_hazard_rate_bumps_bp(&[(4.0, 100.0)])
-        .unwrap();
-    assert_eq!(bumped.hazard_rate(2.0), curve.hazard_rate(2.0));
-    assert!((bumped.hazard_rate(4.0) - 0.03).abs() < 1e-12);
-    assert_eq!(bumped.hazard_rate(6.0), curve.hazard_rate(6.0));
-    assert!((bumped.sp(3.0) - curve.sp(3.0)).abs() < 1e-12);
-    assert!((bumped.sp(4.0) / curve.sp(4.0) - (-0.01_f64).exp()).abs() < 1e-12);
-    assert!((bumped.sp(6.0) / curve.sp(6.0) - (-0.02_f64).exp()).abs() < 1e-12);
-}
-
-#[test]
-fn tenor_hazard_down_bumps_reject_negative_rates() {
-    let curve = HazardCurve::builder("DOWN")
-        .base_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
-        .recovery_rate(0.4)
-        .knots([(1.0, 0.01), (3.0, 0.015), (5.0, 0.02)])
-        .build()
-        .unwrap();
     assert!(
         curve
-            .with_tenor_hazard_rate_bumps_bp(&[(3.0, -200.0)])
+            .with_tenor_hazard_rate_bumps_bp(&[(0.0, 1.0)])
             .is_err()
     );
     assert!(
         curve
-            .with_tenor_hazard_rate_bumps_bp(&[(3.0, -100.0), (3.0, -100.0)])
+            .with_tenor_hazard_rate_bumps_bp(&[(12.0, 1.0)])
             .is_err()
     );
-    assert_eq!(curve.hazard_rate(3.0), 0.015);
-    let zero = curve
-        .with_tenor_hazard_rate_bumps_bp(&[(1.0, -100.0)])
-        .unwrap();
-    assert_eq!(zero.hazard_rate(1.0), 0.0);
-    let restored = zero
-        .with_tenor_hazard_rate_bumps_bp(&[(1.0, 100.0)])
-        .unwrap();
-    assert!((restored.sp(4.0) - curve.sp(4.0)).abs() < 1e-12);
-}
 
-#[test]
-fn failed_bump_in_place_is_atomic() {
-    use BumpSpec;
-
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-    let original = HazardCurve::builder("ATOMIC")
-        .base_date(base)
-        .recovery_rate(0.40)
-        .knots([(1.0, 0.010), (5.0, 0.001)])
-        .build()
-        .expect("valid hazard curve");
-    let mut attempted = original.clone();
-
-    attempted
-        .bump_in_place(&BumpSpec::parallel_bp(-30.0), HazardBumpTarget::ParSpread)
-        .expect_err("second hazard node would become negative");
-
+    // Atomic failed bump
+    let mut attempted = curve.clone();
+    let err = attempted
+        .bump_in_place(&BumpSpec::parallel_bp(-150.0))
+        .expect_err("negative shifted hazard rate must fail");
+    assert!(err.to_string().contains("negative hazard rate after bump"));
     assert_eq!(
         attempted.knot_points().collect::<Vec<_>>(),
-        original.knot_points().collect::<Vec<_>>()
-    );
-    for t in [0.5, 1.0, 3.0, 5.0] {
-        assert_eq!(attempted.sp(t), original.sp(t));
-    }
-}
-
-#[test]
-fn parallel_bump_rejects_negative_shift_that_crosses_zero_hazard() {
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let curve = HazardCurve::builder("HY")
-        .base_date(base)
-        .knots([(1.0, 0.001), (5.0, 0.002)])
-        .recovery_rate(0.40)
-        .build()
-        .expect("valid hazard curve");
-
-    let err = curve
-        .with_parallel_hazard_rate_bump_bp(-15.0)
-        .expect_err("negative shifted hazard rate must be rejected");
-
-    assert!(
-        err.to_string().contains("negative hazard rate after bump"),
-        "unexpected error: {err}"
+        curve.knot_points().collect::<Vec<_>>()
     );
 }
+
 #[test]
 fn triangular_key_rate_bumps_partition_the_parallel_hazard_shift() {
-    use crate::market_data::bumps::Bumpable;
-
     let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let curve = HazardCurve::builder("KR")
         .base_date(base)
+        .day_count(DayCount::Act365F)
         .knots([(1.0, 0.010), (2.0, 0.012), (5.0, 0.015), (10.0, 0.020)])
         .recovery_rate(0.40)
         .build()
@@ -571,8 +313,6 @@ fn triangular_key_rate_bumps_partition_the_parallel_hazard_shift() {
         .apply_bump(BumpSpec::parallel_bp(10.0))
         .expect("parallel bump");
 
-    // Knot-wise the bucket shifts are w_b(t_i) * s / (1 - R); the weights sum
-    // to one at every knot, so the bucket shifts add up to the parallel one.
     let mut summed = [0.0; 4];
     for i in 0..buckets.len() {
         let bumped = curve.apply_bump(spec_for(i)).expect("key-rate bump");
@@ -585,17 +325,11 @@ fn triangular_key_rate_bumps_partition_the_parallel_hazard_shift() {
     for (k, ((_, base_lambda), (_, lambda))) in
         curve.knot_points().zip(parallel.knot_points()).enumerate()
     {
-        assert!(
-            (summed[k] - (lambda - base_lambda)).abs() < 1e-15,
-            "knot {k}: {} vs {}",
-            summed[k],
-            lambda - base_lambda
-        );
+        assert!((summed[k] - (lambda - base_lambda)).abs() < 1e-15);
     }
-    // The 2y knot sits between the 1y and 3y buckets: half of the shift each.
     let first = curve.apply_bump(spec_for(0)).expect("first bucket");
     let lambda_2y = first.knot_points().nth(1).expect("2y knot").1;
-    assert!((lambda_2y - (0.012 + 0.5 * 0.0010 / 0.60)).abs() < 1e-15);
+    assert!((lambda_2y - (0.012 + 0.5 * 0.0010)).abs() < 1e-15);
 }
 
 mod seniority_tests {
@@ -611,16 +345,6 @@ mod seniority_tests {
         ] {
             assert!(matches!(input.parse::<Seniority>(), Ok(value) if value == expected));
         }
-
-        for variant in [
-            Seniority::SeniorSecured,
-            Seniority::Senior,
-            Seniority::Subordinated,
-            Seniority::Junior,
-        ] {
-            let display = variant.to_string();
-            assert!(matches!(display.parse::<Seniority>(), Ok(value) if value == variant));
-        }
     }
 
     #[test]
@@ -632,157 +356,69 @@ mod seniority_tests {
 }
 
 #[test]
-fn conditional_default_prob_flat_dates_and_day_count() {
-    use time::Duration;
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("date");
-    let curve = HazardCurve::builder("CONDITIONAL")
-        .base_date(base)
-        .day_count(DayCount::Act360)
-        .knots([(1.0, 0.02)])
-        .recovery_rate(0.4)
-        .build()
-        .expect("curve");
-    let end = base + Duration::days(540);
-    let expected = -(-0.02_f64).exp_m1();
-    assert!(
-        (curve
-            .conditional_default_prob(base + Duration::days(180), end)
-            .expect("PD")
-            - expected)
-            .abs()
-            < 1e-15
-    );
-    assert_eq!(curve.conditional_default_prob(end, end).expect("zero"), 0.0);
-    assert!(curve.conditional_default_prob(end, base).is_err());
-    assert_eq!(
-        curve
-            .conditional_default_prob(base - Duration::days(10), base)
-            .expect("pre-base"),
-        0.0
-    );
-    assert!(
-        (curve
-            .conditional_default_prob(base - Duration::days(10), base + Duration::days(360))
-            .expect("cross-base")
-            - expected)
-            .abs()
-            < 1e-15
-    );
-}
-
-#[test]
-fn conditional_default_prob_integrates_ending_segments_and_tail() {
-    use time::Duration;
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("date");
-    let curve = HazardCurve::builder("SEGMENTS")
-        .base_date(base)
-        .knots([(0.0, 9.0), (1.0, 0.01), (2.0, 0.03), (3.0, 0.05)])
-        .recovery_rate(0.4)
-        .build()
-        .expect("curve");
-    for (start_days, end_days, integral) in [
-        (0, 365, 0.01_f64),
-        (365, 730, 0.03),
-        (730, 1095, 0.05),
-        (1095, 1460, 0.05),
-        (
-            182,
-            1277,
-            0.01 * (183.0 / 365.0) + 0.03 + 0.05 * (547.0 / 365.0),
-        ),
-    ] {
-        let actual = curve
-            .conditional_default_prob(
-                base + Duration::days(start_days),
-                base + Duration::days(end_days),
-            )
-            .expect("PD");
-        assert!((actual - -(-integral).exp_m1()).abs() < 1e-15);
-    }
-
-    // Positive sub-nanosecond knots are preserved rather than skipped.
+fn sub_nanosecond_segment_and_subnormal_unconditional_pd_are_preserved() {
+    let base = Date::from_calendar_date(1900, Month::January, 1).expect("date");
     let short_front = HazardCurve::builder("SHORT-FRONT")
         .base_date(base)
-        .knots([(1e-9, 9.0), (1.0, 0.01)])
+        .day_count(DayCount::Act365F)
+        .knots([(1e-10, 0.02), (1.0, 0.01)])
         .recovery_rate(0.4)
         .build()
         .expect("short front knot curve");
-    assert!((short_front.sp(1e-9) - (-9.0e-9_f64).exp()).abs() < 1e-15);
-    let expected_1y = -(9.0e-9_f64 + 0.01 * (1.0 - 1e-9));
-    assert!((short_front.sp(1.0) - expected_1y.exp()).abs() < 1e-15);
-}
+    let j = short_front.integrated_hazard(0.0, 5e-11).expect("J");
+    assert!((j - 1e-12).abs() < 1e-26);
 
-#[test]
-fn zero_knot_singleton_and_distressed_long_dated_conditional_survival_succeed() {
-    let base = Date::from_calendar_date(2025, Month::January, 1).expect("date");
-    let zero_only = HazardCurve::builder("ZERO-ONLY")
+    let tiny = HazardCurve::builder("TINY")
         .base_date(base)
-        .knots([(0.0, 0.02)])
-        .recovery_rate(0.4)
-        .build()
-        .expect("single t=0 knot builds");
-    assert!((zero_only.sp(5.0) - (-0.10_f64).exp()).abs() < 1e-15);
-
-    let distressed = HazardCurve::builder("DISTRESSED-50Y")
-        .base_date(base)
-        .max_hazard_rate(25.0)
-        .knots([(1.0, 20.0), (50.0, 20.0)])
-        .par_spreads([(1.0, 12_000.0), (5.0, 12_000.0)])
-        .recovery_rate(0.4)
-        .build()
-        .expect("distressed 50Y curve builds without survival pillar underflow");
-    assert_eq!(distressed.sp(40.0), 0.0);
-    assert_eq!(distressed.sp(41.0), 0.0);
-    let forward_sp = distressed
-        .sp_between(40.0, 41.0)
-        .expect("conditional survival avoids 0/0");
-    assert!((forward_sp - (-20.0_f64).exp()).abs() < 1e-15);
-
-    let rolled = distressed
-        .roll_forward(90)
-        .expect("roll clears par spreads");
-    assert_eq!(rolled.par_spread_points().count(), 0);
-
-    let flat = HazardCurve::flat("FLAT-ROLL", base, 0.03, 0.4).expect("flat hazard");
-    let flat_rolled = flat
-        .roll_forward(400)
-        .expect("rolling flat hazard past 1Y preserves positive maturity");
-    assert!((flat_rolled.sp(2.0) - (-0.06_f64).exp()).abs() < 1e-15);
-}
-
-#[test]
-fn conditional_default_prob_preserves_tiny_hazards_after_large_integrals() {
-    use time::Duration;
-    let base = Date::from_calendar_date(1900, Month::January, 1).expect("date");
-    let curve = HazardCurve::builder("TINY")
-        .base_date(base)
+        .day_count(DayCount::Act365F)
         .knots([(100.0, 7.0), (200.0, 1e-18)])
         .recovery_rate(0.4)
         .build()
         .expect("curve");
     let start = base + Duration::days(365 * 125);
     let end = start + Duration::days(365);
-    let actual = curve.conditional_default_prob(start, end).expect("tiny PD");
-    assert!(actual > 0.0);
-    assert!((actual / 1e-18 - 1.0).abs() < 1e-14);
-    assert_eq!(
-        curve.sp_on_date(start).expect("survival"),
-        curve.sp_on_date(end).expect("survival")
-    );
-    let flat = HazardCurve::flat("TINY-FLAT", base, 1e-18, 0.4).expect("curve");
-    assert!(
-        (flat.conditional_default_prob(start, end).expect("tiny PD") / 1e-18 - 1.0).abs() < 1e-14
-    );
+    let cond = tiny.conditional_default_prob(start, end).expect("tiny PD");
+    assert!(cond > 0.0 && (cond / 1e-18 - 1.0).abs() < 1e-14);
+
+    let uncond = tiny.default_prob(125.0, 126.0).expect("subnormal PD");
+    assert!(uncond > 0.0);
+
+    let overflow_curve =
+        HazardCurve::flat("BIG", base, 1e308, 0.4, DayCount::Act365F).expect("flat");
+    assert_eq!(overflow_curve.sp(10.0).expect("saturates"), 0.0);
+    assert!(overflow_curve.integrated_hazard(0.0, 10.0).is_err());
 }
 
 #[test]
-fn conditional_default_prob_survives_unconditional_underflow() {
-    use time::Duration;
-    let base = Date::from_calendar_date(1900, Month::January, 1).expect("date");
-    let curve = HazardCurve::flat("UNDERFLOW", base, 10.0, 0.4).expect("curve");
-    let start = base + Duration::days(365 * 125);
-    let end = start + Duration::days(365);
-    assert_eq!(curve.sp_on_date(start).expect("survival"), 0.0);
-    let actual = curve.conditional_default_prob(start, end).expect("PD");
-    assert!((actual - -(-10.0_f64).exp_m1()).abs() < 1e-15);
+fn from_survival_probs_validates_strict_order_and_reproduces_pillars() {
+    let base = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    assert!(
+        HazardCurve::from_survival_probs(
+            "BAD",
+            base,
+            &[(2.0, 0.96), (1.0, 0.98)],
+            0.4,
+            DayCount::Act365F,
+        )
+        .is_err()
+    );
+    assert!(
+        HazardCurve::from_survival_probs("ZERO-SP", base, &[(1.0, 0.0)], 0.4, DayCount::Act365F,)
+            .is_err()
+    );
+    let hc = HazardCurve::from_survival_probs(
+        "OK",
+        base,
+        &[
+            (0.0, 1.0),
+            (1.0, (-0.02_f64).exp()),
+            (3.0, (-0.12_f64).exp()),
+        ],
+        0.4,
+        DayCount::Act365F,
+    )
+    .expect("valid survival curve");
+    assert_eq!(hc.len(), 2);
+    assert!((hc.hazard_rate(1.0).expect("r1") - 0.02).abs() < 1e-14);
+    assert!((hc.hazard_rate(3.0).expect("r2") - 0.05).abs() < 1e-14);
 }

@@ -92,7 +92,7 @@
             "base_date": "2026-05-07",
             "method": "bootstrap",
             "interpolation": "linear",
-            "extrapolation": "flat_forward",
+            "extrapolation": "extend",
             "pricing_discount_id": null,
             "pricing_forward_id": null,
             "conventions": {
@@ -112,7 +112,6 @@
             "recovery_rate": 0.4,
             "notional": 1.0,
             "method": "bootstrap",
-            "par_interp": "linear",
             "doc_clause": "isda_na"
           }
         ],
@@ -526,7 +525,7 @@
             0.5,
             1.0
           ],
-          "strikes": [
+          "secondary_values": [
             0.004,
             0.00552848,
             0.0075
@@ -646,7 +645,7 @@
     "vega": {
       "abs": 25.0,
       "rel": 0.01,
-      "tolerance_reason": "Expected output is the raw Bloomberg Vega(1%). After Phase 8 (canonical-NPV simplification — see convention_decisions), finstack reports the plain one-sided σ+0.01 forward difference of the canonical Bloomberg quadrature NPV. The previous FEP-beta vega re-parameterization closed the residual to ~$1 but introduced a parallel calibration pathway and silent solver fallbacks; removing it leaves a documented ~$21 (0.62%) convention residual on this fixture without admitting material model drift."
+      "tolerance_reason": "Expected output is the raw Bloomberg Vega(1%). After Phase 8 (canonical-NPV simplification \u2014 see convention_decisions), finstack reports the plain one-sided \u03c3+0.01 forward difference of the canonical Bloomberg quadrature NPV. The previous FEP-beta vega re-parameterization closed the residual to ~$1 but introduced a parallel calibration pathway and silent solver fallbacks; removing it leaves a documented ~$21 (0.62%) convention residual on this fixture without admitting material model drift."
     },
     "dv01": {
       "abs": 0.5,

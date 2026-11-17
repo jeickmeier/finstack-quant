@@ -516,6 +516,52 @@ class RatingScaleEntry:
         bool
         """
         ...
+    def to_json(self) -> str:
+        """
+        Serialize this entry to a JSON string.
+
+        Returns
+        -------
+        str
+            Canonical JSON representation of this `RatingScaleEntry`, suitable for a matching `from_json` call.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+        ...
+    @classmethod
+    def from_json(cls, json: str) -> RatingScaleEntry:
+        """
+        Deserialize and validate a rating scale entry from JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON document with ``id``, ``source``, and ``scale``.
+
+        Returns
+        -------
+        RatingScaleEntry
+            Validated `RatingScaleEntry` instance reconstructed from the canonical JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If *json* is malformed, has unknown or missing fields, or fails
+            validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.rating_scales import RatingLevel, RatingScaleEntry, ScorecardScale
+        >>> scale = ScorecardScale("Internal", [RatingLevel("A", 90.0, 80.0), RatingLevel("B", 70.0, 0.0)])
+        >>> entry = RatingScaleEntry("internal", "credit policy 2026", scale)
+        >>> RatingScaleEntry.from_json(entry.to_json()) == entry
+        True
+
+        """
+        ...
     def __repr__(self) -> str:
         """Return a debug representation of this entry.
 

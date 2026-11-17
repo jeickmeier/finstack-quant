@@ -97,6 +97,7 @@ mod tests {
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (30.0, 0.50)])
             .interp(InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid discount curve")
     }

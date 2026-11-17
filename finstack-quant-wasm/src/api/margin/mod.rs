@@ -71,8 +71,10 @@ fn base_money(csa: &finstack_quant_margin::types::CsaSpec, amount: f64) -> Resul
 ///   baseDate: "2025-01-01",
 ///   knots: [0.0, 1.0, 5.0, 1.0],
 ///   interp: "log_linear",
+///   extrapolation: "extend",
+///   dayCount: "act_365f",
 /// });
-/// const hz = core.HazardCurve.flat("CPTY", "2025-01-01", 0.02, 0.4);
+/// const hz = core.HazardCurve.flat("CPTY", "2025-01-01", 0.02, 0.4, "act_365f");
 /// const result = margin.computeBilateralXva(
 ///   JSON.stringify({ times: [1, 2], mtm_values: [1e6, 1e6], epe: [1e6, 1e6], ene: [0, 0] }),
 ///   hz, hz, df, 0.4, 0.4,
@@ -85,8 +87,8 @@ fn base_money(csa: &finstack_quant_margin::types::CsaSpec, amount: f64) -> Resul
 /// ```typescript
 /// import init, { core, margin } from "finstack-quant-wasm";
 /// await init();
-/// const df = core.DiscountCurve.flat("USD-OIS", "2025-01-01", 0.03);
-/// const hz = core.HazardCurve.flat("CPTY", "2025-01-01", 0.02, 0.4);
+/// const df = core.DiscountCurve.flat("USD-OIS", "2025-01-01", 0.03, "act_365f");
+/// const hz = core.HazardCurve.flat("CPTY", "2025-01-01", 0.02, 0.4, "act_365f");
 /// const result = margin.computeBilateralXva(
 ///   JSON.stringify({ times: [1, 2], mtm_values: [1e6, 1e6], epe: [1e6, 1e6], ene: [0, 0] }),
 ///   hz, hz, df, 0.4, 0.4,

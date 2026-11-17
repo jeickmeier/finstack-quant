@@ -31,6 +31,9 @@ fn b11_quote_set_propagates_applicable_metric_failure() {
         DiscountCurve::builder(bond.discount_curve_id.as_str())
             .base_date(as_of)
             .knots([(0.0, 1.0), (20.0, 0.5)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve"),
     );
@@ -71,6 +74,9 @@ fn quote_set_reports_a_non_finite_metric_as_none() {
         DiscountCurve::builder(bond.discount_curve_id.as_str())
             .base_date(as_of)
             .knots([(0.0, 1.0), (20.0, 0.5)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve"),
     );
@@ -167,17 +173,30 @@ fn asset_swap_forward_paths_use_discount_factor_implied_rates() {
         .base_date(base)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
         .knots([(0.0, 1.0), (1.0, 0.95)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve should build");
-    let fwd = ForwardCurve::builder("USD-3M", 0.25)
+    let fwd = ForwardCurve::builder("USD-3M")
         .base_date(base)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
-        .knots([(0.0, 0.01), (1.0, 0.21)])
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.997191451372845),
+            (0.25, 0.99128816984017),
+            (0.375, 0.982345204817496),
+            (0.5, 0.970445533548508),
+            (0.625, 0.95569877929473),
+            (0.75, 0.938239530095711),
+            (0.875, 0.918225294157143),
+            (1.0, 0.895834135296528),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("forward curve should build");
     let schedule = [base, date!(2025 - 07 - 01), date!(2026 - 01 - 01)];
     let mut expected_float_pv = 0.0;
-    let mut integrated_float_pv = 0.0;
     for dates in schedule.windows(2) {
         let t1 = fwd
             .day_count()
@@ -192,8 +211,7 @@ fn asset_swap_forward_paths_use_discount_factor_implied_rates() {
             .year_fraction(dates[0], dates[1], DayCountContext::default())
             .expect("valid accrual fraction");
         let df = disc.df_on_date(dates[1]).expect("valid discount factor");
-        expected_float_pv += fwd.rate_between(t1, t2).expect("valid term forward") * yf * df;
-        integrated_float_pv += fwd.rate_period(t1, t2).expect("finite ordered period") * yf * df;
+        expected_float_pv += fwd.rate_between(t1, t2, yf).expect("valid term forward") * yf * df;
     }
 
     let (float_pv, _, _) = asset_swap_forward_components(
@@ -206,7 +224,6 @@ fn asset_swap_forward_paths_use_discount_factor_implied_rates() {
     )
     .expect("asset-swap components should succeed");
 
-    assert!((expected_float_pv - integrated_float_pv).abs() > 1e-6);
     assert!((float_pv - expected_float_pv).abs() < 1e-14);
 }
 
@@ -217,12 +234,26 @@ fn overnight_asset_swap_forward_paths_use_observation_average() {
         .base_date(base)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
         .knots([(0.0, 1.0), (1.0, 0.95)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve should build");
-    let fwd = ForwardCurve::builder("USD-SOFR", 1.0 / 360.0)
+    let fwd = ForwardCurve::builder("USD-SOFR")
         .base_date(base)
         .day_count(finstack_quant_core::dates::DayCount::Act360)
-        .knots([(0.0, 0.01), (1.0, 0.21)])
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.997191451372845),
+            (0.25, 0.99128816984017),
+            (0.375, 0.982345204817496),
+            (0.5, 0.970445533548508),
+            (0.625, 0.95569877929473),
+            (0.75, 0.938239530095711),
+            (0.875, 0.918225294157143),
+            (1.0, 0.895834135296528),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("forward curve should build");
     let schedule = [base, date!(2026 - 01 - 01)];
@@ -232,8 +263,7 @@ fn overnight_asset_swap_forward_paths_use_observation_average() {
         .expect("valid end time");
     let yf = t2;
     let df = disc.df_on_date(schedule[1]).expect("valid discount factor");
-    let expected_float_pv = fwd.rate_period(0.0, t2).expect("finite ordered period") * yf * df;
-    let term_float_pv = fwd.rate_between(0.0, t2).expect("valid term forward") * yf * df;
+    let expected_float_pv = fwd.rate_between(0.0, t2, yf).expect("valid projected rate") * yf * df;
 
     let (float_pv, _, _) = asset_swap_forward_components(
         &disc,
@@ -245,7 +275,6 @@ fn overnight_asset_swap_forward_paths_use_observation_average() {
     )
     .expect("asset-swap components should succeed");
 
-    assert!((expected_float_pv - term_float_pv).abs() > 1e-6);
     assert!((float_pv - expected_float_pv).abs() < 1e-14);
 }
 
@@ -265,6 +294,9 @@ fn compute_quotes_returns_zeroes_for_effectively_zero_notional() {
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots([(0.0, 1.0), (5.0, 0.8)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve");
 
@@ -313,6 +345,9 @@ fn z_spread_input_rejects_option_bond_without_quoted_workout_price() {
         DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.80)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve"),
     );
@@ -372,6 +407,9 @@ fn quote_engine_ytw_input_uses_callable_workout_inverse() {
         DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.80)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve"),
     );
@@ -434,6 +472,9 @@ fn compute_quotes_preserves_custom_tree_and_metric_registries_for_oas_roundtrip(
         DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.80)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve"),
     );

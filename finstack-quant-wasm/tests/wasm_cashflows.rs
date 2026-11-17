@@ -55,12 +55,17 @@ fn cashflow_spec_json() -> String {
 }
 
 fn market_context_json() -> String {
+    use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
     let base = finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
         .unwrap();
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(base)
+        .day_count(DayCount::Act365F)
+        .interp(InterpStyle::MonotoneConvex)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80)])
         .build()
         .unwrap();
@@ -190,20 +195,28 @@ fn canonical_program_spec_json(
 }
 
 fn floating_market_context_json() -> String {
+    use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+    use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 
     let base = finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 15)
         .unwrap();
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(base)
+        .day_count(DayCount::Act365F)
+        .interp(InterpStyle::MonotoneConvex)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80)])
         .build()
         .unwrap();
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let fwd = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(base)
-        .day_count(finstack_quant_core::dates::DayCount::Act360)
-        .knots([(0.0, 0.03), (1.0, 0.04), (5.0, 0.05)])
+        .day_count(DayCount::Act360)
+        .index_tenor(finstack_quant_core::dates::Tenor::quarterly())
+        .knots([(0.0, 1.0), (1.0, 0.965), (5.0, 0.80)])
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let ctx = MarketContext::new().insert(disc).insert(fwd);

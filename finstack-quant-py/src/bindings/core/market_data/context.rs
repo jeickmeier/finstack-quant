@@ -21,7 +21,7 @@ use super::curves::{
     PyBaseCorrelationCurve, PyCreditIndexData, PyDiscountCurve, PyForwardCurve,
     PyFxDeltaVolSurface, PyHazardCurve, PyInflationCurve, PyPriceCurve, PyVolCube, PyVolSurface,
 };
-use super::fx::{PyFxMatrix, PyFxRateResult};
+use super::fx::{PyFxMatrix, PyFxRateResult, extract_fx_policy};
 use super::scalars::{PyInflationIndex, PyScalarTimeSeries, extract_f64};
 
 /// Unified market data container for curves, surfaces, scalars and FX.
@@ -33,7 +33,7 @@ use super::scalars::{PyInflationIndex, PyScalarTimeSeries, extract_f64};
 /// Example
 /// -------
 /// >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
-/// >>> ctx = MarketContext().insert(DiscountCurve.flat("USD-OIS", "2025-01-01", 0.05))
+/// >>> ctx = MarketContext().insert(DiscountCurve.flat("USD-OIS", "2025-01-01", 0.05, "act_365f"))
 /// >>> "USD-OIS" in ctx, len(ctx)
 /// (True, 1)
 #[pyclass(
@@ -94,9 +94,9 @@ impl PyMarketContext {
     /// TypeError
     ///     If ``curve`` is not one of the supported types.
     /// ValueError
-    ///     If a volatility surface, FX delta-vol surface, or vol cube ``id`` is
-    ///     already registered in another volatility registry, or replacing a
-    ///     curve invalidates a bound credit index.
+    ///     If a curve or surface ``id`` is empty or blank, replacing a curve
+    ///     changes its curve family, or replacing a curve invalidates a bound
+    ///     credit index.
     #[pyo3(text_signature = "(self, curve)")]
     fn insert<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -223,10 +223,10 @@ impl PyMarketContext {
                     money.inner.currency()
                 )));
             }
-            MarketScalar::Price(money.inner)
+            MarketScalar::price(money.inner)
         } else {
             match currency {
-                Some(ccy) => MarketScalar::Price(money_from_amount(value, ccy)?),
+                Some(ccy) => MarketScalar::price(money_from_amount(value, ccy)?),
                 None => MarketScalar::unitless(extract_f64(value, "price value")?)
                     .map_err(core_to_py)?,
             }
@@ -384,12 +384,18 @@ impl PyMarketContext {
     /// Raises ``KeyError`` if no scalar is stored under ``id``.
     #[pyo3(text_signature = "(self, id)")]
     fn get_price(&self, py: Python<'_>, id: &str) -> PyResult<(Py<PyAny>, Option<String>)> {
-        match self.inner.get_price(id).map_err(core_to_py)? {
-            MarketScalar::Unitless(value) => Ok((value.into_py_any(py)?, None)),
-            MarketScalar::Price(money) => Ok((
+        let scalar = self.inner.get_price(id).map_err(core_to_py)?;
+        if let Some(money) = scalar.get_price() {
+            Ok((
                 decimal_to_py(py, money.amount_decimal())?.unbind(),
                 Some(money.currency().to_string()),
-            )),
+            ))
+        } else if let Some(value) = scalar.get_unitless() {
+            Ok((value.into_py_any(py)?, None))
+        } else {
+            Err(crate::errors::value_error(
+                "MarketScalar must be unitless or monetary",
+            ))
         }
     }
 
@@ -493,6 +499,9 @@ impl PyMarketContext {
     ///     Destination currency.
     /// as_of : datetime.date | str
     ///     Date used for the FX rate lookup.
+    /// policy : FxConversionPolicy | str
+    ///     Required FX conversion policy (e.g. ``"cashflow_date"`` or
+    ///     ``FxConversionPolicy.CASHFLOW_DATE``; no default).
     ///
     /// Returns
     /// -------
@@ -505,18 +514,20 @@ impl PyMarketContext {
     /// ------
     /// KeyError
     ///     If no FX matrix is attached or the pair cannot be resolved.
-    #[pyo3(text_signature = "(self, amount, target_currency, as_of)")]
+    #[pyo3(text_signature = "(self, amount, target_currency, as_of, policy)")]
     fn convert_money(
         &self,
         amount: &PyMoney,
         target_currency: &Bound<'_, PyAny>,
         as_of: &Bound<'_, PyAny>,
+        policy: &Bound<'_, PyAny>,
     ) -> PyResult<PyConvertedMoney> {
         self.inner
             .convert_money(
                 amount.inner,
                 extract_currency(target_currency)?,
                 py_to_date(as_of)?,
+                extract_fx_policy(policy)?,
             )
             .map(|inner| PyConvertedMoney { inner })
             .map_err(core_to_py)
@@ -581,14 +592,16 @@ impl PyMarketContext {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.stats())
     }
 
-    /// Roll every dated term structure forward by ``days`` calendar days.
+    /// Condition dated term structures in this context to ``reference_date``.
     ///
-    /// Curves keep their shape in time-from-base terms; base dates advance.
+    /// Re-anchors discount, forward, hazard and parametric curves onto
+    /// ``reference_date`` while keeping frozen inflation/price/basis/correlation
+    /// curves, FX matrices, surfaces, scalars, series and indices intact.
     ///
     /// Parameters
     /// ----------
-    /// days : int
-    ///     Non-negative 64-bit calendar days to roll (``0`` clones curves unchanged).
+    /// reference_date : datetime.date | str
+    ///     Target valuation anchor date for conditioned curves.
     ///
     /// Returns
     /// -------
@@ -598,14 +611,13 @@ impl PyMarketContext {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``days < 0``, a rolled base date exceeds the supported date range,
-    ///     a curve cannot be rebuilt after rolling, or a bound credit index fails to rebind.
-    /// OverflowError
-    ///     If ``days`` is outside the signed 64-bit integer range.
-    #[pyo3(text_signature = "(self, days)")]
-    fn roll_forward(&self, days: i64) -> PyResult<Self> {
+    ///     If ``reference_date`` cannot be parsed, a curve rejects the anchor
+    ///     or cannot normalize under its extrapolation policy, or a bound
+    ///     credit index fails to rebind.
+    #[pyo3(text_signature = "(self, reference_date)")]
+    fn condition(&self, reference_date: &Bound<'_, PyAny>) -> PyResult<Self> {
         self.inner
-            .roll_forward(days)
+            .condition(py_to_date(reference_date)?)
             .map(Self::from_inner)
             .map_err(core_to_py)
     }
@@ -766,7 +778,7 @@ impl PyMarketContext {
 /// >>> fx = FxMatrix()
 /// >>> fx.set_quotes([("EUR", "USD", 1.1)])
 /// >>> ctx = MarketContext().insert_fx(fx)
-/// >>> converted = ctx.convert_money(Money(100.0, "EUR"), "USD", "2025-01-02")
+/// >>> converted = ctx.convert_money(Money(100.0, "EUR"), "USD", "2025-01-02", "cashflow_date")
 /// >>> (round(converted.amount.amount, 6), converted.rate.triangulated)
 /// (110.0, False)
 #[pyclass(

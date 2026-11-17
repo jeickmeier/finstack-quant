@@ -43,6 +43,9 @@ fn test_dm_fixed_bond_is_rejected_in_strict_mode() {
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.80)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
     let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
@@ -156,14 +159,12 @@ fn test_dm_solver_convergence_across_spread_regimes() {
         .base_date(as_of)
         .knots([(0.0, 1.0), (10.0, 0.6)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(date!(2024 - 12 - 30))
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.03), (10.0, 0.03)])
-        .build()
-        .unwrap();
+    let fwd =
+        ForwardCurve::flat("USD-SOFR-3M", date!(2024 - 12 - 30), 0.03, DayCount::Act360).unwrap();
     let market = MarketContext::new().insert(disc).insert(fwd);
 
     // Base FRNs for different maturities.
@@ -300,15 +301,12 @@ fn flat_frn_market(
         .day_count(DayCount::Act360)
         .interp(InterpStyle::LogLinear)
         .knots([(0.0, 1.0), (10.0, df_10y)])
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("flat discount curve should build");
     // Base the projection curve a few days before `as_of` so the first
     // coupon's lagged reset date is still projectable (no fixings needed).
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(date!(2024 - 12 - 28))
-        .day_count(DayCount::Act360)
-        .knots([(0.0, rate), (10.0, rate)])
-        .build()
+    let fwd = ForwardCurve::flat("USD-SOFR-3M", date!(2024 - 12 - 28), rate, DayCount::Act360)
         .expect("flat forward curve should build");
     MarketContext::new().insert(disc).insert(fwd)
 }
@@ -446,13 +444,12 @@ fn test_dm_monotone_residual_does_not_break_valid_solve() {
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots([(0.0, 1.0), (5.0, 0.85)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("disc curve");
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(date!(2024 - 12 - 30))
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.03), (5.0, 0.03)])
-        .build()
+    let fwd = ForwardCurve::flat("USD-SOFR-3M", date!(2024 - 12 - 30), 0.03, DayCount::Act360)
         .expect("fwd curve");
     let market = MarketContext::new().insert(disc).insert(fwd);
 
@@ -532,16 +529,15 @@ fn test_dm_amortizing_frn_is_supported() {
         .day_count(finstack_quant_core::dates::DayCount::Act360)
         .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
         .knots([(0.0, 1.0), (10.0, df_10y)])
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve should build");
-    let fwd = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
+    let fwd = finstack_quant_core::market_data::term_structures::ForwardCurve::flat(
         "USD-SOFR-3M",
-        0.25,
+        date!(2024 - 12 - 28),
+        rate,
+        finstack_quant_core::dates::DayCount::Act360,
     )
-    .base_date(date!(2024 - 12 - 28))
-    .day_count(finstack_quant_core::dates::DayCount::Act360)
-    .knots([(0.0, rate), (10.0, rate)])
-    .build()
     .expect("forward curve should build");
     let market = finstack_quant_core::market_data::context::MarketContext::new()
         .insert(disc)

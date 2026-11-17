@@ -829,7 +829,8 @@ mod tests {
 
     fn market(rate: f64) -> MarketContext {
         MarketContext::new().insert(
-            DiscountCurve::flat("USD-OIS", date!(2026 - 01 - 01), rate).expect("discount curve"),
+            DiscountCurve::flat("USD-OIS", date!(2026 - 01 - 01), rate, DayCount::Act365F)
+                .expect("discount curve"),
         )
     }
 

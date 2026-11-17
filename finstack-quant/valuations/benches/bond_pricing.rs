@@ -84,13 +84,59 @@ fn create_market() -> MarketContext {
             (30.0, 0.40),
         ])
         .interp(InterpStyle::MonotoneConvex)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let forward_curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let forward_curve = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(base)
-        .knots([(0.0, 0.045), (1.0, 0.047), (3.0, 0.05), (5.0, 0.052)])
-        .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.994375253456361),
+            (0.25, 0.98875124572718),
+            (0.375, 0.983128323134849),
+            (0.5, 0.977506829936218),
+            (0.625, 0.97188710829143),
+            (0.75, 0.966269498233266),
+            (0.875, 0.96065433763699),
+            (1.0, 0.955041962190715),
+            (1.125, 0.949436414095015),
+            (1.25, 0.943841645801078),
+            (1.375, 0.93825785526549),
+            (1.5, 0.932685238506454),
+            (1.625, 0.927123989596932),
+            (1.75, 0.921574300658061),
+            (1.875, 0.916036361852831),
+            (2.0, 0.910510361380034),
+            (2.125, 0.904996485468475),
+            (2.25, 0.899494918371453),
+            (2.375, 0.894005842361499),
+            (2.5, 0.888529437725386),
+            (2.625, 0.883065882759394),
+            (2.75, 0.877615353764839),
+            (2.875, 0.872178025043864),
+            (3.0, 0.866754068895489),
+            (3.125, 0.861347020242143),
+            (3.25, 0.855960327750733),
+            (3.375, 0.850594031924348),
+            (3.5, 0.845248172059375),
+            (3.625, 0.839922786250618),
+            (3.75, 0.834617911396478),
+            (3.875, 0.829333583204187),
+            (4.0, 0.824069836195111),
+            (4.125, 0.818826703710106),
+            (4.25, 0.813604217914933),
+            (4.375, 0.808402409805731),
+            (4.5, 0.803221309214547),
+            (4.625, 0.798060944814917),
+            (4.75, 0.792921344127507),
+            (4.875, 0.787802533525806),
+            (5.0, 0.782704538241868),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let fixings = ScalarTimeSeries::new(
@@ -100,6 +146,8 @@ fn create_market() -> MarketContext {
             0.045,
         )],
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .unwrap();
 
@@ -114,7 +162,8 @@ fn create_hazard_market() -> MarketContext {
     let hazard = HazardCurve::builder("USD-HAZARD")
         .base_date(base)
         .recovery_rate(0.40)
-        .knots([(0.0, 0.02), (10.0, 0.02)])
+        .knots([(10.0, 0.02)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
     create_market().insert(hazard)

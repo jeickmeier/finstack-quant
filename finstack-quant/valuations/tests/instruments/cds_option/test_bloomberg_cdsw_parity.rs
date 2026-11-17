@@ -64,6 +64,8 @@ fn cdx_ig_46_curves(as_of: Date) -> MarketContext {
         .base_date(as_of)
         .knots(disc_knots)
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
 

@@ -36,6 +36,9 @@ fn market() -> MarketContext {
         DiscountCurve::builder("USD-OIS")
             .base_date(close())
             .knots((0..=10).map(|i| (f64::from(i), (-0.04 * f64::from(i)).exp())))
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve"),
     )

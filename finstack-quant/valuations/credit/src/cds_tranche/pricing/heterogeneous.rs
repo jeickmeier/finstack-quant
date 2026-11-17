@@ -70,12 +70,7 @@ impl PreparedHeterogeneousPool {
             return pricer.integrate_factors(&|factors| {
                 let mut pmf = pmf.borrow_mut();
                 default_count_pmf(&mut pmf, (0..count).map(|i| conditional_p(i, factors)));
-                Ok(count_capped_expectation(
-                    &pmf,
-                    weights[0],
-                    exposures[0],
-                    cap,
-                ))
+                count_capped_expectation(&pmf, weights[0], exposures[0], cap)
             });
         }
         // Small bespoke pools can retain every contractual loss state within
@@ -103,12 +98,12 @@ impl PreparedHeterogeneousPool {
                         probabilities[state] = mass * (1.0 - p);
                     }
                 }
-                Ok(finstack_quant_core::math::summation::neumaier_sum(
+                finstack_quant_core::math::summation::neumaier_sum(
                     probabilities
                         .iter()
                         .zip(&capped_losses)
                         .map(|(p, loss)| p * loss),
-                ))
+                )
             });
         }
         // The PMF spans every reachable loss, including the mass above the cap.
@@ -156,14 +151,14 @@ impl PreparedHeterogeneousPool {
                 };
                 in_first = !in_first;
             }
-            Ok(expected_loss_capped(
+            expected_loss_capped(
                 if in_first {
                     &first[..len]
                 } else {
                     &second[..len]
                 },
                 cap,
-            ))
+            )
         })
     }
 }
@@ -222,7 +217,7 @@ fn default_count_pmf(pmf: &mut [f64], probabilities: impl Iterator<Item = f64>) 
 }
 
 /// Apply the cap to the actual common contractual weight, without normalizing.
-fn count_capped_expectation(pmf: &[f64], weight: f64, exposure: f64, cap: f64) -> f64 {
+fn count_capped_expectation(pmf: &[f64], weight: f64, exposure: f64, cap: f64) -> Result<f64> {
     finstack_quant_core::math::summation::neumaier_sum(
         pmf.iter()
             .enumerate()
@@ -321,7 +316,7 @@ fn accumulate_issuer_pmf(
 /// Uses Neumaier compensated summation to maintain accuracy when the PMF has
 /// many bins (up to `MAX_GRID_POINTS`).
 #[inline]
-fn expected_loss_capped(pmf: &[f64], k: f64) -> f64 {
+fn expected_loss_capped(pmf: &[f64], k: f64) -> Result<f64> {
     finstack_quant_core::math::summation::neumaier_sum(
         pmf.iter()
             .enumerate()

@@ -18,7 +18,7 @@ import pytest
 from finstack_quant.attribution import default_waterfall_order
 from finstack_quant.core.config import FinstackConfig
 from finstack_quant.core.dates import DayCount, Tenor
-from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext
+from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.scenarios import (
     ApplicationReport,
@@ -38,6 +38,7 @@ from finstack_quant.scenarios import (
     validate_scenario_spec,
 )
 from finstack_quant.valuations.instruments import Bond
+from tests.tests_typed_helpers import projection_curve
 
 AS_OF = "2025-01-15"
 
@@ -50,6 +51,8 @@ def _market(as_of: str = AS_OF) -> MarketContext:
             date.fromisoformat(as_of),
             [(0.0, 1.0), (0.5, 0.98), (1.0, 0.96), (2.0, 0.92)],
             day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
         )
     )
     return market
@@ -339,17 +342,17 @@ def test_horizon_methods_support_standard_fixed_income_instruments(method: str, 
 def test_floating_horizons_preserve_opening_and_crossed_fixings(method: str, issue_date: str) -> None:
     origin = "2025-01-02"
     market = MarketContext()
-    market.insert(DiscountCurve("USD-OIS", origin, [(0.0, 1.0), (1.0, 0.95), (2.0, 0.9)], day_count="act_365f"))
     market.insert(
-        ForwardCurve(
-            "USD-SOFR-3M",
-            0.25,
+        DiscountCurve(
+            "USD-OIS",
             origin,
-            [(0.0, 0.03), (1.0, 0.03), (2.0, 0.03)],
-            day_count="act_360",
-            reset_lag=0,
+            [(0.0, 1.0), (1.0, 0.95), (2.0, 0.9)],
+            day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
         )
     )
+    market.insert(projection_curve("USD-SOFR-3M", origin, [(2.0, 0.03)]))
     bond = Bond.floating({
         "id": "HORIZON-FRN",
         "notional": Money(1_000_000.0, "USD"),
@@ -530,7 +533,7 @@ def test_hierarchy_target_pyclass_roundtrip() -> None:
     assert OperationSpec.hierarchy_equity_price_pct(HierarchyTarget(["Equity"]), -5.0).kind == (
         "hierarchy_equity_price_pct"
     )
-    with pytest.raises(ValueError, match="HierarchyTarget"):
+    with pytest.raises(ValueError, match="validation failed"):
         OperationSpec.hierarchy_equity_price_pct("{bad", -5.0)
 
 

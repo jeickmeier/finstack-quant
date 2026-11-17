@@ -37,6 +37,8 @@ fn build_discount_curve(rate: f64) -> DiscountCurve {
             (20.0f64, (-rate * 20.0).exp()),
             (30.0f64, (-rate * 30.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -236,7 +238,9 @@ mod mc_invariants {
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod;
     use finstack_quant_models::types::OptionType;
@@ -255,12 +259,17 @@ mod mc_invariants {
                 (1.0f64, (-rate).exp()),
                 (2.0f64, (-rate * 2.0).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
         let vol_surface = VolSurface::builder("SPOT_VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.5, 1.0, 2.0])
-            .strikes(&[80.0, 100.0, 120.0])
+            .secondary_values(&[80.0, 100.0, 120.0])
             .row(&[vol, vol, vol])
             .row(&[vol, vol, vol])
             .row(&[vol, vol, vol])
@@ -270,7 +279,7 @@ mod mc_invariants {
         MarketContext::new()
             .insert(disc)
             .insert_surface(vol_surface)
-            .insert_price("SPOT", MarketScalar::Unitless(spot))
+            .insert_price("SPOT", MarketScalar::unitless(spot).expect("valid scalar"))
     }
 
     /// Test that MC pricing with the same seed produces identical results.
@@ -420,6 +429,8 @@ mod cds_invariants {
                 (5.0f64, (-flat_rate * 5.0).exp()),
                 (10.0f64, (-flat_rate * 10.0).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
@@ -428,7 +439,6 @@ mod cds_invariants {
             .day_count(DayCount::Act365F)
             .recovery_rate(recovery)
             .knots(vec![
-                (0.0, hazard_rate),
                 (1.0, hazard_rate),
                 (5.0, hazard_rate),
                 (10.0, hazard_rate),
@@ -586,6 +596,8 @@ mod cs01_invariants {
                 (10.0f64, (-flat_rate * 10.0).exp()),
                 (30.0f64, (-flat_rate * 30.0).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
@@ -672,45 +684,6 @@ mod cs_gamma_consistency {
     use std::sync::Arc;
     use time::macros::date;
 
-    /// Build a discount curve and a hazard curve that has par-spread points
-    /// (so CS01 / CS-Gamma will use the par-spread re-bootstrap path).
-    fn build_curves_with_par_spreads(par_shift_bp: f64) -> (DiscountCurve, HazardCurve) {
-        let as_of = date!(2025 - 01 - 01);
-
-        let disc = DiscountCurve::builder("USD-OIS")
-            .base_date(as_of)
-            .day_count(DayCount::Act365F)
-            .knots([
-                (0.0f64, 1.0f64),
-                (1.0f64, (-0.04f64).exp()),
-                (5.0f64, (-0.04f64 * 5.0).exp()),
-                (10.0f64, (-0.04f64 * 10.0).exp()),
-            ])
-            .build()
-            .unwrap();
-
-        // Base par spreads: 100 / 150 / 200 / 250 bp for 1y / 3y / 5y / 10y.
-        // `par_shift_bp` allows building an "up-shifted" or "down-shifted" market
-        // to verify the CS-Gamma consistency identity.
-        let par_spreads: Vec<(f64, f64)> = vec![
-            (1.0, 100.0 + par_shift_bp),
-            (3.0, 150.0 + par_shift_bp),
-            (5.0, 200.0 + par_shift_bp),
-            (10.0, 250.0 + par_shift_bp),
-        ];
-
-        let hazard = HazardCurve::builder("TEST-CREDIT")
-            .base_date(as_of)
-            .day_count(DayCount::Act365F)
-            .recovery_rate(0.40)
-            .knots(vec![(0.0, 0.02), (1.0, 0.025), (5.0, 0.035), (10.0, 0.045)])
-            .par_spreads(par_spreads)
-            .build()
-            .unwrap();
-
-        (disc, hazard)
-    }
-
     fn compute_metric_error(
         cds: &finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap,
         market: &MarketContext,
@@ -734,30 +707,7 @@ mod cs_gamma_consistency {
             .to_string()
     }
 
-    /// Reporting-only par-spread sidecars must not activate standard CS-Gamma.
-    #[test]
-    fn cs_gamma_rejects_unreplayable_par_spread_sidecars() {
-        let as_of = date!(2025 - 01 - 01);
-        let maturity = as_of.add_months(60).expect("valid date shift"); // 5Y CDS
-
-        let cds = crate::metrics::credit_support::cds_buy_protection(
-            "CS_GAMMA_CONSISTENCY",
-            Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-            200.0,
-            as_of,
-            maturity,
-            "USD-OIS",
-            "TEST-CREDIT",
-        )
-        .expect("CDS construction should succeed");
-
-        let (disc, hazard_base) = build_curves_with_par_spreads(0.0);
-        let market_base = MarketContext::new().insert(disc).insert(hazard_base);
-        let error = compute_metric_error(&cds, &market_base, as_of, MetricId::CsGamma);
-        assert!(error.contains("calibration recipe"));
-    }
-
-    /// Standard CS-Gamma requires quote-space replay, even without sidecars.
+    /// Standard CS-Gamma requires quote-space replay on HazardCurve.
     #[test]
     fn cs_gamma_requires_replay_recipe_without_par_spreads() {
         let as_of = date!(2025 - 01 - 01);
@@ -785,18 +735,15 @@ mod cs_gamma_consistency {
                 (5.0f64, (-0.04f64 * 5.0).exp()),
                 (10.0f64, (-0.04f64 * 10.0).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
         let hazard_no_par = HazardCurve::builder("TEST-CREDIT-NOPAR")
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .recovery_rate(0.40)
-            .knots(vec![
-                (0.0, 0.020),
-                (1.0, 0.025),
-                (5.0, 0.035),
-                (10.0, 0.045),
-            ])
+            .knots(vec![(1.0, 0.025), (5.0, 0.035), (10.0, 0.045)])
             // Intentionally no replay recipe.
             .build()
             .unwrap();
@@ -833,6 +780,8 @@ mod bucketed_cs01_invariants {
                 (10.0f64, (-flat_rate * 10.0).exp()),
                 (30.0f64, (-flat_rate * 30.0).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 

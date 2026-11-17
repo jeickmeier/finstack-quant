@@ -120,7 +120,7 @@ impl MetricCalculator for ForwardPv01Calculator {
 
         let bump_bp = sens_config::resolve(context)?.rate_bump_bp;
         let reprice = |bp: f64| -> Result<f64> {
-            let bumped = context.curves.bump([MarketBump::Curve {
+            let bumped = context.curves.bump([MarketBump::ForwardCurve {
                 id: option.forward_curve_id.clone(),
                 spec: BumpSpec::parallel_bp(bp),
             }])?;

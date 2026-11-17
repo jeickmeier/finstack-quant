@@ -63,6 +63,10 @@ pub(super) fn apply(
         // curve, killing the convexity term.
         let mut weighted_shift_acc = NeumaierAccumulator::new();
         let mut weight_acc = NeumaierAccumulator::new();
+        let mut rates_valid = true;
+        let mut shift_valid = true;
+        let mut weighted_shift_valid = true;
+        let mut weight_valid = true;
         let mut shift_terms = 0usize;
         let mut curves_with_data = 0usize;
         for curve_id in curve_ids {
@@ -70,15 +74,36 @@ pub(super) fn apply(
                 continue;
             };
             let mut curve_acc = NeumaierAccumulator::new();
+            let mut curve_valid = true;
             for (_, dv01, shift) in buckets {
-                rates_acc.add(dv01 * shift);
-                curve_acc.add(dv01 * shift);
-                shift_acc.add(*shift);
-                weighted_shift_acc.add(dv01.abs() * shift);
-                weight_acc.add(dv01.abs());
+                let term = dv01 * shift;
+                if rates_acc.add(term).is_err() {
+                    rates_valid = false;
+                }
+                if curve_acc.add(term).is_err() {
+                    curve_valid = false;
+                }
+                if shift_acc.add(*shift).is_err() {
+                    shift_valid = false;
+                }
+                if weighted_shift_acc.add(dv01.abs() * shift).is_err() {
+                    weighted_shift_valid = false;
+                }
+                if weight_acc.add(dv01.abs()).is_err() {
+                    weight_valid = false;
+                }
                 shift_terms += 1;
             }
             curves_with_data += 1;
+            let curve_pnl = if curve_valid {
+                curve_acc.get_total().unwrap_or_else(|_| {
+                    *non_finite_detected = true;
+                    f64::NAN
+                })
+            } else {
+                *non_finite_detected = true;
+                f64::NAN
+            };
             push_first_order_step(
                 attribution,
                 &format!("Rates:{curve_id}"),
@@ -86,10 +111,18 @@ pub(super) fn apply(
                     unit: MoveUnit::BasisPoint,
                     buckets: buckets.clone(),
                 },
-                curve_acc.total(),
+                curve_pnl,
             );
         }
-        let rates_pnl = rates_acc.total();
+        let rates_pnl = if rates_valid {
+            rates_acc.get_total().unwrap_or_else(|_| {
+                *non_finite_detected = true;
+                f64::NAN
+            })
+        } else {
+            *non_finite_detected = true;
+            f64::NAN
+        };
         attribution.rates_curves_pnl = inputs.money(
             rates_pnl,
             "rates curves P&L (key-rate)",
@@ -103,11 +136,37 @@ pub(super) fn apply(
             //   Σ|DV01_i|·Δr_i / Σ|DV01_i|.
             // Guard: when Σ|DV01| ≈ 0 (all-zero DV01 cells) fall back to the
             // unweighted mean rather than dividing by ~0.
-            let total_weight = weight_acc.total();
-            convexity_avg_shift_bp = Some(if total_weight > KEYRATE_WEIGHT_EPS {
-                weighted_shift_acc.total() / total_weight
+            let total_weight = if weight_valid {
+                weight_acc.get_total().unwrap_or_else(|_| {
+                    *non_finite_detected = true;
+                    f64::NAN
+                })
             } else {
-                shift_acc.total() / shift_terms as f64
+                *non_finite_detected = true;
+                f64::NAN
+            };
+            convexity_avg_shift_bp = Some(if total_weight > KEYRATE_WEIGHT_EPS {
+                let weighted = if weighted_shift_valid {
+                    weighted_shift_acc.get_total().unwrap_or_else(|_| {
+                        *non_finite_detected = true;
+                        f64::NAN
+                    })
+                } else {
+                    *non_finite_detected = true;
+                    f64::NAN
+                };
+                weighted / total_weight
+            } else {
+                let unweighted = if shift_valid {
+                    shift_acc.get_total().unwrap_or_else(|_| {
+                        *non_finite_detected = true;
+                        f64::NAN
+                    })
+                } else {
+                    *non_finite_detected = true;
+                    f64::NAN
+                };
+                unweighted / shift_terms as f64
             });
         }
         if curves_with_data > 0 {
@@ -267,8 +326,10 @@ pub(super) fn apply(
             &mut attribution.meta.notes,
             "Rates convexity",
             avg_shift,
-            &inputs.rates_curve_ids,
-            |id| rate_curve_abs_shift_bp(id, inputs.market_t0, inputs.market_t1),
+            &inputs.rates_curves,
+            |(id, family)| {
+                rate_curve_abs_shift_bp(id.as_str(), *family, inputs.market_t0, inputs.market_t1)
+            },
         );
     }
 }

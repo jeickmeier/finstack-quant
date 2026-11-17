@@ -36,7 +36,7 @@ fn sample_correlation_uses_pairwise_overlap_mean_on_sparse_panel() {
     returns.insert(b.clone(), vec![None, None, Some(1.0), Some(2.0)]);
 
     let order = vec![a, b];
-    let rho = sample_correlation_flat(&order, &returns);
+    let rho = sample_correlation_flat(&order, &returns).unwrap();
 
     // 2x2 flat row-major: [aa, ab, ba, bb].
     assert_eq!(rho.len(), 4);
@@ -64,7 +64,7 @@ fn sample_correlation_handles_anti_correlated_overlap() {
     returns.insert(b.clone(), vec![None, Some(-1.0), Some(-2.0), Some(-3.0)]);
 
     let order = vec![a, b];
-    let rho = sample_correlation_flat(&order, &returns);
+    let rho = sample_correlation_flat(&order, &returns).unwrap();
     assert!(
         (rho[1] - (-1.0)).abs() < 1e-9,
         "perfectly anti-correlated overlap must give -1, got {}",

@@ -28,7 +28,8 @@ use std::collections::HashSet;
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct WaterfallSpec {
-    /// Priority order of payments (default: Fees > Interest > Amortization > Sweep > Equity)
+    /// Priority order of payments (default: Fees > Interest > Amortization > Equity).
+    /// Include each prepayment priority explicitly alongside its sizing configuration.
     #[serde(default = "default_priority_of_payments")]
     pub priority_of_payments: Vec<PaymentPriority>,
 
@@ -48,7 +49,7 @@ pub struct WaterfallSpec {
     pub available_cash_node: String,
 
     /// Excess Cash Flow (ECF) sweep specification.
-    /// A positive sweep percentage requires the `Sweep` payment priority.
+    /// This specification and the `Sweep` payment priority must be supplied together.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ecf_sweep: Option<EcfSweepSpec>,
 
@@ -109,13 +110,12 @@ impl Default for WaterfallSpec {
     }
 }
 
-/// Canonical payment stack: fees, interest, amortization, sweep, equity.
+/// Default payment stack for scheduled debt service and equity distributions.
 pub fn default_priority_of_payments() -> Vec<PaymentPriority> {
     vec![
         PaymentPriority::Fees,
         PaymentPriority::Interest,
         PaymentPriority::Amortization,
-        PaymentPriority::Sweep,
         PaymentPriority::Equity,
     ]
 }
@@ -130,9 +130,8 @@ impl WaterfallSpec {
     ///   ([`PikToggleSpec::validate`]).
     /// - `ecf_sweep.sweep_percentage` (when configured) lies in `[0.0, 1.0]`
     ///   ([`EcfSweepSpec::validate`]).
-    /// - When an ECF sweep with a positive `sweep_percentage` is configured,
-    ///   `Sweep` must be present. Mandatory and voluntary prepayments have
-    ///   independent sizing nodes and do not execute the ECF sweep.
+    /// - `Sweep` and `ecf_sweep` must be supplied together, including when the
+    ///   sweep percentage is zero.
     /// - `payment_classes` ids and ranks are unique, each class lists at least
     ///   one instrument, and no instrument appears in more than one class.
     /// - `MandatoryPrepayment` / `VoluntaryPrepayment` require the matching
@@ -148,11 +147,10 @@ impl WaterfallSpec {
     ///
     /// Returns a build error for duplicate priorities, a non-terminal equity
     /// entry, incomplete cash-capping priorities, an empty PIK-toggle target
-    /// set, a sweep percentage outside `[0, 1]`, a positive ECF sweep with
-    /// no `Sweep` priority, invalid payment classes, or a prepayment priority
-    /// and sizing node configured without one another. Validation does not
-    /// confirm that referenced model nodes or instruments exist; that requires
-    /// the enclosing model and evaluation context.
+    /// set, a sweep percentage outside `[0, 1]`, invalid payment classes, or a
+    /// prepayment priority and its sizing configuration supplied separately.
+    /// The enclosing model and evaluation context check referenced model nodes
+    /// and instruments.
     pub fn validate(&self) -> Result<()> {
         for (idx, priority) in self.priority_of_payments.iter().enumerate() {
             if self.priority_of_payments[..idx].contains(priority) {
@@ -241,23 +239,17 @@ impl WaterfallSpec {
         // (Prepayment-after-Equity is already rejected by the "Equity must be
         // last" rule above: if Equity is terminal, no prepayment can follow it.)
 
-        let Some(ecf) = &self.ecf_sweep else {
-            return Ok(());
-        };
-        ecf.validate()?;
-        // A positive sweep also needs somewhere to land, which only the
-        // enclosing waterfall's priority stack can tell.
-        if ecf.sweep_percentage <= 0.0 {
-            return Ok(());
+        let has_sweep = self.priority_of_payments.contains(&PaymentPriority::Sweep);
+        match (&self.ecf_sweep, has_sweep) {
+            (Some(ecf), true) => ecf.validate(),
+            (Some(_), false) => Err(Error::build(
+                "WaterfallSpec: `ecf_sweep` requires the `Sweep` priority in `priority_of_payments`.",
+            )),
+            (None, true) => Err(Error::build(
+                "WaterfallSpec: `Sweep` in `priority_of_payments` requires `ecf_sweep`.",
+            )),
+            (None, false) => Ok(()),
         }
-        if !self.priority_of_payments.contains(&PaymentPriority::Sweep) {
-            return Err(Error::build(
-                "WaterfallSpec: `ecf_sweep.sweep_percentage > 0` requires the `Sweep` \
-                 priority in `priority_of_payments`; mandatory and voluntary \
-                 prepayment priorities do not execute the ECF sweep.",
-            ));
-        }
-        Ok(())
     }
 }
 
@@ -539,6 +531,16 @@ mod tests {
         }
     }
 
+    fn sweep_priorities() -> Vec<PaymentPriority> {
+        vec![
+            PaymentPriority::Fees,
+            PaymentPriority::Interest,
+            PaymentPriority::Amortization,
+            PaymentPriority::Sweep,
+            PaymentPriority::Equity,
+        ]
+    }
+
     #[test]
     fn validate_rejects_duplicate_priorities() {
         let spec = spec_with(vec![
@@ -553,7 +555,7 @@ mod tests {
     #[test]
     fn validate_rejects_sweep_percentage_outside_unit_interval() {
         for pct in [-0.1, 1.5] {
-            let spec = spec_with_sweep(default_priority_of_payments(), sweep_spec(pct));
+            let spec = spec_with_sweep(sweep_priorities(), sweep_spec(pct));
             let err = spec
                 .validate()
                 .expect_err("out-of-range sweep_percentage must be rejected");
@@ -562,20 +564,23 @@ mod tests {
     }
 
     #[test]
-    fn validate_requires_sweep_priority_for_positive_sweep() {
-        let spec = spec_with_sweep(
-            vec![
-                PaymentPriority::Fees,
-                PaymentPriority::Interest,
-                PaymentPriority::Amortization,
-                PaymentPriority::Equity,
-            ],
-            sweep_spec(0.5),
-        );
+    fn validate_requires_sweep_priority_when_ecf_is_configured() {
+        for pct in [0.0, 0.5] {
+            let spec = spec_with_sweep(default_priority_of_payments(), sweep_spec(pct));
+            let err = spec
+                .validate()
+                .expect_err("configured ECF without the Sweep priority must be rejected");
+            assert!(err.to_string().contains("requires the `Sweep`"));
+        }
+    }
+
+    #[test]
+    fn validate_requires_ecf_config_for_sweep_priority() {
+        let spec = spec_with(sweep_priorities());
         let err = spec
             .validate()
-            .expect_err("positive sweep without the Sweep priority must be rejected");
-        assert!(err.to_string().contains("requires the `Sweep`"));
+            .expect_err("the Sweep priority without ECF config must be rejected");
+        assert!(err.to_string().contains("requires `ecf_sweep`"));
     }
 
     #[test]
@@ -666,12 +671,14 @@ mod tests {
     }
 
     #[test]
-    fn validate_accepts_default_spec_with_sweep() {
-        let spec = WaterfallSpec {
-            ecf_sweep: Some(sweep_spec(0.5)),
-            ..spec_with(default_priority_of_payments())
-        };
-        assert!(spec.validate().is_ok());
+    fn validate_accepts_explicit_sweep_with_ecf_config() {
+        for pct in [0.0, 0.5] {
+            assert!(
+                spec_with_sweep(sweep_priorities(), sweep_spec(pct))
+                    .validate()
+                    .is_ok()
+            );
+        }
     }
 
     #[test]

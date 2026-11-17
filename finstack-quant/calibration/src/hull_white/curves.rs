@@ -189,6 +189,8 @@ mod tests {
             .base_date(base)
             .day_count(DayCount::Act365F)
             .knots(knots)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve")
     }
@@ -255,6 +257,7 @@ mod tests {
             .day_count(DayCount::Act360)
             .knots([(0.0, 1.0), (20.0, (-0.03_f64 * 20.0).exp())])
             .interp(InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid curve");
         let forward = DiscountCurve::builder("FORWARD")
@@ -262,6 +265,7 @@ mod tests {
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (20.0, (-0.04_f64 * 20.0).exp())])
             .interp(InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid curve");
         let quotes = [CapFloorQuote::new(5.0, 0.04, 0.009, true, true).expect("valid quote")];

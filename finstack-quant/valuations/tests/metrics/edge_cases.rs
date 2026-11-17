@@ -13,7 +13,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
@@ -84,6 +86,8 @@ fn test_zero_recovery_cds() {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots([(0.0f64, 1.0f64), (5.0f64, (-0.05f64 * 5.0f64).exp())])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -92,7 +96,7 @@ fn test_zero_recovery_cds() {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .recovery_rate(0.0)
-        .knots([(0.0f64, 0.01f64), (5.0f64, 0.01f64)]) // Flat 1% hazard rate
+        .knots([(1.0f64, 0.01f64), (5.0f64, 0.01f64)]) // Flat 1% hazard rate
         .build()
         .unwrap();
 
@@ -721,12 +725,17 @@ fn test_very_low_interest_rate_greeks() {
             (0.0f64, 1.0f64),
             (1.0f64, (-0.001f64).exp()), // 0.1% rate
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     let vol_surface = VolSurface::builder("SPOT_VOL")
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[0.5, 1.0])
-        .strikes(&[80.0, 100.0, 120.0])
+        .secondary_values(&[80.0, 100.0, 120.0])
         .row(&[0.25, 0.25, 0.25])
         .row(&[0.25, 0.25, 0.25])
         .build()
@@ -735,7 +744,7 @@ fn test_very_low_interest_rate_greeks() {
     let market = MarketContext::new()
         .insert(disc_curve)
         .insert_surface(vol_surface)
-        .insert_price("SPOT", MarketScalar::Unitless(spot));
+        .insert_price("SPOT", MarketScalar::unitless(spot).expect("valid scalar"));
 
     let call_option = EquityOption {
         id: "LOW_RATE_CALL".into(),
@@ -802,8 +811,11 @@ fn test_vol_smile_greeks() {
 
     // Create vol surface with equity skew: lower strikes have higher vol
     let vol_surface = VolSurface::builder("SMILE_VOL")
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[0.5, 1.0, 2.0])
-        .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
+        .secondary_values(&[80.0, 90.0, 100.0, 110.0, 120.0])
         // Equity skew pattern: vol decreases as strike increases
         .row(&[0.35, 0.30, 0.25, 0.22, 0.20]) // 6M
         .row(&[0.32, 0.28, 0.24, 0.21, 0.19]) // 1Y
@@ -815,13 +827,15 @@ fn test_vol_smile_greeks() {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots([(0.0f64, 1.0f64), (1.0f64, (-0.05f64).exp())])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     let market = MarketContext::new()
         .insert(disc_curve)
         .insert_surface(vol_surface)
-        .insert_price("SPOT", MarketScalar::Unitless(spot));
+        .insert_price("SPOT", MarketScalar::unitless(spot).expect("valid scalar"));
 
     let option = EquityOption {
         id: "SMILE_TEST".into(),

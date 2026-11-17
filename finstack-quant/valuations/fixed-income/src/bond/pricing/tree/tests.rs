@@ -95,6 +95,8 @@ fn create_test_market_context() -> MarketContext {
             .base_date(base_date)
             .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.85), (10.0, 0.70)])
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("DiscountCurve builder should succeed with valid test data");
     let treasury_curve =
@@ -102,6 +104,8 @@ fn create_test_market_context() -> MarketContext {
             .base_date(base_date)
             .knots([(0.0, 1.0), (1.0, 0.985), (5.0, 0.93), (10.0, 0.86)])
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("Treasury curve should build");
     MarketContext::new()
@@ -332,19 +336,23 @@ fn test_rates_credit_default_lowers_price() {
             .base_date(base_date)
             .knots([(0.0, 1.0), (5.0, 0.85)])
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("Curve builder should succeed with valid test data");
 
     let low_hazard = HazardCurve::builder("HAZ-LOW")
         .base_date(base_date)
         .recovery_rate(0.4)
-        .knots([(0.0, 0.01), (5.0, 0.01)])
+        .knots([(5.0, 0.01)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("Curve builder should succeed with valid test data");
     let _high_hazard = HazardCurve::builder("HAZ-HIGH")
         .base_date(base_date)
         .recovery_rate(0.4)
-        .knots([(0.0, 0.05), (5.0, 0.05)])
+        .knots([(5.0, 0.05)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("Curve builder should succeed with valid test data");
 
@@ -356,13 +364,16 @@ fn test_rates_credit_default_lowers_price() {
             .base_date(base_date)
             .knots([(0.0, 1.0), (5.0, 0.85)])
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("Curve builder should succeed with valid test data");
     let high_hazard2 =
         finstack_quant_core::market_data::term_structures::HazardCurve::builder("HAZ-HIGH")
             .base_date(base_date)
             .recovery_rate(0.4)
-            .knots([(0.0, 0.05), (5.0, 0.05)])
+            .knots([(5.0, 0.05)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("Curve builder should succeed with valid test data");
     let ctx_high = MarketContext::new()
@@ -608,8 +619,14 @@ fn bond_tree_reads_hw1f_parameters_from_market_scalars() {
     let (kappa_key, sigma_key) =
         finstack_quant_models::rates::hull_white::hw1f_scalar_keys("USD-OIS");
     let market = create_test_market_context()
-        .insert_price(kappa_key.as_str(), MarketScalar::Unitless(0.05))
-        .insert_price(sigma_key.as_str(), MarketScalar::Unitless(0.01));
+        .insert_price(
+            kappa_key.as_str(),
+            MarketScalar::unitless(0.05).expect("valid scalar"),
+        )
+        .insert_price(
+            sigma_key.as_str(),
+            MarketScalar::unitless(0.01).expect("valid scalar"),
+        );
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
     let pv = bond
         .price_for_model_raw(
@@ -700,14 +717,12 @@ fn risk_free_callable_frn(maturity: Date) -> Bond {
 
 fn frn_market() -> MarketContext {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-    let forward = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
+    let forward = finstack_quant_core::market_data::term_structures::ForwardCurve::flat(
         "USD-SOFR-3M",
-        0.25,
+        base_date,
+        0.04,
+        finstack_quant_core::dates::DayCount::Act365F,
     )
-    .base_date(base_date)
-    .knots([(0.0, 0.04), (10.0, 0.04)])
-    .interp(InterpStyle::Linear)
-    .build()
     .expect("forward curve");
     create_test_market_context().insert(forward)
 }

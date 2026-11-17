@@ -11,7 +11,7 @@ import pytest
 
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import DayCount, StubKind, Tenor
-from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext
+from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.core.types import Rate
 from finstack_quant.valuations import ValuationResult, schema
@@ -35,6 +35,7 @@ from finstack_quant.valuations.instruments import (
     validate_instrument_json,
     validate_typed_instrument_json,
 )
+from tests.tests_typed_helpers import projection_curve
 
 AS_OF = datetime.date(2024, 1, 15)
 
@@ -47,17 +48,12 @@ def _market() -> MarketContext:
                 "USD-OIS",
                 AS_OF,
                 [(0.0, 1.0), (1.0, 0.96), (5.0, 0.82), (10.0, 0.67)],
+                interp="monotone_convex",
+                extrapolation="extend",
+                day_count="act_365f",
             )
         )
-        .insert(
-            ForwardCurve(
-                "USD-SOFR-3M",
-                0.25,
-                AS_OF,
-                [(0.0, 0.04), (5.0, 0.042), (10.0, 0.045)],
-                day_count="act_360",
-            )
-        )
+        .insert(projection_curve("USD-SOFR-3M", AS_OF, [(0.0, 0.04), (5.0, 0.042), (10.0, 0.045)]))
     )
 
 

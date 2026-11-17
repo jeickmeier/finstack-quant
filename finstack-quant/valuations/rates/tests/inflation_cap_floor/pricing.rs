@@ -5,7 +5,10 @@ use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor, TenorUnit,
 };
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::InflationLag;
+use finstack_quant_core::market_data::scalars::{
+    InflationExpectedRelease, InflationLag, InflationObservation, SeriesInterpolation,
+};
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::CurveId;
@@ -21,7 +24,6 @@ use time::{Duration, Month};
 
 #[test]
 fn cap_floor_parity_matches_same_forward_swap_across_quote_volatilities() {
-    use finstack_quant_core::market_data::scalars::InflationIndex;
     use finstack_quant_core::market_data::surfaces::VolQuoteType;
     use finstack_quant_valuations_rates::inflation_swap::YoYInflationSwap;
     use time::macros::date;
@@ -56,9 +58,7 @@ fn cap_floor_parity_matches_same_forward_swap_across_quote_volatilities() {
                     DayCount::Act365F,
                 ))
                 .insert(flat_inflation_curve("US-CPI", as_of, 300.0, 0.02).unwrap())
-                .insert_inflation_index(
-                    InflationIndex::new("US-CPI", vec![(as_of, 300.0)], Currency::USD).unwrap(),
-                )
+                .insert_inflation_index(simple_index("US-CPI", as_of, 300.0, Currency::USD))
                 .insert_surface(
                     finstack_quant_valuations_test_support::volatility::relabel_quote_type(
                         &flat_vol_surface("USD-INFL-VOL", &[1.0, 2.0], &[0.01, 0.02, 0.03], sigma),
@@ -105,26 +105,29 @@ fn zero_and_day_lag_caplets_do_not_consume_unpublished_denominators() {
         .insert(
             InflationCurve::builder("US-CPI")
                 .base_date(date!(2025 - 12 - 01))
-                .base_cpi(310.0)
+                .day_count(DayCount::Act365F)
+                .interp(InterpStyle::LogLinear)
+                .extrapolation(ExtrapolationPolicy::Flat)
                 .knots([(0.0, 310.0), (2.0, 310.0)])
                 .build()
                 .unwrap(),
         )
         .insert_inflation_index(
-            InflationIndex::new(
-                "US-CPI",
-                vec![
-                    (date!(2026 - 01 - 01), 306.0),
-                    (date!(2026 - 02 - 01), 900.0),
-                ],
-                Currency::USD,
-            )
-            .unwrap()
-            .with_publication_dates(vec![
-                (date!(2026 - 01 - 01), date!(2026 - 02 - 13)),
-                (date!(2026 - 02 - 01), last_release),
-            ])
-            .unwrap(),
+            InflationIndex::new("US-CPI", vec![], Currency::USD, as_of)
+                .unwrap()
+                .with_expected_releases(vec![
+                    InflationExpectedRelease {
+                        reference_month: date!(2026 - 01 - 01),
+                        expected_release: date!(2026 - 02 - 13),
+                        known_on: as_of,
+                    },
+                    InflationExpectedRelease {
+                        reference_month: date!(2026 - 02 - 01),
+                        expected_release: last_release,
+                        known_on: as_of,
+                    },
+                ])
+                .unwrap(),
         )
         .insert_surface(
             finstack_quant_valuations_test_support::volatility::flat_vol_surface_with_quote_type(
@@ -142,7 +145,7 @@ fn zero_and_day_lag_caplets_do_not_consume_unpublished_denominators() {
             date!(2026 - 02 - 01),
         ),
         (
-            InflationLag::Days(10),
+            InflationLag::days(10),
             date!(2026 - 01 - 11),
             date!(2026 - 02 - 11),
         ),
@@ -187,14 +190,26 @@ fn monthly_publication_controls_availability_and_explicit_quote_clock() {
     let index = InflationIndex::new(
         "US-CPI",
         vec![
-            (date!(2025 - 01 - 01), 300.0),
-            (date!(2025 - 12 - 01), 305.0),
+            InflationObservation {
+                reference_month: date!(2025 - 01 - 01),
+                value: 300.0,
+                available_on: date!(2025 - 02 - 13),
+            },
+            InflationObservation {
+                reference_month: date!(2025 - 12 - 01),
+                value: 305.0,
+                available_on: date!(2026 - 01 - 13),
+            },
         ],
         Currency::USD,
+        as_of,
     )
     .unwrap()
-    .with_interpolation(SeriesInterpolation::Step)
-    .with_publication_dates(vec![(january, release)])
+    .with_expected_releases(vec![InflationExpectedRelease {
+        reference_month: january,
+        expected_release: release,
+        known_on: as_of,
+    }])
     .unwrap();
     let market = MarketContext::new()
         .insert(flat_discount_curve_with_day_count(
@@ -206,7 +221,9 @@ fn monthly_publication_controls_availability_and_explicit_quote_clock() {
         .insert(
             InflationCurve::builder("US-CPI")
                 .base_date(date!(2025 - 12 - 01))
-                .base_cpi(306.0)
+                .day_count(DayCount::Act365F)
+                .interp(InterpStyle::LogLinear)
+                .extrapolation(ExtrapolationPolicy::Flat)
                 .knots([(0.0, 306.0), (2.0, 306.0)])
                 .build()
                 .unwrap(),
@@ -255,18 +272,22 @@ fn monthly_publication_controls_availability_and_explicit_quote_clock() {
         );
     }
     for valuation_date in [release, release + Duration::days(1)] {
-        assert!(zc.value(&market, valuation_date).is_err());
-        assert!(yoy.value(&market, valuation_date).is_err());
+        assert!(zc.value(&market, valuation_date).is_ok());
+        assert!(yoy.value(&market, valuation_date).is_ok());
         assert!(
             cap.npv_raw_with_model(&market, valuation_date, ModelKey::Normal)
                 .is_err()
         );
     }
-    let mut observations = index.observations();
-    observations.push((january, 306.0));
-    let published = InflationIndex::new("US-CPI", observations, Currency::USD)
+    let mut observations = index.observations().to_vec();
+    observations.push(InflationObservation {
+        reference_month: january,
+        value: 306.0,
+        available_on: release,
+    });
+    let published = InflationIndex::new("US-CPI", observations, Currency::USD, release)
         .unwrap()
-        .with_publication_dates(index.get_publication_dates())
+        .with_expected_releases(index.get_expected_releases().to_vec())
         .unwrap();
     let published_market = market.insert_inflation_index(published);
     for valuation_date in [release, release + Duration::days(1)] {
@@ -291,13 +312,7 @@ fn test_caplet_intrinsic_after_fixing() {
     let notional = Money::new(1_000_000.0, Currency::USD).expect("valid money fixture");
     let disc = flat_discount_curve_with_day_count(0.02, as_of, "USD-OIS", DayCount::Act365F);
     let infl_curve = flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.02).unwrap();
-    let index = simple_index(
-        "US-CPI-U",
-        as_of,
-        300.0,
-        Currency::USD,
-        InflationLag::Months(3),
-    );
+    let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD);
     let vol_surface = flat_vol_surface("US-CPI-VOL", &[0.25], &[0.02], 0.20);
 
     let ctx = MarketContext::new()
@@ -322,14 +337,20 @@ fn test_caplet_intrinsic_after_fixing() {
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("US-CPI-VOL"))
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
-        .lag_opt(None)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .unwrap();
 
     let idx = ctx.get_inflation_index("US-CPI-U").unwrap();
-    let cpi_start = idx.value_on(start).unwrap();
-    let cpi_end = idx.value_on(end).unwrap();
+    let reference = |date| {
+        finstack_quant_valuations_core::instruments::common_impl::helpers::resolve_reference_inflation(
+        &ctx, "US-CPI-U", date, idx.knowledge_date(), InflationLag::months(3), SeriesInterpolation::Linear,
+    ).unwrap().value
+    };
+    let cpi_start = reference(start);
+    let cpi_end = reference(end);
     let accrual = DayCount::Act365F
         .year_fraction(start, end, DayCountContext::default())
         .unwrap();
@@ -341,7 +362,7 @@ fn test_caplet_intrinsic_after_fixing() {
         .day_count()
         .year_fraction(as_of, end, DayCountContext::default())
         .unwrap();
-    let df = disc_curve.df(t_pay);
+    let df = disc_curve.df(t_pay).expect("df");
     let expected = payoff_rate * accrual * notional.amount() * df;
 
     let pv = caplet
@@ -359,7 +380,7 @@ fn test_floor_value_with_negative_forward_normal_model() {
     let notional = Money::new(5_000_000.0, Currency::USD).expect("valid money fixture");
     let disc = flat_discount_curve_with_day_count(0.01, as_of, "USD-OIS", DayCount::Act365F);
     let infl_curve = flat_inflation_curve("US-CPI-U", as_of, 300.0, -0.01).unwrap();
-    let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD, InflationLag::None);
+    let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD);
     let vol_surface =
         finstack_quant_valuations_test_support::volatility::flat_vol_surface_with_quote_type(
             "US-CPI-VOL",
@@ -391,7 +412,8 @@ fn test_floor_value_with_negative_forward_normal_model() {
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("US-CPI-VOL"))
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
-        .lag_opt(None)
+        .lag(InflationLag::None)
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -412,7 +434,8 @@ fn test_floor_value_with_negative_forward_normal_model() {
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("US-CPI-VOL"))
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
-        .lag_opt(None)
+        .lag(InflationLag::None)
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .unwrap();

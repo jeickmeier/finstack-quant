@@ -48,7 +48,7 @@
       "schema": "finstack_quant.calibration/1",
       "plan": {
         "id": "usd_fra_3x6_calibrated",
-        "description": "Hybrid calibration setup: USD-SOFR discount curve calibrated from Bloomberg SWPM Curve 490 Market Rates (12 quotes: 1W-3W deposits, 1M-2Y OIS swaps) transcribed from `bloomberg_reference.discount_curve_screen`. OIS compounding override `CompoundedWithRateCutoff{cutoff_days: 1}` matches Bloomberg's SWPM convention. The forward curve (USD-3M-CME-TERM-SOFR) is a flat 3.6437% test curve engineered to make this specific FRA at-the-money — not a faithful Bloomberg curve — so it is preserved in prior_market rather than calibrated.",
+        "description": "Hybrid calibration setup: USD-SOFR discount curve calibrated from Bloomberg SWPM Curve 490 Market Rates (12 quotes: 1W-3W deposits, 1M-2Y OIS swaps) transcribed from `bloomberg_reference.discount_curve_screen`. OIS compounding override `CompoundedWithRateCutoff{cutoff_days: 1}` matches Bloomberg's SWPM convention. The forward curve (USD-3M-CME-TERM-SOFR) is a flat 3.6437% test curve engineered to make this specific FRA at-the-money \u2014 not a faithful Bloomberg curve \u2014 so it is preserved in prior_market rather than calibrated.",
         "quote_sets": {
           "swpm_490_disc": [
             "USD-SOFR-DEPOSIT-1W",
@@ -75,7 +75,7 @@
             "base_date": "2026-05-02",
             "method": "bootstrap",
             "interpolation": "log_linear",
-            "extrapolation": "flat_forward",
+            "extrapolation": "extend",
             "pricing_discount_id": null,
             "pricing_forward_id": null,
             "conventions": {
@@ -258,39 +258,35 @@
           "kind": "forward_curve",
           "id": "USD-3M-CME-TERM-SOFR",
           "base": "2026-05-02",
-          "reset_lag": 0,
           "day_count": "act_360",
-          "tenor": 0.25,
+          "index_tenor": {
+            "count": 3,
+            "unit": "months"
+          },
           "knot_points": [
             [
               0.0,
-              0.036437
+              1.0
             ],
             [
               0.18055555555555555,
-              0.036437
+              0.9934640962972475
             ],
             [
               0.4361111111111111,
-              0.036437
-            ],
-            [
-              0.5,
-              0.036437
+              0.9842986246672364
             ],
             [
               1.0,
-              0.036437
+              0.9644819734932388
+            ],
+            [
+              1.25,
+              0.9557755748381445
             ]
           ],
-          "projection_grid": [
-            0.0,
-            0.18055555555555555,
-            0.4361111111111111,
-            1.0
-          ],
-          "interp_style": "linear",
-          "extrapolation": "flat_forward",
+          "interp_style": "log_linear",
+          "extrapolation": "extend",
           "rate_calibration": {
             "currency": "USD",
             "method": "bootstrap",
@@ -440,12 +436,12 @@
     "pv01": {
       "abs": 0.15,
       "rel": 0.0006,
-      "tolerance_reason": "Bloomberg BR01/DV01 displayed to cents; The canonical calibration setup replaces the materialized USD-SOFR discount snapshot with a calibrated curve (12 SWPM Curve 490 quotes + ois_compounding override = CompoundedWithRateCutoff{cutoff_days: 1}). The calibrated curve differs from Bloomberg's snapshot DFs by ~4e-4 at the FRA's pay_date due to schedule/day-count nuances inside Bloomberg's pricing kernel (see docs/archive/plans/2026-05-09-golden-fixture-envelope-migration-plan.md §14). The forward curve (USD-3M-CME-TERM-SOFR) is preserved verbatim in prior_market, so par_rate and NPV remain bit-stable; only sensitivities — which combine forward-rate shocks with discount-curve values — show the calibration drift."
+      "tolerance_reason": "Bloomberg BR01/DV01 displayed to cents; The canonical calibration setup replaces the materialized USD-SOFR discount snapshot with a calibrated curve (12 SWPM Curve 490 quotes + ois_compounding override = CompoundedWithRateCutoff{cutoff_days: 1}). The calibrated curve differs from Bloomberg's snapshot DFs by ~4e-4 at the FRA's pay_date due to schedule/day-count nuances inside Bloomberg's pricing kernel (see docs/archive/plans/2026-05-09-golden-fixture-envelope-migration-plan.md \u00a714). The forward curve (USD-3M-CME-TERM-SOFR) is preserved verbatim in prior_market, so par_rate and NPV remain bit-stable; only sensitivities \u2014 which combine forward-rate shocks with discount-curve values \u2014 show the calibration drift."
     },
     "forward_pv01": {
       "abs": 0.15,
       "rel": 0.0006,
-      "tolerance_reason": "Bloomberg BR01/DV01 displayed to cents; The canonical calibration setup replaces the materialized USD-SOFR discount snapshot with a calibrated curve (12 SWPM Curve 490 quotes + ois_compounding override = CompoundedWithRateCutoff{cutoff_days: 1}). The calibrated curve differs from Bloomberg's snapshot DFs by ~4e-4 at the FRA's pay_date due to schedule/day-count nuances inside Bloomberg's pricing kernel (see docs/archive/plans/2026-05-09-golden-fixture-envelope-migration-plan.md §14). The forward curve (USD-3M-CME-TERM-SOFR) is preserved verbatim in prior_market, so par_rate and NPV remain bit-stable; only sensitivities — which combine forward-rate shocks with discount-curve values — show the calibration drift."
+      "tolerance_reason": "Bloomberg BR01/DV01 displayed to cents; The canonical calibration setup replaces the materialized USD-SOFR discount snapshot with a calibrated curve (12 SWPM Curve 490 quotes + ois_compounding override = CompoundedWithRateCutoff{cutoff_days: 1}). The calibrated curve differs from Bloomberg's snapshot DFs by ~4e-4 at the FRA's pay_date due to schedule/day-count nuances inside Bloomberg's pricing kernel (see docs/archive/plans/2026-05-09-golden-fixture-envelope-migration-plan.md \u00a714). The forward curve (USD-3M-CME-TERM-SOFR) is preserved verbatim in prior_market, so par_rate and NPV remain bit-stable; only sensitivities \u2014 which combine forward-rate shocks with discount-curve values \u2014 show the calibration drift."
     },
     "dv01": {
       "abs": 0.15,

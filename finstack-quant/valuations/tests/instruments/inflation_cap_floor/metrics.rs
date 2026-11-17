@@ -5,6 +5,7 @@ use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, StubKind, Tenor, TenorUnit,
 };
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::scalars::{InflationLag, SeriesInterpolation};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::CurveId;
@@ -13,7 +14,7 @@ use finstack_quant_valuations::instruments::rates::cap_floor::RateOptionType;
 use finstack_quant_valuations::instruments::rates::inflation_cap_floor::InflationCapFloor;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
-use finstack_quant_valuations_test_support::inflation::flat_inflation_curve;
+use finstack_quant_valuations_test_support::inflation::{flat_inflation_curve, simple_index};
 use finstack_quant_valuations_test_support::test_helpers::flat_discount_curve_with_day_count;
 use finstack_quant_valuations_test_support::volatility::flat_vol_surface;
 use rust_decimal::Decimal;
@@ -38,7 +39,8 @@ fn build_caplet() -> InflationCapFloor {
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("US-CPI-VOL"))
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
-        .lag_opt(None)
+        .lag(InflationLag::None)
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .unwrap()
@@ -53,6 +55,7 @@ fn build_market(as_of: Date, vol: f64) -> MarketContext {
             DayCount::Act365F,
         ))
         .insert(flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.025).unwrap())
+        .insert_inflation_index(simple_index("US-CPI-U", as_of, 300.0, Currency::USD))
         .insert_surface(flat_vol_surface("US-CPI-VOL", &[1.0, 5.0], &[0.025], vol))
 }
 
@@ -83,6 +86,7 @@ fn risk_uses_selected_model_and_declared_bump_units() {
                     DayCount::Act365F,
                 ))
                 .insert(flat_inflation_curve("US-CPI-U", as_of, 300.0, inflation).unwrap())
+                .insert_inflation_index(simple_index("US-CPI-U", as_of, 300.0, Currency::USD))
                 .insert_surface(
                     finstack_quant_valuations_test_support::volatility::flat_vol_surface_with_quote_type(
                         "US-CPI-VOL",
@@ -121,7 +125,7 @@ fn risk_uses_selected_model_and_declared_bump_units() {
             (price(&market_at_vol(sigma + 0.01)) - price(&market_at_vol(sigma - 0.01))) / 2.0;
         let bumped = |amount| {
             market
-                .bump([MarketBump::Curve {
+                .bump([MarketBump::InflationCurve {
                     id: option.inflation_index_id.clone(),
                     spec: BumpSpec::inflation_shift_pct(amount),
                 }])
@@ -296,7 +300,8 @@ fn build_option(rate_option_type: RateOptionType, strike: f64) -> InflationCapFl
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("US-CPI-VOL"))
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
-        .lag_opt(None)
+        .lag(InflationLag::None)
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .unwrap()

@@ -269,6 +269,8 @@ mod tests {
             .base_date(start)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, 1.0), (5.0, 1.0)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         // Flat hazard 20% → SP(1y) = exp(-0.2).
@@ -276,6 +278,7 @@ mod tests {
             .base_date(start)
             .knots([(1.0, 0.20), (5.0, 0.20)])
             .recovery_rate(0.40)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard");
         let market = MarketContext::new().insert(disc).insert(hz);
@@ -343,12 +346,15 @@ mod tests {
             .base_date(start)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, 1.0), (5.0, 1.0)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let hz = HazardCurve::builder("USD-HZ")
             .base_date(start)
             .knots([(1.0, 0.20), (5.0, 0.20)])
             .recovery_rate(0.40)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard");
         let market = MarketContext::new().insert(disc).insert(hz);
@@ -596,6 +602,8 @@ mod tests {
                 (1.0, (-0.03f64).exp()),
                 (5.0, (-0.03f64 * 5.0).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve should build");
         let market = MarketContext::new().insert(disc_curve);
@@ -714,6 +722,8 @@ mod tests {
             .base_date(start)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (5.0, 1.0)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new().insert(disc);
@@ -837,6 +847,8 @@ mod tests {
                 (1.0, (-0.03f64).exp()),
                 (5.0, (-0.03f64 * 5.0).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve should build");
         let market = MarketContext::new().insert(disc_curve);
@@ -943,6 +955,8 @@ mod tests {
             .base_date(start)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, (-0.03f64).exp()), (5.0, (-0.15f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         // Risky borrower: flat 5% hazard.
@@ -1029,6 +1043,8 @@ mod tests {
                 .base_date(start)
                 .day_count(DayCount::Act365F)
                 .knots([(0.0, 1.0), (5.0, (-0.15f64).exp())])
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
         )

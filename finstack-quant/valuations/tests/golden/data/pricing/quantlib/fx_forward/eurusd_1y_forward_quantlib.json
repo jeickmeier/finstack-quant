@@ -36,10 +36,9 @@
       "credit_indices": [],
       "curves": [
         {
-          "allow_non_monotonic": false,
           "base": "2026-04-30",
           "day_count": "act_365f",
-          "extrapolation": "flat_forward",
+          "extrapolation": "extend",
           "id": "USD-OIS",
           "interp_style": "log_linear",
           "knot_points": [
@@ -52,16 +51,13 @@
               0.30119421191220214
             ]
           ],
-          "min_forward_rate": null,
-          "min_forward_tenor": 1e-06,
           "rate_calibration": null,
           "type": "discount"
         },
         {
-          "allow_non_monotonic": false,
           "base": "2026-04-30",
           "day_count": "act_365f",
-          "extrapolation": "flat_forward",
+          "extrapolation": "extend",
           "id": "EUR-OIS",
           "interp_style": "log_linear",
           "knot_points": [
@@ -74,8 +70,6 @@
               0.5488116360940264
             ]
           ],
-          "min_forward_rate": null,
-          "min_forward_tenor": 1e-06,
           "rate_calibration": null,
           "type": "discount"
         }
@@ -87,6 +81,7 @@
           "pivot_currency": "USD"
         },
         "pinned_quotes": [],
+        "provider_pinned_quotes": [],
         "provider_quotes": [],
         "quotes": [
           [
@@ -94,8 +89,7 @@
             "USD",
             1.1
           ]
-        ],
-        "provider_pinned_quotes": []
+        ]
       },
       "fx_delta_vol_surfaces": [],
       "hierarchy": null,

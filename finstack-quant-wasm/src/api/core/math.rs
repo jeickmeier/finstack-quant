@@ -125,64 +125,69 @@ pub fn apply_lower_triangular(
 }
 
 /// Arithmetic mean over a typed numeric array.
-/// @param data - Numeric observations in input order; an empty series yields 0.0.
-/// @returns Arithmetic mean of `data`, or 0.0 when `data` is empty.
+/// @param data - Finite numeric observations in input order; empty series returns `undefined`.
+/// @returns Arithmetic mean of `data`, or `undefined` when `data` is empty.
+/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for non-finite values; `FinstackError` (kind `computation`) on overflow.
 #[wasm_bindgen(js_name = mean)]
 pub fn mean(
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] data: JsValue,
-) -> Result<f64, JsValue> {
+) -> Result<Option<f64>, JsValue> {
     let data: &[f64] = &js_f64_seq(&data, "data")?;
-    Ok(stats::mean(data))
+    stats::mean(data).map_err(to_js_err)
 }
 
 /// Sample variance over a typed numeric array.
-/// @param data - Sample observations in input order; fewer than two points yield 0.0.
-/// @returns Unbiased sample variance, or 0.0 when `data` has fewer than two points.
+/// @param data - Finite sample observations in input order; fewer than two points return `undefined`.
+/// @returns Unbiased sample variance, or `undefined` when `data` has fewer than two points.
+/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for non-finite values; `FinstackError` (kind `computation`) on overflow or underflow.
 #[wasm_bindgen(js_name = variance)]
 pub fn variance(
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] data: JsValue,
-) -> Result<f64, JsValue> {
+) -> Result<Option<f64>, JsValue> {
     let data: &[f64] = &js_f64_seq(&data, "data")?;
-    Ok(stats::variance(data))
+    stats::variance(data).map_err(to_js_err)
 }
 
 /// Population variance over a typed numeric array.
-/// @param data - Observations in input order; fewer than two points yield 0.0.
-/// @returns Population variance, or 0.0 when `data` has fewer than two points.
+/// @param data - Finite observations in input order; empty series returns `undefined`.
+/// @returns Population variance, or `undefined` when `data` is empty.
+/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for non-finite values; `FinstackError` (kind `computation`) on overflow or underflow.
 #[wasm_bindgen(js_name = populationVariance)]
 pub fn population_variance(
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] data: JsValue,
-) -> Result<f64, JsValue> {
+) -> Result<Option<f64>, JsValue> {
     let data: &[f64] = &js_f64_seq(&data, "data")?;
-    Ok(stats::population_variance(data))
+    stats::population_variance(data).map_err(to_js_err)
 }
 
 /// Pearson correlation over typed numeric arrays.
-/// @param x - First numeric series; must have the same length as `y`.
-/// @param y - Second numeric series, aligned one-for-one with `x`.
-/// @returns Sample correlation in `[-1, 1]`; 0.0 when fewer than two points or either series is constant; NaN when `x` and `y` lengths differ.
+/// @param x - First finite numeric series; must have the same length as `y`.
+/// @param y - Second finite numeric series, aligned one-for-one with `x`.
+/// @returns Sample correlation in `[-1, 1]`, or `undefined` when fewer than two points exist or either series is constant.
+/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) when lengths differ or values are non-finite; `FinstackError` (kind `computation`) on numerical failure.
 #[wasm_bindgen(js_name = correlation)]
 pub fn correlation(
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] x: JsValue,
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] y: JsValue,
-) -> Result<f64, JsValue> {
+) -> Result<Option<f64>, JsValue> {
     let x: &[f64] = &js_f64_seq(&x, "x")?;
     let y: &[f64] = &js_f64_seq(&y, "y")?;
-    Ok(stats::correlation(x, y))
+    stats::correlation(x, y).map_err(to_js_err)
 }
 
 /// Sample covariance over typed numeric arrays.
-/// @param x - First numeric series; must have the same length as `y`.
-/// @param y - Second numeric series, aligned one-for-one with `x`.
-/// @returns Unbiased sample covariance; 0.0 when fewer than two points; NaN when `x` and `y` lengths differ.
+/// @param x - First finite numeric series; must have the same length as `y`.
+/// @param y - Second finite numeric series, aligned one-for-one with `x`.
+/// @returns Unbiased sample covariance, or `undefined` when fewer than two points exist.
+/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) when lengths differ or values are non-finite; `FinstackError` (kind `computation`) on overflow or underflow.
 #[wasm_bindgen(js_name = covariance)]
 pub fn covariance(
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] x: JsValue,
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] y: JsValue,
-) -> Result<f64, JsValue> {
+) -> Result<Option<f64>, JsValue> {
     let x: &[f64] = &js_f64_seq(&x, "x")?;
     let y: &[f64] = &js_f64_seq(&y, "y")?;
-    Ok(stats::covariance(x, y))
+    stats::covariance(x, y).map_err(to_js_err)
 }
 
 /// Annualized realized variance of a close price series (Rust
@@ -278,17 +283,18 @@ fn realized_var_method(
 }
 
 /// Empirical quantile over a typed numeric array.
-/// @param data - Sample observations in input order; empty or non-finite data yields NaN.
-/// @param q - Quantile probability in `[0, 1]`; values outside that range yield NaN.
-/// @returns R-7 interpolated quantile, or NaN when `data` is empty or non-finite.
+/// @param data - Finite sample observations in input order; an empty series returns `undefined`.
+/// @param q - Quantile probability in `[0, 1]`.
+/// @returns R-7 interpolated quantile, or `undefined` when `data` is empty.
+/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) when `q` is outside `[0, 1]` or any value is non-finite; `FinstackError` (kind `computation`) on underflow.
 #[wasm_bindgen(js_name = quantile)]
 pub fn quantile(
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] data: JsValue,
     #[wasm_bindgen(unchecked_param_type = "number")] q: JsValue,
-) -> Result<f64, JsValue> {
+) -> Result<Option<f64>, JsValue> {
     let mut data = js_f64_seq(&data, "data")?;
     let q = js_f64(&q, "q")?;
-    Ok(stats::quantile(&mut data, q))
+    stats::quantile(&mut data, q).map_err(to_js_err)
 }
 
 /// Standard normal CDF Φ(x).
@@ -360,23 +366,25 @@ pub fn ln_gamma(
 /// Kahan compensated summation over a typed numeric array.
 /// @param values - Finite numeric terms in summation or scan order.
 /// @returns Compensated sum of `values` in input order.
+/// @throws Error with `kind: "validation"` if any element is `NaN` or infinite, or `kind: "computation"` if intermediate accumulation overflows.
 #[wasm_bindgen(js_name = kahanSum)]
 pub fn kahan_sum(
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] values: JsValue,
 ) -> Result<f64, JsValue> {
     let values: &[f64] = &js_f64_seq(&values, "values")?;
-    Ok(summation::kahan_sum(values.iter().copied()))
+    summation::kahan_sum(values.iter().copied()).map_err(to_js_err)
 }
 
 /// Neumaier compensated summation over a typed numeric array.
 /// @param values - Finite numeric terms in summation or scan order.
 /// @returns Compensated sum of `values`, robust to mixed-sign cancellation.
+/// @throws Error with `kind: "validation"` if any element is `NaN` or infinite, or `kind: "computation"` if intermediate or final accumulation overflows.
 #[wasm_bindgen(js_name = neumaierSum)]
 pub fn neumaier_sum(
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] values: JsValue,
 ) -> Result<f64, JsValue> {
     let values: &[f64] = &js_f64_seq(&values, "values")?;
-    Ok(summation::neumaier_sum(values.iter().copied()))
+    summation::neumaier_sum(values.iter().copied()).map_err(to_js_err)
 }
 
 /// Symmetric eigendecomposition of a flat row-major matrix (Rust `symmetric_eigen`).
@@ -449,114 +457,104 @@ pub fn ledoit_wolf_shrinkage(
 ///
 /// # Arguments
 ///
-/// * `data` - Sample observations in input order.
+/// * `data` - Finite sample observations in input order.
 ///
-/// @returns A two-element array `[mean, variance]`; `[0, 0]` for an empty series.
-/// @throws `TypeError` if `data` is not an array of numbers.
-/// @param data - Sample observations in input order.
-#[wasm_bindgen(js_name = meanVar)]
+/// @returns A two-element tuple `[mean, variance]`; `[undefined, undefined]` when empty, `[mean, undefined]` for one observation.
+/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind `validation`) for non-finite observations; `FinstackError` (kind `computation`) on overflow or underflow.
+/// @param data - Finite sample observations in input order.
+#[wasm_bindgen(
+    js_name = meanVar,
+    unchecked_return_type = "[number | undefined, number | undefined]"
+)]
 pub fn mean_var(
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] data: JsValue,
-) -> Result<Box<[f64]>, JsValue> {
-    let (mean, variance) = stats::mean_var(&js_f64_seq(&data, "data")?);
-    Ok(Box::new([mean, variance]))
+) -> Result<js_sys::Array, JsValue> {
+    let (mean, variance) = stats::mean_var(&js_f64_seq(&data, "data")?).map_err(to_js_err)?;
+    Ok(js_sys::Array::of2(
+        &mean.map_or(JsValue::UNDEFINED, JsValue::from_f64),
+        &variance.map_or(JsValue::UNDEFINED, JsValue::from_f64),
+    ))
 }
 
-/// Arithmetic mean with a NaN sentinel for missing data (Rust `stats::mean_or_nan`).
+/// Sample standard deviation with `n - 1` denominator (Rust `stats::std_dev`).
 ///
-/// # Arguments
-///
-/// * `data` - Observations to average.
-///
-/// @returns The mean, or `NaN` for an empty series.
-/// @throws `TypeError` if `data` is not an array of numbers.
-/// @param data - Observations to average.
-#[wasm_bindgen(js_name = meanOrNan)]
-pub fn mean_or_nan(
-    #[wasm_bindgen(unchecked_param_type = "NumericArray")] data: JsValue,
-) -> Result<f64, JsValue> {
-    Ok(stats::mean_or_nan(&js_f64_seq(&data, "data")?))
-}
-
-/// Sample variance with a NaN sentinel (Rust `stats::sample_variance_or_nan`).
+/// Validates all observations upfront. Returns `undefined` when `data` has
+/// fewer than two observations, and `0` when `data.length >= 2` and all
+/// observations are identical.
 ///
 /// # Arguments
 ///
 /// * `data` - Sample observations.
 ///
-/// @returns The unbiased sample variance, or `NaN` for fewer than two observations.
-/// @throws `TypeError` if `data` is not an array of numbers.
+/// @returns The unbiased sample standard deviation, or `undefined` for fewer than two observations.
+/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+/// `validation`) if any observation is `NaN` or infinite; `FinstackError`
+/// (kind `computation`) if non-constant sample standard deviation overflows
+/// or underflows out of the positive finite range.
 /// @param data - Sample observations.
-#[wasm_bindgen(js_name = sampleVarianceOrNan)]
-pub fn sample_variance_or_nan(
+#[wasm_bindgen(js_name = stdDev)]
+pub fn std_dev(
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] data: JsValue,
-) -> Result<f64, JsValue> {
-    Ok(stats::sample_variance_or_nan(&js_f64_seq(&data, "data")?))
+) -> Result<Option<f64>, JsValue> {
+    stats::std_dev(&js_f64_seq(&data, "data")?).map_err(to_js_err)
 }
 
-/// Sample standard deviation with a NaN sentinel (Rust `stats::sample_std_or_nan`).
+/// Sample median using R-7 / NumPy quantile interpolation at `p = 0.5` (Rust `stats::median`).
 ///
-/// # Arguments
-///
-/// * `data` - Sample observations.
-///
-/// @returns The sample standard deviation, or `NaN` for fewer than two observations.
-/// @throws `TypeError` if `data` is not an array of numbers.
-/// @param data - Sample observations.
-#[wasm_bindgen(js_name = sampleStdOrNan)]
-pub fn sample_std_or_nan(
-    #[wasm_bindgen(unchecked_param_type = "NumericArray")] data: JsValue,
-) -> Result<f64, JsValue> {
-    Ok(stats::sample_std_or_nan(&js_f64_seq(&data, "data")?))
-}
-
-/// Median with a NaN sentinel (Rust `stats::median_or_nan`).
+/// Validates all observations upfront without modifying the input array.
+/// Returns `undefined` for empty input.
 ///
 /// # Arguments
 ///
 /// * `data` - Observations whose median is required; the input is not modified.
 ///
-/// @returns The median, or `NaN` for an empty series or when any observation is
-/// non-finite.
-/// @throws `TypeError` if `data` is not an array of numbers.
+/// @returns The median, or `undefined` for an empty series.
+/// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
+/// `validation`) if any observation is `NaN` or infinite.
 /// @param data - Observations whose median is required; the input is not modified.
-#[wasm_bindgen(js_name = medianOrNan)]
-pub fn median_or_nan(
+#[wasm_bindgen(js_name = median)]
+pub fn median(
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] data: JsValue,
-) -> Result<f64, JsValue> {
-    Ok(stats::median_or_nan(&js_f64_seq(&data, "data")?))
+) -> Result<Option<f64>, JsValue> {
+    stats::median(&js_f64_seq(&data, "data")?).map_err(to_js_err)
 }
 
-/// Smallest finite value (Rust `stats::finite_min_or_nan`).
+/// Smallest finite value (Rust `stats::finite_min`).
+///
+/// Ignores `NaN` and infinite entries. Returns `undefined` when `data`
+/// contains no finite values.
 ///
 /// # Arguments
 ///
 /// * `data` - Observations to inspect; NaN and infinite entries are ignored.
 ///
-/// @returns The minimum finite value, or `NaN` when none is finite.
+/// @returns The minimum finite value, or `undefined` when none is finite.
 /// @throws `TypeError` if `data` is not an array of numbers.
 /// @param data - Observations to inspect; NaN and infinite entries are ignored.
-#[wasm_bindgen(js_name = finiteMinOrNan)]
-pub fn finite_min_or_nan(
+#[wasm_bindgen(js_name = finiteMin)]
+pub fn finite_min(
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] data: JsValue,
-) -> Result<f64, JsValue> {
-    Ok(stats::finite_min_or_nan(&js_f64_seq(&data, "data")?))
+) -> Result<Option<f64>, JsValue> {
+    Ok(stats::finite_min(&js_f64_seq(&data, "data")?))
 }
 
-/// Largest finite value (Rust `stats::finite_max_or_nan`).
+/// Largest finite value (Rust `stats::finite_max`).
+///
+/// Ignores `NaN` and infinite entries. Returns `undefined` when `data`
+/// contains no finite values.
 ///
 /// # Arguments
 ///
 /// * `data` - Observations to inspect; NaN and infinite entries are ignored.
 ///
-/// @returns The maximum finite value, or `NaN` when none is finite.
+/// @returns The maximum finite value, or `undefined` when none is finite.
 /// @throws `TypeError` if `data` is not an array of numbers.
 /// @param data - Observations to inspect; NaN and infinite entries are ignored.
-#[wasm_bindgen(js_name = finiteMaxOrNan)]
-pub fn finite_max_or_nan(
+#[wasm_bindgen(js_name = finiteMax)]
+pub fn finite_max(
     #[wasm_bindgen(unchecked_param_type = "NumericArray")] data: JsValue,
-) -> Result<f64, JsValue> {
-    Ok(stats::finite_max_or_nan(&js_f64_seq(&data, "data")?))
+) -> Result<Option<f64>, JsValue> {
+    Ok(stats::finite_max(&js_f64_seq(&data, "data")?))
 }
 
 /// Number of finite observations (Rust `stats::finite_count`).

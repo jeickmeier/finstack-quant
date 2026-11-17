@@ -146,7 +146,7 @@ pub(crate) fn resolve_optioned_coupon(
                 series_id, fixing_date
             ))
         })?;
-        series.value_on_exact(fixing_date)?
+        series.get_value_exact(fixing_date)?
     } else {
         forward_curve.as_ref().rate_between_dates(
             period.accrual_start,
@@ -247,7 +247,9 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, DayCountContext};
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations_core::instruments::Instrument;
@@ -285,18 +287,35 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (0.5, 0.98), (1.0, 0.95)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount");
-        let forward = ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 360.0)
+        let forward = ForwardCurve::builder("USD-SOFR-OIS")
             .base_date(as_of)
             .day_count(DayCount::Act360)
-            .knots([(0.0, 0.025), (0.2, 0.035), (0.5, 0.06), (1.0, 0.065)])
+            .knots([
+                (0.0, 1.0),
+                (0.1, 0.997253777786236),
+                (0.2, 0.994017964053935),
+                (0.3, 0.990132341339749),
+                (0.4, 0.98544036498412),
+                (0.5, 0.979953654267085),
+                (0.625, 0.972555510415284),
+                (0.75, 0.965062415944077),
+                (0.875, 0.957477434793823),
+                (1.0, 0.9498036499622),
+            ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("forward");
         let surface = VolSurface::builder("USD-CAP-VOL")
-            .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal)
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::Normal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.1, 0.5, 1.0])
-            .strikes(&[0.01, 0.04, 0.08])
+            .secondary_values(&[0.01, 0.04, 0.08])
             .row(&[0.005, 0.005, 0.005])
             .row(&[0.005, 0.005, 0.005])
             .row(&[0.005, 0.005, 0.005])
@@ -313,8 +332,11 @@ mod tests {
         let as_of = date!(2024 - 12 - 02);
         let mut market = market(as_of);
         let surface = VolSurface::builder("USD-CAP-VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.1, 1.0])
-            .strikes(&[0.01, 0.04, 0.08])
+            .secondary_values(&[0.01, 0.04, 0.08])
             .row(&[0.15, 0.25, 0.35])
             .row(&[0.15, 0.25, 0.35])
             .build()
@@ -344,7 +366,20 @@ mod tests {
     fn sofr_cutoff_caplet_uses_compounded_coupon_and_delayed_payment() {
         let as_of = date!(2024 - 12 - 02);
         let caplet = compounded_sofr_caplet();
-        let market = market(as_of);
+        let kink = 120.0 / 360.0; // 2025-04-01 (cutoff freezes 2025-03-31 rate for final day)
+        let steep_forward = ForwardCurve::builder("USD-SOFR-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act360)
+            .knots([
+                (0.0, 1.0),
+                (kink, (-0.03_f64 * kink).exp()),
+                (0.5, (-0.03_f64 * kink - 0.12_f64 * (0.5 - kink)).exp()),
+            ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .expect("steep forward");
+        let market = market(as_of).insert(steep_forward);
         caplet
             .validate_for_pricing()
             .expect("valid overnight caplet");
@@ -569,22 +604,36 @@ mod tests {
                     .base_date(as_of)
                     .day_count(DayCount::Act365F)
                     .knots([(0.0, 1.0), (1.0, 0.95)])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("discount"),
             )
-            .insert(
-                ForwardCurve::builder("TEST-TERM-3M", 0.25)
-                    .base_date(as_of)
-                    .day_count(DayCount::Act360)
-                    .knots([(0.0, 0.12), (1.0, 0.12)])
-                    .build()
-                    .expect("forward"),
-            );
+            .insert({
+                let mut pts = if period.accrual_start > as_of {
+                    vec![(as_of, 1.0), (period.accrual_start, 1.0)]
+                } else {
+                    vec![(period.accrual_start, 1.0)]
+                };
+                pts.push((
+                    period.accrual_end,
+                    1.0 / (1.0 + 0.12 * period.accrual_year_fraction),
+                ));
+                ForwardCurve::from_dates(
+                    "TEST-TERM-3M",
+                    as_of,
+                    &pts,
+                    DayCount::Act360,
+                    finstack_quant_core::math::interp::InterpStyle::LogLinear,
+                    finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+                )
+                .expect("forward")
+            });
 
         let resolved = resolve_optioned_caplet_inputs(&caplet, &period, &market, as_of)
             .expect("same-day fixed inputs");
 
-        assert_eq!(resolved.coupon.forward, 0.12);
+        assert!((resolved.coupon.forward - 0.12).abs() < 1e-13);
         assert_eq!(resolved.time_to_fixing, 0.0);
     }
 }

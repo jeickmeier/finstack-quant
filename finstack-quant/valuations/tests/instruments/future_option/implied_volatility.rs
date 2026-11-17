@@ -36,6 +36,8 @@ fn market(curve_id: &str) -> MarketContext {
             .base_date(as_of())
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (2.0, (-2.0 * RATE).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve"),
     )

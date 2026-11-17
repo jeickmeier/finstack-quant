@@ -213,9 +213,13 @@ pub fn attribute_return_contribution(
 
     let mut portfolio_return = NeumaierAccumulator::new();
     for position in &weighted {
-        portfolio_return.add(position.contribution);
+        add_finite(
+            &mut portfolio_return,
+            position.contribution,
+            "portfolio return",
+        )?;
     }
-    let portfolio_return = finite(portfolio_return.total(), "portfolio return")?;
+    let portfolio_return = total_finite(&portfolio_return, "portfolio return")?;
 
     let benchmark_return = if benchmark_mode {
         Some(total_benchmark_return(&weighted)?)
@@ -229,9 +233,13 @@ pub fn attribute_return_contribution(
     } else {
         let mut factor_total = NeumaierAccumulator::new();
         for row in &factor_contribution {
-            factor_total.add(row.contribution);
+            add_finite(
+                &mut factor_total,
+                row.contribution,
+                "total factor contribution",
+            )?;
         }
-        let factor_total = finite(factor_total.total(), "total factor contribution")?;
+        let factor_total = total_finite(&factor_total, "total factor contribution")?;
         Some(finite(portfolio_return - factor_total, "specific return")?)
     };
 
@@ -309,14 +317,28 @@ fn parse_return_contribution_spec(spec_json: &str) -> Result<ReturnContributionS
         .map_err(|err| Error::Validation(format!("invalid return contribution JSON: {err}")))
 }
 
+fn overflow_error(quantity: &str) -> Error {
+    Error::Validation(format!(
+        "return contribution {quantity} must remain finite; arithmetic overflow occurred"
+    ))
+}
+
 fn finite(value: f64, quantity: &str) -> Result<f64> {
     if value.is_finite() {
         Ok(value)
     } else {
-        Err(Error::Validation(format!(
-            "return contribution {quantity} must remain finite; arithmetic overflow occurred"
-        )))
+        Err(overflow_error(quantity))
     }
+}
+
+fn add_finite(acc: &mut NeumaierAccumulator, value: f64, quantity: &str) -> Result<()> {
+    acc.add(value).map_err(|_| overflow_error(quantity))
+}
+
+fn total_finite(acc: &NeumaierAccumulator, quantity: &str) -> Result<f64> {
+    acc.get_total()
+        .map_err(|_| overflow_error(quantity))
+        .and_then(|value| finite(value, quantity))
 }
 
 impl ReturnContributionSpec {
@@ -434,9 +456,9 @@ impl ReturnContributionSpec {
             if !benchmark_present {
                 let mut weight_sum = NeumaierAccumulator::new();
                 for weight in &weights {
-                    weight_sum.add(*weight);
+                    add_finite(&mut weight_sum, *weight, "explicit weight sum")?;
                 }
-                let weight_sum = finite(weight_sum.total(), "explicit weight sum")?;
+                let weight_sum = total_finite(&weight_sum, "explicit weight sum")?;
                 if (weight_sum - 1.0).abs() > EXPLICIT_WEIGHT_SUM_WARN_TOLERANCE {
                     warnings.push(format!(
                         "explicit weights sum to {weight_sum} rather than 1.0; contributions \
@@ -504,15 +526,23 @@ fn market_value_weights(
         let market_value = position.market_value.ok_or_else(|| {
             Error::Internal("market value mode encountered missing market_value".to_string())
         })?;
-        gross.add(market_value.abs());
+        add_finite(&mut gross, market_value.abs(), "gross market value")?;
         match weighting {
-            ReturnContributionWeighting::Gross => denominator.add(market_value.abs()),
-            ReturnContributionWeighting::NetMarketValue => denominator.add(market_value),
+            ReturnContributionWeighting::Gross => add_finite(
+                &mut denominator,
+                market_value.abs(),
+                "market value weighting denominator",
+            )?,
+            ReturnContributionWeighting::NetMarketValue => add_finite(
+                &mut denominator,
+                market_value,
+                "market value weighting denominator",
+            )?,
         }
     }
 
-    let denominator = finite(denominator.total(), "market value weighting denominator")?;
-    let gross = finite(gross.total(), "gross market value")?;
+    let denominator = total_finite(&denominator, "market value weighting denominator")?;
+    let gross = total_finite(&gross, "gross market value")?;
     if denominator.abs() <= WEIGHT_TOLERANCE {
         // Audit fix: an exactly-flat net-MV book has no defined net weights.
         // Silently returning all-zero weights would make a real long/short
@@ -600,40 +630,47 @@ fn group_contributions(
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
     let mut total = NeumaierAccumulator::new();
     for position in weighted {
-        total.add(position.contribution);
+        add_finite(
+            &mut total,
+            position.contribution,
+            "grouped portfolio return",
+        )?;
         for (group_name, key) in &position.input.groups {
-            buckets
-                .entry(group_name.clone())
-                .or_default()
-                .entry(key.clone())
-                .or_default()
-                .add(position.contribution);
+            add_finite(
+                buckets
+                    .entry(group_name.clone())
+                    .or_default()
+                    .entry(key.clone())
+                    .or_default(),
+                position.contribution,
+                "group bucket contribution",
+            )?;
             *seen.entry(group_name.clone()).or_insert(0) += 1;
         }
     }
-    let total_contrib = finite(total.total(), "grouped portfolio return")?;
+    let total_contrib = total_finite(&total, "grouped portfolio return")?;
     for (group_name, count) in &seen {
         if *count < n {
-            let present = buckets
-                .get(group_name)
-                .map(|group| {
-                    let mut present = NeumaierAccumulator::new();
-                    for value in group.values() {
-                        present.add(value.total());
-                    }
-                    present.total()
-                })
-                .unwrap_or(0.0);
-            let missing = finite(
-                total_contrib - finite(present, "grouped present contribution")?,
+            let present = if let Some(group) = buckets.get(group_name) {
+                let mut present = NeumaierAccumulator::new();
+                for value in group.values() {
+                    let bucket_total = total_finite(value, "grouped present contribution")?;
+                    add_finite(&mut present, bucket_total, "grouped present contribution")?;
+                }
+                total_finite(&present, "grouped present contribution")?
+            } else {
+                0.0
+            };
+            let missing = finite(total_contrib - present, "ungrouped contribution")?;
+            add_finite(
+                buckets
+                    .entry(group_name.clone())
+                    .or_default()
+                    .entry("unknown".to_string())
+                    .or_default(),
+                missing,
                 "ungrouped contribution",
             )?;
-            buckets
-                .entry(group_name.clone())
-                .or_default()
-                .entry("unknown".to_string())
-                .or_default()
-                .add(missing);
         }
     }
     buckets
@@ -642,7 +679,7 @@ fn group_contributions(
             let rows = group
                 .into_iter()
                 .map(|(key, contribution)| {
-                    let contribution = finite(contribution.total(), "group bucket contribution")?;
+                    let contribution = total_finite(&contribution, "group bucket contribution")?;
                     Ok(GroupContribution { key, contribution })
                 })
                 .collect::<Result<Vec<_>>>()?;
@@ -680,9 +717,13 @@ fn total_benchmark_return(weighted: &[WeightedPosition<'_>]) -> Result<f64> {
         let ret = position.input.benchmark_return.ok_or_else(|| {
             Error::Internal("benchmark mode encountered missing benchmark_return".to_string())
         })?;
-        benchmark_return.add(finite(weight * ret, "benchmark position contribution")?);
+        add_finite(
+            &mut benchmark_return,
+            finite(weight * ret, "benchmark position contribution")?,
+            "benchmark return",
+        )?;
     }
-    finite(benchmark_return.total(), "benchmark return")
+    total_finite(&benchmark_return, "benchmark return")
 }
 
 fn benchmark_relative(
@@ -705,20 +746,32 @@ fn benchmark_relative(
             None => "all".to_string(),
         };
         let group = groups.entry(key).or_default();
-        group.portfolio_weight.add(position.weight);
-        group.portfolio_contribution.add(position.contribution);
-        group
-            .benchmark_weight
-            .add(position.input.benchmark_weight.ok_or_else(|| {
-                Error::Internal("benchmark mode encountered missing benchmark_weight".to_string())
-            })?);
-        group.benchmark_contribution.add(
-            position.input.benchmark_weight.ok_or_else(|| {
-                Error::Internal("benchmark mode encountered missing benchmark_weight".to_string())
-            })? * position.input.benchmark_return.ok_or_else(|| {
-                Error::Internal("benchmark mode encountered missing benchmark_return".to_string())
-            })?,
-        );
+        add_finite(
+            &mut group.portfolio_weight,
+            position.weight,
+            "group portfolio weight",
+        )?;
+        add_finite(
+            &mut group.portfolio_contribution,
+            position.contribution,
+            "group portfolio contribution",
+        )?;
+        let benchmark_weight = position.input.benchmark_weight.ok_or_else(|| {
+            Error::Internal("benchmark mode encountered missing benchmark_weight".to_string())
+        })?;
+        add_finite(
+            &mut group.benchmark_weight,
+            benchmark_weight,
+            "group benchmark weight",
+        )?;
+        let bench_ret = position.input.benchmark_return.ok_or_else(|| {
+            Error::Internal("benchmark mode encountered missing benchmark_return".to_string())
+        })?;
+        add_finite(
+            &mut group.benchmark_contribution,
+            benchmark_weight * bench_ret,
+            "group benchmark contribution",
+        )?;
     }
 
     let mut allocation = NeumaierAccumulator::new();
@@ -726,14 +779,14 @@ fn benchmark_relative(
     let mut interaction = NeumaierAccumulator::new();
 
     for (key, group) in &groups {
-        let portfolio_weight = finite(group.portfolio_weight.total(), "group portfolio weight")?;
-        let benchmark_weight = finite(group.benchmark_weight.total(), "group benchmark weight")?;
-        let portfolio_contribution = finite(
-            group.portfolio_contribution.total(),
+        let portfolio_weight = total_finite(&group.portfolio_weight, "group portfolio weight")?;
+        let benchmark_weight = total_finite(&group.benchmark_weight, "group benchmark weight")?;
+        let portfolio_contribution = total_finite(
+            &group.portfolio_contribution,
             "group portfolio contribution",
         )?;
-        let benchmark_contribution = finite(
-            group.benchmark_contribution.total(),
+        let benchmark_contribution = total_finite(
+            &group.benchmark_contribution,
             "group benchmark contribution",
         )?;
         for (side, weight, contribution) in [
@@ -784,23 +837,29 @@ fn benchmark_relative(
             portfolio_group_return - benchmark_group_return,
             "group active return",
         )?;
-        allocation.add(finite(
-            weight_delta * (benchmark_group_return - benchmark_return),
-            "group allocation effect",
-        )?);
-        selection.add(finite(
-            benchmark_weight * return_delta,
-            "group selection effect",
-        )?);
-        interaction.add(finite(
-            weight_delta * return_delta,
-            "group interaction effect",
-        )?);
+        add_finite(
+            &mut allocation,
+            finite(
+                weight_delta * (benchmark_group_return - benchmark_return),
+                "group allocation effect",
+            )?,
+            "allocation effect",
+        )?;
+        add_finite(
+            &mut selection,
+            finite(benchmark_weight * return_delta, "group selection effect")?,
+            "selection effect",
+        )?;
+        add_finite(
+            &mut interaction,
+            finite(weight_delta * return_delta, "group interaction effect")?,
+            "interaction effect",
+        )?;
     }
 
-    let allocation_effect = finite(allocation.total(), "allocation effect")?;
-    let selection_effect = finite(selection.total(), "selection effect")?;
-    let interaction_effect = finite(interaction.total(), "interaction effect")?;
+    let allocation_effect = total_finite(&allocation, "allocation effect")?;
+    let selection_effect = total_finite(&selection, "selection effect")?;
+    let interaction_effect = total_finite(&interaction, "interaction effect")?;
     let active_return = finite(portfolio_return - benchmark_return, "active return")?;
     let residual = finite(
         active_return - allocation_effect - selection_effect - interaction_effect,
@@ -822,23 +881,28 @@ fn validate_benchmark_weights(weighted: &[WeightedPosition<'_>]) -> Result<()> {
     let mut portfolio_weight = NeumaierAccumulator::new();
     let mut benchmark_weight = NeumaierAccumulator::new();
     for position in weighted {
-        portfolio_weight.add(position.weight);
-        benchmark_weight.add(position.input.benchmark_weight.ok_or_else(|| {
-            Error::Internal("benchmark mode encountered missing benchmark_weight".to_string())
-        })?);
+        add_finite(
+            &mut portfolio_weight,
+            position.weight,
+            "benchmark-mode portfolio weight sum",
+        )?;
+        add_finite(
+            &mut benchmark_weight,
+            position.input.benchmark_weight.ok_or_else(|| {
+                Error::Internal("benchmark mode encountered missing benchmark_weight".to_string())
+            })?,
+            "benchmark weight sum",
+        )?;
     }
 
-    let portfolio_weight = finite(
-        portfolio_weight.total(),
-        "benchmark-mode portfolio weight sum",
-    )?;
+    let portfolio_weight = total_finite(&portfolio_weight, "benchmark-mode portfolio weight sum")?;
     if (portfolio_weight - 1.0).abs() > WEIGHT_TOLERANCE {
         return Err(Error::Validation(format!(
             "return contribution portfolio weights must sum to 1.0 for benchmark-relative attribution (got {portfolio_weight})"
         )));
     }
 
-    let benchmark_weight = finite(benchmark_weight.total(), "benchmark weight sum")?;
+    let benchmark_weight = total_finite(&benchmark_weight, "benchmark weight sum")?;
     if (benchmark_weight - 1.0).abs() > WEIGHT_TOLERANCE {
         return Err(Error::Validation(format!(
             "return contribution benchmark weights must sum to 1.0 for benchmark-relative attribution (got {benchmark_weight})"

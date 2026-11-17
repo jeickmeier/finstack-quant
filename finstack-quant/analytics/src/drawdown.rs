@@ -92,8 +92,8 @@ pub(crate) fn to_drawdown_series(returns: &[f64]) -> Result<Vec<f64>> {
             path.push(-1.0);
             continue;
         }
-        relative_log_wealth.add(value.ln_1p());
-        let wealth = relative_log_wealth.total();
+        relative_log_wealth.add(value.ln_1p())?;
+        let wealth = relative_log_wealth.get_total()?;
         if !wealth.is_finite() {
             return Err(Error::Internal(
                 "drawdown log wealth is not representable".into(),
@@ -225,18 +225,24 @@ pub(crate) fn worst_episode_depths(drawdown: &[f64], n: usize) -> Vec<f64> {
 ///
 /// * `drawdown` - Internally validated endpoint fractions.
 /// * `n` - Positive financial episode count validated by the caller.
-pub(crate) fn mean_episode_drawdown(drawdown: &[f64], n: usize) -> f64 {
+pub(crate) fn mean_episode_drawdown(
+    drawdown: &[f64],
+    n: usize,
+) -> finstack_quant_core::Result<f64> {
     let depths = worst_episode_depths(drawdown, n);
     if depths.is_empty() {
-        return 0.0;
+        return Ok(0.0);
     }
     let count = depths.len() as f64;
     let scale = depths.iter().map(|d| d.abs()).fold(0.0, f64::max);
+    if scale == 0.0 {
+        return Ok(0.0);
+    }
     let mut sum = NeumaierAccumulator::new();
     for depth in depths {
-        sum.add(depth / scale);
+        sum.add(depth / scale)?;
     }
-    scale * (sum.total() / count)
+    Ok(scale * (sum.get_total()? / count))
 }
 
 /// Longest recovered or open episode in actual calendar days.
@@ -278,9 +284,9 @@ pub(crate) fn ulcer_index(drawdown: &[f64]) -> Result<f64> {
     }
     let mut sum = NeumaierAccumulator::new();
     for &d in drawdown {
-        sum.add((d / scale).powi(2));
+        sum.add((d / scale).powi(2))?;
     }
-    nonzero_path_statistic(scale * (sum.total() / drawdown.len() as f64).sqrt())
+    nonzero_path_statistic(scale * (sum.get_total()? / drawdown.len() as f64).sqrt())
 }
 
 /// Mean absolute validated endpoint drawdown; empty is undefined.
@@ -307,9 +313,9 @@ pub(crate) fn mean_drawdown(drawdown: &[f64]) -> Result<f64> {
     }
     let mut sum = NeumaierAccumulator::new();
     for &d in drawdown {
-        sum.add(d / scale);
+        sum.add(d / scale)?;
     }
-    nonzero_path_statistic(scale * (sum.total() / drawdown.len() as f64))
+    nonzero_path_statistic(scale * (sum.get_total()? / drawdown.len() as f64))
 }
 
 fn nonzero_path_statistic(value: f64) -> Result<f64> {

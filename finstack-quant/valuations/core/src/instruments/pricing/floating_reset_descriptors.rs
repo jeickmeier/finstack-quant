@@ -139,8 +139,8 @@ pub fn build_node_coupons(
 
         let t_slice_reset = inputs.time_steps[reset_step];
         let t_slice_pay = inputs.time_steps[payment_step];
-        let df_reset = inputs.discount.df(t_slice_reset);
-        let df_pay = inputs.discount.df(t_slice_pay);
+        let df_reset = inputs.discount.df(t_slice_reset)?;
+        let df_pay = inputs.discount.df(t_slice_pay)?;
         if df_pay <= f64::EPSILON || df_reset <= f64::EPSILON {
             return Err(Error::Validation(format!(
                 "degenerate discount factors over floating period slices \
@@ -151,7 +151,7 @@ pub fn build_node_coupons(
         // Same DF timing correction the deterministic booking applies via
         // `value_at_step_time`: value at the true payment date, expressed
         // at the snapped payment slice.
-        let timing_scale = inputs.discount.df(t_pay) / df_pay;
+        let timing_scale = inputs.discount.df(t_pay)? / df_pay;
 
         coupons.push(NodeCoupon {
             reset_step,

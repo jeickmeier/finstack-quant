@@ -34,6 +34,15 @@ pub fn model_time_on_curve(
     curve_base_date: Date,
     day_count: DayCount,
 ) -> Result<f64> {
+    Ok(map_model_time_with_slope(as_of, time, curve_base_date, day_count)?.0)
+}
+
+fn map_model_time_with_slope(
+    as_of: Date,
+    time: f64,
+    curve_base_date: Date,
+    day_count: DayCount,
+) -> Result<(f64, f64)> {
     let days = time * 365.0;
     if !days.is_finite() || days < 0.0 || days > (Date::MAX - as_of).whole_days() as f64 {
         return Err(Error::Validation(
@@ -42,16 +51,22 @@ pub fn model_time_on_curve(
     }
     let date = as_of + time::Duration::days(days.floor() as i64);
     let curve_time =
-        |date| day_count.signed_year_fraction(curve_base_date, date, DayCountContext::default());
-    let mut mapped = curve_time(date)?;
+        |d| day_count.signed_year_fraction(curve_base_date, d, DayCountContext::default());
+    let mapped_start = curve_time(date)?;
     let fraction = days.fract();
-    if fraction > 0.0 {
-        let next = date
-            .next_day()
-            .ok_or_else(|| Error::Validation("model time exceeds date range".into()))?;
-        mapped += fraction * (curve_time(next)? - mapped);
-    }
-    Ok(mapped)
+    let dm_per_day = if let Some(next) = date.next_day() {
+        curve_time(next)? - mapped_start
+    } else if let Some(prev) = date.previous_day() {
+        mapped_start - curve_time(prev)?
+    } else {
+        1.0 / 365.0
+    };
+    let mapped = if fraction > 0.0 {
+        mapped_start + fraction * dm_per_day
+    } else {
+        mapped_start
+    };
+    Ok((mapped, 365.0 * dm_per_day))
 }
 
 /// Borrowed discount curve on ACT/365F model time, normalized at valuation date.
@@ -77,7 +92,7 @@ impl<'a> ModelDiscountCurve<'a> {
     /// Returns a validation error for an invalid date mapping or discount factor.
     pub fn new(curve: &'a dyn Discounting, as_of: Date) -> Result<Self> {
         let t = model_time_on_curve(as_of, 0.0, curve.base_date(), curve.day_count())?;
-        let df_as_of = curve.df(t);
+        let df_as_of = curve.df(t)?;
         if !df_as_of.is_finite() || df_as_of <= 0.0 {
             return Err(Error::Validation(format!(
                 "invalid model discount factor at valuation date {as_of}: {df_as_of}"
@@ -106,7 +121,7 @@ impl<'a> ModelDiscountCurve<'a> {
             self.curve.base_date(),
             self.curve.day_count(),
         )?;
-        let df = self.curve.df(mapped) / self.df_as_of;
+        let df = self.curve.df(mapped)? / self.df_as_of;
         if !df.is_finite() || df <= 0.0 {
             return Err(Error::Validation(format!(
                 "invalid model discount factor at t={time}: {df}"
@@ -123,7 +138,16 @@ impl Discounting for ModelDiscountCurve<'_> {
     fn base_date(&self) -> Date {
         self.as_of
     }
-    fn df(&self, t: f64) -> f64 {
-        self.get_df(t).unwrap_or(f64::NAN)
+    fn df(&self, t: f64) -> Result<f64> {
+        self.get_df(t)
+    }
+    fn instantaneous_forward(&self, t: f64) -> Result<f64> {
+        let (mapped, slope) = map_model_time_with_slope(
+            self.as_of,
+            t,
+            self.curve.base_date(),
+            self.curve.day_count(),
+        )?;
+        Ok(self.curve.instantaneous_forward(mapped)? * slope)
     }
 }

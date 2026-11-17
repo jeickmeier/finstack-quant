@@ -59,7 +59,7 @@ class Waterfall:
     ...         calendar_id="nyse",
     ...     ),
     ... )
-    >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
+    >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03, "act_365f"))
     >>> waterfall = deal.create_waterfall()
     >>> waterfall.currency, len(waterfall.tiers) > 0
     ('USD', True)

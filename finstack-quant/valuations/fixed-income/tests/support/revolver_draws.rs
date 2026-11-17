@@ -34,12 +34,22 @@ fn usd(amount: f64) -> Money {
 
 pub(crate) fn market() -> MarketContext {
     let fixings: Vec<(Date, f64)> = (0..25)
+        .rev()
         .map(|days| (AS_OF - time::Duration::days(days), 0.04))
         .collect();
     MarketContext::new()
         .insert(flat_discount_curve(0.03, AS_OF, "USD-OIS"))
         .insert(flat_forward_curve(0.04, AS_OF, "USD-SOFR-3M"))
-        .insert_series(ScalarTimeSeries::new("FIXING:USD-SOFR-3M", fixings, None).expect("fixings"))
+        .insert_series(
+            ScalarTimeSeries::new(
+                "FIXING:USD-SOFR-3M",
+                fixings,
+                None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .expect("fixings"),
+        )
 }
 
 /// Borrower hazard curve whose term structure rises, so the market-anchored
@@ -49,6 +59,7 @@ pub(crate) fn widening_hazard_curve() -> HazardCurve {
         .base_date(AS_OF)
         .knots([(1.0, 0.04), (3.0, 0.10), (5.0, 0.14)])
         .recovery_rate(0.4)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("hazard curve")
 }

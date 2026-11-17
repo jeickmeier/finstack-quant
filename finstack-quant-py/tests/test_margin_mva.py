@@ -26,7 +26,9 @@ from finstack_quant.margin import (
 
 def flat_discount_curve() -> DiscountCurve:
     knots = [(0.5 * i, 1.0) for i in range(9)]
-    return DiscountCurve("USD-OIS", dt.date(2025, 1, 1), knots, interp="log_linear")
+    return DiscountCurve(
+        "USD-OIS", dt.date(2025, 1, 1), knots, interp="log_linear", extrapolation="extend", day_count="act_365f"
+    )
 
 
 def test_decay_profile_factors() -> None:
@@ -189,7 +191,7 @@ def test_xva_result_funding_legs_are_optional_but_total_is_required() -> None:
 
 
 def flat_hazard_curve(lam: float) -> HazardCurve:
-    return HazardCurve("HZ", dt.date(2025, 1, 1), [(0.0, lam), (30.0, lam)], recovery_rate=0.40)
+    return HazardCurve("HZ", dt.date(2025, 1, 1), [(1.0, lam), (30.0, lam)], recovery_rate=0.40, day_count="act_365f")
 
 
 def uniform_exposure() -> ExposureProfile:

@@ -214,7 +214,7 @@ impl ShortRateTree {
             }
 
             let t_next = self.time_steps[step + 1];
-            let target_df = discount_curve.df(t_next);
+            let target_df = discount_curve.df(t_next)?;
             if target_df <= 0.0 {
                 return Err(Error::Validation(format!(
                     "Black-Karasinski calibration: non-positive discount factor \
@@ -234,18 +234,29 @@ impl ShortRateTree {
                 model_df - target_df
             };
             // Initial guess: log of the period forward rate.
-            let prev_df = discount_curve.df(self.time_steps[step]);
+            let prev_df = discount_curve.df(self.time_steps[step])?;
             let fwd = if prev_df > 0.0 && target_df > 0.0 {
                 comp.tree_rate_from_df(target_df / prev_df, dt)
             } else {
                 0.03
             };
             let guess = fwd.max(1e-8).ln();
-            let a = BrentSolver::new().solve(objective, guess).map_err(|e| {
-                Error::Validation(format!(
-                    "Black-Karasinski calibration: drift solve failed at step {step}: {e}"
-                ))
-            })?;
+            let guess_clamped = if guess.is_finite() {
+                guess.clamp(-30.0, 10.0)
+            } else {
+                return Err(Error::Validation(format!(
+                    "Black-Karasinski calibration: non-finite drift guess at step {step}: {guess}"
+                )));
+            };
+            let a = BrentSolver::new(1e-12, 100)
+                .and_then(|solver| {
+                    solver.solve(|a| Ok(objective(a)), guess_clamped, -30.0, 10.0, 0.5, 20)
+                })
+                .map_err(|e| {
+                    Error::Validation(format!(
+                        "Black-Karasinski calibration: drift solve failed at step {step}: {e}"
+                    ))
+                })?;
             alpha[step] = a;
 
             rates[step] = (0..num_nodes)

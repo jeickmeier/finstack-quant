@@ -22,8 +22,8 @@ use crate::market_data::{
     scalars::{InflationIndex, MarketScalar, ScalarTimeSeries},
     surfaces::{FxDeltaVolSurface, VolCube, VolSurface},
     term_structures::{
-        BaseCorrelationCurve, BasisSpreadCurve, DiscountCurve, ForwardCurve, HazardCurve,
-        InflationCurve, ParametricCurve, PriceCurve,
+        BaseCorrelationCurve, DiscountCurve, ForwardCurve, HazardCurve, InflationCurve,
+        ParametricCurve, PriceCurve,
     },
 };
 use crate::money::fx::{FxMatrix, FxMatrixState};
@@ -271,60 +271,6 @@ fn validate_restore_references(
         limits,
         "vol_cubes",
         state.vol_cubes.iter().map(|entry| entry.id().to_string()),
-    );
-
-    let mut vol_owners: crate::FxHashMap<String, &'static str> = crate::FxHashMap::default();
-    let mut record_vol_ids = |field: &'static str, ids: Vec<(String, String)>| {
-        let mut seen_in_field = FxHashSet::default();
-        for (pointer, id) in ids {
-            if !seen_in_field.insert(id.clone()) {
-                continue;
-            }
-            if let Some(existing_field) = vol_owners.get(&id).copied() {
-                report.push_bounded(
-                    limits,
-                    Diagnostic::new(
-                        "market-context/conflicting-id",
-                        LoadPhase::Semantic,
-                        Severity::Error,
-                        format!(
-                            "id '{id}' in MarketContextState.{field} conflicts with MarketContextState.{existing_field}"
-                        ),
-                    )
-                    .with_pointer(pointer)
-                    .with_contract(MARKET_CONTEXT_STATE_CONTRACT.id),
-                );
-            } else {
-                vol_owners.insert(id, field);
-            }
-        }
-    };
-    record_vol_ids(
-        "surfaces",
-        state
-            .surfaces
-            .iter()
-            .enumerate()
-            .map(|(i, e)| (format!("/surfaces/{i}"), e.id().to_string()))
-            .collect(),
-    );
-    record_vol_ids(
-        "fx_delta_vol_surfaces",
-        state
-            .fx_delta_vol_surfaces
-            .iter()
-            .enumerate()
-            .map(|(i, e)| (format!("/fx_delta_vol_surfaces/{i}"), e.id().to_string()))
-            .collect(),
-    );
-    record_vol_ids(
-        "vol_cubes",
-        state
-            .vol_cubes
-            .iter()
-            .enumerate()
-            .map(|(i, e)| (format!("/vol_cubes/{i}"), e.id().to_string()))
-            .collect(),
     );
 
     let hazard_ids: FxHashSet<&str> = state

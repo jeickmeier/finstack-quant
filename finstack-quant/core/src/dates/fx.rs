@@ -292,12 +292,12 @@ mod tests {
     #[test]
     fn date_range_boundaries_return_errors() {
         assert!(
-            resolve_joint_calendar(None, None)
+            resolve_joint_calendar("weekends_only", "weekends_only")
                 .and_then(|cal| Date::MAX.add_business_days(1, cal))
                 .is_err()
         );
         assert_eq!(
-            resolve_joint_calendar(None, None)
+            resolve_joint_calendar("weekends_only", "weekends_only")
                 .and_then(|cal| Date::MAX.add_business_days(0, cal))
                 .unwrap(),
             Date::MAX
@@ -306,7 +306,7 @@ mod tests {
 
     #[test]
     fn test_resolve_calendar_unknown_id() {
-        let result = resolve_calendar(Some("unknown_calendar_id"));
+        let result = resolve_calendar("unknown_calendar_id");
         let err = result.err().expect("unknown calendar must error");
         assert!(
             matches!(err, Error::Input(ref e) if matches!(
@@ -323,7 +323,7 @@ mod tests {
         // EUR/JPY traded Wed 2025-07-02: two-currency T+2 lands on the US
         // holiday; a composite with USNY rolls to Mon 2025-07-07.
         let trade = d(2025, Month::July, 2);
-        let spot_two_cal = resolve_joint_calendar(Some("target2"), Some("jpto"))
+        let spot_two_cal = resolve_joint_calendar("target2", "jpto")
             .and_then(|cal| trade.add_business_days(2, cal))
             .expect("two-calendar roll");
         assert_eq!(spot_two_cal, d(2025, Month::July, 4));

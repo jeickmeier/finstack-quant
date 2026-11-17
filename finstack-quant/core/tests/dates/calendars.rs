@@ -992,19 +992,33 @@ fn test_calendar_weekend_behavior() {
 // Chinese New Year Edge Cases (1970-2150)
 
 fn check_cny_dates(dates: &[(i32, u8, u8)]) {
-    // Check multiple calendars that observe CNY
-    let calendars = [by_id("hkhk"), by_id("sgsi")];
+    let hkhk = by_id("hkhk");
 
     for &(y, m, d) in dates {
         let date = make_date(y, m, d);
-        for cal in &calendars {
+        assert!(
+            hkhk.is_holiday(date).expect("calendar lookup"),
+            "Calendar {} should have holiday on {}-{}-{}",
+            hkhk.metadata().unwrap().id,
+            y,
+            m,
+            d
+        );
+        // Singapore declared moving-holiday coverage is 2024..=2027.
+        let sgsi = by_id("sgsi");
+        if (2024..=2027).contains(&y) {
             assert!(
-                cal.is_holiday(date).expect("calendar lookup"),
+                sgsi.is_holiday(date).expect("calendar lookup"),
                 "Calendar {} should have holiday on {}-{}-{}",
-                cal.metadata().unwrap().id,
+                sgsi.metadata().unwrap().id,
                 y,
                 m,
                 d
+            );
+        } else {
+            assert!(
+                sgsi.is_holiday(date).is_err(),
+                "Calendar sgsi must error outside 2024..=2027 on {date}"
             );
         }
     }
@@ -1569,4 +1583,104 @@ fn nerc_observes_sunday_holidays_on_monday_and_leaves_saturday_holidays() {
             "{holiday}"
         );
     }
+}
+
+#[test]
+fn sifma_nfp_good_fridays_are_open_and_sse_2020_oct8_is_closed() {
+    let sifma = by_id("sifma");
+    for open_good_friday in [
+        make_date(2021, 4, 2),
+        make_date(2023, 4, 7),
+        make_date(2026, 4, 3),
+    ] {
+        assert!(
+            sifma
+                .is_business_day(open_good_friday)
+                .expect("calendar lookup"),
+            "SIFMA {open_good_friday} should be an early-close business day"
+        );
+        assert!(
+            !sifma.is_holiday(open_good_friday).expect("calendar lookup"),
+            "SIFMA {open_good_friday} should not be a full-day holiday"
+        );
+    }
+    for closed_good_friday in [
+        make_date(2020, 4, 10),
+        make_date(2022, 4, 15),
+        make_date(2024, 3, 29),
+        make_date(2025, 4, 18),
+        make_date(2027, 3, 26),
+    ] {
+        assert!(
+            !sifma
+                .is_business_day(closed_good_friday)
+                .expect("calendar lookup"),
+            "SIFMA {closed_good_friday} should be closed"
+        );
+    }
+
+    let sse = by_id("sse");
+    let sse_2020_oct8 = make_date(2020, 10, 8);
+    assert!(
+        sse.is_holiday(sse_2020_oct8).expect("calendar lookup")
+            && !sse.is_business_day(sse_2020_oct8).expect("calendar lookup"),
+        "SSE 2020-10-08 merged National Day / Mid-Autumn closure must be closed"
+    );
+}
+
+#[test]
+fn declared_supported_years_reject_out_of_coverage_queries_and_report_metadata() {
+    let sgsi = by_id("sgsi");
+    assert_eq!(
+        sgsi.metadata().unwrap().supported_years,
+        Some((Some(2024), Some(2027)))
+    );
+    assert_eq!(sgsi.supported_years(), Some((Some(2024), Some(2027))));
+    // Weekdays and weekends outside declared coverage both error (before weekend shortcut).
+    assert!(sgsi.is_business_day(make_date(2028, 1, 26)).is_err());
+    assert!(sgsi.is_business_day(make_date(2028, 1, 29)).is_err());
+    assert!(sgsi.is_holiday(make_date(2023, 12, 31)).is_err());
+    // Half-open [2027-01-01, 2028-01-01) is covered; equal-date in 2028 and cross-boundary error.
+    assert!(
+        sgsi.count_business_days(make_date(2027, 1, 1), make_date(2028, 1, 1))
+            .is_ok()
+    );
+    assert!(
+        sgsi.count_business_days(make_date(2028, 1, 1), make_date(2028, 1, 1))
+            .is_err()
+    );
+    assert!(
+        sgsi.count_business_days(make_date(2027, 12, 31), make_date(2028, 1, 2))
+            .is_err()
+    );
+
+    for id in ["nse", "bse"] {
+        let cal = by_id(id);
+        assert_eq!(
+            cal.metadata().unwrap().supported_years,
+            Some((Some(2024), Some(2026)))
+        );
+        assert!(cal.is_business_day(make_date(2027, 1, 26)).is_err());
+    }
+
+    let nzau = by_id("nzau");
+    assert_eq!(
+        nzau.metadata().unwrap().supported_years,
+        Some((None, Some(2052)))
+    );
+    assert!(nzau.is_business_day(make_date(2053, 6, 20)).is_err());
+    assert!(nzau.is_business_day(make_date(2010, 4, 26)).is_ok());
+
+    // Joint calendars intersect member coverage and surface member errors regardless of order.
+    let nyse_sgsi = by_id("nyse+sgsi");
+    let sgsi_nyse = by_id("sgsi+nyse");
+    assert_eq!(nyse_sgsi.supported_years(), Some((Some(2024), Some(2027))));
+    assert_eq!(sgsi_nyse.supported_years(), Some((Some(2024), Some(2027))));
+    assert!(nyse_sgsi.is_business_day(make_date(2028, 1, 1)).is_err());
+    assert!(sgsi_nyse.is_business_day(make_date(2028, 1, 1)).is_err());
+    assert!(
+        nyse_sgsi
+            .count_business_days(make_date(2028, 1, 1), make_date(2028, 1, 1))
+            .is_err()
+    );
 }

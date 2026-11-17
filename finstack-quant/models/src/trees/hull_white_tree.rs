@@ -94,7 +94,7 @@ impl Default for HullWhiteTreeConfig {
             sigma: 0.01,
             steps: 100,
             volatility: None,
-            compounding: Compounding::default(),
+            compounding: Compounding::Continuous,
         }
     }
 }
@@ -107,7 +107,7 @@ impl HullWhiteTreeConfig {
             sigma,
             steps,
             volatility: None,
-            compounding: Compounding::default(),
+            compounding: Compounding::Continuous,
         }
     }
 
@@ -276,7 +276,7 @@ impl HullWhiteTree {
         let target_dfs: Vec<f64> = time_grid
             .iter()
             .map(|&time| {
-                let target = discount_curve.df(time);
+                let target = discount_curve.df(time)?;
                 if !target.is_finite() || target <= 0.0 {
                     Err(Error::Validation(format!(
                         "Hull-White calibration discount factor must be finite and positive at time {time}, got {target}"
@@ -588,8 +588,19 @@ impl HullWhiteTree {
                 } else {
                     0.03
                 };
-                BrentSolver::new()
-                    .solve(objective, initial_guess)
+                let bound = 10.0_f64.max(initial_guess.abs() * 10.0);
+                let half_width = (0.1 * initial_guess.abs()).max(0.01);
+                BrentSolver::new(1e-12, 100)
+                    .and_then(|solver| {
+                        solver.solve(
+                            |a| Ok(objective(a)),
+                            initial_guess,
+                            -bound,
+                            bound,
+                            half_width,
+                            20,
+                        )
+                    })
                     .map_err(|e| Error::Validation(format!("HW alpha calibration failed: {e}")))?
             }
         };
@@ -728,10 +739,14 @@ impl HullWhiteTree {
 
         let b = crate::rates::hull_white::hw_b(kappa, t, maturity_time);
 
-        let p_0_t = discount_curve.df(t);
-        let p_0_tt = discount_curve.df(maturity_time);
+        let Ok(p_0_t) = discount_curve.df(t) else {
+            return f64::NAN;
+        };
+        let Ok(p_0_tt) = discount_curve.df(maturity_time) else {
+            return f64::NAN;
+        };
 
-        if p_0_t <= 0.0 {
+        if !p_0_t.is_finite() || p_0_t <= 0.0 {
             return 0.0;
         }
 
@@ -913,6 +928,7 @@ mod tests {
                 finstack_quant_core::dates::Date::from_calendar_date(2025, Month::January, 1)
                     .expect("Valid date"),
             )
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([
                 (0.0, 1.0),
                 (0.5, 0.985),
@@ -922,6 +938,7 @@ mod tests {
                 (10.0, 0.70),
             ])
             .interp(InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("Valid curve")
     }
@@ -944,7 +961,7 @@ mod tests {
         // this mild curve, which the old 1 bp tolerance could not see.
         for step in [20, 50, 100, 150, 200] {
             let t = tree.time_at_step(step);
-            let target_df = curve.df(t);
+            let target_df = curve.df(t).expect("valid");
             let sum_q: f64 = (0..tree.num_nodes(step))
                 .map(|j| tree.state_price(step, j))
                 .sum();
@@ -976,11 +993,18 @@ mod tests {
             fn base_date(&self) -> finstack_quant_core::dates::Date {
                 self.curve.base_date()
             }
-            fn df(&self, time: f64) -> f64 {
+            fn df(&self, time: f64) -> finstack_quant_core::Result<f64> {
                 if time < 0.75 {
                     self.curve.df(time)
                 } else {
-                    self.target
+                    Ok(self.target)
+                }
+            }
+            fn instantaneous_forward(&self, time: f64) -> finstack_quant_core::Result<f64> {
+                if time < 0.75 {
+                    self.curve.instantaneous_forward(time)
+                } else {
+                    Ok(self.target)
                 }
             }
         }
@@ -1039,6 +1063,7 @@ mod tests {
                 finstack_quant_core::dates::Date::from_calendar_date(2025, Month::January, 1)
                     .expect("Valid date"),
             )
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             // Zero rates rising ~1% -> ~6%: df(t) = exp(-z(t)*t)
             .knots([
                 (0.0, 1.0),
@@ -1049,6 +1074,7 @@ mod tests {
                 (10.0, (-0.060_f64 * 10.0).exp()),
             ])
             .interp(InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("Valid curve");
 
@@ -1058,7 +1084,7 @@ mod tests {
 
         for step in [10, 20, 40, 100, 160, 200] {
             let t = tree.time_at_step(step);
-            let target_df = steep_curve.df(t);
+            let target_df = steep_curve.df(t).expect("valid");
             let sum_q: f64 = (0..tree.num_nodes(step))
                 .map(|j| tree.state_price(step, j))
                 .sum();
@@ -1079,7 +1105,7 @@ mod tests {
         let value = tree
             .backward_induction(&terminal, |_, _, cont| cont)
             .expect("terminal values sized to final step");
-        let target_df = steep_curve.df(10.0);
+        let target_df = steep_curve.df(10.0).expect("valid");
         let error_bp = ((value - target_df) / target_df).abs() * 10000.0;
         assert!(
             error_bp < 0.1,
@@ -1143,7 +1169,7 @@ mod tests {
             .backward_induction(&terminal, |_, _, cont| cont)
             .expect("terminal values sized to final step");
 
-        let target_df = curve.df(1.0);
+        let target_df = curve.df(1.0).expect("valid");
         let error = (value - target_df).abs();
         let error_bp = (error / target_df) * 10000.0;
 
@@ -1175,9 +1201,10 @@ mod tests {
         let market_annuity: f64 = payment_times
             .iter()
             .zip(accrual_fractions.iter())
-            .map(|(&payment_time, &accrual)| accrual * curve.df(payment_time))
+            .map(|(&payment_time, &accrual)| accrual * curve.df(payment_time).expect("valid"))
             .sum();
-        let market_forward = (curve.df(0.0) - curve.df(5.0)) / market_annuity;
+        let market_forward =
+            (curve.df(0.0).expect("valid") - curve.df(5.0).expect("valid")) / market_annuity;
         let error_bp = (tree_forward - market_forward).abs() * 10_000.0;
 
         assert!(
@@ -1209,7 +1236,7 @@ mod tests {
         let state_price_sum: f64 = (0..tree.num_nodes(midpoint))
             .map(|node| tree.state_price(midpoint, node))
             .sum();
-        let target_df = curve.df(5.0);
+        let target_df = curve.df(5.0).expect("valid");
         let error_bp = ((state_price_sum - target_df) / target_df).abs() * 10_000.0;
         assert!(
             error_bp < 1.0,
@@ -1337,7 +1364,7 @@ mod tests {
         // Relaxed tolerance to 5bp for boundary-heavy scenarios
         for step in [25, 50, 75, 100] {
             let t = tree.time_at_step(step);
-            let target_df = curve.df(t);
+            let target_df = curve.df(t).expect("valid");
             let sum_q: f64 = (0..tree.num_nodes(step))
                 .map(|j| tree.state_price(step, j))
                 .sum();
@@ -1358,7 +1385,7 @@ mod tests {
         let value = tree
             .backward_induction(&terminal, |_, _, cont| cont)
             .expect("terminal values sized to final step");
-        let target_df = curve.df(5.0);
+        let target_df = curve.df(5.0).expect("valid");
         let error_bp = ((value - target_df) / target_df).abs() * 10000.0;
         assert!(
             error_bp < 5.0,
@@ -1414,6 +1441,7 @@ mod tests {
                 finstack_quant_core::dates::Date::from_calendar_date(2025, Month::January, 1)
                     .expect("Valid date"),
             )
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([
                 (0.0, 1.0),
                 (0.5, (-0.012_f64 * 0.5).exp()),
@@ -1423,6 +1451,7 @@ mod tests {
                 (10.0, (-0.060_f64 * 10.0).exp()),
             ])
             .interp(InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("Valid curve");
 
@@ -1433,7 +1462,7 @@ mod tests {
 
         for &t in &pillars {
             let step = tree.step_at_time(t).expect("pillar on grid");
-            let target_df = steep_curve.df(t);
+            let target_df = steep_curve.df(t).expect("valid");
             let sum_q: f64 = (0..tree.num_nodes(step))
                 .map(|j| tree.state_price(step, j))
                 .sum();
@@ -1451,7 +1480,7 @@ mod tests {
         let value = tree
             .backward_induction(&terminal, |_, _, cont| cont)
             .expect("terminal values sized to final step");
-        let target_df = steep_curve.df(10.0);
+        let target_df = steep_curve.df(10.0).expect("valid");
         let error_bp = ((value - target_df) / target_df).abs() * 10000.0;
         assert!(
             error_bp < 0.1,

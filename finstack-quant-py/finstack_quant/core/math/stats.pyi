@@ -1,11 +1,12 @@
 """
 Statistical functions: mean, variance, correlation, covariance, quantiles,
-NaN-sentinel summaries, log returns and realized variance.
+standard deviation, median, finite extrema, log returns and realized variance.
 
 Vector parameters accept any ``Sequence[float]`` or a 1-D ``float64``
 NumPy array, including strided or reversed views. Inputs are copied before
 Rust computation releases the GIL; sorting operations do not mutate the
-caller's array. Invalid series types or dimensions raise ``TypeError``.
+caller's array. Invalid series types or dimensions raise ``TypeError``, and
+non-finite or invalid inputs raise ``ValueError`` (for exact-finite functions).
 
 Examples
 --------
@@ -26,41 +27,45 @@ __all__ = [
     "correlation",
     "covariance",
     "finite_count",
-    "finite_max_or_nan",
-    "finite_min_or_nan",
+    "finite_max",
+    "finite_min",
     "log_returns",
     "mean",
-    "mean_or_nan",
     "mean_var",
-    "median_or_nan",
+    "median",
     "population_variance",
     "quantile",
     "realized_variance",
     "realized_variance_ohlc",
-    "sample_std_or_nan",
-    "sample_variance_or_nan",
+    "std_dev",
     "variance",
 ]
 
-def mean_var(data: Sequence[float] | npt.NDArray[np.float64]) -> tuple[float, float]:
+def mean_var(data: Sequence[float] | npt.NDArray[np.float64]) -> tuple[float | None, float | None]:
     """
-    ``(mean, sample_variance)`` in a single Welford pass.
+    ``(mean, sample_variance)`` in a single pass.
 
     Parameters
     ----------
     data : Sequence[float] or numpy.ndarray
-        Observations; the variance uses the n-1 denominator.
+        Finite observations; sample variance uses the ``n - 1`` denominator.
 
     Returns
     -------
-    tuple[float, float]
-        ``(mean, variance)``; ``(0.0, 0.0)`` for empty input.
+    tuple[float | None, float | None]
+        ``(mean, variance)``; ``(None, None)`` for empty input and
+        ``(mean, None)`` for a single observation.
 
     Raises
     ------
     TypeError
         If a series is not one-dimensional or contains values that cannot
         be converted to float.
+    ValueError
+        If any observation is non-finite or ``len(data)`` exceeds ``2**53``.
+    RuntimeError
+        If the mean or a non-constant sample variance overflows or
+        underflows ``float``.
 
     Examples
     --------
@@ -71,136 +76,88 @@ def mean_var(data: Sequence[float] | npt.NDArray[np.float64]) -> tuple[float, fl
     """
     ...
 
-def mean_or_nan(data: Sequence[float] | npt.NDArray[np.float64]) -> float:
+def std_dev(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
     """
-    Arithmetic mean, or ``nan`` for empty input.
+    Unbiased sample standard deviation (``n - 1`` denominator).
 
     Parameters
     ----------
     data : Sequence[float] or numpy.ndarray
-        Observations.
+        Finite sample observations.
 
     Returns
     -------
-    float
-        Mean, or ``nan`` when *data* is empty.
+    float | None
+        Square root of the unbiased sample variance, or ``None`` for fewer
+        than two observations; ``0.0`` when ``len(data) >= 2`` and all
+        observations are identical.
 
     Raises
     ------
     TypeError
         If a series is not one-dimensional or contains values that cannot
         be converted to float.
+    ValueError
+        If any observation is non-finite or ``len(data)`` exceeds ``2**53``.
+    RuntimeError
+        If a non-constant sample standard deviation overflows or underflows
+        ``float``.
 
     Examples
     --------
     >>> from finstack_quant.core.math import stats
-    >>> stats.mean_or_nan([1.0, 3.0])
-    2.0
-
-    """
-    ...
-
-def sample_variance_or_nan(data: Sequence[float] | npt.NDArray[np.float64]) -> float:
-    """
-    Sample variance (n-1 denominator), or ``nan`` for fewer than 2 observations.
-
-    Parameters
-    ----------
-    data : Sequence[float] or numpy.ndarray
-        Observations.
-
-    Returns
-    -------
-    float
-        Unbiased variance, or ``nan``.
-
-    Raises
-    ------
-    TypeError
-        If a series is not one-dimensional or contains values that cannot
-        be converted to float.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.math import stats
-    >>> stats.sample_variance_or_nan([1.0, 2.0, 3.0])
+    >>> stats.std_dev([1.0, 2.0, 3.0])
     1.0
 
     """
     ...
 
-def sample_std_or_nan(data: Sequence[float] | npt.NDArray[np.float64]) -> float:
+def median(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
     """
-    Sample standard deviation (n-1 denominator), or ``nan`` for fewer than 2 observations.
+    Sample median using R-7 / NumPy quantile interpolation at ``q = 0.5``.
 
     Parameters
     ----------
     data : Sequence[float] or numpy.ndarray
-        Observations.
+        Finite observations (sorted on a copy; caller storage is unchanged).
 
     Returns
     -------
-    float
-        Square root of the unbiased variance, or ``nan``.
+    float | None
+        Median value, or ``None`` for empty input.
 
     Raises
     ------
     TypeError
         If a series is not one-dimensional or contains values that cannot
         be converted to float.
+    ValueError
+        If any observation is non-finite or ``len(data)`` exceeds ``2**53``.
+    RuntimeError
+        If a nonzero median underflows ``float``.
 
     Examples
     --------
     >>> from finstack_quant.core.math import stats
-    >>> stats.sample_std_or_nan([1.0, 2.0, 3.0])
-    1.0
-
-    """
-    ...
-
-def median_or_nan(data: Sequence[float] | npt.NDArray[np.float64]) -> float:
-    """
-    Median (mean of the two middle values for even counts), or ``nan`` for empty
-    input or when any observation is non-finite.
-
-    Parameters
-    ----------
-    data : Sequence[float] or numpy.ndarray
-        Observations (sorted internally).
-
-    Returns
-    -------
-    float
-        Median, or ``nan``.
-
-    Raises
-    ------
-    TypeError
-        If a series is not one-dimensional or contains values that cannot
-        be converted to float.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.math import stats
-    >>> stats.median_or_nan([3.0, 1.0, 2.0, 4.0])
+    >>> stats.median([3.0, 1.0, 2.0, 4.0])
     2.5
 
     """
     ...
 
-def finite_min_or_nan(data: Sequence[float] | npt.NDArray[np.float64]) -> float:
+def finite_min(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
     """
-    Minimum over finite values, or ``nan`` when there are none.
+    Minimum over finite values, ignoring ``nan`` and infinities.
 
     Parameters
     ----------
     data : Sequence[float] or numpy.ndarray
-        Observations; NaN and infinities are ignored.
+        Observations; ``nan`` and infinities are ignored.
 
     Returns
     -------
-    float
-        Smallest finite value, or ``nan``.
+    float | None
+        Smallest finite value, or ``None`` when no observation is finite.
 
     Raises
     ------
@@ -211,25 +168,25 @@ def finite_min_or_nan(data: Sequence[float] | npt.NDArray[np.float64]) -> float:
     Examples
     --------
     >>> from finstack_quant.core.math import stats
-    >>> stats.finite_min_or_nan([3.0, float("nan"), 1.0])
+    >>> stats.finite_min([3.0, float("nan"), 1.0])
     1.0
 
     """
     ...
 
-def finite_max_or_nan(data: Sequence[float] | npt.NDArray[np.float64]) -> float:
+def finite_max(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
     """
-    Maximum over finite values, or ``nan`` when there are none.
+    Maximum over finite values, ignoring ``nan`` and infinities.
 
     Parameters
     ----------
     data : Sequence[float] or numpy.ndarray
-        Observations; NaN and infinities are ignored.
+        Observations; ``nan`` and infinities are ignored.
 
     Returns
     -------
-    float
-        Largest finite value, or ``nan``.
+    float | None
+        Largest finite value, or ``None`` when no observation is finite.
 
     Raises
     ------
@@ -240,7 +197,7 @@ def finite_max_or_nan(data: Sequence[float] | npt.NDArray[np.float64]) -> float:
     Examples
     --------
     >>> from finstack_quant.core.math import stats
-    >>> stats.finite_max_or_nan([3.0, float("inf"), 1.0])
+    >>> stats.finite_max([3.0, float("inf"), 1.0])
     3.0
 
     """
@@ -411,31 +368,31 @@ def realized_variance_ohlc(
     """
     ...
 
-def mean(data: Sequence[float] | npt.NDArray[np.float64]) -> float:
+def mean(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
     """
     Arithmetic mean of a data series.
 
-    Returns ``0.0`` for an empty list.
+    Returns ``None`` for an empty series.
 
     Parameters
     ----------
-    data : list[float]
-        Input data.
+    data : Sequence[float] or numpy.ndarray
+        Finite input observations.
 
     Returns
     -------
-    float
-        Arithmetic mean.
-
-    Notes
-    -----
-    An empty series returns ``0.0``.
+    float | None
+        Arithmetic mean, or ``None`` when ``data`` is empty.
 
     Raises
     ------
     TypeError
         If ``data`` is not a one-dimensional numeric sequence or contains
         values that cannot be converted to float.
+    ValueError
+        If any observation is non-finite or ``len(data)`` exceeds ``2**53``.
+    RuntimeError
+        If reconstructing the scaled mean overflows ``float``.
 
     Examples
     --------
@@ -445,171 +402,172 @@ def mean(data: Sequence[float] | npt.NDArray[np.float64]) -> float:
     """
     ...
 
-def variance(data: Sequence[float] | npt.NDArray[np.float64]) -> float:
+def variance(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
     """
-    Sample variance (unbiased, n-1 denominator).
+    Sample variance (unbiased, ``n - 1`` denominator).
 
-    Returns ``0.0`` for fewer than 2 observations.
+    Returns ``None`` for fewer than 2 observations, and ``0.0`` when
+    ``len(data) >= 2`` and all observations are identical.
 
     Parameters
     ----------
-    data : list[float]
-        Input data.
+    data : Sequence[float] or numpy.ndarray
+        Finite sample observations.
 
     Returns
     -------
-    float
-        Sample variance.
-
-    Notes
-    -----
-    Fewer than two observations return ``0.0``.
+    float | None
+        Sample variance, or ``None`` when ``len(data) < 2``.
 
     Raises
     ------
     TypeError
         If ``data`` is not a one-dimensional numeric sequence or contains
         values that cannot be converted to float.
+    ValueError
+        If any observation is non-finite or ``len(data)`` exceeds ``2**53``.
+    RuntimeError
+        If a non-constant sample variance overflows or underflows ``float``.
 
     Examples
     --------
     >>> from finstack_quant.core.math import stats
-    >>> round(stats.variance([1.0, 2.0, 3.0]), 10)
+    >>> round(stats.variance([1.0, 2.0, 3.0]) or 0.0, 10)
     1.0
     """
     ...
 
-def population_variance(data: Sequence[float] | npt.NDArray[np.float64]) -> float:
+def population_variance(data: Sequence[float] | npt.NDArray[np.float64]) -> float | None:
     """
-    Population variance (n denominator).
+    Population variance (``n`` denominator).
 
-    Returns ``0.0`` for an empty list.
+    Returns ``None`` for an empty series, and ``0.0`` for a constant series.
 
     Parameters
     ----------
-    data : list[float]
-        Input data.
+    data : Sequence[float] or numpy.ndarray
+        Finite input observations.
 
     Returns
     -------
-    float
-        Population variance.
-
-    Notes
-    -----
-    An empty series returns ``0.0``.
+    float | None
+        Population variance, or ``None`` when ``data`` is empty.
 
     Raises
     ------
     TypeError
         If ``data`` is not a one-dimensional numeric sequence or contains
         values that cannot be converted to float.
+    ValueError
+        If any observation is non-finite or ``len(data)`` exceeds ``2**53``.
+    RuntimeError
+        If a non-constant population variance overflows or underflows
+        ``float``.
 
     Examples
     --------
     >>> from finstack_quant.core.math import stats
-    >>> round(stats.population_variance([1.0, 2.0, 3.0]), 10)
+    >>> round(stats.population_variance([1.0, 2.0, 3.0]) or 0.0, 10)
     0.6666666667
     """
     ...
 
-def correlation(x: Sequence[float] | npt.NDArray[np.float64], y: Sequence[float] | npt.NDArray[np.float64]) -> float:
+def correlation(
+    x: Sequence[float] | npt.NDArray[np.float64], y: Sequence[float] | npt.NDArray[np.float64]
+) -> float | None:
     """
     Pearson correlation coefficient between two equal-length series.
 
-    Returns ``NaN`` if the input lengths differ.
+    Returns ``None`` when fewer than two observations exist or either series is
+    constant.
 
     Parameters
     ----------
-    x : list[float]
-        First data series.
-    y : list[float]
-        Second data series.
+    x : Sequence[float] or numpy.ndarray
+        First finite data series.
+    y : Sequence[float] or numpy.ndarray
+        Second finite data series, matching ``len(x)``.
 
     Returns
     -------
-    float
-        Correlation in ``[-1, 1]``, or ``NaN`` on error.
-
-    Notes
-    -----
-    Unequal lengths return ``NaN``; fewer than two observations or a
-    constant series return ``0.0``.
+    float | None
+        Correlation in ``[-1, 1]``, or ``None`` for insufficient or constant data.
 
     Raises
     ------
     TypeError
         If either series is not one-dimensional or contains values that
         cannot be converted to float.
+    ValueError
+        If series lengths differ, any observation is non-finite, or
+        ``len(x)`` exceeds ``2**53``.
+    RuntimeError
+        If numerical evaluation leaves ``[-1, 1]`` or becomes non-finite.
 
     Examples
     --------
     >>> from finstack_quant.core.math import stats
-    >>> round(stats.correlation([1.0, 2.0, 3.0], [2.0, 4.0, 6.0]), 10)
+    >>> round(stats.correlation([1.0, 2.0, 3.0], [2.0, 4.0, 6.0]) or 0.0, 10)
     1.0
     """
     ...
 
-def covariance(x: Sequence[float] | npt.NDArray[np.float64], y: Sequence[float] | npt.NDArray[np.float64]) -> float:
+def covariance(
+    x: Sequence[float] | npt.NDArray[np.float64], y: Sequence[float] | npt.NDArray[np.float64]
+) -> float | None:
     """
-    Sample covariance (unbiased, n-1 denominator).
+    Sample covariance (unbiased, ``n - 1`` denominator).
 
-    Returns ``NaN`` if the input lengths differ.
+    Returns ``None`` when fewer than two observations exist.
 
     Parameters
     ----------
-    x : list[float]
-        First data series.
-    y : list[float]
-        Second data series.
+    x : Sequence[float] or numpy.ndarray
+        First finite data series.
+    y : Sequence[float] or numpy.ndarray
+        Second finite data series, matching ``len(x)``.
 
     Returns
     -------
-    float
-        Sample covariance.
-
-    Notes
-    -----
-    Unequal lengths return ``NaN``; fewer than two observations return
-    ``0.0``.
+    float | None
+        Sample covariance, or ``None`` when ``len(x) < 2``.
 
     Raises
     ------
     TypeError
         If either series is not one-dimensional or contains values that
         cannot be converted to float.
+    ValueError
+        If series lengths differ, any observation is non-finite, or
+        ``len(x)`` exceeds ``2**53``.
+    RuntimeError
+        If a nonzero co-moment overflows or underflows ``float``.
 
     Examples
     --------
     >>> from finstack_quant.core.math import stats
-    >>> round(stats.covariance([1.0, 2.0, 3.0], [2.0, 4.0, 6.0]), 10)
+    >>> round(stats.covariance([1.0, 2.0, 3.0], [2.0, 4.0, 6.0]) or 0.0, 10)
     2.0
     """
     ...
 
-def quantile(data: Sequence[float] | npt.NDArray[np.float64], q: float) -> float:
+def quantile(data: Sequence[float] | npt.NDArray[np.float64], q: float) -> float | None:
     """
     Empirical quantile (R-7 / NumPy default) with linear interpolation.
 
-    Returns ``NaN`` for empty data, *q* outside ``[0, 1]``, or
-    non-finite inputs.
+    Returns ``None`` for empty data; caller storage is never reordered.
 
     Parameters
     ----------
-    data : list[float]
-        Input data (will be sorted internally).
+    data : Sequence[float] or numpy.ndarray
+        Finite input observations (sorted on a copy).
     q : float
-        Quantile in ``[0, 1]``.
+        Quantile probability in ``[0, 1]``.
 
     Returns
     -------
-    float
-        Quantile value.
-
-    Notes
-    -----
-    Empty data, ``q`` outside ``[0, 1]``, or non-finite inputs return
-    ``NaN``. Caller storage is never reordered.
+    float | None
+        Quantile value, or ``None`` when ``data`` is empty.
 
     Raises
     ------
@@ -617,6 +575,11 @@ def quantile(data: Sequence[float] | npt.NDArray[np.float64], q: float) -> float
         If ``data`` is not a one-dimensional numeric sequence or contains
         values that cannot be converted to float, or ``q`` cannot be
         converted to float.
+    ValueError
+        If ``q`` is non-finite or outside ``[0, 1]``, any observation in
+        ``data`` is non-finite, or ``len(data)`` exceeds ``2**53``.
+    RuntimeError
+        If a nonzero interpolated quantile underflows ``float``.
 
     Examples
     --------

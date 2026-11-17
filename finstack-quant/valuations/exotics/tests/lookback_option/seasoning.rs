@@ -44,6 +44,8 @@ fn create_test_market(as_of: Date) -> MarketContext {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (10.0, (-0.05 * 10.0_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
@@ -52,19 +54,25 @@ fn create_test_market(as_of: Date) -> MarketContext {
     // Spot price: 100.0
     market = market.insert_price(
         "SPX-SPOT",
-        finstack_quant_core::market_data::scalars::MarketScalar::Price(
+        finstack_quant_core::market_data::scalars::MarketScalar::price(
             Money::new(100.0, Currency::USD).expect("valid money fixture"),
         ),
     );
 
     // Vol surface: flat 20%
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     let surface = VolSurface::from_grid(
         "SPX-VOL",
-        &[0.0, 10.0],
+        &[0.01, 10.0],
         &[1.0, 10000.0],
         &[0.20, 0.20, 0.20, 0.20],
-        Default::default(),
+        VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
+            interpolation_mode: VolInterpolationMode::Vol,
+        },
         None,
     )
     .unwrap();
@@ -73,7 +81,8 @@ fn create_test_market(as_of: Date) -> MarketContext {
     // Div yield: flat 0%
     market = market.insert_price(
         "SPX-DIV",
-        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(0.0),
+        finstack_quant_core::market_data::scalars::MarketScalar::unitless(0.0)
+            .expect("valid scalar"),
     );
 
     market
@@ -223,7 +232,7 @@ fn test_expired_fixed_strike_call_returns_realized_payoff() {
     let as_of = Date::from_calendar_date(2024, Month::January, 1).unwrap();
     let market = create_test_market(as_of).insert_price(
         "SPX-SPOT",
-        finstack_quant_core::market_data::scalars::MarketScalar::Price(
+        finstack_quant_core::market_data::scalars::MarketScalar::price(
             Money::new(120.0, Currency::USD).expect("valid money fixture"),
         ),
     );

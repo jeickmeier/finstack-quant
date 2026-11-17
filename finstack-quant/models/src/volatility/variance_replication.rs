@@ -194,7 +194,7 @@ pub fn carr_madan_forward_variance(
         }
 
         let qk = otm_option_price(k, k0_idx, i, vol, &bs_price_fn);
-        integral.add((dk / (k * k)) * qk);
+        integral.add((dk / (k * k)) * qk).ok()?;
     }
 
     // --- Wing-truncation tail correction --------------------------------------
@@ -229,8 +229,8 @@ pub fn carr_madan_forward_variance(
         OptionType::Call,
         &bs_price_fn,
     )?;
-    integral.add(lower_tail);
-    integral.add(upper_tail);
+    integral.add(lower_tail).ok()?;
+    integral.add(upper_tail).ok()?;
 
     // Diagnostic: even with the synthetic wings, a grid that barely straddles
     // the forward cannot reproduce the full tail. Warn so a too-narrow surface
@@ -256,7 +256,7 @@ pub fn carr_madan_forward_variance(
     let anchor = demeterfi_anchor(forward, k0, time_to_expiry);
 
     let variance = (2.0 * (risk_free_rate * time_to_expiry).exp() / time_to_expiry)
-        * integral.total()
+        * integral.get_total().ok()?
         - anchor;
 
     if variance.is_finite() && variance > 0.0 {
@@ -358,9 +358,9 @@ fn wing_tail_integral(
         let integrand = bs_price_fn(k, vol, option_type) / (k * k);
         // Trapezoidal weights: endpoints get half weight.
         let weight = if j == 0 || j == n { 0.5 } else { 1.0 };
-        acc.add(weight * step * integrand);
+        acc.add(weight * step * integrand).ok()?;
     }
-    Some(acc.total())
+    acc.get_total().ok()
 }
 
 /// `a - b`, but `None` if the result is non-finite.

@@ -231,13 +231,7 @@ fn bump_discount_curve_from_rate_calibration_with_projection(
         },
     };
 
-    let cfg = CalibrationConfig {
-        discount_curve: crate::DiscountCurveSolveConfig {
-            allow_non_monotonic_final: Some(curve.allows_non_monotonic()),
-            ..crate::DiscountCurveSolveConfig::default()
-        },
-        ..CalibrationConfig::default()
-    };
+    let cfg = CalibrationConfig::default();
     let bumped = bump_discount_curve(&quotes, &params, context, bump, &cfg)?;
     // The replay used a temporary self-projection role for linked OIS curves.
     // Preserve the stored role and conventions, but advance its market quotes
@@ -248,8 +242,8 @@ fn bump_discount_curve_from_rate_calibration_with_projection(
         curve
             .knots()
             .iter()
-            .map(|&time| (time, bumped.df(time)))
-            .collect::<Vec<_>>()
+            .map(|&time| Ok((time, bumped.df(time)?)))
+            .collect::<finstack_quant_core::Result<Vec<_>>>()?
     } else {
         let unbumped =
             bump_discount_curve(&quotes, &params, context, &QuoteBump::ParallelBp(0.0), &cfg)?;
@@ -259,15 +253,15 @@ fn bump_discount_curve_from_rate_calibration_with_projection(
             .iter()
             .zip(curve.dfs())
             .map(|(&t, &df)| {
-                let base_df = unbumped.df(t);
+                let base_df = unbumped.df(t)?;
                 let ratio = if base_df > 0.0 {
-                    bumped.df(t) / base_df
+                    bumped.df(t)? / base_df
                 } else {
                     1.0
                 };
-                (t, df * ratio)
+                Ok((t, df * ratio))
             })
-            .collect()
+            .collect::<finstack_quant_core::Result<Vec<_>>>()?
     };
 
     curve
@@ -319,7 +313,7 @@ fn discount_replay_conventions(
 ///
 /// Like [`bump_discount_curve_from_rate_calibration`], the recalibration is
 /// applied as a delta overlay on the stored curve: the bumped and unbumped
-/// global solves are both run and only their forward-rate difference is added
+/// global solves are both run and only their projection-factor ratio is applied
 /// to the stored knots, so transcribed curves keep their base shape. The returned
 /// recipe contains the shocked quotes for subsequent replay.
 ///
@@ -348,10 +342,11 @@ pub(crate) fn bump_forward_curve_from_rate_calibration(
         curve_id: curve.id().clone(),
         currency: calibration.currency,
         base_date: curve.base_date(),
-        tenor_years: curve.tenor(),
+        index_tenor: curve.index_tenor(),
         discount_curve_id,
         method,
         interpolation: curve.interp_style(),
+        extrapolation: curve.extrapolation(),
         conventions: RatesStepConventions {
             ois_compounding,
             curve_day_count: Some(curve_day_count),
@@ -367,25 +362,20 @@ pub(crate) fn bump_forward_curve_from_rate_calibration(
     let overlaid: Vec<(f64, f64)> = curve
         .knots()
         .iter()
-        .zip(curve.forwards())
-        .map(|(&t, &fwd)| (t, fwd + bumped.rate(t) - unbumped.rate(t)))
-        .collect();
+        .zip(curve.factors())
+        .map(|(&t, &factor)| {
+            let date = date_from_forward_time(curve, t)?;
+            Ok((
+                t,
+                factor * (bumped.df_on_date(date)? / unbumped.df_on_date(date)?),
+            ))
+        })
+        .collect::<finstack_quant_core::Result<_>>()?;
 
-    ForwardCurve::builder(curve.id().clone(), curve.tenor())
-        .base_date(curve.base_date())
-        .reset_lag(curve.reset_lag())
-        .day_count(curve.day_count())
-        .knots(overlaid)
-        .projection_grid_opt(
-            curve
-                .projection_grid()
-                .map(<[f64]>::to_vec)
-                .or_else(|| unbumped.projection_grid().map(<[f64]>::to_vec)),
-        )
-        .interp(curve.interp_style())
-        .extrapolation(curve.extrapolation())
+    curve
+        .rebuild_with_knots(overlaid)?
+        .to_builder_with_id(curve.id().clone())
         .rate_calibration(bumped_recipe)
-        .fx_policy_opt(curve.fx_policy().map(ToOwned::to_owned))
         .build()
 }
 
@@ -564,7 +554,7 @@ fn date_from_forward_time(curve: &ForwardCurve, time: f64) -> finstack_quant_cor
     }
 
     let day_count = curve.day_count();
-    let context = DayCountContext::default();
+    let context = curve.day_count_context();
     let mut low_days = 0_i64;
     let mut high_days = (time * 500.0).ceil() as i64 + 366;
     while low_days < high_days {
@@ -606,36 +596,6 @@ fn date_from_forward_time(curve: &ForwardCurve, time: f64) -> finstack_quant_cor
     })
 }
 
-fn discount_implied_simple_forward(
-    source: &ForwardCurve,
-    discount: &DiscountCurve,
-    start: f64,
-    end: f64,
-) -> finstack_quant_core::Result<f64> {
-    if !(start.is_finite() && end.is_finite()) || end <= start {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "cannot derive linked OIS projection over invalid interval [{start}, {end}]"
-        )));
-    }
-    let start_date = date_from_forward_time(source, start)?;
-    let end_date = date_from_forward_time(source, end)?;
-    let start_df = discount.df_on_date(start_date)?;
-    let end_df = discount.df_on_date(end_date)?;
-    if !(start_df.is_finite() && start_df > 0.0 && end_df.is_finite() && end_df > 0.0) {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "cannot derive linked OIS projection over {start_date}..{end_date}: \
-             invalid discount factors {start_df}/{end_df}"
-        )));
-    }
-    let rate = (start_df / end_df - 1.0) / (end - start);
-    if !rate.is_finite() {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "cannot derive finite linked OIS projection over [{start}, {end}]"
-        )));
-    }
-    Ok(rate)
-}
-
 fn rebuild_linked_ois_projection(
     source: &ForwardCurve,
     discount: &DiscountCurve,
@@ -648,56 +608,22 @@ fn rebuild_linked_ois_projection(
         )));
     }
 
-    let knots = if let Some(grid) = source.projection_grid() {
-        let mut knots = Vec::with_capacity(grid.len());
-        for period in grid.windows(2) {
-            knots.push((
-                period[0],
-                discount_implied_simple_forward(source, discount, period[0], period[1])?,
-            ));
-        }
-        let terminal = *grid.last().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "linked single-curve OIS projection {} has an empty pricing grid",
-                source.id()
-            ))
-        })?;
-        knots.push((
-            terminal,
-            discount_implied_simple_forward(source, discount, terminal, terminal + source.tenor())?,
-        ));
-        knots
-    } else {
-        source
-            .knots()
-            .iter()
-            .map(|&start| {
-                Ok((
-                    start,
-                    discount_implied_simple_forward(
-                        source,
-                        discount,
-                        start,
-                        start + source.tenor(),
-                    )?,
-                ))
-            })
-            .collect::<finstack_quant_core::Result<Vec<_>>>()?
-    };
+    let knots = source
+        .knots()
+        .iter()
+        .map(|&time| {
+            let date = date_from_forward_time(source, time)?;
+            Ok((time, discount.df_on_date(date)?))
+        })
+        .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
     let mut recipe = required_forward_rate_calibration(source)?.clone();
     recipe.quotes = required_discount_rate_calibration(discount)?.quotes.clone();
 
-    ForwardCurve::builder(source.id().clone(), source.tenor())
-        .base_date(source.base_date())
-        .reset_lag(source.reset_lag())
-        .day_count(source.day_count())
-        .knots(knots)
-        .projection_grid_opt(source.projection_grid().map(<[f64]>::to_vec))
-        .interp(source.interp_style())
-        .extrapolation(source.extrapolation())
+    source
+        .rebuild_with_knots(knots)?
+        .to_builder_with_id(source.id().clone())
         .rate_calibration(recipe)
-        .fx_policy_opt(source.fx_policy().map(ToOwned::to_owned))
         .build()
 }
 
@@ -874,6 +800,8 @@ fn fixing_seed(
             (base_date, rate),
         ],
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
 }
 
@@ -1014,28 +942,17 @@ mod tests {
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (0.5, 0.979), (1.0, 0.960), (2.0, 0.925)])
             .interp(InterpStyle::LogLinear)
-            .extrapolation(ExtrapolationPolicy::FlatForward)
+            .extrapolation(ExtrapolationPolicy::Extend)
             .rate_calibration(discount_recipe)
             .fx_policy("single_curve_ois::USD")
             .build()
             .expect("discount representation");
 
         let projection_grid = vec![0.0, 0.5, 1.0, 1.5, 2.0];
-        let mut forward_knots: Vec<(f64, f64)> = projection_grid
-            .windows(2)
-            .map(|period| {
-                let (start, end) = (period[0], period[1]);
-                (
-                    start,
-                    (discount.df(start) / discount.df(end) - 1.0) / (end - start),
-                )
-            })
-            .collect();
-        let terminal = *projection_grid.last().expect("terminal projection time");
-        forward_knots.push((
-            terminal,
-            (discount.df(terminal) / discount.df(terminal + 0.5) - 1.0) / 0.5,
-        ));
+        let forward_knots = projection_grid.iter().map(|&time: &f64| {
+            let date = base_date + Duration::days((time * 360.0).round() as i64);
+            (time, discount.df_on_date(date).expect("projection factor"))
+        });
 
         let forward_recipe = RateCalibrationRecipe {
             currency: Currency::USD,
@@ -1049,14 +966,13 @@ mod tests {
             },
             quotes,
         };
-        let forward = ForwardCurve::builder(forward_curve_id.clone(), 0.5)
+        let forward = ForwardCurve::builder(forward_curve_id.clone())
             .base_date(base_date)
-            .reset_lag(1)
+            .index_tenor(finstack_quant_core::dates::Tenor::semi_annual())
             .day_count(DayCount::Act360)
             .knots(forward_knots)
-            .projection_grid(projection_grid.clone())
             .interp(InterpStyle::CubicHermite)
-            .extrapolation(ExtrapolationPolicy::FlatForward)
+            .extrapolation(ExtrapolationPolicy::Extend)
             .rate_calibration(forward_recipe)
             .fx_policy("single_curve_ois::USD")
             .build()
@@ -1110,7 +1026,7 @@ mod tests {
                 - 1.0)
                 / (end - start);
             let projected = shocked_forward
-                .rate_between(start, end)
+                .rate_between(start, end, end - start)
                 .expect("projection-grid forward");
             assert!(
                 (projected - discount_implied).abs() < 1e-12,
@@ -1119,16 +1035,15 @@ mod tests {
             );
         }
         assert!(
-            (shocked_discount.df(1.0) - source_discount.df(1.0)).abs() > 1e-8,
+            (shocked_discount.df(1.0).expect("valid") - source_discount.df(1.0).expect("valid"))
+                .abs()
+                > 1e-8,
             "non-zero shared quote shock must move the linked discount curve"
         );
 
         assert_eq!(shocked_forward.id(), source_forward.id());
-        assert_eq!(
-            shocked_forward.projection_grid(),
-            source_forward.projection_grid()
-        );
-        assert_eq!(shocked_forward.reset_lag(), source_forward.reset_lag());
+        assert_eq!(shocked_forward.knots(), source_forward.knots());
+        assert_eq!(shocked_forward.index_tenor(), source_forward.index_tenor());
         assert_eq!(shocked_forward.day_count(), source_forward.day_count());
         assert_eq!(
             shocked_forward.interp_style(),
@@ -1194,7 +1109,7 @@ mod tests {
                 - 1.0)
                 / (end - start);
             let projected = shocked_forward
-                .rate_between(start, end)
+                .rate_between(start, end, end - start)
                 .expect("projection-grid forward");
             assert!(
                 (projected - date_implied).abs() < 1e-12,
@@ -1274,10 +1189,14 @@ mod tests {
 
         let (market, discount_id, forward_id, _) =
             linked_single_curve_ois_market(CurveId::new("USD-OIS"));
-        let first_market = market
-            .clone()
-            .insert_price("EQUITY", MarketScalar::Unitless(100.0));
-        let second_market = market.insert_price("EQUITY", MarketScalar::Unitless(200.0));
+        let first_market = market.clone().insert_price(
+            "EQUITY",
+            MarketScalar::unitless(100.0).expect("valid scalar"),
+        );
+        let second_market = market.insert_price(
+            "EQUITY",
+            MarketScalar::unitless(200.0).expect("valid scalar"),
+        );
         let cache = RateRecalibrationCache::default();
         let bump = QuoteBump::ParallelBp(1.0);
         let first = bump_market_via_rate_quote_shock_cached(
@@ -1296,14 +1215,16 @@ mod tests {
             &bump,
         )
         .expect("second market replay");
-        assert!(matches!(
-            first.get_price("EQUITY"),
-            Ok(MarketScalar::Unitless(100.0))
-        ));
-        assert!(matches!(
-            second.get_price("EQUITY"),
-            Ok(MarketScalar::Unitless(200.0))
-        ));
+        assert!(
+            first
+                .get_price("EQUITY")
+                .is_ok_and(|s| s.get_unitless() == Some(100.0))
+        );
+        assert!(
+            second
+                .get_price("EQUITY")
+                .is_ok_and(|s| s.get_unitless() == Some(200.0))
+        );
         assert!(!Arc::ptr_eq(&first, &second));
     }
 
@@ -1335,9 +1256,21 @@ mod tests {
                 .expect("second market replay");
         let expected = bump_single_ois_market_via_rate_quote_shock(&second_market, &id, &bump)
             .expect("independent second market replay");
-        let first_df = first.get_discount(&id).expect("first curve").df(1.0);
-        let second_df = second.get_discount(&id).expect("second curve").df(1.0);
-        let expected_df = expected.get_discount(&id).expect("expected curve").df(1.0);
+        let first_df = first
+            .get_discount(&id)
+            .expect("first curve")
+            .df(1.0)
+            .expect("df");
+        let second_df = second
+            .get_discount(&id)
+            .expect("second curve")
+            .df(1.0)
+            .expect("df");
+        let expected_df = expected
+            .get_discount(&id)
+            .expect("expected curve")
+            .df(1.0)
+            .expect("df");
         assert!((second_df - expected_df).abs() < 1e-12);
         assert!((second_df - first_df).abs() > 1e-3);
     }
@@ -1374,7 +1307,7 @@ mod tests {
             &bump,
         )
         .expect("different source curve replay");
-        assert!((first.df(1.0) - different.df(1.0)).abs() > 1e-3);
+        assert!((first.df(1.0).expect("valid") - different.df(1.0).expect("valid")).abs() > 1e-3);
 
         let mut different_recipe = recipe.clone();
         for quote in &mut different_recipe.quotes {
@@ -1400,7 +1333,9 @@ mod tests {
         )
         .expect("uncached explicit recipe replay");
         assert!(!Arc::ptr_eq(&first, &replayed));
-        assert!((replayed.df(1.0) - expected.df(1.0)).abs() < 1e-12);
+        assert!(
+            (replayed.df(1.0).expect("valid") - expected.df(1.0).expect("valid")).abs() < 1e-12
+        );
     }
 
     #[test]
@@ -1418,6 +1353,8 @@ mod tests {
                 (base_date - Duration::days(1), 0.067),
             ],
             None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .expect("observed fixing history");
         let with_history = market.clone().insert_series(observed.clone());
@@ -1455,6 +1392,8 @@ mod tests {
                 (single_base - Duration::days(1), 0.067),
             ],
             None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .expect("single-OIS history");
         let single_market = single_market.insert_series(single_history.clone());
@@ -1705,12 +1644,14 @@ mod tests {
         let shocked_discount = shocked
             .get_discount(discount_curve_id.as_str())
             .expect("independently replayed discount curve");
-        let grid = shocked_forward
-            .projection_grid()
-            .expect("term-index projection grid");
+        let grid = shocked_forward.knots();
         let first_period = &grid[0..2];
         let projected = shocked_forward
-            .rate_between(first_period[0], first_period[1])
+            .rate_between(
+                first_period[0],
+                first_period[1],
+                first_period[1] - first_period[0],
+            )
             .expect("term-index forward");
         let start_date =
             shocked_forward.base_date() + Duration::days((first_period[0] * 360.0).round() as i64);
@@ -1793,6 +1734,8 @@ mod tests {
             .base_date(base_date)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (5.0, 0.80)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let index_id = IndexId::new("USD-SOFR-3M");
@@ -1820,14 +1763,18 @@ mod tests {
             ],
         };
         let cap_projection_grid = vec![0.0, 91.0 / 360.0, 182.0 / 360.0, 273.0 / 360.0];
-        let source = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+        let source = ForwardCurve::builder("USD-SOFR-3M")
             .base_date(base_date)
-            .reset_lag(2)
+            .index_tenor(finstack_quant_core::dates::Tenor::quarterly())
             .day_count(DayCount::Act360)
-            .knots([(0.0, 0.0400), (0.25, 0.0410), (0.50, 0.0420)])
-            .projection_grid(cap_projection_grid.clone())
+            .knots(
+                cap_projection_grid
+                    .iter()
+                    .copied()
+                    .zip([1.0, 0.990, 0.980, 0.970]),
+            )
             .interp(InterpStyle::CubicHermite)
-            .extrapolation(ExtrapolationPolicy::FlatForward)
+            .extrapolation(ExtrapolationPolicy::Extend)
             .rate_calibration(calibration.clone())
             .fx_policy("xccy_basis::USD/EUR")
             .build()
@@ -1844,8 +1791,8 @@ mod tests {
         .expect("parallel quote shock");
 
         assert_eq!(
-            shocked.projection_grid(),
-            Some(cap_projection_grid.as_slice()),
+            shocked.knots(),
+            cap_projection_grid.as_slice(),
             "quote-shock overlay must retain the source pricing grid"
         );
         let zero_shocked = bump_forward_curve_from_rate_calibration(
@@ -1858,10 +1805,10 @@ mod tests {
         .expect("zero quote shock");
         for period in cap_projection_grid.windows(2) {
             let source_forward = source
-                .rate_between(period[0], period[1])
+                .rate_between(period[0], period[1], period[1] - period[0])
                 .expect("source contractual forward");
             let shocked_forward = zero_shocked
-                .rate_between(period[0], period[1])
+                .rate_between(period[0], period[1], period[1] - period[0])
                 .expect("shocked contractual forward");
             assert!(
                 (shocked_forward - source_forward).abs() < 1e-12,
@@ -1871,7 +1818,7 @@ mod tests {
                 period[1]
             );
         }
-        assert_eq!(shocked.reset_lag(), source.reset_lag());
+        assert_eq!(shocked.index_tenor(), source.index_tenor());
         assert_eq!(shocked.day_count(), source.day_count());
         assert_eq!(shocked.interp_style(), source.interp_style());
         assert_eq!(shocked.extrapolation(), source.extrapolation());
@@ -1922,7 +1869,7 @@ mod tests {
             base_date,
             method: CalibrationMethod::Bootstrap,
             interpolation: InterpStyle::Linear,
-            extrapolation: ExtrapolationPolicy::FlatForward,
+            extrapolation: ExtrapolationPolicy::Extend,
             pricing_discount_id: None,
             pricing_forward_id: None,
             conventions: RatesStepConventions {
@@ -1973,7 +1920,7 @@ mod tests {
         .expect("zero quote shock");
         for (&time, &source_df) in source.knots().iter().zip(source.dfs()) {
             assert!(
-                (zero.df(time) - source_df).abs() < 1e-12,
+                (zero.df(time).expect("valid") - source_df).abs() < 1e-12,
                 "zero shock changed DF at {time}"
             );
         }
@@ -1996,10 +1943,11 @@ mod tests {
             .expect("explicit-recipe quote shock");
             for &time in source.knots() {
                 assert!(
-                    (replayed.df(time) - direct.df(time)).abs() < 1e-12,
+                    (replayed.df(time).expect("valid") - direct.df(time).expect("valid")).abs()
+                        < 1e-12,
                     "{bump_bp:+}bp replay mismatch at {time}: replayed={}, direct={}",
-                    replayed.df(time),
-                    direct.df(time)
+                    replayed.df(time).expect("valid"),
+                    direct.df(time).expect("valid")
                 );
             }
         }
@@ -2089,12 +2037,8 @@ mod tests {
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, 1.01), (2.0, 0.99)])
             .rate_calibration(calibration.clone())
-            .validation(
-                finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                    allow_non_monotonic: true,
-                    forward_floor: Some(-0.02),
-                },
-            )
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("negative-rate source curve");
 
@@ -2104,11 +2048,12 @@ mod tests {
             &MarketContext::new(),
             &QuoteBump::ParallelBp(0.0),
         )
-        .expect("zero quote overlay must preserve permissive source policy");
-        let serialized = serde_json::to_value(overlaid).expect("serialize overlaid curve");
-
-        assert_eq!(serialized["allow_non_monotonic"], true);
-        assert_eq!(serialized["min_forward_rate"], -0.02);
+        .expect("zero quote overlay must preserve non-monotone source curve");
+        assert_eq!(overlaid.day_count(), source.day_count());
+        assert_eq!(overlaid.interp_style(), source.interp_style());
+        assert_eq!(overlaid.extrapolation(), source.extrapolation());
+        assert!((overlaid.df(1.0).expect("df(1)") - 1.01).abs() < 1e-12);
+        assert!((overlaid.df(2.0).expect("df(2)") - 0.99).abs() < 1e-12);
     }
 
     #[test]

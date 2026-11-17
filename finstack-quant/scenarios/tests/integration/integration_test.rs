@@ -4,7 +4,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
@@ -21,6 +23,9 @@ fn test_curve_parallel_shock() {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(base_date)
             .knots(vec![(0.0, 1.0), (1.0, 0.98), (5.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
         let mut market = MarketContext::new().insert(curve);
@@ -44,7 +49,6 @@ fn test_curve_parallel_shock() {
             }],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         };
 
         let engine = ScenarioEngine::new();
@@ -63,14 +67,14 @@ fn test_curve_parallel_shock() {
         // A parallel bump shifts continuously-compounded zeros by exactly the
         // requested size: DF_bumped(t) = DF(t) * exp(-bp/10_000 * t).
         let bumped_curve = market.get_discount("USD-OIS").unwrap();
-        let df_1y = bumped_curve.df(1.0);
+        let df_1y = bumped_curve.df(1.0).unwrap();
         let expected_df_1y = 0.98 * (-bp / 10_000.0).exp();
         assert!(
             (df_1y - expected_df_1y).abs() < 1e-12,
             "{case_id} shock: expected DF(1Y) ~= {expected_df_1y:.6}, got {df_1y:.6}"
         );
 
-        let df_5y = bumped_curve.df(5.0);
+        let df_5y = bumped_curve.df(5.0).unwrap();
         if bp > 0.0 {
             assert!(df_5y < 0.90, "positive shock should decrease DF(5Y)");
         } else {
@@ -84,7 +88,7 @@ fn test_equity_price_shock() {
     // Setup market with equity price
     let mut market = MarketContext::new().insert_price(
         "SPY",
-        MarketScalar::Price(Money::new(450.0, Currency::USD).expect("valid money fixture")),
+        MarketScalar::price(Money::new(450.0, Currency::USD).expect("valid money fixture")),
     );
 
     // Setup empty model
@@ -108,7 +112,6 @@ fn test_equity_price_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     // Apply scenario
@@ -128,13 +131,9 @@ fn test_equity_price_shock() {
 
     // Verify shocked price
     let shocked = market.get_price("SPY").unwrap();
-    match shocked {
-        MarketScalar::Price(money) => {
-            let expected = 450.0 * 0.9; // -10%
-            assert!((money.amount() - expected).abs() < 1e-6);
-        }
-        MarketScalar::Unitless(_) => panic!("Expected Price scalar"),
-    }
+    let money = shocked.get_price().expect("Expected Price scalar");
+    let expected = 450.0 * 0.9; // -10%
+    assert!((money.amount() - expected).abs() < 1e-6);
 }
 
 #[test]
@@ -152,7 +151,6 @@ fn test_scenario_composition() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let s2 = ScenarioSpec {
@@ -167,7 +165,6 @@ fn test_scenario_composition() {
         }],
         priority: 1,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     // Compose scenarios
@@ -185,7 +182,10 @@ fn test_vol_surface_parallel_shock() {
     // Create volatility surface
     let surface = VolSurface::builder("SPX")
         .expiries(&[0.25, 0.5, 1.0])
-        .strikes(&[90.0, 100.0, 110.0])
+        .secondary_values(&[90.0, 100.0, 110.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[0.20, 0.18, 0.22])
         .row(&[0.21, 0.19, 0.23])
         .row(&[0.22, 0.20, 0.24])
@@ -212,7 +212,6 @@ fn test_vol_surface_parallel_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -266,7 +265,6 @@ fn test_base_correlation_parallel_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();

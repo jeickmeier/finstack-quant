@@ -34,6 +34,9 @@ fn first_ohlc_bar_contributes_to_realized_and_seasoned_variance() {
     )
     .base_date(as_of)
     .knots([(0.0, 1.0), (1.0, (-0.05_f64).exp())])
+    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
     .build()
     .unwrap();
     let df = curve
@@ -41,8 +44,16 @@ fn first_ohlc_bar_contributes_to_realized_and_seasoned_variance() {
         .unwrap();
     let mut market = MarketContext::new().insert(curve);
     for (id, value) in [("O", 100.0), ("H", 101.0), ("L", 99.0), ("C", 100.0)] {
-        market =
-            market.insert_series(ScalarTimeSeries::new(id, vec![(as_of, value)], None).unwrap());
+        market = market.insert_series(
+            ScalarTimeSeries::new(
+                id,
+                vec![(as_of, value)],
+                None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .unwrap(),
+        );
     }
     let high_log = 1.01_f64.ln();
     let low_log = 0.99_f64.ln();
@@ -122,6 +133,9 @@ fn test_get_historical_prices_errors_when_past_observations_lack_data() {
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder(DISC_ID)
             .base_date(swap.start_date)
             .knots([(0.0, 1.0), (1.0, 0.95)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap(),
     );
@@ -149,6 +163,9 @@ fn test_get_historical_prices_returns_empty_before_swap_starts() {
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder(DISC_ID)
             .base_date(swap.start_date)
             .knots([(0.0, 1.0), (1.0, 0.95)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap(),
     );
@@ -441,9 +458,14 @@ fn add_ohlc_series(
         .collect();
 
     let mk_series = |id: &str, data: Vec<(Date, f64)>| {
-        ScalarTimeSeries::new(id, data, None)
-            .unwrap()
-            .with_interpolation(SeriesInterpolation::Step)
+        ScalarTimeSeries::new(
+            id,
+            data,
+            None,
+            SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .unwrap()
     };
 
     ctx.insert_series(mk_series("SPX-OPEN", open_prices))

@@ -143,16 +143,15 @@ pub fn allocate_recovery(
             .map(|value| value * (1.0 - claim.collateral_haircut))
             .unwrap_or(0.0)
             .min(total_claim);
-        total_collateral_sum.add(collateral_recovery);
-        if !total_collateral_sum.total().is_finite() {
-            return Err(invalid_input(
-                "aggregate collateral recovery must be finite",
-            ));
-        }
+        total_collateral_sum
+            .add(collateral_recovery)
+            .map_err(|_| invalid_input("aggregate collateral recovery must be finite"))?;
         ordered.push((input_index, claim, total_claim, collateral_recovery));
     }
 
-    let mut total_collateral = total_collateral_sum.total();
+    let mut total_collateral = total_collateral_sum
+        .get_total()
+        .map_err(|_| invalid_input("aggregate collateral recovery must be finite"))?;
     let collateral_tolerance = comparison_tolerance(total_collateral, estate_value);
     if total_collateral > estate_value + collateral_tolerance {
         return Err(invalid_input(format!(
@@ -192,14 +191,13 @@ pub fn allocate_recovery(
 
         let mut group_deficiency_sum = NeumaierAccumulator::new();
         for allocation in &allocations[group_start..group_end] {
-            group_deficiency_sum.add(allocation.deficiency);
+            group_deficiency_sum
+                .add(allocation.deficiency)
+                .map_err(|_| invalid_input("aggregate priority-class deficiency must be finite"))?;
         }
-        let group_deficiency = group_deficiency_sum.total();
-        if !group_deficiency.is_finite() {
-            return Err(invalid_input(
-                "aggregate priority-class deficiency must be finite",
-            ));
-        }
+        let group_deficiency = group_deficiency_sum
+            .get_total()
+            .map_err(|_| invalid_input("aggregate priority-class deficiency must be finite"))?;
 
         if group_deficiency <= residual_estate {
             for allocation in &mut allocations[group_start..group_end] {
@@ -232,7 +230,7 @@ pub fn allocate_recovery(
         finalize_allocation(allocation);
     }
 
-    let mut total_distributed = sum_recoveries(&allocations);
+    let mut total_distributed = sum_recoveries(&allocations)?;
     let distribution_tolerance = comparison_tolerance(total_distributed, estate_value);
     if total_distributed > estate_value + distribution_tolerance {
         return Err(invalid_input(format!(
@@ -241,10 +239,10 @@ pub fn allocate_recovery(
     }
     if total_distributed > estate_value {
         reduce_last_recovery(&mut allocations, total_distributed - estate_value);
-        total_distributed = sum_recoveries(&allocations);
+        total_distributed = sum_recoveries(&allocations)?;
     }
     let undistributed_estate = (estate_value - total_distributed).max(0.0);
-    let conserved = neumaier_sum([total_distributed, undistributed_estate]);
+    let conserved = neumaier_sum([total_distributed, undistributed_estate])?;
     if (conserved - estate_value).abs() > comparison_tolerance(conserved, estate_value) {
         return Err(invalid_input(format!(
             "recovery conservation failed: distributed ({total_distributed}) plus undistributed \
@@ -300,7 +298,7 @@ fn finalize_allocation(allocation: &mut RecoveryAllocation) {
     allocation.deficiency = (allocation.total_claim - allocation.total_recovery).max(0.0);
 }
 
-fn sum_recoveries(allocations: &[RecoveryAllocation]) -> f64 {
+fn sum_recoveries(allocations: &[RecoveryAllocation]) -> Result<f64> {
     neumaier_sum(
         allocations
             .iter()

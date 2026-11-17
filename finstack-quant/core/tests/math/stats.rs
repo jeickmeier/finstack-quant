@@ -9,22 +9,22 @@ use finstack_quant_core::math::stats::{correlation, covariance, mean, variance};
 #[test]
 fn mean_and_variance_basic() {
     let xs = [1.0, 2.0, 3.0, 4.0];
-    let m = mean(&xs);
-    let v = variance(&xs);
-    let (m2, v2) = mean_var(&xs);
+    let m = mean(&xs).unwrap().unwrap();
+    let v = variance(&xs).unwrap().unwrap();
+    let (m2, v2) = mean_var(&xs).unwrap();
     assert!((m - 2.5).abs() < 1e-12);
     // Sample variance of [1,2,3,4]: SS=5, n-1=3, var=5/3
     assert!((v - 5.0 / 3.0).abs() < 1e-12);
-    assert!((m - m2).abs() < 1e-12);
-    assert!((v - v2).abs() < 1e-12);
+    assert!((m - m2.unwrap()).abs() < 1e-12);
+    assert!((v - v2.unwrap()).abs() < 1e-12);
 }
 
 #[test]
 fn covariance_and_correlation() {
     let x = [1.0, 2.0, 3.0, 4.0];
     let y = [2.0, 4.0, 6.0, 8.0];
-    let cov = covariance(&x, &y);
-    let corr = correlation(&x, &y);
+    let cov = covariance(&x, &y).unwrap().unwrap();
+    let corr = correlation(&x, &y).unwrap().unwrap();
     // Perfect linear relationship ⇒ correlation 1
     assert!((corr - 1.0).abs() < 1e-12);
     // Covariance should be positive and consistent with scaling

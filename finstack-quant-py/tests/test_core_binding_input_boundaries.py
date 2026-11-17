@@ -97,12 +97,10 @@ def test_rating_equality_and_hashing_use_typed_values() -> None:
         "variance",
         "population_variance",
         "mean_var",
-        "mean_or_nan",
-        "sample_variance_or_nan",
-        "sample_std_or_nan",
-        "median_or_nan",
-        "finite_min_or_nan",
-        "finite_max_or_nan",
+        "std_dev",
+        "median",
+        "finite_min",
+        "finite_max",
         "finite_count",
         "log_returns",
         "realized_variance",
@@ -156,9 +154,14 @@ def test_statistic_rejects_non_vector_or_non_numeric_inputs(data: object) -> Non
 
 def test_statistics_keep_empty_and_non_finite_policies_in_rust() -> None:
     empty = np.array([], dtype=np.float64)
-    assert stats.mean(empty) == 0.0
-    assert stats.variance(empty) == 0.0
+    assert stats.mean(empty) is None
+    assert stats.variance(empty) is None
+    assert stats.std_dev(np.array([1.0], dtype=np.float64)) is None
+    assert stats.median(empty) is None
     assert stats.finite_count(np.array([1.0, np.nan, np.inf])) == 1
-    assert np.isnan(stats.mean_or_nan(empty))
+    assert stats.finite_min(np.array([np.nan])) is None
+    assert stats.finite_max(np.array([np.inf])) is None
+    with pytest.raises(ValueError, match="finite"):
+        stats.mean(np.array([1.0, np.nan]))
     with pytest.raises(ValueError, match="finite"):
         stats.realized_variance(np.array([1.0, np.nan]))

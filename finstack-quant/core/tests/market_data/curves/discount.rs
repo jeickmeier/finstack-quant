@@ -31,71 +31,15 @@ proptest! {
             .base_date(sample_base_date())
             .knots([(0.0, 1.0), (1.0, df(1.0)), (2.0, df(2.0)), (3.0, df(3.0))])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
-        let interpolated = curve.df(t);
+        let interpolated = curve.df(t).unwrap();
         prop_assert!(interpolated.is_finite());
         prop_assert!(interpolated > 0.0);
         prop_assert!(interpolated <= 1.0 + 1e-12);
-    }
-}
-
-#[test]
-fn to_forward_curve_uses_requested_simple_tenor() {
-    let rate = 0.05_f64;
-    let curve = DiscountCurve::builder("FLAT-CC")
-        .base_date(sample_base_date())
-        .knots([
-            (0.0, 1.0),
-            (1.0, (-rate).exp()),
-            (2.0, (-2.0 * rate).exp()),
-            (5.0, (-5.0 * rate).exp()),
-        ])
-        .interp(InterpStyle::LogLinear)
-        .build()
-        .unwrap();
-
-    for tenor in [0.25, 2.0] {
-        let forwards = curve
-            .to_forward_curve(format!("FWD-{tenor}"), tenor, None)
-            .unwrap();
-        let expected = ((rate * tenor).exp() - 1.0) / tenor;
-        for t in [0.0, 1.0, 2.0] {
-            assert!(
-                (forwards.rate(t) - expected).abs() < 1e-12,
-                "tenor={tenor}, t={t}: actual={}, expected={expected}",
-                forwards.rate(t)
-            );
-        }
-    }
-}
-
-#[test]
-fn to_forward_curve_reconstructs_source_discount_factors_on_tenor_grid() {
-    let curve = DiscountCurve::builder("ROUNDTRIP")
-        .base_date(sample_base_date())
-        .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.85)])
-        .interp(InterpStyle::LogLinear)
-        .build()
-        .unwrap();
-    let forwards = curve.to_forward_curve("ROUNDTRIP-FWD", 1.0, None).unwrap();
-
-    for t in [0.0, 1.0, 2.0] {
-        let rebuilt = forwards.df(t).unwrap();
-        assert!(
-            (rebuilt - curve.df(t)).abs() < 1e-12,
-            "t={t}: rebuilt={rebuilt}, source={}",
-            curve.df(t)
-        );
-    }
-}
-
-#[test]
-fn to_forward_curve_rejects_invalid_tenor() {
-    let curve = sample_discount_curve("INVALID-TENOR");
-    for tenor in [0.0, -0.25, f64::NAN, f64::INFINITY] {
-        assert!(curve.to_forward_curve("INVALID", tenor, None).is_err());
     }
 }
 
@@ -105,6 +49,9 @@ fn date_discounting_supports_dates_before_curve_base() {
     let curve = DiscountCurve::builder("SPOT-BASED")
         .base_date(base)
         .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.90)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let before = base - time::Duration::days(30);
@@ -126,6 +73,9 @@ fn builder_rejects_fewer_than_two_points() {
     let err = DiscountCurve::builder("INVALID")
         .base_date(sample_base_date())
         .knots([(0.0, 1.0)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect_err("should fail with fewer than two points");
     assert!(matches!(err, finstack_quant_core::Error::Input(_)));
@@ -136,6 +86,9 @@ fn builder_rejects_non_positive_discount_factor() {
     let err = DiscountCurve::builder("NONPOS")
         .base_date(sample_base_date())
         .knots([(0.0, 1.0), (1.0, 0.0)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect_err("non-positive discount factor should be rejected");
     assert!(matches!(err, finstack_quant_core::Error::Input(_)));
@@ -151,23 +104,63 @@ fn builder_requires_explicit_base_date() {
 }
 
 #[test]
-fn builder_defaults_to_act365f_regardless_of_curve_id() {
-    for id in ["USD-SOFR", "GBP-SONIA", "EUR-ESTR", "TEST"] {
-        let curve = DiscountCurve::builder(id)
-            .base_date(sample_base_date())
+fn builder_requires_explicit_clock_interp_and_extrapolation() {
+    let base = sample_base_date();
+    assert!(
+        DiscountCurve::builder("NO-DC")
+            .base_date(base)
             .knots([(0.0, 1.0), (1.0, 0.95)])
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Extend)
             .build()
-            .expect("valid curve");
+            .is_err()
+    );
+    assert!(
+        DiscountCurve::builder("NO-INTERP")
+            .base_date(base)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (1.0, 0.95)])
+            .extrapolation(ExtrapolationPolicy::Extend)
+            .build()
+            .is_err()
+    );
+    assert!(
+        DiscountCurve::builder("NO-EXTRAP")
+            .base_date(base)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (1.0, 0.95)])
+            .interp(InterpStyle::LogLinear)
+            .build()
+            .is_err()
+    );
 
-        assert_eq!(curve.day_count(), DayCount::Act365F, "{id}");
-        assert_eq!(curve.min_forward_rate(), Some(-0.005), "{id}");
-    }
+    let curve = DiscountCurve::builder("EXPLICIT")
+        .base_date(base)
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 1.0), (1.0, 0.95)])
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
+        .build()
+        .expect("explicit curve builds");
+    assert_eq!(curve.day_count(), DayCount::Act360);
+    assert!(
+        curve
+            .zero_rate_on_date(
+                base - time::Duration::days(1),
+                finstack_quant_core::math::Compounding::Continuous,
+            )
+            .is_err(),
+        "pre-base zero_rate_on_date must error"
+    );
 }
 
 #[test]
 fn monotonic_df_accepted() {
     let result = DiscountCurve::builder("VALID-MONOTONIC")
         .base_date(sample_base_date())
+        .day_count(DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .knots([
             (0.0, 1.0),
             (1.0, 0.98),
@@ -188,106 +181,38 @@ fn monotonic_df_accepted() {
 }
 
 #[test]
-fn allow_non_monotonic_flag_overrides_validation() {
-    let result = DiscountCurve::builder("OVERRIDE-ALLOWED")
+fn non_monotonic_and_negative_rate_dfs_accepted_without_flags() {
+    let non_mono = DiscountCurve::builder("NON-MONOTONIC")
         .base_date(sample_base_date())
-        .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.96)]) // Non-monotonic
-        .interp(InterpStyle::Linear) // Required for non-monotonic DFs
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        )
+        .day_count(DayCount::Act365F)
+        .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.96)])
+        .interp(InterpStyle::Linear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .build();
-
     assert!(
-        result.is_ok(),
-        "Non-monotonic DFs should be allowed when explicitly overridden: {:?}",
-        result.err()
-    );
-}
-
-// No-Arbitrage Validation Tests
-
-#[test]
-fn non_monotonic_df_rejected_by_default() {
-    let result = DiscountCurve::builder("INVALID-NON-MONOTONIC")
-        .base_date(sample_base_date())
-        .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.96)]) // 0.95 -> 0.96 is increasing!
-        .build();
-
-    assert!(
-        result.is_err(),
-        "Non-monotonic discount factors should be rejected by default"
+        non_mono.is_ok(),
+        "Positive non-monotonic DFs should build cleanly: {:?}",
+        non_mono.err()
     );
 
-    let err = result.unwrap_err();
-    let err_str = format!("{:?}", err);
-    assert!(
-        err_str.contains("strictly decreasing")
-            || err_str.contains("non-increasing")
-            || err_str.contains("Invalid"),
-        "Error message should explain monotonicity violation: {}",
-        err_str
-    );
-}
-
-#[test]
-fn market_standard_validation_enables_all_checks() {
-    let result = DiscountCurve::builder("NO-ARB-CHECK")
+    let neg = DiscountCurve::builder("NEG-EUR-CHF")
         .base_date(sample_base_date())
-        .knots([(0.0, 1.0), (1.0, 0.98), (2.0, 0.95), (5.0, 0.85)])
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::MarketStandard,
-        )
+        .day_count(DayCount::Act365F)
+        .knots([(0.0, 1.0), (1.0, 1.005), (5.0, 1.02)])
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .build();
-
+    assert!(neg.is_ok(), "DF > 1 must build cleanly: {:?}", neg.err());
     assert!(
-        result.is_ok(),
-        "Valid curve should pass no-arbitrage checks: {:?}",
-        result.err()
-    );
-}
-
-#[test]
-fn custom_forward_rate_floor() {
-    let curve = DiscountCurve::builder("CUSTOM-FLOOR")
-        .base_date(sample_base_date())
-        .knots([(0.0, 1.0), (1.0, 0.98), (5.0, 0.85)])
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: false,
-                forward_floor: Some(-0.01),
-            },
-        ) // -100bp floor
-        .build();
-
-    assert!(
-        curve.is_ok(),
-        "Curve with reasonable forwards should pass custom floor: {:?}",
-        curve.err()
-    );
-}
-
-#[test]
-fn reasonable_negative_forward_accepted() {
-    let result = DiscountCurve::builder("INVALID-NEGATIVE-FWD")
-        .base_date(sample_base_date())
-        .knots([
-            (0.0, 1.0),
-            (1.0, 0.95),
-            (2.0, 0.949), // Very small decrease
-        ])
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::MarketStandard,
-        )
-        .build();
-
-    assert!(
-        result.is_ok(),
-        "Reasonable negative spread should be accepted: {:?}",
-        result.err()
+        DiscountCurve::builder("ZERO-DF")
+            .base_date(sample_base_date())
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (1.0, 0.0)])
+            .interp(InterpStyle::Linear)
+            .extrapolation(ExtrapolationPolicy::Extend)
+            .build()
+            .is_err(),
+        "non-positive DF must error"
     );
 }
 
@@ -303,30 +228,40 @@ fn interpolation_consistency_at_knot_points() {
             .base_date(base_date)
             .knots(knots)
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap(),
         DiscountCurve::builder("LOG")
             .base_date(base_date)
             .knots(knots)
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap(),
         DiscountCurve::builder("MC")
             .base_date(base_date)
             .knots(knots)
             .interp(InterpStyle::MonotoneConvex)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap(),
         DiscountCurve::builder("CH")
             .base_date(base_date)
             .knots(knots)
             .interp(InterpStyle::CubicHermite)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap(),
         DiscountCurve::builder("PQF")
             .base_date(base_date)
             .knots(knots)
             .interp(InterpStyle::PiecewiseQuadraticForward)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap(),
     ];
@@ -334,7 +269,7 @@ fn interpolation_consistency_at_knot_points() {
     // All methods should agree exactly at knot points
     for (t, expected_df) in knots {
         for curve in &curves {
-            assert!((curve.df(t) - expected_df).abs() < 1e-12);
+            assert!((curve.df(t).unwrap() - expected_df).abs() < 1e-12);
         }
     }
 }
@@ -355,12 +290,14 @@ fn interpolation_styles_produce_valid_results() {
             .base_date(base_date)
             .knots(knots)
             .interp(style)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
         // Interpolation should produce positive values
-        assert!(curve.df(0.5) > 0.0, "{:?} failed at t=0.5", style);
-        assert!(curve.df(1.5) > 0.0, "{:?} failed at t=1.5", style);
+        assert!(curve.df(0.5).unwrap() > 0.0, "{:?} failed at t=0.5", style);
+        assert!(curve.df(1.5).unwrap() > 0.0, "{:?} failed at t=1.5", style);
     }
 }
 
@@ -374,43 +311,44 @@ fn create_test_curve(
         .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.90), (5.0, 0.78)])
         .interp(InterpStyle::MonotoneConvex)
         .extrapolation(extrapolation)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()?)
 }
 
 #[test]
 fn flat_zero_extrapolation() {
-    let curve = create_test_curve(ExtrapolationPolicy::FlatZero).unwrap();
+    let curve = create_test_curve(ExtrapolationPolicy::Flat).unwrap();
 
     // Test left extrapolation (negative time)
-    assert_eq!(curve.df(-0.5), 1.0);
-    assert_eq!(curve.df(-1.0), 1.0);
+    assert_eq!(curve.df(-0.5).unwrap(), 1.0);
+    assert_eq!(curve.df(-1.0).unwrap(), 1.0);
 
     // Test right extrapolation (beyond 5 years)
-    assert_eq!(curve.df(10.0), 0.78);
-    assert_eq!(curve.df(100.0), 0.78);
+    assert_eq!(curve.df(10.0).unwrap(), 0.78);
+    assert_eq!(curve.df(100.0).unwrap(), 0.78);
 
     // Test exact knot values remain unchanged
-    assert_eq!(curve.df(0.0), 1.0);
-    assert_eq!(curve.df(5.0), 0.78);
+    assert_eq!(curve.df(0.0).unwrap(), 1.0);
+    assert_eq!(curve.df(5.0).unwrap(), 0.78);
 }
 
 #[test]
 fn flat_forward_extrapolation() {
-    let curve = create_test_curve(ExtrapolationPolicy::FlatForward).unwrap();
+    let curve = create_test_curve(ExtrapolationPolicy::Extend).unwrap();
 
     // Test left extrapolation - should extend the forward rate
-    let left_extrap = curve.df(-0.5);
+    let left_extrap = curve.df(-0.5).unwrap();
     assert!(left_extrap > 1.0); // Should be higher than 1.0 for negative time with positive rates
 
     // Test right extrapolation - should extend the forward rate from last segment
-    let right_extrap_near = curve.df(7.0);
-    let right_extrap_far = curve.df(10.0);
+    let right_extrap_near = curve.df(7.0).unwrap();
+    let right_extrap_far = curve.df(10.0).unwrap();
     assert!(right_extrap_near < 0.78); // Should decay further
     assert!(right_extrap_far < right_extrap_near); // Should continue decaying
 
     // Test exact knot values remain unchanged
-    assert_eq!(curve.df(0.0), 1.0);
-    assert_eq!(curve.df(5.0), 0.78);
+    assert_eq!(curve.df(0.0).unwrap(), 1.0);
+    assert_eq!(curve.df(5.0).unwrap(), 0.78);
 }
 
 #[test]
@@ -418,12 +356,14 @@ fn flat_forward_extrapolation_continues_slope() {
     let curve = DiscountCurve::builder("EXTRAP")
         .base_date(sample_base_date())
         .knots([(0.0, 1.0), (2.0, 0.95)])
-        .extrapolation(ExtrapolationPolicy::FlatForward)
+        .extrapolation(ExtrapolationPolicy::Extend)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
         .build()
         .unwrap();
 
-    let df2 = curve.df(2.0);
-    let df4 = curve.df(4.0);
+    let df2 = curve.df(2.0).unwrap();
+    let df4 = curve.df(4.0).unwrap();
     assert!(
         df4 < df2,
         "flat-forward extrapolation should decay beyond last knot"
@@ -432,10 +372,10 @@ fn flat_forward_extrapolation_continues_slope() {
 
 #[test]
 fn extrapolation_extreme_values() {
-    let curve = create_test_curve(ExtrapolationPolicy::FlatForward).unwrap();
+    let curve = create_test_curve(ExtrapolationPolicy::Extend).unwrap();
 
     // Very far right extrapolation
-    let df_50y = curve.df(50.0);
+    let df_50y = curve.df(50.0).unwrap();
     assert!(
         df_50y.is_finite() && df_50y > 0.0 && df_50y < 1.0,
         "50Y extrapolation should be finite and in (0,1): {}",
@@ -443,7 +383,7 @@ fn extrapolation_extreme_values() {
     );
 
     // Very far left extrapolation
-    let df_neg_10 = curve.df(-10.0);
+    let df_neg_10 = curve.df(-10.0).unwrap();
     assert!(
         df_neg_10.is_finite(),
         "Left extrapolation should be finite: {}",
@@ -456,10 +396,7 @@ fn interpolation_styles_with_both_extrapolation_policies() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let knots = [(0.0, 1.0), (1.0, 0.95), (2.0, 0.90)];
 
-    for extrapolation in [
-        ExtrapolationPolicy::FlatZero,
-        ExtrapolationPolicy::FlatForward,
-    ] {
+    for extrapolation in [ExtrapolationPolicy::Flat, ExtrapolationPolicy::Extend] {
         for style in [
             InterpStyle::Linear,
             InterpStyle::LogLinear,
@@ -471,16 +408,17 @@ fn interpolation_styles_with_both_extrapolation_policies() {
                 .knots(knots)
                 .interp(style)
                 .extrapolation(extrapolation)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .unwrap();
 
             let extrap_test_time = 5.0;
             match extrapolation {
-                ExtrapolationPolicy::FlatZero => {
-                    assert_eq!(curve.df(extrap_test_time), 0.90);
+                ExtrapolationPolicy::Flat => {
+                    assert_eq!(curve.df(extrap_test_time).unwrap(), 0.90);
                 }
-                ExtrapolationPolicy::FlatForward => {
-                    assert!(curve.df(extrap_test_time) < 0.90);
+                ExtrapolationPolicy::Extend => {
+                    assert!(curve.df(extrap_test_time).unwrap() < 0.90);
                 }
                 _ => {}
             }
@@ -497,6 +435,8 @@ fn monotone_convex_guarantees_positive_forwards() {
         .base_date(base_date)
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.78), (10.0, 0.60)])
         .interp(InterpStyle::MonotoneConvex)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -507,7 +447,7 @@ fn monotone_convex_guarantees_positive_forwards() {
         if t + dt > 10.0 {
             break;
         }
-        let fwd = (curve.df(t).ln() - curve.df(t + dt).ln()) / dt;
+        let fwd = (curve.df(t).unwrap().ln() - curve.df(t + dt).unwrap().ln()) / dt;
         assert!(
             fwd >= -1e-10,
             "Forward rate at t={:.2} is negative: {:.6}",
@@ -524,14 +464,16 @@ fn monotone_convex_forward_continuity_at_knots() {
         .base_date(base_date)
         .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.90), (5.0, 0.78)])
         .interp(InterpStyle::MonotoneConvex)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     // Check continuity at each interior knot
     let eps = 1e-6;
     for knot in [1.0, 2.0] {
-        let fwd_left = (curve.df(knot - eps).ln() - curve.df(knot).ln()) / eps;
-        let fwd_right = (curve.df(knot).ln() - curve.df(knot + eps).ln()) / eps;
+        let fwd_left = (curve.df(knot - eps).unwrap().ln() - curve.df(knot).unwrap().ln()) / eps;
+        let fwd_right = (curve.df(knot).unwrap().ln() - curve.df(knot + eps).unwrap().ln()) / eps;
         assert!(
             (fwd_left - fwd_right).abs() < 1e-4,
             "Forward discontinuity at knot {}: left={}, right={}",
@@ -552,7 +494,7 @@ fn parallel_bump_lowers_discount_factors() {
 
     let times = [0.5, 1.0, 2.0];
     for &t in &times {
-        assert!(bumped.df(t) < curve.df(t));
+        assert!(bumped.df(t).unwrap() < curve.df(t).unwrap());
     }
 }
 
@@ -561,6 +503,9 @@ fn triangular_key_rate_bump_targets_bucket() {
     let curve = DiscountCurve::builder("KR")
         .base_date(sample_base_date())
         .knots([(0.0, 1.0), (1.0, 0.98), (2.0, 0.95)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -570,64 +515,30 @@ fn triangular_key_rate_bump_targets_bucket() {
         .unwrap();
 
     // DF at t=0 is unchanged (weight = 0 at t=0)
-    assert_eq!(bumped.df(0.0), curve.df(0.0));
+    assert_eq!(bumped.df(0.0).unwrap(), curve.df(0.0).unwrap());
     // DF at t=1 has maximum bump (weight = 1.0 at target)
-    assert!(bumped.df(1.0) < curve.df(1.0));
+    assert!(bumped.df(1.0).unwrap() < curve.df(1.0).unwrap());
     // DF at t=2 is unchanged (weight = 0 at t=2)
-    assert_eq!(bumped.df(2.0), curve.df(2.0));
+    assert_eq!(bumped.df(2.0).unwrap(), curve.df(2.0).unwrap());
 }
 
 #[test]
-fn discount_stress_is_independent_of_construction_policy() {
-    use finstack_quant_core::market_data::term_structures::ValidationMode;
-
-    for policy in [
-        ValidationMode::MarketStandard,
-        ValidationMode::NegativeRateFriendly {
-            forward_floor: -0.005,
-        },
-        ValidationMode::NegativeRateFriendly {
-            forward_floor: -0.01,
-        },
-        ValidationMode::Raw {
-            allow_non_monotonic: true,
-            forward_floor: None,
-        },
-        ValidationMode::Raw {
-            allow_non_monotonic: false,
-            forward_floor: None,
-        },
-    ] {
-        let curve = DiscountCurve::builder("OIS")
-            .base_date(sample_base_date())
-            .knots([(0.0, 1.0), (0.5, 0.999), (1.0, 0.998)])
-            .validation(policy)
-            .build()
-            .unwrap();
-        for result in [
-            curve.apply_bump(BumpSpec::parallel_bp(-100.0)),
-            curve.apply_bump(BumpSpec::triangular_key_rate_first_bp(0.5, 1.0, 100.0)),
-        ] {
-            let bumped = result.expect("stress permits negative forwards");
-            assert!(bumped.df(1.0) > bumped.df(0.5));
-        }
-    }
-}
-
-#[test]
-fn discount_bumps_reject_zero_discount_factors_in_raw_mode() {
-    use finstack_quant_core::market_data::term_structures::ValidationMode;
-
-    let curve = DiscountCurve::builder("RAW")
+fn discount_stress_supports_negative_rates_and_rejects_zero_df() {
+    let curve = DiscountCurve::builder("OIS")
         .base_date(sample_base_date())
-        .knots([(0.0, 1.0), (1.0, 0.99)])
-        .interp(InterpStyle::Linear)
-        .validation(ValidationMode::Raw {
-            allow_non_monotonic: true,
-            forward_floor: None,
-        })
+        .day_count(DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
+        .knots([(0.0, 1.0), (0.5, 0.999), (1.0, 0.998)])
         .build()
         .unwrap();
+    for result in [
+        curve.apply_bump(BumpSpec::parallel_bp(-100.0)),
+        curve.apply_bump(BumpSpec::triangular_key_rate_first_bp(0.5, 1.0, 100.0)),
+    ] {
+        let bumped = result.expect("stress permits negative forwards");
+        assert!(bumped.df(1.0).unwrap() > bumped.df(0.5).unwrap());
+    }
     assert!(curve.apply_bump(BumpSpec::parallel_bp(1e8)).is_err());
 }
 
@@ -636,6 +547,9 @@ fn parallel_bump_returns_error_on_invalid_curve() {
     let curve = DiscountCurve::builder("VALID")
         .base_date(sample_base_date())
         .knots([(0.0, 1.0), (1.0, 0.98), (5.0, 0.85)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -661,6 +575,9 @@ fn triangular_key_rate_bump_error_handling() {
     let curve = DiscountCurve::builder("VALID-KR")
         .base_date(sample_base_date())
         .knots([(0.0, 1.0), (1.0, 0.98), (2.0, 0.95), (5.0, 0.85)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -699,12 +616,12 @@ fn parallel_bump_magnitude_verification() {
     // Verify bump formula at KNOT POINTS only
     // DF_bumped(t) = DF(t) * exp(-bp/10000 * t)
     for t in [0.0_f64, 1.0, 2.0] {
-        let expected = curve.df(t) * (-bp / 10_000.0 * t).exp();
+        let expected = curve.df(t).unwrap() * (-bp / 10_000.0 * t).exp();
         assert!(
-            (bumped.df(t) - expected).abs() < 1e-12,
+            (bumped.df(t).unwrap() - expected).abs() < 1e-12,
             "Bump at knot t={}: got {}, expected {}",
             t,
-            bumped.df(t),
+            bumped.df(t).unwrap(),
             expected
         );
     }
@@ -712,7 +629,7 @@ fn parallel_bump_magnitude_verification() {
     // Also verify the bump reduces DFs (higher rates)
     for t in [0.5, 1.5, 3.0] {
         assert!(
-            bumped.df(t) < curve.df(t),
+            bumped.df(t).unwrap() < curve.df(t).unwrap(),
             "Bump should reduce DF at t={}",
             t
         );
@@ -731,6 +648,8 @@ fn triangular_key_rate_bump_weight_verification() {
             (2.0, 0.95),
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -740,30 +659,30 @@ fn triangular_key_rate_bump_weight_verification() {
         .unwrap();
 
     // At target (t=1.0): weight=1.0
-    let expected_1 = curve.df(1.0) * ((-bp / 10_000.0) * 1.0_f64).exp();
+    let expected_1 = curve.df(1.0).unwrap() * ((-bp / 10_000.0) * 1.0_f64).exp();
     assert!(
-        (bumped.df(1.0) - expected_1).abs() < 1e-10,
+        (bumped.df(1.0).unwrap() - expected_1).abs() < 1e-10,
         "Bump at t=1.0: got {}, expected {}",
-        bumped.df(1.0),
+        bumped.df(1.0).unwrap(),
         expected_1
     );
 
     // At t=0.5: weight=0.5 (linear interpolation from 0 to 1)
-    let expected_05 = curve.df(0.5) * ((-bp / 10_000.0) * 0.5 * 0.5_f64).exp();
+    let expected_05 = curve.df(0.5).unwrap() * ((-bp / 10_000.0) * 0.5 * 0.5_f64).exp();
     assert!(
-        (bumped.df(0.5) - expected_05).abs() < 1e-10,
+        (bumped.df(0.5).unwrap() - expected_05).abs() < 1e-10,
         "Bump at t=0.5: got {}, expected {}",
-        bumped.df(0.5),
+        bumped.df(0.5).unwrap(),
         expected_05
     );
 
     // At boundaries: weight=0, no change
     assert!(
-        (bumped.df(0.0) - curve.df(0.0)).abs() < 1e-12,
+        (bumped.df(0.0).unwrap() - curve.df(0.0).unwrap()).abs() < 1e-12,
         "Bump at t=0.0 should be unchanged"
     );
     assert!(
-        (bumped.df(2.0) - curve.df(2.0)).abs() < 1e-12,
+        (bumped.df(2.0).unwrap() - curve.df(2.0).unwrap()).abs() < 1e-12,
         "Bump at t=2.0 should be unchanged"
     );
 }
@@ -776,6 +695,8 @@ fn forward_rate_analytical_verification() {
         .base_date(sample_base_date())
         .knots([(0.0, 1.0), (1.0, 0.98), (2.0, 0.95)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -810,8 +731,12 @@ fn forward_and_df_on_date() {
     let t1 = 0.5;
     let t2 = 1.0;
     let fwd = curve.forward(t1, t2).expect("forward should succeed");
-    let zero_1 = curve.zero_rate(t1, finstack_quant_core::math::Compounding::Continuous);
-    let zero_2 = curve.zero_rate(t2, finstack_quant_core::math::Compounding::Continuous);
+    let zero_1 = curve
+        .zero_rate(t1, finstack_quant_core::math::Compounding::Continuous)
+        .unwrap();
+    let zero_2 = curve
+        .zero_rate(t2, finstack_quant_core::math::Compounding::Continuous)
+        .unwrap();
 
     // Correct formula: f(t1,t2) = (z2*t2 - z1*t1) / (t2 - t1)
     assert!(
@@ -840,6 +765,7 @@ fn df_on_date_uses_stored_day_count() {
         .day_count(DayCount::Act360)
         .knots([(0.0, 1.0), (1.0, 0.95)])
         .interp(InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -848,6 +774,7 @@ fn df_on_date_uses_stored_day_count() {
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, 0.95)])
         .interp(InterpStyle::Linear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -874,20 +801,22 @@ fn negative_rate_environment() {
     // Simulate EUR/CHF negative rates: DF > 1.0 for t > 0
     let curve = DiscountCurve::builder("NEG-RATES")
         .base_date(sample_base_date())
+        .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, 1.005), (2.0, 1.008)])
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        )
         .interp(InterpStyle::Linear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    assert!(curve.df(1.0) > 1.0, "DF should be > 1 for negative rates");
     assert!(
-        curve.zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous) < 0.0,
+        curve.df(1.0).unwrap() > 1.0,
+        "DF should be > 1 for negative rates"
+    );
+    assert!(
+        curve
+            .zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous)
+            .unwrap()
+            < 0.0,
         "Zero rate should be negative"
     );
 }
@@ -907,24 +836,23 @@ fn negative_rate_environment_monotone_convex() {
 
     let curve = DiscountCurve::builder("EUR-NEG-MC")
         .base_date(sample_base_date())
+        .day_count(DayCount::Act365F)
         .knots(knots)
         .interp(InterpStyle::MonotoneConvex)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::NegativeRateFriendly {
-                forward_floor: -0.05,
-            },
-        )
+        .extrapolation(ExtrapolationPolicy::Extend)
         .build()
         .expect("MonotoneConvex negative-rate curve should build");
 
     // DF > 1 at and between knots; zero rate round-trips the flat -1%.
     for t in [0.5, 1.0, 1.7, 2.5, 3.0, 4.2, 5.0] {
-        let df = curve.df(t);
+        let df = curve.df(t).unwrap();
         assert!(
             df > 1.0,
             "DF({t}) = {df} should exceed 1 for negative rates"
         );
-        let zero = curve.zero_rate(t, finstack_quant_core::math::Compounding::Continuous);
+        let zero = curve
+            .zero_rate(t, finstack_quant_core::math::Compounding::Continuous)
+            .unwrap();
         assert!(
             (zero - rate).abs() < 1e-9,
             "zero rate at t={t} should be ~ -1%, got {zero}"
@@ -960,15 +888,16 @@ fn credit_curve_construction() {
         .base_date(base_date)
         .knots(knots)
         .interp(InterpStyle::MonotoneConvex)
-        .extrapolation(ExtrapolationPolicy::FlatForward)
+        .extrapolation(ExtrapolationPolicy::Extend)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
 
     // Test that survival probabilities are indeed decreasing
-    let sp_1y = credit_curve.df(1.0);
-    let sp_5y = credit_curve.df(5.0);
-    let sp_10y = credit_curve.df(10.0);
-    let sp_15y = credit_curve.df(15.0); // Extrapolated
+    let sp_1y = credit_curve.df(1.0).unwrap();
+    let sp_5y = credit_curve.df(5.0).unwrap();
+    let sp_10y = credit_curve.df(10.0).unwrap();
+    let sp_15y = credit_curve.df(15.0).unwrap(); // Extrapolated
 
     assert!(sp_1y > sp_5y);
     assert!(sp_5y > sp_10y);
@@ -984,16 +913,17 @@ fn minimal_two_point_curve() {
         .base_date(base_date)
         .knots([(0.0, 1.0), (1.0, 0.95)])
         .interp(InterpStyle::Linear)
-        .extrapolation(ExtrapolationPolicy::FlatZero)
+        .extrapolation(ExtrapolationPolicy::Flat)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
 
-    assert_eq!(minimal_curve.df(0.0), 1.0);
-    assert_eq!(minimal_curve.df(1.0), 0.95);
+    assert_eq!(minimal_curve.df(0.0).unwrap(), 1.0);
+    assert_eq!(minimal_curve.df(1.0).unwrap(), 0.95);
 
     // Test extrapolation with minimal curve
-    assert_eq!(minimal_curve.df(-0.5), 1.0); // Flat-zero left
-    assert_eq!(minimal_curve.df(2.0), 0.95); // Flat-zero right
+    assert_eq!(minimal_curve.df(-0.5).unwrap(), 1.0); // Flat-zero left
+    assert_eq!(minimal_curve.df(2.0).unwrap(), 0.95); // Flat-zero right
 }
 
 // Forward-rate numerical precision
@@ -1029,6 +959,8 @@ fn forward_matches_canonical_formula_across_tenor_grid() {
             (10.0, 0.62),
         ])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve builds");
 
@@ -1047,8 +979,8 @@ fn forward_matches_canonical_formula_across_tenor_grid() {
 
     for &(t1, t2) in pairs {
         let fwd = curve.forward(t1, t2).expect("finite forward rate");
-        let df1 = curve.df(t1);
-        let df2 = curve.df(t2);
+        let df1 = curve.df(t1).unwrap();
+        let df2 = curve.df(t2).unwrap();
         let canonical = -(df2 / df1).ln() / (t2 - t1);
         assert!(
             (fwd - canonical).abs() < 1e-13,
@@ -1068,6 +1000,8 @@ fn forward_on_flat_continuously_compounded_curve_equals_rate() {
         .base_date(sample_base_date())
         .knots(knots)
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve builds");
 
@@ -1092,9 +1026,10 @@ fn forward_short_tenor_retains_precision() {
     // for this identity.
     let curve = DiscountCurve::builder("USD")
         .base_date(sample_base_date())
+        .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, 0.96), (2.0, 0.92), (5.0, 0.80)])
         .interp(InterpStyle::LogLinear)
-        .min_forward_tenor(1e-10)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .build()
         .expect("curve builds");
 
@@ -1108,9 +1043,11 @@ fn forward_short_tenor_retains_precision() {
         let t2 = t1 + dt;
         let dt_actual = t2 - t1; // may differ from `dt` by a few ulps
         let fwd = curve.forward(t1, t2).expect("finite forward");
-        let canonical = -(curve.df(t2) / curve.df(t1)).ln() / dt_actual;
+        let df1 = curve.df(t1).unwrap();
+        let df2 = curve.df(t2).unwrap();
+        let canonical = ((df1 - df2) / df2).ln_1p() / dt_actual;
         assert!(
-            fwd.is_finite() && (fwd - canonical).abs() < 1e-14,
+            fwd.is_finite() && (fwd - canonical).abs() < 1e-15,
             "forward({t1}, {t2}) at dt={dt}: got {fwd}, want {canonical}"
         );
     }
@@ -1127,7 +1064,8 @@ mod serde_tests {
             .base_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
             .knots([(0.0, 1.0), (1.0, 0.98), (2.0, 0.95), (5.0, 0.88)])
             .interp(InterpStyle::Linear)
-            .extrapolation(ExtrapolationPolicy::FlatForward)
+            .extrapolation(ExtrapolationPolicy::Extend)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .unwrap();
 
@@ -1141,11 +1079,11 @@ mod serde_tests {
 
         for t in [0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 7.0] {
             assert!(
-                (original.df(t) - deserialized.df(t)).abs() < 1e-12,
+                (original.df(t).unwrap() - deserialized.df(t).unwrap()).abs() < 1e-12,
                 "DF mismatch at t={}: {} vs {}",
                 t,
-                original.df(t),
-                deserialized.df(t)
+                original.df(t).unwrap(),
+                deserialized.df(t).unwrap()
             );
         }
     }
@@ -1156,6 +1094,8 @@ mod serde_tests {
             .base_date(Date::from_calendar_date(2025, Month::June, 30).unwrap())
             .knots([(0.0, 1.0), (0.25, 0.995), (0.5, 0.99), (1.0, 0.98)])
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
@@ -1164,11 +1104,11 @@ mod serde_tests {
 
         for t in [0.0, 0.1, 0.25, 0.4, 0.5, 0.75, 1.0, 1.5] {
             assert!(
-                (original.df(t) - deserialized.df(t)).abs() < 1e-12,
+                (original.df(t).unwrap() - deserialized.df(t).unwrap()).abs() < 1e-12,
                 "LogLinear DF mismatch at t={}: {} vs {}",
                 t,
-                original.df(t),
-                deserialized.df(t)
+                original.df(t).unwrap(),
+                deserialized.df(t).unwrap()
             );
         }
     }
@@ -1186,6 +1126,8 @@ mod serde_tests {
                 (10.0, 0.75),
             ])
             .interp(InterpStyle::MonotoneConvex)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
@@ -1194,11 +1136,11 @@ mod serde_tests {
 
         for t in [0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 5.0, 7.5, 10.0] {
             assert!(
-                (original.df(t) - deserialized.df(t)).abs() < 1e-12,
+                (original.df(t).unwrap() - deserialized.df(t).unwrap()).abs() < 1e-12,
                 "MonotoneConvex DF mismatch at t={}: {} vs {}",
                 t,
-                original.df(t),
-                deserialized.df(t)
+                original.df(t).unwrap(),
+                deserialized.df(t).unwrap()
             );
         }
     }
@@ -1209,6 +1151,8 @@ mod serde_tests {
             .base_date(Date::from_calendar_date(2025, Month::September, 1).unwrap())
             .knots([(0.0, 1.0), (1.0, 0.99), (3.0, 0.96), (5.0, 0.92)])
             .interp(InterpStyle::CubicHermite)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
@@ -1217,11 +1161,11 @@ mod serde_tests {
 
         for t in [0.0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0] {
             assert!(
-                (original.df(t) - deserialized.df(t)).abs() < 1e-12,
+                (original.df(t).unwrap() - deserialized.df(t).unwrap()).abs() < 1e-12,
                 "CubicHermite DF mismatch at t={}: {} vs {}",
                 t,
-                original.df(t),
-                deserialized.df(t)
+                original.df(t).unwrap(),
+                deserialized.df(t).unwrap()
             );
         }
     }
@@ -1232,6 +1176,8 @@ mod serde_tests {
             .base_date(Date::from_calendar_date(2025, Month::December, 31).unwrap())
             .knots([(0.0, 1.0), (0.5, 0.995), (1.0, 0.988), (2.0, 0.975)])
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
@@ -1240,11 +1186,11 @@ mod serde_tests {
 
         for t in [0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5] {
             assert!(
-                (original.df(t) - deserialized.df(t)).abs() < 1e-12,
+                (original.df(t).unwrap() - deserialized.df(t).unwrap()).abs() < 1e-12,
                 "LogLinear DF mismatch at t={}: {} vs {}",
                 t,
-                original.df(t),
-                deserialized.df(t)
+                original.df(t).unwrap(),
+                deserialized.df(t).unwrap()
             );
         }
     }
@@ -1256,7 +1202,8 @@ mod serde_tests {
             .base_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
             .knots([(0.0, 1.0), (1.0, 0.98), (2.0, 0.95)])
             .interp(InterpStyle::Linear)
-            .extrapolation(ExtrapolationPolicy::FlatZero)
+            .extrapolation(ExtrapolationPolicy::Flat)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .unwrap();
 
@@ -1265,7 +1212,9 @@ mod serde_tests {
 
         let t_beyond = 10.0;
         assert!(
-            (curve_flat_zero.df(t_beyond) - deserialized_flat_zero.df(t_beyond)).abs() < 1e-12,
+            (curve_flat_zero.df(t_beyond).unwrap() - deserialized_flat_zero.df(t_beyond).unwrap())
+                .abs()
+                < 1e-12,
             "FlatZero extrapolation mismatch"
         );
 
@@ -1274,7 +1223,8 @@ mod serde_tests {
             .base_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
             .knots([(0.0, 1.0), (1.0, 0.98), (2.0, 0.95)])
             .interp(InterpStyle::Linear)
-            .extrapolation(ExtrapolationPolicy::FlatForward)
+            .extrapolation(ExtrapolationPolicy::Extend)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .unwrap();
 
@@ -1282,14 +1232,18 @@ mod serde_tests {
         let deserialized_flat_forward: DiscountCurve = serde_json::from_str(&json).unwrap();
 
         assert!(
-            (curve_flat_forward.df(t_beyond) - deserialized_flat_forward.df(t_beyond)).abs()
+            (curve_flat_forward.df(t_beyond).unwrap()
+                - deserialized_flat_forward.df(t_beyond).unwrap())
+            .abs()
                 < 1e-12,
             "FlatForward extrapolation mismatch"
         );
 
         // Verify the two policies give different results
         assert!(
-            (curve_flat_zero.df(t_beyond) - curve_flat_forward.df(t_beyond)).abs() > 0.01,
+            (curve_flat_zero.df(t_beyond).unwrap() - curve_flat_forward.df(t_beyond).unwrap())
+                .abs()
+                > 0.01,
             "Different extrapolation policies should produce different results"
         );
     }
@@ -1300,6 +1254,8 @@ mod serde_tests {
             .base_date(Date::from_calendar_date(2025, Month::January, 1).unwrap())
             .knots([(0.0, 1.0), (1.0, 0.98), (2.0, 0.95)])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
@@ -1308,11 +1264,11 @@ mod serde_tests {
 
         for t in [0.0, 0.5, 1.0, 1.5, 2.0] {
             assert!(
-                (original.df(t) - deserialized.df(t)).abs() < 1e-12,
+                (original.df(t).unwrap() - deserialized.df(t).unwrap()).abs() < 1e-12,
                 "Pretty JSON DF mismatch at t={}: {} vs {}",
                 t,
-                original.df(t),
-                deserialized.df(t)
+                original.df(t).unwrap(),
+                deserialized.df(t).unwrap()
             );
         }
     }
@@ -1323,16 +1279,15 @@ mod serde_tests {
             "id": "BAD",
             "base": "2025-01-15",
             "day_count": "act_365f",
-            "knot_points": [[0.0, 1.0], [1.0, 1.01]],
+            "knot_points": [[0.0, 1.0], [1.0, 0.0]],
             "interp_style": "linear",
-            "extrapolation": "FlatForward",
-            "allow_non_monotonic": false
+            "extrapolation": "extend"
         }"#;
 
         let result: Result<DiscountCurve, _> = serde_json::from_str(bad_json);
         assert!(
             result.is_err(),
-            "Should reject non-monotonic discount factors"
+            "Should reject non-positive discount factors"
         );
     }
 }
@@ -1342,15 +1297,19 @@ mod roll_forward_realized_forward {
     //! `DF_new(T - dt) = DF_old(T) / DF_old(dt)`, so forwards realize and a
     //! flat curve stays flat under roll.
 
+    use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
     use time::macros::date;
 
-    /// Synthetic IDs (no market hint) default to Act365F, so rolling 365
-    /// days corresponds to exactly dt = 1.0 in the curve's time basis.
+    /// Synthetic IDs require explicit day count, interpolation, and extrapolation.
     fn flat_curve(rate: f64, knots: &[f64]) -> DiscountCurve {
         let points: Vec<(f64, f64)> = knots.iter().map(|&t| (t, (-rate * t).exp())).collect();
         DiscountCurve::builder("TEST-FLAT")
             .base_date(date!(2025 - 01 - 01))
+            .day_count(DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Extend)
             .knots(points)
             .build()
             .unwrap()
@@ -1362,8 +1321,8 @@ mod roll_forward_realized_forward {
         let rate = 0.05;
         let curve = flat_curve(rate, &knots);
 
-        // Roll 365 days = 1.0y under Act365F.
-        let rolled = curve.roll_forward(365).unwrap();
+        // Condition 365 days = 1.0y under Act365F.
+        let rolled = curve.condition(date!(2026 - 01 - 01)).unwrap();
 
         // Fresh flat 5% curve on the rolled knot grid.
         let fresh_knots = [1.0, 2.0, 4.0, 6.0, 9.0];
@@ -1372,14 +1331,14 @@ mod roll_forward_realized_forward {
         // Knot-aligned probes (interpolation-exact at knots).
         for &t in &fresh_knots {
             assert!(
-                (rolled.df(t) - fresh.df(t)).abs() < 1e-12,
+                (rolled.df(t).unwrap() - fresh.df(t).unwrap()).abs() < 1e-12,
                 "flat curve must stay flat under roll at t={t}: rolled={} fresh={}",
-                rolled.df(t),
-                fresh.df(t)
+                rolled.df(t).unwrap(),
+                fresh.df(t).unwrap()
             );
         }
         // DF(0) = 1 exactly (prepended knot is correct after renormalization).
-        assert!((rolled.df(0.0) - 1.0).abs() < 1e-14);
+        assert!((rolled.df(0.0).unwrap() - 1.0).abs() < 1e-14);
     }
 
     #[test]
@@ -1394,17 +1353,20 @@ mod roll_forward_realized_forward {
                 (5.0, 0.86),
                 (10.0, 0.70),
             ])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
-        // Roll 365 days = dt = 1.0y under Act365F.
+        // Condition 365 days = dt = 1.0y under Act365F.
         let dt = 1.0;
-        let rolled = curve.roll_forward(365).unwrap();
-        let df_dt = curve.df(dt);
+        let rolled = curve.condition(date!(2026 - 01 - 01)).unwrap();
+        let df_dt = curve.df(dt).unwrap();
 
         for &t_old in &[2.0_f64, 5.0, 10.0] {
-            let expected = curve.df(t_old) / df_dt;
-            let actual = rolled.df(t_old - dt);
+            let expected = curve.df(t_old).unwrap() / df_dt;
+            let actual = rolled.df(t_old - dt).unwrap();
             assert!(
                 (actual - expected).abs() < 1e-12,
                 "DF_rolled({}) must equal DF_old({t_old})/DF_old({dt}): {actual} vs {expected}",
@@ -1420,25 +1382,31 @@ mod roll_forward_realized_forward {
         let curve = DiscountCurve::builder("TEST-TWO-PILLAR")
             .base_date(date!(2025 - 01 - 01))
             .knots([(0.0, 1.0), (5.0, 0.80)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
-        // Roll 365 days = dt = 1.0y under Act365F.
-        let rolled = curve.roll_forward(365).unwrap();
-        let expected = 0.80 / curve.df(1.0);
-        assert!((rolled.df(4.0) - expected).abs() < 1e-12);
-        assert!((rolled.df(0.0) - 1.0).abs() < 1e-14);
+        // Condition 365 days = dt = 1.0y under Act365F.
+        let rolled = curve.condition(date!(2026 - 01 - 01)).unwrap();
+        let expected = 0.80 / curve.df(1.0).unwrap();
+        assert!((rolled.df(4.0).unwrap() - expected).abs() < 1e-12);
+        assert!((rolled.df(0.0).unwrap() - 1.0).abs() < 1e-14);
     }
 
-    /// Rolling past every pillar leaves no live knot and must still fail.
+    /// Conditioning past every pillar under ExtrapolationPolicy::None must fail.
     #[test]
     fn roll_past_last_pillar_fails() {
         let curve = DiscountCurve::builder("TEST-TWO-PILLAR")
             .base_date(date!(2025 - 01 - 01))
             .knots([(0.0, 1.0), (1.0, 0.95)])
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Error)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
             .build()
             .unwrap();
-        assert!(curve.roll_forward(730).is_err());
+        assert!(curve.condition(date!(2027 - 01 - 01)).is_err());
     }
 }
 
@@ -1456,6 +1424,8 @@ mod continuous_transform_regressions {
                 (5.0, 0.86),
                 (10.0, 0.70),
             ])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid shaped curve")
     }
@@ -1477,12 +1447,21 @@ mod continuous_transform_regressions {
             InterpStyle::PiecewiseQuadraticForward,
         ] {
             let source = shaped(style);
-            assert!(source.roll_forward(-1).is_err());
+            assert!(
+                source
+                    .condition(sample_base_date() - time::Duration::days(1))
+                    .is_err()
+            );
             for days in [0, 1, 73, 365] {
                 let offset = days as f64 / 365.0;
-                let rolled = source.roll_forward(days).expect("roll");
+                let rolled = source
+                    .condition(sample_base_date() + time::Duration::days(days))
+                    .expect("condition");
                 for t in [0.0, 0.02, 0.1, 0.5, 1.5, 3.0, 7.0] {
-                    close(rolled.df(t), source.df(t + offset) / source.df(offset));
+                    close(
+                        rolled.df(t).unwrap(),
+                        source.df(t + offset).unwrap() / source.df(offset).unwrap(),
+                    );
                 }
             }
         }
@@ -1490,7 +1469,8 @@ mod continuous_transform_regressions {
 
     #[test]
     fn sparse_curve_key_rate_shock_acts_at_every_maturity() {
-        let source = DiscountCurve::flat("SPARSE", sample_base_date(), 0.05).expect("flat");
+        let source = DiscountCurve::flat("SPARSE", sample_base_date(), 0.05, DayCount::Act365F)
+            .expect("flat");
         let shocked = source
             .apply_bump(BumpSpec::triangular_key_rate_bp(3.0, 5.0, 7.0, 10.0))
             .expect("continuous key-rate shock");
@@ -1504,8 +1484,8 @@ mod continuous_transform_regressions {
             (10.0, 0.0),
         ] {
             close(
-                shocked.df(time),
-                source.df(time) * (-0.001_f64 * weight * time).exp(),
+                shocked.df(time).unwrap(),
+                source.df(time).unwrap() * (-0.001_f64 * weight * time).exp(),
             );
         }
     }
@@ -1524,14 +1504,18 @@ mod continuous_transform_regressions {
                 .apply_bump(BumpSpec::parallel_bp(25.0))
                 .expect("parallel shock");
             for t in [0.0, 0.2, 0.75, 1.5, 3.5, 7.5] {
-                close(shocked.df(t), source.df(t) * (-0.0025_f64 * t).exp());
+                close(
+                    shocked.df(t).unwrap(),
+                    source.df(t).unwrap() * (-0.0025_f64 * t).exp(),
+                );
             }
         }
     }
 
     #[test]
     fn sparse_bucket_shocks_partition_the_parallel_log_discount_shift() {
-        let source = DiscountCurve::flat("BUCKETS", sample_base_date(), 0.05).expect("flat");
+        let source = DiscountCurve::flat("BUCKETS", sample_base_date(), 0.05, DayCount::Act365F)
+            .expect("flat");
         let first = source
             .apply_bump(BumpSpec::triangular_key_rate_first_bp(1.0, 5.0, 1.0))
             .expect("first");
@@ -1545,7 +1529,7 @@ mod continuous_transform_regressions {
             .apply_bump(BumpSpec::parallel_bp(1.0))
             .expect("parallel");
         for t in [0.0, 0.1, 0.5, 2.0, 4.5, 5.0, 7.5, 15.0] {
-            close(all.df(t), parallel.df(t));
+            close(all.df(t).unwrap(), parallel.df(t).unwrap());
         }
     }
 
@@ -1555,9 +1539,15 @@ mod continuous_transform_regressions {
         let shocked = source
             .apply_bump(BumpSpec::triangular_key_rate_bp(0.25, 1.0, 3.0, 17.0))
             .expect("shock");
-        let rolled = shocked.roll_forward(73).expect("roll");
-        let twice_rolled = rolled.roll_forward(146).expect("second roll");
-        let rerolled = shocked.roll_forward(219).expect("combined roll");
+        let rolled = shocked
+            .condition(sample_base_date() + time::Duration::days(73))
+            .expect("condition");
+        let twice_rolled = rolled
+            .condition(sample_base_date() + time::Duration::days(219))
+            .expect("second condition");
+        let rerolled = shocked
+            .condition(sample_base_date() + time::Duration::days(219))
+            .expect("combined condition");
         let final_curve = twice_rolled
             .apply_bump(BumpSpec::triangular_key_rate_first_bp(0.3, 1.3, -6.0))
             .expect("shock after roll")
@@ -1571,8 +1561,11 @@ mod continuous_transform_regressions {
             .build()
             .expect("rename builder");
         for t in [0.0, 0.03, 0.3, 0.5, 1.1, 2.0, 7.0] {
-            close(rolled.df(t), shocked.df(t + 0.2) / shocked.df(0.2));
-            close(twice_rolled.df(t), rerolled.df(t));
+            close(
+                rolled.df(t).unwrap(),
+                shocked.df(t + 0.2).unwrap() / shocked.df(0.2).unwrap(),
+            );
+            close(twice_rolled.df(t).unwrap(), rerolled.df(t).unwrap());
             let weight = if t <= 0.3 {
                 1.0
             } else if t < 1.3 {
@@ -1581,19 +1574,19 @@ mod continuous_transform_regressions {
                 0.0
             };
             close(
-                final_curve.df(t),
-                twice_rolled.df(t) * ((0.0006 * weight - 0.0003) * t).exp(),
+                final_curve.df(t).unwrap(),
+                twice_rolled.df(t).unwrap() * ((0.0006 * weight - 0.0003) * t).exp(),
             );
-            close(restored.df(t), final_curve.df(t));
-            close(renamed.df(t), final_curve.df(t));
+            close(restored.df(t).unwrap(), final_curve.df(t).unwrap());
+            close(renamed.df(t).unwrap(), final_curve.df(t).unwrap());
         }
     }
 
     #[test]
     fn inverse_shocks_and_zero_bumps_preserve_exact_roll_economics() {
         let source = shaped(InterpStyle::CubicHermite)
-            .roll_forward(100)
-            .expect("roll");
+            .condition(sample_base_date() + time::Duration::days(100))
+            .expect("condition");
         let zero = source.apply_bump(BumpSpec::parallel_bp(0.0)).expect("zero");
         let up = source
             .apply_bump(BumpSpec::triangular_key_rate_bp(0.1, 0.4, 2.0, 50.0))
@@ -1602,8 +1595,8 @@ mod continuous_transform_regressions {
             .apply_bump(BumpSpec::triangular_key_rate_bp(0.1, 0.4, 2.0, -50.0))
             .expect("down");
         for t in [0.0, 0.05, 0.3, 0.4, 1.0, 2.0, 5.0] {
-            close(zero.df(t), source.df(t));
-            close(restored.df(t), source.df(t));
+            close(zero.df(t).unwrap(), source.df(t).unwrap());
+            close(restored.df(t).unwrap(), source.df(t).unwrap());
         }
     }
 
@@ -1635,7 +1628,7 @@ mod continuous_transform_regressions {
             let once = source
                 .apply_bump(BumpSpec::triangular_key_rate_bp(1.0, 3.0, 5.0, 100.0))
                 .expect("equivalent");
-            close(repeated.df(t), once.df(t));
+            close(repeated.df(t).unwrap(), once.df(t).unwrap());
         }
     }
 
@@ -1657,16 +1650,19 @@ mod continuous_transform_regressions {
         let anchored = DiscountCurve::builder("ANCHORED")
             .base_date(sample_base_date())
             .knots([(1.0, 0.95), (2.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("automatic anchor");
-        assert_eq!(anchored.df(0.0), 1.0);
+        assert_eq!(anchored.df(0.0).unwrap(), 1.0);
     }
 
     #[test]
     fn serialized_transform_cannot_disagree_with_public_pillars() {
         let source = shaped(InterpStyle::MonotoneConvex)
-            .roll_forward(100)
-            .expect("roll");
+            .condition(sample_base_date() + time::Duration::days(100))
+            .expect("condition");
         let mut json = serde_json::to_value(&source).expect("serialize");
         json["transform"]["offset"] = serde_json::json!(0.5);
         assert!(serde_json::from_value::<DiscountCurve>(json).is_err());
@@ -1682,8 +1678,8 @@ mod continuous_transform_regressions {
             InterpStyle::PiecewiseQuadraticForward,
         ] {
             let curve = shaped(style)
-                .roll_forward(73)
-                .expect("roll")
+                .condition(sample_base_date() + time::Duration::days(73))
+                .expect("condition")
                 .apply_bump(BumpSpec::parallel_bp(10.0))
                 .expect("bump");
             let json = serde_json::to_value(&curve).expect("serialize");
@@ -1693,8 +1689,8 @@ mod continuous_transform_regressions {
                 .build()
                 .expect("rename");
             for time in [0.0, 0.1, 0.5, 1.5, 3.0, 8.0] {
-                close(restored.df(time), curve.df(time));
-                close(renamed.df(time), curve.df(time));
+                close(restored.df(time).unwrap(), curve.df(time).unwrap());
+                close(renamed.df(time).unwrap(), curve.df(time).unwrap());
             }
             for field in ["knot_points", "source_points"] {
                 for points in [
@@ -1722,49 +1718,45 @@ mod continuous_transform_regressions {
     }
 
     #[test]
-    fn roll_rejects_overflow_and_preserves_explicit_validation_policy() {
-        use finstack_quant_core::market_data::term_structures::ValidationMode;
-        let raw = ValidationMode::Raw {
-            allow_non_monotonic: true,
-            forward_floor: None,
-        };
+    fn roll_rejects_overflow_and_handles_pqf_conditioning() {
         let extreme = DiscountCurve::builder("OVERFLOW")
             .base_date(sample_base_date())
+            .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, 1e-310), (2.0, 1.0)])
             .interp(InterpStyle::LogLinear)
-            .validation(raw)
+            .extrapolation(ExtrapolationPolicy::Extend)
             .build()
             .expect("finite source");
-        assert!(extreme.roll_forward(365).is_err());
+        assert!(
+            extreme
+                .condition(sample_base_date() + time::Duration::days(365))
+                .is_err()
+        );
         let points = [
             (0.0, 1.0),
             (1.0, (-0.01_f64).exp()),
             (2.0, (-0.011_f64).exp()),
         ];
-        let strict = DiscountCurve::builder("STRICT")
+        let pqf = DiscountCurve::builder("PQF")
             .base_date(sample_base_date())
+            .day_count(DayCount::Act365F)
             .knots(points)
             .interp(InterpStyle::PiecewiseQuadraticForward)
+            .extrapolation(ExtrapolationPolicy::Extend)
             .build()
             .expect("source");
-        assert!(strict.roll_forward(693).is_err());
-        let permissive = DiscountCurve::builder("PERMISSIVE")
-            .base_date(sample_base_date())
-            .knots(points)
-            .interp(InterpStyle::PiecewiseQuadraticForward)
-            .validation(raw)
-            .build()
-            .expect("source");
-        let rolled = permissive.roll_forward(693).expect("permissive roll");
+        let rolled = pqf
+            .condition(sample_base_date() + time::Duration::days(693))
+            .expect("pqf condition");
         let restored: DiscountCurve =
             serde_json::from_str(&serde_json::to_string(&rolled).expect("serialize"))
                 .expect("restore");
         for t in [0.0, 0.03, 0.08] {
             close(
-                rolled.df(t),
-                permissive.df(t + 693.0 / 365.0) / permissive.df(693.0 / 365.0),
+                rolled.df(t).unwrap(),
+                pqf.df(t + 693.0 / 365.0).unwrap() / pqf.df(693.0 / 365.0).unwrap(),
             );
-            close(rolled.df(t), restored.df(t));
+            close(rolled.df(t).unwrap(), restored.df(t).unwrap());
         }
     }
 }
@@ -1775,14 +1767,19 @@ fn tiny_annual_zero_rate_avoids_subtractive_cancellation() {
     let df = 1.0 - 1e-8;
     let curve = DiscountCurve::builder("TINY")
         .base_date(sample_base_date())
+        .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, df)])
         .interp(InterpStyle::LogLinear)
-        .extrapolation(ExtrapolationPolicy::None)
+        .extrapolation(ExtrapolationPolicy::Error)
         .build()
         .unwrap();
     let expected = (1.0 - df) / df;
     assert!(
-        (curve.zero_rate(1.0, Compounding::Periodic(std::num::NonZeroU32::MIN)) - expected).abs()
+        (curve
+            .zero_rate(1.0, Compounding::Periodic(std::num::NonZeroU32::MIN))
+            .unwrap()
+            - expected)
+            .abs()
             < 1e-23
     );
     for convention in [
@@ -1791,19 +1788,23 @@ fn tiny_annual_zero_rate_avoids_subtractive_cancellation() {
         Compounding::Simple,
         Compounding::Periodic(4.try_into().unwrap()),
     ] {
-        assert_eq!(curve.zero_rate(0.0, convention), 0.0);
-        assert!(curve.zero_rate(2.0, convention).is_nan());
+        assert!(curve.zero_rate(0.0, convention).is_err());
+        assert!(curve.zero_rate(2.0, convention).is_err());
         assert_eq!(
-            curve.zero_rate(0.25, convention),
-            convention.rate_from_df(curve.df(0.25), 0.25)
+            curve.zero_rate(0.25, convention).unwrap(),
+            convention
+                .rate_from_df(curve.df(0.25).unwrap(), 0.25)
+                .unwrap()
         );
     }
 }
 
 // Moved from production_audit.rs: negative-rate stress and serde round trip.
 mod negative_rate_stress {
+    use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::bumps::{BumpSpec, Bumpable};
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
     use time::macros::date;
 
     #[test]
@@ -1811,6 +1812,9 @@ mod negative_rate_stress {
         let base = date!(2025 - 01 - 02);
         let curve = DiscountCurve::builder("STRICT")
             .base_date(base)
+            .day_count(DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Extend)
             .knots([
                 (0.0, 1.0),
                 (1.0, (-0.01_f64).exp()),
@@ -1821,20 +1825,23 @@ mod negative_rate_stress {
         let shocked = curve
             .apply_bump(BumpSpec::parallel_bp(-200.0))
             .expect("negative-rate stress");
-        assert!((shocked.df(2.0) - 0.02_f64.exp()).abs() < 1e-12);
+        assert!((shocked.df(2.0).unwrap() - 0.02_f64.exp()).abs() < 1e-12);
         let roundtrip: DiscountCurve =
             serde_json::from_str(&serde_json::to_string(&shocked).expect("serialize"))
                 .expect("stress roundtrip");
-        assert_eq!(roundtrip.df(2.0), shocked.df(2.0));
+        assert_eq!(roundtrip.df(2.0).unwrap(), shocked.df(2.0).unwrap());
         assert!(curve.apply_bump(BumpSpec::parallel_bp(f64::NAN)).is_err());
         assert!(curve.apply_bump(BumpSpec::parallel_bp(-1e308)).is_err());
-        assert!((curve.df(2.0) - (-0.02_f64).exp()).abs() < 1e-12);
+        assert!((curve.df(2.0).unwrap() - (-0.02_f64).exp()).abs() < 1e-12);
         assert!(
-            DiscountCurve::builder("STRICT")
+            DiscountCurve::builder("NEGATIVE")
                 .base_date(base)
+                .day_count(DayCount::Act365F)
+                .interp(InterpStyle::LogLinear)
+                .extrapolation(ExtrapolationPolicy::Extend)
                 .knots([(0.0, 1.0), (1.0, 1.01)])
                 .build()
-                .is_err()
+                .is_ok()
         );
     }
 }

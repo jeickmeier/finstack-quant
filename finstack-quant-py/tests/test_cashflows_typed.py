@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import math
 from typing import TYPE_CHECKING, ClassVar
 
 import pytest
@@ -373,12 +374,7 @@ class TestBuilderSpecs:
 
         # base_date must be on/before every reset date; the first reset
         # trails the issue date by the default 2-business-day reset lag.
-        curve = ForwardCurve(
-            id="USD-SOFR-3M",
-            tenor=0.25,
-            knots=[(0.0, 0.04), (2.0, 0.04)],
-            base_date=dt.date(2025, 1, 1),
-        )
+        curve = ForwardCurve.flat("USD-SOFR-3M", dt.date(2025, 1, 1), 0.04, "act_360")
         market = MarketContext().insert(curve)
 
         typed_schedule = (
@@ -458,11 +454,15 @@ class TestBuilderSpecs:
         from finstack_quant.core.dates import DayCount
         from finstack_quant.core.market_data import ForwardCurve, MarketContext
 
+        # Log-linear factors give piecewise-flat instantaneous forwards: 0.1%
+        # to t = 0.05, a 0.01y bridge at their 15.05% average, then 30%.
         curve = ForwardCurve(
-            id="USD-SOFR-3M",
-            tenor=0.25,
-            knots=[(0.0, 0.001), (0.05, 0.001), (0.06, 0.30), (1.0, 0.30)],
-            base_date=dt.date(2025, 1, 1),
+            "USD-SOFR-3M",
+            dt.date(2025, 1, 1),
+            [(0.05, math.exp(-0.00005)), (0.06, math.exp(-0.001555)), (1.0, math.exp(-0.283555))],
+            interp="log_linear",
+            extrapolation="extend",
+            day_count="act_360",
         )
         market = MarketContext().insert(curve)
 
@@ -735,12 +735,7 @@ class TestCashFlowBuilder:
 
         # base_date must be on/before every reset date; the first reset
         # trails the issue date by the default 2-business-day reset lag.
-        curve = ForwardCurve(
-            id="USD-SOFR-3M",
-            tenor=0.25,
-            knots=[(0.0, 0.04), (2.0, 0.04)],
-            base_date=dt.date(2025, 1, 1),
-        )
+        curve = ForwardCurve.flat("USD-SOFR-3M", dt.date(2025, 1, 1), 0.04, "act_360")
         market = MarketContext().insert(curve)
         spec = FloatingCouponSpec(
             rate_spec=FloatingRateSpec(
@@ -971,7 +966,7 @@ class TestCashFlowSchedule:
 
         schedule = self._bond()
         periods = build_periods("2025Q1..2026Q1").periods
-        market = MarketContext().insert(DiscountCurve.flat("USD-OIS", dt.date(2025, 1, 15), 0.0))
+        market = MarketContext().insert(DiscountCurve.flat("USD-OIS", dt.date(2025, 1, 15), 0.0, "act_365f"))
         pv = schedule.pv_by_period(
             periods=periods,
             market=market,
@@ -1679,14 +1674,7 @@ def test_build_as_of_uses_fixings_after_curve_anchor() -> None:
     from finstack_quant.core.cashflow import CFKind
     from finstack_quant.core.market_data import ForwardCurve, MarketContext, ScalarTimeSeries
 
-    market = MarketContext().insert(
-        ForwardCurve(
-            id="USD-SOFR-3M",
-            tenor=0.25,
-            knots=[(0.0, 0.04), (2.0, 0.04)],
-            base_date=dt.date(2025, 1, 1),
-        )
-    )
+    market = MarketContext().insert(ForwardCurve.flat("USD-SOFR-3M", dt.date(2025, 1, 1), 0.04, "act_360"))
     spec = FloatingCouponSpec(
         rate_spec=FloatingRateSpec(
             forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("0"), reset_frequency=Tenor.parse("3M")
@@ -1708,7 +1696,7 @@ def test_build_as_of_uses_fixings_after_curve_anchor() -> None:
 
     with pytest.raises((KeyError, ValueError), match=r"fixing|FIXING"):
         builder().build_as_of(market, dt.date(2025, 2, 1))
-    market.insert_series(ScalarTimeSeries("FIXING:USD-SOFR-3M", [(dt.date(2025, 1, 13), 0.06)]))
+    market.insert_series(ScalarTimeSeries("FIXING:USD-SOFR-3M", [(dt.date(2025, 1, 13), 0.06)], "step", "error"))
     schedule = builder().build_as_of(market, dt.date(2025, 2, 1))
     coupon = next(flow for flow in schedule.get_flows() if flow.kind == CFKind.FLOATING)
     assert coupon.rate == pytest.approx(0.06, abs=1e-12)

@@ -406,6 +406,12 @@ export interface DFf58Eb1D8C0Cb6416B15 {
    */
   index_id?: Id3 | null;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
+  /**
+   * Explicit CMS benchmark fixing identifier for the long-tenor leg
+   * (`FIXING:<long_cms_fixing_index_id>`), distinct from `forward_curve_id`,
+   * `index_id`, and `short_cms_fixing_index_id`.
+   */
+  long_cms_fixing_index_id?: Id3 | null;
   long_cms_tenor: Tenor;
   long_vol_surface_id: Id4;
   metric_pricing_overrides?: MetricPricingOverrides;
@@ -417,6 +423,12 @@ export interface DFf58Eb1D8C0Cb6416B15 {
   option_type: "call" | "put";
   payment_date: Date1;
   scenario_pricing_overrides?: ScenarioPricingOverrides;
+  /**
+   * Explicit CMS benchmark fixing identifier for the short-tenor leg
+   * (`FIXING:<short_cms_fixing_index_id>`), distinct from `forward_curve_id`,
+   * `index_id`, and `long_cms_fixing_index_id`.
+   */
+  short_cms_fixing_index_id?: Id3 | null;
   short_cms_tenor: Tenor1;
   short_vol_surface_id: Id5;
   strike: Decimal;

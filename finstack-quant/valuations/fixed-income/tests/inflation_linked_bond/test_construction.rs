@@ -39,7 +39,7 @@ fn tips(
         .base_cpi(base_cpi)
         .base_date(issue)
         .indexation_method(IndexationMethod::Tips)
-        .lag(InflationLag::Months(3))
+        .lag(InflationLag::months(3))
         .deflation_protection(DeflationProtection::MaturityOnly)
         .business_day_convention(BusinessDayConvention::Following)
         .stub(StubKind::None)
@@ -192,20 +192,20 @@ fn test_indexation_method_standard_lags() {
     // Assert
     assert_eq!(
         IndexationMethod::Tips.standard_lag(),
-        InflationLag::Months(3)
+        InflationLag::months(3)
     );
     assert_eq!(
         IndexationMethod::Canadian.standard_lag(),
-        InflationLag::Months(3)
+        InflationLag::months(3)
     );
-    assert_eq!(IndexationMethod::Uk.standard_lag(), InflationLag::Months(8));
+    assert_eq!(IndexationMethod::Uk.standard_lag(), InflationLag::months(8));
     assert_eq!(
         IndexationMethod::French.standard_lag(),
-        InflationLag::Months(3)
+        InflationLag::months(3)
     );
     assert_eq!(
         IndexationMethod::Japanese.standard_lag(),
-        InflationLag::Months(3)
+        InflationLag::months(3)
     );
 }
 

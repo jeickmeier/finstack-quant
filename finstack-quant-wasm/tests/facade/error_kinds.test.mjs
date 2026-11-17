@@ -277,3 +277,9 @@ test('a JavaScript value of the wrong type is invalid_type', () => {
     }
   );
 });
+
+test('choleskyDecomposition splits validation errors from non-SPD computation failures', () => {
+  assert.throws(() => core.choleskyDecomposition([1, 2, 2, 1], 2), kind('computation'));
+  assert.throws(() => core.choleskyDecomposition([0, 0, 0, 1], 2), kind('computation'));
+  assert.throws(() => core.choleskyDecomposition([1, 0.5, 0.4, 1], 2), kind('validation'));
+});

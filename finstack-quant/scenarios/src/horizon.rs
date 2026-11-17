@@ -45,7 +45,6 @@
 //!     ],
 //!     priority: 0,
 //!     resolution_mode: Default::default(),
-//!     hazard_bump_mode: Default::default(),
 //! };
 //!
 //! let analyzer = HorizonAnalysis::default();
@@ -571,6 +570,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(base_date)
             .knots(vec![(0.0, 1.0), (1.0, 0.98), (2.0, 0.95), (5.0, 0.90)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
         Ok(MarketContext::new().insert(curve))
     }
@@ -588,7 +590,6 @@ mod tests {
             operations: vec![],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         };
 
         let analyzer = HorizonAnalysis::default();
@@ -622,7 +623,6 @@ mod tests {
             }],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         };
 
         let analyzer = HorizonAnalysis::default();
@@ -684,7 +684,6 @@ mod tests {
             ],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         };
 
         let analyzer = HorizonAnalysis::default();
@@ -742,7 +741,6 @@ mod tests {
             }],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         };
 
         let analyzer = HorizonAnalysis::default();
@@ -780,7 +778,6 @@ mod tests {
             }],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         };
 
         let analyzer = HorizonAnalysis::default();
@@ -814,7 +811,6 @@ mod tests {
             }],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         };
 
         let analyzer = HorizonAnalysis::default();
@@ -964,7 +960,6 @@ mod tests {
             }],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         };
 
         let analyzer = HorizonAnalysis::default().with_calendar_id("not_a_real_calendar");
@@ -999,7 +994,6 @@ mod tests {
             }],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         };
 
         // Weekends-only fallback: 2025-06-19 is a Thursday, so no adjustment.
@@ -1103,15 +1097,19 @@ mod tests {
                     DiscountCurve::builder("USD-OIS")
                         .base_date(origin)
                         .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.9)])
+                        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                        .extrapolation(
+                            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+                        )
                         .build()?,
                 )
-                .insert(
-                    ForwardCurve::builder("USD-SOFR-3M", 0.25)
-                        .base_date(origin)
-                        .day_count(DayCount::Act360)
-                        .knots([(0.0, 0.03), (1.0, 0.03), (2.0, 0.03)])
-                        .build()?,
-                );
+                .insert(ForwardCurve::flat(
+                    "USD-SOFR-3M",
+                    origin,
+                    0.03,
+                    DayCount::Act360,
+                )?);
             let scenario = ScenarioSpec {
                 id: "crossed-reset".into(),
                 operations: vec![OperationSpec::TimeRollForward {

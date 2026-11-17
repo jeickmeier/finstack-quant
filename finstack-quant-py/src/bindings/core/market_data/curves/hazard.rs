@@ -1,7 +1,6 @@
 //! Hazard curve bindings.
 
 use finstack_quant_core::market_data::term_structures::HazardCurve;
-use finstack_quant_core::wire::{serde_label, serde_parse};
 
 use std::sync::Arc;
 
@@ -17,16 +16,16 @@ use crate::errors::core_to_py;
 
 /// Credit hazard-rate curve for default-probability modelling.
 ///
-/// Stores piecewise-constant hazard rates ``(t, lambda)`` in years from
-/// ``base_date`` with ``lambda`` as an annual default intensity (decimal).
-/// Each ``lambda`` applies to the segment *ending* at its knot, so
-/// ``sp(t) = exp(-integral of lambda)``. Query methods accept a year fraction
-/// or a date (converted with the curve day count by Rust).
+/// Stores piecewise-constant hazard rates ``(t, lambda)`` at strictly positive
+/// ending times ``t`` in years from ``base_date`` with ``lambda`` as an annual
+/// default intensity (decimal). Each ``lambda`` applies to the segment *ending*
+/// at its knot, so ``sp(t) = exp(-integral of lambda)``. Query methods accept a
+/// year fraction or a date (converted with the curve day count by Rust).
 ///
 /// Example
 /// -------
 /// >>> from finstack_quant.core.market_data import HazardCurve
-/// >>> curve = HazardCurve("ACME-HZD", "2025-01-01", [(1.0, 0.02), (5.0, 0.03)], recovery_rate=0.4)
+/// >>> curve = HazardCurve("ACME-HZD", "2025-01-01", [(1.0, 0.02), (5.0, 0.03)], recovery_rate=0.4, day_count="act_365f")
 /// >>> round(curve.sp(1.0), 6)
 /// 0.980199
 #[pyclass(
@@ -59,37 +58,33 @@ impl PyHazardCurve {
     /// base_date : datetime.date | str
     ///     Valuation date anchoring ``t = 0``.
     /// knots : list[tuple[float, float]]
-    ///     ``(time_years, hazard_rate)`` pairs; hazard rates are annual default
-    ///     intensities as decimals (``0.02`` is 2% per year), non-negative.
+    ///     ``(time_years, hazard_rate)`` pairs with strictly positive increasing
+    ///     ending times ``t > 0`` and finite non-negative annual default
+    ///     intensities as decimals (``0.02`` is 2% per year).
     /// recovery_rate : float
     ///     Recovery on default as a decimal fraction in ``[0, 1]`` (keyword-only).
-    /// day_count : DayCount | str, optional
-    ///     Day-count convention; default ``"act_365f"``.
-    /// par_spreads : list[tuple[float, float]], optional
-    ///     ``(time_years, par_spread_bp)`` market quotes in **basis points**
-    ///     kept for reporting and re-bootstrap risk.
-    /// par_interp : str, optional
-    ///     Par-spread readout interpolation: ``"linear"`` (default) or ``"log_linear"``.
+    /// day_count : DayCount | str
+    ///     Explicit day-count convention (keyword-only and required).
+    /// calendar_id : str, optional
+    ///     Registered holiday calendar of the curve's time axis (required with ``"bus_252"``).
     /// issuer : str, optional
     ///     Issuer name metadata.
     /// seniority : str, optional
     ///     ``"senior_secured"``, ``"senior"``, ``"subordinated"`` or ``"junior"``.
     /// currency : Currency | str, optional
     ///     Currency of the protection leg (metadata).
-    /// max_hazard_rate : float, optional
-    ///     Sanity ceiling on any ``hazard_rate``; default ``10.0``.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If a knot is non-finite, negative, duplicated or above
-    ///     ``max_hazard_rate``, ``recovery_rate`` is outside ``[0, 1]``, or a
-    ///     label is unknown.
+    ///     If a knot has non-positive/non-increasing time or negative/non-finite
+    ///     hazard rate, ``recovery_rate`` is outside ``[0, 1]``, ``day_count`` is
+    ///     unknown or missing a required calendar, or an enum label is unknown.
     ///
     /// Example
     /// -------
     /// >>> from finstack_quant.core.market_data import HazardCurve
-    /// >>> curve = HazardCurve("ACME-HZD", "2025-01-01", [(1.0, 0.02)], recovery_rate=0.4, seniority="senior")
+    /// >>> curve = HazardCurve("ACME-HZD", "2025-01-01", [(1.0, 0.02)], recovery_rate=0.4, day_count="act_365f", seniority="senior")
     /// >>> curve.seniority
     /// 'senior'
     #[new]
@@ -97,33 +92,24 @@ impl PyHazardCurve {
         clippy::too_many_arguments,
         reason = "keyword-only curve options mirror the Rust builder setters"
     )]
-    #[pyo3(signature = (id, base_date, knots, *, recovery_rate, day_count=None, par_spreads=None, par_interp=None, issuer=None, seniority=None, currency=None, max_hazard_rate=None))]
+    #[pyo3(signature = (id, base_date, knots, *, recovery_rate, day_count, calendar_id=None, issuer=None, seniority=None, currency=None))]
     fn new(
         id: &str,
         base_date: &Bound<'_, PyAny>,
         knots: Vec<(f64, f64)>,
         recovery_rate: f64,
-        day_count: Option<&Bound<'_, PyAny>>,
-        par_spreads: Option<Vec<(f64, f64)>>,
-        par_interp: Option<&str>,
+        day_count: &Bound<'_, PyAny>,
+        calendar_id: Option<String>,
         issuer: Option<&str>,
         seniority: Option<&str>,
         currency: Option<&Bound<'_, PyAny>>,
-        max_hazard_rate: Option<f64>,
     ) -> PyResult<Self> {
         let mut builder = HazardCurve::builder(id)
             .base_date(py_to_date(base_date)?)
+            .day_count(extract_day_count(day_count)?)
+            .calendar_id_opt(calendar_id)
             .knots(knots)
             .recovery_rate(recovery_rate);
-        if let Some(day_count) = day_count {
-            builder = builder.day_count(extract_day_count(day_count)?);
-        }
-        if let Some(points) = par_spreads {
-            builder = builder.par_spreads(points);
-        }
-        if let Some(par_interp) = par_interp {
-            builder = builder.par_interp(serde_parse(par_interp).map_err(core_to_py)?);
-        }
         if let Some(issuer) = issuer {
             builder = builder.issuer(issuer);
         }
@@ -132,9 +118,6 @@ impl PyHazardCurve {
         }
         if let Some(currency) = currency {
             builder = builder.currency(extract_currency(currency)?);
-        }
-        if let Some(max_hazard_rate) = max_hazard_rate {
-            builder = builder.max_hazard_rate(max_hazard_rate);
         }
         builder
             .build()
@@ -154,6 +137,8 @@ impl PyHazardCurve {
     ///     Constant annual default intensity as a decimal (``0.02`` is 2%).
     /// recovery_rate : float
     ///     Recovery on default as a decimal fraction in ``[0, 1]``.
+    /// day_count : DayCount | str
+    ///     Explicit supported curve day-count convention.
     ///
     /// Returns
     /// -------
@@ -163,24 +148,32 @@ impl PyHazardCurve {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``hazard_rate`` is non-finite or negative, or ``recovery_rate`` is outside ``[0, 1]``.
+    ///     If ``hazard_rate`` is non-finite or negative, ``recovery_rate`` is
+    ///     outside ``[0, 1]``, or ``day_count`` is invalid or requires an absent calendar.
     ///
     /// Example
     /// -------
     /// >>> from finstack_quant.core.market_data import HazardCurve
-    /// >>> round(HazardCurve.flat("ACME", "2025-01-01", 0.02, 0.4).sp(5.0), 6)
+    /// >>> round(HazardCurve.flat("ACME", "2025-01-01", 0.02, 0.4, "act_365f").sp(5.0), 6)
     /// 0.904837
     #[staticmethod]
-    #[pyo3(text_signature = "(id, base_date, hazard_rate, recovery_rate)")]
+    #[pyo3(text_signature = "(id, base_date, hazard_rate, recovery_rate, day_count)")]
     fn flat(
         id: &str,
         base_date: &Bound<'_, PyAny>,
         hazard_rate: f64,
         recovery_rate: f64,
+        day_count: &Bound<'_, PyAny>,
     ) -> PyResult<Self> {
-        HazardCurve::flat(id, py_to_date(base_date)?, hazard_rate, recovery_rate)
-            .map(|curve| Self::from_inner(Arc::new(curve)))
-            .map_err(core_to_py)
+        HazardCurve::flat(
+            id,
+            py_to_date(base_date)?,
+            hazard_rate,
+            recovery_rate,
+            extract_day_count(day_count)?,
+        )
+        .map(|curve| Self::from_inner(Arc::new(curve)))
+        .map_err(core_to_py)
     }
 
     /// Construct a hazard curve from survival-probability pillars.
@@ -193,9 +186,12 @@ impl PyHazardCurve {
     ///     Valuation date anchoring ``t = 0``.
     /// points : list[tuple[float, float]]
     ///     ``(time_years, survival_probability)`` pillars with probabilities in
-    ///     ``(0, 1]`` and non-increasing in time. A ``t = 0`` pillar must be ``1.0``.
+    ///     ``(0, 1]`` and non-increasing in time. An optional ``t = 0`` pillar
+    ///     must be ``1.0``; at least one ``t > 0`` pillar is required.
     /// recovery_rate : float
     ///     Recovery on default as a decimal fraction in ``[0, 1]``.
+    /// day_count : DayCount | str
+    ///     Explicit supported curve day-count convention.
     ///
     /// Returns
     /// -------
@@ -205,26 +201,34 @@ impl PyHazardCurve {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``points`` is empty, a probability is outside ``(0, 1]`` or
-    ///     increases with time, or ``recovery_rate`` is outside ``[0, 1]``.
+    ///     If ``points`` is empty or lacks a positive time, a probability is
+    ///     outside ``(0, 1]`` or increases with time, ``recovery_rate`` is
+    ///     outside ``[0, 1]``, or ``day_count`` is invalid.
     ///
     /// Example
     /// -------
     /// >>> from finstack_quant.core.market_data import HazardCurve
-    /// >>> curve = HazardCurve.from_survival_probs("ACME", "2025-01-01", [(1.0, 0.98), (5.0, 0.90)], 0.4)
+    /// >>> curve = HazardCurve.from_survival_probs("ACME", "2025-01-01", [(1.0, 0.98), (5.0, 0.90)], 0.4, "act_365f")
     /// >>> round(curve.sp(5.0), 6)
     /// 0.9
     #[staticmethod]
-    #[pyo3(text_signature = "(id, base_date, points, recovery_rate)")]
+    #[pyo3(text_signature = "(id, base_date, points, recovery_rate, day_count)")]
     fn from_survival_probs(
         id: &str,
         base_date: &Bound<'_, PyAny>,
         points: Vec<(f64, f64)>,
         recovery_rate: f64,
+        day_count: &Bound<'_, PyAny>,
     ) -> PyResult<Self> {
-        HazardCurve::from_survival_probs(id, py_to_date(base_date)?, &points, recovery_rate)
-            .map(|curve| Self::from_inner(Arc::new(curve)))
-            .map_err(core_to_py)
+        HazardCurve::from_survival_probs(
+            id,
+            py_to_date(base_date)?,
+            &points,
+            recovery_rate,
+            extract_day_count(day_count)?,
+        )
+        .map(|curve| Self::from_inner(Arc::new(curve)))
+        .map_err(core_to_py)
     }
 
     /// Survival probability at a year fraction or date.
@@ -232,21 +236,22 @@ impl PyHazardCurve {
     /// Parameters
     /// ----------
     /// t : float | datetime.date | str
-    ///     Year fraction from ``base_date``, or a date converted with the curve day count.
+    ///     Non-negative year fraction from ``base_date``, or a date on or after
+    ///     ``base_date`` converted with the curve day count.
     ///
     /// Returns
     /// -------
     /// float
-    ///     Probability in ``(0, 1]``; ``1.0`` at or before ``t = 0``.
+    ///     Probability in ``[0, 1]``; ``1.0`` at ``t = 0``.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If a date precedes ``base_date``.
+    ///     If ``t < 0``, ``t`` is non-finite, or a date precedes ``base_date``.
     #[pyo3(text_signature = "(self, t)")]
     fn sp(&self, t: &Bound<'_, PyAny>) -> PyResult<f64> {
         match extract_time_point(t)? {
-            TimePoint::Years(t) => Ok(self.inner.sp(t)),
+            TimePoint::Years(t) => self.inner.sp(t).map_err(core_to_py),
             TimePoint::Date(d) => self.inner.sp_on_date(d).map_err(core_to_py),
         }
     }
@@ -256,7 +261,8 @@ impl PyHazardCurve {
     /// Parameters
     /// ----------
     /// t : float | datetime.date | str
-    ///     Year fraction from ``base_date``, or a date converted with the curve day count.
+    ///     Non-negative year fraction from ``base_date``, or a date on or after
+    ///     ``base_date`` converted with the curve day count.
     ///
     /// Returns
     /// -------
@@ -265,11 +271,11 @@ impl PyHazardCurve {
     /// Raises
     /// ------
     /// ValueError
-    ///     If a date precedes ``base_date``.
+    ///     If ``t < 0``, ``t`` is non-finite, or a date precedes ``base_date``.
     #[pyo3(text_signature = "(self, t)")]
     fn hazard_rate(&self, t: &Bound<'_, PyAny>) -> PyResult<f64> {
         match extract_time_point(t)? {
-            TimePoint::Years(t) => Ok(self.inner.hazard_rate(t)),
+            TimePoint::Years(t) => self.inner.hazard_rate(t).map_err(core_to_py),
             TimePoint::Date(d) => self.inner.hazard_rate_on_date(d).map_err(core_to_py),
         }
     }
@@ -333,36 +339,6 @@ impl PyHazardCurve {
             .map_err(core_to_py)
     }
 
-    /// Interpolated par CDS spread in **basis points** at year fraction ``t``.
-    ///
-    /// Uses the stored ``par_spreads`` quotes; when fewer than two quotes are
-    /// stored, falls back to a hazard-based approximation.
-    ///
-    /// Parameters
-    /// ----------
-    /// t : float
-    ///     Year fraction from ``base_date``.
-    /// method : str, optional
-    ///     ``"linear"`` or ``"log_linear"``; defaults to the curve's ``par_interp``.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Spread in basis points.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``method`` is not a recognised label.
-    #[pyo3(signature = (t, method=None))]
-    fn cds_quote_bp(&self, t: f64, method: Option<&str>) -> PyResult<f64> {
-        let method = match method {
-            Some(label) => serde_parse(label).map_err(core_to_py)?,
-            None => self.inner.par_interp(),
-        };
-        Ok(self.inner.cds_quote_bp(t, method))
-    }
-
     /// Copy of this curve with a different recovery-rate metadata value.
     ///
     /// Survival probabilities are unchanged; only the reported recovery differs.
@@ -422,16 +398,16 @@ impl PyHazardCurve {
         self.inner.knot_points().collect()
     }
 
-    /// ``(time_years, par_spread_bp)`` market quotes in basis points (may be empty).
-    #[getter]
-    fn par_spread_points(&self) -> Vec<(f64, f64)> {
-        self.inner.par_spread_points().collect()
-    }
-
     /// Day-count convention label (e.g. ``"act_365f"``).
     #[getter]
     fn day_count(&self) -> String {
         self.inner.day_count().to_string()
+    }
+
+    /// Registered holiday calendar of the curve's time axis, or ``None``.
+    #[getter]
+    fn calendar_id(&self) -> Option<String> {
+        self.inner.calendar_id().map(str::to_owned)
     }
 
     /// Currency of the protection leg, or ``None``.
@@ -450,12 +426,6 @@ impl PyHazardCurve {
     #[getter]
     fn seniority(&self) -> Option<String> {
         self.inner.seniority().map(|s| s.to_string())
-    }
-
-    /// Par-spread readout interpolation label (``"linear"`` or ``"log_linear"``).
-    #[getter]
-    fn par_interp(&self) -> PyResult<String> {
-        serde_label(&self.inner.par_interp()).map_err(core_to_py)
     }
 
     /// Calibration recipe stamped on this curve, as a dict.

@@ -186,6 +186,7 @@ mod time_basis_tests {
             .day_count(day_count)
             .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80), (10.0, 0.62)])
             .interp(InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve")
     }

@@ -266,9 +266,9 @@ impl CommodityFuture {
                             })?
                             .price_on_date(*fixing_date)?
                     };
-                    sum.add(price);
+                    sum.add(price)?;
                 }
-                Ok(sum.total() / fixing_dates.len() as f64)
+                Ok(sum.get_total()? / fixing_dates.len() as f64)
             }
         }
     }

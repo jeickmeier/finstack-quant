@@ -66,17 +66,22 @@ fn bench_sabr_slice(c: &mut Criterion) {
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
         .knots([(0.0, 1.0), (5.0, 0.78)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let market = MarketContext::new()
         .insert(disc)
         .insert_price(
             "SPY",
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(100.0),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(100.0)
+                .expect("valid scalar"),
         )
         .insert_price(
             "SPY-DIVYIELD",
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(0.02),
+            finstack_quant_core::market_data::scalars::MarketScalar::unitless(0.02)
+                .expect("valid scalar"),
         );
     let market_quotes: Vec<MarketQuote> = quotes.iter().cloned().map(MarketQuote::Vol).collect();
     c.bench_function("sabr_slice_calibration", |b| {

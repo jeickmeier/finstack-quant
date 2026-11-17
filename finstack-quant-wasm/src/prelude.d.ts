@@ -32,6 +32,8 @@ import type {
 } from '../types/generated/calibration/index.js';
 import type {
   HazardCalibrationRecipe,
+  InflationExpectedRelease,
+  InflationObservation,
   MarketScalar,
   PeriodPlan,
   RateCalibrationRecipe,
@@ -282,6 +284,8 @@ export type CollateralEntry = Omit<
   'kind'
 >;
 export type {
+  InflationExpectedRelease,
+  InflationObservation,
   MarketScalar,
   PeriodPlan,
   ScheduleSpec,
@@ -510,6 +514,28 @@ export type WithFields<T, R> = { [K in keyof T]: K extends keyof R ? R[K] : T[K]
  * Named `MoneyValue` in JavaScript because `Money` is the wasm-bindgen class.
  */
 export type MoneyValue = generated.core.Money;
+
+/**
+ * Serialized state of a `DayCountContext` (`calendar`, `frequency`, `coupon_period`, `bus_basis`, `end_is_termination_date`).
+ *
+ * Named `DayCountContextValue` in JavaScript because `DayCountContext` is the wasm-bindgen class.
+ */
+export type DayCountContextValue = generated.core.DayCountContextState;
+
+/**
+ * Serialized expiry volatility clock `{reference_date, day_count, context}` (Rust `VolatilityClock` serde form).
+ *
+ * Named `VolatilityClockValue` in JavaScript because `VolatilityClock` is the wasm-bindgen class.
+ */
+export type VolatilityClockValue = generated.core.VolatilityClock;
+
+/**
+ * Ordered FX currency pair `BASE/QUOTE` accepted by `FxDeltaVolSurface`.
+ *
+ * Accepts a canonical pair string such as `"EUR/USD"`, a `[base, quote]` pair of `Currency` handles or ISO-4217 codes, or a `{ base, quote }` `CurrencyPair` object; base and quote must differ.
+ */
+export type CurrencyPairInput =
+  string | readonly [Currency | string, Currency | string] | generated.core.CurrencyPair;
 
 /**
  * Native table columns retain numeric NaN/infinity in non-null float64 storage.
@@ -840,7 +866,7 @@ export interface DiscountCurveOptions {
    */
   interp?: string;
   /**
-   * Extrapolation policy; the Rust builder default is `"flat_forward"`.
+   * Extrapolation policy; the Rust builder default is `"extend"`.
    */
   extrapolation?: string;
   /**
@@ -882,17 +908,13 @@ export interface HazardCurveOptions {
    */
   recoveryRate: number;
   /**
-   * Day-count convention for the time axis; the Rust builder default is `"act_365f"`.
+   * Day-count convention for the time axis, such as `"act_365f"`; never inferred from the id.
    */
-  dayCount?: string;
+  dayCount: string;
   /**
-   * Flat `[t0, bp0, …]` par CDS quotes in basis points, kept for reporting and re-bootstrap risk.
+   * Registered holiday calendar of the curve's time axis (required for `"bus_252"`, e.g. `"brbd"`).
    */
-  parSpreads?: NumericArray;
-  /**
-   * Par-spread readout interpolation: `"linear"` (Rust default) or `"log_linear"`.
-   */
-  parInterp?: string;
+  calendarId?: string | null;
   /**
    * Issuer name metadata.
    */
@@ -905,10 +927,6 @@ export interface HazardCurveOptions {
    * ISO-4217 code of the protection-leg currency (metadata).
    */
   currency?: string;
-  /**
-   * Sanity ceiling on any knot hazard rate; the Rust builder default is `10.0`.
-   */
-  maxHazardRate?: number;
 }
 
 /**
@@ -920,37 +938,33 @@ export interface ForwardCurveOptions {
    */
   id: string;
   /**
-   * Index tenor in years, such as 0.25 for a 3-month forward.
-   */
-  tenor: number;
-  /**
    * ISO-8601 base or valuation date that anchors the curve time axis.
    */
   baseDate: string;
   /**
-   * Flat `[time, rate]` pairs in year-fraction / decimal-rate units.
+   * Flat `[time, factor]` pairs: strictly ascending year fractions and strictly positive projection factors; `(0, 1)` is prepended when absent.
    */
   knots: NumericArray;
   /**
-   * Day-count convention used to convert dates into year fractions.
+   * Interpolation style between knots, such as `"log_linear"` or `"monotone_convex"`.
    */
-  dayCount?: string;
+  interp: string;
   /**
-   * Interpolation style between knots, such as `"monotone_convex"`.
+   * Extrapolation policy outside the knots: `"extend"`, `"flat"`, or `"error"`.
    */
-  interp?: string;
+  extrapolation: string;
   /**
-   * Extrapolation policy outside the knots; the Rust builder default is `"flat_zero"`, which holds the first and last forward rate flat (market-standard projection-curve tail). `"flat_forward"` extends the boundary rate slope instead.
+   * Day-count convention used to convert dates into year fractions; never inferred from the id.
    */
-  extrapolation?: string;
+  dayCount: string;
   /**
-   * Projection-grid specification that defines the curve's forward-rate intervals.
+   * Registered holiday calendar of the curve's time axis (required for `"bus_252"`, e.g. `"brbd"`).
    */
-  projectionGrid?: NumericArray;
+  calendarId?: string | null;
   /**
-   * Reset lag applied when projecting the index or forward rate.
+   * Accrual tenor of the projected index, such as `"3M"`; required by term-rate consumers.
    */
-  resetLag?: number | null;
+  indexTenor?: string | null;
 }
 
 /**
@@ -970,6 +984,10 @@ export interface CalendarMetadata {
    * Whether weekends are ignored when classifying holidays.
    */
   ignore_weekends: boolean;
+  /**
+   * Optional inclusive `[from_year, to_year]` bounds of declared calendar coverage.
+   */
+  supported_years: [number | null, number | null] | null;
 }
 
 /**
@@ -985,29 +1003,25 @@ export interface InflationCurveOptions {
    */
   baseDate: string;
   /**
-   * Strictly positive CPI index level at the base date.
-   */
-  baseCpi: number;
-  /**
-   * Flat `[t0, cpi0, t1, cpi1, …]` pairs: `t` in years, `cpi` the projected index level; even length.
+   * Flat `[0, I0, t1, I1, …]` pairs: explicit origin and at least one positive-time pillar; CPI levels must be finite and positive.
    */
   knots: NumericArray;
   /**
-   * Day-count convention for the time axis; omitted uses the Rust builder default.
+   * Required day-count convention for the source time axis.
    */
-  dayCount?: string;
+  dayCount: string;
   /**
-   * Indexation (publication) lag in whole months; omitted uses the Rust builder default.
+   * Registered holiday calendar identifier, required for Bus/252.
    */
-  indexationLagMonths?: number;
+  calendarId?: string;
   /**
-   * Interpolation style between pillars; omitted uses the Rust builder default.
+   * Required interpolation: `"linear"`, `"cubic_hermite"` or `"log_linear"`.
    */
-  interp?: string;
+  interp: string;
   /**
-   * Extrapolation policy beyond the pillar range; omitted uses the Rust builder default.
+   * Required tail policy: `"flat"`, `"extend"` or `"error"`.
    */
-  extrapolation?: string;
+  extrapolation: string;
 }
 
 /**
@@ -1049,25 +1063,59 @@ export interface PriceCurveOptions {
 }
 
 /**
- * Optional keys of the `VolSurface` constructor; every omitted key takes the Rust default.
+ * Required conventions and optional settings for the `VolSurface` constructor.
  */
 export interface VolSurfaceOptions {
   /**
-   * What `strikes` holds: `"strike"` (default) or `"tenor"`.
+   * What `secondaryValues` holds: `"strike"` or `"tenor"`.
    */
-  secondaryAxis?: string | null;
+  secondaryAxis: 'strike' | 'tenor';
   /**
-   * `"vol"` (default) or `"total_variance"`.
+   * Volatility quote convention: `"black_lognormal"`, `"shifted_black_lognormal"` or `"normal"`.
    */
-  interpolationMode?: string | null;
+  quoteType: 'black_lognormal' | 'shifted_black_lognormal' | 'normal';
   /**
-   * `"black_lognormal"` (default), `"shifted_black_lognormal"` or `"normal"`.
+   * Interpolation contract across the expiry axis: `"vol"` or `"total_variance"`.
    */
-  quoteType?: string | null;
+  interpolationMode: 'vol' | 'total_variance';
   /**
    * One shifted-Black displacement per expiry; required for `"shifted_black_lognormal"` quotes.
    */
   displacements?: NumericArray | null;
+  /**
+   * Optional volatility expiry clock mapping expiry dates to option expiry times.
+   */
+  expiryClock?: VolatilityClock | VolatilityClockValue | null;
+}
+
+/**
+ * Optional keys of the `FxDeltaVolSurface` constructor; every omitted key takes the Rust default.
+ */
+export interface FxDeltaVolSurfaceOptions {
+  /**
+   * 10-delta risk reversal per expiry; must match `expiries` length and be paired with `bf10d`.
+   */
+  rr10d?: NumericArray | null;
+  /**
+   * 10-delta butterfly per expiry; must match `expiries` length and be paired with `rr10d`.
+   */
+  bf10d?: NumericArray | null;
+  /**
+   * FX delta convention; defaults to `"forward_unadjusted"`.
+   */
+  deltaConvention?: 'forward_unadjusted' | null;
+  /**
+   * ATM quote convention; defaults to `"delta_neutral_straddle"`.
+   */
+  atmConvention?: 'delta_neutral_straddle' | null;
+  /**
+   * Butterfly quote convention; defaults to `"smile"`.
+   */
+  butterflyConvention?: 'smile' | null;
+  /**
+   * Optional volatility expiry clock mapping expiry dates to option expiry times.
+   */
+  expiryClock?: VolatilityClock | VolatilityClockValue | null;
 }
 
 /**

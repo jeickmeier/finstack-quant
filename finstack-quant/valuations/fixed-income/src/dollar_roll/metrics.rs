@@ -101,6 +101,9 @@ mod production_mortgage_audit {
                 DiscountCurve::builder("USD-OIS")
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (5.0, 1.0)])
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("curve"),
             )
@@ -110,6 +113,7 @@ mod production_mortgage_audit {
                     .day_count(finstack_quant_core::dates::DayCount::Act360)
                     .knots([(0.0, 1.0), (5.0, (-0.0375_f64 * 5.0).exp())])
                     .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("repo curve"),
             );
@@ -168,6 +172,8 @@ mod rate_risk_rebuild_tests {
                 .base_date(AS_OF)
                 .knots([(0.0, 1.0), (40.0, (-0.04_f64 * 40.0).exp())])
                 .interp(InterpStyle::LogLinear)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
         )
@@ -175,7 +181,7 @@ mod rate_risk_rebuild_tests {
 
     fn bumped(bp: f64) -> MarketContext {
         market()
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::DiscountCurve {
                 id: "USD-OIS".into(),
                 spec: BumpSpec::parallel_bp(bp),
             }])

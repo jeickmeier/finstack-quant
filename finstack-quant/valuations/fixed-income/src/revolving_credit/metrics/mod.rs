@@ -56,17 +56,21 @@ pub(crate) fn register_revolving_credit_metrics(
         instrument: InstrumentType::RevolvingCredit,
         metrics: [
             (Dv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::parallel_combined())),
-            // CS01: with a replayable credit curve, rebootstrap it after
-            // bumping its par spreads; with an analyst-built (knot) curve,
-            // bump the hazard rates directly. With no credit curve, survival
-            // is 1.0, so fall back to the market-standard z-spread bump. See
-            // `metrics::sensitivities::cs01_z_spread`.
+            // CS01: with a credit curve, requires quote-space replay via its
+            // calibration recipe; without one, falls back to z-spread CS01.
+            // Hazard01 measures direct intensity bp sensitivity directly.
             (Cs01, finstack_quant_valuations_core::metrics::ZSpreadParallelCs01::<
                 crate::revolving_credit::RevolvingCredit,
             >::hazard_when_credit_curve()),
             (BucketedCs01, finstack_quant_valuations_core::metrics::ZSpreadBucketedCs01::<
                 crate::revolving_credit::RevolvingCredit,
             >::hazard_when_credit_curve()),
+            (Hazard01, finstack_quant_valuations_core::metrics::sensitivities::cs01_direct_hazard::DirectHazardParallelHazard01::<
+                crate::revolving_credit::RevolvingCredit,
+            >::default()),
+            (BucketedHazard01, finstack_quant_valuations_core::metrics::sensitivities::cs01_direct_hazard::DirectHazardBucketedHazard01::<
+                crate::revolving_credit::RevolvingCredit,
+            >::default()),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate())),
             (Recovery01, exposure::Recovery01Calculator),
             (JumpToDefault, exposure::JumpToDefaultCalculator),

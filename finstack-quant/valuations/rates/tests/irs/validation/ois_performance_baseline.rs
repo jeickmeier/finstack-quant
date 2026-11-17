@@ -108,34 +108,188 @@ fn benchmark_market() -> MarketContext {
             (50.0, 0.20),
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let quarterly = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let quarterly = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(base)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots([
-            (0.0, 0.035),
-            (1.0, 0.038),
-            (2.0, 0.040),
-            (5.0, 0.045),
-            (10.0, 0.050),
-            (30.0, 0.055),
-            (50.0, 0.055),
+            (0.0, 1.0),
+            (0.125, 0.995611221459588),
+            (0.25, 0.991195240930358),
+            (0.375, 0.986752592135641),
+            (0.5, 0.982283810160798),
+            (0.625, 0.977789431347014),
+            (0.75, 0.973269993185277),
+            (0.875, 0.968726034210573),
+            (1.0, 0.964158093896324),
+            (1.125, 0.959574209193318),
+            (1.25, 0.954982273933355),
+            (1.375, 0.950382612946264),
+            (1.5, 0.945775550224929),
+            (1.625, 0.941161408888927),
+            (1.75, 0.936540511148462),
+            (1.875, 0.93191317826863),
+            (2.0, 0.927279730533999),
+            (2.1875, 0.920324184202576),
+            (2.375, 0.913367292399534),
+            (2.5625, 0.906409877451143),
+            (2.75, 0.899452755535353),
+            (2.9375, 0.892496736538075),
+            (3.125, 0.885542623912392),
+            (3.3125, 0.878591214540736),
+            (3.5, 0.871643298600053),
+            (3.6875, 0.864699659429976),
+            (3.875, 0.857761073404031),
+            (4.0625, 0.850828309803906),
+            (4.25, 0.843902130696782),
+            (4.4375, 0.836983290815769),
+            (4.625, 0.830072537443442),
+            (4.8125, 0.823170610298508),
+            (5.0, 0.81627824142561),
+            (5.3125, 0.804840362948709),
+            (5.625, 0.793485262077054),
+            (5.9375, 0.782213972982446),
+            (6.25, 0.771027490817996),
+            (6.5625, 0.759926771886431),
+            (6.875, 0.74891273382482),
+            (7.1875, 0.737986255805403),
+            (7.5, 0.727148178752154),
+            (7.8125, 0.71639930557274),
+            (8.125, 0.705740401405505),
+            (8.4375, 0.695172193881119),
+            (8.75, 0.684695373398532),
+            (9.0625, 0.674310593414836),
+            (9.375, 0.664018470748686),
+            (9.6875, 0.653819585896884),
+            (10.0, 0.643714483363737),
+            (11.25, 0.604595697764404),
+            (12.5, 0.567632401630785),
+            (13.75, 0.532720803704493),
+            (15.0, 0.499761147348737),
+            (16.25, 0.468657613416832),
+            (17.5, 0.439318221663474),
+            (18.75, 0.411654731012661),
+            (20.0, 0.385582538979713),
+            (21.25, 0.361020580528505),
+            (22.5, 0.337891226628893),
+            (23.75, 0.316120182763365),
+            (25.0, 0.29563638761626),
+            (26.25, 0.276371912163538),
+            (27.5, 0.258261859365997),
+            (28.75, 0.241244264654134),
+            (30.0, 0.225259997378556),
+            (31.25, 0.210293732369713),
+            (32.5, 0.196321825395681),
+            (33.75, 0.183278211349314),
+            (35.0, 0.171101214486481),
+            (36.25, 0.159733256796966),
+            (37.5, 0.149120585751199),
+            (38.75, 0.139213020135473),
+            (40.0, 0.129963712773867),
+            (41.25, 0.121328929014911),
+            (42.5, 0.113267839935589),
+            (43.75, 0.105742329284862),
+            (45.0, 0.098716813253846),
+            (46.25, 0.0921580722204673),
+            (47.5, 0.0860350936729815),
+            (48.75, 0.080318925569656),
+            (50.0, 0.0749825394412265),
         ])
-        .interp(InterpStyle::Linear)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let monthly = ForwardCurve::builder("USD-SOFR-1M", 1.0 / 12.0)
+    let monthly = ForwardCurve::builder("USD-SOFR-1M")
         .base_date(base)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots([
-            (0.0, 0.034),
-            (1.0, 0.037),
-            (2.0, 0.039),
-            (5.0, 0.044),
-            (10.0, 0.049),
-            (30.0, 0.054),
-            (50.0, 0.054),
+            (0.0, 1.0),
+            (0.125, 0.995735680640807),
+            (0.25, 0.991443070718023),
+            (0.375, 0.987122693747407),
+            (0.5, 0.982775074871822),
+            (0.625, 0.978400740755897),
+            (0.75, 0.974000219480797),
+            (0.875, 0.969574040439128),
+            (1.0, 0.965122734230001),
+            (1.125, 0.96065433763699),
+            (1.25, 0.956176748166637),
+            (1.375, 0.951690287859541),
+            (1.5, 0.947195278079959),
+            (1.625, 0.942692039478908),
+            (1.75, 0.938180891957541),
+            (1.875, 0.933662154630828),
+            (2.0, 0.929136145791519),
+            (2.1875, 0.922339596909496),
+            (2.375, 0.915539117740705),
+            (2.5625, 0.908735531233421),
+            (2.75, 0.901929654788586),
+            (2.9375, 0.895122300110174),
+            (3.125, 0.888314273058335),
+            (3.3125, 0.881506373505352),
+            (3.5, 0.874699395194429),
+            (3.6875, 0.867894125601357),
+            (3.875, 0.861091345799062),
+            (4.0625, 0.854291830325076),
+            (4.25, 0.847496347051956),
+            (4.4375, 0.840705657060653),
+            (4.625, 0.833920514516883),
+            (4.8125, 0.827141666550488),
+            (5.0, 0.820369853137831),
+            (5.3125, 0.809127454882066),
+            (5.625, 0.797961193431406),
+            (5.9375, 0.786872183825467),
+            (6.25, 0.775861503188559),
+            (6.5625, 0.76493019083878),
+            (6.875, 0.754079248413903),
+            (7.1875, 0.743309640013785),
+            (7.5, 0.732622292358937),
+            (7.8125, 0.722018094964979),
+            (8.125, 0.71149790033261),
+            (8.4375, 0.701062524152792),
+            (8.75, 0.690712745526791),
+            (9.0625, 0.680449307200737),
+            (9.375, 0.670272915814344),
+            (9.6875, 0.660184242163456),
+            (10.0, 0.650183921476041),
+            (11.25, 0.611435802813574),
+            (12.5, 0.574772338287592),
+            (13.75, 0.540096305125504),
+            (15.0, 0.507314069861044),
+            (16.25, 0.476335513620964),
+            (17.5, 0.447073955279954),
+            (18.75, 0.419446072787661),
+            (20.0, 0.393371822958022),
+            (21.25, 0.368774359997452),
+            (22.5, 0.3455799530347),
+            (23.75, 0.323717902901575),
+            (25.0, 0.303120458400172),
+            (26.25, 0.283722732278818),
+            (27.5, 0.265462617125723),
+            (28.75, 0.248280701376271),
+            (30.0, 0.232120185617091),
+            (31.25, 0.216969172010832),
+            (32.5, 0.202807099597632),
+            (33.75, 0.189569417931642),
+            (35.0, 0.177195789921751),
+            (36.25, 0.165629816816315),
+            (37.5, 0.154818781138764),
+            (38.75, 0.144713406402389),
+            (40.0, 0.135267632509086),
+            (41.25, 0.126438405808344),
+            (42.5, 0.118185482859558),
+            (43.75, 0.110471247003219),
+            (45.0, 0.103260536904929),
+            (46.25, 0.0965204862907317),
+            (47.5, 0.0902203741432862),
+            (48.75, 0.0843314846760791),
+            (50.0, 0.0788269764474369),
         ])
-        .interp(InterpStyle::Linear)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     MarketContext::new()
@@ -343,13 +497,13 @@ fn ois_baseline_retained_tenors_match_coupon_and_dv01_references() {
     let as_of = date!(2025 - 01 - 01);
     let market = benchmark_market();
     let up = market
-        .bump([MarketBump::Curve {
+        .bump([MarketBump::DiscountCurve {
             id: "USD-OIS".into(),
             spec: BumpSpec::parallel_bp(1.0),
         }])
         .unwrap();
     let down = market
-        .bump([MarketBump::Curve {
+        .bump([MarketBump::DiscountCurve {
             id: "USD-OIS".into(),
             spec: BumpSpec::parallel_bp(-1.0),
         }])
@@ -422,6 +576,7 @@ fn compact_market() -> MarketContext {
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80)])
             .interp(InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap(),
     )
@@ -447,7 +602,7 @@ fn compact_reference(market: &MarketContext, as_of: Date) -> (f64, Vec<Projected
             market
                 .get_series("FIXING:USD-OIS")
                 .unwrap()
-                .value_on_exact(start)
+                .get_value_exact(start)
                 .unwrap()
         } else {
             (curve.df_on_date(start).unwrap() / curve.df_on_date(end).unwrap() - 1.0) / alpha
@@ -644,7 +799,7 @@ fn ois_baseline_compact_export_and_inclusive_fixing_roll() {
             .observations(),
         observations
     );
-    let rolled = materialized.roll_forward(4).unwrap();
+    let rolled = materialized.condition(horizon).unwrap();
     assert_eq!(rolled.get_discount("USD-OIS").unwrap().base_date(), horizon);
     let (_, roll_record) = check_compact(&swap, &rolled, horizon);
 
@@ -652,7 +807,7 @@ fn ois_baseline_compact_export_and_inclusive_fixing_roll() {
     let before_payment = date!(2025 - 01 - 13);
     let fully_realized = materialize_fixings(&market, [&schedule], origin, before_payment)
         .unwrap()
-        .roll_forward(11)
+        .condition(before_payment)
         .unwrap();
     let (_, unpaid_record) = check_compact(&swap, &fully_realized, before_payment);
     assert_ne!(
@@ -677,9 +832,16 @@ fn ois_baseline_compact_export_and_inclusive_fixing_roll() {
         .find(|(date, _)| *date == horizon)
         .unwrap()
         .1 = 0.75;
-    let same_day_market = rolled
-        .clone()
-        .insert_series(ScalarTimeSeries::new("FIXING:USD-OIS", same_day_values, None).unwrap());
+    let same_day_market = rolled.clone().insert_series(
+        ScalarTimeSeries::new(
+            "FIXING:USD-OIS",
+            same_day_values,
+            None,
+            SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .unwrap(),
+    );
     assert_eq!(
         serde_json::to_value(swap.cashflow_schedule(&rolled, horizon).unwrap()).unwrap(),
         serde_json::to_value(swap.cashflow_schedule(&same_day_market, horizon).unwrap()).unwrap(),
@@ -692,11 +854,16 @@ fn ois_baseline_compact_export_and_inclusive_fixing_roll() {
         .filter(|(date, _)| *date != date!(2025 - 01 - 03))
         .collect();
     let missing = rolled.clone().insert_series(
-        ScalarTimeSeries::new("FIXING:USD-OIS", missing_values, None)
-            .unwrap()
-            .with_interpolation(SeriesInterpolation::Linear),
+        ScalarTimeSeries::new(
+            "FIXING:USD-OIS",
+            missing_values,
+            None,
+            SeriesInterpolation::Linear,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .unwrap(),
     );
-    let expected_error = "Missing fixing for 'USD-OIS' on 2025-01-03 (valuation date: 2025-01-06). The fixing series exists but has no exact observation: Requested item not found: series 'FIXING:USD-OIS' observation on 2025-01-03";
+    let expected_error = "Missing fixing for 'USD-OIS' on 2025-01-03 in series 'FIXING:USD-OIS': no exact observation: Requested item not found: series 'FIXING:USD-OIS' observation on 2025-01-03";
     for error in [
         swap.value(&missing, horizon).unwrap_err(),
         swap.cashflow_schedule(&missing, horizon).unwrap_err(),

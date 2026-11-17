@@ -122,18 +122,20 @@ fn asw_effective_date(
 
 /// Floating-leg day count and roll frequency for the workout asset swap:
 /// SOFR pays annual ACT/360, EURIBOR-6M semi-annual ACT/360, and any other
-/// index follows its forward curve's day count and tenor.
+/// index follows its forward curve's day count and index tenor.
 fn asw_float_leg_conventions(fwd: &ForwardCurve) -> finstack_quant_core::Result<(DayCount, Tenor)> {
     let id = fwd.id().as_str().to_ascii_uppercase();
     if id.contains("SOFRRATE") || id.contains("SOFR") {
         Ok((DayCount::Act360, Tenor::annual()))
     } else if id.contains("EURIBOR-6M") || id.contains("EURIBOR6M") {
         Ok((DayCount::Act360, Tenor::semi_annual()))
+    } else if let Some(tenor) = fwd.index_tenor() {
+        Ok((fwd.day_count(), tenor))
     } else {
-        Ok((
-            fwd.day_count(),
-            Tenor::from_years(fwd.tenor(), fwd.day_count())?,
-        ))
+        Err(finstack_quant_core::Error::Validation(format!(
+            "Forward curve '{}' requires explicit index_tenor metadata for asset-swap float leg conventions",
+            fwd.id()
+        )))
     }
 }
 
@@ -153,12 +155,12 @@ fn pv_coupon_from_custom_schedule(
         match cf.get_kind() {
             CFKind::Fixed | CFKind::Stub => {
                 let df = disc.df_on_date(cf.get_date())?;
-                pv.add(cf.get_amount().amount() * df);
+                pv.add(cf.get_amount().amount() * df)?;
             }
             _ => {}
         }
     }
-    Ok(pv.total())
+    pv.get_total()
 }
 
 /// Forward-based par ASW and its floating-leg annuity, or `None` for a

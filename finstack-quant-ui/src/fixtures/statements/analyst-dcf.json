@@ -1,10 +1,10 @@
 {
   "equity_value": {
-    "amount": "1384420565.351604",
+    "amount": "1384420565.3516035",
     "currency": "USD"
   },
   "enterprise_value": {
-    "amount": "1700820565.351604",
+    "amount": "1700820565.3516035",
     "currency": "USD"
   },
   "net_debt": {
@@ -16,10 +16,10 @@
     "currency": "USD"
   },
   "terminal_value_pv": {
-    "amount": "1601517332.953818",
+    "amount": "1601517332.9538176",
     "currency": "USD"
   },
-  "equity_value_per_share": 27.68841130703208,
+  "equity_value_per_share": 27.68841130703207,
   "diluted_shares": 50000000,
   "wacc": 0.1,
   "periods": [
@@ -42,18 +42,18 @@
     {
       "period_id": "2025Q4",
       "date": "2025-12-31",
-      "free_cash_flow": 37232282.67060437,
+      "free_cash_flow": 37232282.67060436,
       "discount_years": 0.7501711156741958,
       "discount_factor": 0.9309972608029365,
-      "present_value": 34663153.179773316
+      "present_value": 34663153.17977331
     }
   ],
   "pv_explicit": {
-    "amount": "99303232.39778599",
+    "amount": "99303232.39778598",
     "currency": "USD"
   },
   "terminal_value": {
-    "amount": "1720217019.2988462",
+    "amount": "1720217019.2988458",
     "currency": "USD"
   },
   "terminal_discount_years": 0.7501711156741958,

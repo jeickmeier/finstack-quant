@@ -29,7 +29,7 @@
 //! ```
 
 use super::business_days::joint_members;
-use crate::dates::{DateExt, HolidayCalendar};
+use crate::dates::HolidayCalendar;
 use time::Date;
 
 /// A lightweight view combining several holiday calendars (union semantics).
@@ -47,38 +47,101 @@ impl core::fmt::Debug for CompositeCalendar<'_> {
 }
 
 impl<'a> CompositeCalendar<'a> {
-    /// Create a new composite calendar: a date is a holiday if any sub-calendar
-    /// marks it as one.
-    #[must_use]
-    pub const fn new(calendars: &'a [&'a dyn HolidayCalendar]) -> Self {
-        Self { calendars }
+    /// Construct a composite calendar combining one or more sub-calendars.
+    ///
+    /// A date is a holiday if any member marks it as a holiday, and a business day
+    /// only when every member marks it as a business day.
+    ///
+    /// # Arguments
+    ///
+    /// * `calendars` - Non-empty slice of member calendars with non-disjoint
+    ///   declared coverage ranges.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] when `calendars` is empty or when
+    /// member `supported_years` intervals do not overlap.
+    pub(crate) fn try_new(calendars: &'a [&'a dyn HolidayCalendar]) -> crate::Result<Self> {
+        if calendars.is_empty() {
+            return Err(crate::Error::Validation(
+                "composite calendar requires at least one member calendar".to_string(),
+            ));
+        }
+        let mut max_from: Option<i32> = None;
+        let mut min_to: Option<i32> = None;
+        for calendar in calendars {
+            if let Some((from, to)) = calendar.supported_years() {
+                max_from = match (max_from, from) {
+                    (Some(a), Some(b)) => Some(a.max(b)),
+                    (Some(a), None) => Some(a),
+                    (None, Some(b)) => Some(b),
+                    (None, None) => None,
+                };
+                min_to = match (min_to, to) {
+                    (Some(a), Some(b)) => Some(a.min(b)),
+                    (Some(a), None) => Some(a),
+                    (None, Some(b)) => Some(b),
+                    (None, None) => None,
+                };
+            }
+        }
+        if let (Some(from), Some(to)) = (max_from, min_to)
+            && from > to
+        {
+            return Err(crate::Error::Validation(format!(
+                "composite calendar members have disjoint supported years ({from} > {to})"
+            )));
+        }
+        Ok(Self { calendars })
     }
 }
 
 impl HolidayCalendar for CompositeCalendar<'_> {
     fn is_holiday(&self, date: Date) -> crate::Result<bool> {
-        // Empty slice ⇒ no holidays, so return false. Every member is
-        // evaluated so a member failure is never hidden by an earlier hit.
+        // Every member is evaluated so a member failure is never hidden by an earlier hit.
         let mut holiday = false;
         for calendar in self.calendars {
-            holiday |= calendar.is_holiday(date)?;
+            let member = calendar.is_holiday(date)?;
+            holiday |= member;
         }
         Ok(holiday)
     }
 
     /// A date is a business day only if it is one on **all** sub-calendars,
     /// so each member's own `is_business_day` (weekends included) is respected.
-    ///
-    /// An empty calendar list treats Saturday and Sunday as the only closed days.
     fn is_business_day(&self, date: Date) -> crate::Result<bool> {
-        if self.calendars.is_empty() {
-            return Ok(!date.is_weekend());
-        }
         let mut business = true;
         for calendar in self.calendars {
-            business &= calendar.is_business_day(date)?;
+            let member = calendar.is_business_day(date)?;
+            business &= member;
         }
         Ok(business)
+    }
+
+    fn supported_years(&self) -> Option<(Option<i32>, Option<i32>)> {
+        let mut max_from: Option<i32> = None;
+        let mut min_to: Option<i32> = None;
+        for calendar in self.calendars {
+            if let Some((from, to)) = calendar.supported_years() {
+                max_from = match (max_from, from) {
+                    (Some(a), Some(b)) => Some(a.max(b)),
+                    (Some(a), None) => Some(a),
+                    (None, Some(b)) => Some(b),
+                    (None, None) => None,
+                };
+                min_to = match (min_to, to) {
+                    (Some(a), Some(b)) => Some(a.min(b)),
+                    (Some(a), None) => Some(a),
+                    (None, Some(b)) => Some(b),
+                    (None, None) => None,
+                };
+            }
+        }
+        if max_from.is_some() || min_to.is_some() {
+            Some((max_from, min_to))
+        } else {
+            None
+        }
     }
 
     fn calendar_id(&self) -> Option<String> {
@@ -110,7 +173,7 @@ mod tests {
         let gb = GBLO;
         let calendars = [&t2 as &dyn HolidayCalendar, &gb as &dyn HolidayCalendar];
 
-        let cal_union = CompositeCalendar::new(&calendars);
+        let cal_union = CompositeCalendar::try_new(&calendars).expect("non-empty composite");
 
         // Date that is holiday in both calendars (New Year's Day)
         let d1 = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
@@ -129,7 +192,7 @@ mod tests {
         let gb = GBLO;
         let calendars = [&t2 as &dyn HolidayCalendar, &gb as &dyn HolidayCalendar];
 
-        let composite = CompositeCalendar::new(&calendars);
+        let composite = CompositeCalendar::try_new(&calendars).expect("non-empty composite");
 
         // Jan 1 is a holiday in both
         let jan1 = make_date(2025, 1, 1);
@@ -146,20 +209,16 @@ mod tests {
         assert!(!composite.is_holiday(regular_day).expect("calendar lookup"));
     }
     #[test]
-    fn composite_empty_calendars_union() {
+    fn composite_empty_calendars_rejected() {
         let calendars: &[&dyn HolidayCalendar] = &[];
-        let composite = CompositeCalendar::new(calendars);
-
-        // Empty union should have no holidays
-        let any_date = make_date(2025, 1, 1);
-        assert!(!composite.is_holiday(any_date).expect("calendar lookup"));
+        assert!(CompositeCalendar::try_new(calendars).is_err());
     }
     #[test]
     fn composite_single_calendar_behaves_like_original() {
         let t2 = TARGET2;
         let calendars = [&t2 as &dyn HolidayCalendar];
 
-        let composite_union = CompositeCalendar::new(&calendars);
+        let composite_union = CompositeCalendar::try_new(&calendars).expect("non-empty composite");
 
         // Test several dates
         for day in 1..=28 {
@@ -184,7 +243,7 @@ mod tests {
             &t2 as &dyn HolidayCalendar,
         ];
 
-        let composite = CompositeCalendar::new(&calendars);
+        let composite = CompositeCalendar::try_new(&calendars).expect("non-empty composite");
 
         // Any US or EU holiday should be marked
         let us_labor_day = make_date(2025, 9, 1); // First Monday of Sept
@@ -201,7 +260,7 @@ mod tests {
         let gb = GBLO;
         let calendars = [&t2 as &dyn HolidayCalendar, &gb as &dyn HolidayCalendar];
 
-        let composite = CompositeCalendar::new(&calendars);
+        let composite = CompositeCalendar::try_new(&calendars).expect("non-empty composite");
 
         // Weekends should not be business days
         let saturday = make_date(2025, 1, 4);
@@ -221,5 +280,29 @@ mod tests {
         // Regular weekday should be business day
         let weekday = make_date(2025, 1, 2);
         assert!(composite.is_business_day(weekday).expect("calendar lookup"));
+    }
+
+    #[test]
+    fn composite_intersects_supported_years_and_rejects_disjoint_members() {
+        use crate::dates::calendar::rule::Rule;
+        use crate::dates::calendar::types::Calendar;
+        use crate::dates::calendar::{BSE, SGSI};
+
+        let sgsi_nyse_cals: [&dyn HolidayCalendar; 2] = [&SGSI, &NYSE];
+        let sgsi_nyse = CompositeCalendar::try_new(&sgsi_nyse_cals).expect("overlapping coverage");
+        assert_eq!(sgsi_nyse.supported_years(), Some((Some(2024), Some(2027))));
+        assert!(sgsi_nyse.metadata().is_none());
+
+        let sgsi_bse_cals: [&dyn HolidayCalendar; 2] = [&SGSI, &BSE];
+        let sgsi_bse = CompositeCalendar::try_new(&sgsi_bse_cals).expect("overlapping coverage");
+        assert_eq!(sgsi_bse.supported_years(), Some((Some(2024), Some(2026))));
+
+        static EMPTY_RULES: [Rule; 0] = [];
+        let old_cal = Calendar::new("old", "Old", false, &EMPTY_RULES, Some((None, Some(2023))));
+        let calendars: [&dyn HolidayCalendar; 2] = [&old_cal, &SGSI];
+        assert!(
+            CompositeCalendar::try_new(&calendars).is_err(),
+            "disjoint coverage bounds must be rejected"
+        );
     }
 }

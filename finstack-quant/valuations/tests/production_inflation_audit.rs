@@ -4,7 +4,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, calendar_by_id_strict};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationLag, SeriesInterpolation,
+    InflationIndex, InflationLag, InflationObservation,
 };
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
 use finstack_quant_core::money::Money;
@@ -25,6 +25,9 @@ fn b17_fixed_inflation_leg_compounds_one_per_annual_period() {
         DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (40.0, 1.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount"),
     );
@@ -59,6 +62,9 @@ fn fixed_inflation_leg_counts_a_stub_as_a_fraction_of_a_year() {
         DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (40.0, 1.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount"),
     );
@@ -90,26 +96,36 @@ fn fixed_inflation_leg_counts_a_stub_as_a_fraction_of_a_year() {
 }
 
 #[test]
-fn b17_month_end_cpi_has_the_same_reference_month_in_index_and_hybrid_sources() {
+fn monthly_cpi_has_the_same_reference_month_in_index_and_hybrid_sources() {
     let mut bond = InflationLinkedBond::example().expect("example");
     bond.base_cpi = 300.0;
-    bond.lag = InflationLag::Months(3);
+    bond.lag = InflationLag::months(3);
     let index = InflationIndex::new(
         "US-CPI",
         vec![
-            (date!(2024 - 10 - 31), 300.0),
-            (date!(2024 - 11 - 30), 303.0),
+            InflationObservation {
+                reference_month: date!(2024 - 10 - 01),
+                value: 300.0,
+                available_on: date!(2024 - 11 - 13),
+            },
+            InflationObservation {
+                reference_month: date!(2024 - 11 - 01),
+                value: 303.0,
+                available_on: date!(2024 - 12 - 13),
+            },
         ],
         Currency::USD,
+        date!(2025 - 01 - 16),
     )
-    .expect("published monthly CPI")
-    .with_interpolation(SeriesInterpolation::Linear);
+    .expect("published monthly CPI");
     bond.inflation_index_id = "US-CPI".into();
     let historical = MarketContext::new().insert_inflation_index(index);
     let hybrid = historical.clone().insert(
         InflationCurve::builder("US-CPI")
             .base_date(date!(2024 - 11 - 01))
-            .base_cpi(303.0)
+            .day_count(DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .knots([(0.0, 303.0), (1.0, 310.0)])
             .build()
             .expect("projection"),
@@ -131,13 +147,18 @@ fn m20_historical_inflation_requires_an_observation() {
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (10.0, 1.0)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("discount"),
         )
         .insert(
             InflationCurve::builder("US-CPI")
                 .base_date(as_of)
-                .base_cpi(300.0)
+                .day_count(DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
                 .knots([(0.0, 300.0), (10.0, 360.0)])
                 .build()
                 .expect("projection"),
@@ -265,13 +286,18 @@ fn b17_projected_inflation_uses_contract_month_interpolation_weights() {
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (5.0, 1.0)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("discount"),
         )
         .insert(
             InflationCurve::builder("US-CPI")
                 .base_date(origin)
-                .base_cpi(300.0)
+                .day_count(DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
                 .knots([
                     (0.0, 300.0),
                     (time(date!(2025 - 11 - 01)), 303.0),
@@ -281,20 +307,18 @@ fn b17_projected_inflation_uses_contract_month_interpolation_weights() {
                 .expect("projection"),
         )
         .insert_inflation_index(
-            InflationIndex::new(
+            finstack_quant_valuations_test_support::inflation::simple_index(
                 "US-CPI",
-                vec![(date!(2024 - 10 - 31), 300.0)],
+                as_of,
+                300.0,
                 Currency::USD,
-            )
-            .expect("history")
-            .with_interpolation(SeriesInterpolation::Linear)
-            .with_lag(InflationLag::Months(3)),
+            ),
         );
     let mut swap = InflationSwap::example().expect("example");
     swap.start_date = as_of;
     swap.maturity = date!(2026 - 02 - 16);
     swap.base_cpi = Some(300.0);
-    swap.lag = Some(InflationLag::Months(3));
+    swap.lag = Some(InflationLag::months(3));
     let actual = swap
         .pv_inflation_leg(&market, as_of)
         .expect("inflation PV")

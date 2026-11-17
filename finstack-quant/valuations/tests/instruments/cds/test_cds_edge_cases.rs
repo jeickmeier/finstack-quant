@@ -17,13 +17,16 @@ fn build_curves(as_of: Date) -> (DiscountCurve, HazardCurve) {
         .base_date(as_of)
         .day_count(DayCount::Act360)
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.78), (10.0, 0.61)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     let hazard = HazardCurve::builder("CORP")
         .base_date(as_of)
         .recovery_rate(0.40)
-        .knots([(0.0, 0.01), (1.0, 0.01), (5.0, 0.015), (10.0, 0.02)])
+        .knots([(1.0, 0.01), (5.0, 0.015), (10.0, 0.02)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
 
@@ -165,13 +168,16 @@ fn test_zero_recovery_rate() {
         .base_date(as_of)
         .day_count(DayCount::Act360)
         .knots([(0.0, 1.0), (10.0, 0.6)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     let hazard = HazardCurve::builder("CORP")
         .base_date(as_of)
         .recovery_rate(0.0) // Zero recovery
-        .knots([(0.0, 0.02), (10.0, 0.02)])
+        .knots([(10.0, 0.02)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
 
@@ -205,13 +211,16 @@ fn test_full_recovery_rate_is_rejected() {
         .base_date(as_of)
         .day_count(DayCount::Act360)
         .knots([(0.0, 1.0), (10.0, 0.6)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     let hazard = HazardCurve::builder("CORP")
         .base_date(as_of)
         .recovery_rate(0.4)
-        .knots([(0.0, 0.02), (10.0, 0.02)])
+        .knots([(10.0, 0.02)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
 
@@ -336,13 +345,16 @@ fn test_very_high_hazard_rate() {
         .base_date(as_of)
         .day_count(DayCount::Act360)
         .knots([(0.0, 1.0), (10.0, 0.6)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     let hazard = HazardCurve::builder("CORP")
         .base_date(as_of)
         .recovery_rate(0.40)
-        .knots([(0.0, 0.5), (10.0, 0.5)]) // 50% hazard rate
+        .knots([(10.0, 0.5)]) // 50% hazard rate
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
 
@@ -375,13 +387,16 @@ fn test_zero_hazard_rate() {
         .base_date(as_of)
         .day_count(DayCount::Act360)
         .knots([(0.0, 1.0), (10.0, 0.6)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     let hazard = HazardCurve::builder("CORP")
         .base_date(as_of)
         .recovery_rate(0.40)
-        .knots([(0.0, 0.0), (10.0, 0.0)]) // Zero hazard
+        .knots([(10.0, 0.0)]) // Zero hazard
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
 
@@ -470,6 +485,8 @@ fn test_par_spread_with_mismatched_curves_errors() {
                 .base_date(as_of)
                 .day_count(DayCount::Act360)
                 .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.78), (10.0, 0.61)])
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .unwrap(),
         )
@@ -477,7 +494,8 @@ fn test_par_spread_with_mismatched_curves_errors() {
             HazardCurve::builder("CORP_ACTUAL")
                 .base_date(as_of)
                 .recovery_rate(0.40)
-                .knots([(0.0, 0.01), (1.0, 0.01), (5.0, 0.015), (10.0, 0.02)])
+                .knots([(1.0, 0.01), (5.0, 0.015), (10.0, 0.02)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .unwrap(),
         );
@@ -569,7 +587,8 @@ fn test_missing_discount_curve_error() {
     let hazard = HazardCurve::builder("CORP")
         .base_date(as_of)
         .recovery_rate(0.40)
-        .knots([(0.0, 0.02), (10.0, 0.02)])
+        .knots([(10.0, 0.02)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
 
@@ -600,6 +619,8 @@ fn test_missing_hazard_curve_error() {
         .base_date(as_of)
         .day_count(DayCount::Act360)
         .knots([(0.0, 1.0), (10.0, 0.6)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 

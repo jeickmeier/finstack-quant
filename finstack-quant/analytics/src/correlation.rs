@@ -175,9 +175,9 @@ fn unit_centered(values: &[f64]) -> Result<Vec<f64>> {
         .iter()
         .map(|&value| (value - anchor) / scale)
         .collect();
-    let mean = neumaier_sum(shifted.iter().map(|value| value / values.len() as f64));
+    let mean = neumaier_sum(shifted.iter().map(|value| value / values.len() as f64))?;
     let mut centered: Vec<_> = shifted.iter().map(|value| value - mean).collect();
-    let norm = neumaier_sum(centered.iter().map(|value| value * value)).sqrt();
+    let norm = neumaier_sum(centered.iter().map(|value| value * value))?.sqrt();
     if !norm.is_finite() || norm <= 0.0 {
         return Err(Error::Internal(
             "correlation normalization failed for a varying column".into(),
@@ -217,9 +217,9 @@ pub(crate) fn estimate(
     for i in 0..n {
         matrix[i][i] = 1.0;
         for j in i + 1..n {
-            let mut coefficient = neumaier_sum(unit[i].iter().zip(&unit[j]).map(|(x, y)| x * y));
+            let mut coefficient = neumaier_sum(unit[i].iter().zip(&unit[j]).map(|(x, y)| x * y))?;
             let absolute_products =
-                neumaier_sum(unit[i].iter().zip(&unit[j]).map(|(x, y)| (x * y).abs()));
+                neumaier_sum(unit[i].iter().zip(&unit[j]).map(|(x, y)| (x * y).abs()))?;
             if coefficient.abs() <= f64::EPSILON.sqrt() * absolute_products {
                 // Reconstruct the same covariance from exact binary inputs when
                 // cancellation can expose information lost while centering.

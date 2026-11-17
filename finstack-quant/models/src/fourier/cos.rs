@@ -475,10 +475,10 @@ impl<'a> CosPricer<'a> {
             // precomputed for the whole strip; only `v_k` varies with the strike.
             // (The phase identity uses `a_x - x0 = a`.)
             let weight = if k == 0 { 0.5 } else { 1.0 };
-            sum.add(weight * (2.0 / bma) * ak * v_k);
+            sum.add(weight * (2.0 / bma) * ak * v_k)?;
         }
 
-        let raw = strike * df * sum.total();
+        let raw = strike * df * sum.get_total()?;
         // A negative result here is always a truncation / discretisation
         // artefact for a vanilla put — the mathematical price is non-negative.
         // Surface it as a warning so callers can tune `num_terms` or

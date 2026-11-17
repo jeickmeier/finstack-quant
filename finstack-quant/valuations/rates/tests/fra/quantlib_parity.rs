@@ -51,6 +51,8 @@ fn create_flat_discount_curve(base_date: Date, rate: f64, curve_id: &str) -> Dis
         .base_date(base_date)
         .day_count(DayCount::Act360)
         .knots(dfs)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -60,31 +62,29 @@ fn create_flat_forward_curve(
     base_date: Date,
     rate: f64,
     curve_id: &str,
-    tenor: f64,
+    _tenor: f64,
 ) -> ForwardCurve {
-    let projection_grid = (0..=40)
-        .map(|quarter| {
-            DayCount::Act360
-                .year_fraction(
-                    base_date,
-                    base_date.add_months(quarter * 3).expect("valid date shift"),
-                    DayCountContext::default(),
-                )
-                .expect("valid quarterly projection boundary")
-        })
-        .collect::<Vec<_>>();
-    let last_time = *projection_grid
-        .last()
-        .expect("projection grid is non-empty");
-
-    ForwardCurve::builder(curve_id, tenor)
-        .base_date(base_date)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, rate), (last_time, rate)])
-        .projection_grid(projection_grid)
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap()
+    let mut points = vec![(base_date, 1.0)];
+    let mut prev = base_date;
+    let mut factor = 1.0;
+    for quarter in 1..=40 {
+        let next = base_date.add_months(quarter * 3).expect("valid date shift");
+        let yf = DayCount::Act360
+            .year_fraction(prev, next, DayCountContext::default())
+            .expect("valid quarterly accrual");
+        factor /= 1.0 + rate * yf;
+        points.push((next, factor));
+        prev = next;
+    }
+    ForwardCurve::from_dates(
+        curve_id,
+        base_date,
+        &points,
+        DayCount::Act360,
+        InterpStyle::LogLinear,
+        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+    )
+    .unwrap()
 }
 
 /// Helper: Create market context with flat curves

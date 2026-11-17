@@ -317,14 +317,34 @@ pub(crate) fn collect_fx_option_inputs_at_spot(
     }
 
     let forward = no_vol.spot * no_vol.df_foreign / no_vol.df_domestic;
-    let sigma =
-        finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_fx_sigma_at(
-            &request.instrument_pricing_overrides.market_quotes,
-            request.market,
-            request.vol_surface_id,
-            no_vol.t,
-            request.strike,
+    let pair = finstack_quant_core::money::fx::CurrencyPair::try_new(
+        request.base_currency,
+        request.quote_currency,
+    )?;
+    if request
+        .instrument_pricing_overrides
+        .market_quotes
+        .implied_volatility
+        .is_none()
+    {
+        finstack_quant_core::validation::validate_f64_positive(
             forward,
+            "FX option delivery forward",
+        )?;
+    }
+    let sigma =
+        finstack_quant_valuations_core::instruments::common_impl::vol_resolution::resolve_fx_sigma(
+            finstack_quant_valuations_core::instruments::common_impl::vol_resolution::FxVolatilityRequest {
+                overrides: &request.instrument_pricing_overrides.market_quotes,
+                curves: request.market,
+                vol_surface_id: request.vol_surface_id,
+                pair,
+                as_of: request.as_of,
+                expiry: request.expiry,
+                model_time: no_vol.t,
+                strike: request.strike,
+                forward,
+            },
         )?;
 
     Ok(FxOptionInputs {
@@ -594,7 +614,9 @@ mod tests {
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
@@ -606,17 +628,24 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, (-0.04_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid discount");
         let foreign = DiscountCurve::builder("EUR-OIS")
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, (-0.02_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid foreign");
         let vol = VolSurface::builder("EURUSD-VOL")
             .expiries(&[1.0])
-            .strikes(&[1.1])
+            .secondary_values(&[1.1])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.20])
             .build()
             .expect("valid vol");
@@ -632,7 +661,7 @@ mod tests {
             .insert_fx(fx)
             .insert_price(
                 "EURUSD-SPOT",
-                MarketScalar::Price(Money::new(1.1, Currency::USD).expect("valid money fixture")),
+                MarketScalar::price(Money::new(1.1, Currency::USD).expect("valid money fixture")),
             )
     }
 

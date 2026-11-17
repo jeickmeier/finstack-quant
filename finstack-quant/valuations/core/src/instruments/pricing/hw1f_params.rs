@@ -37,10 +37,9 @@ impl Hw1fParamFamily {
 }
 
 fn scalar_as_positive_f64(scalar: &MarketScalar) -> Option<f64> {
-    let value = match scalar {
-        MarketScalar::Unitless(value) => *value,
-        MarketScalar::Price(money) => money.amount(),
-    };
+    let value = scalar
+        .get_unitless()
+        .or_else(|| scalar.get_price().map(|money| money.amount()))?;
     (value.is_finite() && value > 0.0).then_some(value)
 }
 
@@ -217,8 +216,14 @@ mod tests {
     fn complete_market_pair_is_used() {
         let (kappa_key, sigma_key) = hw1f_scalar_keys("USD-OIS");
         let market = MarketContext::new()
-            .insert_price(kappa_key, MarketScalar::Unitless(0.04))
-            .insert_price(sigma_key, MarketScalar::Unitless(0.009));
+            .insert_price(
+                kappa_key,
+                MarketScalar::unitless(0.04).expect("valid scalar"),
+            )
+            .insert_price(
+                sigma_key,
+                MarketScalar::unitless(0.009).expect("valid scalar"),
+            );
         let params = resolve(&ModelConfig::default(), None, &market).expect("complete market pair");
         assert_eq!(
             params,

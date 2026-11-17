@@ -10,15 +10,14 @@
 //!
 //! ## Hazard Curve Recalibration
 //!
-//! When the index hazard curve carries the par-spread quotes it was
-//! bootstrapped from (`par_spread_points` non-empty), the bumped recovery
-//! is propagated through a full re-bootstrap of the index survival curve
-//! so the observed CDS index spreads remain consistent. This captures the
-//! indirect `h ≈ S/(1-R)` effect that dominates the recovery sensitivity for
-//! distressed indices.
+//! When the index hazard curve carries a stored `hazard_calibration` recipe,
+//! the bumped recovery is propagated through a full re-bootstrap of the index
+//! survival curve so the observed CDS index spreads remain consistent. This
+//! captures the indirect `h ≈ S/(1-R)` effect that dominates the recovery
+//! sensitivity for distressed indices.
 //!
-//! When the curve has no stored par spreads (e.g. a hand-built knot curve
-//! used in tests), the calculator falls back to a frozen-curve bump: only
+//! When the curve has no `hazard_calibration` recipe (e.g. a hand-built knot
+//! curve used in tests), the calculator falls back to a frozen-curve bump: only
 //! the index-level recovery rate is updated and the survival curve is
 //! reused unchanged. This produces a *partial* recovery sensitivity that,
 //! for spread-bootstrapped curves, typically understates the true value
@@ -192,7 +191,7 @@ mod tests {
                 .base_date(base)
                 .recovery_rate(0.40)
                 .knots([(1.0, 0.02), (5.0, 0.025)])
-                .par_spreads([(1.0, 120.0), (5.0, 150.0)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .expect("hazard curve"),
         );

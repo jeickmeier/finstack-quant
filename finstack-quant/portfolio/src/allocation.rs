@@ -172,8 +172,8 @@ pub fn allocate_weights(spec: &WeightAllocationSpec) -> Result<WeightAllocationR
         scheme: spec.scheme,
         allocations,
         diagnostics: AllocationDiagnostics {
-            weights_sum: neumaier_sum(weights.iter().copied()),
-            leverage: neumaier_sum(weights.iter().map(|weight| weight.abs())),
+            weights_sum: neumaier_sum(weights.iter().copied())?,
+            leverage: neumaier_sum(weights.iter().map(|weight| weight.abs()))?,
         },
     })
 }
@@ -286,7 +286,7 @@ fn inverse_volatility_weights(
         inverse_vols.push(1.0 / volatility);
     }
 
-    let denominator = neumaier_sum(inverse_vols.iter().copied());
+    let denominator = neumaier_sum(inverse_vols.iter().copied())?;
     if denominator <= WEIGHT_TOLERANCE {
         return Err(Error::invalid_input(
             "allocation inverse volatility denominator is zero",
@@ -323,7 +323,13 @@ fn sample_volatility(strategy: &StrategyAllocationInput) -> Result<f64> {
             strategy.id
         )));
     }
-    Ok(variance(&strategy.returns).sqrt())
+    let var = variance(&strategy.returns)?.ok_or_else(|| {
+        Error::invalid_input(format!(
+            "allocation strategy '{}' requires at least two returns",
+            strategy.id
+        ))
+    })?;
+    Ok(var.sqrt())
 }
 
 fn risk_budget_weights(
@@ -466,9 +472,9 @@ fn risk_contribution_fractions(weights: &[f64], covariance: &[f64]) -> Result<Ve
     for row in 0..n {
         let mut acc = NeumaierAccumulator::new();
         for col in 0..n {
-            acc.add(covariance[row * n + col] * weights[col]);
+            acc.add(covariance[row * n + col] * weights[col])?;
         }
-        sigma_w[row] = acc.total();
+        sigma_w[row] = acc.get_total()?;
     }
 
     let variance = weights
@@ -572,7 +578,7 @@ fn rounded_capitals(total_capital: f64, weights: &[f64], decimal_places: u32) ->
 }
 
 fn validate_weights_sum_to_one(weights: &[f64], label: &str) -> Result<()> {
-    let sum = neumaier_sum(weights.iter().copied());
+    let sum = neumaier_sum(weights.iter().copied())?;
     if (sum - 1.0).abs() > WEIGHT_TOLERANCE {
         return Err(Error::invalid_input(format!(
             "allocation {label} must sum to 1.0 (got {sum})"
@@ -582,7 +588,7 @@ fn validate_weights_sum_to_one(weights: &[f64], label: &str) -> Result<()> {
 }
 
 fn normalize_weights(weights: &mut [f64]) -> Result<()> {
-    let sum = neumaier_sum(weights.iter().copied());
+    let sum = neumaier_sum(weights.iter().copied())?;
     if sum <= WEIGHT_TOLERANCE {
         return Err(Error::invalid_input(
             "allocation weights sum must be positive",
@@ -695,7 +701,7 @@ mod tests {
                 allocation.capital
             );
         }
-        let total = neumaier_sum(result.allocations.iter().map(|a| a.capital));
+        let total = neumaier_sum(result.allocations.iter().map(|a| a.capital)).unwrap();
         assert!(
             (total - 10_000_000.0).abs() <= 1e-8,
             "capitals sum to {total}"

@@ -188,17 +188,11 @@ export type Currency =
 export type CurveState =
   | {
       /**
-       * Whether non-monotonic DFs are allowed (dangerous override)
-       */
-      allow_non_monotonic: boolean;
-      /**
        * Base date
        */
       base: DateWire;
       /**
-       * Registered holiday calendar id of the business-day time axis (for
-       * example `"brbd"` for a Bus/252 curve). Omitted when the day count needs
-       * no calendar.
+       * Registered holiday calendar id of the business-day time axis.
        */
       calendar_id?: string | null;
       /**
@@ -222,17 +216,9 @@ export type CurveState =
        */
       interp_style: InterpStyle;
       /**
-       * Time/value pairs used to construct the curve
+       * Time/value pairs stored on the curve (must already contain origin `(0.0, 1.0)`).
        */
       knot_points: [number, number][];
-      /**
-       * Minimum forward rate floor (if set)
-       */
-      min_forward_rate?: number | null;
-      /**
-       * Minimum tenor for forward rate calculations
-       */
-      min_forward_tenor: number;
       /**
        * Exact typed calibration replay recipe.
        */
@@ -245,68 +231,66 @@ export type CurveState =
     }
   | {
       /**
-       * Base date
+       * Base date.
        */
       base: DateWire;
       /**
-       * Day count convention
+       * Registered holiday calendar id of the business-day time axis.
+       */
+      calendar_id?: string | null;
+      /**
+       * Day-count convention for projection factor time basis.
        */
       day_count: DayCount;
       /**
-       * Extrapolation policy
+       * Extrapolation policy.
        */
       extrapolation: ExtrapolationPolicy;
       /**
-       * Opaque FX policy stamp; see [`crate::market_data::term_structures::DiscountCurve::fx_policy`].
+       * Opaque FX policy stamp; see [`ForwardCurve::fx_policy`].
        */
       fx_policy?: string | null;
       /**
-       * Curve identifier
+       * Curve identifier.
        */
       id: string;
       /**
-       * Interpolation style
+       * Optional index accrual tenor metadata.
+       */
+      index_tenor?: Tenor | null;
+      /**
+       * Interpolation style.
        */
       interp_style: InterpStyle;
       /**
-       * Time/value pairs used to construct the curve
+       * Time/factor pairs stored on the curve (must already contain origin `(0.0, 1.0)`).
        */
       knot_points: [number, number][];
-      /**
-       * Optional contractual reset/end-date boundaries.
-       *
-       * `None` selects fixed numeric-tenor discount-factor stepping.
-       */
-      projection_grid?: number[] | null;
       /**
        * Exact typed calibration replay recipe.
        */
       rate_calibration?: RateCalibrationRecipe | null;
       /**
-       * Reset lag in business days
-       */
-      reset_lag: number;
-      /**
-       * Index tenor in years
-       */
-      tenor: number;
-      /**
-       * Canonical source interpolation and cumulative continuous transformations.
+       * Canonical source interpolation and accumulated continuous transformations.
        */
       transform?: ForwardCurveTransform | null;
       type: "forward";
     }
   | {
       /**
-       * Base date
+       * Base date.
        */
       base: DateWire;
       /**
-       * Currency
+       * Registered holiday calendar id of the business-day time axis.
+       */
+      calendar_id?: string | null;
+      /**
+       * Currency.
        */
       currency?: Currency | null;
       /**
-       * Day count convention
+       * Day count convention.
        */
       day_count: DayCount;
       /**
@@ -318,77 +302,60 @@ export type CurveState =
        */
       hazard_calibration?: HazardCalibrationRecipe | null;
       /**
-       * Curve identifier
+       * Curve identifier.
        */
       id: string;
       /**
-       * Optional issuer
+       * Optional issuer.
        */
       issuer?: string | null;
       /**
-       * Time/value pairs used to construct the curve
+       * Strictly positive ending `(time_years, hazard_rate)` pillars.
        */
       knot_points: [number, number][];
       /**
-       * Hazard-rate cap the curve was built with, when it differs from the
-       * default of 10; absent for curves built with the default.
-       */
-      max_hazard_rate?: number | null;
-      /**
-       * Par interpolation method
-       */
-      par_interp?: ParInterp;
-      /**
-       * Par spread points for reporting
-       */
-      par_points: [number, number][];
-      /**
-       * Recovery rate
+       * Recovery rate in `[0, 1]`.
        */
       recovery_rate: number;
       /**
-       * Seniority
+       * Seniority.
        */
       seniority?: Seniority | null;
+      /**
+       * Source coordinate anchor for conditioned curves.
+       */
+      source?: HazardConditionSource | null;
       type: "hazard";
     }
   | {
       /**
-       * Base CPI level at t=0
-       */
-      base_cpi: number;
-      /**
-       * Base date
+       * Anchor date represented by the `t = 0.0` CPI pillar.
        */
       base_date: DateWire;
       /**
-       * Day count convention
+       * Optional registered holiday calendar identifier (`"brbd"`, `"usny+target2"`, etc.).
        */
-      day_count?: DayCount;
+      calendar_id?: string | null;
       /**
-       * Extrapolation policy
+       * Explicit day-count convention.
+       */
+      day_count: DayCount;
+      /**
+       * Explicit extrapolation policy (`flat`, `extend`, or `error`).
        */
       extrapolation: ExtrapolationPolicy;
       /**
-       * Curve identifier
+       * Curve identifier.
        */
       id: string;
       /**
-       * Indexation lag in months
-       */
-      indexation_lag_months?: number;
-      /**
-       * Interpolation style
+       * Explicit scalar interpolation style (`linear`, `cubic_hermite`, or `log_linear`).
        */
       interp_style: InterpStyle;
       /**
-       * Time/value pairs used to construct the curve
+       * Strictly increasing `(time_years, cpi_level)` pillars starting at `0.0`.
        */
       knot_points: [number, number][];
-      /**
-       * Source interpolation and accumulated time origin for a rolled curve.
-       */
-      roll_transform?: InterpRollState | null;
       type: "inflation";
     }
   | {
@@ -423,10 +390,6 @@ export type CurveState =
        */
       knot_points: [number, number][];
       /**
-       * Source interpolation and accumulated time origin for a rolled curve.
-       */
-      roll_transform?: InterpRollState | null;
-      /**
        * Spot index level (volatility index curves)
        */
       spot_level?: number | null;
@@ -438,41 +401,18 @@ export type CurveState =
     }
   | {
       /**
-       * Base date.
+       * Accumulated continuous-zero shock adjustment on the source clock.
        */
-      base: DateWire;
-      /**
-       * Day count convention.
-       */
-      day_count: DayCount;
-      /**
-       * Extrapolation policy.
-       */
-      extrapolation: ExtrapolationPolicy;
-      /**
-       * Curve identifier.
-       */
-      id: string;
-      /**
-       * Interpolation style.
-       */
-      interp_style: InterpStyle;
-      /**
-       * Time/value pairs used to construct the curve.
-       */
-      knot_points: [number, number][];
-      /**
-       * Source interpolation and accumulated time origin for a rolled curve.
-       */
-      roll_transform?: InterpRollState | null;
-      type: "basis_spread";
-    }
-  | {
+      adjustment?: PiecewiseLinearAdjustment | null;
       /**
        * Base date.
        */
       base_date: DateWire;
       /**
+       * Registered holiday calendar id for Bus/252.
+       */
+      calendar_id?: string | null;
+      /**
        * Day count convention.
        */
       day_count: DayCount;
@@ -481,14 +421,13 @@ export type CurveState =
        */
       id: string;
       /**
-       * Nelson-Siegel model parameters.
+       * Validated Nelson-Siegel model parameters.
        */
       model: NelsonSiegelModel;
       /**
-       * Current origin in the source model's year-fraction coordinates;
-       * omitted means `0.0` (a curve that has never been rolled).
+       * Original anchor date when the curve has been conditioned.
        */
-      time_offset?: number;
+      source_base_date?: DateWire | null;
       type: "parametric";
     };
 /**
@@ -636,18 +575,18 @@ export type DayCount =
  * Extrapolation policy for evaluation outside the knot range.
  *
  * Every interpolation strategy honours this policy at both ends of the knot
- * range. Choose based on what behaviour the downstream pricer expects:
+ * range. Callers must choose an explicit policy:
  *
- * - `FlatZero` (default): hold the boundary value constant.
- * - `FlatForward`: extend the boundary segment's slope, measured in the
- *   space the interpolation style works in (table below).
- * - `None`: refuse to extrapolate; return `NaN` and require the caller to
- *   detect and handle out-of-range queries explicitly. Recommended for
- *   production risk systems.
+ * - `Flat`: hold the boundary ordinate constant outside the knot range
+ *   (and return derivative `0.0` strictly outside the knot range).
+ * - `Extend`: extend the boundary segment's slope in the interpolation style's
+ *   working space (table below).
+ * - `Error`: refuse to extrapolate; return an explicit error for queries
+ *   outside `[knots[0], knots[last]]`.
  *
- * What `FlatForward` extends depends on the [`InterpStyle`]:
+ * What `Extend` extends depends on the [`InterpStyle`]:
  *
- * | Style | `FlatForward` extends | On a discount-factor curve | On a rate-valued curve |
+ * | Style | `Extend` extends | On a discount-factor curve | On a rate-valued curve |
  * |---|---|---|---|
  * | `Linear` | the value linearly | - | rates keep trending |
  * | `CubicHermite` | the value linearly, with the end-knot slope | - | rates keep trending |
@@ -656,14 +595,10 @@ export type DayCount =
  * | `MonotoneConvex` | the boundary instantaneous forward | flat forward rate | - |
  *
  * The market-standard tail for a discount-factor curve is a flat forward
- * rate (`FlatForward` with a log-space style). For a curve that stores
- * rates, such as [`ForwardCurve`](crate::market_data::term_structures::ForwardCurve),
- * the market-standard tail holds the last rate flat, which is `FlatZero`.
- *
- * `#[non_exhaustive]` so that future policies (e.g. linear-zero,
- * asymptotic) can be added without breaking downstream code.
+ * rate (`Extend` with a log-space style). For a curve that stores rates or
+ * spreads, holding the last rate constant is `Flat`.
  */
-export type ExtrapolationPolicy = "flat_zero" | "flat_forward" | "none";
+export type ExtrapolationPolicy = "flat" | "extend" | "error";
 /**
  * Enum of supported interpolation styles. The default is `Linear`.
  */
@@ -871,22 +806,7 @@ export type RateCalibrationCurveRole =
       };
     };
 /**
- * Interpolation method for reporting par spreads stored on the curve.
- *
- * Applies only to *par-spread* readouts (the spreads quoted at calibration
- * pillars), not to the underlying hazard rates. Hazard interpolation always
- * follows piecewise-constant survival. Use `LogLinear` when spreads span
- * multiple decades (e.g. high-yield issuers) so interpolation stays in
- * log-space; otherwise the default `Linear` is fine.
- */
-export type ParInterp = "linear" | "log_linear";
-/**
  * Seniority level for credit exposures.
- *
- * Used to tag a hazard curve with the seniority of the issuer's debt
- * observed by the curve. Drives the recovery-rate prior in default
- * modelling and selects the right LGD prior in
- * `finstack_quant_models::credit::lgd::seniority`.
  *
  * Order is **not** total — `SeniorSecured` is strictly senior to `Senior`,
  * `Subordinated`, and `Junior`, but the relative ordering of `Subordinated`
@@ -894,58 +814,24 @@ export type ParInterp = "linear" | "log_linear";
  */
 export type Seniority = "senior_secured" | "senior" | "subordinated" | "junior";
 /**
- * Nelson-Siegel model parameters.
- *
- * Stores either the 4-parameter NS or 6-parameter NSS specification.
+ * Validated Nelson-Siegel or Nelson-Siegel-Svensson model parameters.
  */
 export type NelsonSiegelModel =
   | {
-      /**
-       * Long-term rate level.
-       */
       beta0: number;
-      /**
-       * Short-term component.
-       */
       beta1: number;
-      /**
-       * Medium-term hump.
-       */
       beta2: number;
-      /**
-       * Decay factor (must be > 0).
-       */
       tau: number;
       variant: "ns";
-      [k: string]: unknown;
     }
   | {
-      /**
-       * Long-term rate level.
-       */
       beta0: number;
-      /**
-       * Short-term component.
-       */
       beta1: number;
-      /**
-       * Medium-term hump.
-       */
       beta2: number;
-      /**
-       * Second hump.
-       */
       beta3: number;
-      /**
-       * First decay factor (must be > 0).
-       */
       tau1: number;
-      /**
-       * Second decay factor (must be > 0, ≠ τ₁).
-       */
       tau2: number;
       variant: "nss";
-      [k: string]: unknown;
     };
 /**
  * Exact decimal encoded only as a JSON string.
@@ -986,6 +872,14 @@ export type DividendKind =
       };
     };
 /**
+ * At-the-money strike convention on [`FxDeltaVolSurface`].
+ */
+export type FxAtmConvention = "delta_neutral_straddle";
+/**
+ * Butterfly quote convention on [`FxDeltaVolSurface`].
+ */
+export type FxButterflyConvention = "smile";
+/**
  * Provider-selection purpose of a point-date FX query (record
  * CORE-CONVENTIONS-013 #1/#2).
  *
@@ -995,6 +889,10 @@ export type DividendKind =
  * owner that needs one computes the oriented aggregate itself.
  */
 export type FxConversionPolicy = "cashflow_date" | "period_end";
+/**
+ * Delta convention governing how [`FxDeltaVolSurface`] maps wing deltas onto strikes.
+ */
+export type FxSurfaceDeltaConvention = "forward_unadjusted";
 /**
  * Regular-grid selection for schedule generation (record
  * CORE-CONVENTIONS-008 #2, #5, #6).
@@ -1017,39 +915,75 @@ export type FxConversionPolicy = "cashflow_date" | "period_end";
  */
 export type GridMode = "natural" | "end_of_month" | "quarterly_imm";
 /**
- * Interpolation strategy for [`ScalarTimeSeries`].
+ * Canonical family-typed identifier for an addressable entry in
+ * [`MarketContext`](crate::market_data::context::MarketContext).
+ *
+ * Identifiers in `MarketContext` are namespace-local: the same `CurveId` may
+ * coexist across distinct stores (for example a `VolSurface` and a
+ * `ScalarTimeSeries`). `MarketDataTarget` pairs an exact [`CurveId`] with the
+ * exact store and subkind to select without multi-store probing.
  */
-export type SeriesInterpolation = "step" | "linear";
-/**
- * Contractual observation lag for inflation index reference dates.
- *
- * Inflation indices are published with a delay (typically 2-4 weeks). Securities
- * using these indices incorporate an observation lag to ensure the reference
- * index is published by settlement. This lag does not specify the actual
- * publication date; use [`InflationIndex::with_publication_dates`] for that.
- *
- * # Standard Lags by Market
- *
- * - **US TIPS**: 3-month lag (reference index from 3 months prior)
- * - **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)
- * - **French OATi**: 3-month lag
- * - **German index-linked**: 3-month lag
- *
- * # Rationale
- *
- * The lag ensures:
- * 1. Reference index is published before settlement
- * 2. Index value is known at coupon payment date
- * 3. No estimation or forecasting required for payment calculation
- */
-export type InflationLag =
+export type MarketDataTarget =
   | {
-      months: number;
+      id: Id;
+      kind: "discount_curve";
+      [k: string]: unknown;
     }
   | {
-      days: number;
+      id: Id;
+      kind: "forward_curve";
+      [k: string]: unknown;
     }
-  | "none";
+  | {
+      id: Id;
+      kind: "parametric_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id;
+      kind: "hazard_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id;
+      kind: "inflation_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id;
+      kind: "price_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id;
+      kind: "vol_index_curve";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id;
+      kind: "base_correlation";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id;
+      kind: "vol_surface";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id;
+      kind: "price_scalar";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id;
+      kind: "unitless_scalar";
+      [k: string]: unknown;
+    }
+  | {
+      id: Id;
+      kind: "series";
+      [k: string]: unknown;
+    };
 /**
  * Single market observable that doesn't require a full curve.
  *
@@ -1076,6 +1010,17 @@ export type MarketScalar =
  * Numeric schema revision for contracts whose sole supported revision is v1.
  */
 export type SchemaVersion = number;
+/**
+ * Right-tail extrapolation policy for [`ScalarTimeSeries`].
+ *
+ * Applies only to dates strictly after the latest observation; queries on an
+ * empty series or strictly before the earliest observation always fail.
+ */
+export type SeriesExtrapolation = "flat" | "error";
+/**
+ * Interpolation strategy for [`ScalarTimeSeries`].
+ */
+export type SeriesInterpolation = "step" | "linear";
 /**
  * Interpolation contract for vol surfaces.
  */
@@ -1261,6 +1206,25 @@ export interface CreditIndexState {
    */
   recovery_rate: number;
 }
+/**
+ * An ordered `base/quote` currency pair parsed from host text.
+ *
+ * [`FromStr`](std::str::FromStr) accepts the slash form `"EUR/USD"` and the
+ * six-letter compact form `"EURUSD"`. Each half parses with [`Currency`]'s
+ * case-insensitive, non-trimming parser, so a bad half reports the code it
+ * rejected. Orientation is kept: a quote on the pair means
+ * `1 base = rate quote`.
+ */
+export interface CurrencyPair {
+  /**
+   * Base (from) currency: one unit of it is worth `rate` quote units.
+   */
+  base: Currency;
+  /**
+   * Quote (to) currency in which the rate is expressed.
+   */
+  quote: Currency;
+}
 export interface CurveAdjustmentSegment {
   /**
    * Function slope on this segment.
@@ -1330,13 +1294,13 @@ export interface Tenor {
  */
 export interface DiscountCurveTransform {
   /**
-   * Cumulative derivative of the additive log-discount adjustment.
+   * Cumulative derivative of the additive log-factor adjustment.
    */
   adjustment: PiecewiseLinearAdjustment;
   /**
-   * Current origin in the source interpolation's year-fraction coordinates.
+   * Original, untransformed curve base date defining the source coordinate system.
    */
-  offset: number;
+  source_base_date: DateWire;
   /**
    * Original, untransformed interpolation pillars.
    */
@@ -1356,21 +1320,23 @@ export interface PiecewiseLinearAdjustment {
    */
   segments: CurveAdjustmentSegment[];
 }
+/**
+ * Source interpolation and a single accumulated transformation, never a chain
+ * of nested curves. The adjustment is stored as its piecewise-linear derivative
+ * so evaluating beyond a completed triangular shock does not subtract large
+ * quadratic polynomials.
+ */
 export interface ForwardCurveTransform {
   /**
-   * Cumulative additive rate adjustment in source time coordinates.
+   * Cumulative derivative of the additive log-factor adjustment.
    */
   adjustment: PiecewiseLinearAdjustment;
   /**
-   * Current curve origin in the source curve's year-fraction coordinates.
+   * Original, untransformed curve base date defining the source coordinate system.
    */
-  offset: number;
+  source_base_date: DateWire;
   /**
-   * Accumulated parallel multiplicative factor on the source interpolation.
-   */
-  scale: number;
-  /**
-   * Original interpolation pillars, independent of current curve samples.
+   * Original, untransformed interpolation pillars.
    */
   source_points: [number, number][];
 }
@@ -1425,17 +1391,59 @@ export interface HazardCalibrationInput {
   };
 }
 /**
- * Serialized source grid and time origin of a rolled curve.
+ * Source coordinate anchor and original piecewise-constant hazard schedule
+ * retained across [`HazardCurve::condition`] transformations so dated survival
+ * integrates directly on the retained source timeline.
  */
-export interface InterpRollState {
+export interface HazardConditionSource {
   /**
-   * Current origin in the source interpolation's year-fraction coordinates.
+   * Original untransformed curve base date.
    */
-  offset: number;
+  base_date: DateWire;
   /**
-   * Source pillars `(time, value)` in the source curve's own coordinates.
+   * Original `(time_years, hazard_rate)` pillars from `base_date`.
    */
-  source_points: [number, number][];
+  knot_points: [number, number][];
+}
+/**
+ * Serializable snapshot of [`DayCountContext`] state for persistence and interchange.
+ *
+ * This struct captures the optional context parameters (calendar, frequency, business-day basis)
+ * needed to reconstruct a [`DayCountContext`] at runtime using the built-in calendar lookup.
+ * `Default` is the empty context (no calendar, frequency, basis, coupon
+ * period or termination status), the snapshot of
+ * [`DayCountContext::default`].
+ */
+export interface DayCountContextState {
+  /**
+   * Optional custom business-day divisor (defaults to 252 when `None`).
+   */
+  bus_basis?: number | null;
+  /**
+   * Optional calendar code (e.g. "target2").
+   */
+  calendar_id?: string | null;
+  /**
+   * Optional unadjusted regular ICMA reference period or ACT/365L enclosing
+   * coupon `(start, end)`, serialized as two ISO dates.
+   *
+   * Required for exact ICMA accrual on round-trip. `None` selects the
+   * frequency-only ICMA calculation path; ACT/365L requires these dates.
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  coupon_period?: [DateWire, DateWire] | null;
+  /**
+   * Whether the later accrual endpoint is the contractual termination
+   * date; `None` (omitted or `null` on the wire) means unspecified, which
+   * 30E/360 ISDA rejects.
+   */
+  end_is_termination_date?: boolean | null;
+  /**
+   * Optional coupon frequency, required for ACT/ACT ISMA.
+   */
+  frequency?: Tenor | null;
 }
 /**
  * A dated dividend event.
@@ -1541,30 +1549,51 @@ export interface FxConfig {
  * Delta-quoted FX volatility surface.
  *
  * Stores market-standard FX vol quotes (ATM DNS, 25-delta risk-reversal,
- * 25-delta butterfly) across multiple expiries. Models-layer functions
- * perform delta conversion and volatility evaluation.
+ * 25-delta arithmetic smile butterfly, optional 10-delta wings) together with
+ * explicit currency pair, quote profile conventions, and optional [`VolatilityClock`].
+ * Models-layer functions perform delta conversion and volatility evaluation.
  */
 export interface FxDeltaVolSurface {
+  /**
+   * At-the-money strike convention.
+   */
+  atm_convention: FxAtmConvention;
   /**
    * ATM delta-neutral straddle vols per expiry.
    */
   atm_vols: number[];
   /**
-   * Optional 10-delta butterfly per expiry.
+   * Optional 10-delta arithmetic smile butterfly per expiry.
    */
   bf_10d?: number[] | null;
   /**
-   * 25-delta butterfly per expiry.
+   * 25-delta arithmetic smile butterfly per expiry.
    */
   bf_25d: number[];
+  /**
+   * Butterfly quote convention.
+   */
+  butterfly_convention: FxButterflyConvention;
+  /**
+   * Delta convention governing wing delta-to-strike conversion.
+   */
+  delta_convention: FxSurfaceDeltaConvention;
   /**
    * Expiry times in years.
    */
   expiries: number[];
   /**
+   * Optional volatility clock translating calendar expiry dates to `expiries`.
+   */
+  expiry_clock?: VolatilityClock | null;
+  /**
    * Surface identifier.
    */
   id: Id;
+  /**
+   * Currency pair (`base/quote`) matching quoted FX forward orientation.
+   */
+  pair: CurrencyPair;
   /**
    * Optional 10-delta risk reversal per expiry.
    */
@@ -1573,6 +1602,29 @@ export interface FxDeltaVolSurface {
    * 25-delta risk reversal per expiry.
    */
   rr_25d: number[];
+}
+/**
+ * Explicit day-count clock translating calendar expiry dates into year fractions
+ * relative to a surface or cube reference date.
+ *
+ * Market data objects such as [`FxDeltaVolSurface`](crate::market_data::surfaces::FxDeltaVolSurface)
+ * attach an optional `VolatilityClock` so downstream pricers can validate that
+ * the surface anchor matches `as_of` and bridge between instrument day-counts
+ * and surface variance time without silently assuming a day-count convention.
+ */
+export interface VolatilityClock {
+  /**
+   * Owned, canonicalized day-count context parameters.
+   */
+  context?: DayCountContextState;
+  /**
+   * Day-count convention used to measure expiry times from `reference_date`.
+   */
+  day_count: DayCount;
+  /**
+   * Valuation reference date anchored to year fraction `0.0`.
+   */
+  reference_date: DateWire;
 }
 /**
  * Serializable state of an FxMatrix.
@@ -1612,121 +1664,108 @@ export interface FxMatrixState {
   quotes: [Currency, Currency, number][];
 }
 /**
- * A single node in the market data hierarchy tree.
+ * A single node within [`MarketDataHierarchy`].
  *
- * Nodes form a tree: each is named by its key in the parent map, and carries
- * optional key-value tags for cross-cutting queries, ordered children, and
- * leaf `CurveId` references.
+ * Nodes can contain tags (key-value pairs for filtering), ordered child entries,
+ * and typed [`MarketDataTarget`] associations.
  */
 export interface HierarchyNode {
   /**
-   * Child nodes, keyed by their name. The key becomes the child's `name`
-   * during deserialization. Insertion order is preserved.
+   * Ordered child entries at this level.
    */
-  children?: {
-    [k: string]: HierarchyNode;
-  };
+  children?: HierarchyNodeEntry[];
   /**
-   * Curves attached directly to this node. Serialized as `curves`.
-   */
-  curves?: Id[];
-  /**
-   * Free-form key/value labels on this node, used for selection and
-   * reporting. Insertion order is preserved.
+   * Metadata tags for tag-filter selection.
    */
   tags?: {
     [k: string]: string;
   };
+  /**
+   * Typed market-data targets stored directly at this node in authored order.
+   */
+  targets?: MarketDataTarget[];
 }
 /**
- * Inflation index time series with lagging and seasonality.
+ * Named child or root entry preserving authored sequence order at a hierarchy level.
+ */
+export interface HierarchyNodeEntry {
+  /**
+   * Exact node segment name at this hierarchy level.
+   */
+  name: string;
+  /**
+   * Node metadata tags, child entries, and typed market-data associations.
+   */
+  node: HierarchyNode;
+}
+/**
+ * One expected-release schedule assumption for a monthly CPI/RPI reference period.
+ */
+export interface InflationExpectedRelease {
+  /**
+   * Scheduled or expected release date on or after `reference_month`.
+   */
+  expected_release: DateWire;
+  /**
+   * Inclusive date on or before the snapshot `knowledge_date` when this release assumption was known.
+   */
+  known_on: DateWire;
+  /**
+   * Canonical first calendar day of the reference inflation month (`day() == 1`).
+   */
+  reference_month: DateWire;
+}
+/**
+ * Immutable monthly CPI/RPI observation snapshot at an explicit knowledge date `K`.
  *
- * Wraps historical CPI/RPI observations with market-standard conventions for
- * lag application and interpolation. Used for pricing TIPS, linkers, and
- * inflation derivatives.
+ * Stores strictly ordered, unique first-of-month [`InflationObservation`] records
+ * whose `available_on` satisfies `reference_month <= available_on <= knowledge_date`,
+ * together with distinct [`InflationExpectedRelease`] assumptions (`known_on <= knowledge_date`).
+ * Empty histories are valid (allowing projection-only markets with release metadata).
  *
- * # Components
- *
- * - **Observations**: Index levels labelled by reference date/month
- * - **Interpolation**: Daily interpolation between monthly observations
- * - **Lag**: Contractual observation lag (typically 3 months for TIPS)
- * - **Publication dates**: Optional explicit availability dates by reference month
- * - **Seasonality**: Optional monthly adjustment factors
- *
- * # Interpolation Methods
- *
- * - **Step**: Last observation carried forward (conservative)
- * - **Linear**: Daily interpolation between months (TIPS standard)
- *
- * # Lag Application
- *
- * Reference index calculation applies lag before interpolation:
- * ```text
- * For settlement date T with 3-month lag:
- * 1. Reference date = T - 3 months
- * 2. Find bracketing CPI observations
- * 3. Interpolate linearly between them
- * ```
- *
- * # Thread Safety
- *
- * Immutable after construction; safe to share via `Arc<InflationIndex>`.
- *
- * # References
- *
- * - **TIPS Mechanics**:
- *   - US Treasury (2024). "TIPS In Depth." treasurydirect.gov. `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`
- *   - Deacon, M., Derry, A., & Mirfendereski, D. (2004). *Inflation-Indexed Securities*
- *     (2nd ed.). Wiley Finance. Chapter 2 (Index-linked bond mechanics). `docs/REFERENCES.md#deacon-derry-mirfendereski-2004`
- *
- * - **Index Lagging**:
- *   - Kerkhof, J. (2005). "Inflation Derivatives Explained." *Journal of Derivatives
- *     Accounting*, 2(1), 1-19. `docs/REFERENCES.md#kerkhof-2005`
- *   - Hurd, M., & Relleen, J. (2006). "Estimating the Inflation Risk Premium."
- *     Bank of England Quarterly Bulletin, Q2 2006. `docs/REFERENCES.md#kerkhof-2005`
+ * Lookups ([`get_observation`](Self::get_observation) and
+ * [`qualified_monthly_observation`](Self::qualified_monthly_observation)) are exact
+ * by canonical first-of-month key and perform no lag, interpolation, carry, or
+ * seasonal adjustment.
  */
 export interface InflationIndex {
   /**
-   * Currency
+   * Reporting currency association.
    */
   currency: Currency;
   /**
-   * Unique identifier
+   * Distinct strictly ascending monthly expected-release schedule assumptions.
+   */
+  expected_releases?: InflationExpectedRelease[];
+  /**
+   * Unique identifier.
    */
   id: string;
   /**
-   * Interpolation method
+   * Inclusive end-of-day snapshot knowledge cutoff date `K`.
    */
-  interpolation: SeriesInterpolation;
+  knowledge_date: DateWire;
   /**
-   * Lag policy
+   * Strictly ascending canonical monthly fixing observations.
    */
-  lag: InflationLag;
-  /**
-   * Observations as (date, value) pairs
-   */
-  observations: [DateWire, number][];
-  /**
-   * Explicit monthly observation availability; no release dates are inferred.
-   */
-  publication_dates?: InflationPublicationWire[];
-  /**
-   * Optional seasonality factors
-   *
-   * @minItems 12
-   * @maxItems 12
-   */
-  seasonality?: [number, number, number, number, number, number, number, number, number, number, number, number] | null;
+  observations: InflationObservation[];
 }
-export interface InflationPublicationWire {
+/**
+ * One published monthly CPI/RPI fixing record inside an [`InflationIndex`] snapshot.
+ */
+export interface InflationObservation {
   /**
-   * Inclusive date on which the observation must be available.
+   * Inclusive end-of-day availability date for this selected observation version.
    */
-  publication_date: DateWire;
+  available_on: DateWire;
   /**
-   * First calendar day of the reference month.
+   * Canonical first calendar day of the reference inflation month (`day() == 1`).
    */
   reference_month: DateWire;
+  /**
+   * Published finite, strictly positive index level.
+   */
+  value: number;
 }
 /**
  * Canonical v1 persisted snapshot of a complete market-data context.
@@ -1788,21 +1827,18 @@ export interface MarketContextState {
   vol_cubes: VolCube[];
 }
 /**
- * The top-level market data hierarchy containing root nodes.
+ * Top-level market-data hierarchy containing ordered root entries.
  *
- * Each root represents a major asset class or category (e.g., "Rates", "Credit",
- * "FX", "Equity", "Volatility"). The hierarchy is fully serializable and can be
- * loaded from JSON configuration files.
+ * Each root represents a major organizational branch (such as `"Rates"`,
+ * `"Credit"`, `"FX"`, `"Equity"`, or `"Volatility"`). Roots and child levels
+ * use explicit name/node entry arrays so numeric-looking names retain their
+ * authored sequence across Rust, Python, and JavaScript.
  */
 export interface MarketDataHierarchy {
   /**
-   * Top-level nodes, keyed by their name. The key becomes each node's
-   * `name` during deserialization. Insertion order is preserved.
+   * Top-level ordered `(name, node)` entries.
    */
-  roots: {
-    [k: string]: HierarchyNode;
-  };
-  [k: string]: unknown;
+  roots: HierarchyNodeEntry[];
 }
 /**
  * Date-indexed time series with flexible interpolation.
@@ -1836,6 +1872,10 @@ export interface ScalarTimeSeries {
    */
   currency?: Currency | null;
   /**
+   * Right-tail extrapolation policy
+   */
+  extrapolation: SeriesExtrapolation;
+  /**
    * Series identifier
    */
   id: string;
@@ -1849,9 +1889,9 @@ export interface ScalarTimeSeries {
   observations: [DateWire, number][];
 }
 /**
- * Volatility surface defined on expiry × strike grid.
+ * Volatility surface defined on an expiry × secondary-coordinate grid.
  *
- * Internally stores volatilities in row-major order as a boxed slice.
+ * Internally stores annual volatilities in row-major order as a boxed slice.
  */
 export interface VolSurface {
   /**
@@ -1859,11 +1899,15 @@ export interface VolSurface {
    */
   displacements?: number[] | null;
   /**
-   * Expiry times in years
+   * Strictly positive option expiry times in years.
    */
   expiries: number[];
   /**
-   * Surface identifier
+   * Optional calibration clock mapping calendar dates to source expiry year fractions.
+   */
+  expiry_clock?: VolatilityClock | null;
+  /**
+   * Surface identifier.
    */
   id: string;
   /**
@@ -1879,11 +1923,11 @@ export interface VolSurface {
    */
   secondary_axis: VolSurfaceAxis;
   /**
-   * Strike prices
+   * Secondary-axis coordinates (absolute strikes or positive underlying tenors).
    */
-  strikes: number[];
+  secondary_values: number[];
   /**
-   * Volatility values in row-major order
+   * Volatility values in row-major order.
    */
   vols_row_major: number[];
 }

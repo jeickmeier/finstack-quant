@@ -105,12 +105,17 @@ pub(crate) fn pricing_case_inputs(case: &Value) -> (Value, MarketContext) {
             .iter_mut()
             .find(|curve| curve["type"] == "forward" && curve["id"] == "USD-SOFR-3M")
             .expect("facility forward curve");
+        // Flat 4% quarterly projection: factor P(t) = 1.01^(-4t).
         assert!(
             forward["knot_points"]
                 .as_array()
                 .expect("forward knots")
                 .iter()
-                .all(|knot| knot[1].as_f64() == Some(0.04))
+                .all(|knot| {
+                    let t = knot[0].as_f64().expect("knot time");
+                    let factor = knot[1].as_f64().expect("knot factor");
+                    (factor - 1.01_f64.powf(-4.0 * t)).abs() < 1e-12
+                })
         );
         forward["day_count"] = Value::String("act_360".to_string());
     }
@@ -297,7 +302,7 @@ fn checks() -> Vec<Check> {
             )],
             "316852.54901668496318353932995",
         ),
-        ("rc_base", "revolving_credit", vec![], "1712846.279446133"),
+        ("rc_base", "revolving_credit", vec![], "1712958.3845499195"),
         (
             "rc_fixed",
             "revolving_credit",
@@ -317,7 +322,7 @@ fn checks() -> Vec<Check> {
                     json!([{"date": "2025-03-01", "delta_bp": "-25"}]),
                 ),
             ],
-            "1625928.952566946",
+            "1626041.057670733",
         ),
         (
             "abf_base",

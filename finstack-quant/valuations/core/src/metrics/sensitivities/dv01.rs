@@ -376,7 +376,7 @@ impl UnifiedDv01Calculator {
         // rounding error when summing many curves with widely differing
         // magnitudes (mirrors the per-bucket `neumaier_sum` in
         // `compute_triangular_for_curve`).
-        let total_dv01 = neumaier_sum(series.iter().map(|(_, v)| *v));
+        let total_dv01 = neumaier_sum(series.iter().map(|(_, v)| *v))?;
         context.store_bucketed_series(self.config.series_id.clone(), series);
         Ok(total_dv01)
     }
@@ -412,7 +412,7 @@ impl UnifiedDv01Calculator {
 
         // Compensated summation over per-curve key-rate totals: avoids the
         // rounding drift a naive `+=` accumulates across many curves.
-        Ok(neumaier_sum(curve_totals))
+        neumaier_sum(curve_totals)
     }
 
     /// Compute triangular key-rate DV01 for a single curve (central differencing).
@@ -472,7 +472,7 @@ impl UnifiedDv01Calculator {
             Ok(())
         })?;
 
-        let total: f64 = neumaier_sum(series.iter().map(|(_, v)| *v));
+        let total: f64 = neumaier_sum(series.iter().map(|(_, v)| *v))?;
         context.store_bucketed_series(metric_id, series);
         Ok(total)
     }
@@ -501,7 +501,7 @@ mod tests {
         values.push(-1.0e16);
 
         let naive: f64 = values.iter().fold(0.0_f64, |acc, v| acc + v);
-        let compensated = neumaier_sum(values.iter().copied());
+        let compensated = neumaier_sum(values.iter().copied()).expect("finite terms");
 
         assert!(
             (compensated - n as f64).abs() < 1e-6,

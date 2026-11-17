@@ -418,8 +418,8 @@ def cell_returns_from_curves(
     >>> import json
     >>> from finstack_quant.core.market_data import DiscountCurve
     >>> from finstack_quant.portfolio import cell_returns_from_curves
-    >>> start = DiscountCurve.flat("start", date(2025, 1, 1), 0.02)
-    >>> end = DiscountCurve.flat("end", date(2025, 4, 1), 0.03)
+    >>> start = DiscountCurve.flat("start", date(2025, 1, 1), 0.02, "act_365f")
+    >>> end = DiscountCurve.flat("end", date(2025, 4, 1), 0.03, "act_365f")
     >>> table = cell_returns_from_curves(start, end, 0.25, 2.0, "UST", '{"width":1.0}')
     >>> len(table.cells)
     2

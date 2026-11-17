@@ -128,24 +128,35 @@ fn test_credit_spread_effect_larger_for_otm() {
 
         let rf_curve = DiscountCurve::builder("USD-OIS")
             .base_date(base_date)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.0, 1.0), (10.0, (-rf_rate * 10.0).exp())])
             .interp(InterpStyle::Linear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
-        let credit_curve =
-            HazardCurve::flat("USD-CREDIT", base_date, credit_rate - rf_rate, 0.0).unwrap();
+        let credit_curve = HazardCurve::flat(
+            "USD-CREDIT",
+            base_date,
+            credit_rate - rf_rate,
+            0.0,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .unwrap();
 
         finstack_quant_core::market_data::context::MarketContext::new()
             .insert(rf_curve)
             .insert(credit_curve)
-            .insert_price("AAPL", MarketScalar::Unitless(market_params::SPOT_LOW))
+            .insert_price(
+                "AAPL",
+                MarketScalar::unitless(market_params::SPOT_LOW).expect("valid scalar"),
+            )
             .insert_price(
                 "AAPL-VOL",
-                MarketScalar::Unitless(market_params::VOL_STANDARD),
+                MarketScalar::unitless(market_params::VOL_STANDARD).expect("valid scalar"),
             )
             .insert_price(
                 "AAPL-DIVYIELD",
-                MarketScalar::Unitless(market_params::DIV_YIELD),
+                MarketScalar::unitless(market_params::DIV_YIELD).expect("valid scalar"),
             )
     };
 

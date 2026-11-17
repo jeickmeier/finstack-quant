@@ -33,7 +33,7 @@
 //! f(t₁, t₂) = -ln(DF(t₂) / DF(t₁)) / (t₂ - t₁)
 //! ```
 //!
-//! The simple money-market forward `(DF(t₁)/DF(t₂) − 1) / (t₂ − t₁)` lives on
+//! The simple money-market forward `(P(t₁)/P(t₂) − 1) / alpha` lives on
 //! [`crate::market_data::term_structures::ForwardCurve::rate_between`], not on
 //! the discount curve.
 //!
@@ -62,35 +62,42 @@
 //! # Conventions
 //!
 //! - Time is expressed as a year fraction from a base date.
-//! - Rate-like curves should document whether stored values are discount
-//!   factors, simple forward rates, hazard intensities, or CPI-derived levels.
+//! - Rate-like curves document whether stored values are discount
+//!   factors, projection factors, hazard intensities, or CPI-derived levels.
 //! - Builder validation is part of the public contract; prefer calling
 //!   `build()` rather than bypassing validation paths.
 //!
 //! ## Example – assembling curves inside a `MarketContext`
 //! ```rust
+//! use finstack_quant_core::dates::{DayCount, Tenor};
 //! use finstack_quant_core::market_data::term_structures::{
 //!     DiscountCurve, ForwardCurve, HazardCurve,
 //! };
 //! use finstack_quant_core::market_data::context::MarketContext;
-//! use finstack_quant_core::math::interp::InterpStyle;
+//! use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 //! use time::macros::date;
 //!
 //! let base = date!(2025 - 01 - 01);
 //! let disc = DiscountCurve::builder("USD-OIS")
 //!     .base_date(base)
+//!     .day_count(DayCount::Act365F)
 //!     .knots([(0.0, 1.0), (5.0, 0.88)])
 //!     .interp(InterpStyle::MonotoneConvex)
+//!     .extrapolation(ExtrapolationPolicy::Extend)
 //!     .build()
 //!     ?;
-//! let fwd3m = ForwardCurve::builder("USD-SOFR3M", 0.25)
+//! let fwd3m = ForwardCurve::builder("USD-SOFR3M")
 //!     .base_date(base)
-//!     .knots([(0.0, 0.03), (5.0, 0.04)])
-//!     .interp(InterpStyle::Linear)
+//!     .day_count(DayCount::Act360)
+//!     .index_tenor(Tenor::quarterly())
+//!     .knots([(0.0, 1.0), (5.0, 0.85)])
+//!     .interp(InterpStyle::LogLinear)
+//!     .extrapolation(ExtrapolationPolicy::Extend)
 //!     .build()
 //!     ?;
 //! let hazard = HazardCurve::builder("USD-CRED")
 //!     .base_date(base)
+//!     .day_count(finstack_quant_core::dates::DayCount::Act365F)
 //!     .recovery_rate(0.40)
 //!     .knots([(1.0, 0.01), (10.0, 0.015)])
 //!     .build()
@@ -113,8 +120,6 @@
 
 /// Base correlation curves for CDS tranche pricing.
 mod base_correlation;
-/// Basis spread curves for cross-currency frameworks.
-mod basis_spread_curve;
 /// Internal shared helpers for 1D curves (not exported publicly).
 pub(crate) mod common;
 /// Credit index aggregates for CDS tranche pricing and credit derivatives.
@@ -142,14 +147,12 @@ pub use base_correlation::{
     BaseCorrelationCurve, BaseCorrelationCurveBuilder, CorrelationShapeReport,
     CorrelationShapeViolation,
 };
-pub use basis_spread_curve::{BasisSpreadCurve, BasisSpreadCurveBuilder};
 pub use credit_index::{CreditIndexData, CreditIndexDataBuilder};
-pub use discount_curve::{DiscountCurve, DiscountCurveBuilder, ValidationMode};
+pub use discount_curve::{DiscountCurve, DiscountCurveBuilder};
 pub use forward_curve::{ForwardCurve, ForwardCurveBuilder};
 pub use forward_variance::ForwardVarianceCurve;
 pub use hazard_calibration::{HazardCalibrationInput, HazardCalibrationRecipe};
-pub(crate) use hazard_curve::HazardBumpTarget;
-pub use hazard_curve::{HazardCurve, HazardCurveBuilder, ParInterp, Seniority};
+pub use hazard_curve::{HazardCurve, HazardCurveBuilder, Seniority};
 pub use inflation::{InflationCurve, InflationCurveBuilder};
 pub use parametric_curve::{NelsonSiegelModel, NsVariant, ParametricCurve, ParametricCurveBuilder};
 pub use price_curve::{PriceCurve, PriceCurveBuilder, PriceCurveKind};

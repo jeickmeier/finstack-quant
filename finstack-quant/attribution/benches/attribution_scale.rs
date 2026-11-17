@@ -492,7 +492,8 @@ fn bench_snapshot_scale(c: &mut Criterion) {
             b.iter(|| {
                 let snap = MarketSnapshot::extract(black_box(t0), MarketRestoreFlags::RATES);
                 let restored =
-                    MarketSnapshot::restore_market(black_box(t1), &snap, MarketRestoreFlags::RATES);
+                    MarketSnapshot::restore_market(black_box(t1), &snap, MarketRestoreFlags::RATES)
+                        .unwrap();
                 black_box(restored);
             });
         });

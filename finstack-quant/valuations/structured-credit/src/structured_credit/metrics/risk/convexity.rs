@@ -70,13 +70,13 @@ pub fn calculate_tranche_convexity(
 
     for (t, df, amount) in discounted_flows(cashflows, discount_curve, as_of)? {
         let base = amount * df;
-        pv0.add(base);
+        pv0.add(base)?;
         // Higher rate -> lower PV: bump up multiplies by exp(-Δy·t).
-        pv_up.add(base * (-bump * t).exp());
-        pv_dn.add(base * (bump * t).exp());
+        pv_up.add(base * (-bump * t).exp())?;
+        pv_dn.add(base * (bump * t).exp())?;
     }
 
-    let p0 = pv0.total();
+    let p0 = pv0.get_total()?;
     // Guard relative to the cashflow scale, not `f64::EPSILON`.
     //
     // `f64::EPSILON` is 2.2e-16 — an absolute threshold on a CURRENCY amount.
@@ -93,7 +93,7 @@ pub fn calculate_tranche_convexity(
     if p0.abs() <= scale * 1e-12 {
         return Ok(0.0);
     }
-    Ok((pv_up.total() + pv_dn.total() - 2.0 * p0) / (p0 * bump * bump))
+    Ok((pv_up.get_total()? + pv_dn.get_total()? - 2.0 * p0) / (p0 * bump * bump))
 }
 
 /// Modified convexity calculator for structured credit.

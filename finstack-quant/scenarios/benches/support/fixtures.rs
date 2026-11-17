@@ -9,23 +9,30 @@
 #![allow(clippy::expect_used)]
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, build_periods};
+use finstack_quant_core::dates::{
+    BusinessDayConvention, Date, DayCount, DayCountContextState, Tenor, VolatilityClock,
+    build_periods,
+};
+use finstack_quant_core::market_data::bumps::MarketDataTarget;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::hierarchy::MarketDataHierarchy;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::{
     BaseCorrelationCurve, DiscountCurve, ForwardCurve, HazardCurve, InflationCurve, PriceCurve,
-    PriceCurveKind,
+    PriceCurveKind, Seniority,
 };
 use finstack_quant_core::math::Compounding;
-use finstack_quant_core::math::interp::InterpStyle;
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
+use finstack_quant_core::types::CurveId;
 use finstack_quant_models::credit::pool::CorrelationStructure;
 use finstack_quant_scenarios::{
-    ApplicationReport, ExecutionContext, HazardBumpMode, OperationSpec, RateBindingSpec,
-    ScenarioEngine, ScenarioSpec,
+    ApplicationReport, ExecutionContext, OperationSpec, RateBindingSpec, ScenarioEngine,
+    ScenarioSpec,
 };
 use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::{AmountOrScalar, NodeSpec, NodeType};
@@ -50,6 +57,85 @@ pub const CDX_IG: &str = "CDX_IG";
 pub const CDX_IG_HAZARD: &str = "CDX_IG_HAZARD";
 pub const CDX_HY_HAZARD: &str = "CDX_HY_HAZARD";
 
+pub fn calibrate_hazard(
+    base_date: Date,
+    discount: &DiscountCurve,
+    curve_id: &str,
+    recovery_rate: f64,
+    spreads: &[(&str, f64)],
+) -> HazardCurve {
+    use finstack_quant_calibration::api::{
+        engine,
+        market_datum::MarketDatum,
+        prior_market::PriorMarketObject,
+        schema::{
+            CalibrationEnvelope, CalibrationPlan, CalibrationSchema, CalibrationStep,
+            HazardCurveParams, StepParams,
+        },
+    };
+    use finstack_quant_calibration::quotes::{CdsQuote, MarketQuote, Pillar, QuoteId};
+    use finstack_quant_calibration::{CalibrationConfig, CalibrationMethod};
+    use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+
+    let mut quotes = Vec::with_capacity(spreads.len());
+    let mut quote_ids = Vec::with_capacity(spreads.len());
+    for (tenor_str, spread_bp) in spreads {
+        let id = QuoteId::new(format!("{curve_id}-{tenor_str}"));
+        quote_ids.push(id.clone());
+        quotes.push(MarketDatum::from(MarketQuote::Cds(
+            CdsQuote::CdsParSpread {
+                id,
+                entity: curve_id.to_string(),
+                pillar: Pillar::Tenor(Tenor::parse(tenor_str).expect("valid tenor")),
+                spread_bp: *spread_bp,
+                recovery_rate,
+                convention: CdsConventionKey {
+                    currency: Currency::USD,
+                    doc_clause: CdsDocClause::IsdaNa,
+                },
+            },
+        )));
+    }
+    let mut quote_sets = finstack_quant_core::FxHashMap::default();
+    quote_sets.insert("credit".to_string(), quote_ids);
+    let envelope = CalibrationEnvelope {
+        schema_url: None,
+        schema: CalibrationSchema::CURRENT,
+        plan: CalibrationPlan {
+            id: format!("{curve_id}-cal"),
+            description: None,
+            quote_sets: quote_sets.into_iter().collect(),
+            steps: vec![CalibrationStep {
+                id: curve_id.to_string(),
+                quote_set: "credit".to_string(),
+                params: StepParams::Hazard(HazardCurveParams {
+                    curve_id: CurveId::new(curve_id),
+                    entity: curve_id.to_string(),
+                    seniority: Seniority::Senior,
+                    currency: Currency::USD,
+                    base_date,
+                    discount_curve_id: discount.id().clone(),
+                    recovery_rate,
+                    notional: 1.0,
+                    method: CalibrationMethod::Bootstrap,
+                    doc_clause: None,
+                    cds_valuation_convention: None,
+                }),
+            }],
+            settings: CalibrationConfig::default(),
+        },
+        market_data: quotes,
+        prior_market: vec![PriorMarketObject::DiscountCurve(discount.clone())],
+    };
+    let calibrated = engine::calibrate(&envelope).expect("hazard calibration");
+    MarketContext::try_from(calibrated.result.final_market)
+        .expect("calibrated market")
+        .get_hazard(curve_id)
+        .expect("calibrated hazard")
+        .as_ref()
+        .clone()
+}
+
 pub fn spec(id: &str, operations: Vec<OperationSpec>) -> ScenarioSpec {
     ScenarioSpec {
         id: id.into(),
@@ -58,8 +144,6 @@ pub fn spec(id: &str, operations: Vec<OperationSpec>) -> ScenarioSpec {
         operations,
         priority: 0,
         resolution_mode: Default::default(),
-        // Hand-built fixture curves have no lossless recipe.
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     }
 }
 
@@ -79,8 +163,10 @@ fn discount_knots() -> [(f64, f64); 8] {
 pub fn discount_curve(id: &str) -> DiscountCurve {
     DiscountCurve::builder(id)
         .base_date(AS_OF)
+        .day_count(DayCount::Act365F)
         .knots(discount_knots())
         .interp(InterpStyle::MonotoneConvex)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -90,9 +176,25 @@ pub fn lean_market() -> MarketContext {
 }
 
 fn vol_surface(id: &str, atm: f64) -> VolSurface {
+    let clock = VolatilityClock::try_new(AS_OF, DayCount::Act365F, DayCountContextState::default())
+        .unwrap();
+    let expiries: Vec<f64> = ["3M", "6M", "1Y"]
+        .iter()
+        .map(|s| {
+            let d = Tenor::parse(s)
+                .unwrap()
+                .add_to_date(AS_OF, None, BusinessDayConvention::Unadjusted)
+                .unwrap();
+            clock.expiry_time(d).unwrap()
+        })
+        .collect();
     VolSurface::builder(id)
-        .expiries(&[0.25, 0.5, 1.0])
-        .strikes(&[90.0, 100.0, 110.0])
+        .expiries(&expiries)
+        .secondary_values(&[90.0, 100.0, 110.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
+        .expiry_clock(clock)
         .row(&[atm + 0.05, atm, atm + 0.02])
         .row(&[atm + 0.04, atm - 0.01, atm + 0.01])
         .row(&[atm + 0.03, atm - 0.02, atm])
@@ -113,44 +215,38 @@ pub fn full_market() -> MarketContext {
         p
     });
 
-    let hazard_ig = HazardCurve::builder(CDX_IG_HAZARD)
-        .base_date(AS_OF)
-        .recovery_rate(0.40)
-        .knots([
-            (0.0, 0.0),
-            (1.0, 0.01),
-            (3.0, 0.015),
-            (5.0, 0.02),
-            (10.0, 0.025),
-        ])
-        .par_spreads([(1.0, 60.0), (3.0, 90.0), (5.0, 120.0), (10.0, 150.0)])
-        .build()
-        .unwrap();
+    let usd_disc = discount_curve(USD_SOFR);
+    let hazard_ig = calibrate_hazard(
+        AS_OF,
+        &usd_disc,
+        CDX_IG_HAZARD,
+        0.40,
+        &[("1Y", 60.0), ("3Y", 90.0), ("5Y", 120.0), ("10Y", 150.0)],
+    );
 
-    let hazard_hy = HazardCurve::builder(CDX_HY_HAZARD)
-        .base_date(AS_OF)
-        .recovery_rate(0.30)
-        .knots([
-            (0.0, 0.0),
-            (1.0, 0.05),
-            (3.0, 0.06),
-            (5.0, 0.07),
-            (10.0, 0.08),
-        ])
-        .par_spreads([(1.0, 350.0), (3.0, 420.0), (5.0, 490.0), (10.0, 560.0)])
-        .build()
-        .unwrap();
+    let hazard_hy = calibrate_hazard(
+        AS_OF,
+        &usd_disc,
+        CDX_HY_HAZARD,
+        0.30,
+        &[("1Y", 350.0), ("3Y", 420.0), ("5Y", 490.0), ("10Y", 560.0)],
+    );
 
-    let forward = ForwardCurve::builder(USD_SOFR_3M, 0.25)
-        .base_date(AS_OF)
-        .knots([(0.0, 0.04), (1.0, 0.038), (2.0, 0.036), (5.0, 0.035)])
-        .interp(InterpStyle::Linear)
-        .build()
-        .unwrap();
+    let forward = ForwardCurve::from_zero_rates(
+        USD_SOFR_3M,
+        AS_OF,
+        &[(1.0, 0.038), (2.0, 0.036), (5.0, 0.035)],
+        Compounding::Continuous,
+        DayCount::Act360,
+        InterpStyle::LogLinear,
+        ExtrapolationPolicy::Extend,
+    )
+    .unwrap();
 
     let inflation = InflationCurve::builder(USD_CPI)
         .base_date(AS_OF)
-        .base_cpi(100.0)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .knots([(0.0, 100.0), (1.0, 102.0), (5.0, 110.0), (10.0, 122.0)])
         .interp(InterpStyle::Linear)
         .build()
@@ -191,15 +287,15 @@ pub fn full_market() -> MarketContext {
         .insert(hazard_hy)
         .insert_price(
             "SPY",
-            MarketScalar::Price(Money::new(450.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(450.0, Currency::USD).expect("valid money fixture")),
         )
         .insert_price(
             "QQQ",
-            MarketScalar::Price(Money::new(380.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(380.0, Currency::USD).expect("valid money fixture")),
         )
         .insert_price(
             "EWU",
-            MarketScalar::Price(Money::new(32.0, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(32.0, Currency::USD).expect("valid money fixture")),
         )
 }
 
@@ -210,22 +306,21 @@ pub fn hierarchy_hazard_market(n_curves: usize) -> MarketContext {
     for id in &ids {
         builder = builder
             .add_node(&format!("Credit/USD/{id}"))
-            .curve_ids(&[id.as_str()]);
+            .target(MarketDataTarget::HazardCurve(CurveId::from(id.as_str())));
     }
     let hierarchy = builder.build().unwrap();
 
-    let mut market = MarketContext::new().insert(discount_curve(USD_SOFR));
+    let usd_disc = discount_curve(USD_SOFR);
+    let mut market = MarketContext::new().insert(usd_disc.clone());
     for (i, id) in ids.iter().enumerate() {
         let spread = 60.0 + i as f64;
-        market.insert_mut(
-            HazardCurve::builder(id.as_str())
-                .base_date(AS_OF)
-                .recovery_rate(0.40)
-                .knots([(1.0, 0.01), (5.0, 0.02)])
-                .par_spreads([(1.0, spread), (5.0, spread + 60.0)])
-                .build()
-                .unwrap(),
-        );
+        market.insert_mut(calibrate_hazard(
+            AS_OF,
+            &usd_disc,
+            id.as_str(),
+            0.40,
+            &[("1Y", spread), ("5Y", spread + 60.0)],
+        ));
     }
     market.set_hierarchy(hierarchy);
     market
@@ -238,7 +333,7 @@ pub fn hierarchy_market(n_curves: usize) -> MarketContext {
     for id in &ids {
         builder = builder
             .add_node(&format!("Rates/USD/{id}"))
-            .curve_ids(&[id.as_str()]);
+            .target(MarketDataTarget::DiscountCurve(CurveId::from(id.as_str())));
     }
     let hierarchy = builder.build().unwrap();
 
@@ -362,7 +457,6 @@ pub fn compose_specs(count: usize) -> Vec<ScenarioSpec> {
             ],
             priority: (i % 3) as i32,
             resolution_mode: Default::default(),
-            hazard_bump_mode: HazardBumpMode::FirstOrderShift,
         })
         .collect()
 }

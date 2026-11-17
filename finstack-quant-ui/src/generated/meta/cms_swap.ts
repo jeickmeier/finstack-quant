@@ -15,6 +15,7 @@ export default [
               0.25
             ],
             "attributes": {},
+            "cms_fixing_index_id": "USD-CMS-10Y",
             "cms_spread_bp": "0",
             "cms_tenor": {
               "count": 10,
@@ -709,6 +710,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/cms_cap",
     "description": "Optional cap on the CMS rate (decimal).",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_fixing_index_id",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/cms_fixing_index_id",
+    "description": "Explicit CMS benchmark fixing identifier used for historical fixings\n(`FIXING:<cms_fixing_index_id>`), distinct from `forward_curve_id` and `index_id`."
+  },
+  {
+    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_fixing_index_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/cms_fixing_index_id/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_fixing_index_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/cms_fixing_index_id/anyOf/1"
   },
   {
     "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/cms_floor",

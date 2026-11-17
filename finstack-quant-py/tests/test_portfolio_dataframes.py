@@ -129,6 +129,8 @@ def _market() -> MarketContext:
             date.fromisoformat(AS_OF),
             [(0.0, 1.0), (0.5, 0.98), (1.0, 0.95)],
             day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
         )
     )
     return market
@@ -367,8 +369,26 @@ def _moving_attribution() -> tuple[PortfolioAttribution, pd.DataFrame]:
         eurusd: float,
     ) -> MarketContext:
         context = MarketContext()
-        context.insert(DiscountCurve("USD-OIS", date.fromisoformat(AS_OF), usd_knots, day_count="act_365f"))
-        context.insert(DiscountCurve("EUR-OIS", date.fromisoformat(AS_OF), eur_knots, day_count="act_365f"))
+        context.insert(
+            DiscountCurve(
+                "USD-OIS",
+                date.fromisoformat(AS_OF),
+                usd_knots,
+                day_count="act_365f",
+                interp="monotone_convex",
+                extrapolation="extend",
+            )
+        )
+        context.insert(
+            DiscountCurve(
+                "EUR-OIS",
+                date.fromisoformat(AS_OF),
+                eur_knots,
+                day_count="act_365f",
+                interp="monotone_convex",
+                extrapolation="extend",
+            )
+        )
         fx = FxMatrix(None)
         fx.set_quotes([("EUR", "USD", eurusd)])
         context.insert_fx(fx)
@@ -1144,7 +1164,16 @@ def test_portfolio_valuation_to_dataframe_matches_arrow_columns() -> None:
 def test_position_value_exports_the_fx_rate_applied() -> None:
     """``value_native * fx_rate`` reproduces ``value_base`` for a converted position."""
     context = MarketContext()
-    context.insert(DiscountCurve("EUR-OIS", date.fromisoformat(AS_OF), [(0.0, 1.0), (1.0, 0.97)], day_count="act_365f"))
+    context.insert(
+        DiscountCurve(
+            "EUR-OIS",
+            date.fromisoformat(AS_OF),
+            [(0.0, 1.0), (1.0, 0.97)],
+            day_count="act_365f",
+            interp="monotone_convex",
+            extrapolation="extend",
+        )
+    )
     fx = FxMatrix(None)
     fx.set_quotes([("EUR", "USD", 1.10)])
     context.insert_fx(fx)

@@ -71,7 +71,7 @@ class StochasticPricingResult:
     >>> envelope = json.loads(deal.to_json())
     >>> envelope["instrument"]["spec"]["calendar_id"] = "nyse"
     >>> deal = StructuredCredit.from_json(json.dumps(envelope))
-    >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
+    >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03, "act_365f"))
     >>> result = deal.price_stochastic(market, as_of, num_paths=4)
     >>> (result.num_paths, [t["tranche_id"] for t in result.tranche_results])
     (8, ['A'])

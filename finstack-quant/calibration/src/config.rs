@@ -880,9 +880,7 @@ impl CalibrationConfig {
         use finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver;
 
         self.solver.validate()?;
-        Ok(LevenbergMarquardtSolver::new()
-            .with_tolerance(self.solver.tolerance())
-            .with_max_iterations(self.solver.max_iterations()))
+        LevenbergMarquardtSolver::new(self.solver.tolerance(), 1e-12, self.solver.max_iterations())
     }
 }
 

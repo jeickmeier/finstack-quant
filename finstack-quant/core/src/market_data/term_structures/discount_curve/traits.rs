@@ -17,7 +17,7 @@ impl Discounting for DiscountCurve {
     }
 
     #[inline]
-    fn df(&self, t: f64) -> f64 {
+    fn df(&self, t: f64) -> crate::Result<f64> {
         DiscountCurve::df(self, t)
     }
 
@@ -29,5 +29,15 @@ impl Discounting for DiscountCurve {
     #[inline]
     fn day_count_context(&self) -> DayCountContext<'_> {
         DiscountCurve::day_count_context(self)
+    }
+
+    #[inline]
+    fn df_on_date(&self, date: Date) -> crate::Result<f64> {
+        DiscountCurve::df_on_date(self, date)
+    }
+
+    #[inline]
+    fn instantaneous_forward(&self, t: f64) -> crate::Result<f64> {
+        DiscountCurve::instantaneous_forward(self, t)
     }
 }

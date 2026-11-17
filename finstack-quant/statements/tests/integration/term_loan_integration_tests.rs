@@ -85,6 +85,9 @@ fn term_loan_capital_structure_evaluates_with_market() {
     let discount_curve = DiscountCurve::builder("USD-OIS")
         .base_date(issue)
         .knots(vec![(0.0, 1.0), (1.0, 0.95), (5.0, 0.80)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("valid discount curve");
     let market = MarketContext::new().insert(discount_curve);

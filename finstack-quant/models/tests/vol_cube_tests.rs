@@ -392,7 +392,7 @@ fn test_vol_cube_materialize_tenor_slice() {
     )
     .unwrap();
     assert_eq!(surface.expiries(), &[1.0, 5.0]);
-    assert_eq!(surface.strikes(), &strikes[..]);
+    assert_eq!(surface.secondary_values(), &strikes[..]);
     let cube_vol = finstack_quant_models::volatility::get_cube_vol(
         &cube,
         1.0,
@@ -486,9 +486,19 @@ fn shifted_materialization_preserves_convention_and_displacement_rows() {
         restored,
         surface.scaled(1.01).unwrap(),
         surface
-            .apply_bucket_bump(Some(&[1.0]), Some(&[0.03]), 1.0)
+            .apply_bucket_bump(
+                Some(&[1.0]),
+                Some(&[0.03]),
+                finstack_quant_core::market_data::bumps::BumpSpec::multiplier(1.01),
+            )
             .unwrap(),
-        surface.apply_bucket_bump(None, None, 1.0).unwrap(),
+        surface
+            .apply_bucket_bump(
+                None,
+                None,
+                finstack_quant_core::market_data::bumps::BumpSpec::multiplier(1.01),
+            )
+            .unwrap(),
     ] {
         assert_eq!(artifact.displacements(), surface.displacements());
         let source = VolSource::Surface(Arc::new(artifact));
@@ -615,9 +625,15 @@ fn test_vol_source_cube() {
 
 #[test]
 fn test_vol_source_surface_ignores_tenor() {
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
+    };
     let surface = VolSurface::builder("TEST")
         .expiries(&[1.0, 2.0])
-        .strikes(&[0.02, 0.03, 0.04])
+        .secondary_values(&[0.02, 0.03, 0.04])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[0.20, 0.21, 0.22])
         .row(&[0.19, 0.20, 0.21])
         .build()
@@ -654,9 +670,15 @@ fn test_market_context_cube_builds_vol_source() {
 
 #[test]
 fn test_market_context_surface_builds_vol_source() {
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
+    };
     let surface = VolSurface::builder("EQ-VOL")
         .expiries(&[1.0, 2.0])
-        .strikes(&[90.0, 100.0])
+        .secondary_values(&[90.0, 100.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[0.2, 0.2])
         .row(&[0.2, 0.2])
         .build()

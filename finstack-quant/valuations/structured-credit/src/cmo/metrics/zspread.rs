@@ -65,27 +65,25 @@ pub(crate) fn calculate_tranche_zspread(
         .collect::<Result<Vec<_>>>()?;
 
     // Objective: model PV at `spread` minus the dirty market price.
-    let objective = |spread: f64| -> f64 {
+    let objective = |spread: f64| -> Result<f64> {
         let mut pv = 0.0;
         for &(years, base_df, total) in &cached_flows {
             let spread_adj = (-spread * years).exp();
             let df = base_df * spread_adj;
             pv += total * df;
         }
-        pv - market_price
+        Ok(pv - market_price)
     };
 
     // `BrentSolver` returns `Err(SolverConvergenceFailed)` when no bracketing
     // interval exists; that is propagated as an error rather than reporting a
     // boundary (or a silent 0.0) as a converged spread.
     const MAX_ITERATIONS: usize = 100;
-    let solver = BrentSolver::new()
-        .with_tolerance(1e-8)
-        .with_max_iterations(MAX_ITERATIONS)
-        .with_bracket_bounds(-0.10, 0.20)
-        .with_initial_bracket_size(Some(0.05));
+    let solver = BrentSolver::new(1e-8, MAX_ITERATIONS)?;
 
-    solver.solve(objective, 0.0).map_err(|e| {
+    solver
+        .solve(objective, 0.0, -0.10, 0.20, 0.05, 10)
+        .map_err(|e| {
         finstack_quant_core::Error::Validation(format!(
             "CMO tranche Z-spread solver failed to converge within bounds [-10%, 20%]: {e}. \
              Check that market price {market_price_pct} pct is within the model's reachable PV range."
@@ -112,6 +110,8 @@ mod tests {
                 (30.0, 0.30),
             ])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid curve");
 
@@ -155,7 +155,7 @@ mod tests {
             let years = day_count
                 .year_fraction(as_of, cf.payment_date, DayCountContext::default())
                 .expect("yf");
-            model_price += cf.total * disc.df(years);
+            model_price += cf.total * disc.df(years).expect("df");
         }
 
         let tranche = cmo.reference_tranche().expect("tranche");
@@ -183,6 +183,9 @@ mod production_mortgage_audit {
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (40.0, 1.0)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
         );
@@ -215,6 +218,8 @@ mod production_mortgage_audit {
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (40.0, (-flat * 40.0).exp())])
                     .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("curve"),
             );

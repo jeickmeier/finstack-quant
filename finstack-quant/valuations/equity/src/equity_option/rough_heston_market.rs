@@ -60,12 +60,30 @@ mod tests {
     #[test]
     fn from_market_strict_succeeds_when_full_config_present() {
         let market = MarketContext::new()
-            .insert_price("ROUGH_HESTON_V0", MarketScalar::Unitless(0.05))
-            .insert_price("ROUGH_HESTON_KAPPA", MarketScalar::Unitless(1.5))
-            .insert_price("ROUGH_HESTON_THETA", MarketScalar::Unitless(0.06))
-            .insert_price("ROUGH_HESTON_SIGMA_V", MarketScalar::Unitless(0.4))
-            .insert_price("ROUGH_HESTON_RHO", MarketScalar::Unitless(-0.5))
-            .insert_price("ROUGH_HESTON_HURST", MarketScalar::Unitless(0.08));
+            .insert_price(
+                "ROUGH_HESTON_V0",
+                MarketScalar::unitless(0.05).expect("valid scalar"),
+            )
+            .insert_price(
+                "ROUGH_HESTON_KAPPA",
+                MarketScalar::unitless(1.5).expect("valid scalar"),
+            )
+            .insert_price(
+                "ROUGH_HESTON_THETA",
+                MarketScalar::unitless(0.06).expect("valid scalar"),
+            )
+            .insert_price(
+                "ROUGH_HESTON_SIGMA_V",
+                MarketScalar::unitless(0.4).expect("valid scalar"),
+            )
+            .insert_price(
+                "ROUGH_HESTON_RHO",
+                MarketScalar::unitless(-0.5).expect("valid scalar"),
+            )
+            .insert_price(
+                "ROUGH_HESTON_HURST",
+                MarketScalar::unitless(0.08).expect("valid scalar"),
+            );
 
         let s = RoughHestonScalars::from_market_strict(&market).expect("strict config");
         assert_eq!(s.v0, 0.05);

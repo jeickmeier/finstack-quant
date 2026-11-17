@@ -36,15 +36,19 @@ const discount = () =>
     'USD-OIS',
     '2025-01-02',
     [0.5, 0.04, 1.0, 0.042, 5.0, 0.045],
-    'semi_annual'
+    'semi_annual',
+    'act_365f',
+    'monotone_convex',
+    'extend'
   );
 const inflation = () =>
   new core.InflationCurve({
     id: 'US-CPI',
     baseDate: '2025-01-02',
-    baseCpi: 300.0,
     knots: [0.0, 300.0, 5.0, 331.2],
-    indexationLagMonths: 3,
+    dayCount: 'act_365f',
+    interp: 'log_linear',
+    extrapolation: 'flat',
   });
 const price = () =>
   new core.PriceCurve({
@@ -59,10 +63,27 @@ const surface = () =>
     'SPX-VOL',
     [0.5, 1.0],
     [90.0, 100.0, 110.0],
-    [0.24, 0.2, 0.22, 0.23, 0.21, 0.22]
+    [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
+    {
+      secondaryAxis: 'strike',
+      quoteType: 'black_lognormal',
+      interpolationMode: 'vol',
+    }
   );
-const shiftedSurface = () => surface().withDisplacements([0.01, 0.015]);
-const expirySlice = (quoteType, displacements) =>
+const shiftedSurface = () =>
+  new core.VolSurface(
+    'SPX-VOL',
+    [0.5, 1.0],
+    [90.0, 100.0, 110.0],
+    [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
+    {
+      secondaryAxis: 'strike',
+      quoteType: 'shifted_black_lognormal',
+      interpolationMode: 'vol',
+      displacements: [0.01, 0.015],
+    }
+  );
+const expirySlice = (quoteType = 'black_lognormal', displacements) =>
   new core.VolCubeExpirySlice(
     'USD-SWAPTION-1Y',
     1.0,
@@ -73,9 +94,9 @@ const expirySlice = (quoteType, displacements) =>
     displacements
   );
 const numbers = (values) => (values === undefined ? null : Array.from(values));
-const PUBLICATION_DATES = [
-  ['2024-10-01', '2024-11-13'],
-  ['2024-11-01', '2024-12-11'],
+const EXPECTED_RELEASES = [
+  { reference_month: '2024-10-01', expected_release: '2024-11-13', known_on: '2024-10-01' },
+  { reference_month: '2024-11-01', expected_release: '2024-12-11', known_on: '2024-11-01' },
 ];
 const series = () =>
   new core.ScalarTimeSeries(
@@ -84,25 +105,63 @@ const series = () =>
       ['2025-01-02', 0.0431],
       ['2025-01-06', 0.0433],
     ],
-    null,
-    'linear'
+    'linear',
+    'flat'
   );
-const index = (lag = '3M') =>
+const index = () =>
   new core.InflationIndex(
     'US-CPI-U',
     [
-      ['2024-10-01', 315.664],
-      ['2024-11-01', 315.493],
-      ['2024-12-01', 315.605],
+      { reference_month: '2024-10-01', value: 315.664, available_on: '2024-11-13' },
+      { reference_month: '2024-11-01', value: 315.493, available_on: '2024-12-11' },
+      { reference_month: '2024-12-01', value: 315.605, available_on: '2025-01-15' },
     ],
     'USD',
-    'linear',
-    lag
+    '2025-01-15'
   );
+
+test('inflation sources enforce explicit clocks and fixing knowledge cutoffs', () => {
+  assert.throws(
+    () =>
+      new core.InflationCurve({
+        id: 'CPI',
+        baseDate: '2025-01-01',
+        knots: [0, 300, 1, 306],
+      })
+  );
+  const curve = new core.InflationCurve({
+    id: 'CPI',
+    baseDate: '2025-01-01',
+    knots: [0, 300, 1, 306],
+    dayCount: 'act_365f',
+    interp: 'log_linear',
+    extrapolation: 'error',
+  });
+  for (const t of [-1, NaN, Infinity, 2]) {
+    assert.throws(() => curve.cpi(t));
+  }
+  const snapshot = index();
+  assert.equal(snapshot.getObservation('2024-10-01').available_on, '2024-11-13');
+  assert.throws(() => snapshot.getObservation('2024-10-15'));
+  assert.throws(() => snapshot.getObservation('2024-09-01'));
+  assert.throws(() => snapshot.qualifiedMonthlyObservation(2024, 10, '2024-11-12'));
+  assert.equal(snapshot.qualifiedMonthlyObservation(2024, 10, '2024-11-13'), 315.664);
+  assert.throws(() => snapshot.qualifiedMonthlyObservation(2024, 10, '2025-01-16'));
+  assert.throws(() =>
+    snapshot.withExpectedReleases([
+      { reference_month: '2025-01-01', expected_release: '2025-02-12', known_on: '2025-01-16' },
+    ])
+  );
+  const scheduled = snapshot.withExpectedReleases(EXPECTED_RELEASES);
+  assert.equal(scheduled.getExpectedRelease('2024-10-01').known_on, '2024-10-01');
+  assert.equal(snapshot.getExpectedRelease('2024-10-01'), null);
+  assert.deepEqual(scheduled.getExpectedReleases(), EXPECTED_RELEASES);
+});
+
 const fx = () => core.FxMatrix.fromDict({ 'EUR/USD': 1.1, GBPUSD: 1.27 }, null);
 const market = () => {
   const context = new core.MarketContext();
-  context.insert(core.DiscountCurve.flat('USD-OIS', '2025-01-02', 0.04));
+  context.insert(core.DiscountCurve.flat('USD-OIS', '2025-01-02', 0.04, 'act_365f'));
   context.insert(inflation());
   context.insert(price());
   context.insert(baseCorrelation());
@@ -113,7 +172,7 @@ const market = () => {
   context.insertSeries(series());
   context.insertInflationIndex(index());
   // A credit index is persisted by reference, so its curves are stored too.
-  const hazard = core.HazardCurve.flat('CDX-IG-HZD', '2025-01-02', 0.01, 0.4);
+  const hazard = core.HazardCurve.flat('CDX-IG-HZD', '2025-01-02', 0.01, 0.4, 'act_365f');
   context.insert(hazard);
   context.insertCreditIndex(
     'CDX-IG-43',
@@ -160,10 +219,11 @@ const CASES = {
   tolerance_config_new: () => [core.toleranceConfigNew(), core.toleranceConfigNew(1e-8)],
   rating_level_try_new: () => core.ratingLevelTryNew('AAA', 95, 90),
   scorecard_scale_try_new: () =>
-    core.scorecardScaleTryNew('custom', 'fixture', [
-      core.ratingLevelTryNew('A', 90, 85),
-      core.ratingLevelTryNew('B', 70, 0),
-    ]),
+    core.scorecardScaleTryNew(
+      'custom',
+      [core.ratingLevelTryNew('A', 90, 85), core.ratingLevelTryNew('B', 70, 0)],
+      'fixture'
+    ),
   sabr_parameter_data_new: () => [
     core.sabrParameterDataNew(0.2, 1, 0, -0.5),
     core.sabrParameterDataNew(0.2, 0.5, 0.4, -0.3, -0.01),
@@ -252,19 +312,21 @@ const CASES = {
     return { covariance: Array.from(covariance), shrinkage };
   },
   mean_var: () => Array.from(core.meanVar(SERIES)),
-  stats_or_nan: () => [
-    core.meanOrNan(SERIES),
-    core.sampleVarianceOrNan(SERIES),
-    core.sampleStdOrNan(SERIES),
-    core.medianOrNan(SERIES),
+  stats_summary: () => [
+    core.mean(SERIES),
+    core.variance(SERIES),
+    core.stdDev(SERIES),
+    core.median(SERIES),
     core.quantile(SERIES, 0.3),
-    core.finiteMinOrNan(SERIES),
-    core.finiteMaxOrNan(SERIES),
+    core.finiteMin(SERIES),
+    core.finiteMax(SERIES),
   ],
-  stats_empty_is_nan: () => [
-    Number.isNaN(core.meanOrNan([])),
-    Number.isNaN(core.sampleVarianceOrNan([1.0])),
-    Number.isNaN(core.finiteMinOrNan([NaN])),
+  stats_missing_is_none: () => [
+    core.mean([]) === undefined,
+    core.variance([1.0]) === undefined,
+    core.stdDev([1.0]) === undefined,
+    core.median([]) === undefined,
+    core.finiteMin([NaN]) === undefined,
   ],
   finite_count: () => core.finiteCount([1.0, NaN, Infinity, 2.0]),
   log_returns: () => Array.from(core.logReturns(SERIES)),
@@ -326,13 +388,13 @@ const CASES = {
   // --- market data ------------------------------------------------------------------
   discount_curve: () => JSON.parse(discount().toJson()),
   discount_curve_queries: () => [
-    discount().zeroRate(2.0),
+    discount().zeroRate(2.0, 'continuous'),
     discount().zeroRate(2.0, 'periodic(1)'),
     discount().zeroRate(2.0, 'semi_annual'),
     discount().zeroRate('2027-01-02', 'quarterly'),
     discount().df('2027-01-02'),
     discount().dfBetweenDates('2026-01-02', '2027-01-02'),
-    discount().toForwardCurve('USD-FWD', 0.25).rate(1.0),
+    core.ForwardCurve.fromDiscountCurve('USD-FWD', discount(), '3M').rateBetween(1.0, 1.25, 0.25),
     discount().dayCount,
     discount().interpStyle,
     discount().extrapolation,
@@ -341,19 +403,23 @@ const CASES = {
   ],
   discount_curve_from_dates: () =>
     JSON.parse(
-      core.DiscountCurve.fromDates('USD-OIS', '2025-01-02', [
-        ['2026-01-02', 0.96],
-        ['2030-01-02', 0.8],
-      ]).toJson()
+      core.DiscountCurve.fromDates(
+        'USD-OIS',
+        '2025-01-02',
+        [
+          ['2026-01-02', 0.96],
+          ['2030-01-02', 0.8],
+        ],
+        'act_365f',
+        'monotone_convex',
+        'extend'
+      ).toJson()
     ),
   inflation_curve: () => JSON.parse(inflation().toJson()),
   inflation_curve_queries: () => [
     inflation().cpi(2.5),
     inflation().cpi('2027-07-02'),
-    inflation().cpiWithLag(2.5),
-    inflation().indexRatio(2.5),
     inflation().inflationRate(0.0, 5.0),
-    inflation().indexationLagMonths,
   ],
   price_curve: () => JSON.parse(price().toJson()),
   price_curve_queries: () => [price().price(0.5), price().price('2025-07-02'), price().kind],
@@ -362,10 +428,12 @@ const CASES = {
   vol_surface: () => JSON.parse(surface().toJson()),
   vol_surface_queries: () => [
     models.volatility.getSurfaceVol(surface(), 0.75, 100.0),
+    numbers(surface().secondaryValues),
     Array.from(surface().gridShape),
     surface().secondaryAxis,
     surface().quoteType,
     surface().interpolationMode,
+    surface().expiryClock ?? null,
   ],
   vol_surface_displacements: () => [
     numbers(surface().displacements),
@@ -377,7 +445,12 @@ const CASES = {
       [0.5, 1.0],
       [90.0, 100.0, 110.0],
       [0.24, 0.2, 0.22, 0.23, 0.21, 0.22],
-      { quoteType: 'shifted_black_lognormal', displacements: [0.01, 0.015] }
+      {
+        secondaryAxis: 'strike',
+        quoteType: 'shifted_black_lognormal',
+        interpolationMode: 'vol',
+        displacements: [0.01, 0.015],
+      }
     ).toJson() === shiftedSurface().toJson(),
   ],
   vol_cube_expiry_slice: () => JSON.parse(expirySlice().toJson()),
@@ -396,28 +469,22 @@ const CASES = {
   ],
   scalar_time_series: () => JSON.parse(series().toJson()),
   scalar_time_series_queries: () => [
-    series().valueOn('2025-01-04'),
-    series().valueOnExact('2025-01-06'),
+    series().getValue('2025-01-04'),
+    series().getValueExact('2025-01-06'),
     series().firstDate ?? null,
     series().lastDate ?? null,
   ],
   inflation_index: () => JSON.parse(index().toJson()),
   inflation_index_queries: () => [
-    index('none').ratio('2024-10-01', '2024-12-01'),
-    index('none').valueOn('2024-11-16'),
-    index().refCpiMonthsLag('2025-02-15', 3),
+    index().getObservation('2024-10-01').value,
+    index().qualifiedMonthlyObservation(2024, 11, '2024-12-11'),
     index().dateRange(),
-    index().lag,
+    index().knowledgeDate,
   ],
-  inflation_index_publication_dates: () => [
-    index().getPublicationDates(),
-    index().getPublicationDate('2024-10-20') ?? null,
-    index().withPublicationDates(PUBLICATION_DATES).getPublicationDates(),
-    index()
-      .withPublicationDates(JSON.stringify(PUBLICATION_DATES))
-      .getPublicationDate('2024-10-20'),
-    index().withPublicationDates(PUBLICATION_DATES).getPublicationDate('2024-12-05') ?? null,
-    JSON.parse(index().withPublicationDates(PUBLICATION_DATES).toJson()),
+  inflation_index_expected_releases: () => [
+    index().getExpectedReleases(),
+    index().getExpectedRelease('2024-10-01'),
+    JSON.parse(index().withExpectedReleases(EXPECTED_RELEASES).toJson()),
   ],
   fx_matrix: () => [
     fx().rate('EUR', 'USD', '2025-01-02', core.FxConversionPolicy.cashflowDate()).rate,
@@ -431,25 +498,47 @@ const CASES = {
     is_empty: [market().isEmpty(), new core.MarketContext().isEmpty()],
     df: market().getDiscount('USD-OIS').df(1.0),
     vol: models.volatility.getSurfaceVol(market().getSurface('SPX-VOL'), 0.75, 100.0),
-    series: market().getSeries('SOFR-FIXINGS').valueOn('2025-01-06'),
-    index_lag: market().getInflationIndex('US-CPI-U').lag,
+    series: market().getSeries('SOFR-FIXINGS').getValue('2025-01-06'),
+    index_knowledge_date: market().getInflationIndex('US-CPI-U').knowledgeDate,
     credit_index: market().getCreditIndex('CDX-IG-43').numConstituents,
     fx_rate: market()
       .fxRequired()
       .rate('EUR', 'USD', '2025-01-02', core.FxConversionPolicy.cashflowDate()).rate,
     converted: [
-      market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').amount
-        .amount,
+      market().convertMoney(
+        money(100.0, 'EUR'),
+        new core.Currency('USD'),
+        '2025-01-02',
+        core.FxConversionPolicy.cashflowDate()
+      ).amount.amount,
       market()
-        .convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02')
+        .convertMoney(
+          money(100.0, 'EUR'),
+          new core.Currency('USD'),
+          '2025-01-02',
+          core.FxConversionPolicy.cashflowDate()
+        )
         .amount.currency.toString(),
-      market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').rate.rate,
-      market().convertMoney(money(100.0, 'EUR'), new core.Currency('USD'), '2025-01-02').rate
-        .triangulated,
-      market().convertMoney(money(100.0, 'USD'), new core.Currency('USD'), '2025-01-02').rate ===
-        undefined,
+      market().convertMoney(
+        money(100.0, 'EUR'),
+        new core.Currency('USD'),
+        '2025-01-02',
+        core.FxConversionPolicy.cashflowDate()
+      ).rate.rate,
+      market().convertMoney(
+        money(100.0, 'EUR'),
+        new core.Currency('USD'),
+        '2025-01-02',
+        core.FxConversionPolicy.cashflowDate()
+      ).rate.triangulated,
+      market().convertMoney(
+        money(100.0, 'USD'),
+        new core.Currency('USD'),
+        '2025-01-02',
+        core.FxConversionPolicy.cashflowDate()
+      ).rate === undefined,
     ],
-    rolled_base_date: market().rollForward(30).getDiscount('USD-OIS').baseDate,
+    rolled_base_date: market().condition('2025-02-01').getDiscount('USD-OIS').baseDate,
     round_trip: core.MarketContext.fromJson(market().toJson()).toJson() === market().toJson(),
   }),
 };
@@ -670,7 +759,7 @@ test('MarketContext.len counts the FX matrix', () => {
 });
 
 test('CreditIndexData issuer accessors fall back to the index data', () => {
-  const hazard = core.HazardCurve.flat('CDX-IG-HZD', '2025-01-02', 0.01, 0.4);
+  const hazard = core.HazardCurve.flat('CDX-IG-HZD', '2025-01-02', 0.01, 0.4, 'act_365f');
   const data = new core.CreditIndexData(4, 0.4, hazard, baseCorrelation());
   assert.equal(data.hasIssuerCurves(), false);
   assert.deepEqual(data.issuerIds(), []);
@@ -681,7 +770,7 @@ test('CreditIndexData issuer accessors fall back to the index data', () => {
 
   const context = new core.MarketContext();
   context.insert(hazard);
-  context.insert(core.HazardCurve.flat('A-HZD', '2025-01-02', 0.02, 0.3));
+  context.insert(core.HazardCurve.flat('A-HZD', '2025-01-02', 0.02, 0.3, 'act_365f'));
   context.insert(baseCorrelation());
   context.insertCreditIndex('CDX', new core.CreditIndexData(2, 0.4, hazard, baseCorrelation()));
   const state = JSON.parse(context.toJson());
@@ -734,23 +823,34 @@ test('MarketContext inserts change the context in place and share curve data', (
     () => context.insertPrice('MISMATCH', exactMoney, 'USD'),
     kind('validation', /currency argument/)
   );
-  const laggedCpi = new core.InflationIndex('US-CPI', [['2025-01-01', 300.0]], 'USD', 'step', 3);
-  assert.equal(laggedCpi.lag, '3M');
+  const snapshot = new core.InflationIndex('US-CPI', [], 'USD', '2025-01-01');
+  assert.equal(snapshot.knowledgeDate, '2025-01-01');
+  assert.equal(snapshot.dateRange(), null);
 });
 
-test('MarketContext rejects cross-volatility-registry ID collisions and negative rollForward days', () => {
+test('MarketContext keeps volatility registries namespace-local, rejects cross-family curve replacement, and conditions curves', () => {
   const context = new core.MarketContext();
-  context.insert(core.DiscountCurve.flat('SHARED', '2025-01-02', 0.04));
+  context.insert(core.DiscountCurve.flat('SHARED', '2025-01-02', 0.04, 'act_365f'));
   context.insertPrice('SHARED', 100.0);
-  context.insertSeries(new core.ScalarTimeSeries('SHARED', [['2025-01-02', 1.0]]));
-  context.insert(new core.VolSurface('SHARED', [1.0], [100.0], [0.2]));
+  context.insertSeries(new core.ScalarTimeSeries('SHARED', [['2025-01-02', 1.0]], 'step', 'flat'));
+  context.insert(
+    new core.VolSurface('SHARED', [1.0], [100.0], [0.2], {
+      secondaryAxis: 'strike',
+      quoteType: 'black_lognormal',
+      interpolationMode: 'vol',
+    })
+  );
   assert.equal(context.getDiscount('SHARED').id, 'SHARED');
   assert.equal(context.getSeries('SHARED').id, 'SHARED');
+  context.insert(new core.FxDeltaVolSurface('SHARED', 'EUR/USD', [1.0], [0.12], [0.01], [0.002]));
+  assert.equal(context.getFxDeltaVolSurface('SHARED').id, 'SHARED');
   assert.throws(
-    () => context.insert(new core.FxDeltaVolSurface('SHARED', [1.0], [0.12], [0.01], [0.002])),
-    kind('validation', /already registered/)
+    () => context.insert(core.ForwardCurve.flat('SHARED', '2025-01-02', 0.04, 'act_360')),
+    kind('validation', /Cannot replace curve/)
   );
-  assert.throws(() => context.rollForward(-1), kind('validation', /non-negative/));
+  const conditioned = context.condition('2025-07-02');
+  assert.equal(conditioned.getDiscount('SHARED').baseDate, '2025-07-02');
+  assert.throws(() => context.condition('not-a-date'), kind('validation', /.+/));
 });
 
 test('FinstackConfig extensions hold JSON values, not JSON text', () => {

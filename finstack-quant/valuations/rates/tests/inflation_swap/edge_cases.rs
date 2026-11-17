@@ -2,6 +2,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::market_data::scalars::{InflationLag, SeriesInterpolation};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_valuations_core::instruments::Instrument;
@@ -28,6 +29,8 @@ fn test_matured_swap_has_zero_pv() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -57,6 +60,8 @@ fn test_very_short_maturity() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -85,6 +90,8 @@ fn test_very_long_maturity() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -112,6 +119,8 @@ fn test_very_high_fixed_rate() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Receive)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -141,6 +150,8 @@ fn test_very_low_negative_fixed_rate() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -168,6 +179,8 @@ fn test_very_small_notional() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -201,6 +214,8 @@ fn test_start_equals_maturity() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build();
 
@@ -240,6 +255,8 @@ fn test_pricing_on_maturity_date() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -269,6 +286,8 @@ fn test_pricing_after_start_before_maturity() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -297,6 +316,8 @@ fn test_zero_inflation_rate() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -326,6 +347,8 @@ fn test_very_high_inflation_rate() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -356,6 +379,8 @@ fn test_deflation_scenario() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -384,6 +409,8 @@ fn test_flat_discount_curve_zero_rate() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -412,6 +439,8 @@ fn test_swap_with_multiple_currencies() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Attributes::new())
         .build()
         .unwrap();

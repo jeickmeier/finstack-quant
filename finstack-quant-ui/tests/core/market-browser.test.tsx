@@ -97,7 +97,7 @@ it("searches literal paths and preserves identified selection across reorder, th
   showOriginal(screen.getByRole("region", { name: "Selected stored value" }));
   expect(
     screen.getByRole("region", { name: "Selected stored value" }).textContent,
-  ).toContain('"min_forward_rate":-1');
+  ).toContain("[1,1.01]");
   rerender(
     <MarketContextBrowser
       state={{ ...market, curves: [...market.curves].reverse() }}

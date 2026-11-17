@@ -235,6 +235,7 @@ impl FullRepricingEngine {
                     continue;
                 }
                 let bumped_market = market.bump(mapping_to_market_bumps(
+                    market,
                     &factor.market_mapping,
                     bump_size * shift,
                     bump_units,
@@ -402,7 +403,7 @@ mod tests {
             Ok(market.get_discount(self.curve_id.as_str())?.zero_rate(
                 self.tenor_years,
                 finstack_quant_core::math::Compounding::Continuous,
-            ) * self.scale)
+            )? * self.scale)
         }
     }
 
@@ -489,6 +490,8 @@ mod tests {
             .base_date(as_of)
             .interp(InterpStyle::MonotoneConvex)
             .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.80), (10.0, 0.60)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
         Ok(MarketContext::new().insert(curve))
     }
@@ -498,6 +501,8 @@ mod tests {
             .base_date(as_of)
             .interp(InterpStyle::MonotoneConvex)
             .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.75), (10.0, 0.55)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
         Ok(test_market(as_of)?.insert(other_curve))
     }

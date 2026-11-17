@@ -23,7 +23,10 @@ fn fx_barrier_generic_theta_horizon_caps_at_expiry() -> finstack_quant_core::Res
             &[0.9, 1.0, 1.1, 1.2, 1.3],
             0.15,
         ))
-        .insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.10));
+        .insert_price(
+            "EURUSD-SPOT",
+            MarketScalar::unitless(1.10).expect("valid scalar"),
+        );
     let mut option = FxBarrierOption::example()?;
     option.expiry = expiry;
     option.barrier = 1.60;

@@ -13,7 +13,7 @@ use finstack_quant_core::market_data::bumps::{
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
-    MarketScalar, ScalarTimeSeries, SeriesInterpolation,
+    MarketScalar, ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
 };
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -71,7 +71,7 @@ fn check_bump(ctx: &MarketContext, bumped: &MarketContext, target: &CurveId, n_c
                 let unchanged = (-0.04 * t).exp();
                 assert_eq!(stored_df.to_bits(), unchanged.to_bits());
                 let expected = stored_df * (-0.0001 * t).exp();
-                let actual = after.df(t);
+                let actual = after.df(t).unwrap();
                 assert!(actual.is_finite() && actual > 0.0);
                 assert!(
                     (actual - expected).abs() <= 2e-13 * expected.abs().max(1.0),
@@ -80,8 +80,8 @@ fn check_bump(ctx: &MarketContext, bumped: &MarketContext, target: &CurveId, n_c
             }
             // The shock also applies between stored pillars.
             let t = 2.25;
-            let expected = original.df(t) * (-0.0001_f64 * t).exp();
-            assert!((after.df(t) - expected).abs() <= 2e-13);
+            let expected = original.df(t).unwrap() * (-0.0001_f64 * t).exp();
+            assert!((after.df(t).unwrap() - expected).abs() <= 2e-13);
         } else {
             assert!(Arc::ptr_eq(&original, &after), "unrelated curve {id}");
         }
@@ -100,7 +100,7 @@ fn benchmark_bump(c: &mut Criterion) {
             |b, _| {
                 let (ctx, target) = build_context(n_curves);
                 let checked = ctx
-                    .bump([MarketBump::Curve {
+                    .bump([MarketBump::DiscountCurve {
                         id: target.clone(),
                         spec: BumpSpec::parallel_bp(1.0),
                     }])
@@ -109,7 +109,7 @@ fn benchmark_bump(c: &mut Criterion) {
                 drop(checked);
                 b.iter(|| {
                     let bumped = black_box(&ctx)
-                        .bump([MarketBump::Curve {
+                        .bump([MarketBump::DiscountCurve {
                             id: target.clone(),
                             spec: BumpSpec::parallel_bp(1.0),
                         }])
@@ -136,10 +136,16 @@ enum MixedTarget {
 }
 
 fn mixed_context(n_curves: usize) -> MarketContext {
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
+    };
     let (ctx, _) = build_context(n_curves);
     let surface = VolSurface::builder("EQ-VOL")
         .expiries(&EXPIRIES)
-        .strikes(&STRIKES)
+        .secondary_values(&STRIKES)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&VOLS[..3])
         .row(&VOLS[3..6])
         .row(&VOLS[6..])
@@ -156,24 +162,25 @@ fn mixed_context(n_curves: usize) -> MarketContext {
             })
             .collect(),
         Some(Currency::USD),
+        SeriesInterpolation::Step,
+        SeriesExtrapolation::Error,
     )
-    .expect("fixed close series")
-    .with_interpolation(SeriesInterpolation::Step);
+    .expect("fixed close series");
     ctx.insert_surface(surface)
         .insert_price(
             "SPX-SPOT",
-            MarketScalar::Price(Money::from((100_i64, Currency::USD))),
+            MarketScalar::price(Money::from((100_i64, Currency::USD))),
         )
         .insert_series(series)
 }
 
 fn mixed_bump(target: MixedTarget) -> MarketBump {
     match target {
-        MixedTarget::Money => MarketBump::Curve {
+        MixedTarget::Money => MarketBump::PriceScalar {
             id: CurveId::from("SPX-SPOT"),
             spec: BumpSpec::multiplier(1.01),
         },
-        MixedTarget::Surface => MarketBump::Curve {
+        MixedTarget::Surface => MarketBump::VolSurface {
             id: CurveId::from("EQ-VOL"),
             spec: BumpSpec {
                 mode: BumpMode::Additive,
@@ -182,14 +189,14 @@ fn mixed_bump(target: MixedTarget) -> MarketBump {
                 bump_type: BumpType::Parallel,
             },
         },
-        MixedTarget::Series => MarketBump::Curve {
+        MixedTarget::Series => MarketBump::Series {
             id: CurveId::from("SPX-CLOSE"),
             spec: BumpSpec::multiplier(1.01),
         },
         MixedTarget::TypedVol => MarketBump::VolBucketPct {
             vol_surface_id: CurveId::from("EQ-VOL"),
             expiries: None,
-            strikes: None,
+            secondary_values: None,
             pct: 5.0,
         },
     }
@@ -229,7 +236,7 @@ fn check_mixed_bump(
         let surface = ctx.get_surface("EQ-VOL").expect("surface");
         assert_eq!(surface.id().as_str(), "EQ-VOL");
         assert_eq!(surface.expiries(), EXPIRIES);
-        assert_eq!(surface.strikes(), STRIKES);
+        assert_eq!(surface.secondary_values(), STRIKES);
         assert_eq!(surface.vols().len(), VOLS.len());
         for (&actual, original) in surface.vols().iter().zip(VOLS) {
             let expected = match (changed, target) {
@@ -240,9 +247,11 @@ fn check_mixed_bump(
             assert!(actual.is_finite());
             assert_eq!(actual.to_bits(), expected.to_bits());
         }
-        let MarketScalar::Price(spot) = ctx.get_price("SPX-SPOT").expect("spot") else {
-            panic!("Money spot fixture changed variant");
-        };
+        let spot = ctx
+            .get_price("SPX-SPOT")
+            .expect("spot")
+            .get_price()
+            .expect("Money spot fixture changed variant");
         assert_eq!(spot.currency(), Currency::USD);
         let expected_spot = if changed && matches!(target, MixedTarget::Money) {
             101_i64

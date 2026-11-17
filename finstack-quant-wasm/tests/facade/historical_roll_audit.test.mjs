@@ -15,23 +15,6 @@ function fixture(name) {
   );
 }
 
-test('first-order credit spread shocks use recovery conversion and disclose approximation', () => {
-  const f = fixture('production_cds_option');
-  const original = f.market.curves.find((curve) => curve.type === 'hazard');
-  const spec = {
-    id: 'credit-spread-units',
-    hazard_bump_mode: 'first_order_shift',
-    operations: [
-      { kind: 'curve_parallel_bp', curve_kind: 'par_cds', curve_id: original.id, bp: 10 },
-    ],
-  };
-  const result = scenarios.applyScenario(JSON.stringify(spec), JSON.stringify(f.market), f.as_of);
-  const actual = result.market.curves.find((curve) => curve.id === original.id).knot_points[0][1];
-  const expected = original.knot_points[0][1] + 0.001 / (1 - original.recovery_rate);
-  assert.ok(Math.abs(actual - expected) < 1e-12, `${actual} versus ${expected}`);
-  assert.ok(result.report.warnings.some((warning) => warning.kind.includes('first_order')));
-});
-
 test('time roll preserves the raw crossed fixing and supports repeated rolls', () => {
   const f = fixture('production_quanto_range');
   f.market.curves = f.market.curves.filter((curve) => curve.id === 'USD-OIS');
@@ -58,17 +41,11 @@ test('time roll preserves the raw crossed fixing and supports repeated rolls', (
     type: 'forward',
     id: 'USD-SOFR-3M',
     base: f.as_of,
-    reset_lag: 0,
     day_count: 'act_360',
-    tenor: 0.25,
-    knot_points: [
-      [0, 0.03],
-      [1, 0.03],
-      [2, 0.03],
-    ],
-    projection_grid: null,
-    interp_style: 'linear',
-    extrapolation: 'flat_forward',
+    index_tenor: { count: 3, unit: 'months' },
+    knot_points: [0, 1, 2].map((t) => [t, Math.exp(-0.03 * t)]),
+    interp_style: 'log_linear',
+    extrapolation: 'extend',
     rate_calibration: null,
     fx_policy: null,
   });
@@ -89,7 +66,12 @@ test('time roll preserves the raw crossed fixing and supports repeated rolls', (
   const observed = result.market.series.find((series) => series.id === 'FIXING:USD-SOFR-3M');
   assert.ok(observed, 'crossed reset must have a fixing series');
   const rate = observed.observations.find(([date]) => date === '2025-01-03')[1];
-  assert.ok(Math.abs(rate - 0.03) < 1e-12, 'the 150bp spread must not enter the index fixing');
+  // Flat 3% continuous factor curve; the 2025-01-03 to 2025-04-03 accrual is 90/360.
+  const expected = Math.expm1(0.03 * 0.25) / 0.25;
+  assert.ok(
+    Math.abs(rate - expected) < 1e-12,
+    `${rate} versus ${expected}: the 150bp spread must not enter the index fixing`
+  );
   spec.operations[0].period = '1D';
   const next = scenarios.applyScenario(
     JSON.stringify(spec),
@@ -183,17 +165,10 @@ function addForward(market, id, rate) {
     type: 'forward',
     id,
     base: '2025-01-02',
-    reset_lag: 0,
     day_count: 'act_360',
-    tenor: 0.25,
-    knot_points: [
-      [0, rate],
-      [1, rate],
-      [10, rate],
-    ],
-    projection_grid: null,
-    interp_style: 'linear',
-    extrapolation: 'flat_forward',
+    knot_points: [0, 1, 10].map((t) => [t, Math.exp(-rate * t)]),
+    interp_style: 'log_linear',
+    extrapolation: 'extend',
     rate_calibration: null,
     fx_policy: null,
   });
@@ -234,7 +209,12 @@ test('basis swap rolls both raw overnight indices without spread contamination',
       (series) => series.id === `FIXING:${leg.forward_curve_id}`
     ).observations;
     assert.ok(observations.length >= 1);
-    for (const [, value] of observations) assert.ok(Math.abs(value - rate) < 1e-10);
+    for (const [date, value] of observations) {
+      // Daily fixing over the next weekends-only business day under ACT/360.
+      const days = new Date(`${date}T00:00:00Z`).getUTCDay() === 5 ? 3 : 1;
+      const expected = Math.expm1((rate * days) / 360) / (days / 360);
+      assert.ok(Math.abs(value - expected) < 1e-10, `${date}: ${value} versus ${expected}`);
+    }
   }
 });
 

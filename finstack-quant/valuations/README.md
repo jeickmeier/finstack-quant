@@ -304,7 +304,9 @@ use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+use finstack_quant_core::market_data::scalars::{
+    ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use time::macros::date;
 
@@ -333,6 +335,8 @@ let market = MarketContext::new()
             .map(|i| (date!(2023-12-01) + time::Duration::days(i), 0.05))
             .collect::<Vec<_>>(),
         None,
+        SeriesInterpolation::Step,
+        SeriesExtrapolation::Error,
     )?);
 let metrics = vec![MetricId::Dv01]; // Parallel DV01
 
@@ -388,8 +392,8 @@ let market = MarketContext::new()
             .knots([(0.0, 1.0), (5.0, 0.80)])
             .build()?,
     )
-    .insert_price("EQUITY-SPOT", MarketScalar::Unitless(4500.0))
-    .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(0.015))
+    .insert_price("EQUITY-SPOT", MarketScalar::unitless(4500.0)?)
+    .insert_price("EQUITY-DIVYIELD", MarketScalar::unitless(0.015)?)
     .insert_surface(
         VolSurface::builder("EQUITY-VOL")
             .expiries(&[0.25, 0.5, 1.0])
@@ -448,8 +452,8 @@ let market = MarketContext::new()
             .knots([(0.0, 1.0), (5.0, 0.80)])
             .build()?,
     )
-    .insert_price("EQUITY-SPOT", MarketScalar::Unitless(4500.0))
-    .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(0.015))
+    .insert_price("EQUITY-SPOT", MarketScalar::unitless(4500.0)?)
+    .insert_price("EQUITY-DIVYIELD", MarketScalar::unitless(0.015)?)
     .insert_surface(
         VolSurface::builder("EQUITY-VOL")
             .expiries(&[0.25, 0.5, 1.0])

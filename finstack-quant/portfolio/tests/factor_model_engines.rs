@@ -64,6 +64,8 @@ fn create_test_market(base_date: Date) -> Result<MarketContext> {
             (5.0, 0.88),
             (10.0, 0.70),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()?;
 
     Ok(MarketContext::new().insert(curve))
@@ -179,6 +181,8 @@ fn create_two_currency_market(base_date: Date) -> Result<MarketContext> {
             (5.0, 0.90),
             (10.0, 0.75),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()?;
 
     Ok(create_test_market(base_date)?.insert(eur_curve))
@@ -359,25 +363,39 @@ const VOL_DIV: f64 = 0.01;
 
 fn equity_vol_market(as_of: Date) -> Result<MarketContext> {
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
 
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots([(0.0, 1.0), (5.0, (-VOL_RATE * 5.0).exp())])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()?;
     let strikes = [80.0, 90.0, 100.0, 110.0, 120.0];
     let expiries = [0.25, 0.5, 1.0, 2.0];
     let mut surface = VolSurface::builder("EQUITY-VOL")
         .expiries(&expiries)
-        .strikes(&strikes);
+        .secondary_values(&strikes)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol);
     for _ in expiries {
         surface = surface.row(&[VOL_LEVEL; 5]);
     }
     Ok(MarketContext::new()
         .insert(discount)
         .insert_surface(surface.build()?)
-        .insert_price("EQUITY-SPOT", MarketScalar::Unitless(VOL_SPOT))
-        .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(VOL_DIV)))
+        .insert_price(
+            "EQUITY-SPOT",
+            MarketScalar::unitless(VOL_SPOT).expect("valid scalar"),
+        )
+        .insert_price(
+            "EQUITY-DIVYIELD",
+            MarketScalar::unitless(VOL_DIV).expect("valid scalar"),
+        ))
 }
 
 fn equity_vol_factor() -> FactorDefinition {

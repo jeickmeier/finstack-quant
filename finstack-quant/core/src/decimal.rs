@@ -202,16 +202,28 @@ pub fn f64_to_decimal(value: f64) -> Result<Decimal> {
 /// # Arguments
 ///
 /// * `value` - Exact Decimal to view as binary64.
-///
-/// # Errors
-///
-/// Returns `InputError::ConversionOverflow` if the Decimal's text cannot be
-/// parsed, which does not happen for a valid Decimal.
-pub(crate) fn decimal_to_f64_nearest(value: Decimal) -> Result<f64> {
-    value
-        .to_string()
-        .parse::<f64>()
-        .map_err(|_| InputError::ConversionOverflow.into())
+#[must_use]
+pub(crate) fn decimal_to_f64_nearest(value: Decimal) -> f64 {
+    use std::io::Write;
+
+    if value.scale() == 0 && value.mantissa().unsigned_abs() <= (1_u128 << 53) {
+        if value.is_zero() {
+            return if value.is_sign_negative() { -0.0 } else { 0.0 };
+        }
+        return value.mantissa() as f64;
+    }
+
+    let mut buf = [0_u8; 64];
+    let mut cursor = std::io::Cursor::new(&mut buf[..]);
+    if write!(cursor, "{value}").is_ok() {
+        let len = cursor.position() as usize;
+        if let Ok(text) = std::str::from_utf8(&buf[..len])
+            && let Ok(parsed) = text.parse::<f64>()
+        {
+            return parsed;
+        }
+    }
+    value.as_f64()
 }
 
 /// Convert a pricer's model value to [`Decimal`], rounding explicitly to
@@ -456,5 +468,29 @@ mod tests {
         assert!(parse_decimal("1e-29").is_err());
         assert!(parse_decimal("0.10000000000000000000000000001").is_err());
         assert!(parse_decimal("2.5e-28").is_err());
+    }
+
+    #[test]
+    fn decimal_to_f64_nearest_matches_single_rounding_parser() {
+        for text in [
+            "0",
+            "-0.5",
+            "0.1",
+            "1e-28",
+            "1.0000000000000001",
+            "9007199254740993",
+            "9007199254740995",
+            "12345678901234567890123456789",
+            "0.1234567890123456789012345678",
+            "79228162514264337593543950335",
+        ] {
+            let dec = parse_decimal(text).expect("valid decimal");
+            let expected: f64 = dec.to_string().parse().expect("valid f64 text");
+            assert_eq!(
+                decimal_to_f64_nearest(dec).to_bits(),
+                expected.to_bits(),
+                "{text}"
+            );
+        }
     }
 }

@@ -5,15 +5,13 @@
 //! Dates are ISO-8601 strings (`"YYYY-MM-DD"`), as for the curves.
 
 use crate::api::core::currency::JsCurrency;
-use crate::utils::input::{
-    from_js_json, js_currency, js_opt_currency, js_opt_f64_seq, js_opt_string, js_string, js_uint,
-};
+use crate::utils::input::{from_js_json, js_currency, js_int, js_opt_currency, js_string, js_uint};
 use crate::utils::wire::js_date;
 use crate::utils::{date_to_iso, parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex as RustInflationIndex, InflationLag, ScalarTimeSeries as RustScalarTimeSeries,
-    SeriesInterpolation,
+    InflationExpectedRelease, InflationIndex as RustInflationIndex, InflationObservation,
+    ScalarTimeSeries as RustScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
 };
 use std::sync::Arc;
 use wasm_bindgen::prelude::*;
@@ -47,8 +45,10 @@ fn observations_value(observations: Vec<(Date, f64)>) -> Result<JsValue, JsValue
 ///     ["2025-01-02", 0.0431],
 ///     ["2025-01-03", 0.0433],
 ///   ],
+///   "step",
+///   "flat",
 /// );
-/// series.valueOn("2025-01-03"); // 0.0433
+/// series.getValue("2025-01-03"); // 0.0433
 /// series.lastDate; // "2025-01-03"
 /// ```
 #[wasm_bindgen(js_name = ScalarTimeSeries)]
@@ -65,43 +65,44 @@ impl JsScalarTimeSeries {
     ///
     /// * `id` - Series identifier, the `MarketContext` lookup key.
     /// * `observations` - Array of `[isoDate, value]` pairs (or its JSON
-    ///   text); dates must be unique and values finite.
+    ///   text); dates must be strictly ascending and unique (empty accepted),
+    ///   and values must be finite.
+    /// * `interpolation` - Required in-range fill policy: `"step"` or `"linear"`.
+    /// * `extrapolation` - Required right-tail policy after the last observation:
+    ///   `"flat"` or `"error"`.
     /// * `currency` - ISO-4217 code of the series' unit; omitted for a
     ///   unitless series such as a rate or an index level.
-    /// * `interpolation` - How `valueOn` fills dates between observations:
-    ///   `"step"` or `"linear"`; omitted uses the Rust default (`"step"`).
     ///
     /// @returns The validated `ScalarTimeSeries`.
     /// @throws `TypeError` (kind `invalid_type`) for a mistyped argument;
-    /// `FinstackError` (kind `validation`) for a malformed date or pair, an
-    /// empty or duplicated observation set, an unknown currency, or an unknown
-    /// interpolation name.
+    /// `FinstackError` (kind `validation`) for a malformed date or pair, a
+    /// non-monotonic or duplicate observation set, an unknown currency, or an
+    /// unknown interpolation/extrapolation name.
     /// @param id - Series identifier, the `MarketContext` lookup key.
-    /// @param observations - Array of `[isoDate, value]` pairs (or its JSON text); dates must be unique and values finite.
+    /// @param observations - Array of `[isoDate, value]` pairs (or its JSON text); dates must be strictly ascending and unique (empty accepted), and values must be finite.
+    /// @param interpolation - Required in-range fill policy between observations: `"step"` or `"linear"`.
+    /// @param extrapolation - Required right-tail policy after the last observation: `"flat"` or `"error"`.
     /// @param currency - ISO-4217 code of the series' unit; omitted for a unitless series such as a rate or an index level.
-    /// @param interpolation - How `valueOn` fills dates between observations: `"step"` or `"linear"`; omitted uses the Rust default (`"step"`).
     #[wasm_bindgen(constructor)]
     pub fn new(
         #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
         #[wasm_bindgen(unchecked_param_type = "readonly (readonly [string, number])[] | string")]
         observations: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] interpolation: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "string")] extrapolation: JsValue,
         #[wasm_bindgen(unchecked_optional_param_type = "string | null")] currency: Option<JsValue>,
-        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] interpolation: Option<
-            JsValue,
-        >,
     ) -> Result<JsScalarTimeSeries, JsValue> {
         let id = js_string(&id, "id")?;
         let observations = observations_arg(&observations)?;
+        let interpolation = js_string(&interpolation, "interpolation")?
+            .parse::<SeriesInterpolation>()
+            .map_err(to_js_err)?;
+        let extrapolation = js_string(&extrapolation, "extrapolation")?
+            .parse::<SeriesExtrapolation>()
+            .map_err(to_js_err)?;
         let currency = js_opt_currency(currency.as_ref(), "currency")?;
-        let interpolation = js_opt_string(interpolation.as_ref(), "interpolation")?
-            .map(|name| name.parse::<SeriesInterpolation>())
-            .transpose()
-            .map_err(to_js_err)?
-            .unwrap_or_default();
-        RustScalarTimeSeries::new(id, observations, currency)
-            .map(|series| Self {
-                inner: series.with_interpolation(interpolation),
-            })
+        RustScalarTimeSeries::new(id, observations, currency, interpolation, extrapolation)
+            .map(|inner| Self { inner })
             .map_err(to_js_err)
     }
 
@@ -134,7 +135,8 @@ impl JsScalarTimeSeries {
         serde_json::to_string(&self.inner).map_err(to_js_err)
     }
 
-    /// Value on a date under the series interpolation (Rust `ScalarTimeSeries::value_on`).
+    /// Value on a date under the series interpolation and right-tail
+    /// extrapolation policies (Rust `ScalarTimeSeries::get_value`).
     ///
     /// # Arguments
     ///
@@ -142,21 +144,22 @@ impl JsScalarTimeSeries {
     ///
     /// @returns The observed or interpolated value.
     /// @throws `TypeError` if `date` is not a string; `FinstackError` for a
-    /// malformed date or a date the series cannot serve (for example before
-    /// the first observation).
+    /// malformed date or a date the series cannot serve (for example empty
+    /// series, before the first observation, or after the last observation
+    /// under `"error"` extrapolation).
     /// @param date - ISO-8601 lookup date.
-    #[wasm_bindgen(js_name = valueOn)]
-    pub fn value_on(
+    #[wasm_bindgen(js_name = getValue)]
+    pub fn get_value(
         &self,
         #[wasm_bindgen(unchecked_param_type = "string")] date: JsValue,
     ) -> Result<f64, JsValue> {
         self.inner
-            .value_on(js_date(&date, "date")?)
+            .get_value(js_date(&date, "date")?)
             .map_err(to_js_err)
     }
 
     /// Value observed exactly on a date, with no interpolation (Rust
-    /// `ScalarTimeSeries::value_on_exact`).
+    /// `ScalarTimeSeries::get_value_exact`).
     ///
     /// # Arguments
     ///
@@ -166,13 +169,13 @@ impl JsScalarTimeSeries {
     /// @throws `TypeError` if `date` is not a string; `FinstackError` for a
     /// malformed date or a date with no observation.
     /// @param date - ISO-8601 observation date.
-    #[wasm_bindgen(js_name = valueOnExact)]
-    pub fn value_on_exact(
+    #[wasm_bindgen(js_name = getValueExact)]
+    pub fn get_value_exact(
         &self,
         #[wasm_bindgen(unchecked_param_type = "string")] date: JsValue,
     ) -> Result<f64, JsValue> {
         self.inner
-            .value_on_exact(js_date(&date, "date")?)
+            .get_value_exact(js_date(&date, "date")?)
             .map_err(to_js_err)
     }
 
@@ -194,6 +197,12 @@ impl JsScalarTimeSeries {
         self.inner.interpolation().to_string()
     }
 
+    /// Right-tail extrapolation policy after the latest observation: `"flat"` or `"error"`.
+    #[wasm_bindgen(getter, js_name = extrapolation)]
+    pub fn extrapolation(&self) -> String {
+        self.inner.extrapolation().to_string()
+    }
+
     /// Observations in date order as `[isoDate, value]` pairs.
     #[wasm_bindgen(getter, js_name = observations, unchecked_return_type = "[string, number][]")]
     pub fn observations(&self) -> Result<JsValue, JsValue> {
@@ -213,8 +222,7 @@ impl JsScalarTimeSeries {
     }
 }
 
-/// Historical consumer-price index with the publication lag, interpolation
-/// and seasonality used to index inflation-linked cashflows.
+/// Immutable monthly CPI fixing snapshot at an explicit knowledge cutoff.
 ///
 /// @example
 /// ```typescript
@@ -223,16 +231,14 @@ impl JsScalarTimeSeries {
 /// const index = new core.InflationIndex(
 ///   "US-CPI-U",
 ///   [
-///     ["2024-10-01", 315.664],
-///     ["2024-11-01", 315.493],
-///     ["2024-12-01", 315.605],
+///     { reference_month: "2024-10-01", value: 315.664, available_on: "2024-11-13" },
+///     { reference_month: "2024-11-01", value: 315.493, available_on: "2024-12-11" },
 ///   ],
 ///   "USD",
-///   "linear",
-///   "3M",
+///   "2025-01-02",
 /// );
-/// index.lag; // "3M"
-/// index.dateRange(); // ["2024-10-01", "2024-12-01"]
+/// index.getObservation("2024-10-01").value; // 315.664
+/// index.dateRange(); // ["2024-10-01", "2024-11-01"]
 /// ```
 #[wasm_bindgen(js_name = InflationIndex)]
 #[derive(Clone)]
@@ -248,91 +254,44 @@ impl JsInflationIndex {
 
 #[wasm_bindgen(js_class = InflationIndex)]
 impl JsInflationIndex {
-    /// Construct an index from dated CPI prints (Rust `InflationIndex::new`).
+    /// Construct an index from monthly CPI fixing records.
     ///
     /// # Arguments
     ///
     /// * `id` - Index identifier, the `MarketContext` lookup key.
-    /// * `observations` - Array of `[isoDate, level]` pairs (or its JSON
-    ///   text): unique dates and strictly positive index levels.
+    /// * `observations` - Canonical first-of-month records, strictly ascending and
+    ///   unique, with finite positive levels and availability on or before the cutoff.
     /// * `currency` - ISO-4217 code of the index's currency.
-    /// * `interpolation` - How the level is read between prints: `"step"` or
-    ///   `"linear"`; omitted uses the Rust default (`"step"`).
-    /// * `lag` - Observation lag as text (`"3M"`, `"90D"`, `"none"`) or
-    ///   an integer number of months (`0` for `"none"`, `3` for `"3M"`);
-    ///   omitted keeps the Rust default (`"none"`).
-    /// * `seasonality` - Twelve multiplicative monthly factors, January
-    ///   first; omitted applies no seasonality.
+    /// * `knowledge_date` - Inclusive ISO-8601 snapshot cutoff date.
     ///
     /// @returns The validated `InflationIndex`.
     /// @throws `TypeError` (kind `invalid_type`) for a mistyped argument;
-    /// `FinstackError` (kind `validation`) for a malformed date or pair, an
-    /// empty or duplicated observation set, an unknown currency,
-    /// interpolation or lag, or a `seasonality` array that does not hold
-    /// twelve valid factors.
+    /// `FinstackError` (kind `validation`) for malformed dates, invalid values,
+    /// unsorted or duplicate months, availability outside the reference-month/cutoff
+    /// interval, or an unknown currency. Empty histories are valid.
     /// @param id - Index identifier, the `MarketContext` lookup key.
-    /// @param observations - Array of `[isoDate, level]` pairs (or its JSON text): unique dates and strictly positive index levels.
+    /// @param observations - Ordered monthly records (or JSON text), with snake_case fields and ISO-8601 dates; no lag or interpolation is applied.
     /// @param currency - ISO-4217 code of the index's currency.
-    /// @param interpolation - How the level is read between prints: `"step"` or `"linear"`; omitted uses the Rust default (`"step"`).
-    /// @param lag - Observation lag as text (`"3M"`, `"90D"`, `"none"`) or an integer number of months (`0` for `"none"`, `3` for `"3M"`); omitted keeps the Rust default (`"none"`).
-    /// @param seasonality - Twelve multiplicative monthly factors, January first; omitted applies no seasonality.
+    /// @param knowledgeDate - Inclusive ISO-8601 snapshot cutoff date.
     #[wasm_bindgen(constructor)]
     pub fn new(
         #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "readonly (readonly [string, number])[] | string")]
+        #[wasm_bindgen(unchecked_param_type = "readonly InflationObservation[] | string")]
         observations: JsValue,
         #[wasm_bindgen(unchecked_param_type = "string")] currency: JsValue,
-        #[wasm_bindgen(unchecked_optional_param_type = "string | null")] interpolation: Option<
-            JsValue,
-        >,
-        #[wasm_bindgen(unchecked_optional_param_type = "string | number | null")] lag: Option<
-            JsValue,
-        >,
-        #[wasm_bindgen(unchecked_optional_param_type = "NumericArray | null")] seasonality: Option<
-            JsValue,
-        >,
+        #[wasm_bindgen(js_name = "knowledgeDate", unchecked_param_type = "string")] knowledge_date: JsValue,
     ) -> Result<JsInflationIndex, JsValue> {
         let id = js_string(&id, "id")?;
-        let observations = observations_arg(&observations)?;
+        let observations =
+            from_js_json::<Vec<InflationObservation>>(&observations, "observations")?;
         let currency = js_currency(&currency, "currency")?;
-        let interpolation = js_opt_string(interpolation.as_ref(), "interpolation")?
-            .map(|name| name.parse::<SeriesInterpolation>())
-            .transpose()
-            .map_err(to_js_err)?
-            .unwrap_or_default();
-        let lag = match lag {
-            Some(ref v) if !(v.is_null() || v.is_undefined()) => {
-                if v.as_f64().is_some() {
-                    Some(InflationLag::from(js_uint::<u8>(v, "lag")?))
-                } else {
-                    Some(
-                        js_string(v, "lag")?
-                            .parse::<InflationLag>()
-                            .map_err(to_js_err)?,
-                    )
-                }
-            }
-            _ => None,
-        };
-        let seasonality = js_opt_f64_seq(seasonality.as_ref(), "seasonality")?
-            .map(|factors| {
-                <[f64; 12]>::try_from(factors).map_err(|got| {
-                    to_js_err(format!(
-                        "seasonality must have exactly 12 monthly factors, got {}",
-                        got.len()
-                    ))
-                })
-            })
-            .transpose()?;
-        let mut inner = RustInflationIndex::new(id, observations, currency)
-            .map_err(to_js_err)?
-            .with_interpolation(interpolation);
-        if let Some(lag) = lag {
-            inner = inner.with_lag(lag);
-        }
-        if let Some(factors) = seasonality {
-            inner = inner.with_seasonality(factors).map_err(to_js_err)?;
-        }
+        let inner = RustInflationIndex::new(
+            id,
+            observations,
+            currency,
+            js_date(&knowledge_date, "knowledgeDate")?,
+        )
+        .map_err(to_js_err)?;
         Ok(Self::from_inner(Arc::new(inner)))
     }
 
@@ -366,88 +325,74 @@ impl JsInflationIndex {
         serde_json::to_string(&*self.inner).map_err(to_js_err)
     }
 
-    /// Index level on a date, applying the index lag, interpolation and
-    /// seasonality (Rust `InflationIndex::value_on`).
+    /// Look up the exact stored observation for a canonical reference month.
     ///
     /// # Arguments
     ///
-    /// * `date` - ISO-8601 lookup date.
+    /// * `reference_month` - ISO-8601 first calendar day of the reference month.
     ///
-    /// @returns The index level applicable on `date`.
-    /// @throws `TypeError` if `date` is not a string; `FinstackError` for a
-    /// malformed date or a date the index history cannot serve.
-    /// @param date - ISO-8601 lookup date.
-    #[wasm_bindgen(js_name = valueOn)]
-    pub fn value_on(
+    /// @returns The stored record, with snake_case fields and ISO dates.
+    /// @throws `FinstackError` for an invalid month key or a missing observation;
+    /// `TypeError` for a non-string argument.
+    /// @param referenceMonth - ISO-8601 first calendar day; no carry or interpolation.
+    #[wasm_bindgen(js_name = getObservation, unchecked_return_type = "InflationObservation")]
+    pub fn get_observation(
         &self,
-        #[wasm_bindgen(unchecked_param_type = "string")] date: JsValue,
-    ) -> Result<f64, JsValue> {
-        self.inner
-            .value_on(js_date(&date, "date")?)
-            .map_err(to_js_err)
+        #[wasm_bindgen(js_name = "referenceMonth", unchecked_param_type = "string")]
+        reference_month: JsValue,
+    ) -> Result<JsValue, JsValue> {
+        to_js_value(
+            &self
+                .inner
+                .get_observation(js_date(&reference_month, "referenceMonth")?)
+                .map_err(to_js_err)?,
+        )
     }
 
-    /// Index ratio `I(settleDate) / I(baseDate)` (Rust `InflationIndex::ratio`).
+    /// Resolve a monthly fixing eligible at an explicit query knowledge date.
     ///
     /// # Arguments
     ///
-    /// * `base_date` - ISO-8601 date of the base (issue) index level.
-    /// * `settle_date` - ISO-8601 date of the settlement index level.
+    /// * `year` - Calendar year of the reference month.
+    /// * `month` - Calendar month number, 1 through 12.
+    /// * `knowledge_date` - Inclusive ISO cutoff, no later than the snapshot cutoff.
     ///
-    /// @returns The uplift factor applied to an inflation-linked notional.
-    /// @throws `TypeError` for a mistyped argument; `FinstackError` for a
-    /// malformed date or a date the index history cannot serve.
-    /// @param baseDate - ISO-8601 date of the base (issue) index level.
-    /// @param settleDate - ISO-8601 date of the settlement index level.
-    #[wasm_bindgen(js_name = ratio)]
-    pub fn ratio(
+    /// @returns The published positive CPI level.
+    /// @throws `TypeError` for mistyped arguments; `FinstackError` for an invalid
+    /// date, absent month, unavailable observation or cutoff after the snapshot.
+    /// @param year - Calendar year of the reference month.
+    /// @param month - Calendar month number, 1 through 12.
+    /// @param knowledgeDate - Inclusive ISO cutoff, no later than the snapshot cutoff.
+    #[wasm_bindgen(js_name = qualifiedMonthlyObservation)]
+    pub fn qualified_monthly_observation(
         &self,
-        #[wasm_bindgen(js_name = "baseDate", unchecked_param_type = "string")] base_date: JsValue,
-        #[wasm_bindgen(js_name = "settleDate", unchecked_param_type = "string")]
-        settle_date: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] year: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "number")] month: JsValue,
+        #[wasm_bindgen(js_name = "knowledgeDate", unchecked_param_type = "string")] knowledge_date: JsValue,
     ) -> Result<f64, JsValue> {
+        let month = time::Month::try_from(js_uint::<u8>(&month, "month")?)
+            .map_err(|err| to_js_err(finstack_quant_core::Error::Validation(err.to_string())))?;
         self.inner
-            .ratio(
-                js_date(&base_date, "baseDate")?,
-                js_date(&settle_date, "settleDate")?,
+            .qualified_monthly_observation(
+                js_int(&year, "year")?,
+                month,
+                js_date(&knowledge_date, "knowledgeDate")?,
             )
-            .map_err(to_js_err)
-    }
-
-    /// Reference CPI on a date under a months-lag convention, interpolated
-    /// linearly by day of month between the two lagged monthly prints (Rust
-    /// `InflationIndex::ref_cpi_months_lag`).
-    ///
-    /// # Arguments
-    ///
-    /// * `date` - ISO-8601 settlement date.
-    /// * `lag_months` - Indexation lag in whole months (for example `3` for
-    ///   US TIPS and UK index-linked gilts issued since 2005).
-    ///
-    /// @returns The reference index level for `date`.
-    /// @throws `TypeError` for a mistyped argument; `FinstackError` for a
-    /// malformed date or when a required monthly print is missing.
-    /// @param date - ISO-8601 settlement date.
-    /// @param lagMonths - Indexation lag in whole months (for example `3` for US TIPS and UK index-linked gilts issued since 2005).
-    #[wasm_bindgen(js_name = refCpiMonthsLag)]
-    pub fn ref_cpi_months_lag(
-        &self,
-        #[wasm_bindgen(unchecked_param_type = "string")] date: JsValue,
-        #[wasm_bindgen(js_name = "lagMonths", unchecked_param_type = "number")] lag_months: JsValue,
-    ) -> Result<f64, JsValue> {
-        self.inner
-            .ref_cpi_months_lag(js_date(&date, "date")?, js_uint(&lag_months, "lagMonths")?)
             .map_err(to_js_err)
     }
 
     /// First and last observation dates (Rust `InflationIndex::date_range`).
     ///
-    /// @returns A two-element array `[firstIsoDate, lastIsoDate]`.
-    /// @throws `FinstackError` if the index holds no observations.
-    #[wasm_bindgen(js_name = dateRange)]
-    pub fn date_range(&self) -> Result<Vec<String>, JsValue> {
-        let (first, last) = self.inner.date_range().map_err(to_js_err)?;
-        Ok(vec![date_to_iso(first), date_to_iso(last)])
+    /// @returns `[firstIsoDate, lastIsoDate]`, or `null` for an empty snapshot.
+    /// @throws `FinstackError` if host serialization fails.
+    #[wasm_bindgen(js_name = dateRange, unchecked_return_type = "[string, string] | null")]
+    pub fn date_range(&self) -> Result<JsValue, JsValue> {
+        to_js_value(
+            &self
+                .inner
+                .date_range()
+                .map(|(first, last)| (date_to_iso(first), date_to_iso(last))),
+        )
     }
 
     /// Index identifier (the `MarketContext` lookup key).
@@ -464,113 +409,79 @@ impl JsInflationIndex {
         }
     }
 
-    /// Interpolation between prints: `"step"` or `"linear"`.
-    #[wasm_bindgen(getter, js_name = interpolation)]
-    pub fn interpolation(&self) -> String {
-        self.inner.interpolation().to_string()
+    /// Inclusive snapshot knowledge cutoff as an ISO-8601 date.
+    #[wasm_bindgen(getter, js_name = knowledgeDate)]
+    pub fn knowledge_date(&self) -> String {
+        date_to_iso(self.inner.knowledge_date())
     }
 
-    /// Observation lag as text, such as `"3M"`, `"90D"` or `"none"`.
-    #[wasm_bindgen(getter, js_name = lag)]
-    pub fn lag(&self) -> String {
-        self.inner.lag().to_string()
-    }
-
-    /// Twelve monthly seasonality factors (January first), or `undefined` when none are set.
-    #[wasm_bindgen(getter, js_name = seasonality)]
-    pub fn seasonality(&self) -> Option<Box<[f64]>> {
-        self.inner
-            .seasonality()
-            .map(|factors| factors.to_vec().into_boxed_slice())
-    }
-
-    /// Observations in date order as `[isoDate, level]` pairs.
-    #[wasm_bindgen(getter, js_name = observations, unchecked_return_type = "[string, number][]")]
+    /// Stored monthly records in ascending reference-month order.
+    /// @returns Records with snake_case fields and ISO dates; empty when no history exists.
+    /// @throws `FinstackError` if host serialization fails.
+    #[wasm_bindgen(getter, js_name = observations, unchecked_return_type = "InflationObservation[]")]
     pub fn observations(&self) -> Result<JsValue, JsValue> {
-        observations_value(self.inner.observations())
+        to_js_value(&self.inner.observations())
     }
 
-    /// A copy of this index with an explicit monthly publication schedule
-    /// (Rust `InflationIndex::with_publication_dates`).
+    /// Copy the snapshot with a replacement expected-release schedule.
     ///
     /// # Arguments
     ///
-    /// * `dates` - Array of `[referenceMonth, publicationDate]` ISO-8601 date
-    ///   pairs (or its JSON text). Each reference month is a first-of-month
-    ///   date and each publication date is the inclusive date its print
-    ///   becomes available; the schedule replaces any existing one and is
-    ///   independent of the contractual observation lag.
+    /// * `expected_releases` - Strictly ascending first-of-month records with
+    ///   `expected_release >= reference_month` and `known_on <= knowledge_date`.
     ///
-    /// @returns A new `InflationIndex` keeping the observations and other
-    /// conventions; this index is unchanged.
-    /// @throws `TypeError` (kind `invalid_type`) if `dates` is not an array or
-    /// JSON text; `FinstackError` (kind `validation`) for a malformed date or
-    /// pair, a reference date that is not a month start, a duplicated month,
-    /// or a publication date before its reference month.
-    /// @param dates - Array of `[referenceMonth, publicationDate]` ISO-8601 date pairs (or its JSON text). Each reference month is a first-of-month date and each publication date is the inclusive date its print becomes available; the schedule replaces any existing one and is independent of the contractual observation lag.
-    #[wasm_bindgen(js_name = withPublicationDates)]
-    pub fn with_publication_dates(
+    /// @returns A new snapshot retaining observations and knowledge cutoff.
+    /// @throws `FinstackError` for invalid records, dates or ordering; `TypeError`
+    /// for unsupported argument types.
+    /// @param expectedReleases - Ordered monthly schedule facts (or JSON text), snake_case fields and ISO dates. These do not assert observation availability.
+    #[wasm_bindgen(js_name = withExpectedReleases)]
+    pub fn with_expected_releases(
         &self,
-        #[wasm_bindgen(unchecked_param_type = "readonly (readonly [string, string])[] | string")]
-        dates: JsValue,
+        #[wasm_bindgen(
+            js_name = "expectedReleases",
+            unchecked_param_type = "readonly InflationExpectedRelease[] | string"
+        )]
+        expected_releases: JsValue,
     ) -> Result<JsInflationIndex, JsValue> {
-        let dates = from_js_json::<Vec<(String, String)>>(&dates, "dates")?
-            .into_iter()
-            .map(|(reference_month, publication_date)| {
-                Ok((
-                    parse_iso_date(&reference_month)?,
-                    parse_iso_date(&publication_date)?,
-                ))
-            })
-            .collect::<Result<Vec<_>, JsValue>>()?;
+        let expected_releases =
+            from_js_json::<Vec<InflationExpectedRelease>>(&expected_releases, "expectedReleases")?;
         self.inner
             .as_ref()
             .clone()
-            .with_publication_dates(dates)
+            .with_expected_releases(expected_releases)
             .map(|index| Self::from_inner(Arc::new(index)))
             .map_err(to_js_err)
     }
 
-    /// Explicit publication date of a reference month (Rust
-    /// `InflationIndex::get_publication_date`).
+    /// Look up the expected-release assumption for an exact reference month.
     ///
     /// # Arguments
     ///
-    /// * `reference_date` - Any ISO-8601 date in the reference month; its day
-    ///   is ignored.
+    /// * `reference_month` - ISO first calendar day of the reference month.
     ///
-    /// @returns The inclusive ISO-8601 availability date, or `undefined` when
-    /// the month has no configured publication date.
-    /// @throws `TypeError` (kind `invalid_type`) if `referenceDate` is not a
-    /// string; `FinstackError` (kind `validation`) if it is not an ISO-8601 date.
-    /// @param referenceDate - Any ISO-8601 date in the reference month; its day is ignored.
-    #[wasm_bindgen(js_name = getPublicationDate)]
-    pub fn get_publication_date(
+    /// @returns The stored schedule fact, or `null` when unspecified.
+    /// @throws `TypeError` for non-string inputs; `FinstackError` for invalid month keys.
+    /// @param referenceMonth - ISO first calendar day; other days are rejected.
+    #[wasm_bindgen(js_name = getExpectedRelease, unchecked_return_type = "InflationExpectedRelease | null")]
+    pub fn get_expected_release(
         &self,
-        #[wasm_bindgen(js_name = "referenceDate", unchecked_param_type = "string")] reference_date: JsValue,
-    ) -> Result<Option<String>, JsValue> {
-        Ok(self
-            .inner
-            .get_publication_date(js_date(&reference_date, "referenceDate")?)
-            .map(date_to_iso))
+        #[wasm_bindgen(js_name = "referenceMonth", unchecked_param_type = "string")]
+        reference_month: JsValue,
+    ) -> Result<JsValue, JsValue> {
+        to_js_value(
+            &self
+                .inner
+                .get_expected_release(js_date(&reference_month, "referenceMonth")?)
+                .map_err(to_js_err)?,
+        )
     }
 
-    /// Configured monthly publication schedule (Rust
-    /// `InflationIndex::get_publication_dates`).
+    /// Configured expected-release assumptions in reference-month order.
     ///
-    /// @returns `[referenceMonth, publicationDate]` ISO-8601 pairs in
-    /// ascending reference-month order; empty when no schedule is set.
-    /// @throws If the pairs cannot be converted to a JavaScript array.
-    #[wasm_bindgen(js_name = getPublicationDates, unchecked_return_type = "[string, string][]")]
-    pub fn get_publication_dates(&self) -> Result<JsValue, JsValue> {
-        let pairs: Vec<(String, String)> = self
-            .inner
-            .get_publication_dates()
-            .into_iter()
-            .map(|(reference_month, publication_date)| {
-                (date_to_iso(reference_month), date_to_iso(publication_date))
-            })
-            .collect();
-        to_js_value(&pairs)
+    /// @returns Ordered records with ISO dates, empty when no schedule is set.
+    /// @throws `FinstackError` if host serialization fails.
+    #[wasm_bindgen(js_name = getExpectedReleases, unchecked_return_type = "InflationExpectedRelease[]")]
+    pub fn get_expected_releases(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.get_expected_releases())
     }
 }

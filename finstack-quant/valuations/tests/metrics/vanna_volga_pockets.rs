@@ -35,11 +35,14 @@ fn bump_scalar_price(
     bump_pct: f64,
 ) -> finstack_quant_core::Result<MarketContext> {
     let current = context.get_price(price_id)?;
-    let bumped_value = match current {
-        MarketScalar::Unitless(v) => MarketScalar::Unitless(v * (1.0 + bump_pct)),
-        MarketScalar::Price(m) => MarketScalar::Price(
+    let bumped_value = if let Some(v) = current.get_unitless() {
+        MarketScalar::unitless(v * (1.0 + bump_pct))?
+    } else if let Some(m) = current.get_price() {
+        MarketScalar::price(
             Money::new(m.amount() * (1.0 + bump_pct), m.currency()).expect("valid money fixture"),
-        ),
+        )
+    } else {
+        panic!("unsupported MarketScalar variant");
     };
     Ok(context.clone().insert_price(price_id, bumped_value))
 }
@@ -49,7 +52,7 @@ fn bump_surface_vol_absolute(
     vol_surface_id: &str,
     bump_abs: f64,
 ) -> finstack_quant_core::Result<MarketContext> {
-    context.bump([MarketBump::Curve {
+    context.bump([MarketBump::VolSurface {
         id: CurveId::from(vol_surface_id),
         spec: BumpSpec {
             mode: BumpMode::Additive,
@@ -76,8 +79,14 @@ fn equity_market(as_of: Date, spot: f64, vol: f64, rate: f64, div_yield: f64) ->
     MarketContext::new()
         .insert(flat_discount_with_tenor("USD-OIS", as_of, rate, 5.0))
         .insert_surface(flat_vol_surface("EQUITY-VOL", &expiries, &strikes, vol))
-        .insert_price("EQUITY-SPOT", MarketScalar::Unitless(spot))
-        .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(div_yield))
+        .insert_price(
+            "EQUITY-SPOT",
+            MarketScalar::unitless(spot).expect("valid scalar"),
+        )
+        .insert_price(
+            "EQUITY-DIVYIELD",
+            MarketScalar::unitless(div_yield).expect("valid scalar"),
+        )
 }
 
 fn equity_option(as_of: Date, expiry: Date, strike: f64) -> EquityOption {
@@ -99,10 +108,11 @@ fn equity_delta_fd(
     let pv_dn = opt.value(&curves_dn, as_of)?.amount();
 
     // Convert bump_pct into absolute spot bump for denominator.
-    let spot = match curves.get_price(&opt.spot_id)? {
-        MarketScalar::Unitless(v) => *v,
-        MarketScalar::Price(m) => m.amount(),
-    };
+    let spot_scalar = curves.get_price(&opt.spot_id)?;
+    let spot = spot_scalar
+        .get_unitless()
+        .or_else(|| spot_scalar.get_price().map(|m| m.amount()))
+        .expect("spot scalar");
     let h = spot * spot_bump_decimal;
     Ok((pv_up - pv_dn) / (2.0 * h))
 }

@@ -145,9 +145,9 @@ pub fn pv_with_discount_margin(
             .year_fraction(settlement, *date, DayCountContext::default())?;
         let df = disc.df_between_dates(settlement, *date)?;
         let df_dm = z_spread_discount_factor(df, t, dm, compounding)?;
-        pv.add(amount * df_dm);
+        pv.add(amount * df_dm)?;
     }
-    Ok(pv.total())
+    pv.get_total()
 }
 
 /// Solve the discount margin whose repriced PV equals `target`.
@@ -174,11 +174,21 @@ pub fn solve_discount_margin(
     target: f64,
     guess: f64,
 ) -> Result<f64> {
+    if !guess.is_finite() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Discount margin initial guess must be finite, got {guess}"
+        )));
+    }
+    let search_bound = (guess.abs() * 2.0).max(2.0);
     // The first repricing error aborts the solve and is reported as-is.
-    let dm = BrentSolver::new()
-        .with_tolerance(1e-10)
-        .with_initial_bracket_size(Some(0.05))
-        .solve_fallible(|dm| Ok(pv(dm)? - target), guess)?;
+    let dm = BrentSolver::new(1e-10, 100)?.solve(
+        |dm| Ok(pv(dm)? - target),
+        guess,
+        -search_bound,
+        search_bound,
+        0.05,
+        20,
+    )?;
     if dm.abs() > DISCOUNT_MARGIN_BOUND {
         return Err(finstack_quant_core::Error::Validation(format!(
             "Discount margin {} bp exceeds sanity bounds (±{} bp)",
@@ -482,6 +492,8 @@ mod tests {
                 (1.0, (-0.04_f64).exp()),
                 (5.0, (-0.20_f64).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let flows = vec![

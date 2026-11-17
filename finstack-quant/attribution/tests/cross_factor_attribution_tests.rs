@@ -10,7 +10,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::{DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
@@ -36,16 +38,70 @@ fn build_discount_curve(id: &str, as_of: Date, rate: f64) -> DiscountCurve {
             (5.0f64, (-rate * 5.0).exp()),
             (10.0f64, (-rate * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve should build")
 }
 
 fn build_hazard_curve(id: &str, as_of: Date, hazard_rate: f64) -> HazardCurve {
+    use finstack_quant_calibration::CalibrationMethod;
+    use finstack_quant_calibration::api::schema::HazardCurveParams;
+    use finstack_quant_calibration::quotes::{CdsQuote, Pillar, QuoteId};
+    use finstack_quant_core::dates::DayCountContext;
+    use finstack_quant_core::market_data::term_structures::{
+        HazardCalibrationInput, HazardCalibrationRecipe, Seniority,
+    };
+    use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+
+    let day_count = DayCount::Act365F;
+    let pillar_date = date!(2030 - 01 - 15);
+    let convention = CdsConventionKey {
+        currency: Currency::USD,
+        doc_clause: CdsDocClause::IsdaNa,
+    };
+    let quote = CdsQuote::CdsParSpread {
+        id: QuoteId::new(format!("{id}-5Y")),
+        entity: id.to_string(),
+        convention,
+        pillar: Pillar::Date(pillar_date),
+        spread_bp: hazard_rate * 0.6 * 10_000.0,
+        recovery_rate: 0.4,
+    };
+    let inputs = vec![HazardCalibrationInput {
+        quote: serde_json::to_value(quote).expect("quote json"),
+        pillar_date,
+        pillar_time: day_count
+            .year_fraction(as_of, pillar_date, DayCountContext::default())
+            .expect("pillar time"),
+    }];
+    let params = HazardCurveParams {
+        curve_id: CurveId::new(id),
+        entity: id.to_string(),
+        seniority: Seniority::Senior,
+        currency: Currency::USD,
+        base_date: as_of,
+        discount_curve_id: CurveId::new("USD-OIS"),
+        recovery_rate: 0.4,
+        notional: 1.0,
+        method: CalibrationMethod::Bootstrap,
+        doc_clause: Some("isda_na".to_string()),
+        cds_valuation_convention: None,
+    };
+    let recipe = HazardCalibrationRecipe::new(
+        serde_json::to_value(params).expect("params json"),
+        inputs.clone(),
+        inputs,
+        serde_json::json!({"fail_on_bad_fit": true}),
+    )
+    .expect("recipe");
+
     HazardCurve::builder(id)
         .base_date(as_of)
-        .day_count(DayCount::Act365F)
+        .day_count(day_count)
         .recovery_rate(0.4)
-        .knots([(0.0f64, hazard_rate), (5.0f64, hazard_rate)])
+        .knots([(1.0f64, hazard_rate), (5.0f64, hazard_rate)])
+        .hazard_calibration(recipe)
         .build()
         .expect("hazard curve should build")
 }
@@ -106,8 +162,8 @@ impl Instrument for RatesCreditInteractionInstrument {
     fn base_value(&self, market: &MarketContext, _as_of: Date) -> Result<Money> {
         let rate = market
             .get_discount("USD-OIS")?
-            .zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous);
-        let hazard = market.get_hazard("ACME-HAZ")?.hazard_rate(1.0);
+            .zero_rate(1.0, finstack_quant_core::math::Compounding::Continuous)?;
+        let hazard = market.get_hazard("ACME-HAZ")?.hazard_rate(1.0)?;
         Ok(Money::new(1_000_000.0 * rate * hazard, Currency::USD).expect("valid money fixture"))
     }
 }
@@ -175,7 +231,7 @@ impl Instrument for CreditVolInteractionInstrument {
     }
 
     fn base_value(&self, market: &MarketContext, _as_of: Date) -> Result<Money> {
-        let hazard = market.get_hazard("ACME-HAZ")?.hazard_rate(1.0);
+        let hazard = market.get_hazard("ACME-HAZ")?.hazard_rate(1.0)?;
         let surface = market.get_surface("EQ-VOL")?;
         let vol = get_surface_vol(&surface, 1.0, 100.0)?;
         Ok(Money::new(1_000_000.0 * hazard * vol, Currency::USD).expect("valid money fixture"))
@@ -185,7 +241,10 @@ impl Instrument for CreditVolInteractionInstrument {
 fn build_vol_surface(id: &str, vol: f64) -> VolSurface {
     VolSurface::builder(id)
         .expiries(&[1.0])
-        .strikes(&[100.0])
+        .secondary_values(&[100.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[vol])
         .build()
         .expect("vol surface should build")

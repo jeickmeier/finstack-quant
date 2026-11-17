@@ -173,6 +173,8 @@ fn test_fx_attribution_parallel_internal_exposure() {
         .base_date(as_of_t0)
         .knots(vec![(0.0, 1.0), (5.0, 0.82)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -180,6 +182,8 @@ fn test_fx_attribution_parallel_internal_exposure() {
         .base_date(as_of_t1)
         .knots(vec![(0.0, 1.0), (5.0, 0.82)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -250,6 +254,8 @@ fn test_waterfall_attribution_sum_equality() {
         .base_date(as_of_t0)
         .knots(vec![(0.0, 1.0), (5.0, 0.82)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -257,6 +263,8 @@ fn test_waterfall_attribution_sum_equality() {
         .base_date(as_of_t1)
         .knots(vec![(0.0, 1.0), (5.0, 0.78)]) // Rates increased
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -343,6 +351,8 @@ fn test_fx_attribution_cross_currency_exposure() {
         .base_date(as_of_t0)
         .knots(vec![(0.0, 1.0), (5.0, 0.85)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -350,6 +360,8 @@ fn test_fx_attribution_cross_currency_exposure() {
         .base_date(as_of_t1)
         .knots(vec![(0.0, 1.0), (5.0, 0.85)]) // Same rates
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -527,6 +539,8 @@ fn test_fx_attribution_eur_weakening() {
         .base_date(as_of_t0)
         .knots(vec![(0.0, 1.0), (5.0, 0.85)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -592,6 +606,8 @@ fn test_waterfall_factor_ordering_sensitivity() {
         .base_date(as_of_t0)
         .knots(vec![(0.0, 1.0), (5.0, 0.82)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -599,6 +615,8 @@ fn test_waterfall_factor_ordering_sensitivity() {
         .base_date(as_of_t1)
         .knots(vec![(0.0, 1.0), (5.0, 0.78)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 

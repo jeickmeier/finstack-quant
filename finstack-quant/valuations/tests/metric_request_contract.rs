@@ -44,6 +44,9 @@ fn market(as_of: Date) -> MarketContext {
             (5.0, 0.78),
             (10.0, 0.61),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("USD discount curve fixture");
     let eur = DiscountCurve::builder("EUR-OIS")
@@ -55,6 +58,9 @@ fn market(as_of: Date) -> MarketContext {
             (5.0, 0.86),
             (10.0, 0.74),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("EUR discount curve fixture");
     let fx = Arc::new(SimpleFxProvider::new());

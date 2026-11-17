@@ -50,6 +50,9 @@ fn create_test_discount_curve(base_date: Date) -> DiscountCurve {
             (5.0, 0.80),  // 5Y: ~4% rate
             (10.0, 0.64), // 10Y: ~4% rate
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve")
 }
@@ -578,6 +581,8 @@ fn calibrate_flat_normal_cube(fixed_day_count: DayCount, tenor_years: i32) -> Ma
         .base_date(base_date)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (10.0, (-0.05_f64 * 10.0).exp())])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
     let source_market = MarketContext::new().insert(discount);

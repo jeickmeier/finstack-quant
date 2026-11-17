@@ -407,18 +407,6 @@ export type D_727E7Ef07B1A104Fe20D = "bankers" | "midpoint_away_from_zero" | "to
 export type D_9F32C296492D66417E76 =
   | {
       /**
-       * Hazard curve affected by the approximate spread shock.
-       */
-      curve_id: string;
-      kind: "hazard_spread_first_order";
-      /**
-       * Decimal recovery fraction used in the loss-given-default conversion.
-       */
-      recovery_rate: number;
-      [k: string]: unknown;
-    }
-  | {
-      /**
        * The discount curve selected by the heuristic.
        */
       chosen_discount: string;
@@ -697,6 +685,14 @@ export type D_9F32C296492D66417E76 =
       [k: string]: unknown;
     }
   | {
+      kind: "vol_surface_bucket_empty_selection";
+      /**
+       * Volatility-surface identifier.
+       */
+      vol_surface_id: string;
+      [k: string]: unknown;
+    }
+  | {
       /**
        * Whether this was a parallel (`false`) or bucket (`true`) shock.
        */
@@ -710,30 +706,6 @@ export type D_9F32C296492D66417E76 =
        * Volatility-surface identifier.
        */
       vol_surface_id: string;
-      [k: string]: unknown;
-    }
-  | {
-      kind: "hierarchy_no_match";
-      /**
-       * Operation `kind` tag (e.g., `"hierarchy_curve_parallel_bp"`).
-       */
-      op_kind: string;
-      /**
-       * Hierarchy path the operation targeted, joined with `/`.
-       */
-      target_path: string;
-      [k: string]: unknown;
-    }
-  | {
-      /**
-       * The resolved identifier that was skipped.
-       */
-      curve_id: string;
-      kind: "hierarchy_resolved_id_skipped";
-      /**
-       * Operation `kind` tag (e.g., `"hierarchy_curve_parallel_bp"`).
-       */
-      op_kind: string;
       [k: string]: unknown;
     }
   | {

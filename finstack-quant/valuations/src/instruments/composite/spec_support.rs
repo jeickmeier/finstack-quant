@@ -641,18 +641,24 @@ pub(crate) fn cashflows_between(
             .map(|converted| converted * quantity)
         })
         .collect::<Result<Vec<_>>>()?;
-    Ok(neumaier_sum(amounts))
+    neumaier_sum(amounts)
 }
 
 /// Sample (n-1) standard deviation of unit P&L observations.
 ///
 /// Rejects fewer than two observations and any non-finite value instead of
-/// returning the zero or NaN that [`variance`] would produce for them.
+/// returning the zero or NaN that an unchecked routine would produce for them.
 pub(super) fn sample_std_dev(values: &[f64]) -> Result<f64> {
     if values.len() < 2 || values.iter().any(|value| !value.is_finite()) {
         return Err(Error::Validation(
             "unit-P&L volatility requires at least two finite observations".to_string(),
         ));
     }
-    Ok(variance(values).sqrt())
+    Ok(variance(values)?
+        .ok_or_else(|| {
+            Error::Validation(
+                "unit-P&L volatility requires at least two finite observations".to_string(),
+            )
+        })?
+        .sqrt())
 }

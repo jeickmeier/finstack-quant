@@ -52,6 +52,8 @@ fn build_test_discount(rate: f64, base: Date, id: &str) -> DiscountCurve {
             (5.0, (-rate * 5.0).exp()),
             (10.0, (-rate * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -108,7 +110,8 @@ fn build_test_hazard(hz: f64, rec: f64, base: Date, id: &str) -> HazardCurve {
     HazardCurve::builder(id)
         .base_date(base)
         .recovery_rate(rec)
-        .knots([(0.0, hz), (1.0, hz), (5.0, hz), (10.0, hz)])
+        .knots([(1.0, hz), (5.0, hz), (10.0, hz)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap()
 }
@@ -1061,14 +1064,7 @@ fn test_cds_dv01_keeps_unreplayable_hazard_curve_frozen() {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .recovery_rate(0.4)
-        .knots([
-            (0.0, 0.0060),
-            (1.0, 0.0080),
-            (3.0, 0.0120),
-            (5.0, 0.0180),
-            (7.0, 0.0200),
-        ])
-        .par_spreads([(1.0, 50.0), (3.0, 80.0), (5.0, 120.0), (7.0, 150.0)])
+        .knots([(1.0, 0.0080), (3.0, 0.0120), (5.0, 0.0180), (7.0, 0.0200)])
         .build()
         .unwrap();
     let market = MarketContext::new().insert(discount).insert(hazard);

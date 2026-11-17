@@ -141,14 +141,14 @@ impl ScaledMoments {
                 x / scale - origin / scale
             }
         };
-        let mean_offset = neumaier_sum(values.iter().map(|&x| offset(x) / n));
+        let mean_offset = neumaier_sum(values.iter().map(|&x| offset(x) / n))?;
         let sd = if values.len() < 2 {
             f64::NAN
         } else {
             (neumaier_sum(values.iter().map(|&x| {
                 let d = offset(x) - mean_offset;
                 d * d
-            })) / (n - 1.0))
+            }))? / (n - 1.0))
                 .sqrt()
         };
         if values.len() >= 2
@@ -163,7 +163,7 @@ impl ScaledMoments {
         }
         Ok(Self {
             scale,
-            sum: neumaier_sum(values.iter().map(|&x| x / scale)),
+            sum: neumaier_sum(values.iter().map(|&x| x / scale))?,
             count: n,
             sd,
         })
@@ -241,7 +241,7 @@ pub fn volatility(returns: &[f64], periods_per_year: f64) -> Result<f64> {
 }
 
 /// Represent a mean difference without materializing a potentially overflowing sum.
-fn scaled_mean_difference(values: &[f64], reference: f64) -> (f64, f64, f64) {
+fn scaled_mean_difference(values: &[f64], reference: f64) -> Result<(f64, f64, f64)> {
     let scale = values
         .iter()
         .map(|&x| (x - reference).abs())
@@ -261,8 +261,8 @@ fn scaled_mean_difference(values: &[f64], reference: f64) -> (f64, f64, f64) {
         } else {
             x / scale - reference / scale
         }
-    }));
-    (scale, mean, values.len() as f64)
+    }))?;
+    Ok((scale, mean, values.len() as f64))
 }
 
 fn scaled_product(scale: f64, value: f64, multiplier: f64, metric: &str) -> Result<f64> {
@@ -347,7 +347,7 @@ pub fn sharpe(returns: &[f64], risk_free_rate: f64, periods_per_year: f64) -> Re
         return Ok(f64::NAN);
     }
     let moments = ScaledMoments::new(returns)?;
-    let (scale, excess, count) = scaled_mean_difference(returns, cash);
+    let (scale, excess, count) = scaled_mean_difference(returns, cash)?;
     scaled_ratio(
         scale,
         excess,
@@ -407,7 +407,7 @@ fn downside_scaled(returns: &[f64], mar: f64) -> Result<(f64, f64)> {
         };
         d * d / returns.len() as f64
     }));
-    let rms = ss.sqrt();
+    let rms = ss?.sqrt();
     if rms == 0.0 {
         return Err(Error::Internal(
             "positive downside risk was lost numerically".into(),
@@ -463,7 +463,7 @@ pub fn sortino(returns: &[f64], mar: f64, periods_per_year: f64) -> Result<f64> 
     if returns.len() < 2 {
         return Ok(f64::NAN);
     }
-    let (num_scale, numerator, count) = scaled_mean_difference(returns, mar);
+    let (num_scale, numerator, count) = scaled_mean_difference(returns, mar)?;
     scaled_ratio(
         num_scale,
         numerator,
@@ -523,13 +523,13 @@ pub(crate) fn omega_ratio(returns: &[f64], threshold: f64) -> Result<f64> {
             r / scale - threshold / scale
         };
         if r > threshold {
-            gains.add(d);
+            gains.add(d)?;
         } else if r < threshold {
-            losses.add(-d);
+            losses.add(-d)?;
         }
     }
-    let gains = gains.total();
-    let losses = losses.total();
+    let gains = gains.get_total()?;
+    let losses = losses.get_total()?;
     if (gains == 0.0 && returns.iter().any(|&r| r > threshold))
         || (losses == 0.0 && returns.iter().any(|&r| r < threshold))
     {
@@ -553,8 +553,8 @@ pub(crate) fn gain_to_pain(returns: &[f64]) -> Result<f64> {
         .iter()
         .fold(0.0_f64, |s, x| s.max(x.abs()))
         .max(f64::MIN_POSITIVE);
-    let net = neumaier_sum(returns.iter().map(|r| r / scale));
-    let losses = neumaier_sum(returns.iter().filter(|&&r| r < 0.0).map(|r| -r / scale));
+    let net = neumaier_sum(returns.iter().map(|r| r / scale))?;
+    let losses = neumaier_sum(returns.iter().filter(|&&r| r < 0.0).map(|r| -r / scale))?;
     if losses == 0.0 {
         if returns.iter().any(|&r| r < 0.0) {
             return Err(Error::Internal(
@@ -580,7 +580,7 @@ pub(crate) fn modified_sharpe(
     if returns.len() < 4 || cf.is_nan() || cf >= 0.0 {
         return Ok(f64::NAN);
     }
-    let (scale, numerator, count) = scaled_mean_difference(returns, cash);
+    let (scale, numerator, count) = scaled_mean_difference(returns, cash)?;
     scaled_ratio(
         scale,
         numerator,

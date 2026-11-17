@@ -28,6 +28,8 @@ fn sample_market_context() -> MarketContext {
         .base_date(base_date)
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.60)])
         .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("Curve builder should succeed with valid test data");
 
@@ -36,7 +38,7 @@ fn sample_market_context() -> MarketContext {
         .base_date(base_date)
         .recovery_rate(0.40)
         .knots(vec![(1.0, 0.01), (3.0, 0.015), (5.0, 0.02), (10.0, 0.025)])
-        .par_spreads(vec![(1.0, 60.0), (3.0, 80.0), (5.0, 100.0), (10.0, 140.0)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("Curve builder should succeed with valid test data");
 
@@ -426,7 +428,8 @@ fn concentration_test_index(count: usize, first_weight: f64) -> CreditIndexData 
         HazardCurve::builder("CONCENTRATION")
             .base_date(base)
             .recovery_rate(0.4)
-            .knots([(0.0, 0.05), (10.0, 0.05)])
+            .knots([(10.0, 0.05)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard"),
     );
@@ -524,6 +527,9 @@ fn homogeneity_detection_uses_consistent_tolerance() {
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
             .base_date(base_date)
             .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.60)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
     let index_curve =
@@ -536,7 +542,7 @@ fn homogeneity_detection_uses_consistent_tolerance() {
                 (5.0, 0.022),
                 (10.0, 0.028),
             ])
-            .par_spreads(vec![(1.0, 65.0), (3.0, 85.0), (5.0, 105.0), (10.0, 145.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("index curve");
     let base_corr =
@@ -565,6 +571,7 @@ fn homogeneity_detection_uses_consistent_tolerance() {
                 (5.0, 0.022 + hazard_shift),
                 (10.0, 0.028 + hazard_shift),
             ])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("issuer curve");
             issuer_curves.insert(id, Arc::new(hz));
@@ -1633,6 +1640,9 @@ fn arbitrage_market_context() -> MarketContext {
     let discount_curve = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.60)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("Curve builder should succeed");
 
@@ -1641,12 +1651,7 @@ fn arbitrage_market_context() -> MarketContext {
         .base_date(base_date)
         .recovery_rate(0.40)
         .knots(vec![(1.0, 0.05), (3.0, 0.06), (5.0, 0.07), (10.0, 0.08)])
-        .par_spreads(vec![
-            (1.0, 300.0),
-            (3.0, 360.0),
-            (5.0, 420.0),
-            (10.0, 480.0),
-        ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("Curve builder should succeed");
 
@@ -1780,13 +1785,15 @@ fn realistic_base_correlation_skew_prices_every_tranche() {
         .base_date(base_date)
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.60)])
         .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
     let index_curve = HazardCurve::builder("CDX.NA.IG.42")
         .base_date(base_date)
         .recovery_rate(0.40)
         .knots(vec![(1.0, 0.01), (3.0, 0.015), (5.0, 0.02), (10.0, 0.025)])
-        .par_spreads(vec![(1.0, 60.0), (3.0, 80.0), (5.0, 100.0), (10.0, 140.0)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("hazard curve");
     let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
@@ -1941,6 +1948,7 @@ fn homogeneous_path_boundary_default_prob_does_not_panic() {
             .base_date(base_date)
             .recovery_rate(0.40)
             .knots(vec![(1.0, 0.01), (5.0, 0.02), (10.0, 0.025)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard curve");
 
@@ -2012,7 +2020,7 @@ fn within_period_default_fraction_is_survival_weighted() {
             .base_date(base_date)
             .recovery_rate(0.40)
             .knots(vec![(1.0, 0.15), (5.0, 0.15), (10.0, 0.15)])
-            .par_spreads(vec![(1.0, 900.0), (5.0, 900.0), (10.0, 900.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard curve");
     let base_corr =
@@ -2041,7 +2049,7 @@ fn within_period_default_fraction_is_survival_weighted() {
             .base_date(base_date)
             .recovery_rate(0.40)
             .knots(vec![(1.0, 1e-7), (5.0, 1e-7), (10.0, 1e-7)])
-            .par_spreads(vec![(1.0, 0.6), (5.0, 0.6), (10.0, 0.6)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard curve");
     let tiny_index = CreditIndexData::builder()
@@ -2087,6 +2095,8 @@ fn discounting_is_invariant_under_curve_rebasing() {
             .base_date(base)
             .knots(knots)
             .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve")
     };
@@ -2095,7 +2105,7 @@ fn discounting_is_invariant_under_curve_rebasing() {
         .base_date(as_of)
         .recovery_rate(0.40)
         .knots(vec![(1.0, 0.01), (3.0, 0.015), (5.0, 0.02), (10.0, 0.025)])
-        .par_spreads(vec![(1.0, 60.0), (3.0, 80.0), (5.0, 100.0), (10.0, 140.0)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("hazard curve");
     let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
@@ -2181,6 +2191,8 @@ fn rising_hazard_lowers_premium_leg_pv() {
             .base_date(base_date)
             .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.60)])
             .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let index_curve = HazardCurve::builder("CDX.NA.IG.42")
@@ -2192,7 +2204,7 @@ fn rising_hazard_lowers_premium_leg_pv() {
                 (5.0, 0.02 * hazard_scale),
                 (10.0, 0.025 * hazard_scale),
             ])
-            .par_spreads(vec![(1.0, 60.0), (3.0, 80.0), (5.0, 100.0), (10.0, 140.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard curve");
         let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
@@ -2237,6 +2249,8 @@ fn recovery_market_context(recovery: f64, hazard_scale: f64) -> MarketContext {
         .base_date(base_date)
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.60)])
         .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
     let index_curve = HazardCurve::builder("CDX.NA.IG.42")
@@ -2248,7 +2262,7 @@ fn recovery_market_context(recovery: f64, hazard_scale: f64) -> MarketContext {
             (5.0, 0.02 * hazard_scale),
             (10.0, 0.025 * hazard_scale),
         ])
-        .par_spreads(vec![(1.0, 60.0), (3.0, 80.0), (5.0, 100.0), (10.0, 140.0)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("hazard curve");
     let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
@@ -2607,7 +2621,7 @@ fn seasoned_aod_reduces_only_the_remaining_day_of_accrual() {
                 .base_date(as_of)
                 .recovery_rate(0.4)
                 .knots([(1.0, 36.5), (10.0, 36.5)])
-                .max_hazard_rate(40.0)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .expect("hazard"),
         ))
@@ -2667,6 +2681,7 @@ fn heterogeneous_tail_loss_matches_independent_state_enumeration_and_factor_grid
                         .base_date(base)
                         .recovery_rate(recoveries[i])
                         .knots([(1.0, -(1.0 - pd).ln())])
+                        .day_count(finstack_quant_core::dates::DayCount::Act365F)
                         .build()
                         .unwrap(),
                 ),
@@ -2790,6 +2805,7 @@ fn credit_performance_numerical_baseline() {
             .base_date(as_of)
             .recovery_rate(0.4)
             .knots([(1.0, hazard), (10.0, hazard)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .expect("hazard");
         let correlation = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
@@ -3022,6 +3038,7 @@ fn prepared_tranche_snapshots_market_and_reuses_only_correlation_inputs() {
                 .base_date(as_of)
                 .recovery_rate(0.4)
                 .knots([(1.0, 0.05), (10.0, 0.06)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .expect("new hazard"),
         );
@@ -3061,6 +3078,9 @@ fn prepared_wiped_tranche_preserves_upfront_without_requiring_credit_index() {
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots([(0.0, 1.0), (10.0, 0.6)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount");
     let market = MarketContext::new().insert(discount);

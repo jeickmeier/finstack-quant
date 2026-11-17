@@ -76,7 +76,7 @@ test('rating registry rejects legacy fields, empty lists and invalid ids or sour
 });
 
 test('scales cover [0, 100], classify to the better band and hold their representatives', () => {
-  const scale = core.scorecardScaleTryNew('Internal', undefined, [
+  const scale = core.scorecardScaleTryNew('Internal', [
     core.ratingLevelTryNew('A', 90, 80),
     core.ratingLevelTryNew('B', 70, 0),
   ]);
@@ -90,7 +90,7 @@ test('scales cover [0, 100], classify to the better band and hold their represen
     );
   }
   assert.throws(
-    () => core.scorecardScaleTryNew('gap', undefined, [core.ratingLevelTryNew('A', 90, 80)]),
+    () => core.scorecardScaleTryNew('gap', [core.ratingLevelTryNew('A', 90, 80)]),
     (e) => e.kind === 'validation'
   );
   assert.throws(

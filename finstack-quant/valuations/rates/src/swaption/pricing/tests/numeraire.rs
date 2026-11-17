@@ -184,10 +184,10 @@ fn lmm_reference_european(
         };
 
         // E^{T_N}[ H_t / P(t,T_N) ]; the caller scales by P(0,T_N).
-        stats.update(payoff_over_numeraire);
+        stats.update(payoff_over_numeraire).expect("finite payoff");
     }
 
-    stats.mean()
+    stats.get_mean().expect("finite mean").expect("paths")
 }
 
 /// The single-exercise LMM engine **is** a European swaption: its terminal-
@@ -470,9 +470,11 @@ fn hw1f_reference_european(
             discount_fn,
         );
         // Pathwise discount: 1 / B(t_exercise).
-        stats.update(intrinsic / bank_paths[i][exercise_step]);
+        stats
+            .update(intrinsic / bank_paths[i][exercise_step])
+            .expect("finite payoff");
     }
-    stats.mean()
+    stats.get_mean().expect("finite mean").expect("paths")
 }
 
 /// Correct-numéraire reference for the *multi-exercise* Bermudan: a
@@ -568,9 +570,11 @@ fn hw1f_reference_bermudan(
     let mut stats = OnlineStats::new();
     for i in 0..num_paths {
         // PV = realised cashflow / B(t_exercise).
-        stats.update(cashflows[i] / bank_paths[i][exercise_step_of[i]]);
+        stats
+            .update(cashflows[i] / bank_paths[i][exercise_step_of[i]])
+            .expect("finite pv");
     }
-    stats.mean()
+    stats.get_mean().expect("finite mean").expect("paths")
 }
 
 /// A single-exercise Bermudan swaption is a European swaption, whose price

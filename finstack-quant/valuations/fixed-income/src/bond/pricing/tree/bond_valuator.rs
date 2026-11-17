@@ -1000,16 +1000,22 @@ impl BondValuator {
 
         // A periodic OAS is added to each node's short rate on its own
         // compounding, so the continuous shift differs node by node.
-        let node_shift = |step: usize, node_idx: usize| -> f64 {
+        let mut node_shifts = Vec::with_capacity(final_step + 1);
+        for step in 0..=final_step {
             let dt = hw_tree.dt_at_step(step.min(final_step.saturating_sub(1)));
-            let continuous = comp.tree_to_continuous(hw_tree.rate_at_node(step, node_idx), dt);
-            oas_compounding.continuous_spread_shift(continuous, oas_rate)
-        };
+            let num_nodes = hw_tree.num_nodes(step);
+            let mut row = Vec::with_capacity(num_nodes);
+            for node_idx in 0..num_nodes {
+                let continuous = comp.tree_to_continuous(hw_tree.rate_at_node(step, node_idx), dt);
+                row.push(oas_compounding.continuous_spread_shift(continuous, oas_rate)?);
+            }
+            node_shifts.push(row);
+        }
         let terminal_values: Vec<f64> = (0..hw_tree.num_nodes(final_step))
-            .map(|node_idx| self.terminal_value(final_step, node_shift(final_step, node_idx)))
+            .map(|node_idx| self.terminal_value(final_step, node_shifts[final_step][node_idx]))
             .collect();
         hw_tree.backward_induction(&terminal_values, |step, node_idx, continuation| {
-            let shift = node_shift(step, node_idx);
+            let shift = node_shifts[step][node_idx];
             let oas_adjusted = continuation * (-shift * hw_tree.dt_at_step(step)).exp();
             self.cashflow_at_oas(step, shift) + self.apply_exercise(step, oas_adjusted)
         })
@@ -1067,13 +1073,13 @@ impl BondValuator {
         };
         let mut value = self.terminal_value(
             last,
-            oas_compounding.continuous_spread_shift(terminal_rate, oas_rate),
+            oas_compounding.continuous_spread_shift(terminal_rate, oas_rate)?,
         );
 
         for step in (0..last).rev() {
             let dt = tree_times[step + 1] - tree_times[step];
             let short_rate = tree.rate_at_node(step, 0)?;
-            let oas_shift = oas_compounding.continuous_spread_shift(short_rate, oas_rate);
+            let oas_shift = oas_compounding.continuous_spread_shift(short_rate, oas_rate)?;
             let hazard = tree.hazard_at_node(step, 0)?.max(0.0);
             let interval_discount = (-(short_rate + oas_shift) * dt).exp();
             let survival = (-hazard * dt).exp();
@@ -1131,14 +1137,14 @@ impl BondValuator {
             let shift = if oas_compounding == Compounding::Continuous || dt <= 0.0 {
                 oas_rate
             } else {
-                oas_compounding.continuous_spread_shift(-step_df.ln() / dt, oas_rate)
+                oas_compounding.continuous_spread_shift(-step_df.ln() / dt, oas_rate)?
             };
             Ok((step_df, dt, shift))
         };
         let terminal_shift = if last > 0 {
             step_shift(last - 1)?.2
         } else {
-            oas_compounding.continuous_spread_shift(0.0, oas_rate)
+            oas_compounding.continuous_spread_shift(0.0, oas_rate)?
         };
         let mut value = self.terminal_value(last, terminal_shift);
         for step in (0..last).rev() {
@@ -1454,6 +1460,8 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act360)
             .knots([(0.0, 1.0), (1.1, 0.94)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new().insert(curve);
@@ -1564,6 +1572,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, 0.95)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new().insert(curve);
@@ -1640,6 +1651,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, 1.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new().insert(curve);
@@ -1684,6 +1698,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(issue)
             .knots([(0.0, 1.0), (1.0, 1.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new().insert(curve);
@@ -1759,6 +1776,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, 0.95)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new().insert(curve);
@@ -1820,6 +1840,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (7.0, 0.50)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new().insert(curve);
@@ -1853,7 +1876,7 @@ mod tests {
         // PV of every step's mapped cashflow, discounted at its step time.
         let mut pv_mapped = 0.0;
         for (step, amount) in valuator.cashflow_vec.iter().enumerate() {
-            pv_mapped += amount * discount_curve.df(step as f64 * dt);
+            pv_mapped += amount * discount_curve.df(step as f64 * dt).expect("df");
         }
         // PV of the raw cashflows at their true times.
         let mut pv_true = 0.0;
@@ -1864,7 +1887,7 @@ mod tests {
             let tf = day_count
                 .year_fraction(as_of, *date, DayCountContext::default())
                 .expect("year fraction");
-            pv_true += amount.amount() * discount_curve.df(tf);
+            pv_true += amount.amount() * discount_curve.df(tf).expect("df");
         }
 
         assert!(
@@ -1919,6 +1942,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (10.0, 0.60)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new().insert(curve);
@@ -1964,7 +1990,7 @@ mod tests {
         // vanished and this identity failed by ~0.1 coupon.
         let mut pv_mapped = 0.0;
         for (step, amount) in valuator.cashflow_vec.iter().enumerate() {
-            pv_mapped += amount * discount_curve.df(step as f64 * dt);
+            pv_mapped += amount * discount_curve.df(step as f64 * dt).expect("df");
         }
         let mut pv_true = 0.0;
         for (date, amount) in &flows {
@@ -1974,7 +2000,7 @@ mod tests {
             let tf = day_count
                 .year_fraction(as_of, *date, DayCountContext::default())
                 .expect("year fraction");
-            pv_true += amount.amount() * discount_curve.df(tf);
+            pv_true += amount.amount() * discount_curve.df(tf).expect("df");
         }
         assert!(
             (pv_mapped - pv_true).abs() < 1e-9,
@@ -2020,6 +2046,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.55)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new().insert(curve);

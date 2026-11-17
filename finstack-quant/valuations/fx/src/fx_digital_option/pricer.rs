@@ -433,7 +433,9 @@ mod tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount};
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::money::Money;
@@ -450,17 +452,24 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("usd curve");
         let eur_curve = DiscountCurve::builder("EUR-OIS")
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, (-0.01_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("eur curve");
         let vol_surface = VolSurface::builder("EURUSD-VOL")
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&[0.9, 1.0, 1.1, 1.2, 1.3])
+            .secondary_values(&[0.9, 1.0, 1.1, 1.2, 1.3])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.15; 5])
             .row(&[0.15; 5])
             .row(&[0.15; 5])

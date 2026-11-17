@@ -174,7 +174,7 @@ impl VarianceSwap {
         {
             return past_dates
                 .iter()
-                .map(|&date| series.value_on_exact(date))
+                .map(|&date| series.get_value_exact(date))
                 .collect();
         }
         if past_dates.len() >= 2 {
@@ -326,7 +326,7 @@ pub(crate) fn get_historical_ohlc(
         let series = context.get_series(id)?;
         dates
             .iter()
-            .map(|&date| series.value_on_exact(date))
+            .map(|&date| series.get_value_exact(date))
             .collect()
     };
     let open_vals = exact_values(open_id)?;
@@ -418,18 +418,18 @@ fn spot_variance_to_date(
     )?;
     let q = match &inst.div_yield_id {
         None => 0.0,
-        Some(div_yield_id) => match context.get_price(div_yield_id)? {
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(_) => {
-                return Err(finstack_quant_core::Error::Validation(format!(
+        Some(div_yield_id) => context
+            .get_price(div_yield_id)?
+            .get_unitless()
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
                     "VarianceSwap '{}' div_yield_id '{}' must be a unitless scalar",
                     inst.id, div_yield_id
-                )));
-            }
-        },
+                ))
+            })?,
     };
     let fwd = spot / df_mat * (-q * t).exp();
-    let strikes = surface.strikes();
+    let strikes = surface.secondary_values();
     if t > 0.0 {
         let vol_fn = |t_exp: f64, k: f64| {
             finstack_quant_models::volatility::get_surface_vol_clamped(&surface, t_exp, k)
@@ -454,7 +454,9 @@ mod tests {
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolGridOpts, VolInterpolationMode, VolSurface,
+    };
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_valuations_core::instruments::Instrument;
     use time::macros::date;
@@ -463,20 +465,29 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let strikes = [50.0, 75.0, 90.0, 100.0, 110.0, 125.0, 150.0];
         let mut surface = VolSurface::builder("SPX-VOL")
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&strikes);
+            .secondary_values(&strikes)
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol);
         for _ in 0..4 {
             surface = surface.row(&[0.20; 7]);
         }
         MarketContext::new()
             .insert(curve)
             .insert_surface(surface.build().expect("surface"))
-            .insert_price("SPX", MarketScalar::Unitless(100.0))
-            .insert_price("SPX-DIVYIELD", MarketScalar::Unitless(0.0))
+            .insert_price("SPX", MarketScalar::unitless(100.0).expect("valid scalar"))
+            .insert_price(
+                "SPX-DIVYIELD",
+                MarketScalar::unitless(0.0).expect("valid scalar"),
+            )
     }
 
     #[test]
@@ -503,20 +514,31 @@ mod tests {
                 "black_lognormal",
             ),
             (
-                base.clone()
-                    .with_displacements(&[10.0; 4])
-                    .expect("shifted surface"),
+                VolSurface::from_grid(
+                    base.id(),
+                    base.expiries(),
+                    base.secondary_values(),
+                    base.vols(),
+                    VolGridOpts {
+                        secondary_axis: base.secondary_axis(),
+                        quote_type: VolQuoteType::ShiftedBlackLognormal,
+                        interpolation_mode: base.interpolation_mode(),
+                    },
+                    Some(&[10.0; 4]),
+                )
+                .expect("shifted surface"),
                 "black_lognormal",
             ),
             (
-                finstack_quant_core::market_data::surfaces::VolSurface::from_grid(
+                VolSurface::from_grid(
                     base.id(),
                     base.expiries(),
-                    base.strikes(),
+                    base.secondary_values(),
                     base.vols(),
-                    finstack_quant_core::market_data::surfaces::VolGridOpts {
+                    VolGridOpts {
                         secondary_axis: VolSurfaceAxis::Tenor,
-                        ..finstack_quant_core::market_data::surfaces::VolGridOpts::default()
+                        quote_type: base.quote_type(),
+                        interpolation_mode: base.interpolation_mode(),
                     },
                     None,
                 )
@@ -552,8 +574,16 @@ mod tests {
             .enumerate()
             .map(|(i, d)| (*d, 100.0 * (0.01 * i as f64).exp()))
             .collect();
-        let market = build_market(final_date)
-            .insert_series(ScalarTimeSeries::new("SPX", prices, None).expect("series"));
+        let market = build_market(final_date).insert_series(
+            ScalarTimeSeries::new(
+                "SPX",
+                prices,
+                None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+            )
+            .expect("series"),
+        );
         let expected = swap
             .partial_realized_variance(&market, final_date)
             .expect("realized");
@@ -612,7 +642,10 @@ mod tests {
         let strikes: Vec<f64> = (4..=60).map(|i| 5.0 * i as f64).collect(); // 20..300
         let mut builder = VolSurface::builder("SPX-VOL")
             .expiries(&[0.25, 0.5, 1.0, 2.0])
-            .strikes(&strikes);
+            .secondary_values(&strikes)
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol);
         for _ in 0..4 {
             builder = builder.row(&vec![vol; strikes.len()]);
         }
@@ -622,13 +655,18 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (2.0, (-0.03_f64 * 2.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new()
             .insert(curve)
             .insert_surface(surface)
-            .insert_price("SPX", MarketScalar::Unitless(100.0))
-            .insert_price("SPX-DIVYIELD", MarketScalar::Unitless(0.015));
+            .insert_price("SPX", MarketScalar::unitless(100.0).expect("valid scalar"))
+            .insert_price(
+                "SPX-DIVYIELD",
+                MarketScalar::unitless(0.015).expect("valid scalar"),
+            );
 
         let fair_var = swap
             .remaining_forward_variance(&market, as_of)
@@ -692,7 +730,10 @@ mod tests {
         let vol_rows = [0.30_f64, 0.30, 0.25];
         let mut builder = VolSurface::builder("SPX-VOL")
             .expiries(&[0.25, 0.51, 1.0])
-            .strikes(&strikes);
+            .secondary_values(&strikes)
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol);
         for v in vol_rows {
             builder = builder.row(&vec![v; strikes.len()]);
         }
@@ -702,13 +743,18 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (2.0, (-0.03_f64 * 2.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new()
             .insert(curve)
             .insert_surface(surface)
-            .insert_price("SPX", MarketScalar::Unitless(100.0))
-            .insert_price("SPX-DIVYIELD", MarketScalar::Unitless(0.0));
+            .insert_price("SPX", MarketScalar::unitless(100.0).expect("valid scalar"))
+            .insert_price(
+                "SPX-DIVYIELD",
+                MarketScalar::unitless(0.0).expect("valid scalar"),
+            );
 
         let fwd = swap
             .remaining_forward_variance(&market, as_of)
@@ -760,6 +806,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new().insert(curve);
@@ -860,7 +909,14 @@ mod tests {
             .enumerate()
             .map(|(i, &d)| (d, 100.0 * (1.0 + 0.001 * (i as f64 % 3.0 - 1.0))))
             .collect();
-        let series = ScalarTimeSeries::new("SPX", obs, None).expect("series");
+        let series = ScalarTimeSeries::new(
+            "SPX",
+            obs,
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("series");
         let market = build_market(as_of).insert_series(series);
 
         let pv = compute_pv(&swap, &market, as_of).expect("seasoned pv");

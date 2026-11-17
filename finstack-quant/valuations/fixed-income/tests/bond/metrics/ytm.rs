@@ -33,6 +33,9 @@ fn test_ytm_par_bond() {
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.80)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
     let market = finstack_quant_core::market_data::context::MarketContext::new().insert(curve);
@@ -80,12 +83,34 @@ fn test_ytm_floating_bond_is_finite_from_price() {
         .base_date(as_of)
         .knots([(0.0, 1.0), (2.0, 0.95)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let fwd = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(date!(2024 - 12 - 30))
         .day_count(DayCount::Act360)
-        .knots([(0.0, 0.03), (2.0, 0.035)])
+        .knots([
+            (0.0, 1.0),
+            (0.125, 0.996237564514221),
+            (0.25, 0.992450516593732),
+            (0.375, 0.988639245094031),
+            (0.5, 0.984804140218095),
+            (0.625, 0.980945593450363),
+            (0.75, 0.977063997490706),
+            (0.875, 0.973159746188438),
+            (1.0, 0.969233234476344),
+            (1.125, 0.965284858304774),
+            (1.25, 0.961315014575791),
+            (1.375, 0.957324101077411),
+            (1.5, 0.953312516417934),
+            (1.625, 0.949280659960383),
+            (1.75, 0.945228931757081),
+            (1.875, 0.941157732484354),
+            (2.0, 0.937067463377403),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let market = MarketContext::new().insert(disc).insert(fwd);
@@ -156,6 +181,8 @@ fn test_ytm_amortizing_bond_is_finite_from_price() {
         .base_date(as_of)
         .knots([(0.0, 1.0), (3.0, 0.94)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let market = MarketContext::new().insert(disc);

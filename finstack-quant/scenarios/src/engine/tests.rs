@@ -20,7 +20,6 @@ fn compose_rejects_two_time_rolls() {
         }],
         priority: 1,
         resolution_mode: ResolutionMode::Cumulative,
-        hazard_bump_mode: Default::default(),
     };
     let s2 = ScenarioSpec {
         id: "roll_1y".into(),
@@ -33,7 +32,6 @@ fn compose_rejects_two_time_rolls() {
         }],
         priority: 2,
         resolution_mode: ResolutionMode::Cumulative,
-        hazard_bump_mode: Default::default(),
     };
 
     let err = ScenarioSpec::compose(vec![s1, s2])
@@ -54,8 +52,7 @@ fn compose_preserves_source_ids_and_names() {
                 pct: 1.0,
             }],
             priority: 2,
-            resolution_mode: ResolutionMode::MostSpecificWins,
-            hazard_bump_mode: Default::default(),
+            resolution_mode: ResolutionMode::Cumulative,
         },
         ScenarioSpec {
             id: "credit_down".into(),
@@ -67,7 +64,6 @@ fn compose_preserves_source_ids_and_names() {
             }],
             priority: 1,
             resolution_mode: ResolutionMode::Cumulative,
-            hazard_bump_mode: Default::default(),
         },
     ];
 
@@ -77,69 +73,29 @@ fn compose_preserves_source_ids_and_names() {
     assert_eq!(strict.name.as_deref(), Some("credit_down + Rates Up"));
     assert_eq!(strict.operations.len(), 2);
     assert_eq!(strict.resolution_mode, ResolutionMode::Cumulative);
-    assert_eq!(strict.hazard_bump_mode, crate::HazardBumpMode::SolveToPar);
 }
 
 #[test]
-fn compose_keeps_agreed_first_order_hazard_mode() {
+fn compose_rejects_mixed_resolution_modes() {
     let s1 = ScenarioSpec {
-        id: "a".into(),
+        id: "msw".into(),
         name: None,
         description: None,
         operations: Vec::new(),
         priority: 0,
-        resolution_mode: Default::default(),
-        hazard_bump_mode: crate::HazardBumpMode::FirstOrderShift,
+        resolution_mode: ResolutionMode::MostSpecificWins,
     };
     let s2 = ScenarioSpec {
-        id: "b".into(),
+        id: "cum".into(),
         name: None,
         description: None,
         operations: Vec::new(),
         priority: 1,
-        resolution_mode: Default::default(),
-        hazard_bump_mode: crate::HazardBumpMode::FirstOrderShift,
+        resolution_mode: ResolutionMode::Cumulative,
     };
-    let composed = ScenarioSpec::compose(vec![s1, s2]).expect("compose");
-    assert_eq!(
-        composed.hazard_bump_mode,
-        crate::HazardBumpMode::FirstOrderShift
-    );
-}
 
-#[test]
-fn compose_falls_back_to_solve_to_par_when_modes_disagree() {
-    let s1 = ScenarioSpec {
-        id: "a".into(),
-        name: None,
-        description: None,
-        operations: Vec::new(),
-        priority: 0,
-        resolution_mode: Default::default(),
-        hazard_bump_mode: crate::HazardBumpMode::FirstOrderShift,
-    };
-    let s2 = ScenarioSpec {
-        id: "b".into(),
-        name: None,
-        description: None,
-        operations: Vec::new(),
-        priority: 1,
-        resolution_mode: Default::default(),
-        hazard_bump_mode: crate::HazardBumpMode::SolveToPar,
-    };
-    let error =
-        ScenarioSpec::compose(vec![s1, s2]).expect_err("mixed hazard bump modes must be rejected");
-    let message = error.to_string();
-    assert!(message.contains("a"), "unexpected error: {message}");
-    assert!(message.contains("b"), "unexpected error: {message}");
-    assert!(
-        message.contains("first_order_shift"),
-        "unexpected error: {message}"
-    );
-    assert!(
-        message.contains("solve_to_par"),
-        "unexpected error: {message}"
-    );
+    let err = ScenarioSpec::compose(vec![s1, s2]).expect_err("mixed resolution modes must error");
+    assert!(err.to_string().contains("resolution_mode"), "{err}");
 }
 
 #[test]
@@ -166,7 +122,6 @@ fn apply_rejects_hierarchy_op_without_hierarchy() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -185,8 +140,8 @@ fn apply_rejects_hierarchy_op_without_hierarchy() {
 }
 
 #[test]
-fn apply_emits_warning_when_hierarchy_target_matches_no_curves() {
-    // Empty hierarchy attached, but the target path has no curves.
+fn apply_errors_when_hierarchy_target_matches_no_targets() {
+    // Empty hierarchy attached, so the target path does not resolve.
     let hierarchy = MarketDataHierarchy::default();
     let mut market = MarketContext::new();
     market.set_hierarchy(hierarchy);
@@ -211,7 +166,6 @@ fn apply_emits_warning_when_hierarchy_target_matches_no_curves() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -223,20 +177,10 @@ fn apply_emits_warning_when_hierarchy_target_matches_no_curves() {
         calendar: None,
         as_of: date!(2025 - 01 - 01),
     };
-    let report = engine
+    let err = engine
         .apply(&scenario, &mut ctx)
-        .expect("apply should succeed");
-
-    assert_eq!(report.operations_applied, 0);
-    assert_eq!(report.expanded_operations, 0);
-    assert!(
-        report.warnings.iter().any(|w| matches!(
-            w,
-            Warning::HierarchyNoMatch { op_kind, .. } if op_kind == "hierarchy_equity_price_pct"
-        )),
-        "expected HierarchyNoMatch warning, got {:?}",
-        report.warnings
-    );
+        .expect_err("unmatched hierarchy target must fail");
+    assert!(err.to_string().contains("equities/us"), "{err}");
 }
 
 #[test]
@@ -253,7 +197,6 @@ fn market_only_context_applies_without_statement_model() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -325,6 +268,9 @@ fn application_report_records_the_size_of_each_market_shock() {
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots(knots)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve should build");
     let provider = std::sync::Arc::new(SimpleFxProvider::new());
@@ -334,7 +280,7 @@ fn application_report_records_the_size_of_each_market_shock() {
     let mut market = MarketContext::new()
         .insert(curve)
         .insert_fx(FxMatrix::new(provider, None))
-        .insert_price("AAPL", MarketScalar::Unitless(200.0));
+        .insert_price("AAPL", MarketScalar::unitless(200.0).expect("valid scalar"));
 
     let scenario = ScenarioSpec {
         id: "sized".into(),
@@ -366,7 +312,6 @@ fn application_report_records_the_size_of_each_market_shock() {
         ],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
     let mut ctx = ExecutionContext {
         market: &mut market,
@@ -419,10 +364,13 @@ fn application_report_records_the_size_of_each_market_shock() {
     let level = equity.level_change.expect("scalar levels are recorded");
     assert_eq!(level.before, 200.0);
     assert!((level.after - level.before * (1.0 + -10.0 / 100.0)).abs() < 1e-12);
-    let MarketScalar::Unitless(stored) = ctx.market.get_price("AAPL").expect("price") else {
-        panic!("AAPL stays unitless");
-    };
-    assert_eq!(level.after, *stored);
+    let stored = ctx
+        .market
+        .get_price("AAPL")
+        .expect("price")
+        .get_unitless()
+        .expect("AAPL stays unitless");
+    assert_eq!(level.after, stored);
 
     assert_eq!(
         shocks[2],
@@ -497,7 +445,6 @@ fn statement_operation_without_model_errors_clearly() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -528,7 +475,6 @@ fn single_op_spec(id: &str, operation: OperationSpec) -> ScenarioSpec {
         operations: vec![operation],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     }
 }
 

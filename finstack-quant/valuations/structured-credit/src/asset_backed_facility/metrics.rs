@@ -137,6 +137,8 @@ pub(crate) fn register_asset_backed_facility_metrics(
             )),
             (Cs01, finstack_quant_valuations_core::metrics::ZSpreadParallelCs01::<AssetBackedFacility>::hazard_when_credit_curve()),
             (BucketedCs01, finstack_quant_valuations_core::metrics::ZSpreadBucketedCs01::<AssetBackedFacility>::hazard_when_credit_curve()),
+            (Hazard01, finstack_quant_valuations_core::metrics::sensitivities::cs01_direct_hazard::DirectHazardParallelHazard01::<AssetBackedFacility>::default()),
+            (BucketedHazard01, finstack_quant_valuations_core::metrics::sensitivities::cs01_direct_hazard::DirectHazardBucketedHazard01::<AssetBackedFacility>::default()),
             (BucketedDv01, finstack_quant_valuations_core::metrics::sensitivities::dv01::UnifiedDv01Calculator::new(
                 finstack_quant_valuations_core::metrics::sensitivities::dv01::Dv01CalculatorConfig::triangular_key_rate()
             )),

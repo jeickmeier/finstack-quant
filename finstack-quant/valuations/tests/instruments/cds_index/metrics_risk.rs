@@ -107,7 +107,7 @@ fn dv01_rebootstraps_calibrated_index_hazard_from_unchanged_spreads() {
 
     let pv_at = |bp: f64| {
         let bumped = ctx
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::DiscountCurve {
                 id: "USD-OIS".into(),
                 spec: BumpSpec::parallel_bp(bp),
             }])

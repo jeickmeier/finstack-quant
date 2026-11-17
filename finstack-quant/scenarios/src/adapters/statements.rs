@@ -102,6 +102,9 @@ pub fn apply_forecast_assign(
 /// * `model` - Statement model whose scalar forecast rates are replaced; actuals stay fixed.
 ///   Monetary target nodes are rejected because annualized rates are dimensionless.
 /// * `market` - Discount and forward curves used to obtain annualized decimal rates.
+///   A discount curve yields the zero rate to `tenor`; a forward curve yields
+///   the forward over `[base + tenor, base + tenor + index_tenor]` from its
+///   projection-factor growth and must carry `index_tenor` metadata.
 /// * `calendar` - Optional calendar for Modified Following tenor date adjustments;
 ///   without one, tenor dates are unadjusted.
 pub fn update_rate_from_binding(
@@ -163,7 +166,7 @@ pub fn update_rate_from_binding(
         let zero = curve.zero_rate(
             tenor_years,
             finstack_quant_core::math::Compounding::Continuous,
-        );
+        )?;
         let output_years = tenor.to_years_with_context(
             curve.base_date(),
             calendar,
@@ -201,47 +204,32 @@ pub fn update_rate_from_binding(
             )));
         }
 
+        let index_tenor = curve.index_tenor().ok_or_else(|| {
+            Error::Validation(format!(
+                "Forward curve '{curve_id}' requires index_tenor metadata for rate binding"
+            ))
+        })?;
         let forward_start = tenor.add_to_date(curve.base_date(), calendar, roll)?;
-
-        let accrual_years = Tenor::from_years(curve.tenor(), curve.day_count())?
-            .to_years_with_context(
-                forward_start,
-                calendar,
-                roll,
-                curve.day_count(),
-                finstack_quant_core::dates::DayCountContext::default(),
-            )?;
-        if !accrual_years.is_finite() || accrual_years <= 0.0 {
+        let forward_end = index_tenor.add_to_date(forward_start, calendar, roll)?;
+        let output_accrual = index_tenor.to_years_with_context(
+            forward_start,
+            calendar,
+            roll,
+            effective_day_count,
+            finstack_quant_core::dates::DayCountContext::default(),
+        )?;
+        if !output_accrual.is_finite() || output_accrual <= 0.0 {
             return Err(Error::Validation(format!(
-                "Forward curve '{curve_id}' has non-positive accrual period ({accrual_years:.6}y); \
-                 cannot convert simple forward rate"
+                "Forward curve '{curve_id}' has non-positive accrual period ({output_accrual:.6}y); \
+                 cannot convert projected forward rate"
             )));
         }
 
-        let forward_simple = curve.rate(start_years);
-        let accumulation = 1.0 + forward_simple * accrual_years;
-        if !accumulation.is_finite() || accumulation <= 0.0 {
-            return Err(Error::Validation(format!(
-                "Forward curve '{curve_id}' has invalid simple accumulation factor \
-                 ({accumulation}); rate {forward_simple} over {accrual_years:.6}y \
-                 must produce a positive finite accumulation factor"
-            )));
-        }
-        let output_accrual = Tenor::from_years(curve.tenor(), curve.day_count())?
-            .to_years_with_context(
-                forward_start,
-                calendar,
-                roll,
-                effective_day_count,
-                finstack_quant_core::dates::DayCountContext::default(),
-            )?;
-        let forward_continuous = Compounding::Simple.convert_rate(
-            forward_simple,
-            accrual_years,
-            &Compounding::Continuous,
-        );
+        // The projection-factor growth over the index period is the
+        // convention-free accumulation; only the output quote basis annualizes it.
+        let log_growth = -curve.df_between_dates(forward_start, forward_end)?.ln();
         let converted = convert_continuous_rate(
-            forward_continuous * accrual_years / output_accrual,
+            log_growth / output_accrual,
             binding.compounding,
             output_accrual,
         )?;
@@ -264,7 +252,7 @@ fn convert_continuous_rate(
         )));
     }
 
-    let discount_factor = Compounding::Continuous.df_from_rate(continuous_rate, year_fraction);
+    let discount_factor = Compounding::Continuous.df_from_rate(continuous_rate, year_fraction)?;
     let accumulation = discount_factor.recip();
     if !continuous_rate.is_finite() || !accumulation.is_finite() || accumulation <= 0.0 {
         return Err(Error::Validation(format!(
@@ -276,7 +264,7 @@ fn convert_continuous_rate(
     let converted = if comp == Compounding::Continuous {
         continuous_rate
     } else {
-        comp.rate_from_df(discount_factor, year_fraction)
+        comp.rate_from_df(discount_factor, year_fraction)?
     };
     if !converted.is_finite() {
         return Err(Error::Validation(format!(
@@ -359,15 +347,28 @@ mod tests {
                 (1.0, (-0.05_f64).exp()),
                 (5.0, (-0.25_f64).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount");
-        let forward = ForwardCurve::builder("FWD", 0.25)
+        let forward = ForwardCurve::builder("FWD")
             .base_date(base)
             .day_count(DayCount::Act365F)
-            .knots([(0.0, 0.04), (1.0, 0.05), (5.0, 0.09)])
+            .index_tenor(Tenor::quarterly())
+            .knots([
+                (0.0, 1.0),
+                (1.0, (-0.045_f64).exp()),
+                (5.0, (-0.35_f64).exp()),
+            ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("forward");
-        let native_forward = forward.rate(1.0);
+        let start = date!(2026 - 01 - 01);
+        let end = Tenor::quarterly()
+            .add_to_date(start, None, BusinessDayConvention::Unadjusted)
+            .expect("end");
+        let log_growth = -forward.df_between_dates(start, end).expect("growth").ln();
         let market = MarketContext::new().insert(discount).insert(forward);
         let mut binding = RateBindingSpec {
             node_id: "rate".into(),
@@ -388,23 +389,11 @@ mod tests {
         ] {
             binding.compounding = compounding;
             update_rate_from_binding(&binding, &mut model, &market, None).expect("forward binding");
-            let start = date!(2026 - 01 - 01);
-            let end = Tenor::from_years(0.25, DayCount::Act365F)
-                .expect("tenor")
-                .add_to_date(start, None, BusinessDayConvention::Unadjusted)
-                .expect("end");
-            let native = DayCount::Act365F
-                .year_fraction(start, end, DayCountContext::default())
-                .expect("native");
             let output = DayCount::Act360
                 .year_fraction(start, end, DayCountContext::default())
                 .expect("output");
-            let expected = convert_continuous_rate(
-                (native_forward * native).ln_1p() / output,
-                compounding,
-                output,
-            )
-            .expect("convert");
+            let expected =
+                convert_continuous_rate(log_growth / output, compounding, output).expect("convert");
             assert!((values(&model)[1] - expected).abs() < 1e-12);
             assert_eq!(values(&model)[0], 100.0);
         }

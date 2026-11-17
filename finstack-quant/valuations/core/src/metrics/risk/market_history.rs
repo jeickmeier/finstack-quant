@@ -139,13 +139,16 @@ impl MarketScenario {
                 RiskFactorType::DiscountRate {
                     curve_id,
                     tenor_years,
+                } => {
+                    let (id, spec) = key_rate_bp_bump(curve_id, *tenor_years, shift.shift);
+                    MarketBump::DiscountCurve { id, spec }
                 }
-                | RiskFactorType::ForwardRate {
+                RiskFactorType::ForwardRate {
                     curve_id,
                     tenor_years,
                 } => {
                     let (id, spec) = key_rate_bp_bump(curve_id, *tenor_years, shift.shift);
-                    MarketBump::Curve { id, spec }
+                    MarketBump::ForwardCurve { id, spec }
                 }
                 RiskFactorType::CreditSpread {
                     curve_id,
@@ -169,10 +172,15 @@ impl MarketScenario {
                     }
                     continue;
                 }
-                RiskFactorType::EquitySpot { ticker } => MarketBump::Curve {
-                    id: CurveId::from(ticker.as_str()),
-                    spec: BumpSpec::multiplier(1.0 + shift.shift),
-                },
+                RiskFactorType::EquitySpot { ticker } => {
+                    let id = CurveId::from(ticker.as_str());
+                    let spec = BumpSpec::multiplier(1.0 + shift.shift);
+                    if base_market.get_price(id.as_str())?.is_price() {
+                        MarketBump::PriceScalar { id, spec }
+                    } else {
+                        MarketBump::UnitlessScalar { id, spec }
+                    }
+                }
                 RiskFactorType::FxSpot { base, quote } => MarketBump::FxPct {
                     base: *base,
                     quote: *quote,
@@ -253,7 +261,7 @@ impl MarketScenario {
                     .iter()
                     .position(|value| same_grid_coordinate(*value, expiry));
                 let column = surface
-                    .strikes()
+                    .secondary_values()
                     .iter()
                     .position(|value| same_grid_coordinate(*value, strike));
                 let (Some(row), Some(column)) = (row, column) else {
@@ -261,7 +269,8 @@ impl MarketScenario {
                         "historical volatility point ({expiry}, {strike}) must exactly match a grid node on '{surface_id}'"
                     )));
                 };
-                let new_vol = surface.vols()[row * surface.strikes().len() + column] + amount;
+                let new_vol =
+                    surface.vols()[row * surface.secondary_values().len() + column] + amount;
                 if !new_vol.is_finite() || new_vol < 0.0 {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "historical volatility point ({expiry}, {strike}) on '{surface_id}' must remain finite and nonnegative"
@@ -317,12 +326,7 @@ fn key_rate_bp_bump(curve_id: &CurveId, tenor_years: f64, shift: f64) -> (CurveI
 /// [`MarketContext::bump`] call). Returns `None` for bumps that are applied
 /// independently (e.g. FX), which never collide.
 fn bump_curve_id(bump: &MarketBump) -> Option<CurveId> {
-    match bump {
-        MarketBump::Curve { id, .. } => Some(id.clone()),
-        MarketBump::VolBucketPct { vol_surface_id, .. } => Some(vol_surface_id.clone()),
-        MarketBump::BaseCorrBucketPts { surface_id, .. } => Some(surface_id.clone()),
-        MarketBump::FxPct { .. } => None,
-    }
+    bump.curve_id().cloned()
 }
 
 /// Find the neighboring bucket boundaries for a triangular key-rate bump.
@@ -558,6 +562,8 @@ mod tests {
             .base_date(base_date)
             .day_count(DayCount::Act365F)
             .knots(vec![(0.0, 1.0), (5.0, 0.85)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
         let base_market = MarketContext::new().insert(curve);
 
@@ -596,6 +602,8 @@ mod tests {
             .base_date(base_date)
             .day_count(DayCount::Act365F)
             .knots(vec![(0.0, 1.0), (5.0, 0.85), (10.0, 0.70)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?;
 
         let base_market = MarketContext::new().insert(base_curve);
@@ -657,7 +665,7 @@ mod tests {
     fn test_equity_spot_shift_applied() -> Result<()> {
         use finstack_quant_core::market_data::scalars::MarketScalar;
 
-        let base_market = MarketContext::new().insert_price("AAPL", MarketScalar::Unitless(100.0));
+        let base_market = MarketContext::new().insert_price("AAPL", MarketScalar::unitless(100.0)?);
 
         let scenario = MarketScenario::new(
             date!(2024 - 01 - 02),
@@ -670,10 +678,11 @@ mod tests {
         );
 
         let bumped = scenario.apply(&base_market, None)?;
-        match bumped.get_price("AAPL")? {
-            MarketScalar::Unitless(v) => assert!((v - 110.0).abs() < 1e-9),
-            other @ MarketScalar::Price(_) => panic!("unexpected scalar variant: {:?}", other),
-        }
+        let v = bumped
+            .get_price("AAPL")?
+            .get_unitless()
+            .expect("unexpected scalar variant");
+        assert!((v - 110.0).abs() < 1e-9);
 
         Ok(())
     }
@@ -716,11 +725,16 @@ mod tests {
     /// cancelling as a parallel mean shift.
     #[test]
     fn test_same_surface_vol_points_preserve_distinct_shocks() -> Result<()> {
-        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::market_data::surfaces::{
+            VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+        };
 
         let surface = VolSurface::builder("EQ-VOL")
             .expiries(&[0.5, 1.0])
-            .strikes(&[100.0, 110.0])
+            .secondary_values(&[100.0, 110.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.20, 0.20])
             .row(&[0.20, 0.20])
             .build()?;
@@ -760,16 +774,24 @@ mod tests {
     /// Vol shocks on DIFFERENT surfaces stay independent.
     #[test]
     fn test_distinct_surface_vol_shifts_stay_independent() -> Result<()> {
-        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::market_data::surfaces::{
+            VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+        };
 
         let eq = VolSurface::builder("EQ-VOL")
             .expiries(&[1.0])
-            .strikes(&[100.0])
+            .secondary_values(&[100.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.20])
             .build()?;
         let fx = VolSurface::builder("FX-VOL")
             .expiries(&[1.0])
-            .strikes(&[1.10])
+            .secondary_values(&[1.10])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.10])
             .build()?;
         let base_market = MarketContext::new().insert_surface(eq).insert_surface(fx);
@@ -810,11 +832,16 @@ mod tests {
 
     #[test]
     fn test_implied_vol_shift_applied() -> Result<()> {
-        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::market_data::surfaces::{
+            VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+        };
 
         let surface = VolSurface::builder("EQ-VOL")
             .expiries(&[0.5, 1.0])
-            .strikes(&[100.0, 110.0])
+            .secondary_values(&[100.0, 110.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.20, 0.22])
             .row(&[0.21, 0.23])
             .build()?;
@@ -851,13 +878,18 @@ mod tests {
 
     #[test]
     fn test_vol_point_coordinate_and_duplicate_policy() -> Result<()> {
-        use finstack_quant_core::market_data::surfaces::VolSurface;
+        use finstack_quant_core::market_data::surfaces::{
+            VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+        };
 
         assert!(same_grid_coordinate(0.0, -0.0));
         assert!(!same_grid_coordinate(f64::NAN, f64::NAN));
         let surface = VolSurface::builder("VOL")
             .expiries(&[0.5, 1.0])
-            .strikes(&[100.0, 110.0])
+            .secondary_values(&[100.0, 110.0])
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .row(&[0.2, 0.2])
             .row(&[0.2, 0.2])
             .build()?;

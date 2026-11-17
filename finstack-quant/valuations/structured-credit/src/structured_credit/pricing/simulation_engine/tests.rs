@@ -8,6 +8,7 @@ mod cases {
         DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
     };
     use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::Tenor;
     use finstack_quant_core::market_data::fixings::fixing_series_id;
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use finstack_quant_valuations_core::results::structured_credit::TrancheSeniority;
@@ -636,15 +637,16 @@ mod cases {
     #[test]
     fn rate_shift_moves_floating_collateral_coupons() {
         let base = Date::from_calendar_date(2024, Month::January, 1).expect("base");
-        let curve = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
-            "SOFR-3M", 0.25,
-        )
-        .base_date(base)
-        .day_count(DayCount::Act360)
-        .reset_lag(2)
-        .knots([(0.0, 0.04), (10.0, 0.04)])
-        .build()
-        .expect("forward curve should build");
+        let curve =
+            finstack_quant_core::market_data::term_structures::ForwardCurve::builder("SOFR-3M")
+                .base_date(base)
+                .day_count(DayCount::Act360)
+                .index_tenor(Tenor::quarterly())
+                .knots([(0.0, 1.0), (10.0, (-0.4_f64).exp())])
+                .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("forward curve should build");
         let accrual_start = Date::from_calendar_date(2024, Month::June, 1).expect("start");
         let market = MarketContext::new();
 
@@ -659,6 +661,7 @@ mod cases {
                 index_floor_rate: None,
             },
             0.0,
+            2,
         )
         .expect("unshifted rate");
         let shifted = collateral_asset_rate_for_period(
@@ -672,6 +675,7 @@ mod cases {
                 index_floor_rate: None,
             },
             0.01,
+            2,
         )
         .expect("shifted rate");
 
@@ -694,6 +698,7 @@ mod cases {
                 index_floor_rate: Some(0.01),
             },
             -0.05,
+            2,
         )
         .expect("index-floored rate");
         assert!(
@@ -713,6 +718,7 @@ mod cases {
                 index_floor_rate: None,
             },
             -0.50,
+            2,
         )
         .expect("floored rate");
         assert!(
@@ -724,27 +730,32 @@ mod cases {
     #[test]
     fn collateral_term_rate_is_discount_factor_implied() {
         let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid base date");
-        let curve = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
-            "USD-3M", 0.25,
-        )
-        .base_date(base)
-        .day_count(DayCount::Act365F)
-        .reset_lag(2)
-        .knots([(0.0, 0.01), (1.0, 0.21)])
-        .build()
-        .expect("forward curve should build");
+        let curve =
+            finstack_quant_core::market_data::term_structures::ForwardCurve::builder("USD-3M")
+                .base_date(base)
+                .day_count(DayCount::Act365F)
+                .index_tenor(Tenor::quarterly())
+                .knots([
+                    (0.0, 1.0),
+                    (0.25, (-0.01_f64 * 0.25 - 0.5 * 0.05 * 0.25 * 0.25).exp()),
+                    (0.5, (-0.01_f64 * 0.5 - 0.5 * 0.10 * 0.5 * 0.5).exp()),
+                    (1.0, (-0.11_f64).exp()),
+                ])
+                .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("forward curve should build");
         let start_date = Date::from_calendar_date(2025, Month::April, 1).expect("valid start date");
         let calendar =
             finstack_quant_core::dates::calendar_by_id_strict("weekends_only").expect("calendar");
         let fixing_date = start_date
-            .add_business_days(-curve.reset_lag(), calendar)
+            .add_business_days(-2, calendar)
             .expect("fixing date");
-        let reset_end = crate::structured_credit::pricing::simulation_engine::period_helpers::try_tenor_to_period_end(
-            fixing_date,
-            curve.tenor(),
-            curve.day_count(),
-        )
-        .expect("reset end");
+        let reset_end = curve
+            .index_tenor()
+            .expect("3M index tenor")
+            .add_to_date(fixing_date, None, BusinessDayConvention::Unadjusted)
+            .expect("reset end");
         let t1 = curve
             .day_count()
             .year_fraction(base, fixing_date, DayCountContext::default())
@@ -759,34 +770,55 @@ mod cases {
             - 1.0;
         let expected = growth / accrual;
 
-        let actual =
-            term_rate_for_period(&curve, &MarketContext::new(), start_date, DayCount::Act360)
-                .expect("term projection should succeed");
+        let actual = term_rate_for_period(
+            &curve,
+            &MarketContext::new(),
+            start_date,
+            DayCount::Act360,
+            2,
+        )
+        .expect("term projection should succeed");
 
-        assert!(
-            (expected - curve.rate_period(t1, t2).expect("finite ordered period")).abs() > 1e-6
-        );
         assert!((actual - expected).abs() < 1e-14);
-        let curve_basis_rate = curve.rate_between(t1, t2).expect("curve-basis rate");
+        let curve_basis_rate = curve
+            .rate_between(t1, t2, t2 - t1)
+            .expect("curve-basis rate");
         assert!((actual - curve_basis_rate).abs() > 1e-5);
     }
 
     #[test]
     fn collateral_term_rate_rejects_period_straddling_curve_base() {
         let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid base date");
-        let curve = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
-            "USD-3M", 0.25,
-        )
-        .base_date(base)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.03), (1.0, 0.04)])
-        .build()
-        .expect("forward curve should build");
+        let curve =
+            finstack_quant_core::market_data::term_structures::ForwardCurve::builder("USD-3M")
+                .base_date(base)
+                .day_count(DayCount::Act360)
+                .index_tenor(Tenor::quarterly())
+                .knots([
+                    (0.0, 1.0),
+                    (0.125, 0.996179192929547),
+                    (0.25, 0.992217938260244),
+                    (0.375, 0.988118029809016),
+                    (0.5, 0.983881318976687),
+                    (0.625, 0.979509713355454),
+                    (0.75, 0.975005175298418),
+                    (0.875, 0.970369720452687),
+                    (1.0, 0.965605416257566),
+                ])
+                .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("forward curve should build");
         let start_date =
             Date::from_calendar_date(2024, Month::December, 1).expect("valid start date");
-        let error =
-            term_rate_for_period(&curve, &MarketContext::new(), start_date, DayCount::Act360)
-                .expect_err("straddling term period should require a fixing");
+        let error = term_rate_for_period(
+            &curve,
+            &MarketContext::new(),
+            start_date,
+            DayCount::Act360,
+            2,
+        )
+        .expect_err("straddling term period should require a fixing");
 
         assert!(error.to_string().contains("FIXING:USD-3M"));
     }
@@ -794,11 +826,13 @@ mod cases {
     #[test]
     fn seasoned_collateral_uses_stored_coupon_without_fixing_series() {
         let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid base date");
-        let curve = ForwardCurve::builder("USD-3M", 0.25)
+        let curve = ForwardCurve::builder("USD-3M")
             .base_date(base)
             .day_count(DayCount::Act360)
-            .reset_lag(2)
-            .knots([(0.0, 0.03), (1.0, 0.08)])
+            .index_tenor(Tenor::quarterly())
+            .knots([(0.0, 1.0), (0.5, 0.98), (1.0, 0.946)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("forward curve");
         let accrual_start =
@@ -815,6 +849,7 @@ mod cases {
                 index_floor_rate: None,
             },
             0.0, // no OAS rate shift in this unit test,
+            2,
         )
         .expect("stored current coupon is authoritative for an already-reset period");
 
@@ -827,21 +862,28 @@ mod cases {
             Date::from_calendar_date(2025, Month::January, 6).expect("valid curve base");
         let accrual_start =
             Date::from_calendar_date(2025, Month::January, 7).expect("valid accrual start");
-        let curve = ForwardCurve::builder("USD-3M", 0.25)
+        let curve = ForwardCurve::builder("USD-3M")
             .base_date(curve_base)
             .day_count(DayCount::Act360)
-            .reset_lag(2)
-            .knots([(0.0, 0.05), (1.0, 0.05)])
+            .index_tenor(Tenor::quarterly())
+            .knots([(0.0, 1.0), (1.0, (-0.05_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("forward curve");
         let fixing_date =
             Date::from_calendar_date(2025, Month::January, 3).expect("valid fixing date");
-        let series =
-            ScalarTimeSeries::new(fixing_series_id("USD-3M"), vec![(fixing_date, 0.041)], None)
-                .expect("fixing series");
+        let series = ScalarTimeSeries::new(
+            fixing_series_id("USD-3M"),
+            vec![(fixing_date, 0.041)],
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("fixing series");
         let context = MarketContext::new().insert_series(series);
 
-        let rate = term_rate_for_period(&curve, &context, accrual_start, DayCount::Act360)
+        let rate = term_rate_for_period(&curve, &context, accrual_start, DayCount::Act360, 2)
             .expect("future accrual with historical fixing");
         assert!((rate - 0.041).abs() < 1e-14);
     }
@@ -852,18 +894,22 @@ mod cases {
         let period_start =
             Date::from_calendar_date(2025, Month::April, 1).expect("valid period start");
         let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid maturity");
-        let curve_3m = ForwardCurve::builder("USD-3M", 0.25)
+        let curve_3m = ForwardCurve::builder("USD-3M")
             .base_date(base)
             .day_count(DayCount::Act360)
-            .reset_lag(0)
-            .knots([(0.0, 0.02), (1.0, 0.08)])
+            .index_tenor(Tenor::quarterly())
+            .knots([(0.0, 1.0), (0.5, 0.9838), (1.0, 0.9512)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("3M curve");
-        let curve_6m = ForwardCurve::builder("USD-6M", 0.5)
+        let curve_6m = ForwardCurve::builder("USD-6M")
             .base_date(base)
             .day_count(DayCount::Act365F)
-            .reset_lag(0)
-            .knots([(0.0, 0.03), (1.0, 0.12)])
+            .index_tenor(Tenor::semi_annual())
+            .knots([(0.0, 1.0), (0.5, 0.9741), (1.0, 0.9277)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("6M curve");
         let context = MarketContext::new()
@@ -899,9 +945,10 @@ mod cases {
         let tranches = TrancheStructure::new(vec![tranche]).expect("tranche structure");
         let state = SimulationState::new(&pool, &tranches, base, base, 0).expect("state");
 
-        let rate_3m = term_rate_for_period(&curve_3m, &context, period_start, DayCount::Act360)
+        // The engine fixes collateral indices two business days before accrual start.
+        let rate_3m = term_rate_for_period(&curve_3m, &context, period_start, DayCount::Act360, 2)
             .expect("3M rate");
-        let rate_6m = term_rate_for_period(&curve_6m, &context, period_start, DayCount::Act360)
+        let rate_6m = term_rate_for_period(&curve_6m, &context, period_start, DayCount::Act360, 2)
             .expect("6M rate");
         let actual =
             current_collateral_wac(&state, &context, period_start).expect("collateral WAC");
@@ -997,6 +1044,9 @@ mod cases {
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
             .base_date(cleanup_test_date())
             .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.88)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve")
     }
@@ -1139,6 +1189,9 @@ mod cases {
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
             .base_date(cc_test_date())
             .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.88), (10.0, 0.75)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve")
     }
@@ -2673,6 +2726,9 @@ mod cases {
             finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
                 .base_date(start)
                 .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.88), (15.0, 0.70)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
         );

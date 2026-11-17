@@ -12,13 +12,21 @@ fn builders_and_fixtures_agree_on_the_discount_factor() {
     let from_builder = market
         .get_discount("USD-OIS")
         .expect("builder writes USD-OIS")
-        .df(1.0);
-    let from_helper = flat_discount_curve(0.05, as_of, "USD-OIS").df(1.0);
+        .df(1.0)
+        .expect("builder DF");
+    let from_helper = flat_discount_curve(0.05, as_of, "USD-OIS")
+        .df(1.0)
+        .expect("helper DF");
     assert_parity!(
         from_builder,
         from_helper,
         ParityConfig::default(),
         "flat 5% one-year DF"
     );
-    assert!(usd_discount_curve(as_of, "USD-OIS").df(1.0) < 1.0);
+    assert!(
+        usd_discount_curve(as_of, "USD-OIS")
+            .df(1.0)
+            .expect("USD DF")
+            < 1.0
+    );
 }

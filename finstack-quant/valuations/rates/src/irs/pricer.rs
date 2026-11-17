@@ -88,10 +88,10 @@ impl InterestRateSwap {
                 )
             {
                 let discount = disc.df_between_dates(as_of, flow.get_date())?;
-                pv.add(flow.get_amount().amount() * discount);
+                pv.add(flow.get_amount().amount() * discount)?;
             }
         }
-        Ok(pv.total())
+        pv.get_total()
     }
 
     /// Compute PV of floating leg (helper for value calculation).
@@ -139,11 +139,9 @@ impl InterestRateSwap {
         context: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
-        // Reuse the floating schedule's exact daily coupon calculation while
-        // omitting the projected-fixing metadata needed only by cashflow exports.
-        // Term coupons still read the named index curve at
-        // `reset_date` (`fwd.rate(t_reset)`); `index_tenor` is diagnostic error
-        // context only, not a FRA window.
+        // Reuse the floating schedule's exact period projection while omitting
+        // the projected-fixing metadata needed only by cashflow exports.
+        // `index_tenor` metadata mismatch checks run against `validate_term_curve_tenor`.
         use finstack_quant_core::cashflow::CFKind;
 
         if as_of >= self.float_leg.end {
@@ -176,9 +174,9 @@ impl InterestRateSwap {
                 continue;
             }
             let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
-            acc.add(flow.get_amount().amount() * df);
+            acc.add(flow.get_amount().amount() * df)?;
         }
-        Ok(acc.total())
+        acc.get_total()
     }
 }
 
@@ -364,15 +362,14 @@ mod tests {
         let disc = DiscountCurve::builder(disc_id.clone())
             .base_date(as_of)
             .knots(vec![(0.0, 1.0), (1.0, df_1y)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 
         let fwd_rate = 0.03;
-        let fwd = ForwardCurve::builder(fwd_id.clone(), 1.0 / 12.0)
-            .base_date(as_of)
-            .day_count(DayCount::Act360)
-            .knots(vec![(0.0, fwd_rate), (1.0, fwd_rate)])
-            .build()
+        let fwd = ForwardCurve::flat(fwd_id.clone(), as_of, fwd_rate, DayCount::Act360)
             .expect("forward curve");
 
         let fixing_rate = 0.05;
@@ -382,8 +379,14 @@ mod tests {
             obs.push((d, fixing_rate));
             d = d.add_weekdays(1).expect("valid date shift");
         }
-        let fixings = ScalarTimeSeries::new(format!("FIXING:{}", fwd_id.as_str()), obs, None)
-            .expect("fixings series");
+        let fixings = ScalarTimeSeries::new(
+            format!("FIXING:{}", fwd_id.as_str()),
+            obs,
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("fixings series");
 
         let ctx = MarketContext::new()
             .insert(disc.clone())
@@ -438,8 +441,12 @@ mod tests {
             let dcf = DayCount::Act360
                 .year_fraction(day, step_end, DayCountContext::default())
                 .expect("dcf");
-            let r = if day < as_of { fixing_rate } else { fwd_rate };
-            acc *= 1.0 + r * dcf;
+            if day < as_of {
+                acc *= 1.0 + fixing_rate * dcf;
+            } else {
+                // ForwardCurve::flat models continuous growth exp(fwd_rate * dcf).
+                acc *= (fwd_rate * dcf).exp();
+            }
             day = step_end;
         }
 
@@ -468,6 +475,9 @@ mod tests {
         let disc = DiscountCurve::builder(disc_id.clone())
             .base_date(as_of)
             .knots(vec![(0.0, 1.0), (0.25, 0.99), (1.0, 0.95)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 
@@ -550,6 +560,9 @@ mod tests {
         let disc = DiscountCurve::builder(disc_id.clone())
             .base_date(as_of)
             .knots(vec![(0.0, 1.0), (0.25, 0.99), (1.0, 0.95)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 
@@ -628,6 +641,9 @@ mod tests {
         let disc = DiscountCurve::builder(disc_id.clone())
             .base_date(as_of)
             .knots(vec![(0.0, 1.0), (0.25, 0.99), (1.0, 0.95)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 
@@ -713,6 +729,9 @@ mod tests {
         let disc = DiscountCurve::builder(disc_id.clone())
             .base_date(as_of)
             .knots(vec![(0.0, 1.0), (0.25, 0.99), (1.0, 0.95)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let ctx = MarketContext::new().insert(disc.clone());
@@ -781,6 +800,9 @@ mod tests {
         let disc = DiscountCurve::builder(disc_id.clone())
             .base_date(as_of)
             .knots(vec![(0.0, 1.0), (0.25, 0.99), (1.0, 0.95)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let ctx = MarketContext::new().insert(disc);
@@ -856,15 +878,14 @@ mod tests {
         let disc = DiscountCurve::builder(disc_id.clone())
             .base_date(as_of)
             .knots(vec![(0.0, 1.0), (1.0, df_1y)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 
         let fwd_rate = 0.03;
-        let fwd = ForwardCurve::builder(fwd_id.clone(), 1.0 / 12.0)
-            .base_date(as_of)
-            .day_count(DayCount::Act360)
-            .knots(vec![(0.0, fwd_rate), (1.0, fwd_rate)])
-            .build()
+        let fwd = ForwardCurve::flat(fwd_id.clone(), as_of, fwd_rate, DayCount::Act360)
             .expect("forward curve");
 
         let fixing_rate = 0.05;
@@ -874,8 +895,14 @@ mod tests {
             obs.push((d, fixing_rate));
             d = d.add_weekdays(1).expect("valid date shift");
         }
-        let fixings = ScalarTimeSeries::new(format!("FIXING:{}", fwd_id.as_str()), obs, None)
-            .expect("fixings series");
+        let fixings = ScalarTimeSeries::new(
+            format!("FIXING:{}", fwd_id.as_str()),
+            obs,
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("fixings series");
 
         let ctx = MarketContext::new()
             .insert(disc)
@@ -959,6 +986,9 @@ mod tests {
                 (0.5, 0.9850),  // ~3% rate
                 (1.0, 0.9650),  // ~3.5% rate
             ])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 

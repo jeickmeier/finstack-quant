@@ -50,6 +50,8 @@ fn create_flat_discount_curve(base_date: Date, rate: f64, curve_id: &str) -> Dis
         .base_date(base_date)
         .knots(dfs)
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -66,9 +68,18 @@ fn create_convertible_market(
 
     MarketContext::new()
         .insert(discount_curve)
-        .insert_price("EQUITY", MarketScalar::Unitless(equity_spot))
-        .insert_price("EQUITY-VOL", MarketScalar::Unitless(volatility))
-        .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(dividend_yield))
+        .insert_price(
+            "EQUITY",
+            MarketScalar::unitless(equity_spot).expect("valid scalar"),
+        )
+        .insert_price(
+            "EQUITY-VOL",
+            MarketScalar::unitless(volatility).expect("valid scalar"),
+        )
+        .insert_price(
+            "EQUITY-DIVYIELD",
+            MarketScalar::unitless(dividend_yield).expect("valid scalar"),
+        )
 }
 
 /// Helper: Create a standard convertible bond for QuantLib parity tests

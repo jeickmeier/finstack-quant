@@ -73,7 +73,14 @@ class FactorModel:
     ...         ],
     ...     })
     ... )
-    >>> curve = DiscountCurve("USD-OIS", "2025-01-15", [(t, math.exp(-0.04 * t)) for t in (0.0, 0.5, 1.0, 2.0)])
+    >>> curve = DiscountCurve(
+    ...     "USD-OIS",
+    ...     "2025-01-15",
+    ...     [(t, math.exp(-0.04 * t)) for t in (0.0, 0.5, 1.0, 2.0)],
+    ...     interp="monotone_convex",
+    ...     extrapolation="extend",
+    ...     day_count="act_365f",
+    ... )
     >>> market = MarketContext().insert(curve)
     >>> model = FactorModel.from_config(config)
     >>> model.assign_factors(book, market).assignments[0].factor_ids

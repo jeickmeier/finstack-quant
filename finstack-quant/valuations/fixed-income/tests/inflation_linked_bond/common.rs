@@ -4,10 +4,11 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationLag, SeriesInterpolation,
+    InflationExpectedRelease, InflationIndex, InflationLag, InflationObservation,
 };
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::InflationCurve;
+pub use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Attributes;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -15,6 +16,7 @@ pub use finstack_quant_test_utils::assert::relative_eq;
 use finstack_quant_valuations_fixed_income::inflation_linked_bond::{
     DeflationProtection, IndexationMethod, InflationLinkedBond,
 };
+pub use finstack_quant_valuations_test_support::inflation::simple_index;
 use rust_decimal::Decimal;
 use time::Month;
 
@@ -51,7 +53,7 @@ pub fn sample_tips() -> InflationLinkedBond {
         .base_cpi(250.0)
         .base_date(d(2019, 10, 1))
         .indexation_method(IndexationMethod::Tips)
-        .lag(InflationLag::Months(3))
+        .lag(InflationLag::months(3))
         .deflation_protection(DeflationProtection::MaturityOnly)
         .floor_vol_surface_id(CurveId::new("CPI-ZERO-VOL"))
         .business_day_convention(BusinessDayConvention::Following)
@@ -81,7 +83,7 @@ pub fn sample_uk_linker() -> InflationLinkedBond {
         .base_cpi(280.0)
         .base_date(d(2019, 7, 1))
         .indexation_method(IndexationMethod::Uk)
-        .lag(InflationLag::Months(8))
+        .lag(InflationLag::months(8))
         .deflation_protection(DeflationProtection::None)
         .business_day_convention(BusinessDayConvention::Following)
         .stub(StubKind::ShortBack)
@@ -109,15 +111,20 @@ pub fn market_context_with_index() -> (MarketContext, InflationIndex) {
             (5.0, 0.90),
             (10.0, 0.82),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     // Cover the bond's full lagged history so schedule generation can look up
     // early coupon fixings instead of failing on missing 2020-era observations.
-    let observations = monthly_observations(d(2019, 10, 1), 664, 250.0, 0.002);
-    let index = InflationIndex::new("US-CPI-U", observations, Currency::USD)
+    let cutoff = d(2025, 1, 2);
+    let observations = monthly_observations(d(2019, 10, 1), 64, 250.0, 0.002);
+    let index = fixing_snapshot("US-CPI-U", observations, Currency::USD, cutoff)
         .unwrap()
-        .with_interpolation(SeriesInterpolation::Linear);
+        .with_expected_releases(future_releases(cutoff))
+        .unwrap();
 
     let ctx = MarketContext::new()
         .insert_surface(zero_floor_vol())
@@ -140,13 +147,18 @@ pub fn market_context_with_curve() -> (MarketContext, InflationCurve) {
             (5.0, 0.90),
             (10.0, 0.82),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     let inflation_base = d(2025, 1, 2);
     let curve = InflationCurve::builder("US-CPI-U")
         .base_date(inflation_base)
-        .base_cpi(300.0)
+        .day_count(DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Flat)
         .knots([
             (0.0, 300.0),
             (0.5, 303.0),
@@ -160,6 +172,14 @@ pub fn market_context_with_curve() -> (MarketContext, InflationCurve) {
 
     let ctx = MarketContext::new()
         .insert_surface(zero_floor_vol())
+        .insert_inflation_index(
+            finstack_quant_valuations_test_support::inflation::simple_index(
+                "US-CPI-U",
+                inflation_base,
+                300.0,
+                Currency::USD,
+            ),
+        )
         .insert(disc)
         .insert(curve);
 
@@ -167,7 +187,9 @@ pub fn market_context_with_curve() -> (MarketContext, InflationCurve) {
         ctx,
         InflationCurve::builder("US-CPI-U")
             .base_date(inflation_base)
-            .base_cpi(300.0)
+            .day_count(DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .knots([
                 (0.0, 300.0),
                 (0.5, 303.0),
@@ -193,13 +215,18 @@ pub fn uk_market_context() -> (MarketContext, InflationIndex) {
             (5.0, 0.87),
             (15.0, 0.65),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let observations = monthly_observations(d(2019, 7, 1), 260, 280.0, 0.0025);
-    let index = InflationIndex::new("UK-RPI", observations, Currency::GBP)
+    let cutoff = d(2025, 1, 2);
+    let observations = monthly_observations(d(2019, 7, 1), 67, 280.0, 0.0025);
+    let index = fixing_snapshot("UK-RPI", observations, Currency::GBP, cutoff)
         .unwrap()
-        .with_interpolation(SeriesInterpolation::Step);
+        .with_expected_releases(future_releases(cutoff))
+        .unwrap();
 
     let ctx = MarketContext::new()
         .insert_surface(zero_floor_vol())
@@ -229,15 +256,18 @@ pub fn relative_diff(a: f64, b: f64) -> f64 {
 pub fn zero_floor_vol() -> finstack_quant_core::market_data::surfaces::VolSurface {
     finstack_quant_core::market_data::surfaces::VolSurface::builder("CPI-ZERO-VOL")
         .expiries(&[0.01, 100.0])
-        .strikes(&[0.5, 1.5])
+        .secondary_values(&[0.5, 1.5])
+        .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+        .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::BlackLognormal)
+        .interpolation_mode(finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol)
         .row(&[0.0, 0.0])
         .row(&[0.0, 0.0])
         .build()
         .unwrap()
 }
 
-// The fixture supplies a separate forecast curve, even where the stored series
-// contains future data. Valuation must never use that data as published history.
+// Forecasts retain all future levels; the observation snapshot contains only
+// explicitly available historical months.
 fn index_projection(index: &InflationIndex) -> InflationCurve {
     let (start, count, initial, growth) = if index.id() == "UK-RPI" {
         (d(2019, 7, 1), 664, 280.0, 0.0025)
@@ -250,8 +280,45 @@ fn index_projection(index: &InflationIndex) -> InflationCurve {
         .collect();
     InflationCurve::builder(index.id())
         .base_date(start)
-        .base_cpi(initial)
+        .day_count(DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Flat)
         .knots(knots)
         .build()
         .unwrap()
+}
+
+/// Synthetic snapshot whose selected monthly versions all become available on `knowledge_date`.
+pub fn fixing_snapshot(
+    id: &str,
+    observations: Vec<(Date, f64)>,
+    currency: Currency,
+    knowledge_date: Date,
+) -> finstack_quant_core::Result<InflationIndex> {
+    InflationIndex::new(
+        id,
+        observations
+            .into_iter()
+            .map(|(reference_month, value)| InflationObservation {
+                reference_month,
+                value,
+                available_on: knowledge_date,
+            })
+            .collect(),
+        currency,
+        knowledge_date,
+    )
+}
+
+fn future_releases(cutoff: Date) -> Vec<InflationExpectedRelease> {
+    (1..=664)
+        .map(|months| {
+            let reference_month = cutoff.replace_day(1).unwrap().add_months(months).unwrap();
+            InflationExpectedRelease {
+                reference_month,
+                expected_release: reference_month,
+                known_on: cutoff,
+            }
+        })
+        .collect()
 }

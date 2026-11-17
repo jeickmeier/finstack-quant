@@ -6,7 +6,7 @@
     "description": "Synthetic 5Y zero-coupon inflation swap on deterministic CPI and USD OIS curves.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Synthetic 5Y zero-coupon inflation swap on deterministic CPI and USD OIS curves. Canonical typed market inputs are supplied directly; the pricing tolerance contract is preserved. Amended and re-baselined 2026-09-18. Commit 413953021 made a historical reference anchor require a published fixing rather than a curve projection, so the contract now states its base CPI explicitly. The contract also follows the USD-CPI market convention (one/one accrual, NYSE calendar, modified following, linear monthly reference interpolation), and the curve's declared 3M indexation lag is now resolved by the instrument, so the stated base CPI is this curve's reference level at the lagged 2026-04-30 anchor rather than at the unlagged start date.",
+    "source_detail": "Synthetic 5Y zero-coupon inflation swap on deterministic CPI and USD OIS curves. The contract explicitly selects three-month lag, linear monthly reference interpolation and its fixed start CPI, independently of the projection source origin. A 2026-04-30 knowledge snapshot carries the expected releases for both future monthly anchors. Expected outputs and tolerances are unchanged internal regression anchors.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
     "last_reviewed_by": "claude",
@@ -33,39 +33,42 @@
           }
         }
       },
-      "market_data": [],
+      "market_data": [
+        {
+          "kind": "inflation_fixings",
+          "id": "US-CPI",
+          "currency": "USD",
+          "knowledge_date": "2026-04-30",
+          "observations": [],
+          "expected_releases": [
+            {
+              "reference_month": "2031-01-01",
+              "expected_release": "2031-02-15",
+              "known_on": "2026-04-30"
+            },
+            {
+              "reference_month": "2031-02-01",
+              "expected_release": "2031-03-15",
+              "known_on": "2026-04-30"
+            }
+          ]
+        }
+      ],
       "prior_market": [
         {
           "kind": "inflation_curve",
           "id": "US-CPI",
-          "base_cpi": 300.0,
           "base_date": "2024-01-15",
           "day_count": "act_365f",
-          "indexation_lag_months": 3,
           "knot_points": [
-            [
-              0.0,
-              300.0
-            ],
-            [
-              1.0,
-              306.0
-            ],
-            [
-              2.0,
-              312.2
-            ],
-            [
-              5.0,
-              331.6
-            ],
-            [
-              10.0,
-              366.2
-            ]
+            [0.0, 300.0],
+            [1.0, 306.0],
+            [2.0, 312.2],
+            [5.0, 331.6],
+            [10.0, 366.2]
           ],
           "interp_style": "log_linear",
-          "extrapolation": "flat_zero"
+          "extrapolation": "flat"
         },
         {
           "kind": "discount_curve",
@@ -73,44 +76,17 @@
           "base": "2026-04-30",
           "day_count": "act_365f",
           "knot_points": [
-            [
-              0.0,
-              1.0
-            ],
-            [
-              0.25,
-              0.99
-            ],
-            [
-              0.5,
-              0.9802
-            ],
-            [
-              1.0,
-              0.9608
-            ],
-            [
-              2.0,
-              0.9231
-            ],
-            [
-              5.0,
-              0.8187
-            ],
-            [
-              10.0,
-              0.6703
-            ],
-            [
-              30.0,
-              0.301
-            ]
+            [0.0, 1.0],
+            [0.25, 0.99],
+            [0.5, 0.9802],
+            [1.0, 0.9608],
+            [2.0, 0.9231],
+            [5.0, 0.8187],
+            [10.0, 0.6703],
+            [30.0, 0.301]
           ],
           "interp_style": "log_linear",
-          "extrapolation": "flat_forward",
-          "min_forward_rate": null,
-          "allow_non_monotonic": false,
-          "min_forward_tenor": 1e-06,
+          "extrapolation": "extend",
           "rate_calibration": null,
           "fx_policy": null
         },
@@ -120,40 +96,16 @@
           "base": "2026-04-30",
           "day_count": "act_365f",
           "knot_points": [
-            [
-              0.0,
-              1.0
-            ],
-            [
-              0.25,
-              0.9975
-            ],
-            [
-              0.5,
-              0.995
-            ],
-            [
-              1.0,
-              0.99
-            ],
-            [
-              2.0,
-              0.975
-            ],
-            [
-              5.0,
-              0.93
-            ],
-            [
-              10.0,
-              0.86
-            ]
+            [0.0, 1.0],
+            [0.25, 0.9975],
+            [0.5, 0.995],
+            [1.0, 0.99],
+            [2.0, 0.975],
+            [5.0, 0.93],
+            [10.0, 0.86]
           ],
           "interp_style": "log_linear",
-          "extrapolation": "flat_forward",
-          "min_forward_rate": null,
-          "allow_non_monotonic": false,
-          "min_forward_tenor": 1e-06,
+          "extrapolation": "extend",
           "rate_calibration": null,
           "fx_policy": null
         }
@@ -177,13 +129,12 @@
         "discount_curve_id": "USD-OIS",
         "side": "pay",
         "attributes": {
-          "tags": [
-            "golden"
-          ],
+          "tags": ["golden"],
           "meta": {}
         },
         "day_count": "one_one",
         "base_cpi": 312.49179121221636,
+        "lag": { "months": 3 },
         "calendar_id": "nyse",
         "business_day_convention": "modified_following",
         "interpolation": "linear"
@@ -198,23 +149,23 @@
   },
   "tolerances": {
     "npv": {
-      "abs": 1e-09,
-      "rel": 5e-09,
+      "abs": 1e-9,
+      "rel": 5e-9,
       "tolerance_reason": "Formula self-test: tolerance pinned to ~10x the worst observed deterministic FP residual (1.16e-10 abs / 2.8e-11 rel) for canonical pricing on synthetic inputs. Tightening from 1e-6 to 1e-9 catches drift introduced by refactors, FP-contract changes, or algorithm swaps that would otherwise be invisible at the looser band."
     },
     "par_rate": {
-      "abs": 1e-09,
-      "rel": 5e-09,
+      "abs": 1e-9,
+      "rel": 5e-9,
       "tolerance_reason": "Formula self-test: tolerance pinned to ~10x the worst observed deterministic FP residual (1.16e-10 abs / 2.8e-11 rel) for canonical pricing on synthetic inputs. Tightening from 1e-6 to 1e-9 catches drift introduced by refactors, FP-contract changes, or algorithm swaps that would otherwise be invisible at the looser band."
     },
     "dv01": {
-      "abs": 1e-09,
-      "rel": 5e-09,
+      "abs": 1e-9,
+      "rel": 5e-9,
       "tolerance_reason": "Formula self-test: tolerance pinned to ~10x the worst observed deterministic FP residual (1.16e-10 abs / 2.8e-11 rel) for canonical pricing on synthetic inputs. Tightening from 1e-6 to 1e-9 catches drift introduced by refactors, FP-contract changes, or algorithm swaps that would otherwise be invisible at the looser band."
     },
     "inflation01": {
-      "abs": 1e-09,
-      "rel": 5e-09,
+      "abs": 1e-9,
+      "rel": 5e-9,
       "tolerance_reason": "Formula self-test: tolerance pinned to ~10x the worst observed deterministic FP residual (1.16e-10 abs / 2.8e-11 rel) for canonical pricing on synthetic inputs. Tightening from 1e-6 to 1e-9 catches drift introduced by refactors, FP-contract changes, or algorithm swaps that would otherwise be invisible at the looser band."
     }
   }

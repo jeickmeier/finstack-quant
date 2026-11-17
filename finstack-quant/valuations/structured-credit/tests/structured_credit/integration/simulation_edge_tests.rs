@@ -112,6 +112,8 @@ fn flat_market() -> MarketContext {
         .base_date(test_date())
         .knots(vec![(0.0, 1.0), (1.0, 0.95), (5.0, 0.78)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("valid discount curve");
 

@@ -770,6 +770,8 @@ pub fn instrument_cashflows_with_market(
 #[cfg(test)]
 pub(super) mod tests {
     use super::*;
+    use finstack_quant_core::math::Compounding;
+    use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 
     fn price_instrument_with_context(
         instrument_json: &str,
@@ -934,6 +936,8 @@ pub(super) mod tests {
                 .base_date(date!(2024 - 01 - 01))
                 .day_count(DayCount::Act365F)
                 .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.85)])
+                .interp(InterpStyle::MonotoneConvex)
+                .extrapolation(ExtrapolationPolicy::Extend)
                 .build()
                 .expect("discount curve"),
         );
@@ -941,6 +945,7 @@ pub(super) mod tests {
             market = market.insert(
                 HazardCurve::builder("USD-HZ")
                     .base_date(date!(2024 - 01 - 01))
+                    .day_count(DayCount::Act365F)
                     .recovery_rate(0.4)
                     .knots([(1.0, 0.02), (5.0, 0.02)])
                     .build()
@@ -1189,6 +1194,8 @@ pub(super) mod tests {
             correlation: 0.5,
             day_count: DayCount::Act365F,
             index_id: Some(finstack_quant_core::types::IndexId::new("USD-SOFR-OIS")),
+            long_cms_fixing_index_id: None,
+            short_cms_fixing_index_id: None,
             swap_fixed_frequency: None,
             swap_float_frequency: None,
             swap_fixed_day_count: None,
@@ -1209,7 +1216,10 @@ pub(super) mod tests {
                 .expect("date");
         let disc = DiscountCurve::builder("USD-OIS")
             .base_date(base)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.5, 0.99), (1.0, 0.98), (5.0, 0.90), (10.0, 0.80)])
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let ctx = MarketContext::new().insert(disc);
@@ -1224,22 +1234,14 @@ pub(super) mod tests {
         let base =
             finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
                 .expect("date");
-        let disc = DiscountCurve::builder("USD-OIS")
-            .base_date(base)
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, 1.0), (6.0, (-0.02_f64 * 6.0).exp())])
-            .build()
-            .expect("discount curve");
-        let fwd = ForwardCurve::builder("USD-SOFR-6M", 0.5)
-            .base_date(base)
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, 0.03), (6.0, 0.03)])
-            .build()
+        let disc =
+            DiscountCurve::flat("USD-OIS", base, 0.02, DayCount::Act365F).expect("discount curve");
+        let fwd = ForwardCurve::flat("USD-SOFR-6M", base, 0.03, DayCount::Act365F)
             .expect("forward curve");
-        let ctx = MarketContext::new()
-            .insert(disc)
-            .insert(fwd)
-            .insert_price("SOFR-RATE", MarketScalar::Unitless(0.03));
+        let ctx = MarketContext::new().insert(disc).insert(fwd).insert_price(
+            "SOFR-RATE",
+            MarketScalar::unitless(0.03).expect("unitless scalar"),
+        );
         serde_json::to_string(&ctx).expect("serialize")
     }
 
@@ -1250,9 +1252,15 @@ pub(super) mod tests {
         use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 
         fn flat_surface(id: &str, vol: f64) -> VolSurface {
+            use finstack_quant_core::market_data::surfaces::{
+                VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
+            };
             VolSurface::builder(id)
                 .expiries(&[0.25, 1.0, 5.0])
-                .strikes(&[0.01, 0.10])
+                .secondary_values(&[0.01, 0.10])
+                .secondary_axis(VolSurfaceAxis::Strike)
+                .quote_type(VolQuoteType::BlackLognormal)
+                .interpolation_mode(VolInterpolationMode::Vol)
                 .row(&[vol, vol])
                 .row(&[vol, vol])
                 .row(&[vol, vol])
@@ -1263,18 +1271,18 @@ pub(super) mod tests {
         let base =
             finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::January, 1)
                 .expect("date");
-        let disc = DiscountCurve::builder("USD-OIS")
-            .base_date(base)
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, 1.0), (30.0, (-0.035_f64 * 30.0).exp())])
-            .build()
-            .expect("discount curve");
-        let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-            .base_date(base)
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, 0.025), (2.0, 0.030), (10.0, 0.045), (30.0, 0.055)])
-            .build()
-            .expect("forward curve");
+        let disc =
+            DiscountCurve::flat("USD-OIS", base, 0.035, DayCount::Act365F).expect("discount curve");
+        let fwd = ForwardCurve::from_zero_rates(
+            "USD-SOFR-3M",
+            base,
+            &[(2.0, 0.030), (10.0, 0.045), (30.0, 0.055)],
+            Compounding::Continuous,
+            DayCount::Act365F,
+            InterpStyle::LogLinear,
+            ExtrapolationPolicy::Extend,
+        )
+        .expect("forward curve");
         let ctx = MarketContext::new()
             .insert(disc)
             .insert(fwd)
@@ -1572,11 +1580,12 @@ pub(super) mod tests {
     fn return_floor_market_json() -> String {
         use finstack_quant_core::market_data::context::MarketContext;
         use finstack_quant_core::market_data::term_structures::DiscountCurve;
-        use finstack_quant_core::math::interp::InterpStyle;
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(time::macros::date!(2024 - 01 - 01))
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .knots([(0.0, 1.0), (5.0, 0.85)])
             .interp(InterpStyle::MonotoneConvex)
+            .extrapolation(ExtrapolationPolicy::Extend)
             .build()
             .expect("valid discount curve");
         serde_json::to_string(&MarketContext::new().insert(curve)).expect("serialize market")

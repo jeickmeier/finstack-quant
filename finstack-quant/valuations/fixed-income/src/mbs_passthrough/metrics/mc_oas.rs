@@ -543,16 +543,12 @@ pub(crate) fn calculate_mc_oas(
         &steps,
     );
     let payment_times = oas_payment_times(&steps);
-    let objective = |oas: f64| spread_value(&coefficients, &payment_times, oas) - market_price;
+    let objective = |oas: f64| Ok(spread_value(&coefficients, &payment_times, oas) - market_price);
 
     // Solve for OAS using Brent's method
-    let solver = BrentSolver::new()
-        .with_tolerance(OAS_TOLERANCE)
-        .with_max_iterations(200)
-        .with_bracket_bounds(-0.10, 0.20)
-        .with_initial_bracket_size(Some(0.05));
+    let solver = BrentSolver::new(OAS_TOLERANCE, 200)?;
 
-    let result = solver.solve(objective, 0.0);
+    let result = solver.solve(objective, 0.0, -0.10, 0.20, 0.05, 10);
 
     // Solver failure is now informative: the underlying pricing succeeded but
     // no OAS bracketed the target market price (likely far-from-feasible
@@ -629,6 +625,8 @@ mod tests {
                 (30.0, 0.30),
             ])
             .interp(InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid curve");
 
@@ -1095,6 +1093,8 @@ mod tests {
             .base_date(as_of)
             .knots([(0.0, 1.0), (40.0, (-flat_rate * 40.0_f64).exp())])
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("valid curve");
         let market = MarketContext::new().insert(disc);
@@ -1182,6 +1182,9 @@ mod production_mortgage_audit {
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (5.0, 1.0)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
         );
@@ -1232,6 +1235,8 @@ mod production_mortgage_audit {
                     .base_date(as_of)
                     .knots([(0.0, 1.0), (40.0, (-flat * 40.0).exp())])
                     .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+                    .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("curve"),
             );

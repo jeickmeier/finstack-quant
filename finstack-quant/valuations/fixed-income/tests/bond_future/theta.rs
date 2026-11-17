@@ -61,12 +61,16 @@ fn market(as_of: Date) -> MarketContext {
         .base_date(as_of)
         .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.80), (10.0, 0.65)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("Treasury curve");
     let repo = DiscountCurve::builder("USD-REPO")
         .base_date(as_of)
         .knots([(0.0, 1.0), (1.0, 0.98)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("repo curve");
     MarketContext::new().insert(discount).insert(repo)
@@ -117,7 +121,7 @@ fn theta_matches_held_market_repricing_across_ctd_coupon() {
     let as_of = date!(2025 - 01 - 14);
     let rolled_date = date!(2025 - 01 - 16);
     let market = market(as_of);
-    let rolled_market = market.roll_forward(2).expect("rolled market");
+    let rolled_market = market.condition(rolled_date).expect("conditioned market");
     let mut long = future(Position::Long);
     long.metric_pricing_overrides.theta_period = Some(Tenor::parse("2D").expect("tenor"));
     let ctd_schedule = long

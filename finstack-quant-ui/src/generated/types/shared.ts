@@ -4009,7 +4009,9 @@ export type Id56 = string;
  *
  * # Examples
  * ```rust
- * use finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};
+ * use finstack_quant_core::market_data::scalars::{
+ *     ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+ * };
  * use finstack_quant_core::dates::Date;
  * use time::Month;
  *
@@ -4020,11 +4022,12 @@ export type Id56 = string;
  *         (Date::from_calendar_date(2024, Month::February, 1).expect("Valid date"), 105.0),
  *     ],
  *     None,
+ *     SeriesInterpolation::Step,
+ *     SeriesExtrapolation::Error,
  * )
  * .expect("Series creation should succeed");
- * let stepped = series.clone().with_interpolation(SeriesInterpolation::Step);
  * let mid_date = Date::from_calendar_date(2024, Month::January, 15).expect("Valid date");
- * assert_eq!(stepped.value_on(mid_date).expect("Value lookup should succeed"), 100.0);
+ * assert_eq!(series.get_value(mid_date).expect("Value lookup should succeed"), 100.0);
  * ```
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -4034,33 +4037,21 @@ export type SeriesInterpolation = "step" | "linear";
 /**
  * Contractual observation lag for inflation index reference dates.
  *
- * Inflation indices are published with a delay (typically 2-4 weeks). Securities
- * using these indices incorporate an observation lag to ensure the reference
- * index is published by settlement. This lag does not specify the actual
- * publication date; use [`InflationIndex::with_publication_dates`] for that.
- *
- * # Standard Lags by Market
- *
- * - **US TIPS**: 3-month lag (reference index from 3 months prior)
- * - **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)
- * - **French OATi**: 3-month lag
- * - **German index-linked**: 3-month lag
- *
- * # Rationale
- *
- * The lag ensures:
- * 1. Reference index is published before settlement
- * 2. Index value is known at coupon payment date
- * 3. No estimation or forecasting required for payment calculation
+ * Specifies how far before a contractual reference date the historical or
+ * projected CPI anchor is sampled. Publication and knowledge cutoffs are
+ * tracked separately on [`InflationIndex`].
  *
  * # Examples
  *
  * ```rust
  * use finstack_quant_core::market_data::scalars::InflationLag;
  *
- * let tips_lag = InflationLag::Months(3);  // US TIPS standard
- * let gilt_lag = InflationLag::Months(3);  // UK modern gilts
- * let no_lag = InflationLag::None;         // Inflation swaps (forecast-based)
+ * let tips_lag = InflationLag::months(3);
+ * let day_lag = InflationLag::days(90);
+ * let no_lag = InflationLag::None;
+ * assert_eq!(tips_lag.to_string(), "3M");
+ * assert_eq!(day_lag.to_string(), "90D");
+ * assert_eq!(no_lag.to_string(), "none");
  * ```
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -34419,13 +34410,11 @@ export interface InflationSwap {
   inflation_index_id: Id56;
   instrument_pricing_overrides?: InstrumentPricingOverrides16;
   /**
-   * Contractual monthly reference-index interpolation; takes precedence over index metadata;
-   * without either source the default is monthly step interpolation.
+   * Explicit contractual monthly reference-index interpolation; no source default is used.
    */
   interpolation?: SeriesInterpolation | null;
   /**
-   * Contractual CPI observation lag; when `None` the index lag, then the
-   * curve's indexation lag, applies.
+   * Explicit contractual CPI observation lag; missing terms fail reference resolution.
    */
   lag?: InflationLag | null;
   maturity: Date59;
@@ -34723,13 +34712,11 @@ export interface YoYInflationSwap {
   inflation_index_id: Id59;
   instrument_pricing_overrides?: InstrumentPricingOverrides17;
   /**
-   * Contractual monthly reference-index interpolation; takes precedence over index metadata;
-   * without either source the default is monthly step interpolation.
+   * Explicit contractual monthly reference-index interpolation; no source default is used.
    */
   interpolation?: SeriesInterpolation | null;
   /**
-   * Contractual CPI observation lag; when `None` the index lag, then the
-   * curve's indexation lag, applies.
+   * Explicit contractual CPI observation lag; missing terms fail reference resolution.
    */
   lag?: InflationLag | null;
   maturity: Date61;
@@ -35034,13 +35021,12 @@ export interface InflationCapFloor {
   inflation_index_id: Id62;
   instrument_pricing_overrides?: InstrumentPricingOverrides18;
   /**
-   * Contractual monthly CPI interpolation; takes precedence over index metadata.
+   * Explicit contractual monthly CPI interpolation; no source default is used.
    * Defaults to monthly step interpolation when neither source supplies it.
    */
   interpolation?: SeriesInterpolation | null;
   /**
-   * Contractual CPI observation lag; when `None` the index lag, then the
-   * curve's indexation lag, applies.
+   * Explicit contractual CPI observation lag; missing terms fail reference resolution.
    */
   lag?: InflationLag | null;
   maturity: Date63;
@@ -37650,6 +37636,11 @@ export interface CmsSwap {
    */
   cms_cap?: number | null;
   /**
+   * Explicit CMS benchmark fixing identifier used for historical fixings
+   * (`FIXING:<cms_fixing_index_id>`), distinct from `forward_curve_id` and `index_id`.
+   */
+  cms_fixing_index_id?: Id9 | null;
+  /**
    * Optional floor on the CMS rate (decimal).
    */
   cms_floor?: number | null;
@@ -38021,6 +38012,11 @@ export interface CmsOption {
    */
   accrual_fractions: number[];
   attributes?: Attributes27;
+  /**
+   * Explicit CMS benchmark fixing identifier used for historical fixings
+   * (`FIXING:<cms_fixing_index_id>`), distinct from `forward_curve_id` and `index_id`.
+   */
+  cms_fixing_index_id?: Id9 | null;
   cms_tenor: Tenor15;
   day_count: DayCount28;
   discount_curve_id: Id85;
@@ -49445,6 +49441,12 @@ export interface CmsSpreadOption {
    */
   index_id?: Id9 | null;
   instrument_pricing_overrides?: InstrumentPricingOverrides66;
+  /**
+   * Explicit CMS benchmark fixing identifier for the long-tenor leg
+   * (`FIXING:<long_cms_fixing_index_id>`), distinct from `forward_curve_id`,
+   * `index_id`, and `short_cms_fixing_index_id`.
+   */
+  long_cms_fixing_index_id?: Id9 | null;
   long_cms_tenor: Tenor24;
   long_vol_surface_id: Id221;
   metric_pricing_overrides?: MetricPricingOverrides66;
@@ -49456,6 +49458,12 @@ export interface CmsSpreadOption {
   option_type: "call" | "put";
   payment_date: Date125;
   scenario_pricing_overrides?: ScenarioPricingOverrides66;
+  /**
+   * Explicit CMS benchmark fixing identifier for the short-tenor leg
+   * (`FIXING:<short_cms_fixing_index_id>`), distinct from `forward_curve_id`,
+   * `index_id`, and `long_cms_fixing_index_id`.
+   */
+  short_cms_fixing_index_id?: Id9 | null;
   short_cms_tenor: Tenor25;
   short_vol_surface_id: Id222;
   strike: Decimal33;

@@ -47,7 +47,7 @@ it.each([storedSurface, tenorSurface])(
       expect(node.surface).toBe(surface);
       expect([node.expiry, node.secondary, node.value]).toEqual([
         surface.expiries[Math.floor(i / 3)],
-        surface.strikes[i % 3],
+        surface.secondary_values[i % 3],
         surface.vols_row_major[i],
       ]);
     });

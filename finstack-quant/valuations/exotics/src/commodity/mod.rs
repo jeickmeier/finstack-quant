@@ -98,7 +98,7 @@ pub(crate) fn bump_price_curve_pct(
     use finstack_quant_core::market_data::bumps::{
         BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
     };
-    market.bump([MarketBump::Curve {
+    market.bump([MarketBump::PriceCurve {
         id: finstack_quant_core::types::CurveId::new(curve_id),
         spec: BumpSpec {
             bump_type: BumpType::Parallel,

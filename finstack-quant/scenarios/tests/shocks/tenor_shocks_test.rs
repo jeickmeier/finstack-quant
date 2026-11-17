@@ -21,6 +21,9 @@ fn test_tenor_exact_match() {
             (5.0, 0.90),  // 5Y pillar
             (10.0, 0.80), // 10Y pillar
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -48,7 +51,6 @@ fn test_tenor_exact_match() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     // Apply scenario
@@ -66,7 +68,7 @@ fn test_tenor_exact_match() {
     assert_eq!(report.operations_applied, 1);
 
     let bumped_curve = market.get_discount("USD-OIS").unwrap();
-    let df_5y = bumped_curve.df(5.0);
+    let df_5y = bumped_curve.df(5.0).unwrap();
     // An exact-match tenor shock shifts the continuously-compounded zero at the
     // matched node by exactly the requested size:
     //   DF_bumped(5) = DF(5) · exp(-25/10_000 · 5)
@@ -87,6 +89,9 @@ fn test_tenor_exact_not_found() {
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
         .knots(vec![(0.0, 1.0), (1.0, 0.98), (5.0, 0.90)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -114,7 +119,6 @@ fn test_tenor_exact_not_found() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     // Apply scenario - should fail
@@ -147,6 +151,9 @@ fn test_tenor_interpolate_mode() {
             (5.0, 0.90),
             (10.0, 0.80),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -161,7 +168,7 @@ fn test_tenor_interpolate_mode() {
     );
 
     // Store original DF at 3Y for comparison
-    let original_df_3y = market.get_discount("USD-OIS").unwrap().df(3.0);
+    let original_df_3y = market.get_discount("USD-OIS").unwrap().df(3.0).unwrap();
 
     // Shock at 3Y using interpolation
     // Triangular region: prev=1.5Y, target=3Y, next=4.5Y
@@ -179,7 +186,6 @@ fn test_tenor_interpolate_mode() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     // Apply scenario
@@ -200,7 +206,7 @@ fn test_tenor_interpolate_mode() {
     // Verify shock was applied (interpolated at 3Y)
     // The curve ID remains "USD-OIS".
     let bumped_curve = market.get_discount("USD-OIS").unwrap();
-    let df_3y = bumped_curve.df(3.0);
+    let df_3y = bumped_curve.df(3.0).unwrap();
     // With interpolate mode, the shock is distributed via triangular weights
     // The 2Y and 4Y knots are affected, changing the interpolated DF at 3Y
     assert!(
@@ -214,19 +220,24 @@ fn test_tenor_interpolate_mode() {
 /// Off-pillar interpolated bumps must deliver the full requested shift at the
 /// requested tenor, not the `Σw²`-attenuated value (50% at a midpoint).
 ///
-/// Uses a forward curve because its node path applies the additive shift
-/// directly to pillar forwards, making the linear-interpolation delivery math
-/// exact.
+/// Uses a forward curve, whose node path applies triangular key-rate shocks
+/// to the continuously compounded projection zero rate, so the delivered move
+/// is measured in that coordinate.
 #[test]
 fn test_tenor_interpolate_delivers_full_bump_at_requested_tenor() {
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
 
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let curve = ForwardCurve::builder("USD-FWD-3M", 0.25)
-        .base_date(base_date)
-        .knots(vec![(1.0, 0.040), (2.0, 0.042), (3.0, 0.045)])
-        .build()
-        .unwrap();
+    let curve = ForwardCurve::from_zero_rates(
+        "USD-FWD-3M",
+        base_date,
+        &[(1.0, 0.040), (2.0, 0.042), (3.0, 0.045)],
+        finstack_quant_core::math::Compounding::Continuous,
+        finstack_quant_core::dates::DayCount::Act365F,
+        finstack_quant_core::math::interp::InterpStyle::LogLinear,
+        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+    )
+    .unwrap();
     let mut market = MarketContext::new().insert(curve);
     let mut model = FinancialModelSpec::new(
         "test",
@@ -261,10 +272,10 @@ fn test_tenor_interpolate_delivers_full_bump_at_requested_tenor() {
         t_star > 2.0 && t_star < 3.0,
         "resolved tenor {t_star} must land inside the 2Y-3Y segment"
     );
-    let original_at_t_star = base_curve.rate(t_star);
-    let original_mid = base_curve.rate(2.5); // midpoint of 2Y-3Y segment
-    let original_asym = base_curve.rate(1.25); // asymmetric point in 1Y-2Y
-    let original_1y = base_curve.rate(1.0);
+    let original_at_t_star = projection_zero(&base_curve, t_star);
+    let original_mid = projection_zero(&base_curve, 2.5); // midpoint of 2Y-3Y segment
+    let original_asym = projection_zero(&base_curve, 1.25); // asymmetric point in 1Y-2Y
+    let original_1y = projection_zero(&base_curve, 1.0);
 
     let scenario = ScenarioSpec {
         id: "full_delivery".into(),
@@ -279,7 +290,6 @@ fn test_tenor_interpolate_delivers_full_bump_at_requested_tenor() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -296,7 +306,7 @@ fn test_tenor_interpolate_delivers_full_bump_at_requested_tenor() {
     let bumped = market.get_forward("USD-FWD-3M").unwrap();
     // Exact delivery at the resolved tenor: the curve must move by the full
     // requested 50bp there (the old Σw² attenuation delivered only ~25bp).
-    let realized = bumped.rate(t_star) - original_at_t_star;
+    let realized = projection_zero(&bumped, t_star) - original_at_t_star;
     assert!(
         (realized - 0.0050).abs() < 1e-10,
         "requested +50bp at the resolved 30M point ({t_star:.4}Y) must be fully delivered, \
@@ -306,7 +316,7 @@ fn test_tenor_interpolate_delivers_full_bump_at_requested_tenor() {
     // Near the nominal 2.5Y midpoint the realized move differs only by the
     // day-count basis between 2.5 and the resolved point — far above the 25bp
     // the attenuated scheme would have delivered.
-    let realized_mid = bumped.rate(2.5) - original_mid;
+    let realized_mid = projection_zero(&bumped, 2.5) - original_mid;
     assert!(
         (realized_mid - 0.0050).abs() < 0.25e-4,
         "realized move at 2.5Y ({:.4}bp) should be within 0.25bp of the request",
@@ -314,12 +324,12 @@ fn test_tenor_interpolate_delivers_full_bump_at_requested_tenor() {
     );
     // Pillars outside the bumped segment are untouched.
     assert!(
-        (bumped.rate(1.0) - original_1y).abs() < 1e-12,
+        (projection_zero(&bumped, 1.0) - original_1y).abs() < 1e-12,
         "1Y pillar should be unaffected"
     );
     // The 1Y-2Y segment interpolates toward the bumped 2Y pillar but the
     // asymmetric point must not have received its own full bump.
-    let leak = bumped.rate(1.25) - original_asym;
+    let leak = projection_zero(&bumped, 1.25) - original_asym;
     assert!(
         leak < 0.0050,
         "off-segment leakage {:.4}bp should stay below the requested bump",
@@ -335,6 +345,9 @@ fn tenor_not_found_error_names_curve() {
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
         .knots(vec![(0.0, 1.0), (1.0, 0.98), (5.0, 0.90)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -361,7 +374,6 @@ fn tenor_not_found_error_names_curve() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -397,6 +409,9 @@ fn extrapolation_warning_includes_both_bounds_and_curve_id() {
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
         .knots(vec![(0.0, 1.0), (1.0, 0.98), (5.0, 0.90), (10.0, 0.80)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -424,7 +439,6 @@ fn extrapolation_warning_includes_both_bounds_and_curve_id() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -457,19 +471,21 @@ fn extrapolation_warning_includes_both_bounds_and_curve_id() {
 fn interpolate_delivers_overlapping_tenors_and_exact_pillars_together() {
     use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
-    use finstack_quant_core::math::interp::InterpStyle;
     let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     for nodes in [
         vec![("2Y", 100.0), ("4Y", 200.0)],
         vec![("2Y", 100.0), ("3Y", 150.0), ("4Y", 200.0)],
     ] {
-        let curve = ForwardCurve::builder("FWD", 0.25)
-            .base_date(base)
-            .day_count(DayCount::Act365F)
-            .interp(InterpStyle::Linear)
-            .knots([(1.0, 0.04), (3.0, 0.04), (5.0, 0.04)])
-            .build()
-            .unwrap();
+        let curve = ForwardCurve::from_zero_rates(
+            "FWD",
+            base,
+            &[(1.0, 0.04), (3.0, 0.04), (5.0, 0.04)],
+            finstack_quant_core::math::Compounding::Continuous,
+            DayCount::Act365F,
+            finstack_quant_core::math::interp::InterpStyle::LogLinear,
+            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+        )
+        .unwrap();
         let mut market = MarketContext::new().insert(curve);
         let spec = regression_scenario(
             "overlapping",
@@ -506,9 +522,17 @@ fn interpolate_delivers_overlapping_tenors_and_exact_pillars_together() {
                 )
                 .unwrap();
             let t = if tenor == "3Y" { 3.0 } else { t };
-            assert!((shocked.rate(t) - 0.04 - bp * 1e-4).abs() < 1e-12);
+            assert!((projection_zero(&shocked, t) - 0.04 - bp * 1e-4).abs() < 1e-11);
         }
     }
+}
+
+/// Continuously compounded projection zero rate `-ln(P(t)) / t`.
+fn projection_zero(
+    curve: &finstack_quant_core::market_data::term_structures::ForwardCurve,
+    t: f64,
+) -> f64 {
+    -curve.df(t).unwrap().ln() / t
 }
 
 fn regression_scenario(id: &str, operations: Vec<OperationSpec>) -> ScenarioSpec {

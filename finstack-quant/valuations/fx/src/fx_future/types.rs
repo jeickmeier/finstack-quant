@@ -253,11 +253,17 @@ mod tests {
         let domestic = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, (-0.04_f64).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("domestic curve");
         let foreign = DiscountCurve::builder("EUR-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (1.0, (-0.02_f64).exp())])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("foreign curve");
         let market = MarketContext::new().insert(domestic).insert(foreign);

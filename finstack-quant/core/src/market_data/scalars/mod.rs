@@ -6,14 +6,16 @@
 //!
 //! # Examples
 //! ```rust
-//! use finstack_quant_core::market_data::scalars::{MarketScalar, ScalarTimeSeries, SeriesInterpolation};
+//! use finstack_quant_core::market_data::scalars::{
+//!     MarketScalar, ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+//! };
 //! use finstack_quant_core::currency::Currency;
 //! use time::macros::date;
 //! # fn main() -> finstack_quant_core::Result<()> {
 //!
 //! // 1. Store a spot quote as a scalar
-//! let spot = MarketScalar::Price(finstack_quant_core::money::Money::new(101.5, Currency::USD).expect("valid money fixture"));
-//! if let MarketScalar::Price(m) = &spot {
+//! let spot = MarketScalar::price(finstack_quant_core::money::Money::new(101.5, Currency::USD).expect("valid money fixture"));
+//! if let Some(m) = spot.get_price() {
 //!     assert_eq!(m.currency(), Currency::USD);
 //! }
 //!
@@ -25,11 +27,11 @@
 //!         (date!(2024 - 02 - 29), 101.0),
 //!     ],
 //!     None,
-//! )
-//! ?
-//! .with_interpolation(SeriesInterpolation::Linear);
+//!     SeriesInterpolation::Linear,
+//!     SeriesExtrapolation::Error,
+//! )?;
 //! let mid = date!(2024 - 02 - 14);
-//! let value = ts.value_on(mid)?;
+//! let value = ts.get_value(mid)?;
 //! assert!(value > 100.0 && value < 101.0);
 //! # Ok(())
 //! # }
@@ -38,8 +40,10 @@
 /// Generic market primitives: scalars and ad-hoc time series.
 mod primitives;
 
-/// Inflation index data (CPI/RPI) with lagging and seasonality support.
+/// Monthly CPI/RPI observation snapshots with explicit release availability.
 mod inflation_index;
 
-pub use inflation_index::{InflationIndex, InflationLag};
-pub use primitives::{MarketScalar, ScalarTimeSeries, SeriesInterpolation};
+pub use inflation_index::{
+    InflationExpectedRelease, InflationIndex, InflationLag, InflationObservation,
+};
+pub use primitives::{MarketScalar, ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation};

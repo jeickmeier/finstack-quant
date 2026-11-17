@@ -521,7 +521,7 @@ def hw1f_cap_floor_price(
     >>> import datetime
     >>> from finstack_quant.core.market_data import DiscountCurve
     >>> from finstack_quant.models.rates.hull_white import hw1f_cap_floor_price
-    >>> curve = DiscountCurve.flat("USD-OIS", datetime.date(2025, 1, 1), 0.03)
+    >>> curve = DiscountCurve.flat("USD-OIS", datetime.date(2025, 1, 1), 0.03, "act_365f")
     >>> cap = hw1f_cap_floor_price(0.05, 0.01, [(1.0, 2.0, 1.0)], 0.03, True, curve, curve)
     >>> floor = hw1f_cap_floor_price(0.05, 0.01, [(1.0, 2.0, 1.0)], 0.03, False, curve, curve)
     >>> cap > 0.0 and floor > 0.0

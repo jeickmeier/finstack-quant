@@ -46,7 +46,7 @@ unconditional dependency. A few convenience entry points (`EuropeanPricer`,
 | `closed_form` | Black-Scholes/Black-76, implied volatility, exotics, and Heston Fourier formulas |
 | `fourier` | Characteristic-function models and the product-independent COS pricing engine |
 | `rates` | Interest-rate models: Hull-White parameters and pricing kernels, the HW1F Monte Carlo and LSMC engines (`rates::hw1f`), plus Diebold-Li and PCA dynamic term structures |
-| `volatility` | SABR parameters, smile, and calibration; FX ATM / risk-reversal / butterfly quote conversion (`FxVolSurfaceBuilder`, `get_fx_delta_vol`) |
+| `volatility` | SABR parameters, smile, and calibration; FX ATM / risk-reversal / butterfly quote conversion (`get_fx_delta_vol`, `materialize_fx_delta_surface`) |
 | `liquidity` | Roll and Amihud estimators, days-to-liquidate tiering, Bangia LVaR, Almgren-Chriss execution impact, and Kyle lambda |
 | `pde` | One- and two-dimensional grids, steppers, and solvers |
 | `trees` | Equity, short-rate, and multi-factor tree engines |

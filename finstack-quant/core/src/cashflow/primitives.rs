@@ -490,17 +490,29 @@ impl CashFlowAccrual {
     }
 
     /// Check this accrual slice: actual endpoints strictly increasing, a
-    /// strictly increasing reference coupon period when present, and a finite
-    /// projected index rate when present (record CORE-CONVENTIONS-015 #7, #9).
+    /// strictly increasing reference coupon period when present, a finite
+    /// projected index rate when present, and all context inputs required by
+    /// `day_count` (record CORE-CONVENTIONS-015 #7, #9, #10).
+    ///
+    /// For `DayCount::Bus252`, the holiday calendar ID must be present and
+    /// resolve in the registry (date-range coverage stays at calculation time).
+    /// Non-`Bus252` conventions do not resolve `calendar_id` at storage time.
+    /// For `DayCount::Act365L`, enclosing `coupon_period` containment over
+    /// `[start, end]` is verified here. For `DayCount::ActActIsma`, the
+    /// nominal reference `coupon_period` must reproduce one month grid of
+    /// `frequency` and overlap `[start, end]` (admitting regular periods,
+    /// adjusted-boundary spillovers, and multi-period long stubs).
     ///
     /// # Errors
     ///
-    /// Returns a validation error for an inverted or empty interval and a
-    /// non-finite-value error for a non-finite projected rate.
+    /// Returns a validation or input error for an inverted or empty interval,
+    /// a non-finite projected rate, missing or invalid convention context,
+    /// an unknown `Bus252` calendar identifier, or an `Act365L`/`ActActIsma`
+    /// slice incompatible with its reference coupon period.
     pub fn validate(&self) -> crate::Result<()> {
         if self
             .context
-            .coupon_period
+            .get_coupon_period()
             .is_some_and(|(start, end)| start >= end)
         {
             return Err(crate::Error::Validation(
@@ -519,6 +531,40 @@ impl CashFlowAccrual {
                 kind: NonFiniteKind::classify(projected_index_rate),
             }
             .into());
+        }
+        let calendar = match self.day_count {
+            DayCount::Bus252 => {
+                let id = self
+                    .context
+                    .get_calendar_id()
+                    .ok_or(InputError::MissingCalendarForBus252)?;
+                Some(crate::dates::calendar_by_id_strict(id)?)
+            }
+            _ => None,
+        };
+        let ctx = DayCountContext {
+            calendar,
+            frequency: self.context.get_frequency(),
+            bus_basis: self.context.get_bus_basis(),
+            coupon_period: self.context.get_coupon_period(),
+            end_is_termination_date: self.context.get_end_is_termination_date(),
+        };
+        self.day_count.validate_context(ctx)?;
+        match self.day_count {
+            DayCount::Act365L => {
+                self.day_count.year_fraction(self.start, self.end, ctx)?;
+            }
+            DayCount::ActActIsma => {
+                if let Some((period_start, period_end)) = self.context.get_coupon_period()
+                    && (self.start >= period_end || period_start >= self.end)
+                {
+                    return Err(crate::Error::Validation(format!(
+                        "ACT/ACT ISMA accrual [{}, {}] must overlap reference coupon_period [{period_start}, {period_end}]",
+                        self.start, self.end
+                    )));
+                }
+            }
+            _ => {}
         }
         Ok(())
     }

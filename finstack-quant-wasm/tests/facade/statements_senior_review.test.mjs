@@ -157,10 +157,11 @@ test('suite validation and execution reject negative thresholds', () => {
 
 test('waterfall validation requires funded prepayment and sweep priorities', () => {
   const waterfall = {
-    priority_of_payments: ['fees', 'interest', 'amortization', 'equity'],
     available_cash_node: 'cash',
-    mandatory_prepay_node: 'prepay',
   };
+  const defaults = JSON.parse(statements.validateWaterfallSpecJson(JSON.stringify(waterfall)));
+  assert.deepEqual(defaults.priority_of_payments, ['fees', 'interest', 'amortization', 'equity']);
+  waterfall.mandatory_prepay_node = 'prepay';
   assert.throws(
     () => statements.validateWaterfallSpecJson(JSON.stringify(waterfall)),
     /MandatoryPrepayment|mandatory_prepay/i
@@ -170,6 +171,13 @@ test('waterfall validation requires funded prepayment and sweep priorities', () 
   assert.throws(
     () => statements.validateWaterfallSpecJson(JSON.stringify(waterfall)),
     /Sweep|sweep/i
+  );
+  waterfall.priority_of_payments = ['fees', 'interest', 'amortization', 'sweep', 'equity'];
+  assert.doesNotThrow(() => statements.validateWaterfallSpecJson(JSON.stringify(waterfall)));
+  delete waterfall.ecf_sweep;
+  assert.throws(
+    () => statements.validateWaterfallSpecJson(JSON.stringify(waterfall)),
+    /requires `ecf_sweep`/
   );
 });
 
@@ -186,7 +194,10 @@ for (const [name, side, fixedRate, forwardRate] of [
     swap.side = side;
     swap.fixed_leg.rate = fixedRate;
     const forward = fixture.market.curves.find((curve) => curve.type === 'forward');
-    forward.knot_points = forward.knot_points.map(([time]) => [time, forwardRate]);
+    forward.knot_points = forward.knot_points.map(([time]) => [
+      time,
+      Math.exp(-forwardRate * time),
+    ]);
     const result = evaluateModelWithMarket(
       JSON.stringify(fixture.model),
       JSON.stringify(fixture.market),

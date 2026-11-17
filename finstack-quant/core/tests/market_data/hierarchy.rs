@@ -1,42 +1,38 @@
-//! Tests for the surrounding crate component and its documented behavior.
-//!
+//! Tests for `MarketDataHierarchy`, builder, strict validation, and preorder resolution.
+
+use finstack_quant_core::market_data::bumps::MarketDataTarget;
 use finstack_quant_core::market_data::hierarchy::{
-    HierarchyTarget, MarketDataHierarchy, ResolutionMode, TagFilter, TagPredicate,
+    HierarchyTarget, MarketDataHierarchy, ResolvedTargetMatch, TagFilter, TagPredicate,
 };
 use finstack_quant_core::types::CurveId;
 
-/// Curve ids a target resolves to, in traversal order.
-fn resolved_ids(
-    h: &MarketDataHierarchy,
-    target: &HierarchyTarget,
-    mode: ResolutionMode,
-) -> Vec<CurveId> {
-    h.resolve_matches(target, mode)
+fn resolved_matches(h: &MarketDataHierarchy, target: &HierarchyTarget) -> Vec<ResolvedTargetMatch> {
+    h.resolve_matches(target)
+        .expect("target resolution should succeed")
+}
+
+fn resolved_ids(h: &MarketDataHierarchy, target: &HierarchyTarget) -> Vec<CurveId> {
+    resolved_matches(h, target)
         .into_iter()
-        .map(|matched| matched.curve_id)
+        .map(|matched| matched.target.id().clone())
         .collect()
 }
 
-/// Root node names, read from the hierarchy's wire form.
 fn root_names(h: &MarketDataHierarchy) -> Vec<String> {
     serde_json::to_value(h).unwrap()["roots"]
-        .as_object()
+        .as_array()
         .unwrap()
-        .keys()
-        .cloned()
+        .iter()
+        .map(|entry| entry["name"].as_str().unwrap().to_string())
         .collect()
 }
 
-/// Every curve id in the hierarchy (the subtree of each root).
-fn all_ids(h: &MarketDataHierarchy) -> Vec<CurveId> {
+fn all_targets(h: &MarketDataHierarchy) -> Vec<MarketDataTarget> {
     root_names(h)
         .into_iter()
         .flat_map(|root| {
-            let target = HierarchyTarget {
-                path: vec![root],
-                tag_filter: None,
-            };
-            resolved_ids(h, &target, ResolutionMode::Cumulative)
+            let target = HierarchyTarget::unfiltered(vec![root]).unwrap();
+            resolved_matches(h, &target).into_iter().map(|m| m.target)
         })
         .collect()
 }
@@ -45,6 +41,7 @@ fn all_ids(h: &MarketDataHierarchy) -> Vec<CurveId> {
 fn empty_hierarchy_has_no_roots() {
     let h = MarketDataHierarchy::default();
     assert!(root_names(&h).is_empty());
+    assert!(h.roots().is_empty());
 }
 
 #[test]
@@ -56,34 +53,40 @@ fn hierarchy_node_built_from_a_path_starts_empty() {
     let node = h
         .get_node(&["Rates".to_string(), "USD".to_string()])
         .expect("USD node");
-    assert!(node.curve_ids().is_empty());
+    assert!(node.targets().is_empty());
     assert!(node.children().is_empty());
     assert!(node.tags().is_empty());
 }
 
 #[test]
-fn builder_creates_hierarchy_with_slash_paths() {
+fn builder_creates_hierarchy_with_slash_paths_and_typed_targets() {
     let h = MarketDataHierarchy::builder()
         .add_node("Rates/USD/OIS")
-        .curve_ids(&["USD-OIS"])
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("USD-OIS")))
         .add_node("Rates/USD/Forward/SOFR")
-        .curve_ids(&["USD-SOFR-3M", "USD-SOFR-6M"])
+        .targets([
+            MarketDataTarget::ForwardCurve(CurveId::from("USD-SOFR-3M")),
+            MarketDataTarget::ForwardCurve(CurveId::from("USD-SOFR-6M")),
+        ])
         .add_node("Credit/US/IG/Financials")
         .tag("sector", "Financials")
         .tag("rating", "A")
-        .curve_ids(&["JPM-5Y", "GS-5Y"])
+        .targets([
+            MarketDataTarget::HazardCurve(CurveId::from("JPM-5Y")),
+            MarketDataTarget::HazardCurve(CurveId::from("GS-5Y")),
+        ])
         .build()
         .unwrap();
 
     let roots = root_names(&h);
-    assert_eq!(roots.len(), 2);
-    assert!(roots.contains(&"Rates".to_string()));
-    assert!(roots.contains(&"Credit".to_string()));
+    assert_eq!(roots, vec!["Rates".to_string(), "Credit".to_string()]);
 
     let path: Vec<String> = vec!["Rates".into(), "USD".into(), "OIS".into()];
     let node = h.get_node(&path).unwrap();
-    assert_eq!(node.curve_ids().len(), 1);
-    assert_eq!(node.curve_ids()[0], CurveId::from("USD-OIS"));
+    assert_eq!(
+        node.targets(),
+        &[MarketDataTarget::DiscountCurve(CurveId::from("USD-OIS"))]
+    );
 
     let credit_path: Vec<String> = vec![
         "Credit".into(),
@@ -97,74 +100,169 @@ fn builder_creates_hierarchy_with_slash_paths() {
 }
 
 #[test]
-fn builder_rejects_duplicate_curve_ids() {
+fn builder_rejects_duplicate_exact_targets() {
     let result = MarketDataHierarchy::builder()
         .add_node("Rates/USD")
-        .curve_ids(&["USD-OIS"])
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("USD-OIS")))
         .add_node("Credit/US")
-        .curve_ids(&["USD-OIS"]) // duplicate!
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("USD-OIS")))
         .build();
 
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();
     assert!(
         err.contains("USD-OIS"),
-        "Error should mention the duplicate: {err}"
+        "Error should mention the duplicate target: {err}"
     );
 }
 
 #[test]
-fn builder_rejects_invalid_paths_without_panicking() {
-    for path in ["", "Rates/", "Rates//USD"] {
-        let result = std::panic::catch_unwind(|| {
-            MarketDataHierarchy::builder()
-                .add_node(path)
-                .curve_ids(&["USD-OIS"])
-                .build()
-        });
+fn same_raw_id_allowed_across_distinct_target_namespaces() {
+    let h = MarketDataHierarchy::builder()
+        .add_node("Equity/SPX")
+        .targets([
+            MarketDataTarget::PriceScalar(CurveId::from("SPX")),
+            MarketDataTarget::VolSurface(CurveId::from("SPX")),
+        ])
+        .build()
+        .expect("distinct namespaces with same raw ID should coexist");
 
-        let build_result = result.unwrap_or_else(|_| {
-            panic!("builder should reject invalid path {path:?} with an error, not panic")
-        });
+    let matches = resolved_matches(
+        &h,
+        &HierarchyTarget::unfiltered(vec!["Equity".into()]).unwrap(),
+    );
+    assert_eq!(matches.len(), 2);
+    assert_eq!(
+        matches[0].target,
+        MarketDataTarget::PriceScalar(CurveId::from("SPX"))
+    );
+    assert_eq!(
+        matches[1].target,
+        MarketDataTarget::VolSurface(CurveId::from("SPX"))
+    );
+}
+
+#[test]
+fn builder_rejects_invalid_paths_and_is_sticky() {
+    for path in ["", "Rates/", "Rates//USD", "   ", "Rates/   "] {
+        let build_result = MarketDataHierarchy::builder()
+            .add_node(path)
+            .target(MarketDataTarget::DiscountCurve(CurveId::from("USD-OIS")))
+            .build();
         assert!(
             build_result.is_err(),
             "builder should reject invalid path {path:?}"
         );
     }
+
+    // Subsequent valid add_node calls must not clear earlier sticky errors.
+    let sticky = MarketDataHierarchy::builder()
+        .add_node("Rates//USD")
+        .add_node("Rates/USD")
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("USD-OIS")))
+        .build();
+    assert!(sticky.is_err());
+
+    // Setting tags or targets without an active node must error rather than no-op.
+    assert!(
+        MarketDataHierarchy::builder()
+            .tag("desk", "rates")
+            .build()
+            .is_err()
+    );
+    assert!(
+        MarketDataHierarchy::builder()
+            .target(MarketDataTarget::DiscountCurve(CurveId::from("USD-OIS")))
+            .build()
+            .is_err()
+    );
+    assert!(
+        MarketDataHierarchy::builder()
+            .add_node("Rates/USD")
+            .tag("   ", "rates")
+            .build()
+            .is_err()
+    );
+}
+
+#[test]
+fn builder_preserves_non_blank_whitespace_in_segments() {
+    let h = MarketDataHierarchy::builder()
+        .add_node("Credit/ US ")
+        .target(MarketDataTarget::HazardCurve(CurveId::from("JPM-5Y")))
+        .build()
+        .expect("segment with surrounding spaces must be preserved verbatim");
+
+    assert!(
+        h.get_node(&["Credit".into(), "US".into()]).is_none(),
+        "segments must not be trimmed"
+    );
+    let node = h
+        .get_node(&["Credit".into(), " US ".into()])
+        .expect("exact untrimmed segment lookup");
+    assert_eq!(node.targets().len(), 1);
 }
 
 #[test]
 fn root_resolution_collects_entire_tree() {
     let h = MarketDataHierarchy::builder()
         .add_node("Rates/USD/OIS")
-        .curve_ids(&["USD-OIS"])
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("USD-OIS")))
         .add_node("Rates/EUR/ESTR")
-        .curve_ids(&["EUR-ESTR"])
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("EUR-ESTR")))
         .add_node("Credit/US/IG")
-        .curve_ids(&["JPM-5Y"])
+        .target(MarketDataTarget::HazardCurve(CurveId::from("JPM-5Y")))
         .build()
         .unwrap();
 
-    let all = all_ids(&h);
-    assert_eq!(all.len(), 3);
+    assert_eq!(all_targets(&h).len(), 3);
+}
+
+#[test]
+fn numeric_root_and_child_names_preserve_authored_order() {
+    let h = MarketDataHierarchy::builder()
+        .add_node("2/10")
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("C-2-10")))
+        .add_node("2/1")
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("C-2-1")))
+        .add_node("1")
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("C-1")))
+        .build()
+        .unwrap();
+
+    let json = h.to_json().unwrap();
+    let restored = MarketDataHierarchy::from_json(&json).unwrap();
+    assert_eq!(root_names(&restored), vec!["2", "1"]);
+
+    let children_of_2: Vec<&str> = restored
+        .get_node(&["2".into()])
+        .unwrap()
+        .children()
+        .iter()
+        .map(|entry| entry.name.as_str())
+        .collect();
+    assert_eq!(children_of_2, vec!["10", "1"]);
 }
 
 #[test]
 fn serde_round_trip() {
     let h = MarketDataHierarchy::builder()
         .add_node("Rates/USD/OIS")
-        .curve_ids(&["USD-OIS"])
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("USD-OIS")))
         .add_node("Credit/US/IG/Financials")
         .tag("sector", "Financials")
-        .curve_ids(&["JPM-5Y", "GS-5Y"])
+        .targets([
+            MarketDataTarget::HazardCurve(CurveId::from("JPM-5Y")),
+            MarketDataTarget::HazardCurve(CurveId::from("GS-5Y")),
+        ])
         .build()
         .unwrap();
 
-    let json = serde_json::to_string_pretty(&h).unwrap();
-    let deserialized: MarketDataHierarchy = serde_json::from_str(&json).unwrap();
+    let json = h.to_json().unwrap();
+    let deserialized = MarketDataHierarchy::from_json(&json).unwrap();
 
-    assert_eq!(root_names(&deserialized).len(), root_names(&h).len());
-    assert_eq!(all_ids(&deserialized).len(), all_ids(&h).len());
+    assert_eq!(root_names(&deserialized), root_names(&h));
+    assert_eq!(all_targets(&deserialized), all_targets(&h));
 
     let path: Vec<String> = vec![
         "Credit".into(),
@@ -174,430 +272,329 @@ fn serde_round_trip() {
     ];
     let node = deserialized.get_node(&path).unwrap();
     assert_eq!(node.tags().get("sector").unwrap(), "Financials");
-    assert_eq!(node.curve_ids().len(), 2);
+    assert_eq!(node.targets().len(), 2);
+}
+
+#[test]
+fn json_loader_rejects_duplicate_siblings_and_duplicate_keys() {
+    let dup_roots = r#"{
+        "roots": [
+            {"name": "Rates", "node": {}},
+            {"name": "Rates", "node": {}}
+        ]
+    }"#;
+    assert!(MarketDataHierarchy::from_json(dup_roots).is_err());
+
+    let dup_children = r#"{
+        "roots": [{
+            "name": "Rates",
+            "node": {
+                "children": [
+                    {"name": "USD", "node": {}},
+                    {"name": "USD", "node": {}}
+                ]
+            }
+        }]
+    }"#;
+    assert!(MarketDataHierarchy::from_json(dup_children).is_err());
+
+    let dup_tags = r#"{
+        "roots": [{
+            "name": "Rates",
+            "node": {
+                "tags": {"desk": "a", "desk": "b"}
+            }
+        }]
+    }"#;
+    assert!(MarketDataHierarchy::from_json(dup_tags).is_err());
+    assert!(serde_json::from_str::<MarketDataHierarchy>(dup_tags).is_err());
 }
 
 // ─── Resolution engine tests ─────────────────────────────────────────────────
 
-/// Build a hierarchy where both `Credit` and `Credit/US` match the same tag
-/// filter, so inherited-subtree matching produces duplicate occurrences for the
-/// descendant curve without requiring invalid duplicate placements in the tree.
-fn hierarchy_with_overlapping_tag_matches() -> MarketDataHierarchy {
-    MarketDataHierarchy::builder()
+#[test]
+fn resolve_emits_unique_targets_in_preorder_with_deepest_matching_ancestor() {
+    // Both `Credit` and `Credit/US` match `Exists(scope)`. JPM-5Y must be emitted
+    // once (not twice), with deepest matching ancestor `Credit/US` (depth 2).
+    // Meanwhile `Credit/B` matches at `Credit` (depth 1) and must keep preorder after `Credit/US`.
+    let h = MarketDataHierarchy::builder()
         .add_node("Credit")
         .tag("scope", "all")
-        .curve_ids(&[])
+        .target(MarketDataTarget::HazardCurve(CurveId::from("ROOT-CDS")))
         .add_node("Credit/US")
         .tag("scope", "us")
-        .curve_ids(&[])
         .add_node("Credit/US/IG")
-        .curve_ids(&["JPM-5Y"])
-        .build()
-        .unwrap()
-}
-
-#[test]
-fn resolve_most_specific_wins_deduplicates_by_depth() {
-    let h = hierarchy_with_overlapping_tag_matches();
-
-    let target = HierarchyTarget {
-        path: vec!["Credit".into()],
-        tag_filter: Some(TagFilter {
-            predicates: vec![TagPredicate::Exists {
-                key: "scope".into(),
-            }],
-        }),
-    };
-    let mut ids = resolved_ids(&h, &target, ResolutionMode::MostSpecificWins);
-    ids.sort();
-
-    // `Credit` and `Credit/US` both match the filter, so inherited-subtree
-    // matching sees JPM-5Y twice. MostSpecificWins should keep only the deeper
-    // `Credit/US` match.
-    assert_eq!(
-        ids.len(),
-        1,
-        "expected 1 distinct curve, got {}: {:?}",
-        ids.len(),
-        ids
-    );
-    assert_eq!(ids[0], CurveId::from("JPM-5Y"));
-}
-
-#[test]
-fn resolve_cumulative_returns_all_occurrences() {
-    let h = hierarchy_with_overlapping_tag_matches();
-
-    let target = HierarchyTarget {
-        path: vec!["Credit".into()],
-        tag_filter: Some(TagFilter {
-            predicates: vec![TagPredicate::Exists {
-                key: "scope".into(),
-            }],
-        }),
-    };
-    let ids = resolved_ids(&h, &target, ResolutionMode::Cumulative);
-
-    // `Credit` and `Credit/US` both match the filter, so JPM-5Y is collected
-    // once from each matching subtree.
-    assert_eq!(
-        ids.len(),
-        2,
-        "expected 2 total curve entries (including duplicates), got {}: {:?}",
-        ids.len(),
-        ids
-    );
-    assert!(ids.iter().all(|id| *id == "JPM-5Y"));
-}
-
-#[test]
-fn resolve_returns_empty_for_nonexistent_path() {
-    let h = MarketDataHierarchy::builder()
-        .add_node("Rates/USD")
-        .curve_ids(&["USD-OIS"])
+        .target(MarketDataTarget::HazardCurve(CurveId::from("JPM-5Y")))
+        .add_node("Credit/B")
+        .target(MarketDataTarget::HazardCurve(CurveId::from("B-CDS")))
         .build()
         .unwrap();
 
-    let target = HierarchyTarget {
-        path: vec!["Nonexistent".into()],
+    let target = HierarchyTarget::new(
+        vec!["Credit".into()],
+        Some(TagFilter {
+            predicates: vec![TagPredicate::Exists {
+                key: "scope".into(),
+            }],
+        }),
+    )
+    .unwrap();
+
+    let matches = resolved_matches(&h, &target);
+    assert_eq!(
+        matches,
+        vec![
+            ResolvedTargetMatch {
+                target: MarketDataTarget::HazardCurve(CurveId::from("ROOT-CDS")),
+                matched_depth: 1,
+                matched_path: vec!["Credit".into()],
+            },
+            ResolvedTargetMatch {
+                target: MarketDataTarget::HazardCurve(CurveId::from("JPM-5Y")),
+                matched_depth: 2,
+                matched_path: vec!["Credit".into(), "US".into()],
+            },
+            ResolvedTargetMatch {
+                target: MarketDataTarget::HazardCurve(CurveId::from("B-CDS")),
+                matched_depth: 1,
+                matched_path: vec!["Credit".into()],
+            },
+        ]
+    );
+}
+
+#[test]
+fn resolve_treats_empty_tag_filter_identically_to_none() {
+    let h = MarketDataHierarchy::builder()
+        .add_node("Credit/US/IG")
+        .target(MarketDataTarget::HazardCurve(CurveId::from("JPM-5Y")))
+        .build()
+        .unwrap();
+
+    let none_target = HierarchyTarget {
+        path: vec!["Credit".into()],
         tag_filter: None,
     };
-    assert!(resolved_ids(&h, &target, ResolutionMode::MostSpecificWins).is_empty());
-    assert!(resolved_ids(&h, &target, ResolutionMode::Cumulative).is_empty());
+    let empty_target = HierarchyTarget {
+        path: vec!["Credit".into()],
+        tag_filter: Some(TagFilter { predicates: vec![] }),
+    };
+
+    assert_eq!(none_target, empty_target);
+    assert_eq!(
+        serde_json::to_string(&none_target).unwrap(),
+        serde_json::to_string(&empty_target).unwrap()
+    );
+    assert_eq!(
+        resolved_matches(&h, &none_target),
+        resolved_matches(&h, &empty_target)
+    );
+    assert_eq!(resolved_matches(&h, &empty_target)[0].matched_depth, 1);
+
+    let from_json =
+        HierarchyTarget::from_json(r#"{"path":["Credit"],"tag_filter":{"predicates":[]}}"#)
+            .unwrap();
+    assert!(from_json.tag_filter.is_none());
 }
 
 #[test]
-fn resolve_with_tag_filter_finds_curves_where_node_tag_matches() {
+fn resolve_errors_on_nonexistent_path_and_zero_matches() {
     let h = MarketDataHierarchy::builder()
-        .add_node("Credit/US/IG/Financials")
-        .tag("sector", "Financials")
-        .curve_ids(&["JPM-5Y", "GS-5Y"])
-        .add_node("Credit/US/IG/Technology")
-        .tag("sector", "Technology")
-        .curve_ids(&["MSFT-5Y"])
-        .add_node("Rates/USD/OIS")
-        .curve_ids(&["USD-OIS"])
+        .add_node("Rates/USD")
+        .target(MarketDataTarget::DiscountCurve(CurveId::from("USD-OIS")))
         .build()
         .unwrap();
 
-    let target = HierarchyTarget {
-        path: vec!["Credit".into()],
-        tag_filter: Some(TagFilter {
-            predicates: vec![TagPredicate::Equals {
-                key: "sector".into(),
-                value: "Financials".into(),
+    let missing = HierarchyTarget::unfiltered(vec!["Nonexistent".into()]).unwrap();
+    assert!(h.resolve_matches(&missing).is_err());
+
+    let no_tag_match = HierarchyTarget::new(
+        vec!["Rates".into()],
+        Some(TagFilter {
+            predicates: vec![TagPredicate::Exists {
+                key: "nonexistent".into(),
             }],
         }),
-    };
-
-    let mut ids = resolved_ids(&h, &target, ResolutionMode::MostSpecificWins);
-    ids.sort();
-
-    assert_eq!(ids.len(), 2);
-    assert!(ids.contains(&CurveId::from("JPM-5Y")));
-    assert!(ids.contains(&CurveId::from("GS-5Y")));
-    assert!(!ids.contains(&CurveId::from("MSFT-5Y")));
-    assert!(!ids.contains(&CurveId::from("USD-OIS")));
+    )
+    .unwrap();
+    assert!(h.resolve_matches(&no_tag_match).is_err());
 }
 
 #[test]
-fn resolve_with_tag_filter_includes_descendant_curves_of_matching_parent() {
+fn resolve_with_tag_filter_includes_descendants_of_matching_parent_even_if_child_differs() {
     let h = MarketDataHierarchy::builder()
         .add_node("Credit/US")
         .tag("region", "us")
-        .curve_ids(&[])
-        .add_node("Credit/US/IG")
-        .curve_ids(&["JPM-5Y"])
+        .add_node("Credit/US/Sub")
+        .tag("region", "eu")
+        .target(MarketDataTarget::HazardCurve(CurveId::from("JPM-5Y")))
         .build()
         .unwrap();
 
-    let target = HierarchyTarget {
-        path: vec!["Credit".into()],
-        tag_filter: Some(TagFilter {
+    let target = HierarchyTarget::new(
+        vec!["Credit".into()],
+        Some(TagFilter {
             predicates: vec![TagPredicate::Equals {
                 key: "region".into(),
                 value: "us".into(),
             }],
         }),
-    };
+    )
+    .unwrap();
 
-    let ids = resolved_ids(&h, &target, ResolutionMode::MostSpecificWins);
-    assert_eq!(ids, vec![CurveId::from("JPM-5Y")]);
+    // Subtree inclusion under matching parent `Credit/US` retains descendants.
+    let matches = resolved_matches(&h, &target);
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0].target.id(), &CurveId::from("JPM-5Y"));
+    assert_eq!(matches[0].matched_path, vec!["Credit", "US"]);
 }
 
 #[test]
-fn tag_predicate_equals_matches_exact_value_only() {
+fn multi_predicate_filter_evaluates_locally_per_node() {
+    // Parent has region=us, child has only rating=A; neither node satisfies BOTH locally.
     let h = MarketDataHierarchy::builder()
+        .add_node("Credit/US")
+        .tag("region", "us")
         .add_node("Credit/US/IG")
         .tag("rating", "A")
-        .curve_ids(&["JPM-5Y"])
-        .add_node("Credit/EU/HY")
-        .tag("rating", "BB")
-        .curve_ids(&["PEUGEOT-3Y"])
+        .target(MarketDataTarget::HazardCurve(CurveId::from("JPM-5Y")))
         .build()
         .unwrap();
 
-    let target = HierarchyTarget {
-        path: vec!["Credit".into()],
-        tag_filter: Some(TagFilter {
+    let target = HierarchyTarget::new(
+        vec!["Credit".into()],
+        Some(TagFilter {
+            predicates: vec![
+                TagPredicate::Equals {
+                    key: "region".into(),
+                    value: "us".into(),
+                },
+                TagPredicate::Equals {
+                    key: "rating".into(),
+                    value: "A".into(),
+                },
+            ],
+        }),
+    )
+    .unwrap();
+
+    assert!(h.resolve_matches(&target).is_err());
+}
+
+#[test]
+fn tag_predicates_and_in_empty_semantics() {
+    let h = MarketDataHierarchy::builder()
+        .add_node("Credit/US/IG")
+        .tag("rating", "A")
+        .tag("sector", "Financials")
+        .target(MarketDataTarget::HazardCurve(CurveId::from("JPM-5Y")))
+        .add_node("Credit/EU/IG")
+        .tag("rating", "AA")
+        .tag("sector", "Industrials")
+        .target(MarketDataTarget::HazardCurve(CurveId::from("SIEMENS-5Y")))
+        .add_node("Credit/EU/HY")
+        .tag("rating", "BB")
+        .target(MarketDataTarget::HazardCurve(CurveId::from("PEUGEOT-3Y")))
+        .build()
+        .unwrap();
+
+    let eq_target = HierarchyTarget::new(
+        vec!["Credit".into()],
+        Some(TagFilter {
             predicates: vec![TagPredicate::Equals {
                 key: "rating".into(),
                 value: "A".into(),
             }],
         }),
-    };
-    let ids = resolved_ids(&h, &target, ResolutionMode::MostSpecificWins);
-    assert_eq!(ids.len(), 1);
-    assert_eq!(ids[0], CurveId::from("JPM-5Y"));
+    )
+    .unwrap();
+    assert_eq!(resolved_ids(&h, &eq_target), vec![CurveId::from("JPM-5Y")]);
 
-    // A predicate for a value that doesn't exist should return nothing.
-    let target_none = HierarchyTarget {
-        path: vec!["Credit".into()],
-        tag_filter: Some(TagFilter {
-            predicates: vec![TagPredicate::Equals {
-                key: "rating".into(),
-                value: "AAA".into(),
-            }],
-        }),
-    };
-    assert!(resolved_ids(&h, &target_none, ResolutionMode::MostSpecificWins).is_empty());
-}
-
-#[test]
-fn tag_predicate_in_matches_any_of_the_given_values() {
-    let h = MarketDataHierarchy::builder()
-        .add_node("Credit/US/IG")
-        .tag("rating", "A")
-        .curve_ids(&["JPM-5Y"])
-        .add_node("Credit/EU/IG")
-        .tag("rating", "AA")
-        .curve_ids(&["SIEMENS-5Y"])
-        .add_node("Credit/EU/HY")
-        .tag("rating", "BB")
-        .curve_ids(&["PEUGEOT-3Y"])
-        .build()
-        .unwrap();
-
-    let target = HierarchyTarget {
-        path: vec!["Credit".into()],
-        tag_filter: Some(TagFilter {
+    let in_target = HierarchyTarget::new(
+        vec!["Credit".into()],
+        Some(TagFilter {
             predicates: vec![TagPredicate::In {
                 key: "rating".into(),
                 values: vec!["A".into(), "AA".into()],
             }],
         }),
-    };
-    let mut ids = resolved_ids(&h, &target, ResolutionMode::MostSpecificWins);
-    ids.sort();
+    )
+    .unwrap();
+    assert_eq!(
+        resolved_ids(&h, &in_target),
+        vec![CurveId::from("JPM-5Y"), CurveId::from("SIEMENS-5Y")]
+    );
 
-    assert_eq!(ids.len(), 2);
-    assert!(ids.contains(&CurveId::from("JPM-5Y")));
-    assert!(ids.contains(&CurveId::from("SIEMENS-5Y")));
-    assert!(!ids.contains(&CurveId::from("PEUGEOT-3Y")));
-}
+    let in_empty = HierarchyTarget::new(
+        vec!["Credit".into()],
+        Some(TagFilter {
+            predicates: vec![TagPredicate::In {
+                key: "rating".into(),
+                values: vec![],
+            }],
+        }),
+    )
+    .unwrap();
+    assert!(h.resolve_matches(&in_empty).is_err());
 
-#[test]
-fn tag_predicate_exists_matches_key_regardless_of_value() {
-    let h = MarketDataHierarchy::builder()
-        .add_node("Credit/US/IG")
-        .tag("sector", "Financials")
-        .curve_ids(&["JPM-5Y"])
-        .add_node("Credit/EU/IG")
-        .tag("sector", "Industrials")
-        .curve_ids(&["BASF-5Y"])
-        .add_node("Credit/Sovereign")
-        // No sector tag
-        .curve_ids(&["UST-10Y"])
-        .build()
-        .unwrap();
-
-    let target = HierarchyTarget {
-        path: vec!["Credit".into()],
-        tag_filter: Some(TagFilter {
+    let exists_target = HierarchyTarget::new(
+        vec!["Credit".into()],
+        Some(TagFilter {
             predicates: vec![TagPredicate::Exists {
                 key: "sector".into(),
             }],
         }),
-    };
-    let mut ids = resolved_ids(&h, &target, ResolutionMode::MostSpecificWins);
-    ids.sort();
-
-    assert_eq!(ids.len(), 2);
-    assert!(ids.contains(&CurveId::from("JPM-5Y")));
-    assert!(ids.contains(&CurveId::from("BASF-5Y")));
-    assert!(!ids.contains(&CurveId::from("UST-10Y")));
-}
-
-#[test]
-fn tag_predicate_exists_returns_empty_when_key_absent_from_all_nodes() {
-    let h = MarketDataHierarchy::builder()
-        .add_node("Rates/USD/OIS")
-        .curve_ids(&["USD-OIS"])
-        .build()
-        .unwrap();
-
-    let target = HierarchyTarget {
-        path: vec!["Rates".into()],
-        tag_filter: Some(TagFilter {
-            predicates: vec![TagPredicate::Exists {
-                key: "nonexistent-key".into(),
-            }],
-        }),
-    };
-    assert!(resolved_ids(&h, &target, ResolutionMode::MostSpecificWins).is_empty());
-}
-
-#[test]
-fn resolve_cumulative_with_tag_filter_scopes_to_subtree() {
-    // Build a hierarchy with two regions (USD and EUR), each with children
-    // tagged with `asset_class`. Only the USD subtree nodes tagged as "rates"
-    // should appear in the result.
-    //
-    // Structure:
-    //   USD
-    //   USD/Rates        (asset_class=rates)  → curves: USD-OIS, USD-SOFR
-    //   USD/Credit       (asset_class=credit) → curves: JPM-5Y
-    //   EUR
-    //   EUR/Rates        (asset_class=rates)  → curves: EUR-ESTR
-    let h = MarketDataHierarchy::builder()
-        .add_node("USD/Rates")
-        .tag("asset_class", "rates")
-        .curve_ids(&["USD-OIS", "USD-SOFR"])
-        .add_node("USD/Credit")
-        .tag("asset_class", "credit")
-        .curve_ids(&["JPM-5Y"])
-        .add_node("EUR/Rates")
-        .tag("asset_class", "rates")
-        .curve_ids(&["EUR-ESTR"])
-        .build()
-        .unwrap();
-
-    let filter = TagFilter {
-        predicates: vec![TagPredicate::Equals {
-            key: "asset_class".into(),
-            value: "rates".into(),
-        }],
-    };
-
-    // Resolve within the USD subtree with the tag filter in Cumulative mode.
-    let target = HierarchyTarget {
-        path: vec!["USD".into()],
-        tag_filter: Some(filter),
-    };
-    let mut ids = resolved_ids(&h, &target, ResolutionMode::Cumulative);
-    ids.sort();
-
-    // Only USD/Rates curves should appear — EUR-ESTR is excluded (wrong path),
-    // and JPM-5Y is excluded (wrong tag).
+    )
+    .unwrap();
     assert_eq!(
-        ids.len(),
-        2,
-        "expected 2 curves (USD-OIS, USD-SOFR), got {}: {:?}",
-        ids.len(),
-        ids
+        resolved_ids(&h, &exists_target),
+        vec![CurveId::from("JPM-5Y"), CurveId::from("SIEMENS-5Y")]
     );
-    assert!(ids.contains(&CurveId::from("USD-OIS")));
-    assert!(ids.contains(&CurveId::from("USD-SOFR")));
+}
+
+#[test]
+fn hierarchy_target_validation_rejects_invalid_shapes() {
+    assert!(HierarchyTarget::unfiltered(vec![]).is_err());
+    assert!(HierarchyTarget::unfiltered(vec!["  ".into()]).is_err());
+    assert!(HierarchyTarget::unfiltered(vec!["Credit/US".into()]).is_err());
     assert!(
-        !ids.contains(&CurveId::from("EUR-ESTR")),
-        "EUR curve must be excluded by path scoping"
+        HierarchyTarget::from_json(
+            r#"{"path":["Credit"],"tag_filter":{"predicates":[{"equals":{"key":" ","value":"a"}}]}}"#
+        )
+        .is_err()
     );
     assert!(
-        !ids.contains(&CurveId::from("JPM-5Y")),
-        "credit curve must be excluded by tag filter"
+        HierarchyTarget::from_json(
+            r#"{"path":["Credit"],"tag_filter":{"predicates":[{"equals":{"key":"k","value":"v","extra":1}}]}}"#
+        )
+        .is_err()
     );
+    assert!(HierarchyTarget::from_json(r#"{"path":["Credit"],"unknown":1}"#).is_err());
+    assert!(HierarchyTarget::from_json(r#"{"path":["Credit"],"path":["Rates"]}"#).is_err());
 }
 
-#[test]
-fn resolve_cumulative_with_tag_filter_includes_descendants_of_matching_parent() {
-    let h = MarketDataHierarchy::builder()
-        .add_node("Credit/US")
-        .tag("region", "us")
-        .curve_ids(&[])
-        .add_node("Credit/US/IG")
-        .curve_ids(&["JPM-5Y"])
-        .add_node("Credit/EU/IG")
-        .curve_ids(&["SIE-5Y"])
-        .build()
-        .unwrap();
-
-    let filter = TagFilter {
-        predicates: vec![TagPredicate::Equals {
-            key: "region".into(),
-            value: "us".into(),
-        }],
-    };
-
-    let target = HierarchyTarget {
-        path: vec!["Credit".into()],
-        tag_filter: Some(filter),
-    };
-
-    let ids = resolved_ids(&h, &target, ResolutionMode::Cumulative);
-    assert_eq!(ids, vec![CurveId::from("JPM-5Y")]);
-}
-
-#[test]
-fn resolve_most_specific_wins_with_tag_filter() {
-    // Build a hierarchy where a tagged parent and a tagged child both match.
-    // Inherited-subtree matching should see descendant curves for both nodes,
-    // and MostSpecificWins should keep only the deeper match.
-    //
-    // Structure:
-    //   Rates                (asset_class=rates)
-    //   Rates/USD            (asset_class=rates) → SHARED-RATE, USD-OIS
-    let h = MarketDataHierarchy::builder()
-        .add_node("Rates")
-        .tag("asset_class", "rates")
-        .curve_ids(&[])
-        .add_node("Rates/USD")
-        .tag("asset_class", "rates")
-        .curve_ids(&["SHARED-RATE", "USD-OIS"])
-        .build()
-        .unwrap();
-
-    let filter = TagFilter {
-        predicates: vec![TagPredicate::Equals {
-            key: "asset_class".into(),
-            value: "rates".into(),
-        }],
-    };
-
-    let target = HierarchyTarget {
-        path: vec!["Rates".into()],
-        tag_filter: Some(filter),
-    };
-    let mut ids = resolved_ids(&h, &target, ResolutionMode::MostSpecificWins);
-    ids.sort();
-
-    // Rates and Rates/USD both match, so inherited-subtree matching sees both
-    // descendant curves twice. MostSpecificWins keeps the deeper Rates/USD hit.
-    assert_eq!(
-        ids.len(),
-        2,
-        "expected 2 distinct curves (SHARED-RATE, USD-OIS), got {}: {:?}",
-        ids.len(),
-        ids
-    );
-    assert!(ids.contains(&CurveId::from("SHARED-RATE")));
-    assert!(ids.contains(&CurveId::from("USD-OIS")));
-}
-
-// Moved from phase2_strictness.rs: unknown raw hierarchy fields.
 mod strict_raw_fields {
     use finstack_quant_core::market_data::hierarchy::MarketDataHierarchy;
 
     #[test]
-    fn market_hierarchy_rejects_unknown_raw_fields_recursively() {
+    fn market_hierarchy_rejects_unknown_raw_fields_and_legacy_map_shape() {
         let top_level = serde_json::json!({
-            "roots": {},
+            "roots": [],
             "__nonexistent__": true
         });
         let nested = serde_json::json!({
+            "roots": [{
+                "name": "Rates",
+                "node": {
+                    "targets": [],
+                    "__nonexistent__": true
+                }
+            }]
+        });
+        let legacy_map = serde_json::json!({
             "roots": {
                 "Rates": {
-                    "curves": [],
-                    "__nonexistent__": true
+                    "curves": []
                 }
             }
         });
@@ -607,5 +604,9 @@ mod strict_raw_fields {
                 .expect_err("unknown raw hierarchy fields must fail");
             assert!(error.to_string().contains("unknown field"), "{error}");
         }
+        assert!(
+            serde_json::from_value::<MarketDataHierarchy>(legacy_map).is_err(),
+            "legacy object-map roots shape must be rejected"
+        );
     }
 }

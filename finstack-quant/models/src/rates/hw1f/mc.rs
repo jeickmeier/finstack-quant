@@ -260,17 +260,17 @@ pub fn money_estimate_from_pairs(
             continue;
         }
         let pair_avg = chunk.iter().sum::<f64>() / chunk.len() as f64;
-        stats.update(pair_avg * scale);
+        stats.update(pair_avg * scale)?;
     }
 
-    let estimators = stats.count();
+    let estimators = stats.get_count();
     if estimators < 2 {
         return Err(finstack_quant_core::Error::Validation(
             "Monte Carlo estimates require at least 2 independent pricing estimators".into(),
         ));
     }
     MoneyEstimate::from_estimate(
-        Estimate::from_stats(&stats).with_num_simulated_paths(estimators * multiplicity),
+        Estimate::from_stats(&stats)?.with_num_simulated_paths(estimators * multiplicity),
         currency,
     )
 }

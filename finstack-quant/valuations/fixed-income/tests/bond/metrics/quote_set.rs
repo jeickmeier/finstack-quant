@@ -39,13 +39,12 @@ fn market() -> MarketContext {
             (5.0, 0.85),
             (10.0, 0.70),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("discount curve");
-    let forward = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(date!(2024 - 12 - 30))
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.03), (10.0, 0.03)])
-        .build()
+    let forward = ForwardCurve::flat("USD-SOFR-3M", date!(2024 - 12 - 30), 0.03, DayCount::Act360)
         .expect("forward curve");
     MarketContext::new().insert(discount).insert(forward)
 }

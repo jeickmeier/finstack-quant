@@ -14,8 +14,8 @@ from finstack_quant.valuations.instruments import Bond, BondQuoteSet, compute_qu
 AS_OF = datetime.date(2025, 1, 15)
 MARKET = (
     MarketContext()
-    .insert(DiscountCurve.flat("USD-OIS", AS_OF, 0.04))
-    .insert(DiscountCurve.flat("USD-TREASURY", AS_OF, 0.04))
+    .insert(DiscountCurve.flat("USD-OIS", AS_OF, 0.04, "act_365f"))
+    .insert(DiscountCurve.flat("USD-TREASURY", AS_OF, 0.04, "act_365f"))
 )
 QUOTE_METRICS = ("ytm", "ytw", "z_spread", "oas", "asw_par", "asw_market", "i_spread")
 

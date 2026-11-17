@@ -154,7 +154,11 @@ export async function generate(repo = repoRoot) {
   const names = new Set();
   const sharedPlan = planSharedDefs(
     roots
-      .filter((root) => !root.$id.includes("/statements/1/"))
+      .filter(
+        (root) =>
+          !root.$id.includes("/statements/1/") &&
+          !root.source.startsWith("finstack-quant/core/"),
+      )
       .map((root) => root.schema),
   );
   // Wide roots link against the shared document only when one is emitted;
@@ -307,7 +311,7 @@ export async function generate(repo = repoRoot) {
       const referenced = new Set(sharedRefNames(schema));
       for (const [title, def] of Object.entries(typeInput.$defs ?? {})) {
         const local = converterSchema(
-          structuredClone({ ...def, title }),
+          structuredClone({ ...def, title, $defs: typeInput.$defs }),
           "typescript",
         );
         const part = await compile(local, title, {

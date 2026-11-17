@@ -11,7 +11,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_models::types::{ExerciseStyle, OptionType};
@@ -107,12 +109,17 @@ fn create_market_context(
             (1.0f64, (-rate).exp()),
             (2.0f64, (-rate * 2.0f64).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     let vol_surface = VolSurface::builder("AAPL_VOL")
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[0.25, 0.5, 1.0, 2.0])
-        .strikes(&[80.0, 90.0, 100.0, 110.0, 120.0])
+        .secondary_values(&[80.0, 90.0, 100.0, 110.0, 120.0])
         .row(&[vol, vol, vol, vol, vol])
         .row(&[vol, vol, vol, vol, vol])
         .row(&[vol, vol, vol, vol, vol])
@@ -125,9 +132,12 @@ fn create_market_context(
         .insert_surface(vol_surface)
         .insert_price(
             "AAPL",
-            MarketScalar::Price(Money::new(spot, Currency::USD).expect("valid money fixture")),
+            MarketScalar::price(Money::new(spot, Currency::USD).expect("valid money fixture")),
         )
-        .insert_price("AAPL_DIV", MarketScalar::Unitless(div_yield))
+        .insert_price(
+            "AAPL_DIV",
+            MarketScalar::unitless(div_yield).expect("valid scalar"),
+        )
 }
 
 #[test]
@@ -225,7 +235,7 @@ fn test_speed_equals_gamma_convexity() {
     let spot_bump = spot * spot_bump_decimal;
     let market_up = market.clone().insert_price(
         "AAPL",
-        MarketScalar::Price(
+        MarketScalar::price(
             Money::new(spot + spot_bump, Currency::USD).expect("valid money fixture"),
         ),
     );
@@ -240,7 +250,7 @@ fn test_speed_equals_gamma_convexity() {
     // Compute gamma at spot - bump
     let market_down = market.clone().insert_price(
         "AAPL",
-        MarketScalar::Price(
+        MarketScalar::price(
             Money::new(spot - spot_bump, Currency::USD).expect("valid money fixture"),
         ),
     );

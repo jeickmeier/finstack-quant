@@ -47,8 +47,9 @@ mod tests {
     use crate::inflation_cap_floor::InflationCapFloor;
     use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::market_data::scalars::InflationIndex;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{
+        VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+    };
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations_core::instruments::Instrument;
@@ -60,31 +61,39 @@ mod tests {
         let discount = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (10.0, 0.7)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
         let inflation = InflationCurve::builder("US-CPI")
             .base_date(as_of)
-            .base_cpi(100.0)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
             .knots([(0.0, 100.0), (5.0, 112.0), (10.0, 125.0)])
             .build()
             .expect("inflation curve");
         // Flat vol surface at 20% so options have positive time value.
         let vol = 0.20_f64;
         let vol_surface = VolSurface::builder(CurveId::new("USD-INFL-VOL"))
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.5, 1.0, 2.0, 5.0])
-            .strikes(&[0.005, 0.01, 0.02, 0.03, 0.05])
+            .secondary_values(&[0.005, 0.01, 0.02, 0.03, 0.05])
             .row(&[vol, vol, vol, vol, vol])
             .row(&[vol, vol, vol, vol, vol])
             .row(&[vol, vol, vol, vol, vol])
             .row(&[vol, vol, vol, vol, vol])
             .build()
             .expect("vol surface");
-        let index = InflationIndex::new(
+        let index = finstack_quant_valuations_test_support::inflation::simple_index(
             "US-CPI",
-            vec![(date!(2023 - 10 - 01), 100.0)],
+            as_of,
+            100.0,
             finstack_quant_core::currency::Currency::USD,
-        )
-        .expect("inflation index");
+        );
         MarketContext::new()
             .insert(discount)
             .insert(inflation)
@@ -119,13 +128,13 @@ mod tests {
 
         // Compute the two bumped PVs the same way the calculator does.
         let curves_up = market
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::InflationCurve {
                 id: cap.inflation_index_id.clone(),
                 spec: BumpSpec::inflation_shift_pct(INFLATION_BUMP_PCT),
             }])
             .expect("bump up");
         let curves_down = market
-            .bump([MarketBump::Curve {
+            .bump([MarketBump::InflationCurve {
                 id: cap.inflation_index_id.clone(),
                 spec: BumpSpec::inflation_shift_pct(-INFLATION_BUMP_PCT),
             }])

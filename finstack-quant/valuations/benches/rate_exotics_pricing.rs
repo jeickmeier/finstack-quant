@@ -18,8 +18,10 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
-use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
 use finstack_quant_models::monte_carlo::engine::PathCaptureMode;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
@@ -64,19 +66,36 @@ fn hw1f_market(as_of: Date) -> MarketContext {
             (5.0, 0.85),
             (10.0, 0.70),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
-    let fwd_6m = discount.to_forward_curve("USD-SOFR-6M", 0.5, None).unwrap();
-    let fwd_3m = discount
-        .to_forward_curve("USD-SOFR-3M", 0.25, None)
-        .unwrap();
+    let fwd_6m = ForwardCurve::from_discount_curve(
+        "USD-SOFR-6M",
+        &discount,
+        Some(finstack_quant_core::dates::Tenor::semi_annual()),
+    );
+    let fwd_3m = ForwardCurve::from_discount_curve(
+        "USD-SOFR-3M",
+        &discount,
+        Some(finstack_quant_core::dates::Tenor::quarterly()),
+    );
     MarketContext::new()
         .insert(discount)
         .insert(fwd_6m)
         .insert(fwd_3m)
-        .insert_price("SOFR-RATE", MarketScalar::Unitless(0.03))
-        .insert_price("USD-OIS_CAPFLOOR_HW1F_KAPPA", MarketScalar::Unitless(0.03))
-        .insert_price("USD-OIS_CAPFLOOR_HW1F_SIGMA", MarketScalar::Unitless(0.01))
+        .insert_price(
+            "SOFR-RATE",
+            MarketScalar::unitless(0.03).expect("valid scalar"),
+        )
+        .insert_price(
+            "USD-OIS_CAPFLOOR_HW1F_KAPPA",
+            MarketScalar::unitless(0.03).expect("valid scalar"),
+        )
+        .insert_price(
+            "USD-OIS_CAPFLOOR_HW1F_SIGMA",
+            MarketScalar::unitless(0.01).expect("valid scalar"),
+        )
 }
 
 /// Equity-linked range-accrual market matching the instrument example IDs.
@@ -85,11 +104,16 @@ fn equity_range_market(as_of: Date) -> MarketContext {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, 0.97), (2.0, 0.94)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let surface = VolSurface::builder("SPX-VOL")
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[0.25, 0.5, 1.0, 2.0])
-        .strikes(&[80.0, 100.0, 120.0, 140.0])
+        .secondary_values(&[80.0, 100.0, 120.0, 140.0])
         .row(&[0.20, 0.20, 0.20, 0.20])
         .row(&[0.20, 0.20, 0.20, 0.20])
         .row(&[0.20, 0.20, 0.20, 0.20])
@@ -99,8 +123,14 @@ fn equity_range_market(as_of: Date) -> MarketContext {
     MarketContext::new()
         .insert(curve)
         .insert_surface(surface)
-        .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0))
-        .insert_price("SPX-DIV", MarketScalar::Unitless(0.02))
+        .insert_price(
+            "SPX-SPOT",
+            MarketScalar::unitless(100.0).expect("valid scalar"),
+        )
+        .insert_price(
+            "SPX-DIV",
+            MarketScalar::unitless(0.02).expect("valid scalar"),
+        )
 }
 
 fn with_mc_paths<T>(mut inst: T, apply: impl FnOnce(&mut T, InstrumentPricingOverrides)) -> T {
@@ -325,18 +355,24 @@ fn quanto_range_fixture(as_of: Date) -> (RangeAccrual, MarketContext) {
             DiscountCurve::builder("EUR-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (2.0, (-0.2_f64).exp())])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .unwrap(),
         )
         .insert_price(
             "SPX-SPOT",
-            MarketScalar::Price(Money::from((100_i64, Currency::EUR))),
+            MarketScalar::price(Money::from((100_i64, Currency::EUR))),
         )
-        .insert_price("EURUSD", MarketScalar::Unitless(1.1))
+        .insert_price("EURUSD", MarketScalar::unitless(1.1).expect("valid scalar"))
         .insert_surface(
             VolSurface::builder("FX-VOL")
+                .secondary_axis(VolSurfaceAxis::Strike)
+                .quote_type(VolQuoteType::BlackLognormal)
+                .interpolation_mode(VolInterpolationMode::Vol)
                 .expiries(&[1.0])
-                .strikes(&[1.1])
+                .secondary_values(&[1.1])
                 .row(&[0.1])
                 .build()
                 .unwrap(),

@@ -99,7 +99,7 @@ fn test_v2_simple_usd_calibration() {
                     base_date,
                     method: CalibrationMethod::Bootstrap,
                     interpolation: Default::default(),
-                    extrapolation: ExtrapolationPolicy::FlatForward,
+                    extrapolation: ExtrapolationPolicy::Extend,
                     pricing_discount_id: None,
                     pricing_forward_id: None,
                     conventions: Default::default(),
@@ -112,12 +112,13 @@ fn test_v2_simple_usd_calibration() {
                     curve_id: "USD-3M".into(),
                     currency,
                     base_date,
-                    tenor_years: 0.25,
+                    index_tenor: Some(finstack_quant_core::dates::Tenor::quarterly()),
                     discount_curve_id: "USD-OIS".into(),
                     method: CalibrationMethod::GlobalSolve {
                         use_analytical_jacobian: false,
                     },
                     interpolation: Default::default(),
+                    extrapolation: finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
                     conventions: Default::default(),
                 }),
             },
@@ -199,7 +200,7 @@ fn test_v2_simple_usd_calibration() {
     let discount = context
         .get_discount("USD-OIS")
         .expect("Discount curve missing");
-    let df_1y = discount.df(1.0);
+    let df_1y = discount.df(1.0).expect("valid");
     assert!(df_1y < 1.0 && df_1y > 0.9, "Reasonable DF");
 
     // Check Forward Curve
@@ -210,15 +211,17 @@ fn test_v2_simple_usd_calibration() {
         .get_forward("USD-3M")
         .expect("Repeated forward curve missing");
     assert_eq!(forward.knots(), repeated_forward.knots());
-    assert_eq!(forward.forwards(), repeated_forward.forwards());
-    assert_eq!(
-        forward.projection_grid(),
-        repeated_forward.projection_grid()
-    );
-    let fwd_0 = forward.rate(0.0);
+    assert_eq!(forward.factors(), repeated_forward.factors());
+    let first_fra_rate = forward
+        .rate_between_dates(
+            base_date + time::Duration::days(90),
+            base_date + time::Duration::days(180),
+            90.0 / 360.0,
+        )
+        .expect("first FRA projection");
     assert!(
-        (fwd_0 - 0.0530).abs() < tolerances::FWD_RATE_ABS_TOL,
-        "Spot forward should match first FRA"
+        (first_fra_rate - 0.0530).abs() < tolerances::FWD_RATE_ABS_TOL,
+        "Contractual forward should match first FRA"
     );
 }
 
@@ -260,7 +263,7 @@ fn independent_failing_discount_envelope(
                 base_date,
                 method: CalibrationMethod::Bootstrap,
                 interpolation: Default::default(),
-                extrapolation: ExtrapolationPolicy::FlatForward,
+                extrapolation: ExtrapolationPolicy::Extend,
                 pricing_discount_id: None,
                 pricing_forward_id: None,
                 conventions: Default::default(),

@@ -35,7 +35,6 @@ fn test_empty_operations_list() {
         operations: vec![], // Empty
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -58,7 +57,7 @@ fn test_multiple_operations_same_target_last_wins() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new().insert_price(
         "SPY",
-        MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+        MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
     );
     let mut model = FinancialModelSpec::new(
         "test",
@@ -86,7 +85,6 @@ fn test_multiple_operations_same_target_last_wins() {
         ],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -104,13 +102,9 @@ fn test_multiple_operations_same_target_last_wins() {
 
     // Both operations applied sequentially
     let price = market.get_price("SPY").unwrap();
-    match price {
-        MarketScalar::Price(money) => {
-            let expected = 100.0 * 0.9 * 1.2; // 108
-            assert!((money.amount() - expected).abs() < 1e-6);
-        }
-        MarketScalar::Unitless(_) => panic!("Expected Price scalar"),
-    }
+    let money = price.get_price().expect("Expected Price scalar");
+    let expected = 100.0 * 0.9 * 1.2; // 108
+    assert!((money.amount() - expected).abs() < 1e-6);
 }
 
 #[test]
@@ -125,7 +119,6 @@ fn test_scenario_composition_same_priority() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let s2 = ScenarioSpec {
@@ -138,7 +131,6 @@ fn test_scenario_composition_same_priority() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let composed = ScenarioSpec::compose(vec![s1, s2]).expect("compose should succeed");
@@ -159,7 +151,6 @@ fn test_scenario_composition_different_priorities() {
         }],
         priority: -10, // Lower value = higher priority
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let low_priority = ScenarioSpec {
@@ -172,7 +163,6 @@ fn test_scenario_composition_different_priorities() {
         }],
         priority: 10,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let composed =
@@ -198,7 +188,6 @@ fn test_scenario_composition_keeps_priority_and_descriptions() {
         operations: Vec::new(),
         priority,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let composed = ScenarioSpec::compose(vec![
@@ -248,7 +237,6 @@ fn test_warnings_missing_equity() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -296,7 +284,6 @@ fn test_attribute_based_operations_without_inventory_are_rejected() {
         ],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -342,7 +329,6 @@ fn test_stmt_forecast_percent_missing_node_warns() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -407,7 +393,6 @@ fn test_rate_binding_missing_curve() {
         operations: vec![],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -432,6 +417,9 @@ fn test_rate_binding_missing_node() {
     let curve = DiscountCurve::builder("USD_SOFR")
         .base_date(base_date)
         .knots(vec![(0.0, 1.0), (1.0, 0.98)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -462,7 +450,6 @@ fn test_rate_binding_missing_node() {
         operations: vec![],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -510,7 +497,6 @@ fn test_time_roll_with_apply_shocks_false() {
         ],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -537,7 +523,7 @@ fn test_time_roll_with_apply_shocks_true() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new().insert_price(
         "SPY",
-        MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+        MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
     );
     let mut model = FinancialModelSpec::new(
         "test",
@@ -565,7 +551,6 @@ fn test_time_roll_with_apply_shocks_true() {
         ],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -583,10 +568,6 @@ fn test_time_roll_with_apply_shocks_true() {
 
     // Verify price was shocked
     let price = market.get_price("SPY").unwrap();
-    match price {
-        MarketScalar::Price(money) => {
-            assert!((money.amount() - 90.0).abs() < 1e-6);
-        }
-        MarketScalar::Unitless(_) => panic!("Expected Price scalar"),
-    }
+    let money = price.get_price().expect("Expected Price scalar");
+    assert!((money.amount() - 90.0).abs() < 1e-6);
 }

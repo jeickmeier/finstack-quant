@@ -441,12 +441,7 @@ fn test_mc_stochastic_floating_rate_index_cap() {
     let maturity_date = date!(2026 - 01 - 01);
 
     // Flat forward curve at 8% — well above the 3% cap
-    let fwd_curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(val_date)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.08), (1.0, 0.08), (5.0, 0.08)])
-        .build()
-        .unwrap();
+    let fwd_curve = ForwardCurve::flat("USD-SOFR-3M", val_date, 0.08, DayCount::Act360).unwrap();
 
     let disc_curve = build_flat_discount_curve(0.03, val_date, "USD-OIS");
 
@@ -458,6 +453,8 @@ fn test_mc_stochastic_floating_rate_index_cap() {
                 "FIXING:USD-SOFR-3M",
                 vec![(date!(2024 - 12 - 30), 0.08)],
                 None,
+                finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+                finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
             )
             .expect("valuation-date contractual fixing"),
         );
@@ -594,11 +591,7 @@ fn overnight_rfr_rejects_stochastic_hull_white_and_prices_when_sigma_is_zero() {
         overnight_basis: None,
         fallback: Default::default(),
     };
-    let fwd = ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 365.0)
-        .base_date(val_date)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.04), (1.0, 0.04)])
-        .build()
+    let fwd = ForwardCurve::flat("USD-SOFR-OIS", val_date, 0.04, DayCount::Act360)
         .expect("sofr ois forward");
     let market = MarketContext::new()
         .insert(build_flat_discount_curve(0.03, val_date, "USD-OIS"))

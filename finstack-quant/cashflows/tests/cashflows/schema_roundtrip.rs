@@ -638,10 +638,12 @@ fn test_json_bridge_seasoned_floating_schedule_with_fixing_series() {
 
     // Curve based mid-life (2025-06-15); the Jan-15 and Apr-15 resets are
     // realized history carried by the FIXING:USD-SOFR-3M series.
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+    let fwd = ForwardCurve::builder("USD-SOFR-3M")
         .base_date(date!(2025 - 06 - 15))
         .day_count(CoreDayCount::Act360)
-        .knots([(0.0, 0.03), (5.0, 0.03)])
+        .knots([(0.0, 1.0), (5.0, (-0.15_f64).exp())])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("flat forward curve builds");
     let series = ScalarTimeSeries::new(
@@ -651,6 +653,8 @@ fn test_json_bridge_seasoned_floating_schedule_with_fixing_series() {
             (date!(2025 - 04 - 15), 0.042),
         ],
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .expect("fixing series builds");
     let market = MarketContext::new().insert(fwd).insert_series(series);

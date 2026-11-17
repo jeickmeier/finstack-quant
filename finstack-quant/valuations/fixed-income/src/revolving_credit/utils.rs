@@ -688,11 +688,13 @@ mod tests {
             overnight_basis: None,
             fallback: Default::default(),
         };
-        let forward = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-            .base_date(reset)
-            .knots(vec![(0.0, 0.03), (1.0, 0.03)])
-            .build()
-            .expect("forward curve");
+        let forward = ForwardCurve::flat(
+            "USD-SOFR-3M",
+            reset,
+            0.03,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("forward curve");
 
         let rate = finstack_quant_cashflows::builder::project_floating_rate(
             reset,
@@ -736,11 +738,13 @@ mod tests {
             overnight_basis: None,
             fallback: Default::default(),
         };
-        let forward = ForwardCurve::builder("USD-SOFR-OIS", 0.25)
-            .base_date(start)
-            .knots(vec![(0.0, 0.04), (1.0, 0.04)])
-            .build()
-            .expect("forward curve");
+        let forward = ForwardCurve::flat(
+            "USD-SOFR-OIS",
+            start,
+            0.04,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("forward curve");
         let revolver_rate = project_revolver_floating_rate(
             RevolverFloatingProjection {
                 accrual_start: start,
@@ -816,11 +820,7 @@ mod tests {
             overnight_basis: None,
             fallback: Default::default(),
         };
-        let forward = ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 365.0)
-            .base_date(coupon_start)
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, 0.05), (2.0, 0.05)])
-            .build()
+        let forward = ForwardCurve::flat("USD-SOFR-OIS", coupon_start, 0.05, DayCount::Act365F)
             .expect("flat overnight curve");
         let calendar = calendar_by_id_strict("weekends_only").expect("weekend calendar");
         for (start, end, margin_delta_bp) in
@@ -851,9 +851,9 @@ mod tests {
                     .add_business_days(1, calendar)
                     .expect("next weekday")
                     .min(end);
-                // Projection growth uses the curve's ACT/365F clock; the
+                // Projection growth uses the curve's continuous ACT/365F clock; the
                 // resulting coupon is annualized on contractual ACT/365L.
-                factor *= 1.0 + 0.05 * (next - date).whole_days() as f64 / 365.0;
+                factor *= (0.05 * (next - date).whole_days() as f64 / 365.0).exp();
                 date = next;
             }
             let expected = (factor - 1.0) / ((end - start).whole_days() as f64 / 366.0)
@@ -889,8 +889,14 @@ mod tests {
                 .add_business_days(1, calendar)
                 .expect("next business day");
         }
-        let series = ScalarTimeSeries::new("FIXING:USD-SOFR-OIS", observations.clone(), None)
-            .expect("fixings");
+        let series = ScalarTimeSeries::new(
+            "FIXING:USD-SOFR-OIS",
+            observations.clone(),
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("fixings");
 
         // Hand calculation: ∏(1 + r_i · d_i / 360) over each business day,
         // d_i the calendar days to the next business day.
@@ -912,11 +918,13 @@ mod tests {
             "fixings straddle zero"
         );
 
-        let forward = ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 360.0)
-            .base_date(start)
-            .knots(vec![(0.0, 0.03), (1.0, 0.03)])
-            .build()
-            .expect("forward curve");
+        let forward = ForwardCurve::flat(
+            "USD-SOFR-OIS",
+            start,
+            0.03,
+            finstack_quant_core::dates::DayCount::Act365F,
+        )
+        .expect("forward curve");
         let rate = |application: OvernightIndexConstraintApplication| -> f64 {
             let spec = finstack_quant_cashflows::builder::FloatingRateSpec {
                 forward_curve_id: "USD-SOFR-OIS".into(),

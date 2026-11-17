@@ -90,7 +90,9 @@ def _portfolio_spec_json() -> str:
 
 def _market() -> MarketContext:
     knots = [(0.0, 1.0), (0.5, 0.98), (1.0, 0.96), (2.0, 0.92)]
-    return MarketContext().insert(DiscountCurve("USD-OIS", AS_OF, knots))
+    return MarketContext().insert(
+        DiscountCurve("USD-OIS", AS_OF, knots, interp="monotone_convex", extrapolation="extend", day_count="act_365f")
+    )
 
 
 def test_to_arrow_positions_matches_positions_to_table_columns() -> None:

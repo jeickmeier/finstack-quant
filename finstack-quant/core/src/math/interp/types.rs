@@ -9,74 +9,21 @@ use super::strategies::{
     PiecewiseQuadraticForwardStrategy,
 };
 
-/// Validation policy for interpolator input values.
-///
-/// Controls whether the interpolator validates that all values are positive
-/// (required for discount factors) or allows any finite values (needed for
-/// forward rate curves where negative rates are possible).
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::math::interp::{
-///     ExtrapolationPolicy, Interpolator, LinearStrategy, ValidationPolicy,
-/// };
-///
-/// # fn main() -> finstack_quant_core::Result<()> {
-/// // Strict validation (default) - requires positive values
-/// let strict = Interpolator::<LinearStrategy>::new(
-///     vec![0.0, 1.0, 2.0].into_boxed_slice(),
-///     vec![1.0, 0.95, 0.90].into_boxed_slice(),
-///     ExtrapolationPolicy::FlatZero,
-///     ValidationPolicy::Strict,
-/// )?;
-///
-/// // AllowNegative - permits negative values (e.g., for forward curves)
-/// let relaxed = Interpolator::<LinearStrategy>::new(
-///     vec![0.0, 1.0, 2.0].into_boxed_slice(),
-///     vec![-0.01, 0.0, 0.01].into_boxed_slice(),
-///     ExtrapolationPolicy::FlatZero,
-///     ValidationPolicy::AllowNegative,
-/// )?;
-/// # Ok(())
-/// # }
-/// ```
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum ValidationPolicy {
-    /// Require all values to be positive (default).
-    ///
-    /// This is appropriate for discount factors and other quantities that must
-    /// remain positive to avoid arbitrage.
-    #[default]
-    Strict,
-    /// Allow any finite values, including negative and zero.
-    ///
-    /// Use this for forward rate curves where negative rates are allowed
-    /// (e.g., EUR, CHF, JPY markets since 2014).
-    ///
-    /// **Note:** Some interpolation methods (LogLinear, MonotoneConvex) require
-    /// positive values for mathematical reasons and will still reject negative
-    /// values even with this policy.
-    AllowNegative,
-}
-
 /// Extrapolation policy for evaluation outside the knot range.
 ///
 /// Every interpolation strategy honours this policy at both ends of the knot
-/// range. Choose based on what behaviour the downstream pricer expects:
+/// range. Callers must choose an explicit policy:
 ///
-/// - `FlatZero` (default): hold the boundary value constant.
-/// - `FlatForward`: extend the boundary segment's slope, measured in the
-///   space the interpolation style works in (table below).
-/// - `None`: refuse to extrapolate; return `NaN` and require the caller to
-///   detect and handle out-of-range queries explicitly. Recommended for
-///   production risk systems.
+/// - `Flat`: hold the boundary ordinate constant outside the knot range
+///   (and return derivative `0.0` strictly outside the knot range).
+/// - `Extend`: extend the boundary segment's slope in the interpolation style's
+///   working space (table below).
+/// - `Error`: refuse to extrapolate; return an explicit error for queries
+///   outside `[knots[0], knots[last]]`.
 ///
-/// What `FlatForward` extends depends on the [`InterpStyle`]:
+/// What `Extend` extends depends on the [`InterpStyle`]:
 ///
-/// | Style | `FlatForward` extends | On a discount-factor curve | On a rate-valued curve |
+/// | Style | `Extend` extends | On a discount-factor curve | On a rate-valued curve |
 /// |---|---|---|---|
 /// | `Linear` | the value linearly | - | rates keep trending |
 /// | `CubicHermite` | the value linearly, with the end-knot slope | - | rates keep trending |
@@ -85,41 +32,20 @@ pub enum ValidationPolicy {
 /// | `MonotoneConvex` | the boundary instantaneous forward | flat forward rate | - |
 ///
 /// The market-standard tail for a discount-factor curve is a flat forward
-/// rate (`FlatForward` with a log-space style). For a curve that stores
-/// rates, such as [`ForwardCurve`](crate::market_data::term_structures::ForwardCurve),
-/// the market-standard tail holds the last rate flat, which is `FlatZero`.
-///
-/// `#[non_exhaustive]` so that future policies (e.g. linear-zero,
-/// asymptotic) can be added without breaking downstream code.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+/// rate (`Extend` with a log-space style). For a curve that stores rates or
+/// spreads, holding the last rate constant is `Flat`.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ExtrapolationPolicy {
-    /// Hold the boundary value constant.
-    #[default]
-    FlatZero,
+    /// Hold the boundary value constant outside `[knots[0], knots[last]]`.
+    Flat,
     /// Extend the boundary segment's slope in the interpolation style's
     /// working space; see the table on [`ExtrapolationPolicy`].
-    FlatForward,
-    /// Return `NaN` for queries outside the knot range.
-    ///
-    /// Use this to prevent silent extrapolation in production risk systems
-    /// where extrapolated values should be explicitly opted-in.
-    /// Callers should check `.is_nan()` on the result and handle accordingly.
-    ///
-    /// # When to Use
-    ///
-    /// - Risk management systems where extrapolated values are unreliable
-    /// - Validation pipelines where out-of-range queries indicate data errors
-    /// - Any context where silent extrapolation could mask problems
-    ///
-    /// # Note
-    ///
-    /// Since interpolation returns `f64` (not `Result`), this policy returns
-    /// `f64::NAN` rather than an error. This avoids changing the hot-path
-    /// signature while still making out-of-range queries detectable.
-    None,
+    Extend,
+    /// Return an error for queries outside `[knots[0], knots[last]]`.
+    Error,
 }
 
 /// Enum of supported interpolation styles. The default is `Linear`.
@@ -133,9 +59,9 @@ pub enum InterpStyle {
     Linear,
     /// Log‐linear interpolation of positive values.
     LogLinear,
-    /// Monotone‐convex interpolation of positive, non-increasing values.
+    /// Hagan‐West monotone‐convex interpolation of positive values.
     MonotoneConvex,
-    /// Cubic Hermite interpolation (monotone-preserving slopes).
+    /// Cubic Hermite interpolation (Fritsch‐Butland / Moler PCHIP slopes).
     CubicHermite,
     /// Piecewise quadratic forwards (C¹ forwards and C² log discount factors).
     PiecewiseQuadraticForward,
@@ -173,7 +99,7 @@ impl std::str::FromStr for InterpStyle {
 /// Crate-private enum enabling static dispatch for interpolation in hot loops.
 ///
 /// Storing this enum (instead of a boxed trait object) allows the compiler to
-/// inline calls to `interp` and `interp_prime` for each concrete variant.
+/// inline calls to `interp` for each concrete variant.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Interp {
@@ -186,13 +112,24 @@ pub(crate) enum Interp {
 
 impl Interp {
     #[inline]
-    pub(crate) fn interp(&self, x: f64) -> f64 {
+    pub(crate) fn interp(&self, x: f64) -> crate::Result<f64> {
         match self {
             Interp::Linear(i) => i.interp(x),
             Interp::LogLinear(i) => i.interp(x),
             Interp::MonotoneConvex(i) => i.interp(x),
             Interp::CubicHermite(i) => i.interp(x),
             Interp::PiecewiseQuadraticForward(i) => i.interp(x),
+        }
+    }
+
+    #[inline]
+    pub(crate) fn interp_prime(&self, x: f64) -> crate::Result<f64> {
+        match self {
+            Interp::Linear(i) => i.interp_prime(x),
+            Interp::LogLinear(i) => i.interp_prime(x),
+            Interp::MonotoneConvex(i) => i.interp_prime(x),
+            Interp::CubicHermite(i) => i.interp_prime(x),
+            Interp::PiecewiseQuadraticForward(i) => i.interp_prime(x),
         }
     }
 
@@ -220,75 +157,44 @@ impl Interp {
 }
 
 impl InterpStyle {
-    /// Return the effective validation policy for this style.
-    ///
-    /// LogLinear and MonotoneConvex always require strict (positive) values
-    /// for mathematical reasons, regardless of what the caller requested.
-    #[inline]
-    fn effective_validation(self, validation: ValidationPolicy) -> ValidationPolicy {
-        match self {
-            InterpStyle::LogLinear
-            | InterpStyle::MonotoneConvex
-            | InterpStyle::PiecewiseQuadraticForward => ValidationPolicy::Strict,
-            _ => validation,
-        }
-    }
-
     /// Build an enum-backed interpolator enabling static dispatch.
     ///
     /// # Arguments
-    /// * `knots` – strictly ascending knot times.
-    /// * `values` – corresponding values.
-    /// * `extrapolation` – extrapolation policy.
-    /// * `validation` – validation policy controlling whether negative values are allowed.
-    ///
-    /// **Note:** LogLinear and MonotoneConvex require positive values for mathematical
-    /// reasons (log transform, monotonicity). These will enforce `Strict` validation
-    /// regardless of the passed policy.
+    /// * `knots` – strictly ascending finite knot coordinates.
+    /// * `values` – corresponding finite values (positive for `LogLinear`,
+    ///   `MonotoneConvex`, and `PiecewiseQuadraticForward`).
+    /// * `extrapolation` – extrapolation policy applied outside the knot domain.
     #[inline]
     pub(crate) fn build_enum(
         self,
         knots: Box<[f64]>,
         values: Box<[f64]>,
         extrapolation: ExtrapolationPolicy,
-        validation: ValidationPolicy,
     ) -> crate::Result<Interp> {
-        let effective_validation = self.effective_validation(validation);
         let interp = match self {
             InterpStyle::Linear => Interp::Linear(Interpolator::<LinearStrategy>::new(
                 knots,
                 values,
                 extrapolation,
-                effective_validation,
             )?),
             InterpStyle::LogLinear => Interp::LogLinear(Interpolator::<LogLinearStrategy>::new(
                 knots,
                 values,
                 extrapolation,
-                effective_validation,
             )?),
-            InterpStyle::MonotoneConvex => {
-                Interp::MonotoneConvex(Interpolator::<MonotoneConvexStrategy>::new(
-                    knots,
-                    values,
-                    extrapolation,
-                    effective_validation,
-                )?)
-            }
-            InterpStyle::CubicHermite => {
-                Interp::CubicHermite(Interpolator::<CubicHermiteStrategy>::new(
-                    knots,
-                    values,
-                    extrapolation,
-                    effective_validation,
-                )?)
-            }
+            InterpStyle::MonotoneConvex => Interp::MonotoneConvex(Interpolator::<
+                MonotoneConvexStrategy,
+            >::new(
+                knots, values, extrapolation
+            )?),
+            InterpStyle::CubicHermite => Interp::CubicHermite(
+                Interpolator::<CubicHermiteStrategy>::new(knots, values, extrapolation)?,
+            ),
             InterpStyle::PiecewiseQuadraticForward => Interp::PiecewiseQuadraticForward(
                 Interpolator::<PiecewiseQuadraticForwardStrategy>::new(
                     knots,
                     values,
                     extrapolation,
-                    effective_validation,
                 )?,
             ),
         };
@@ -312,134 +218,92 @@ mod tests {
         (a - b).abs() < tol
     }
 
-    // build_enum Tests with ValidationPolicy
-
     #[test]
-    fn build_enum_linear_strict() {
+    fn build_enum_linear() {
         let result = InterpStyle::Linear.build_enum(
             standard_knots(),
             standard_dfs(),
-            ExtrapolationPolicy::FlatZero,
-            ValidationPolicy::Strict,
+            ExtrapolationPolicy::Flat,
         );
         assert!(result.is_ok());
         let interp = result.expect("should build in test");
-        assert!(approx_eq(interp.interp(0.0), 1.0, 1e-12));
+        assert!(approx_eq(interp.interp(0.0).expect("knot hit"), 1.0, 1e-12));
     }
 
     #[test]
-    fn build_enum_log_linear_strict() {
+    fn build_enum_log_linear() {
         let result = InterpStyle::LogLinear.build_enum(
             standard_knots(),
             standard_dfs(),
-            ExtrapolationPolicy::FlatForward,
-            ValidationPolicy::Strict,
+            ExtrapolationPolicy::Extend,
         );
         assert!(result.is_ok());
     }
 
     #[test]
-    fn build_enum_monotone_convex_strict() {
+    fn build_enum_monotone_convex() {
         let result = InterpStyle::MonotoneConvex.build_enum(
             standard_knots(),
             standard_dfs(),
-            ExtrapolationPolicy::FlatZero,
-            ValidationPolicy::Strict,
+            ExtrapolationPolicy::Flat,
         );
         assert!(result.is_ok());
     }
 
     #[test]
-    fn build_enum_cubic_hermite_strict() {
+    fn build_enum_cubic_hermite() {
         let result = InterpStyle::CubicHermite.build_enum(
             standard_knots(),
             standard_dfs(),
-            ExtrapolationPolicy::FlatForward,
-            ValidationPolicy::Strict,
+            ExtrapolationPolicy::Extend,
         );
         assert!(result.is_ok());
     }
 
     #[test]
-    fn build_enum_piecewise_quadratic_strict() {
+    fn build_enum_piecewise_quadratic() {
         let result = InterpStyle::PiecewiseQuadraticForward.build_enum(
             standard_knots(),
             standard_dfs(),
-            ExtrapolationPolicy::FlatZero,
-            ValidationPolicy::Strict,
-        );
-        assert!(result.is_ok());
-    }
-
-    // ValidationPolicy::AllowNegative Tests
-
-    #[test]
-    fn allow_negative_linear_with_negative_values() {
-        let knots = vec![0.0, 1.0, 2.0].into_boxed_slice();
-        let values = vec![-0.5, -0.2, 0.1].into_boxed_slice();
-        let result = InterpStyle::Linear.build_enum(
-            knots,
-            values,
-            ExtrapolationPolicy::FlatZero,
-            ValidationPolicy::AllowNegative,
+            ExtrapolationPolicy::Flat,
         );
         assert!(result.is_ok());
     }
 
     #[test]
-    fn allow_negative_cubic_with_negative_values() {
-        let knots = vec![0.0, 1.0, 2.0, 3.0].into_boxed_slice();
-        let values = vec![-1.0, -0.5, 0.0, 0.5].into_boxed_slice();
-        let result = InterpStyle::CubicHermite.build_enum(
-            knots,
-            values,
-            ExtrapolationPolicy::FlatForward,
-            ValidationPolicy::AllowNegative,
+    fn signed_linear_and_cubic_accept_negative_values() {
+        let linear = InterpStyle::Linear.build_enum(
+            vec![0.0, 1.0, 2.0].into_boxed_slice(),
+            vec![-0.5, -0.2, 0.1].into_boxed_slice(),
+            ExtrapolationPolicy::Flat,
         );
-        assert!(result.is_ok());
+        assert!(linear.is_ok());
+
+        let cubic = InterpStyle::CubicHermite.build_enum(
+            vec![0.0, 1.0, 2.0, 3.0].into_boxed_slice(),
+            vec![-1.0, -0.5, 0.0, 0.5].into_boxed_slice(),
+            ExtrapolationPolicy::Extend,
+        );
+        assert!(cubic.is_ok());
     }
 
     #[test]
-    fn log_linear_rejects_negative_even_with_allow_negative_policy() {
+    fn positive_strategies_reject_non_positive_values() {
         let knots = vec![0.0, 1.0, 2.0].into_boxed_slice();
         let values = vec![-0.5, 0.2, 0.5].into_boxed_slice();
-        let result = InterpStyle::LogLinear.build_enum(
-            knots,
-            values,
-            ExtrapolationPolicy::FlatZero,
-            ValidationPolicy::AllowNegative, // Should still enforce Strict for LogLinear
-        );
-        // LogLinear requires positive values for log transform
-        assert!(result.is_err());
+        for style in [
+            InterpStyle::LogLinear,
+            InterpStyle::MonotoneConvex,
+            InterpStyle::PiecewiseQuadraticForward,
+        ] {
+            assert!(
+                style
+                    .build_enum(knots.clone(), values.clone(), ExtrapolationPolicy::Flat)
+                    .is_err(),
+                "{style} must reject negative values"
+            );
+        }
     }
-
-    #[test]
-    fn monotone_convex_rejects_negative_even_with_allow_negative_policy() {
-        let knots = vec![0.0, 1.0, 2.0].into_boxed_slice();
-        let values = vec![-1.0, -0.5, -0.2].into_boxed_slice();
-        let result = InterpStyle::MonotoneConvex.build_enum(
-            knots,
-            values,
-            ExtrapolationPolicy::FlatZero,
-            ValidationPolicy::AllowNegative, // Should still enforce Strict for MonotoneConvex
-        );
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn strict_rejects_negative_for_linear() {
-        let knots = vec![0.0, 1.0, 2.0].into_boxed_slice();
-        let values = vec![-0.5, -0.2, 0.1].into_boxed_slice();
-        let result = InterpStyle::Linear.build_enum(
-            knots,
-            values,
-            ExtrapolationPolicy::FlatZero,
-            ValidationPolicy::Strict,
-        );
-        assert!(result.is_err());
-    }
-
-    // Interp Enum Method Tests
 
     #[test]
     fn interp_method_all_variants() {
@@ -453,60 +317,24 @@ mod tests {
 
         for style in styles {
             let interp = style
-                .build_enum(
-                    standard_knots(),
-                    standard_dfs(),
-                    ExtrapolationPolicy::FlatZero,
-                    ValidationPolicy::Strict,
-                )
+                .build_enum(standard_knots(), standard_dfs(), ExtrapolationPolicy::Flat)
                 .expect("should build in test");
-            assert!(approx_eq(interp.interp(0.0), 1.0, 1e-10));
+            assert_eq!(interp.interp(0.0).expect("knot hit"), 1.0);
         }
     }
 
     #[test]
     fn style_method_returns_correct_type() {
         let linear = InterpStyle::Linear
-            .build_enum(
-                standard_knots(),
-                standard_dfs(),
-                ExtrapolationPolicy::FlatZero,
-                ValidationPolicy::Strict,
-            )
+            .build_enum(standard_knots(), standard_dfs(), ExtrapolationPolicy::Flat)
             .expect("should build in test");
         assert_eq!(linear.style(), InterpStyle::Linear);
 
         let log_linear = InterpStyle::LogLinear
-            .build_enum(
-                standard_knots(),
-                standard_dfs(),
-                ExtrapolationPolicy::FlatZero,
-                ValidationPolicy::Strict,
-            )
+            .build_enum(standard_knots(), standard_dfs(), ExtrapolationPolicy::Flat)
             .expect("should build in test");
         assert_eq!(log_linear.style(), InterpStyle::LogLinear);
     }
-
-    // ExtrapolationPolicy Tests
-
-    #[test]
-    fn extrapolation_default_is_flat_zero() {
-        let default = ExtrapolationPolicy::default();
-        match default {
-            ExtrapolationPolicy::FlatZero => {}
-            _ => panic!("Default should be FlatZero"),
-        }
-    }
-
-    // ValidationPolicy Tests
-
-    #[test]
-    fn validation_policy_default_is_strict() {
-        let default = ValidationPolicy::default();
-        assert_eq!(default, ValidationPolicy::Strict);
-    }
-
-    // InterpStyle FromStr / Display roundtrip tests
 
     #[test]
     fn interp_style_display_roundtrip() {
@@ -548,14 +376,12 @@ mod tests {
         assert!("garbage".parse::<InterpStyle>().is_err());
     }
 
-    // ExtrapolationPolicy FromStr / Display roundtrip tests
-
     #[test]
     fn extrap_policy_display_roundtrip() {
         let all = [
-            ExtrapolationPolicy::FlatZero,
-            ExtrapolationPolicy::FlatForward,
-            ExtrapolationPolicy::None,
+            ExtrapolationPolicy::Flat,
+            ExtrapolationPolicy::Extend,
+            ExtrapolationPolicy::Error,
         ];
 
         for policy in &all {
@@ -568,9 +394,21 @@ mod tests {
     }
 
     #[test]
-    fn extrap_policy_from_str_rejects_noncanonical_spellings() {
-        for rejected in ["flatzero", "flat", "flatforward", "FlatZero", "flat-zero"] {
-            assert!(rejected.parse::<ExtrapolationPolicy>().is_err());
+    fn extrap_policy_from_str_rejects_legacy_and_noncanonical_spellings() {
+        for rejected in [
+            "flat_zero",
+            "flat_forward",
+            "none",
+            "flatzero",
+            "flatforward",
+            "Flat",
+            "Extend",
+            "Error",
+        ] {
+            assert!(
+                rejected.parse::<ExtrapolationPolicy>().is_err(),
+                "{rejected} must be rejected"
+            );
         }
     }
 

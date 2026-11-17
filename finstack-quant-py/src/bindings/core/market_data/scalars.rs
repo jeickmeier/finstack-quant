@@ -4,16 +4,18 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use finstack_quant_core::market_data::scalars::{
-    InflationIndex, InflationLag, ScalarTimeSeries, SeriesInterpolation,
+    InflationExpectedRelease, InflationIndex, InflationObservation, ScalarTimeSeries,
+    SeriesExtrapolation, SeriesInterpolation,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyModule};
 
 use crate::bindings::core::currency::{PyCurrency, extract_currency};
-use crate::bindings::core::money::{decimal_from_py, is_python_decimal};
+use crate::bindings::core::money::is_python_decimal;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{dates_to_datetime_index, dict_to_dataframe};
+use crate::bindings::pydoc::pydoc;
 use crate::errors::core_to_py;
 
 fn observations_to_dataframe<'py>(
@@ -32,8 +34,8 @@ fn observations_to_dataframe<'py>(
 /// Extract an `f64` observation from a `float`, `int` or `decimal.Decimal`
 /// (rejecting `bool`).
 ///
-/// A `Decimal` converts to `f64` with `Decimal::as_f64`; finiteness is
-/// checked by the Rust constructor that receives the value.
+/// A `Decimal` converts to `f64` with ``Decimal.__float__`` and is rejected
+/// when non-finite.
 pub(crate) fn extract_f64(value: &Bound<'_, PyAny>, field: &str) -> PyResult<f64> {
     if value.is_instance_of::<pyo3::types::PyBool>() {
         return Err(pyo3::exceptions::PyTypeError::new_err(format!(
@@ -41,7 +43,15 @@ pub(crate) fn extract_f64(value: &Bound<'_, PyAny>, field: &str) -> PyResult<f64
         )));
     }
     if is_python_decimal(value)? {
-        return Ok(decimal_from_py(value)?.as_f64());
+        let parsed: f64 = value.call_method0("__float__")?.extract()?;
+        if !parsed.is_finite() {
+            return Err(core_to_py(finstack_quant_core::Error::Input(
+                finstack_quant_core::InputError::NonFiniteValue {
+                    kind: finstack_quant_core::NonFiniteKind::classify(parsed),
+                },
+            )));
+        }
+        return Ok(parsed);
     }
     value.extract::<f64>().map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(format!(
@@ -50,16 +60,11 @@ pub(crate) fn extract_f64(value: &Bound<'_, PyAny>, field: &str) -> PyResult<f64
     })
 }
 
-/// Parse `(date, value)` observation pairs and an optional interpolation
-/// label (default: step) for the series-backed scalar constructors.
-fn parse_series(
+/// Parse `(date, value)` observation pairs into chronologically ascending Rust values.
+fn parse_observations(
     observations: &[(Bound<'_, PyAny>, Bound<'_, PyAny>)],
-    interpolation: Option<&str>,
-) -> PyResult<(
-    Vec<(finstack_quant_core::dates::Date, f64)>,
-    SeriesInterpolation,
-)> {
-    let observations = observations
+) -> PyResult<Vec<(finstack_quant_core::dates::Date, f64)>> {
+    observations
         .iter()
         .enumerate()
         .map(|(index, (date, value))| {
@@ -68,13 +73,7 @@ fn parse_series(
                 extract_f64(value, &format!("observations[{index}] value"))?,
             ))
         })
-        .collect::<PyResult<Vec<_>>>()?;
-    let interpolation = interpolation
-        .map(SeriesInterpolation::from_str)
-        .transpose()
-        .map_err(core_to_py)?
-        .unwrap_or_default();
-    Ok((observations, interpolation))
+        .collect()
 }
 
 /// Date-indexed scalar market observations with Rust-owned interpolation.
@@ -99,45 +98,52 @@ impl PyScalarTimeSeries {
 
 #[pymethods]
 impl PyScalarTimeSeries {
-    /// Construct a scalar time series from dated observations.
+    /// Construct a scalar time series from strictly ascending dated observations.
     ///
     /// Parameters
     /// ----------
     /// id : str
-    ///     Series identifier.
+    ///     Non-empty trimmed series identifier.
     /// observations : list[tuple[datetime.date | str, float | int | decimal.Decimal]]
-    ///     Dated values; a ``Decimal`` converts to ``float``.
-    ///     Dates must be unique; any order is accepted.
+    ///     Chronologically strictly ascending ``(date, value)`` pairs; empty and
+    ///     single-point series are admitted, duplicate or unsorted dates and
+    ///     non-finite values raise ``ValueError``, and ``Decimal`` converts to ``float``.
+    /// interpolation : str
+    ///     Required in-range fill policy: ``"step"`` or ``"linear"``.
+    /// extrapolation : str
+    ///     Required right-tail policy after the latest observation: ``"flat"``
+    ///     (hold last observation) or ``"error"`` (raise ``KeyError``).
     /// currency : Currency | str, optional
     ///     Currency tag for monetary series; ``None`` for unitless values.
-    /// interpolation : str, optional
-    ///     ``"step"`` (default, last observation carried forward) or ``"linear"``.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``observations`` is empty or has duplicate dates, a value is
-    ///     non-finite, or ``interpolation`` is not a recognised label.
+    ///     If ``id`` is blank/untrimmed, dates are unsorted or duplicated, a
+    ///     value is non-finite, or ``interpolation``/``extrapolation`` is not
+    ///     a recognised label.
     ///
     /// Example
     /// -------
     /// >>> from finstack_quant.core.market_data import ScalarTimeSeries
-    /// >>> series = ScalarTimeSeries("SOFR", [("2025-01-01", 0.04), ("2025-01-03", 0.05)], interpolation="linear")
-    /// >>> series.value_on("2025-01-02")
+    /// >>> series = ScalarTimeSeries("SOFR", [("2025-01-01", 0.04), ("2025-01-03", 0.05)], "linear", "flat")
+    /// >>> series.get_value("2025-01-02")
     /// 0.045
     #[new]
-    #[pyo3(signature = (id, observations, currency=None, interpolation=None))]
+    #[pyo3(signature = (id, observations, interpolation, extrapolation, currency=None))]
     fn new(
         id: &str,
         observations: Vec<(Bound<'_, PyAny>, Bound<'_, PyAny>)>,
+        interpolation: &str,
+        extrapolation: &str,
         currency: Option<&Bound<'_, PyAny>>,
-        interpolation: Option<&str>,
     ) -> PyResult<Self> {
-        let (observations, interpolation) = parse_series(&observations, interpolation)?;
+        let observations = parse_observations(&observations)?;
+        let interpolation = SeriesInterpolation::from_str(interpolation).map_err(core_to_py)?;
+        let extrapolation = SeriesExtrapolation::from_str(extrapolation).map_err(core_to_py)?;
         let currency = currency.map(extract_currency).transpose()?;
-        let inner = ScalarTimeSeries::new(id, observations, currency)
-            .map_err(core_to_py)?
-            .with_interpolation(interpolation);
+        let inner = ScalarTimeSeries::new(id, observations, currency, interpolation, extrapolation)
+            .map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
@@ -153,10 +159,16 @@ impl PyScalarTimeSeries {
         self.inner.currency().map(PyCurrency::from_inner)
     }
 
-    /// Interpolation policy name.
+    /// Interpolation policy name (``"step"`` or ``"linear"``).
     #[getter]
     fn interpolation(&self) -> String {
         self.inner.interpolation().to_string()
+    }
+
+    /// Right-tail extrapolation policy name (``"flat"`` or ``"error"``).
+    #[getter]
+    fn extrapolation(&self) -> String {
+        self.inner.extrapolation().to_string()
     }
 
     /// Chronologically sorted observations.
@@ -169,12 +181,14 @@ impl PyScalarTimeSeries {
             .collect()
     }
 
-    /// Value on a date under the series interpolation policy.
+    /// Value on a date under the series interpolation and extrapolation policies.
     ///
     /// Parameters
     /// ----------
     /// date : datetime.date | str
-    ///     Lookup date; must lie within the observation range.
+    ///     Lookup date; empty series, dates before the first observation, and
+    ///     dates after the last observation under ``"error"`` extrapolation
+    ///     raise ``KeyError``.
     ///
     /// Returns
     /// -------
@@ -182,11 +196,14 @@ impl PyScalarTimeSeries {
     ///
     /// Raises
     /// ------
+    /// KeyError
+    ///     If the series is empty, ``date`` precedes the first observation, or
+    ///     ``date`` exceeds the last observation when ``extrapolation == "error"``.
     /// ValueError
-    ///     If ``date`` is outside the observed range.
+    ///     If ``date`` cannot be parsed as a valid date.
     #[pyo3(text_signature = "(self, date)")]
-    fn value_on(&self, date: &Bound<'_, PyAny>) -> PyResult<f64> {
-        self.inner.value_on(py_to_date(date)?).map_err(core_to_py)
+    fn get_value(&self, date: &Bound<'_, PyAny>) -> PyResult<f64> {
+        self.inner.get_value(py_to_date(date)?).map_err(core_to_py)
     }
 
     /// Value on an exact observation date (no interpolation).
@@ -205,9 +222,9 @@ impl PyScalarTimeSeries {
     /// KeyError
     ///     If no observation exists on ``date``.
     #[pyo3(text_signature = "(self, date)")]
-    fn value_on_exact(&self, date: &Bound<'_, PyAny>) -> PyResult<f64> {
+    fn get_value_exact(&self, date: &Bound<'_, PyAny>) -> PyResult<f64> {
         self.inner
-            .value_on_exact(py_to_date(date)?)
+            .get_value_exact(py_to_date(date)?)
             .map_err(core_to_py)
     }
 
@@ -236,11 +253,11 @@ impl PyScalarTimeSeries {
     /// The index is a ``DatetimeIndex`` built from the observation dates, so
     /// the frame joins directly against other date-indexed market data and
     /// resamples without a conversion step. Rows follow the chronologically
-    /// sorted order of :attr:`observations`; there is always at least one row,
-    /// because the constructor rejects an empty observation set.
+    /// ascending order of :attr:`observations`; an empty series produces an
+    /// empty ``DatetimeIndex`` frame with column ``value``.
     ///
     /// Only the stored observations appear; nothing is interpolated. Use
-    /// :meth:`value_on` for values between observation dates — the
+    /// :meth:`get_value` for values between observation dates — the
     /// interpolation policy stays owned by Rust.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         // `ScalarTimeSeries` derives Serialize, but the wire format nests the
@@ -267,7 +284,105 @@ wire_methods!(PyScalarTimeSeries, ScalarTimeSeries, "ScalarTimeSeries");
 
 impl_repr_html_via_dataframe!(PyScalarTimeSeries);
 
-/// Inflation index observations with Rust-owned interpolation and validation.
+#[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationObservation")]
+#[pyclass(
+    name = "InflationObservation",
+    module = "finstack_quant.core.market_data",
+    frozen,
+    skip_from_py_object
+)]
+#[derive(Clone)]
+pub struct PyInflationObservation {
+    inner: InflationObservation,
+}
+
+#[pymethods]
+impl PyInflationObservation {
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationObservation.__init__")]
+    #[new]
+    fn new(
+        reference_month: &Bound<'_, PyAny>,
+        value: &Bound<'_, PyAny>,
+        available_on: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: InflationObservation {
+                reference_month: py_to_date(reference_month)?,
+                value: extract_f64(value, "value")?,
+                available_on: py_to_date(available_on)?,
+            },
+        })
+    }
+
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationObservation.reference_month")]
+    #[getter]
+    fn reference_month<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.reference_month)
+    }
+
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationObservation.value")]
+    #[getter]
+    fn value(&self) -> f64 {
+        self.inner.value
+    }
+
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationObservation.available_on")]
+    #[getter]
+    fn available_on<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.available_on)
+    }
+}
+
+#[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationExpectedRelease")]
+#[pyclass(
+    name = "InflationExpectedRelease",
+    module = "finstack_quant.core.market_data",
+    frozen,
+    skip_from_py_object
+)]
+#[derive(Clone)]
+pub struct PyInflationExpectedRelease {
+    inner: InflationExpectedRelease,
+}
+
+#[pymethods]
+impl PyInflationExpectedRelease {
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationExpectedRelease.__init__")]
+    #[new]
+    fn new(
+        reference_month: &Bound<'_, PyAny>,
+        expected_release: &Bound<'_, PyAny>,
+        known_on: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: InflationExpectedRelease {
+                reference_month: py_to_date(reference_month)?,
+                expected_release: py_to_date(expected_release)?,
+                known_on: py_to_date(known_on)?,
+            },
+        })
+    }
+
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationExpectedRelease.reference_month")]
+    #[getter]
+    fn reference_month<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.reference_month)
+    }
+
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationExpectedRelease.expected_release")]
+    #[getter]
+    fn expected_release<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.expected_release)
+    }
+
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationExpectedRelease.known_on")]
+    #[getter]
+    fn known_on<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.known_on)
+    }
+}
+
+#[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationIndex")]
 #[pyclass(
     name = "InflationIndex",
     module = "finstack_quant.core.market_data",
@@ -290,319 +405,132 @@ impl PyInflationIndex {
 
 #[pymethods]
 impl PyInflationIndex {
-    /// Construct an inflation index from dated observations.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Index identifier (e.g. ``"US-CPI-U"``).
-    /// observations : list[tuple[datetime.date | str, float | int | decimal.Decimal]]
-    ///     Dated index levels; a ``Decimal`` converts to ``float``.
-    /// currency : Currency | str
-    ///     Currency of the index.
-    /// interpolation : str, optional
-    ///     ``"step"`` (default, last observation carried forward) or ``"linear"``.
-    /// lag : str | int, optional
-    ///     Contractual observation lag applied before lookups: ``"none"`` (default),
-    ///     ``"3M"``/``"90D"`` market strings, or an integer number of months.
-    /// seasonality : list[float], optional
-    ///     Twelve multiplicative factors, January through December.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``observations`` is empty or has duplicate dates, a label is
-    ///     unknown, a value is non-finite, or ``seasonality`` does not have
-    ///     exactly 12 entries.
-    ///
-    /// Example
-    /// -------
-    /// >>> from finstack_quant.core.market_data import InflationIndex
-    /// >>> index = InflationIndex("US-CPI", [("2025-01-01", 300.0), ("2025-02-01", 301.5)], "USD", lag="3M")
-    /// >>> index.lag
-    /// '3M'
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationIndex.__init__")]
     #[new]
-    #[pyo3(signature = (id, observations, currency, interpolation=None, lag=None, seasonality=None))]
     fn new(
         id: &str,
-        observations: Vec<(Bound<'_, PyAny>, Bound<'_, PyAny>)>,
+        observations: Vec<PyRef<'_, PyInflationObservation>>,
         currency: &Bound<'_, PyAny>,
-        interpolation: Option<&str>,
-        lag: Option<&Bound<'_, PyAny>>,
-        seasonality: Option<Vec<f64>>,
+        knowledge_date: &Bound<'_, PyAny>,
     ) -> PyResult<Self> {
-        let lag = match lag {
-            None => None,
-            Some(value) => {
-                if value.is_instance_of::<pyo3::types::PyBool>() {
-                    return Err(pyo3::exceptions::PyTypeError::new_err(
-                        "lag must be an int number of months or a string, not bool",
-                    ));
-                }
-                Some(match value.extract::<u8>() {
-                    Ok(months) => InflationLag::from(months),
-                    _ => {
-                        let label: String = value.extract().map_err(|_| {
-                            crate::errors::value_error(
-                                "lag must be an int number of months or a string like \"3M\", \"90D\" or \"none\"",
-                            )
-                        })?;
-                        label.parse::<InflationLag>().map_err(core_to_py)?
-                    }
-                })
-            }
-        };
-        let seasonality = match seasonality {
-            None => None,
-            Some(factors) => Some(<[f64; 12]>::try_from(factors).map_err(|got| {
-                crate::errors::value_error(format!(
-                    "seasonality must have exactly 12 monthly factors, got {}",
-                    got.len()
-                ))
-            })?),
-        };
-        let (observations, interpolation) = parse_series(&observations, interpolation)?;
-        let currency = extract_currency(currency)?;
-        let mut inner = InflationIndex::new(id, observations, currency)
-            .map_err(core_to_py)?
-            .with_interpolation(interpolation);
-        if let Some(lag) = lag {
-            inner = inner.with_lag(lag);
-        }
-        if let Some(factors) = seasonality {
-            inner = inner.with_seasonality(factors).map_err(core_to_py)?;
-        }
-        Ok(Self {
-            inner: Arc::new(inner),
-        })
+        InflationIndex::new(
+            id,
+            observations.into_iter().map(|obs| obs.inner).collect(),
+            extract_currency(currency)?,
+            py_to_date(knowledge_date)?,
+        )
+        .map(|inner| Self::from_inner(Arc::new(inner)))
+        .map_err(core_to_py)
     }
 
-    /// Return a new index with an explicit monthly publication schedule.
-    ///
-    /// Parameters
-    /// ----------
-    /// dates : list[tuple[datetime.date | str, datetime.date | str]]
-    ///     Pairs of first-of-month reference dates and inclusive publication
-    ///     dates. Replaces the existing schedule; publication must not precede
-    ///     its reference month. Contractual observation lag is independent.
-    ///     This declares monthly reference observations for valuation even
-    ///     with no lag or a day lag; raw observation label days are not fixing dates.
-    ///
-    /// Returns
-    /// -------
-    /// InflationIndex
-    ///     A new index preserving observations and other conventions.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If a date is malformed, a key is not month start, a month is
-    ///     duplicated, or publication precedes its reference month.
-    /// TypeError
-    ///     If an entry is not a pair of supported date-like values.
-    fn with_publication_dates(
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationIndex.with_expected_releases")]
+    fn with_expected_releases(
         &self,
-        dates: Vec<(Bound<'_, PyAny>, Bound<'_, PyAny>)>,
+        expected_releases: Vec<PyRef<'_, PyInflationExpectedRelease>>,
     ) -> PyResult<Self> {
-        let dates = dates
-            .iter()
-            .map(|(reference_month, publication_date)| {
-                Ok((py_to_date(reference_month)?, py_to_date(publication_date)?))
-            })
-            .collect::<PyResult<Vec<_>>>()?;
         let inner = self
             .inner
             .as_ref()
             .clone()
-            .with_publication_dates(dates)
+            .with_expected_releases(expected_releases.into_iter().map(|rel| rel.inner).collect())
             .map_err(core_to_py)?;
         Ok(Self::from_inner(Arc::new(inner)))
     }
 
-    /// Get the explicit publication date for a reference month.
-    ///
-    /// Parameters
-    /// ----------
-    /// reference_date : datetime.date | str
-    ///     Any date in the reference month; its day is ignored.
-    ///
-    /// Returns
-    /// -------
-    /// datetime.date | None
-    ///     Inclusive availability date, or ``None`` when unspecified. Missing
-    ///     metadata never authorizes projection of missing historical data.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``reference_date`` is malformed.
-    /// TypeError
-    ///     If ``reference_date`` is not date-like or an ISO date string.
-    fn get_publication_date(
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationIndex.get_expected_release")]
+    fn get_expected_release(
         &self,
-        py: Python<'_>,
-        reference_date: &Bound<'_, PyAny>,
-    ) -> PyResult<Option<Py<PyAny>>> {
+        reference_month: &Bound<'_, PyAny>,
+    ) -> PyResult<Option<PyInflationExpectedRelease>> {
         self.inner
-            .get_publication_date(py_to_date(reference_date)?)
-            .map(|date| date_to_py(py, date).map(Bound::unbind))
-            .transpose()
+            .get_expected_release(py_to_date(reference_month)?)
+            .map(|rel| rel.map(|inner| PyInflationExpectedRelease { inner }))
+            .map_err(core_to_py)
     }
 
-    /// Get the configured monthly publication schedule.
-    ///
-    /// Returns
-    /// -------
-    /// list[tuple[datetime.date, datetime.date]]
-    ///     Reference-month/publication pairs in ascending reference-month order.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If an internal date cannot be converted to a Python date.
-    fn get_publication_dates(&self, py: Python<'_>) -> PyResult<Vec<(Py<PyAny>, Py<PyAny>)>> {
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationIndex.get_expected_releases")]
+    fn get_expected_releases(&self) -> Vec<PyInflationExpectedRelease> {
         self.inner
-            .get_publication_dates()
-            .into_iter()
-            .map(|(reference_month, publication_date)| {
-                Ok((
-                    date_to_py(py, reference_month)?.unbind(),
-                    date_to_py(py, publication_date)?.unbind(),
-                ))
-            })
+            .get_expected_releases()
+            .iter()
+            .map(|&inner| PyInflationExpectedRelease { inner })
             .collect()
     }
 
-    /// Indexation ratio ``value_on(settle_date) / value_on(base_date)`` with lag and seasonality applied.
-    ///
-    /// Parameters
-    /// ----------
-    /// base_date : datetime.date | str
-    ///     Reference date of the base index level.
-    /// settle_date : datetime.date | str
-    ///     Date of the uplifted level.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If either lag-adjusted date is outside the observation range.
-    #[pyo3(text_signature = "(self, base_date, settle_date)")]
-    fn ratio(&self, base_date: &Bound<'_, PyAny>, settle_date: &Bound<'_, PyAny>) -> PyResult<f64> {
-        self.inner
-            .ratio(py_to_date(base_date)?, py_to_date(settle_date)?)
-            .map_err(core_to_py)
-    }
-
-    /// Reference CPI for a date under an explicit month lag (bond-style lookup).
-    ///
-    /// Parameters
-    /// ----------
-    /// date : datetime.date | str
-    ///     Contract date.
-    /// lag_months : int
-    ///     Calendar months to look back (``3`` for TIPS/gilts). Observations
-    ///     must be unique within each reference month; missing months are not
-    ///     interpolated. The first of the contract month needs only the first
-    ///     lagged observation.
-    ///
-    /// Returns
-    /// -------
-    /// float
-    ///     Reference index level.
-    ///
-    /// Raises
-    /// ------
-    /// KeyError
-    ///     If a required monthly CPI observation is missing.
-    /// ValueError
-    ///     If the contract date cannot be parsed or a required month has multiple observations.
-    #[pyo3(text_signature = "(self, date, lag_months)")]
-    fn ref_cpi_months_lag(
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationIndex.get_observation")]
+    fn get_observation(
         &self,
-        date: &Bound<'_, PyAny>,
-        lag_months: &Bound<'_, PyAny>,
-    ) -> PyResult<f64> {
-        if lag_months.is_instance_of::<pyo3::types::PyBool>() {
-            return Err(pyo3::exceptions::PyTypeError::new_err(
-                "lag_months must be an int, not bool",
-            ));
-        }
-        let lag_months: u32 = lag_months.extract()?;
+        reference_month: &Bound<'_, PyAny>,
+    ) -> PyResult<PyInflationObservation> {
         self.inner
-            .ref_cpi_months_lag(py_to_date(date)?, lag_months)
+            .get_observation(py_to_date(reference_month)?)
+            .map(|inner| PyInflationObservation { inner })
             .map_err(core_to_py)
     }
 
-    /// ``(first_date, last_date)`` of the stored observations.
-    ///
-    /// Returns
-    /// -------
-    /// tuple[datetime.date, datetime.date]
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the index has no observations.
-    #[pyo3(text_signature = "(self)")]
-    fn date_range<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyAny>)> {
-        let (first, last) = self.inner.date_range().map_err(core_to_py)?;
-        Ok((date_to_py(py, first)?, date_to_py(py, last)?))
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationIndex.qualified_monthly_observation")]
+    fn qualified_monthly_observation(
+        &self,
+        year: i32,
+        month: u8,
+        knowledge_date: &Bound<'_, PyAny>,
+    ) -> PyResult<f64> {
+        let month = time::Month::try_from(month)
+            .map_err(|err| crate::errors::value_error(err.to_string()))?;
+        self.inner
+            .qualified_monthly_observation(year, month, py_to_date(knowledge_date)?)
+            .map_err(core_to_py)
     }
 
-    /// Publication lag label: ``"none"``, ``"<n>M"`` or ``"<n>D"``.
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationIndex.date_range")]
+    fn date_range<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> PyResult<Option<(Bound<'py, PyAny>, Bound<'py, PyAny>)>> {
+        self.inner
+            .date_range()
+            .map(|(first, last)| Ok((date_to_py(py, first)?, date_to_py(py, last)?)))
+            .transpose()
+    }
+
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationIndex.knowledge_date")]
     #[getter]
-    fn lag(&self) -> String {
-        self.inner.lag().to_string()
+    fn knowledge_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        date_to_py(py, self.inner.knowledge_date())
     }
 
-    /// Twelve monthly seasonality factors (January first), or ``None``.
-    #[getter]
-    fn seasonality(&self) -> Option<Vec<f64>> {
-        self.inner.seasonality().map(|f| f.to_vec())
-    }
-
-    /// Inflation-index identifier.
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationIndex.id")]
     #[getter]
     fn id(&self) -> &str {
         self.inner.id()
     }
 
-    /// ISO-4217 currency of this inflation index.
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationIndex.currency")]
     #[getter]
     fn currency(&self) -> PyCurrency {
         PyCurrency::from_inner(self.inner.currency())
     }
 
-    /// Interpolation policy name.
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationIndex.observations")]
     #[getter]
-    fn interpolation(&self) -> String {
-        self.inner.interpolation().to_string()
-    }
-
-    /// Chronologically sorted observations.
-    #[getter]
-    fn observations<'py>(&self, py: Python<'py>) -> PyResult<Vec<(Bound<'py, PyAny>, f64)>> {
+    fn observations(&self) -> Vec<PyInflationObservation> {
         self.inner
             .observations()
-            .into_iter()
-            .map(|(date, value)| Ok((date_to_py(py, date)?, value)))
+            .iter()
+            .map(|&inner| PyInflationObservation { inner })
             .collect()
     }
 
-    /// Interpolated index value on a date.
-    fn value_on(&self, date: &Bound<'_, PyAny>) -> PyResult<f64> {
-        self.inner.value_on(py_to_date(date)?).map_err(core_to_py)
-    }
-
-    /// Export as a pandas ``DataFrame`` indexed by observation date.
-    ///
-    /// Columns: ``value``.
+    #[doc = pydoc!("finstack_quant.core.market_data._scalars", "InflationIndex.to_dataframe")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        observations_to_dataframe(py, self.inner.observations())
+        let observations = self.inner.observations();
+        let months: Vec<_> = observations.iter().map(|obs| obs.reference_month).collect();
+        let values: Vec<_> = observations.iter().map(|obs| obs.value).collect();
+        let available: Vec<_> = observations.iter().map(|obs| obs.available_on).collect();
+        let data = PyDict::new(py);
+        data.set_item("value", values)?;
+        data.set_item("available_on", dates_to_datetime_index(py, &available)?)?;
+        dict_to_dataframe(py, &data, Some(dates_to_datetime_index(py, &months)?))
     }
 
     fn __len__(&self) -> usize {
@@ -618,15 +546,28 @@ impl PyInflationIndex {
     }
 }
 
-wire_methods!(PyInflationIndex, InflationIndex, "InflationIndex", arc);
+wire_methods!(
+    PyInflationIndex,
+    InflationIndex,
+    "InflationIndex",
+    module = "finstack_quant.core.market_data._scalars",
+    arc
+);
 
 impl_repr_html_via_dataframe!(PyInflationIndex);
 
-pub(super) const EXPORTS: &[&str] = &["InflationIndex", "ScalarTimeSeries"];
+pub(super) const EXPORTS: &[&str] = &[
+    "InflationIndex",
+    "InflationObservation",
+    "InflationExpectedRelease",
+    "ScalarTimeSeries",
+];
 
 /// Register scalar time-series classes on `finstack_quant.core.market_data`.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyScalarTimeSeries>()?;
     m.add_class::<PyInflationIndex>()?;
+    m.add_class::<PyInflationObservation>()?;
+    m.add_class::<PyInflationExpectedRelease>()?;
     Ok(())
 }

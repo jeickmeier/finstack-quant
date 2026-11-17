@@ -51,8 +51,7 @@ pub(crate) fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result
     // two stated calendars. No pair table or implicit USD gate applies; a
     // convention that needs one names a composite calendar.
     let spot = {
-        let calendar =
-            resolve_joint_calendar(Some(&conv.base_calendar_id), Some(&conv.quote_calendar_id))?;
+        let calendar = resolve_joint_calendar(&conv.base_calendar_id, &conv.quote_calendar_id)?;
         let lag = i32::try_from(conv.settlement_days).map_err(|_| {
             finstack_quant_core::Error::Validation(format!(
                 "XCCY spot lag {} is out of range",
@@ -136,7 +135,7 @@ fn resolve_far_date(
     base_calendar_id: &str,
     quote_calendar_id: &str,
 ) -> Result<finstack_quant_core::dates::Date> {
-    let calendar = resolve_joint_calendar(Some(base_calendar_id), Some(quote_calendar_id))?;
+    let calendar = resolve_joint_calendar(base_calendar_id, quote_calendar_id)?;
     match pillar {
         Pillar::Tenor(tenor) => {
             let raw = tenor.add_to_date(spot, None, BusinessDayConvention::Unadjusted)?;

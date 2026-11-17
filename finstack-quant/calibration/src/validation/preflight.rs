@@ -260,45 +260,19 @@ fn validate_inflation_step(
         )));
     }
 
-    // The lag must be one the inflation curve can carry: a month lag or none.
-    let lag = crate::targets::inflation::parse_observation_lag(&p.observation_lag)?.map_or(
-        finstack_quant_core::market_data::scalars::InflationLag::None,
-        finstack_quant_core::market_data::scalars::InflationLag::Months,
-    );
-
-    // If an InflationIndex fixings series is provided, enforce consistency:
-    // - currency match
-    // - lag match
-    // - base CPI match (including any seasonality applied by the index)
-    if let Ok(index) = context.get_inflation_index(p.curve_id.as_str()) {
+    crate::targets::inflation::parse_observation_lag(&p.observation_lag)?;
+    if !p.source_base_cpi.is_finite() || p.source_base_cpi <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "Inflation source_base_cpi must be finite and positive".into(),
+        ));
+    }
+    {
+        let index = context.get_inflation_index(p.curve_id.as_str())?;
         if index.currency() != p.currency {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Inflation step currency mismatch: params.currency='{}' but InflationIndex.currency='{}'",
                 p.currency,
                 index.currency()
-            )));
-        }
-
-        if lag != index.lag() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Inflation step lag mismatch: params.observation_lag='{}' but InflationIndex.lag={:?}",
-                p.observation_lag,
-                index.lag()
-            )));
-        }
-
-        let expected_base = index.value_on(p.base_date).map_err(|e| {
-            finstack_quant_core::Error::Validation(format!(
-                "Failed to resolve base CPI from InflationIndex '{}': {}",
-                p.curve_id.as_str(),
-                e
-            ))
-        })?;
-        let abs_tol = 1e-8_f64.max(1e-10_f64 * expected_base.abs());
-        if (expected_base - p.base_cpi).abs() > abs_tol {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Inflation base_cpi mismatch: params.base_cpi={} but InflationIndex.value_on(base_date)={}",
-                p.base_cpi, expected_base
             )));
         }
     }
@@ -411,7 +385,7 @@ mod tests {
                 .expect("valid test date"),
                 method: CalibrationMethod::Bootstrap,
                 interpolation: InterpStyle::Linear,
-                extrapolation: ExtrapolationPolicy::FlatZero,
+                extrapolation: ExtrapolationPolicy::Flat,
                 pricing_discount_id: None,
                 pricing_forward_id: None,
                 conventions: Default::default(),
@@ -429,6 +403,8 @@ mod tests {
                 (5.0, (-rate * 5.0).exp()),
                 (10.0, (-rate * 10.0).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("flat discount curve should build")
     }

@@ -3,7 +3,9 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor, TenorUnit};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::market_data::traits::Discounting;
@@ -31,19 +33,15 @@ fn single_curve_market(as_of: Date, r: f64, v: f64) -> MarketContext {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots(ois_knots)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap(),
     );
 
     // Separate forward curve for multi-curve regressions.
-    let fwd_knots = vec![(0.0, r), (30.0, r)];
     mkt = mkt.insert(
-        ForwardCurve::builder(CurveId::new("USD-FLAT-FWD"), 0.25)
-            .base_date(as_of)
-            .day_count(DayCount::Act365F)
-            .knots(fwd_knots)
-            .build()
-            .unwrap(),
+        ForwardCurve::flat(CurveId::new("USD-FLAT-FWD"), as_of, r, DayCount::Act365F).unwrap(),
     );
 
     // Flat vol surface
@@ -53,8 +51,11 @@ fn single_curve_market(as_of: Date, r: f64, v: f64) -> MarketContext {
     let expiries = vec![0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0];
     let flat_row = vec![v; strikes.len()];
     let mut builder = VolSurface::builder(CurveId::new("USD-FLAT-VOL"))
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&expiries)
-        .strikes(&strikes);
+        .secondary_values(&strikes);
     for _ in 0..expiries.len() {
         builder = builder.row(&flat_row);
     }
@@ -81,6 +82,7 @@ fn single_curve_cms(
         notional: Money::new(1.0, Currency::USD).expect("valid money fixture"),
         day_count: DayCount::Act365F,
         index_id: Some(finstack_quant_core::types::IndexId::new("USD-LIBOR-3M")),
+        cms_fixing_index_id: None,
         swap_fixed_frequency: Some(Tenor::semi_annual()),
         swap_float_frequency: Some(Tenor::quarterly()),
         // Same day count for both legs so forward rate equals OIS rate exactly.

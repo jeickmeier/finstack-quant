@@ -26,6 +26,8 @@ fn create_test_market(base_date: Date) -> MarketContext {
         .base_date(base_date)
         .knots([(0.0, 1.0), (1.0, 0.90), (5.0, 0.70), (10.0, 0.50)])
         .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 

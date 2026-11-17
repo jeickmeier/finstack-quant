@@ -13,18 +13,19 @@ export interface SurfaceNode extends SurfacePoint {
 export function surfaceNodes(surface: StoredSurface): SurfaceNode[] {
   if (
     surface.vols_row_major.length !==
-    surface.expiries.length * surface.strikes.length
+    surface.expiries.length * surface.secondary_values.length
   )
     throw new TypeError(
       "Stored surface dimensions do not match its row-major values",
     );
   return surface.expiries.flatMap((expiry, row) =>
-    surface.strikes.map((secondary, column) => ({
+    surface.secondary_values.map((secondary, column) => ({
       surface,
       expiry,
       secondary,
       // finstack-arith: row-major index into the supplied flat grid
-      value: surface.vols_row_major[row * surface.strikes.length + column]!,
+      value:
+        surface.vols_row_major[row * surface.secondary_values.length + column]!,
       key: JSON.stringify([surface.id, expiry, secondary]),
     })),
   );

@@ -67,7 +67,7 @@ impl PyRateBindingSpec {
         let compounding = compounding
             .map(extract_compounding)
             .transpose()?
-            .unwrap_or_default();
+            .unwrap_or(finstack_quant_core::math::Compounding::Continuous);
         Ok(Self {
             inner: RateBindingSpec {
                 node_id: NodeId::from(node_id),

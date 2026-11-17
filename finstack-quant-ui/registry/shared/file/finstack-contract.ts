@@ -949,15 +949,11 @@ export interface FxDeltaSampleRequest {
     forward: number;
   }[];
 }
-/** Explicit spot and continuously compounded decimal rates for models.volatility.materializeFxDeltaSurface. */
+/** Explicit qualified delivery forwards for models.volatility.materializeFxDeltaSurface. */
 export interface FxStrikeSurfaceRequest {
   readonly surface: MarketContextStateWire["fx_delta_vol_surfaces"][number];
-  /** FX spot, domestic per unit of foreign; Rust rejects non-positive values. */
-  readonly spot: number;
-  /** Continuously compounded domestic rate, as a decimal. */
-  readonly domesticRate: number;
-  /** Continuously compounded foreign rate, as a decimal. */
-  readonly foreignRate: number;
+  /** Delivery forward rates (quote currency per unit of base currency) ordered to match `surface.expiries`; Rust rejects empty, mismatched-length, non-finite, or non-positive values. */
+  readonly deliveryForwards: readonly number[];
 }
 /** Canonical stored-surface JSON of a native VolSurface (`toJson`). */
 export type StoredSurfaceWire = MarketContextStateWire["surfaces"][number];

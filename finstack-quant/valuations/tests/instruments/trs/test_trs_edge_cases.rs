@@ -59,18 +59,18 @@ fn test_equity_trs_missing_spot_price() {
         .base_date(as_of_date())
         .knots(vec![(0.0, 1.0), (1.0, 0.98)])
         .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     market = market.insert(disc);
 
-    let fwd = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
+    let fwd = finstack_quant_core::market_data::term_structures::ForwardCurve::flat(
         "USD-SOFR-3M",
-        0.25,
+        as_of_date(),
+        0.02,
+        finstack_quant_core::dates::DayCount::Act365F,
     )
-    .base_date(as_of_date())
-    .knots(vec![(0.0, 0.02), (1.0, 0.02)])
-    .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
-    .build()
     .unwrap();
     market = market.insert(fwd);
 
@@ -88,8 +88,14 @@ fn test_equity_trs_missing_discount_curve() {
     // Arrange
     let mut market = MarketContext::new();
     // Add spot but no discount curve
-    market = market.insert_price("SPX-SPOT", MarketScalar::Unitless(5000.0));
-    market = market.insert_price("SPX-DIV-YIELD", MarketScalar::Unitless(0.015));
+    market = market.insert_price(
+        "SPX-SPOT",
+        MarketScalar::unitless(5000.0).expect("valid scalar"),
+    );
+    market = market.insert_price(
+        "SPX-DIV-YIELD",
+        MarketScalar::unitless(0.015).expect("valid scalar"),
+    );
 
     let trs = TestEquityTrsBuilder::new().build();
 
@@ -104,13 +110,21 @@ fn test_equity_trs_missing_discount_curve() {
 fn test_equity_trs_missing_forward_curve() {
     // Arrange
     let mut market = MarketContext::new();
-    market = market.insert_price("SPX-SPOT", MarketScalar::Unitless(5000.0));
-    market = market.insert_price("SPX-DIV-YIELD", MarketScalar::Unitless(0.015));
+    market = market.insert_price(
+        "SPX-SPOT",
+        MarketScalar::unitless(5000.0).expect("valid scalar"),
+    );
+    market = market.insert_price(
+        "SPX-DIV-YIELD",
+        MarketScalar::unitless(0.015).expect("valid scalar"),
+    );
 
     let disc = finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
         .base_date(as_of_date())
         .knots(vec![(0.0, 1.0), (1.0, 0.98)])
         .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     market = market.insert(disc);
@@ -159,7 +173,10 @@ fn test_fi_index_trs_builder_validation() {
 fn test_equity_trs_with_zero_spot_price() {
     // Arrange
     let mut market = create_market_context();
-    market = market.insert_price("SPX-SPOT", MarketScalar::Unitless(0.0));
+    market = market.insert_price(
+        "SPX-SPOT",
+        MarketScalar::unitless(0.0).expect("valid scalar"),
+    );
 
     let trs = TestEquityTrsBuilder::new().build();
 
@@ -176,7 +193,10 @@ fn test_equity_trs_with_zero_spot_price() {
 fn test_equity_trs_with_negative_dividend_yield() {
     // Arrange
     let mut market = create_market_context();
-    market = market.insert_price("SPX-DIV-YIELD", MarketScalar::Unitless(-0.01)); // -1%
+    market = market.insert_price(
+        "SPX-DIV-YIELD",
+        MarketScalar::unitless(-0.01).expect("valid scalar"),
+    ); // -1%
 
     let trs = TestEquityTrsBuilder::new().build();
 
@@ -191,7 +211,10 @@ fn test_equity_trs_with_negative_dividend_yield() {
 fn test_equity_trs_with_very_high_spot() {
     // Arrange
     let mut market = create_market_context();
-    market = market.insert_price("SPX-SPOT", MarketScalar::Unitless(1_000_000.0)); // Very high
+    market = market.insert_price(
+        "SPX-SPOT",
+        MarketScalar::unitless(1_000_000.0).expect("valid scalar"),
+    ); // Very high
 
     let trs = TestEquityTrsBuilder::new().build();
 
@@ -207,7 +230,10 @@ fn test_equity_trs_with_very_high_spot() {
 fn test_fi_index_trs_with_negative_yield() {
     // Arrange
     let mut market = create_market_context();
-    market = market.insert_price("HY-INDEX-YIELD", MarketScalar::Unitless(-0.01)); // -1%
+    market = market.insert_price(
+        "HY-INDEX-YIELD",
+        MarketScalar::unitless(-0.01).expect("valid scalar"),
+    ); // -1%
 
     let trs = TestFIIndexTrsBuilder::new().build();
 
@@ -222,7 +248,10 @@ fn test_fi_index_trs_with_negative_yield() {
 fn test_fi_index_trs_with_very_high_duration() {
     // Arrange
     let mut market = create_market_context();
-    market = market.insert_price("HY-INDEX-DURATION", MarketScalar::Unitless(20.0)); // 20 years
+    market = market.insert_price(
+        "HY-INDEX-DURATION",
+        MarketScalar::unitless(20.0).expect("valid scalar"),
+    ); // 20 years
 
     let trs = TestFIIndexTrsBuilder::new().build();
 
@@ -238,7 +267,10 @@ fn test_fi_index_trs_with_very_high_duration() {
 fn test_fi_index_trs_with_zero_duration() {
     // Arrange
     let mut market = create_market_context();
-    market = market.insert_price("HY-INDEX-DURATION", MarketScalar::Unitless(0.0));
+    market = market.insert_price(
+        "HY-INDEX-DURATION",
+        MarketScalar::unitless(0.0).expect("valid scalar"),
+    );
 
     let trs = TestFIIndexTrsBuilder::new().build();
 
@@ -499,7 +531,10 @@ fn test_par_spread_with_tiny_annuity() {
 fn test_index_delta_with_very_small_spot() {
     // Arrange
     let mut market = create_market_context();
-    market = market.insert_price("SPX-SPOT", MarketScalar::Unitless(0.01)); // Tiny spot
+    market = market.insert_price(
+        "SPX-SPOT",
+        MarketScalar::unitless(0.01).expect("valid scalar"),
+    ); // Tiny spot
 
     let trs = TestEquityTrsBuilder::new().build();
 

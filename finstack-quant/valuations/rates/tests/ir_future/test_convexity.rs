@@ -2,7 +2,9 @@
 
 use super::utils::*;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_valuations_core::instruments::Position;
 use finstack_quant_valuations_rates::ir_future::FutureContractSpecs;
 
@@ -161,9 +163,11 @@ fn test_large_convexity_adjustment() {
 /// Build a flat volatility surface for testing convexity adjustments.
 fn build_flat_vol_surface(vol: f64, vol_surface_id: &str) -> VolSurface {
     VolSurface::builder(vol_surface_id)
-        .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::Normal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[0.25, 1.0, 2.0, 5.0, 10.0])
-        .strikes(&[0.01, 0.03, 0.05, 0.07, 0.10])
+        .secondary_values(&[0.01, 0.03, 0.05, 0.07, 0.10])
         .row(&[vol, vol, vol, vol, vol])
         .row(&[vol, vol, vol, vol, vol])
         .row(&[vol, vol, vol, vol, vol])

@@ -55,7 +55,7 @@ BASE = datetime.date(2024, 1, 1)
 
 def _discount(curve_id: str, rate: float) -> DiscountCurve:
     knots = [(t, math.exp(-rate * t)) for t in (0.0, 1.0, 5.0, 10.0)]
-    return DiscountCurve(curve_id, BASE, knots, day_count="act_365f")
+    return DiscountCurve(curve_id, BASE, knots, day_count="act_365f", interp="monotone_convex", extrapolation="extend")
 
 
 def _credit_market() -> MarketContext:
@@ -95,6 +95,9 @@ def _equity_market() -> MarketContext:
             [0.25, 1.0, 2.0],
             [4000.0, 4500.0, 5000.0],
             [[0.2, 0.2, 0.2], [0.2, 0.2, 0.2], [0.2, 0.2, 0.2]],
+            secondary_axis="strike",
+            quote_type="black_lognormal",
+            interpolation_mode="vol",
         )
     )
     return market
@@ -113,6 +116,9 @@ def _fx_market() -> MarketContext:
             [0.5, 1.0, 2.0],
             [1.0, 1.12, 1.3],
             [[0.1, 0.1, 0.1], [0.1, 0.1, 0.1], [0.1, 0.1, 0.1]],
+            secondary_axis="strike",
+            quote_type="black_lognormal",
+            interpolation_mode="vol",
         )
     )
     return market

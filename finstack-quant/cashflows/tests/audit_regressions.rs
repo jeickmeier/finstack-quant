@@ -70,16 +70,19 @@ fn act365l_balance_segments_preserve_the_full_coupon_denominator() {
                 "date":balance_change, "payment_date":balance_change, "kind":"amortization",
                 "delta":{"amount":"-500000","currency":"USD"}
             }]);
-            // Both contractual coupons use ACT/365L's 366-day denominator.
-            // Express the intended 10% coupon on the curve's ACT/365F basis:
-            // r_curve * days/365 = 10% * days/366.
-            let curve_rate = 0.1 * 365.0 / 366.0;
-            let curve = ForwardCurve::builder("TERM", if first_days == 92.0 { 1.0 } else { 0.25 })
-                .day_count(DayCount::Act365F)
-                .base_date(date(issue))
-                .knots([(0.0, curve_rate), (2.0, curve_rate)])
-                .build()
-                .expect("flat term curve");
+            // Both contractual coupons use ACT/365L's 366-day denominator, so a factor curve
+            // targeting P(maturity) = 1 / (1 + 0.1 * total_days / 366) projects 10% exactly.
+            let total_days = first_days + last_days;
+            let mat_factor = 1.0 / (1.0 + 0.1 * total_days / 366.0);
+            let curve = ForwardCurve::from_dates(
+                "TERM",
+                date(issue),
+                &[(date(issue), 1.0), (date(maturity), mat_factor)],
+                DayCount::Act365F,
+                finstack_quant_core::math::interp::InterpStyle::LogLinear,
+                finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+            )
+            .expect("flat term curve");
             let market = MarketContext::new().insert(curve);
             if floating {
                 value["coupon_program"][0]["kind"] = json!("floating");
@@ -187,12 +190,12 @@ fn act365l_periodic_fees_use_actual_stub_boundaries_for_every_balance_segment() 
             for flow in fees {
                 let accrual = flow.get_accrual().as_ref().expect("fee accrual metadata");
                 assert_eq!(
-                    accrual.get_context().coupon_period,
+                    accrual.get_context().get_coupon_period(),
                     Some((date(issue), date(maturity)))
                 );
                 let context = DayCountContext {
                     frequency: Some(frequency),
-                    coupon_period: accrual.get_context().coupon_period,
+                    coupon_period: accrual.get_context().get_coupon_period(),
                     ..Default::default()
                 };
                 close(
@@ -304,12 +307,14 @@ fn b14_overnight_principal_events_preserve_cumulative_rate_clock() {
         "date":"2025-01-07", "payment_date":"2025-01-07", "kind":"amortization",
         "delta":{"amount":"-500000","currency":"USD"}
     }]);
-    let curve = ForwardCurve::builder("RFR", 0.25)
-        .day_count(finstack_quant_core::dates::DayCount::Act360)
-        .base_date(date("2025-01-06"))
-        .knots([(0.0, 0.1), (1.0, 0.1)])
-        .build()
-        .expect("constant overnight rate");
+    let cont_rate = 360.0 * (0.1_f64 / 360.0).ln_1p();
+    let curve = ForwardCurve::flat(
+        "RFR",
+        date("2025-01-06"),
+        cont_rate,
+        finstack_quant_core::dates::DayCount::Act360,
+    )
+    .expect("constant overnight rate");
     let schedule = serde_json::from_value::<cf::CashflowScheduleBuildSpec>(v)
         .expect("spec")
         .build(Some(&MarketContext::new().insert(curve)))
@@ -444,6 +449,7 @@ fn funding_outflow_has_no_default_recovery_payment() {
             date("2025-01-01"),
             &[(181.0 / 365.0, 0.8), (1.0, 0.64)],
             0.4,
+            finstack_quant_core::dates::DayCount::Act365F,
         )
         .expect("valid hazard curve");
     let mut v = spec("2025-01-01", "2026-01-01");
@@ -459,6 +465,9 @@ fn funding_outflow_has_no_default_recovery_payment() {
     let flat_disc =
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("FLAT")
             .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .knots([(0.0, 1.0), (5.0, 1.0)])
             .build()
             .expect("valid flat discount curve");
@@ -647,7 +656,7 @@ fn february_rate_and_payment_boundaries_are_not_termination() {
                 .as_ref()
                 .expect("metadata")
                 .get_context()
-                .end_is_termination_date,
+                .get_end_is_termination_date(),
             Some(false)
         );
     }
@@ -1274,10 +1283,13 @@ mod slice3_regressions {
     fn non_overnight_index_tenor_mismatch_fails_instead_of_warning() {
         let issue = d(2025, Month::January, 15);
         let maturity = d(2025, Month::July, 15);
-        let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+        let fwd = ForwardCurve::builder("USD-SOFR-3M")
             .base_date(d(2025, Month::January, 10))
             .day_count(DayCount::Act360)
-            .knots([(0.0, 0.04), (2.0, 0.04)])
+            .index_tenor(Tenor::quarterly())
+            .knots([(0.0, 1.0), (2.0, (-0.08_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
         let market = MarketContext::new().insert(fwd);
@@ -1315,18 +1327,20 @@ mod slice3_regressions {
 
     #[test]
     fn spread_only_fallback_does_not_mask_supplied_curve_or_series_errors() {
-        // Case 1: Curve is present and covers all observations (`>= curve.base_date()`),
-        // but 30/360 forward clock on 2025-03-30 -> 2025-03-31 has 0 curve year fraction.
+        // Case 1: Curve is present and covers observations from `base_date`,
+        // but fails projection mid-window under `ExtrapolationPolicy::Error`.
         // Fallback must NOT mask that curve-projection failure.
         let base = d(2025, Month::March, 28);
         let end = d(2025, Month::April, 2);
-        let fwd_30360 = ForwardCurve::builder("USD-SOFR-3M", 1.0 / 360.0)
+        let fwd_err = ForwardCurve::builder("USD-SOFR-3M")
             .base_date(base)
-            .day_count(DayCount::Thirty360)
-            .knots([(0.0, 0.04), (1.0, 0.04)])
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 1.0), (1.0 / 360.0, (-0.04_f64 / 360.0).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Error)
             .build()
             .unwrap();
-        let market = MarketContext::new().insert(fwd_30360);
+        let market = MarketContext::new().insert(fwd_err);
         let mut schedule_params = ScheduleParams::quarterly_act360();
         schedule_params.stub = finstack_quant_core::dates::StubKind::ShortBack;
         let on_spec = base_term_spec(
@@ -1356,6 +1370,8 @@ mod slice3_regressions {
             "FIXING:USD-SOFR-3M",
             vec![(d(2025, Month::January, 13), 0.04)],
             Some(Currency::USD),
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .unwrap();
         let fixings_only = MarketContext::new().insert_series(gap_fixings);
@@ -1386,10 +1402,13 @@ mod slice3_regressions {
         let base = d(2025, Month::January, 2);
         let start = d(2025, Month::April, 4);
         let end = d(2025, Month::July, 4);
-        let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+        let fwd = ForwardCurve::builder("USD-SOFR-3M")
             .base_date(base)
             .day_count(DayCount::Act360)
-            .knots([(0.0, 0.03), (1.0, 0.05)])
+            .index_tenor(Tenor::quarterly())
+            .knots([(0.0, 1.0), (1.0, (-0.05_f64).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
         let market = MarketContext::new().insert(fwd);
@@ -1475,16 +1494,13 @@ mod slice3_regressions {
     #[test]
     fn json_schedule_honors_spec_and_override_as_of_cutoff() {
         let curve_base = d(2025, Month::April, 15);
-        let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-            .base_date(curve_base)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.05), (2.0, 0.05)])
-            .build()
-            .unwrap();
+        let fwd = ForwardCurve::flat("USD-SOFR-3M", curve_base, 0.05, DayCount::Act360).unwrap();
         let fixings = ScalarTimeSeries::new(
             "FIXING:USD-SOFR-3M",
             vec![(d(2025, Month::April, 11), 0.032)],
             Some(Currency::USD),
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
         )
         .unwrap();
         let market_json =
@@ -2014,8 +2030,12 @@ mod slice6_regressions {
                 self.base
             }
 
-            fn df(&self, t: f64) -> f64 {
-                (-self.rate * t).exp()
+            fn df(&self, t: f64) -> finstack_quant_core::Result<f64> {
+                Ok((-self.rate * t).exp())
+            }
+
+            fn instantaneous_forward(&self, _t: f64) -> finstack_quant_core::Result<f64> {
+                Ok(self.rate)
             }
         }
 
@@ -2030,8 +2050,9 @@ mod slice6_regressions {
             base: as_of,
             rate: r,
         };
-        let hazard = HazardCurve::flat("flat-3pct", as_of, lambda, recovery_rate)
-            .expect("valid hazard curve");
+        let hazard =
+            HazardCurve::flat("flat-3pct", as_of, lambda, recovery_rate, DayCount::Act365F)
+                .expect("valid hazard curve");
 
         let repayment = CashFlowParams::new(
             maturity,
@@ -2060,7 +2081,7 @@ mod slice6_regressions {
         let t_end = DayCount::Act365F
             .year_fraction(as_of, maturity, DayCountContext::default())
             .expect("valid Act365F fraction");
-        let df_end = disc.df(t_end);
+        let df_end = disc.df(t_end).expect("discount factor");
         let sp_end = hazard.sp_on_date(maturity).expect("valid survival");
         let settlement_pv = notional * df_end * sp_end;
         let actual_recovery_pv = pvs[0] - settlement_pv;

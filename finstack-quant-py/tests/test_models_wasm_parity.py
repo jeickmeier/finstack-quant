@@ -756,6 +756,8 @@ def _rates_cases() -> dict[str, Callable[[], Any]]:
         date(2025, 1, 15),
         [(t, math.exp(-rate * t)) for t in (0.0, 0.5, 1.0, 2.0)],
         day_count="act_365f",
+        interp="monotone_convex",
+        extrapolation="extend",
     )
     model = lambda: dtsm.DieboldLi().fit(_panel())  # noqa: E731
     pca = lambda: dtsm.YieldPca.fit(_panel())  # noqa: E731
@@ -807,12 +809,20 @@ def _volatility_cases() -> dict[str, Callable[[], Any]]:
     tenor_slice = lambda: volatility.materialize_cube_tenor_slice(_cube(), 5.0, [0.02, 0.03, 0.04], "lognormal")  # noqa: E731
     expiry_slice = lambda: volatility.materialize_cube_expiry_slice(_cube(), 1.0, [0.02, 0.03, 0.04], "lognormal")  # noqa: E731
     grid_slice = lambda: VolCubeExpirySlice(  # noqa: E731
-        "GRID", 1.0, [2.0, 5.0], [0.02, 0.03, 0.04], [0.3, 0.25, 0.27, 0.28, 0.24, 0.26]
+        "GRID", 1.0, [2.0, 5.0], [0.02, 0.03, 0.04], [0.3, 0.25, 0.27, 0.28, 0.24, 0.26], quote_type="black_lognormal"
     )
-    fx = lambda: FxDeltaVolSurface("EURUSD", [0.5, 1.0], [0.10, 0.11], [0.01, 0.012], [0.002, 0.003])  # noqa: E731
+    fx = lambda: FxDeltaVolSurface("EURUSD", "EUR/USD", [0.5, 1.0], [0.10, 0.11], [0.01, 0.012], [0.002, 0.003])  # noqa: E731
     greeks = lambda: models.bs_greeks(_gbm("call"))  # noqa: E731
     smile = lambda: volatility.SabrSmile(volatility.SabrParameters(0.2, 1.0, 0.3, -0.2), 100.0, 1.5)  # noqa: E731
-    implied = lambda: VolSurface("SKEW", LV_EXPIRIES, STRIKES, [LV_SMILE] * 4)  # noqa: E731
+    implied = lambda: VolSurface(  # noqa: E731
+        "SKEW",
+        LV_EXPIRIES,
+        STRIKES,
+        [LV_SMILE] * 4,
+        secondary_axis="strike",
+        quote_type="black_lognormal",
+        interpolation_mode="vol",
+    )
     local_vol = lambda: volatility.LocalVolSurface.from_implied_vol(implied(), LV_FORWARDS)  # noqa: E731
     return {
         "volatility.local_vol": lambda: [
@@ -849,7 +859,10 @@ def _volatility_cases() -> dict[str, Callable[[], Any]]:
             volatility.get_cube_expiry_slice_vol_clamped(grid_slice(), 9.0, 0.035),
         ],
         "volatility.fx_delta_surface": lambda: _surface_vols(
-            volatility.materialize_fx_delta_surface(fx(), 1.10, 0.03, 0.02)
+            volatility.materialize_fx_delta_surface(
+                fx(),
+                [1.10 * math.exp(0.01 * 0.5), 1.10 * math.exp(0.01 * 1.0)],
+            )
         ),
         "volatility.sabr_smile": lambda: [smile().forward, smile().time_to_expiry],
         "models.bs_greeks_is_valid": lambda: greeks().is_valid(),

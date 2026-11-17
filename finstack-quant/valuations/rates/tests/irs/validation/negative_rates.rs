@@ -31,12 +31,7 @@ fn build_negative_rate_discount_curve(rate: f64, base_date: Date, curve_id: &str
     DiscountCurve::builder(curve_id)
         .base_date(base_date)
         .day_count(DayCount::Act360)
-        .validation(
-            finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
-                allow_non_monotonic: true,
-                forward_floor: None,
-            },
-        ) // Required for negative rates (DFs > 1)
+        // Required for negative rates (DFs > 1)
         .interp(InterpStyle::Linear) // Linear supports non-monotonic DFs
         .knots([
             (0.0, 1.0),
@@ -44,18 +39,14 @@ fn build_negative_rate_discount_curve(rate: f64, base_date: Date, curve_id: &str
             (5.0, (-rate * 5.0).exp()),
             (10.0, (-rate * 10.0).exp()),
         ])
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
 
 /// Build a flat forward curve with negative rate
 fn build_negative_rate_forward_curve(rate: f64, base_date: Date, curve_id: &str) -> ForwardCurve {
-    ForwardCurve::builder(curve_id, 0.25)
-        .base_date(base_date)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, rate), (10.0, rate)])
-        .build()
-        .unwrap()
+    ForwardCurve::flat(curve_id, base_date, rate, DayCount::Act360).unwrap()
 }
 
 fn create_negative_rate_market(disc_rate: f64, fwd_rate: f64, base_date: Date) -> MarketContext {

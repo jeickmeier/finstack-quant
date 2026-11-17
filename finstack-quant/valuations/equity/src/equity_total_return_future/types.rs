@@ -141,12 +141,18 @@ impl EquityTotalReturnFuture {
         id: &PriceId,
         label: &str,
     ) -> finstack_quant_core::Result<f64> {
-        let value = match market.get_price(id)? {
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => {
+        let scalar = market.get_price(id)?;
+        let value = match (scalar.get_unitless(), scalar.get_price()) {
+            (Some(value), _) => value,
+            (None, Some(money)) => {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "EquityTotalReturnFuture {label} must be unitless, got Price({})",
                     money.currency()
+                )));
+            }
+            (None, None) => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "EquityTotalReturnFuture {label} must be unitless"
                 )));
             }
         };
@@ -319,10 +325,13 @@ mod tests {
         let as_of = date!(2026 - 01 - 01);
         let settlement = date!(2027 - 01 - 01);
         let market = MarketContext::new()
-            .insert_price("SPOT", MarketScalar::Unitless(100.0))
-            .insert_price("DIST", MarketScalar::Unitless(8.0))
-            .insert_price("FUND", MarketScalar::Unitless(3.0))
-            .insert_price("SPREAD", MarketScalar::Unitless(50.0));
+            .insert_price("SPOT", MarketScalar::unitless(100.0).expect("valid scalar"))
+            .insert_price("DIST", MarketScalar::unitless(8.0).expect("valid scalar"))
+            .insert_price("FUND", MarketScalar::unitless(3.0).expect("valid scalar"))
+            .insert_price(
+                "SPREAD",
+                MarketScalar::unitless(50.0).expect("valid scalar"),
+            );
         let future = EquityTotalReturnFuture::builder()
             .id(InstrumentId::new("TESX"))
             .underlying_ticker("SX5E".to_string())
@@ -364,12 +373,21 @@ mod tests {
         let as_of = date!(2026 - 01 - 01);
         let future = EquityTotalReturnFuture::example().expect("example future");
         let market = MarketContext::new()
-            .insert_price("SX5E-CLOSE", MarketScalar::Unitless(100.0))
-            .insert_price("TESX-ACCRUED-DISTRIBUTIONS", MarketScalar::Unitless(8.0))
-            .insert_price("TESX-ACCRUED-FUNDING", MarketScalar::Unitless(3.0))
+            .insert_price(
+                "SX5E-CLOSE",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "TESX-ACCRUED-DISTRIBUTIONS",
+                MarketScalar::unitless(8.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "TESX-ACCRUED-FUNDING",
+                MarketScalar::unitless(3.0).expect("valid scalar"),
+            )
             .insert_price(
                 "TESX-SPREAD-BPS",
-                MarketScalar::Price(Money::from((50_i64, Currency::EUR))),
+                MarketScalar::price(Money::from((50_i64, Currency::EUR))),
             );
 
         let error = future

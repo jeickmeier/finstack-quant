@@ -29,11 +29,17 @@ fn curves(as_of: Date) -> MarketContext {
     let usd_curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots(vec![(0.0, 1.0), (0.5, 0.9753), (1.0, 0.9512)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("usd curve");
     let cny_curve = DiscountCurve::builder("CNY-OIS")
         .base_date(as_of)
         .knots(vec![(0.0, 1.0), (0.5, 0.9876), (1.0, 0.9753)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("cny curve");
     MarketContext::new().insert(usd_curve).insert(cny_curve)

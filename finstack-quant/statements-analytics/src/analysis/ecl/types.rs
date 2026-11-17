@@ -10,9 +10,7 @@
 //! - [`RawPdCurve`] -- user-supplied PD term structure with linear interpolation
 //! - [`RatingPdMap`] -- rating-keyed map of [`RawPdCurve`] values
 
-use finstack_quant_core::math::interp::{
-    ExtrapolationPolicy, Interpolator, LinearStrategy, ValidationPolicy,
-};
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, Interpolator, LinearStrategy};
 use finstack_quant_core::{Error, InputError, Result};
 use finstack_quant_models::credit::lgd::{CreditConversionFactor, EadCalculator};
 use indexmap::IndexMap;
@@ -357,8 +355,7 @@ impl Exposure {
                 Interpolator::<LinearStrategy>::new(
                     times.into_boxed_slice(),
                     eads.into_boxed_slice(),
-                    ExtrapolationPolicy::FlatZero,
-                    ValidationPolicy::AllowNegative,
+                    ExtrapolationPolicy::Flat,
                 )?;
             }
         }
@@ -394,10 +391,9 @@ impl Exposure {
                     let interp = Interpolator::<LinearStrategy>::new(
                         times.into_boxed_slice(),
                         eads.into_boxed_slice(),
-                        ExtrapolationPolicy::FlatZero,
-                        ValidationPolicy::AllowNegative,
+                        ExtrapolationPolicy::Flat,
                     )?;
-                    interp.interp(t)
+                    interp.interp(t)?
                 }
             }
             _ => self.ead,
@@ -568,8 +564,7 @@ impl RawPdCurve {
         let interp = Interpolator::<LinearStrategy>::new(
             times.into_boxed_slice(),
             pds.into_boxed_slice(),
-            ExtrapolationPolicy::FlatZero,
-            ValidationPolicy::AllowNegative,
+            ExtrapolationPolicy::Flat,
         )?;
         Ok(Self {
             rating: rating.into(),
@@ -612,7 +607,7 @@ impl PdTermStructure for RawPdCurve {
                 "RawPdCurve: horizon t must be finite (got {t})"
             )));
         }
-        Ok(self.interp.interp(t))
+        self.interp.interp(t)
     }
 
     fn contains_rating(&self, rating: &str) -> bool {
@@ -660,7 +655,7 @@ impl PdTermStructure for RatingPdMap {
                 "RatingPdMap: horizon t must be finite (got {t})"
             )));
         }
-        Ok(curve.interp.interp(t))
+        curve.interp.interp(t)
     }
 
     fn contains_rating(&self, rating: &str) -> bool {

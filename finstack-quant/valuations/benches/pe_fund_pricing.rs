@@ -41,6 +41,8 @@ fn create_market() -> MarketContext {
         .base_date(as_of)
         .knots([(0.0, 1.0), (2.0, 0.916), (5.0, 0.790), (10.0, 0.608)])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     MarketContext::new().insert(disc)

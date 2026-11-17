@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from finstack_quant.calibration import CalibrationDiagnostics, CalibrationReport, calibrate
-from finstack_quant.core.market_data import DiscountCurve, HazardCurve
+from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, HazardCurve
 
 GOLDEN: dict[str, Any] = json.loads((Path(__file__).parent / "data" / "calibration_wasm_parity.json").read_text())
 
@@ -110,15 +110,26 @@ def test_calibrated_discount_curve_exposes_its_rate_calibration_recipe() -> None
 
 
 def test_directly_built_curves_have_no_calibration_recipe() -> None:
-    discount = DiscountCurve("USD-OIS", "2025-01-01", [(0.0, 1.0), (1.0, 0.95)])
+    discount = DiscountCurve(
+        "USD-OIS",
+        "2025-01-01",
+        [(0.0, 1.0), (1.0, 0.95)],
+        interp="monotone_convex",
+        extrapolation="extend",
+        day_count="act_365f",
+    )
     assert discount.rate_calibration is None
-    assert discount.to_forward_curve("USD-FWD", 0.25).rate_calibration is None
-    hazard = HazardCurve("ACME-HZD", "2025-01-01", [(1.0, 0.02), (5.0, 0.03)], recovery_rate=0.4)
+    assert ForwardCurve.from_discount_curve("USD-FWD", discount).rate_calibration is None
+    hazard = HazardCurve("ACME-HZD", "2025-01-01", [(1.0, 0.02), (5.0, 0.03)], recovery_rate=0.4, day_count="act_365f")
     assert hazard.hazard_calibration is None
 
 
 def test_hazard_curve_exposes_its_hazard_calibration_recipe() -> None:
-    wire = json.loads(HazardCurve("RECIPE", "2025-01-01", [(1.0, 0.01), (5.0, 0.02)], recovery_rate=0.4).to_json())
+    wire = json.loads(
+        HazardCurve(
+            "RECIPE", "2025-01-01", [(1.0, 0.01), (5.0, 0.02)], recovery_rate=0.4, day_count="act_365f"
+        ).to_json()
+    )
     quote_input = {
         "quote": {"type": "cds_par_spread", "id": "CDS-5Y"},
         "pillar_date": "2026-01-01",

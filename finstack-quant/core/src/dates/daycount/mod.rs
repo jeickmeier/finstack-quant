@@ -1330,11 +1330,11 @@ mod tests {
 
         // Context → state → JSON → state → context preserves coupon_period.
         let state = DayCountContextState::try_from(ctx).expect("snapshot context");
-        assert_eq!(state.coupon_period, Some(coupon));
+        assert_eq!(state.get_coupon_period(), Some(coupon));
 
         let json = serde_json::to_string(&state).expect("serialize");
         let restored: DayCountContextState = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(restored.coupon_period, Some(coupon));
+        assert_eq!(restored.get_coupon_period(), Some(coupon));
 
         let restored_ctx = restored.to_ctx().expect("calendar state hydrates");
         assert_eq!(restored_ctx.coupon_period, Some(coupon));
@@ -1344,7 +1344,7 @@ mod tests {
         let omitted =
             r#"{"calendar_id":null,"frequency":null,"bus_basis":null,"coupon_period":null}"#;
         let state: DayCountContextState = serde_json::from_str(omitted).expect("omission is valid");
-        assert_eq!(state.end_is_termination_date, None);
+        assert_eq!(state.get_end_is_termination_date(), None);
         let day = date!(2025 - 02 - 28);
         assert!(
             super::DayCount::ThirtyE360Isda
@@ -1355,13 +1355,14 @@ mod tests {
 
     #[test]
     fn daycount_context_state_rejects_unknown_calendar() {
-        let state = super::DayCountContextState {
-            calendar_id: Some("not_a_calendar".to_string()),
-            frequency: None,
-            bus_basis: None,
-            coupon_period: None,
-            end_is_termination_date: None,
-        };
+        let state = super::DayCountContextState::try_new(
+            Some("not_a_calendar".to_string()),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("calendar lookup is deferred to to_ctx");
 
         let error = state
             .to_ctx()

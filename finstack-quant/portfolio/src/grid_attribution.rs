@@ -317,8 +317,8 @@ fn aggregate_side(
 
     for p in positions {
         validate_position(p, side)?;
-        sum_w.add(p.weight);
-        sum_r.add(p.weight * p.total_return);
+        sum_w.add(p.weight)?;
+        sum_r.add(p.weight * p.total_return)?;
 
         let sector_map = cells.entry(p.cell.clone()).or_default();
         let entry = sector_map.entry(p.sector.clone()).or_default();
@@ -330,10 +330,10 @@ fn aggregate_side(
         agg.add(p.weight, p.total_return);
     }
 
-    let total_w = sum_w.total();
+    let total_w = sum_w.get_total()?;
     check_weights_sum(side_name, total_w)?;
 
-    Ok(sum_r.total())
+    Ok(sum_r.get_total()?)
 }
 
 /// Compute a single-period hierarchical duration-cell x sector grid
@@ -457,7 +457,7 @@ pub fn grid_attribution(
         };
 
         let curve_effect = (x_p - x_b) * (r_t_b - benchmark_return);
-        total_curve.add(curve_effect);
+        total_curve.add(curve_effect)?;
         curve_effects.push(GridCellEffect {
             cell: cell.clone(),
             portfolio_weight: x_p,
@@ -484,8 +484,8 @@ pub fn grid_attribution(
             let allocation_effect = x_p * (z_p - z_b) * (r_st_b - r_t_b);
             let selection_effect = sp.weight * (r_st_p - r_st_b);
 
-            total_sector.add(allocation_effect);
-            total_selection.add(selection_effect);
+            total_sector.add(allocation_effect)?;
+            total_selection.add(selection_effect)?;
 
             sector_effects.push(GridSectorEffect {
                 cell: cell.clone(),
@@ -502,9 +502,9 @@ pub fn grid_attribution(
         active_return,
         curve_effects,
         sector_effects,
-        total_curve: total_curve.total(),
-        total_sector: total_sector.total(),
-        total_selection: total_selection.total(),
+        total_curve: total_curve.get_total()?,
+        total_sector: total_sector.get_total()?,
+        total_selection: total_selection.get_total()?,
     })
 }
 

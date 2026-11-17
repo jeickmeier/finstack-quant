@@ -46,7 +46,8 @@ fn restoring_credit_curves_preserves_complete_canonical_index_dependencies() {
             HazardCurve::builder(id)
                 .base_date(as_of)
                 .recovery_rate(0.4)
-                .knots([(0.0, rate), (5.0, rate)])
+                .knots([(5.0, rate)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
                 .build()
                 .expect("hazard"),
         )
@@ -87,7 +88,8 @@ fn restoring_credit_curves_preserves_complete_canonical_index_dependencies() {
         );
     let flags = MarketRestoreFlags::HAZARD | MarketRestoreFlags::CORRELATION;
     let snapshot = MarketSnapshot::extract(&source, flags);
-    let restored = MarketSnapshot::restore_market(&current, &snapshot, flags);
+    let restored = MarketSnapshot::restore_market(&current, &snapshot, flags)
+        .expect("restore_market should succeed");
     let index = restored
         .get_credit_index("INDEX")
         .expect("index survives curve replacement");
@@ -105,16 +107,15 @@ fn restoring_credit_curves_preserves_complete_canonical_index_dependencies() {
         &index.issuer_credit_curves().expect("issuer curves")["ISSUER"],
         &restored.get_hazard("ISSUER-HAZ").expect("restored issuer"),
     ));
-    assert!((index.index_credit_curve().sp(5.0) - (-0.1_f64).exp()).abs() < 1e-14);
+    assert!((index.index_credit_curve().sp(5.0).expect("sp") - (-0.1_f64).exp()).abs() < 1e-14);
     let json = serde_json::to_string(&restored).expect("consistent restored snapshot");
     let _: MarketContext = serde_json::from_str(&json).expect("restored market roundtrip");
 
     let missing = MarketSnapshot::extract(&MarketContext::new(), MarketRestoreFlags::HAZARD);
-    let without_hazards =
-        MarketSnapshot::restore_market(&current, &missing, MarketRestoreFlags::HAZARD);
-    assert!(without_hazards.get_credit_index("INDEX").is_err());
-    let json = serde_json::to_string(&without_hazards).expect("snapshot after removal");
-    let _: MarketContext = serde_json::from_str(&json).expect("no dangling index references");
+    assert!(
+        MarketSnapshot::restore_market(&current, &missing, MarketRestoreFlags::HAZARD).is_err(),
+        "removing hazard curves referenced by INDEX must fail atomically"
+    );
 }
 
 fn create_test_discount_curve(id: &str, base_date: Date) -> DiscountCurve {
@@ -122,14 +123,23 @@ fn create_test_discount_curve(id: &str, base_date: Date) -> DiscountCurve {
         .base_date(base_date)
         .knots(vec![(0.0, 1.0), (1.0, 0.98), (5.0, 0.90)])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("DiscountCurve builder should succeed with valid test data")
 }
 
 fn create_test_forward_curve(id: &str, base_date: Date) -> ForwardCurve {
-    ForwardCurve::builder(id, 0.25)
+    ForwardCurve::builder(id)
         .base_date(base_date)
-        .knots(vec![(0.0, 0.02), (1.0, 0.025), (5.0, 0.03)])
+        .knots(vec![
+            (0.0, 1.0),
+            (1.0, (-0.025_f64).exp()),
+            (5.0, (-0.15_f64).exp()),
+        ])
+        .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act360)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("ForwardCurve builder should succeed with valid test data")
 }
@@ -137,8 +147,9 @@ fn create_test_forward_curve(id: &str, base_date: Date) -> ForwardCurve {
 fn create_test_hazard_curve(id: &str, base_date: Date) -> HazardCurve {
     HazardCurve::builder(id)
         .base_date(base_date)
-        .knots(vec![(0.0, 0.0050), (1.0, 0.0055), (5.0, 0.0060)])
+        .knots(vec![(1.0, 0.0055), (5.0, 0.0060)])
         .recovery_rate(0.40)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .expect("HazardCurve builder should succeed with valid test data")
 }
@@ -146,7 +157,9 @@ fn create_test_hazard_curve(id: &str, base_date: Date) -> HazardCurve {
 fn create_test_inflation_curve(id: &str, _base_date: Date) -> InflationCurve {
     InflationCurve::builder(id)
         .base_date(_base_date)
-        .base_cpi(100.0)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Flat)
         .knots(vec![(0.0, 100.0), (1.0, 102.0), (5.0, 110.0)])
         .build()
         .expect("InflationCurve builder should succeed with valid test data")
@@ -176,7 +189,8 @@ fn test_extract_and_restore_rates_curves() {
     assert_eq!(snapshot.discount_curves.len(), 2);
 
     let restored =
-        MarketSnapshot::restore_market(&MarketContext::new(), &snapshot, MarketRestoreFlags::RATES);
+        MarketSnapshot::restore_market(&MarketContext::new(), &snapshot, MarketRestoreFlags::RATES)
+            .expect("restore_market should succeed");
 
     assert!(restored.get_discount("USD-OIS").is_ok());
     assert!(restored.get_discount("EUR-OIS").is_ok());
@@ -283,7 +297,8 @@ fn test_restore_market_unified_discount_only() {
     };
 
     let restored =
-        MarketSnapshot::restore_market(&current_market, &snapshot, MarketRestoreFlags::DISCOUNT);
+        MarketSnapshot::restore_market(&current_market, &snapshot, MarketRestoreFlags::DISCOUNT)
+            .expect("restore_market should succeed");
 
     assert!(restored.get_discount("EUR-OIS").is_ok());
     assert!(restored.get_discount("USD-OIS").is_err());
@@ -316,7 +331,8 @@ fn test_restore_market_unified_rates() {
     };
 
     let restored =
-        MarketSnapshot::restore_market(&current_market, &snapshot, MarketRestoreFlags::RATES);
+        MarketSnapshot::restore_market(&current_market, &snapshot, MarketRestoreFlags::RATES)
+            .expect("restore_market should succeed");
 
     assert!(restored.get_discount("EUR-OIS").is_ok());
     assert!(restored.get_forward("EUR-ESTR").is_ok());
@@ -333,7 +349,8 @@ fn test_restore_market_empty_snapshot_and_empty_market() {
         &market,
         &MarketSnapshot::default(),
         MarketRestoreFlags::RATES,
-    );
+    )
+    .expect("restore_market should succeed");
     assert!(restored.get_discount("USD-OIS").is_err());
 
     let snapshot = MarketSnapshot {
@@ -346,7 +363,8 @@ fn test_restore_market_empty_snapshot_and_empty_market() {
         ..Default::default()
     };
     let restored2 =
-        MarketSnapshot::restore_market(&MarketContext::new(), &snapshot, MarketRestoreFlags::RATES);
+        MarketSnapshot::restore_market(&MarketContext::new(), &snapshot, MarketRestoreFlags::RATES)
+            .expect("restore_market should succeed");
     assert!(restored2.get_discount("USD-OIS").is_ok());
 }
 
@@ -372,11 +390,13 @@ fn test_restore_equivalence_mixed_curve_types() {
         .insert(create_test_hazard_curve("CORP-B", base_date));
 
     let after_rates =
-        MarketSnapshot::restore_market(&target, &rates_snap, MarketRestoreFlags::RATES);
+        MarketSnapshot::restore_market(&target, &rates_snap, MarketRestoreFlags::RATES)
+            .expect("restore_market should succeed");
     assert!(after_rates.get_hazard("CORP-B").is_ok());
 
     let after_credit =
-        MarketSnapshot::restore_market(&after_rates, &credit_snap, MarketRestoreFlags::HAZARD);
+        MarketSnapshot::restore_market(&after_rates, &credit_snap, MarketRestoreFlags::HAZARD)
+            .expect("restore_market should succeed");
     assert!(after_credit.get_discount("USD-OIS").is_ok());
     assert!(after_credit.get_hazard("CORP-A").is_ok());
 
@@ -384,14 +404,16 @@ fn test_restore_equivalence_mixed_curve_types() {
         &after_credit,
         &inflation_snap,
         MarketRestoreFlags::INFLATION,
-    );
+    )
+    .expect("restore_market should succeed");
     assert!(after_inflation.get_inflation_curve("US-CPI").is_ok());
 
     let final_market = MarketSnapshot::restore_market(
         &after_inflation,
         &corr_snap,
         MarketRestoreFlags::CORRELATION,
-    );
+    )
+    .expect("restore_market should succeed");
     assert!(final_market.get_base_correlation("CDX-IG").is_ok());
     assert!(final_market.get_discount("GBP-OIS").is_err());
 }
@@ -412,20 +434,24 @@ fn test_combined_restore_matches_stacked_restore_for_cross_factor_flags() {
 
     let flags = MarketRestoreFlags::RATES | MarketRestoreFlags::HAZARD | MarketRestoreFlags::FX;
     let combined_snapshot = MarketSnapshot::extract(&market_t0, flags);
-    let combined = MarketSnapshot::restore_market(&market_t1, &combined_snapshot, flags);
+    let combined = MarketSnapshot::restore_market(&market_t1, &combined_snapshot, flags)
+        .expect("restore_market should succeed");
 
     let rates_snapshot = MarketSnapshot::extract(&market_t0, MarketRestoreFlags::RATES);
     let credit_snapshot = MarketSnapshot::extract(&market_t0, MarketRestoreFlags::HAZARD);
     let fx_snapshot = MarketSnapshot::extract(&market_t0, MarketRestoreFlags::FX);
     let stacked_rates =
-        MarketSnapshot::restore_market(&market_t1, &rates_snapshot, MarketRestoreFlags::RATES);
+        MarketSnapshot::restore_market(&market_t1, &rates_snapshot, MarketRestoreFlags::RATES)
+            .expect("restore_market should succeed");
     let stacked_credit = MarketSnapshot::restore_market(
         &stacked_rates,
         &credit_snapshot,
         MarketRestoreFlags::HAZARD,
-    );
+    )
+    .expect("restore_market should succeed");
     let stacked =
-        MarketSnapshot::restore_market(&stacked_credit, &fx_snapshot, MarketRestoreFlags::FX);
+        MarketSnapshot::restore_market(&stacked_credit, &fx_snapshot, MarketRestoreFlags::FX)
+            .expect("restore_market should succeed");
 
     assert_eq!(
         combined
@@ -441,11 +467,11 @@ fn test_combined_restore_matches_stacked_restore_for_cross_factor_flags() {
         combined
             .get_forward("USD-SOFR")
             .expect("combined forward")
-            .rate(1.0),
+            .df(1.0),
         stacked
             .get_forward("USD-SOFR")
             .expect("stacked forward")
-            .rate(1.0)
+            .df(1.0)
     );
     assert_eq!(
         combined
@@ -470,7 +496,8 @@ fn test_restore_fx_with_none_snapshot_clears_current_fx() {
         &market_with_fx,
         &snapshot_without_fx,
         MarketRestoreFlags::FX,
-    );
+    )
+    .expect("restore_market should succeed");
 
     assert!(restored.fx().is_none());
 }
@@ -531,7 +558,8 @@ fn test_restore_preserves_families_outside_the_snapshot_model() {
 
     // Restore the rates family to T0: everything else must survive.
     let snapshot = MarketSnapshot::extract(&market_t0, MarketRestoreFlags::RATES);
-    let restored = MarketSnapshot::restore_market(&market_t1, &snapshot, MarketRestoreFlags::RATES);
+    let restored = MarketSnapshot::restore_market(&market_t1, &snapshot, MarketRestoreFlags::RATES)
+        .expect("restore_market should succeed");
 
     assert!(restored.get_discount("USD-OIS").is_ok(), "rates restored");
     assert!(restored.get_hazard("ACME-HAZ").is_ok(), "hazard preserved");
@@ -552,7 +580,8 @@ fn test_restore_preserves_families_outside_the_snapshot_model() {
     // cube must be gone afterwards (vol cubes belong to the VOL family now).
     let vol_snapshot = MarketSnapshot::extract(&market_t0, MarketRestoreFlags::VOL);
     let vol_restored =
-        MarketSnapshot::restore_market(&market_t1, &vol_snapshot, MarketRestoreFlags::VOL);
+        MarketSnapshot::restore_market(&market_t1, &vol_snapshot, MarketRestoreFlags::VOL)
+            .expect("restore_market should succeed");
     assert!(
         vol_restored.get_vol_cube("USD-SWAPTION").is_err(),
         "VOL restore must replace vol cubes from the snapshot"

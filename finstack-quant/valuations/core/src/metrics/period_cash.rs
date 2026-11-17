@@ -206,7 +206,12 @@ pub(crate) fn collect_cashflows_from_flows(
                 continue;
             }
             let payment = curves
-                .convert_money(cf.get_amount(), base_currency, cf.get_date())?
+                .convert_money(
+                    cf.get_amount(),
+                    base_currency,
+                    cf.get_date(),
+                    finstack_quant_core::money::fx::FxConversionPolicy::CashflowDate,
+                )?
                 .amount;
             cash.total = cash.total.checked_add(payment)?;
             if is_period_income(cf.get_kind()) {

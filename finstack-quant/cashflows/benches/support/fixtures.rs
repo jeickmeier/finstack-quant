@@ -90,10 +90,17 @@ pub fn make_forward_market(base: Date) -> MarketContext {
     // Curve origin sits before issue so T-2 term resets and 5-business-day
     // overnight lookback observations project instead of requiring fixings.
     let curve_base = base + time::Duration::days(-45);
-    let fwd = ForwardCurve::builder(INDEX_ID, 0.25)
+    let fwd = ForwardCurve::builder(INDEX_ID)
         .base_date(curve_base)
         .day_count(DayCount::Act360)
-        .knots([(0.0, 0.045), (10.0, 0.045), (40.0, 0.045)])
+        .index_tenor(Tenor::quarterly())
+        .knots([
+            (0.0, 1.0),
+            (10.0, (-0.045_f64 * 10.0).exp()),
+            (40.0, (-0.045_f64 * 40.0).exp()),
+        ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     MarketContext::new().insert(fwd)

@@ -27,22 +27,16 @@ fn build_flat_curves(disc_rate: f64, fwd_rate: f64, base_date: Date) -> MarketCo
             (5.0, (-disc_rate * 5.0).exp()),
             (10.0, (-disc_rate * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let fwd_curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(base_date)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, fwd_rate), (10.0, fwd_rate)])
-        .build()
-        .unwrap();
+    let fwd_curve =
+        ForwardCurve::flat("USD-SOFR-3M", base_date, fwd_rate, DayCount::Act360).unwrap();
 
-    let fwd_curve_6m = ForwardCurve::builder("USD-SOFR-6M", 0.5)
-        .base_date(base_date)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, fwd_rate), (10.0, fwd_rate)])
-        .build()
-        .unwrap();
+    let fwd_curve_6m =
+        ForwardCurve::flat("USD-SOFR-6M", base_date, fwd_rate, DayCount::Act360).unwrap();
 
     // Provide fixings for theta calculations where the rolled as_of date
     // puts the first reset in the past.
@@ -50,6 +44,8 @@ fn build_flat_curves(disc_rate: f64, fwd_rate: f64, base_date: Date) -> MarketCo
         "FIXING:USD-SOFR-3M",
         vec![(base_date, fwd_rate)], // Fixing on base_date at the flat rate
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .expect("fixings series");
 
@@ -162,15 +158,12 @@ fn test_forward_starting_swap() {
             (5.0, (-0.05_f64 * 5.0).exp()),
             (10.0, (-0.05_f64 * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let fwd_curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(as_of)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.05), (10.0, 0.05)])
-        .build()
-        .unwrap();
+    let fwd_curve = ForwardCurve::flat("USD-SOFR-3M", as_of, 0.05, DayCount::Act360).unwrap();
 
     let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
 
@@ -271,17 +264,14 @@ fn test_swap_seasoned() {
             (1.0, (-0.06_f64).exp()), // Rates have risen
             (5.0, (-0.06_f64 * 5.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     // Flat forward curve based at the trade date: seasoned resets strictly
     // before the curve base now error under the default FloatingRateFallback.
-    let fwd_curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(start)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.06), (10.0, 0.06)])
-        .build()
-        .unwrap();
+    let fwd_curve = ForwardCurve::flat("USD-SOFR-3M", start, 0.06, DayCount::Act360).unwrap();
 
     // Provide fixings for past reset dates (quarterly from Jan through Apr)
     let fixings = finstack_quant_core::market_data::scalars::ScalarTimeSeries::new(
@@ -291,6 +281,8 @@ fn test_swap_seasoned() {
             (date!(2024 - 04 - 01), 0.05), // Q2 reset at 5% (rate started rising)
         ],
         None,
+        finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+        finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
     )
     .expect("fixings series");
 
@@ -376,11 +368,11 @@ fn test_swap_risk_attribution() {
         use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
         let bumped = market
             .bump([
-                MarketBump::Curve {
+                MarketBump::DiscountCurve {
                     id: "USD-OIS".into(),
                     spec: BumpSpec::parallel_bp(bp),
                 },
-                MarketBump::Curve {
+                MarketBump::ForwardCurve {
                     id: "USD-SOFR-3M".into(),
                     spec: BumpSpec::parallel_bp(bp),
                 },

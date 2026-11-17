@@ -190,6 +190,8 @@ def test_future_delivery_choice_switches_and_american_value_is_not_lower(tracks:
                 tracks.AS_OF,
                 [(t, math.exp(-rate * t)) for t in (0.0, 1.0, 5.0, 10.0, 20.0)],
                 day_count="act_365f",
+                interp="monotone_convex",
+                extrapolation="extend",
             )
         )
         prices = {}

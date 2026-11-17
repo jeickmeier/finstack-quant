@@ -91,29 +91,29 @@ export default [
   {
     "path": "#/$defs/d_29fc80a77a20009549e3",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/ResolutionMode",
-    "description": "Controls how shocks at multiple hierarchy levels combine for a single curve."
+    "description": "Controls how shocks at multiple hierarchy levels combine for a single market target."
   },
   {
     "path": "#/$defs/d_29fc80a77a20009549e3/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/ResolutionMode/oneOf/0",
     "const": "most_specific_wins",
-    "description": "The deepest (most specific) matching node's shock wins.\nParent-level shocks are ignored if a more specific one exists."
+    "description": "The deepest (most specific) matching hierarchy operation wins per exact target."
   },
   {
     "path": "#/$defs/d_29fc80a77a20009549e3/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/ResolutionMode/oneOf/1",
     "const": "cumulative",
-    "description": "Shocks accumulate walking down the tree.\nA curve gets the sum of all shocks from root to its leaf node."
+    "description": "Matching hierarchy operations accumulate in authored and preorder placement order."
   },
   {
     "path": "#/$defs/d_3d218202d529576e2f82",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/HierarchyTarget",
-    "description": "A target specifying a hierarchy path with optional tag filtering."
+    "description": "A target specifying a hierarchy path with an optional tag filter."
   },
   {
     "path": "#/$defs/d_3d218202d529576e2f82/properties/path",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/HierarchyTarget/properties/path",
-    "description": "Path through the hierarchy (e.g., `[\"Credit\", \"US\", \"IG\"]`)."
+    "description": "Non-empty path through the hierarchy (e.g., `[\"Credit\", \"US\", \"IG\"]`)."
   },
   {
     "path": "#/$defs/d_3d218202d529576e2f82/properties/path/items",
@@ -122,7 +122,7 @@ export default [
   {
     "path": "#/$defs/d_3d218202d529576e2f82/properties/tag_filter",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/HierarchyTarget/properties/tag_filter",
-    "description": "Optional tag filter applied to nodes in the subtree."
+    "description": "Optional tag filter applied to nodes in the subtree; an empty filter\ncanonicalizes to `None`."
   },
   {
     "path": "#/$defs/d_3d218202d529576e2f82/properties/tag_filter/anyOf/0",
@@ -202,7 +202,7 @@ export default [
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/10",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/10",
-    "description": "Bucketed volatility surface shock.\n\nSame sticky-strike multiplicative convention as\n[`OperationSpec::VolSurfaceParallelPct`], restricted to the selected\nexpiry/strike buckets. The calendar-spread check remains fixed-strike\nand is not a no-arbitrage certificate.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::VolSurfaceBucketPct {\n    vol_surface_id: \"SPX\".into(),\n    tenors: Some(vec![\"1M\".into(), \"3M\".into()]),\n    strikes: Some(vec![90.0, 95.0, 100.0]),\n    pct: 15.0,\n};\n```"
+    "description": "Bucketed volatility surface shock.\n\nSame sticky-strike multiplicative convention as\n[`OperationSpec::VolSurfaceParallelPct`], restricted to the selected\nexpiry/strike buckets (`pct >= -100`). Tenor selection requires an\nexplicit `expiry_clock` on the target surface anchored at the execution\ndate; strike filtering requires a `Strike` secondary axis. The\ncalendar-spread check applies only to `Strike`-axis `BlackLognormal`\nsurfaces and is not a no-arbitrage certificate.\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::VolSurfaceBucketPct {\n    vol_surface_id: \"SPX\".into(),\n    tenors: Some(vec![\"1M\".into(), \"3M\".into()]),\n    strikes: Some(vec![90.0, 95.0, 100.0]),\n    pct: 15.0,\n};\n```"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/10/properties/kind",
@@ -488,7 +488,7 @@ export default [
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/20",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/20",
-    "description": "Hierarchy-targeted vol-surface parallel shift.\n\nResolution follows the same hierarchy-expansion rules as\n[`OperationSpec::HierarchyCurveParallelBp`], but targets volatility\nsurfaces."
+    "description": "Hierarchy-targeted vol-surface parallel shift.\n\nResolution follows the same hierarchy-expansion rules as\n[`OperationSpec::HierarchyCurveParallelBp`], expanding into\n[`OperationSpec::VolSurfaceParallelPct`] per matched surface (`pct >= -100`)."
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/20/properties/kind",
@@ -818,7 +818,7 @@ export default [
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/9",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/OperationSpec/oneOf/9",
-    "description": "Parallel percent shift to a volatility surface.\n\nShocks are **sticky-strike** multiplicative grid moves: each stored\n`(expiry, strike)` vol is multiplied by `1 + pct/100`. This is not a\nsticky-delta re-mark. The post-shock calendar-spread check is\nfixed-strike and is a heuristic screen, not a no-arbitrage certificate.\n\n`pct` may be `<= -100`: vol-to-zero is sometimes used in degenerate\nstress (non-positive vol is a hard error; calendar-spread flags a\nwarning).\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::VolSurfaceParallelPct {\n    vol_surface_id: \"SPX\".into(),\n    pct: 10.0, // +10% volatility increase\n};\n```"
+    "description": "Parallel percent shift to a volatility surface.\n\nShocks are **sticky-strike** multiplicative grid moves: each stored\n`(expiry, secondary_value)` vol is multiplied by `1 + pct/100`. This is\nnot a sticky-delta re-mark. The post-shock fixed-strike calendar-spread\ncheck applies only to `Strike`-axis `BlackLognormal` surfaces and is a\nheuristic screen, not a no-arbitrage certificate.\n\n`pct` must satisfy `pct >= -100` (`-100%` collapses vols to `0.0`;\n`pct < -100` fails validation).\n\n# Example\n```rust\nuse finstack_quant_scenarios::OperationSpec;\n\nlet op = OperationSpec::VolSurfaceParallelPct {\n    vol_surface_id: \"SPX\".into(),\n    pct: 10.0, // +10% volatility increase\n};\n```"
   },
   {
     "path": "#/$defs/d_4a1bd77a72c86da677de/oneOf/9/properties/kind",
@@ -1861,23 +1861,6 @@ export default [
     "description": "Commodity forward [`PriceCurve`](finstack_quant_core::market_data::term_structures::PriceCurve).\n\n`bp` on parallel/node ops is percent of the price-curve forward\n(`5.0` = +5%), not a rate basis-point shock. Looking up a\n[`DiscountCurve`](finstack_quant_core::market_data::term_structures::DiscountCurve)\nunder this id is an error."
   },
   {
-    "path": "#/$defs/d_ab1d7cdb544921d346b3",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/HazardBumpMode",
-    "description": "How ParCDS operations deliver a spread shock onto a hazard curve.\n\n[`Self::SolveToPar`] is the production default: implied par CDS spreads are\nshocked and the hazard is re-bootstrapped so the curve still prices those\nquotes. [`Self::FirstOrderShift`] converts the spread shock to a hazard\nshift using `delta_hazard = delta_spread / (1 - recovery)` and emits an\napproximation warning. It does not reconcile the resulting par quotes."
-  },
-  {
-    "path": "#/$defs/d_ab1d7cdb544921d346b3/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/HazardBumpMode/oneOf/0",
-    "const": "solve_to_par",
-    "description": "Shock implied par CDS spreads and re-bootstrap the hazard curve."
-  },
-  {
-    "path": "#/$defs/d_ab1d7cdb544921d346b3/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/HazardBumpMode/oneOf/1",
-    "const": "first_order_shift",
-    "description": "Convert spread to hazard using loss given default, without exact par repricing."
-  },
-  {
     "path": "#/$defs/d_d1ea61763dcf52f6c7dc",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/Compounding",
     "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Periodic(1)]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor a common discount factor below one, annual and simple rates both exceed\nthe continuous rate. Their ordering depends on the maturity `t` in years:\n`r_annual > r_simple` for `0 < t < 1`, they agree at `t = 1`, and\n`r_simple > r_annual` for `t > 1`."
@@ -1922,7 +1905,7 @@ export default [
   {
     "path": "#/$defs/d_e939dec829e78a9c8ed9/oneOf/0/properties/equals/properties/key",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/TagPredicate/oneOf/0/properties/equals/properties/key",
-    "description": "Tag key to match."
+    "description": "Non-blank tag key to match."
   },
   {
     "path": "#/$defs/d_e939dec829e78a9c8ed9/oneOf/0/properties/equals/properties/value",
@@ -1932,7 +1915,7 @@ export default [
   {
     "path": "#/$defs/d_e939dec829e78a9c8ed9/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/TagPredicate/oneOf/1",
-    "description": "Tag value must be one of the given values."
+    "description": "Tag value must be one of the given values. An empty `values` list never matches."
   },
   {
     "path": "#/$defs/d_e939dec829e78a9c8ed9/oneOf/1/properties/in",
@@ -1941,7 +1924,7 @@ export default [
   {
     "path": "#/$defs/d_e939dec829e78a9c8ed9/oneOf/1/properties/in/properties/key",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/TagPredicate/oneOf/1/properties/in/properties/key",
-    "description": "Tag key to match."
+    "description": "Non-blank tag key to match."
   },
   {
     "path": "#/$defs/d_e939dec829e78a9c8ed9/oneOf/1/properties/in/properties/values",
@@ -1964,7 +1947,7 @@ export default [
   {
     "path": "#/$defs/d_e939dec829e78a9c8ed9/oneOf/2/properties/exists/properties/key",
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/TagPredicate/oneOf/2/properties/exists/properties/key",
-    "description": "Tag key that must be present."
+    "description": "Non-blank tag key that must be present."
   },
   {
     "path": "#/$defs/d_eac5202c75ff61c89c33",
@@ -2556,13 +2539,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/properties/description",
     "default": null,
     "description": "Optional description."
-  },
-  {
-    "path": "#/properties/hazard_bump_mode",
-    "source": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/properties/hazard_bump_mode",
-    "description": "How ParCDS curve operations rewrite hazard curves.\n\nDefault: [`HazardBumpMode::SolveToPar`]. Omitted from JSON when left\nat that default so existing envelopes keep their wire shape.",
-    "ref": "#/$defs/HazardBumpMode",
-    "resolvedRef": "https://finstack_quant.dev/schemas/scenarios/1/scenario_spec.schema.json#/$defs/HazardBumpMode"
   },
   {
     "path": "#/properties/id",

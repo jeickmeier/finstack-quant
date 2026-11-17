@@ -19,7 +19,7 @@ fn test_zero_percent_shock() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new().insert_price(
         "SPY",
-        MarketScalar::Price(Money::new(400.0, Currency::USD).expect("valid money fixture")),
+        MarketScalar::price(Money::new(400.0, Currency::USD).expect("valid money fixture")),
     );
     let mut model = FinancialModelSpec::new(
         "test",
@@ -40,7 +40,6 @@ fn test_zero_percent_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -57,12 +56,8 @@ fn test_zero_percent_shock() {
     assert_eq!(report.operations_applied, 1);
 
     let price = market.get_price("SPY").unwrap();
-    match price {
-        MarketScalar::Price(money) => {
-            assert!((money.amount() - 400.0).abs() < 1e-6);
-        }
-        MarketScalar::Unitless(_) => panic!("Expected Price"),
-    }
+    let money = price.get_price().expect("Expected Price");
+    assert!((money.amount() - 400.0).abs() < 1e-6);
 }
 
 #[test]
@@ -70,7 +65,7 @@ fn test_negative_shock() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new().insert_price(
         "SPY",
-        MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+        MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
     );
     let mut model = FinancialModelSpec::new(
         "test",
@@ -91,7 +86,6 @@ fn test_negative_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -108,12 +102,8 @@ fn test_negative_shock() {
     assert_eq!(report.operations_applied, 1);
 
     let price = market.get_price("SPY").unwrap();
-    match price {
-        MarketScalar::Price(money) => {
-            assert!((money.amount() - 50.0).abs() < 1e-6);
-        }
-        MarketScalar::Unitless(_) => panic!("Expected Price"),
-    }
+    let money = price.get_price().expect("Expected Price");
+    assert!((money.amount() - 50.0).abs() < 1e-6);
 }
 
 #[test]
@@ -121,7 +111,7 @@ fn test_very_large_shock() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new().insert_price(
         "SPY",
-        MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+        MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
     );
     let mut model = FinancialModelSpec::new(
         "test",
@@ -142,7 +132,6 @@ fn test_very_large_shock() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -159,12 +148,8 @@ fn test_very_large_shock() {
     assert_eq!(report.operations_applied, 1);
 
     let price = market.get_price("SPY").unwrap();
-    match price {
-        MarketScalar::Price(money) => {
-            assert!((money.amount() - 600.0).abs() < 1e-6);
-        }
-        MarketScalar::Unitless(_) => panic!("Expected Price"),
-    }
+    let money = price.get_price().expect("Expected Price");
+    assert!((money.amount() - 600.0).abs() < 1e-6);
 }
 
 #[test]
@@ -174,7 +159,7 @@ fn test_negative_100_percent_shock_on_equity_is_accepted() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new().insert_price(
         "SPY",
-        MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+        MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
     );
     let mut model = FinancialModelSpec::new(
         "test",
@@ -195,7 +180,6 @@ fn test_negative_100_percent_shock_on_equity_is_accepted() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -219,7 +203,7 @@ fn test_shock_beyond_negative_100_percent_on_equity_is_rejected() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let mut market = MarketContext::new().insert_price(
         "SPY",
-        MarketScalar::Price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
+        MarketScalar::price(Money::new(100.0, Currency::USD).expect("valid money fixture")),
     );
     let mut model = FinancialModelSpec::new(
         "test",
@@ -240,7 +224,6 @@ fn test_shock_beyond_negative_100_percent_on_equity_is_rejected() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -260,10 +243,8 @@ fn test_shock_beyond_negative_100_percent_on_equity_is_rejected() {
     let price = market
         .get_price("SPY")
         .expect("base price remains available");
-    match price {
-        MarketScalar::Price(money) => assert_eq!(money.amount(), 100.0),
-        MarketScalar::Unitless(_) => panic!("Expected Price"),
-    }
+    let money = price.get_price().expect("Expected Price");
+    assert_eq!(money.amount(), 100.0);
 }
 
 #[test]
@@ -295,7 +276,6 @@ fn test_negative_100_percent_fx_shock_is_rejected() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -337,7 +317,6 @@ fn test_shock_nonexistent_market_data() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -378,7 +357,6 @@ fn test_shock_nonexistent_statement_node() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -410,6 +388,9 @@ fn test_curve_parallel_shock_zero_bp() {
     let curve = DiscountCurve::builder("USD_SOFR")
         .base_date(base_date)
         .knots(vec![(0.0, 1.0), (1.0, 0.98)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -435,7 +416,6 @@ fn test_curve_parallel_shock_zero_bp() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -485,7 +465,6 @@ fn test_statement_shock_negative_percent() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -536,7 +515,6 @@ fn test_curve_shock_nonexistent_curve() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -586,7 +564,6 @@ fn test_statement_assign_extreme_value() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();

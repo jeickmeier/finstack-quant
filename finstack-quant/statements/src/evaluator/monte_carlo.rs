@@ -531,7 +531,10 @@ impl MonteCarloAccumulator {
                 sorted.sort_by(|a, b| a.total_cmp(b));
                 let mut pairs: Vec<(f64, f64)> = Vec::with_capacity(self.percentiles.len());
                 for &q in &self.percentiles {
-                    pairs.push((q, quantile_sorted(&sorted, q)));
+                    let value = quantile_sorted(&sorted, q)?.ok_or_else(|| {
+                        Error::eval("Monte Carlo quantile requested for empty sorted sample")
+                    })?;
+                    pairs.push((q, value));
                 }
 
                 series.values.insert(*period_id, pairs);

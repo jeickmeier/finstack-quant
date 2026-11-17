@@ -3,7 +3,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::InflationLag;
+use finstack_quant_core::market_data::scalars::{InflationLag, SeriesInterpolation};
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::PayReceive;
 use finstack_quant_valuations_rates::inflation_swap::InflationSwap;
@@ -13,20 +13,14 @@ use rust_decimal::Decimal;
 use time::Month;
 
 #[test]
-fn test_lag_override_vs_index_lag() {
+fn test_missing_lag_is_not_inherited_from_sources() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
     // Index with 3M lag
     let disc = flat_discount_curve_with_day_count(0.04, as_of, "USD-OIS", DayCount::Act365F);
     let infl_curve = flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.02).unwrap();
-    let index = simple_index(
-        "US-CPI-U",
-        as_of,
-        300.0,
-        Currency::USD,
-        InflationLag::Months(3),
-    );
+    let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD);
 
     let ctx = MarketContext::new()
         .insert(disc)
@@ -44,6 +38,7 @@ fn test_lag_override_vs_index_lag() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -60,22 +55,13 @@ fn test_lag_override_vs_index_lag() {
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
         .lag(InflationLag::None)
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
 
-    let pv_idx_lag = swap_idx_lag.value(&ctx, as_of).unwrap().amount();
-    let pv_no_lag = swap_no_lag.value(&ctx, as_of).unwrap().amount();
-
-    // The override must change both reference CPI anchors. There is no general
-    // directional PV ordering: lagging both numerator and denominator can move
-    // the ratio either way depending on realized history and curve shape.
-    assert!(
-        (pv_no_lag - pv_idx_lag).abs() > 1e-6,
-        "No-lag override must produce a distinct valuation from the index's 3M lag: {} vs {}",
-        pv_no_lag,
-        pv_idx_lag
-    );
+    assert!(swap_idx_lag.value(&ctx, as_of).is_err());
+    assert!(swap_no_lag.value(&ctx, as_of).unwrap().amount().is_finite());
 }
 
 #[test]
@@ -85,7 +71,7 @@ fn test_different_lag_durations() {
 
     let disc = flat_discount_curve_with_day_count(0.04, as_of, "USD-OIS", DayCount::Act365F);
     let infl_curve = flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.03).unwrap();
-    let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD, InflationLag::None);
+    let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD);
 
     let ctx = MarketContext::new()
         .insert(disc)
@@ -107,8 +93,9 @@ fn test_different_lag_durations() {
             .lag(if *lag_months == 0 {
                 InflationLag::None
             } else {
-                InflationLag::Months(*lag_months)
+                InflationLag::months(*lag_months)
             })
+            .interpolation(SeriesInterpolation::Linear)
             .attributes(Default::default())
             .build()
             .unwrap();
@@ -133,7 +120,7 @@ fn test_lag_in_days_vs_months() {
 
     let disc = flat_discount_curve_with_day_count(0.04, as_of, "USD-OIS", DayCount::Act365F);
     let infl_curve = flat_inflation_curve("US-CPI-U", as_of, 300.0, 0.02).unwrap();
-    let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD, InflationLag::None);
+    let index = simple_index("US-CPI-U", as_of, 300.0, Currency::USD);
 
     let ctx = MarketContext::new()
         .insert(disc)
@@ -151,7 +138,8 @@ fn test_lag_in_days_vs_months() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
-        .lag(InflationLag::Months(3))
+        .lag(InflationLag::months(3))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -166,7 +154,8 @@ fn test_lag_in_days_vs_months() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
-        .lag(InflationLag::Days(90))
+        .lag(InflationLag::days(90))
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -205,6 +194,8 @@ fn test_historical_observation_requires_fixing_or_explicit_contract_base() {
         .discount_curve_id("USD-OIS".into())
         .day_count(DayCount::Act365F)
         .side(PayReceive::Pay)
+        .lag(InflationLag::None)
+        .interpolation(SeriesInterpolation::Linear)
         .attributes(Default::default())
         .build()
         .unwrap();
@@ -216,10 +207,7 @@ fn test_historical_observation_requires_fixing_or_explicit_contract_base() {
     let mut explicitly_fixed = swap;
     explicitly_fixed.base_cpi = Some(300.0);
     assert!(
-        explicitly_fixed
-            .value(&ctx, as_of)
-            .expect("explicit start fixing")
-            .amount()
-            .is_finite()
+        explicitly_fixed.value(&ctx, as_of).is_err(),
+        "an explicit denominator does not replace the required projection snapshot"
     );
 }

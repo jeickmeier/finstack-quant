@@ -78,7 +78,7 @@ def calculate_var(
     >>> from finstack_quant.core.types import Rate
     >>> from finstack_quant.valuations.instruments import Bond, MarketHistory, calculate_var
     >>> as_of = datetime.date(2024, 1, 2)
-    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
+    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04, "act_365f"))
     >>> def bond(id):
     ...     return Bond.fixed(
     ...         id, Money(1e6, Currency("USD")), Rate(0.05), as_of, datetime.date(2029, 1, 2), StubKind.NONE, "USD-OIS"

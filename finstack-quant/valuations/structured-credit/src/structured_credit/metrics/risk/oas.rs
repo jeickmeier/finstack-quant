@@ -168,7 +168,7 @@ pub fn tranche_oas(
     // `exp(-beta * (r - base_rate)) == 1` at t = 0 (no prepayment shock on
     // the valuation date). Using the spot zero (0 by construction at t = 0)
     // would inject a spurious level shift equal to the first forward.
-    let base_rate = monthly_forwards(disc.as_ref(), 1)
+    let base_rate = monthly_forwards(disc.as_ref(), 1)?
         .first()
         .copied()
         .unwrap_or(0.0);
@@ -194,7 +194,7 @@ pub fn tranche_oas(
     // Discounting uses the exact curve DF times exp(-∫x), reproducing the curve
     // when volatility is zero.
     let forwards = if config.stochastic_rates {
-        Some(monthly_forwards(disc.as_ref(), num_months))
+        Some(monthly_forwards(disc.as_ref(), num_months)?)
     } else {
         None
     };
@@ -336,20 +336,18 @@ pub fn tranche_oas(
     }
 
     let path_count = num_paths as f64;
-    let objective = |oas: f64| -> f64 {
+    let objective = |oas: f64| -> Result<f64> {
         let mut total = 0.0;
         for entries in &scenarios {
             for (t, cf_base_df) in entries {
                 total += cf_base_df * (-oas * t).exp();
             }
         }
-        total / path_count - target_pv
+        Ok(total / path_count - target_pv)
     };
 
-    let solver = BrentSolver::new()
-        .with_tolerance(config.tolerance)
-        .with_initial_bracket_size(Some(0.05));
-    let oas = solver.solve(objective, 0.0)?;
+    let solver = BrentSolver::new(config.tolerance, 100)?;
+    let oas = solver.solve(objective, 0.0, -0.50, 2.0, 0.05, 20)?;
 
     // Per-scenario PVs at solved OAS for model price and Monte Carlo error.
     let path_pvs: Vec<f64> = scenarios
@@ -361,7 +359,9 @@ pub fn tranche_oas(
                 .sum()
         })
         .collect();
-    let (mean_pv, var) = mean_var(&path_pvs);
+    let (mean_opt, var_opt) = mean_var(&path_pvs)?;
+    let mean_pv = mean_opt.unwrap_or(0.0);
+    let var = var_opt.unwrap_or(0.0);
     let model_price = quote.clean_price(mean_pv);
     let price_std_error = if num_paths > 1 && current_balance > 0.0 {
         // Bessel-corrected standard error of the mean: sqrt(var / n).
@@ -384,16 +384,13 @@ pub fn tranche_oas(
 /// Monthly continuously-compounded forward rates from the discount curve over
 /// `[m/12, (m+1)/12]` for `m` in `0..num_months`. These are the deterministic
 /// term-structure anchor for the Hull-White short rate `r(t) = forward(t) + x(t)`.
-fn monthly_forwards(curve: &DiscountCurve, num_months: usize) -> Vec<f64> {
+fn monthly_forwards(curve: &DiscountCurve, num_months: usize) -> Result<Vec<f64>> {
     let dt = 1.0 / 12.0;
     (0..num_months)
         .map(|m| {
             let t1 = m as f64 * dt;
             let t2 = (m + 1) as f64 * dt;
-            // `forward` only errors on a non-positive interval, impossible here.
-            curve.forward(t1, t2).unwrap_or_else(|_| {
-                curve.zero_rate(t2, finstack_quant_core::math::Compounding::Continuous)
-            })
+            curve.forward(t1, t2)
         })
         .collect()
 }
@@ -525,6 +522,8 @@ mod tests {
             .base_date(Date::from_calendar_date(2024, Month::January, 1).expect("date"))
             .knots([(0.0, 1.0), (1.0, 0.97), (5.0, 0.80), (10.0, 0.58)])
             .interp(InterpStyle::LogLinear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve")
     }
@@ -533,10 +532,10 @@ mod tests {
     #[test]
     fn rate_path_starts_at_the_reference_rate() {
         let curve = steep_curve();
-        let forwards = monthly_forwards(&curve, 12);
+        let forwards = monthly_forwards(&curve, 12).expect("monthly forwards");
         // Zero vol: the path is the forward curve plus a zero drift.
         let path = absolute_rate_path(&forwards, &[0.0; 12], 0.05, 0.0);
-        let base_rate = monthly_forwards(&curve, 1)[0];
+        let base_rate = monthly_forwards(&curve, 1).expect("base forward")[0];
 
         assert!(
             (path[0] - base_rate).abs() < 1e-12,

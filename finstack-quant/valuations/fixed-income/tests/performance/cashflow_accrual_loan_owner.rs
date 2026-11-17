@@ -54,7 +54,9 @@ fn actual_callable_loan_record() -> Value {
         assert_eq!(outstanding.to_bits(), valuator.call_outstanding_vec[step].expect("stored call outstanding").to_bits());
         let event_time = discount.day_count().year_fraction(valuator.origin, date, DayCountContext::default()).expect("event time");
         let dirty = 1.01 * outstanding + accrued;
-        let expected_stored = dirty * discount.df(event_time) / discount.df(valuator.time_steps[step]);
+        let expected_stored = dirty
+            * discount.df(event_time).expect("df")
+            / discount.df(valuator.time_steps[step]).expect("df");
         support::close(stored, expected_stored, support::AI_BOUND_USD);
         Some(json!({
             "step": step, "query_date": date.to_string(), "actual_step_time": support::scalar(valuator.time_steps[step]),

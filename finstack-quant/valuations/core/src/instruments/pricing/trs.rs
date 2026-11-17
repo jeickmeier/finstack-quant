@@ -173,11 +173,10 @@ fn financing_period_projection(
                         fixings,
                         financing.forward_curve_id.as_str(),
                         period_start,
-                        as_of,
                     )?,
                 )
             } else if period_start == as_of {
-                fixings.and_then(|series| series.value_on_exact(period_start).ok())
+                fixings.and_then(|series| series.get_value_exact(period_start).ok())
             } else {
                 None
             };
@@ -472,9 +471,9 @@ impl TrsEngine {
         for (date, amount) in
             Self::cashflows_total_return_leg_with_model(params, market, as_of, model)?
         {
-            pv.add(amount.amount() * disc.as_ref().df_between_dates(as_of, date)?);
+            pv.add(amount.amount() * disc.as_ref().df_between_dates(as_of, date)?)?;
         }
-        Money::new(pv.total(), currency)
+        Money::new(pv.get_total()?, currency)
     }
 
     /// Projects the undiscounted total-return leg cashflows, one per period.
@@ -582,9 +581,9 @@ impl TrsEngine {
         for (date, amount) in
             Self::cashflows_financing_leg(financing, schedule, notional, market, as_of)?
         {
-            pv.add(amount.amount() * disc.as_ref().df_between_dates(as_of, date)?);
+            pv.add(amount.amount() * disc.as_ref().df_between_dates(as_of, date)?)?;
         }
-        Money::new(pv.total(), currency)
+        Money::new(pv.get_total()?, currency)
     }
 
     /// Projects the undiscounted financing leg cashflows, one per period.
@@ -733,12 +732,12 @@ impl TrsEngine {
             false,
             |payment_date, projected| {
                 let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
-                annuity.add(df * projected.year_fraction);
+                annuity.add(df * projected.year_fraction)?;
                 Ok(())
             },
         )?;
 
-        let result = annuity.total() * notional.amount();
+        let result = annuity.get_total()? * notional.amount();
 
         if result.abs() < crate::instruments::pricing::swap_legs::ANNUITY_EPSILON {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -796,12 +795,12 @@ impl TrsEngine {
             |payment_date, projected| {
                 let payment = projected.unsigned_coupon(notional.amount(), 0.0);
                 let df = disc.as_ref().df_between_dates(as_of, payment_date)?;
-                total_pv.add(payment * df);
+                total_pv.add(payment * df)?;
                 Ok(())
             },
         )?;
 
-        Ok(total_pv.total())
+        total_pv.get_total()
     }
 
     /// Par financing spread in basis points: the spread that zeroes the
@@ -940,34 +939,58 @@ mod tests {
                     roll_rule: finstack_quant_cashflows::builder::RollRule::None,
                 },
             );
-            let market = MarketContext::new()
-                .insert(
-                    DiscountCurve::builder("DISC")
-                        .base_date(as_of)
-                        .day_count(DayCount::Act365F)
-                        .knots([(0.0, 1.0), (3.0, 1.0)])
-                        .build()
-                        .expect("flat discount"),
-                )
-                .insert(
-                    // Express the 5% contractual ACT/365L rate on the curve's
-                    // ACT/365F basis while retaining the actual coupon tenor.
-                    ForwardCurve::builder("TERM", (end - start).whole_days() as f64 / 365.0)
-                        .base_date(as_of)
-                        .day_count(DayCount::Act365F)
-                        .knots([
-                            (0.0, 0.05 * 365.0 / denominator),
-                            (3.0, 0.05 * 365.0 / denominator),
-                        ])
-                        .build()
-                        .expect("flat forward"),
-                );
+            let disc = DiscountCurve::builder("DISC")
+                .base_date(as_of)
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 1.0), (3.0, 1.0)])
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+                .build()
+                .expect("flat discount");
             let notional = Money::from((1_000_000_i64, Currency::USD));
             let total_fraction = (end - start).whole_days() as f64 / denominator;
             for compounding in [
                 FloatingLegCompounding::Simple,
                 FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
             ] {
+                let fwd = if matches!(compounding, FloatingLegCompounding::Simple) {
+                    ForwardCurve::from_dates(
+                        "TERM",
+                        as_of,
+                        &[
+                            (as_of, 1.0),
+                            (start, 1.0),
+                            (end, 1.0 / (1.0 + 0.05 * total_fraction)),
+                        ],
+                        DayCount::Act365F,
+                        finstack_quant_core::math::interp::InterpStyle::LogLinear,
+                        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+                    )
+                    .expect("flat term forward")
+                } else {
+                    let mut pts = vec![(as_of, 1.0), (start, 1.0)];
+                    let mut day = start;
+                    let mut fac = 1.0;
+                    while day < end {
+                        let next = day
+                            .add_weekdays(1)
+                            .expect("next overnight interval")
+                            .min(end);
+                        fac /= 1.0 + 0.05 * (next - day).whole_days() as f64 / denominator;
+                        pts.push((next, fac));
+                        day = next;
+                    }
+                    ForwardCurve::from_dates(
+                        "TERM",
+                        as_of,
+                        &pts,
+                        DayCount::Act365F,
+                        finstack_quant_core::math::interp::InterpStyle::LogLinear,
+                        finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+                    )
+                    .expect("flat overnight forward")
+                };
+                let market = MarketContext::new().insert(disc.clone()).insert(fwd);
                 let financing = FinancingLegSpec {
                     discount_curve_id: CurveId::new("DISC"),
                     forward_curve_id: CurveId::new("TERM"),
@@ -1082,6 +1105,8 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, 1.0)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 
@@ -1128,6 +1153,8 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act360)
             .knots([(0.0, 1.0), (1.0, 0.95)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 
@@ -1157,7 +1184,7 @@ mod tests {
                 .day_count
                 .year_fraction(as_of, period_end, ctx_day_count)
                 .expect("t_end");
-            let df_naive = disc.df(t_end);
+            let df_naive = disc.df(t_end).expect("df");
             let payment = 1_000_000.0 * model.rate;
             expected += payment * df;
             naive += payment * df_naive;
@@ -1197,15 +1224,21 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act360)
             .knots([(0.0, 1.0), (1.0, 0.95)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 
-        let fwd = ForwardCurve::builder(CurveId::new("FWD"), 0.25)
-            .base_date(as_of)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.03), (1.0, 0.04)])
-            .build()
-            .expect("forward curve");
+        let fwd = ForwardCurve::from_zero_rates(
+            CurveId::new("FWD"),
+            as_of,
+            &[(0.0, 0.03), (1.0, 0.04)],
+            finstack_quant_core::math::Compounding::Continuous,
+            DayCount::Act360,
+            finstack_quant_core::math::interp::InterpStyle::LogLinear,
+            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+        )
+        .expect("forward curve");
 
         let ctx = MarketContext::new()
             .insert(disc.clone())
@@ -1264,9 +1297,9 @@ mod tests {
                 .year_fraction(as_of, period_end, ctx_day_count)
                 .expect("t_end");
             let fwd_naive = fwd
-                .rate_period(t_start, t_end)
+                .rate_between(t_start, t_end, yf)
                 .expect("finite ordered period");
-            let df_naive = disc.df(t_end);
+            let df_naive = disc.df(t_end).expect("df");
             naive += 1_000_000.0 * fwd_naive * yf * df_naive;
         }
 
@@ -1297,12 +1330,8 @@ mod tests {
         let period_end = date(2025, 2, 3);
         let as_of = date(2025, 1, 20);
 
-        // Flat OIS forward at 5 % (overnight tenor ~ 1/365).
-        let fwd = ForwardCurve::builder(CurveId::new("SOFR"), 1.0 / 365.0)
-            .base_date(period_start)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.05), (1.0, 0.05)])
-            .build()
+        // Flat OIS forward at 5%.
+        let fwd = ForwardCurve::flat(CurveId::new("SOFR"), period_start, 0.05, DayCount::Act360)
             .expect("forward curve");
 
         // Realized fixings at 4 % for every weekday in Jan 01..15.
@@ -1321,13 +1350,21 @@ mod tests {
             ds
         };
         let realized_obs: Vec<(Date, f64)> = realized_dates.iter().map(|&d| (d, 0.04)).collect();
-        let fixing_series =
-            ScalarTimeSeries::new("FIXING:SOFR", realized_obs, None).expect("fixing series");
+        let fixing_series = ScalarTimeSeries::new(
+            "FIXING:SOFR",
+            realized_obs,
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("fixing series");
 
         let disc = DiscountCurve::builder(CurveId::new("DISC"))
             .base_date(as_of)
             .day_count(DayCount::Act360)
             .knots([(0.0, 1.0), (1.0, 1.0)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 
@@ -1403,6 +1440,8 @@ mod tests {
                     .base_date(as_of)
                     .day_count(DayCount::Act360)
                     .knots([(0.0, 1.0), (1.0, 1.0)])
+                    .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                    .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                     .build()
                     .expect("disc no_fixings"),
             )
@@ -1464,11 +1503,7 @@ mod tests {
         let period_start = date(2025, 1, 6);
         let period_end = date(2025, 4, 7);
         let as_of = date(2025, 2, 3);
-        let fwd = ForwardCurve::builder("USD-TERM-3M", 0.25)
-            .base_date(period_start)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.05), (1.0, 0.05)])
-            .build()
+        let fwd = ForwardCurve::flat("USD-TERM-3M", period_start, 0.05, DayCount::Act360)
             .expect("forward curve");
         let financing = FinancingLegSpec {
             discount_curve_id: CurveId::new("DISC"),
@@ -1496,9 +1531,14 @@ mod tests {
         .expect_err("started term period without fixing must fail");
         assert!(missing.to_string().contains("FIXING:USD-TERM-3M"));
 
-        let fixings =
-            ScalarTimeSeries::new("FIXING:USD-TERM-3M", vec![(period_start, 0.041)], None)
-                .expect("fixing series");
+        let fixings = ScalarTimeSeries::new(
+            "FIXING:USD-TERM-3M",
+            vec![(period_start, 0.041)],
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("fixing series");
         let observed = financing_period_rate(
             &financing,
             &fwd,
@@ -1534,11 +1574,7 @@ mod tests {
     fn trs_term_rate_period_resetting_on_valuation_date_uses_published_fixing_or_projects() {
         let as_of = date(2025, 1, 6);
         let period_end = date(2025, 4, 7);
-        let fwd = ForwardCurve::builder("USD-TERM-3M", 0.25)
-            .base_date(as_of)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.05), (1.0, 0.05)])
-            .build()
+        let fwd = ForwardCurve::flat("USD-TERM-3M", as_of, 0.05, DayCount::Act360)
             .expect("forward curve");
         let financing = FinancingLegSpec {
             discount_curve_id: CurveId::new("DISC"),
@@ -1565,8 +1601,14 @@ mod tests {
             financing_period_projection(&leg, as_of, period_end, year_fraction).expect("projection")
         };
 
-        let published = ScalarTimeSeries::new("FIXING:USD-TERM-3M", vec![(as_of, 0.041)], None)
-            .expect("fixing series");
+        let published = ScalarTimeSeries::new(
+            "FIXING:USD-TERM-3M",
+            vec![(as_of, 0.041)],
+            None,
+            finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
+            finstack_quant_core::market_data::scalars::SeriesExtrapolation::Error,
+        )
+        .expect("fixing series");
         let fixed = project(Some(&published));
         assert!((fixed.rate - 0.041).abs() < 1e-14);
         assert!(
@@ -1590,8 +1632,8 @@ mod tests {
         // drops. A `simple` and a compounded leg over the same
         // curves must therefore price differently, with OIS strictly higher.
         let as_of = date(2024, 12, 31);
-        let start = date(2025, 1, 1);
-        let end = date(2026, 1, 1);
+        let start = date(2025, 1, 15);
+        let end = date(2025, 10, 15);
         let schedule = TrsScheduleSpec::from_params(
             start,
             end,
@@ -1612,16 +1654,22 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act360)
             .knots([(0.0, 1.0), (1.0, 0.95)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
 
         // Steep upward-sloping overnight forward: 3% -> 6% over the year.
-        let fwd = ForwardCurve::builder(CurveId::new("FWD"), 0.25)
-            .base_date(as_of)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.03), (1.0, 0.06)])
-            .build()
-            .expect("forward curve");
+        let fwd = ForwardCurve::from_zero_rates(
+            CurveId::new("FWD"),
+            as_of,
+            &[(0.0, 0.03), (0.25, 0.035), (0.5, 0.045), (1.0, 0.06)],
+            finstack_quant_core::math::Compounding::Continuous,
+            DayCount::Act360,
+            finstack_quant_core::math::interp::InterpStyle::LogLinear,
+            finstack_quant_core::math::interp::ExtrapolationPolicy::Extend,
+        )
+        .expect("forward curve");
 
         let ctx = MarketContext::new().insert(disc).insert(fwd);
         let notional = Money::from((1_000_000_i64, Currency::USD));
@@ -1631,25 +1679,38 @@ mod tests {
             .clone()
             .with_compounding(FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 });
 
+        let ois_lookback = term
+            .clone()
+            .with_compounding(FloatingLegCompounding::CompoundedInArrears { lookback_days: 5 });
+
         let pv_term = TrsEngine::pv_financing_leg(&term, &schedule, notional, &ctx, as_of)
             .expect("term-rate financing pv");
         let pv_ois = TrsEngine::pv_financing_leg(&ois, &schedule, notional, &ctx, as_of)
             .expect("OIS financing pv");
+        let pv_lookback =
+            TrsEngine::pv_financing_leg(&ois_lookback, &schedule, notional, &ctx, as_of)
+                .expect("OIS lookback financing pv");
 
         assert!(
-            pv_ois.amount() > pv_term.amount(),
-            "OIS compounding must exceed term-rate on an upward curve: ois={}, term={}",
+            (pv_ois.amount() - pv_term.amount()).abs() < 1e-6,
+            "Unshifted OIS compounding must telescope to term-rate on a shared factor curve: ois={}, term={}",
             pv_ois.amount(),
             pv_term.amount()
         );
+        assert!(
+            pv_ois.amount() > pv_lookback.amount(),
+            "Unshifted OIS compounding must exceed positive-lookback compounding on an upward curve: ois={}, lookback={}",
+            pv_ois.amount(),
+            pv_lookback.amount()
+        );
 
-        // The convexity gap should be material (a fraction of a bp up to a few
+        // The lookback gap should be material (a fraction of a bp up to a few
         // bp of notional) but not absurd — guards against a degenerate
         // near-zero pass or a units blunder.
-        let gap_bp = (pv_ois.amount() - pv_term.amount()) / notional.amount() * 10_000.0;
+        let gap_bp = (pv_ois.amount() - pv_lookback.amount()) / notional.amount() * 10_000.0;
         assert!(
             (0.1..50.0).contains(&gap_bp),
-            "OIS-vs-term convexity gap {gap_bp} bp is outside the expected range"
+            "OIS-vs-lookback gap {gap_bp} bp is outside the expected range"
         );
     }
 
@@ -1663,12 +1724,8 @@ mod tests {
 
         let start = date(2025, 1, 2);
         let end = date(2025, 4, 2);
-        let fwd = ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 365.0)
-            .base_date(start)
-            .day_count(DayCount::Act360)
-            .knots([(0.0, 0.04), (1.0, 0.04)])
-            .build()
-            .expect("forward");
+        let fwd =
+            ForwardCurve::flat("USD-SOFR-OIS", start, 0.04, DayCount::Act360).expect("forward");
         let financing = FinancingLegSpec {
             discount_curve_id: CurveId::new("USD-OIS"),
             forward_curve_id: CurveId::new("USD-SOFR-OIS"),

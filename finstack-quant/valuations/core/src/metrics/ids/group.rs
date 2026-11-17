@@ -188,6 +188,8 @@ impl MetricGroup {
             Self::Credit => &[
                 MetricId::Cs01,
                 MetricId::BucketedCs01,
+                MetricId::Hazard01,
+                MetricId::BucketedHazard01,
                 MetricId::ParSpread,
                 MetricId::RiskyPv01,
                 MetricId::RiskyAnnuity,

@@ -17,7 +17,7 @@ export function Example({
       surface={{
         id: "SPX implied volatility",
         expiries: [0.25, 0.5, 1, 2, 5],
-        strikes: [4000, 4250, 4500, 4750, 5000],
+        secondary_values: [4000, 4250, 4500, 4750, 5000],
         secondary_axis: "strike",
         quote_type: "black_lognormal",
         interpolation_mode: "total_variance",

@@ -1,6 +1,6 @@
 {
   "expected": {
-    "dv01": 503.812034230521,
+    "dv01": 524.2607692279125,
     "npv": 30091.43913435537,
     "vega": 1499.5634006621185
   },
@@ -69,10 +69,9 @@
       "credit_indices": [],
       "curves": [
         {
-          "allow_non_monotonic": false,
           "base": "2026-04-30",
           "day_count": "act_365f",
-          "extrapolation": "flat_forward",
+          "extrapolation": "extend",
           "id": "USD-OIS",
           "interp_style": "log_linear",
           "knot_points": [
@@ -85,30 +84,34 @@
               0.40656965974059917
             ]
           ],
-          "min_forward_rate": null,
-          "min_forward_tenor": 1e-06,
           "rate_calibration": null,
           "type": "discount"
         },
         {
           "base": "2026-04-30",
           "day_count": "act_365f",
-          "extrapolation": "flat_forward",
+          "extrapolation": "extend",
           "id": "USD-TERM-1Y",
-          "interp_style": "linear",
+          "index_tenor": {
+            "count": 12,
+            "unit": "months"
+          },
+          "interp_style": "log_linear",
           "knot_points": [
             [
               0.0,
-              0.04
+              1.0
             ],
             [
-              30.0,
-              0.04
+              1.0,
+              0.9615384615384615
+            ],
+            [
+              2.0027397260273974,
+              0.9244587990241767
             ]
           ],
           "rate_calibration": null,
-          "reset_lag": 2,
-          "tenor": 0.25,
           "type": "forward"
         }
       ],
@@ -131,7 +134,7 @@
           "interpolation_mode": "vol",
           "quote_type": "black_lognormal",
           "secondary_axis": "tenor",
-          "strikes": [
+          "secondary_values": [
             0.5,
             1.0,
             2.0

@@ -628,12 +628,9 @@ pub(crate) fn bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn(
                 quote.is_cap,
             )
         };
-        let residual = |candidate: f64| match model_price(candidate) {
-            Ok(price) => price - market_price,
-            Err(_) => f64::NAN,
-        };
-        let lower = residual(config.sigma_min);
-        let upper = residual(config.sigma_max);
+        let residual = |candidate: f64| model_price(candidate).map(|price| price - market_price);
+        let lower = residual(config.sigma_min)?;
+        let upper = residual(config.sigma_max)?;
         if !lower.is_finite()
             || !upper.is_finite()
             || (lower.signum() == upper.signum() && lower != 0.0 && upper != 0.0)
@@ -643,10 +640,11 @@ pub(crate) fn bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn(
                 quote.maturity, config.sigma_min, config.sigma_max, lower, upper
             )));
         }
-        let solved = BrentSolver::new()
-            .with_tolerance(1.0e-12)
-            .with_max_iterations(200)
-            .solve_in_bracket(|x| Ok(residual(x)), config.sigma_min, config.sigma_max)?;
+        let solved = BrentSolver::new(1.0e-12, 200)?.solve_in_bracket(
+            residual,
+            config.sigma_min,
+            config.sigma_max,
+        )?;
         if solved >= config.sigma_max * (1.0 - 1.0e-6) {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "piecewise HW1F bootstrap pillar {}Y hit sigma upper bound {}",

@@ -11,7 +11,9 @@ use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolGridOpts, VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve, Seniority};
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
@@ -96,6 +98,8 @@ fn create_market() -> MarketContext {
             (10.0, 0.60),
         ])
         .interp(InterpStyle::LogLinear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -107,7 +111,6 @@ fn create_market() -> MarketContext {
         .recovery_rate(0.40)
         .base_date(base)
         .knots([
-            (0.0, 0.012), // 120bp hazard
             (0.5, 0.013),
             (1.0, 0.014),
             (2.0, 0.016),
@@ -115,6 +118,7 @@ fn create_market() -> MarketContext {
             (5.0, 0.022),
             (10.0, 0.030),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap();
 
@@ -125,7 +129,11 @@ fn create_market() -> MarketContext {
         &[30.0 / 365.0, 90.0 / 365.0, 0.5, 1.0, 2.0, 3.0],
         &[0.005, 0.0075, 0.01, 0.015, 0.02], // Strikes as decimal rates
         &[0.30; 30],                         // Flat 30% vol
-        Default::default(),
+        VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
+            quote_type: VolQuoteType::BlackLognormal,
+            interpolation_mode: VolInterpolationMode::Vol,
+        },
         None,
     )
     .unwrap();

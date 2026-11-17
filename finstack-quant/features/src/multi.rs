@@ -202,7 +202,7 @@ pub fn transform_timeseries_pairwise(
                 }
             }
             if left.len() >= required {
-                output[idx] = pairwise_value(&left, &right, op);
+                output[idx] = pairwise_value(&left, &right, op)?;
             }
             Ok(())
         })
@@ -380,28 +380,38 @@ fn validate_exposures(primary_len: usize, exposures: &[Vec<Option<f64>>]) -> Res
     Ok(())
 }
 
-fn pairwise_value(left: &[f64], right: &[f64], op: PairwiseOp) -> Option<f64> {
-    let (left_scale, left) = scaled_centered(left);
-    let (right_scale, right) = scaled_centered(right);
-    let cov = covariance(&left, &right);
+fn pairwise_value(left: &[f64], right: &[f64], op: PairwiseOp) -> Result<Option<f64>> {
+    let (left_scale, left) = scaled_centered(left)?;
+    let (right_scale, right) = scaled_centered(right)?;
+    let Some(cov) = covariance(&left, &right)? else {
+        return Ok(None);
+    };
     match op {
-        PairwiseOp::RollingCov => Some((cov * left_scale) * right_scale),
+        PairwiseOp::RollingCov => Ok(Some((cov * left_scale) * right_scale)),
         PairwiseOp::RollingCorr => {
-            let left_std = variance(&left).sqrt();
-            let right_std = variance(&right).sqrt();
-            Some(if left_std > 0.0 && right_std > 0.0 {
+            let Some(left_var) = variance(&left)? else {
+                return Ok(None);
+            };
+            let Some(right_var) = variance(&right)? else {
+                return Ok(None);
+            };
+            let left_std = left_var.sqrt();
+            let right_std = right_var.sqrt();
+            Ok(Some(if left_std > 0.0 && right_std > 0.0 {
                 ((cov / left_std) / right_std).clamp(-1.0, 1.0)
             } else {
                 0.0
-            })
+            }))
         }
         PairwiseOp::RollingBeta => {
-            let right_var = variance(&right);
-            Some(if right_var > 0.0 {
+            let Some(right_var) = variance(&right)? else {
+                return Ok(None);
+            };
+            Ok(Some(if right_var > 0.0 {
                 ((cov / right_var) * left_scale) / right_scale
             } else {
                 0.0
-            })
+            }))
         }
     }
 }
@@ -486,7 +496,7 @@ fn fit_ols(
             .map(|&idx| exposure[idx].unwrap_or(0.0) / scale)
             .collect();
         let center = if fit_intercept {
-            mean(&normalized).unwrap_or(0.0)
+            mean(&normalized)?.unwrap_or(0.0)
         } else {
             0.0
         };

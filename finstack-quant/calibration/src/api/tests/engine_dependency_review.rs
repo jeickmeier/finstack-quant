@@ -31,15 +31,15 @@ fn assert_parallel_matches_sequential(
     let parallel = MarketContext::try_from(parallel.result.final_market)?;
     for time in [0.25, 1.0, 2.0, 5.0, 10.0] {
         assert!(
-            (sequential.get_discount("USD-OIS")?.df(time)
-                - parallel.get_discount("USD-OIS")?.df(time))
+            (sequential.get_discount("USD-OIS")?.df(time)?
+                - parallel.get_discount("USD-OIS")?.df(time)?)
             .abs()
                 <= 1e-12,
             "parallel discount factor differs at t={time}"
         );
         assert!(
-            (sequential.get_forward("USD-SOFR-3M")?.rate(time)
-                - parallel.get_forward("USD-SOFR-3M")?.rate(time))
+            (sequential.get_forward("USD-SOFR-3M")?.df(time)?
+                - parallel.get_forward("USD-SOFR-3M")?.df(time)?)
             .abs()
                 <= 1e-12,
             "parallel projection differs at t={time}"
@@ -75,11 +75,8 @@ fn swaption_example_has_identical_sequential_and_parallel_outputs()
 fn prior_projection_does_not_bypass_an_earlier_recalibration_writer()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
     let mut envelope = swaption_fixture()?;
-    let stale_forward = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(date!(2026 - 05 - 08))
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.01), (30.0, 0.01)])
-        .build()?;
+    let stale_forward =
+        ForwardCurve::flat("USD-SOFR-3M", date!(2026 - 05 - 08), 0.01, DayCount::Act360)?;
     envelope
         .prior_market
         .push(PriorMarketObject::ForwardCurve(stale_forward));
@@ -132,15 +129,20 @@ fn xccy_dependencies_include_both_convention_projection_curves()
         DiscountCurve::builder("USD-OIS")
             .base_date(base_date)
             .knots([(0.0, 1.0), (10.0, 0.8)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?,
     ));
     for id in ["EUR-ESTR-OIS", "USD-SOFR-OIS"] {
-        envelope.prior_market.push(PriorMarketObject::ForwardCurve(
-            ForwardCurve::builder(id, 0.25)
-                .base_date(base_date)
-                .knots([(0.0, 0.02), (10.0, 0.02)])
-                .build()?,
-        ));
+        envelope
+            .prior_market
+            .push(PriorMarketObject::ForwardCurve(ForwardCurve::flat(
+                id,
+                base_date,
+                0.02,
+                DayCount::Act360,
+            )?));
     }
 
     let complete = validate(&envelope);
@@ -217,6 +219,9 @@ fn equity_dependency_fixture(
         DiscountCurve::builder("USD-OIS")
             .base_date(date!(2025 - 01 - 02))
             .knots([(0.0, 1.0), (10.0, 0.8)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?,
     ));
     Ok(envelope)

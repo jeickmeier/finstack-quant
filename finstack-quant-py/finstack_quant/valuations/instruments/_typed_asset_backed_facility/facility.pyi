@@ -1602,7 +1602,7 @@ class FacilityProjection:
     >>> from finstack_quant.valuations.instruments import AssetBackedFacility
     >>> facility = AssetBackedFacility.example()
     >>> as_of = facility.closing_date
-    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
+    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04, "act_365f"))
     >>> projection = facility.project(market, as_of)
     >>> list(projection.to_dataframe().columns)
     ['date', 'interest', 'principal', 'commitment_fee', 'draw', 'lender_total', 'residual']

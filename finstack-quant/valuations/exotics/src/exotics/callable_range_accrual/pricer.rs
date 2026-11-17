@@ -469,10 +469,12 @@ fn build_schedule(
 
 fn initial_short_rate(inst: &CallableRangeAccrual, market: &MarketContext) -> Result<f64> {
     let scalar = market.get_price(inst.range_accrual.spot_id.as_ref())?;
-    let rate = match scalar {
-        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-        finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
-    };
+    let rate = scalar
+        .get_unitless()
+        .or_else(|| scalar.get_price().map(|m| m.amount()))
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation("Unsupported MarketScalar variant".to_string())
+        })?;
     if !rate.is_finite() {
         return Err(finstack_quant_core::Error::Validation(format!(
             "CallableRangeAccrual {} initial rate is not finite",
@@ -560,11 +562,14 @@ mod tests {
                 (0.5, (-discount_rate * 0.5).exp()),
                 (1.5, (-discount_rate * 1.5).exp()),
             ])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve");
-        MarketContext::new()
-            .insert(discount)
-            .insert_price("SOFR-RATE", MarketScalar::Unitless(short_rate))
+        MarketContext::new().insert(discount).insert_price(
+            "SOFR-RATE",
+            MarketScalar::unitless(short_rate).expect("valid scalar"),
+        )
     }
 
     fn deterministic_pricer(paths: usize) -> CallableRangeAccrualPricer {

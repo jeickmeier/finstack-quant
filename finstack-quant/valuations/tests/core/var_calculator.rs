@@ -5,7 +5,9 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
@@ -30,6 +32,8 @@ fn usd_ois_curve(as_of: Date) -> Result<DiscountCurve> {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots(vec![(0.0, 1.0), (5.0, 0.85), (10.0, 0.70)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
 }
 
@@ -100,10 +104,19 @@ fn taylor_equity_pnl_uses_market_spot_ids_and_aggregates_shared_spots() -> Resul
     second_a.id = "another-position-a".into();
     second_a.quantity = Some(3.0);
     let market = usd_ois_market(as_of)?
-        .insert_price("SPOT-A", MarketScalar::Unitless(100.0))
-        .insert_price("SPOT-B", MarketScalar::Unitless(80.0))
-        .insert_price("UNRELATED", MarketScalar::Unitless(500.0))
-        .insert_price("DIV-A", MarketScalar::Unitless(0.02));
+        .insert_price(
+            "SPOT-A",
+            MarketScalar::unitless(100.0).expect("valid scalar"),
+        )
+        .insert_price(
+            "SPOT-B",
+            MarketScalar::unitless(80.0).expect("valid scalar"),
+        )
+        .insert_price(
+            "UNRELATED",
+            MarketScalar::unitless(500.0).expect("valid scalar"),
+        )
+        .insert_price("DIV-A", MarketScalar::unitless(0.02).expect("valid scalar"));
     let history = MarketHistory::new(
         as_of,
         1,
@@ -164,7 +177,8 @@ fn taylor_quoted_equity_has_no_market_spot_sensitivity() -> Result<()> {
     .with_spot_id("SPOT")
     .with_quoted_spot(120.0);
     equity.discount_curve_id = "USD-OIS".into();
-    let market = usd_ois_market(as_of)?.insert_price("SPOT", MarketScalar::Unitless(100.0));
+    let market = usd_ois_market(as_of)?
+        .insert_price("SPOT", MarketScalar::unitless(100.0).expect("valid scalar"));
     let history = MarketHistory::new(
         as_of,
         1,
@@ -196,8 +210,14 @@ fn taylor_multifactor_instrument_accepts_empty_direction() -> Result<()> {
     let as_of = sample_as_of();
     let basket = finstack_quant_valuations::instruments::exotics::basket::Basket::example()?;
     let market = usd_ois_market(as_of)?
-        .insert_price("AAPL-SPOT", MarketScalar::Unitless(100.0))
-        .insert_price("UST10Y-PRICE", MarketScalar::Unitless(100.0));
+        .insert_price(
+            "AAPL-SPOT",
+            MarketScalar::unitless(100.0).expect("valid scalar"),
+        )
+        .insert_price(
+            "UST10Y-PRICE",
+            MarketScalar::unitless(100.0).expect("valid scalar"),
+        );
     let history = MarketHistory::new(as_of, 1, vec![MarketScenario::new(as_of, vec![])]);
     let result = calculate_var(
         &[&basket as &dyn Instrument],
@@ -227,20 +247,32 @@ fn historical_vol_point_revaluation_matches_manual_surface() -> Result<()> {
             finstack_quant_models::types::OptionType::Call,
         )?;
     let base_surface = VolSurface::builder("EQUITY-VOL")
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[0.5, 1.5])
-        .strikes(&[100.0, 110.0])
+        .secondary_values(&[100.0, 110.0])
         .row(&[0.20, 0.23])
         .row(&[0.24, 0.25])
         .build()?;
     let manual_surface = VolSurface::builder("EQUITY-VOL")
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[0.5, 1.5])
-        .strikes(&[100.0, 110.0])
+        .secondary_values(&[100.0, 110.0])
         .row(&[0.21, 0.23])
         .row(&[0.24, 0.23])
         .build()?;
     let market = usd_ois_market(as_of)?
-        .insert_price("EQUITY-SPOT", MarketScalar::Unitless(100.0))
-        .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(0.0))
+        .insert_price(
+            "EQUITY-SPOT",
+            MarketScalar::unitless(100.0).expect("valid scalar"),
+        )
+        .insert_price(
+            "EQUITY-DIVYIELD",
+            MarketScalar::unitless(0.0).expect("valid scalar"),
+        )
         .insert_surface(base_surface);
     let manual_market = market.clone().insert_surface(manual_surface);
     let expected_pnl =
@@ -604,6 +636,9 @@ fn directional_taylor_keeps_nonstandard_tenor_and_unrelated_curves() -> Result<(
         DiscountCurve::builder("EUR-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (10.0, 0.8)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()?,
     );
     let scenario = MarketScenario::new(

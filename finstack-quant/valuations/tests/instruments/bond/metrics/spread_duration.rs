@@ -45,6 +45,8 @@ fn bullet_5y(credit: bool) -> (Bond, MarketContext) {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (7.0, 0.80)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve builds");
     let mut market = MarketContext::new().insert(disc);
@@ -225,6 +227,8 @@ fn callable_bond_spread_duration_uses_quote_reproducing_workout_path() {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (10.0, 0.65)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("curve builds");
     let market = MarketContext::new().insert(disc);

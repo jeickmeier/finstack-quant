@@ -137,8 +137,8 @@ impl WealthEngine {
             self.invalid = true;
         } else if r <= -1.0 {
             self.terminal = true;
-        } else {
-            self.acc.add(r.ln_1p());
+        } else if self.acc.add(r.ln_1p()).is_err() {
+            self.invalid = true;
         }
     }
 
@@ -149,7 +149,7 @@ impl WealthEngine {
         } else if self.terminal {
             f64::NEG_INFINITY
         } else {
-            self.acc.total()
+            self.acc.get_total().unwrap_or(f64::NAN)
         }
     }
 }

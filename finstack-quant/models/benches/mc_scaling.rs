@@ -502,10 +502,10 @@ fn price_lmm_caplet(params: &LmmParams, grid: &TimeGrid) -> MoneyEstimate {
             * (state[2] - 0.03).max(0.0)
             * bond_ratio;
         assert!(value.is_finite() && value >= 0.0);
-        stats.update(value);
+        stats.update(value).expect("finite path value");
     }
-    MoneyEstimate::from_estimate(Estimate::from_stats(&stats), Currency::USD)
-        .expect("finite caplet estimate")
+    let estimate = Estimate::from_stats(&stats).expect("finite stats estimate");
+    MoneyEstimate::from_estimate(estimate, Currency::USD).expect("finite caplet estimate")
 }
 
 fn bench_lmm_caplet(c: &mut Criterion) {

@@ -87,10 +87,10 @@ impl MetricCalculator for ConvexityCalculator {
             )?;
             let c = m * t;
             let denom = m + yield_rate;
-            d2_price.add(amount.amount() * c * (c + 1.0) / (denom * denom) * df);
+            d2_price.add(amount.amount() * c * (c + 1.0) / (denom * denom) * df)?;
         }
 
-        Ok(d2_price.total() / price / 100.0)
+        Ok(d2_price.get_total()? / price / 100.0)
     }
 }
 
@@ -125,6 +125,9 @@ mod tests {
         let curve = DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.8)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("curve");
         let market = MarketContext::new().insert(curve);

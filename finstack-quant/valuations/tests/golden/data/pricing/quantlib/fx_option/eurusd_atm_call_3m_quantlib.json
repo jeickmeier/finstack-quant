@@ -2,7 +2,7 @@
   "expected": {
     "delta": 536419.5443643782,
     "delta_forward": 539773.4225472712,
-    "delta_premium_adjusted_forward": 517970.8009361119,
+    "delta_premium_adjusted_forward": 517970.80093611183,
     "delta_premium_adjusted_spot": 514752.39318191545,
     "foreign_rho": -14.711122298869693,
     "gamma": 7182418.217391691,
@@ -49,10 +49,9 @@
       "credit_indices": [],
       "curves": [
         {
-          "allow_non_monotonic": false,
           "base": "2026-04-30",
           "day_count": "act_365f",
-          "extrapolation": "flat_forward",
+          "extrapolation": "extend",
           "id": "USD-OIS",
           "interp_style": "log_linear",
           "knot_points": [
@@ -65,16 +64,13 @@
               0.30119421191220214
             ]
           ],
-          "min_forward_rate": null,
-          "min_forward_tenor": 1e-06,
           "rate_calibration": null,
           "type": "discount"
         },
         {
-          "allow_non_monotonic": false,
           "base": "2026-04-30",
           "day_count": "act_365f",
-          "extrapolation": "flat_forward",
+          "extrapolation": "extend",
           "id": "EUR-OIS",
           "interp_style": "log_linear",
           "knot_points": [
@@ -87,8 +83,6 @@
               0.4723665527410147
             ]
           ],
-          "min_forward_rate": null,
-          "min_forward_tenor": 1e-06,
           "rate_calibration": null,
           "type": "discount"
         }
@@ -100,6 +94,7 @@
           "pivot_currency": "USD"
         },
         "pinned_quotes": [],
+        "provider_pinned_quotes": [],
         "provider_quotes": [],
         "quotes": [
           [
@@ -107,8 +102,7 @@
             "USD",
             1.1
           ]
-        ],
-        "provider_pinned_quotes": []
+        ]
       },
       "fx_delta_vol_surfaces": [],
       "hierarchy": null,
@@ -127,7 +121,7 @@
           "interpolation_mode": "vol",
           "quote_type": "black_lognormal",
           "secondary_axis": "strike",
-          "strikes": [
+          "secondary_values": [
             0.5,
             1.0,
             2.0

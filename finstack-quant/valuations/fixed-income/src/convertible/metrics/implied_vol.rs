@@ -76,11 +76,7 @@ impl MetricCalculator for ImpliedVolCalculator {
                 "convertible clean-price quote is not bracketed on the selected lattice's admissible volatility interval [{lower}, {upper}]; dirty-price residuals per unit notional are {low_residual} and {high_residual}"
             )));
         }
-        let volatility = BrentSolver::new()
-            .with_tolerance(1e-12)
-            .with_max_iterations(100)
-            .with_bracket_bounds(lower, upper)
-            .solve_fallible(&evaluate, 0.25_f64.clamp(lower, upper))?;
+        let volatility = BrentSolver::new(1e-12, 100)?.solve_in_bracket(evaluate, lower, upper)?;
         let residual = evaluate(volatility)?;
         if residual.abs() > 1e-10 {
             return Err(Error::Validation(format!(
@@ -217,14 +213,22 @@ mod tests {
             .base_date(base_date)
             .knots([(0.0, 1.0), (10.0, 0.90)])
             .interp(finstack_quant_core::math::interp::InterpStyle::Linear)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("should succeed");
 
         finstack_quant_core::market_data::context::MarketContext::new()
             .insert(discount_curve)
-            .insert_price("AAPL", MarketScalar::Unitless(150.0))
-            .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
-            .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(r_approx))
+            .insert_price("AAPL", MarketScalar::unitless(150.0).expect("valid scalar"))
+            .insert_price(
+                "AAPL-VOL",
+                MarketScalar::unitless(0.25).expect("valid scalar"),
+            )
+            .insert_price(
+                "AAPL-DIVYIELD",
+                MarketScalar::unitless(r_approx).expect("valid scalar"),
+            )
     }
 
     /// Regression: quoted_clean_price_pct is percentage-of-par, so it must be scaled
@@ -315,7 +319,10 @@ mod tests {
         let accrued = calculate_accrued_interest(&bond, &market, as_of).expect("accrued");
         let target_dirty = quoted_clean_pct * notional / 100.0 + accrued;
 
-        let repriced = market.insert_price("AAPL-VOL", MarketScalar::Unitless(ivol));
+        let repriced = market.insert_price(
+            "AAPL-VOL",
+            MarketScalar::unitless(ivol).expect("valid scalar"),
+        );
         let pv = price_convertible_bond(&bond, &repriced, as_of).expect("reprice at solved vol");
         let recovered = pv.amount() / settle_df;
         assert!(

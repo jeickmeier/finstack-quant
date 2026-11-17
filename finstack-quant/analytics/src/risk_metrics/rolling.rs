@@ -321,6 +321,7 @@ struct RollingDownside {
     peak: f64,
     below: usize,
     above: usize,
+    non_finite: bool,
 }
 
 impl RollingDownside {
@@ -342,13 +343,17 @@ impl RollingDownside {
             peak: 0.0,
             below: 0,
             above: 0,
+            non_finite: false,
         };
         if scale > 0.0 {
             for &value in window {
                 state.update(value, mar, 1.0);
             }
         }
-        state.peak = state.downside.total();
+        state.peak = state.downside.get_total().unwrap_or(f64::NAN);
+        if !state.peak.is_finite() {
+            state.non_finite = true;
+        }
         state
     }
 
@@ -362,7 +367,9 @@ impl RollingDownside {
         } else {
             value / self.scale - mar / self.scale
         };
-        self.sum.add(sign * excess);
+        if self.sum.add(sign * excess).is_err() {
+            self.non_finite = true;
+        }
         if value > mar {
             if sign > 0.0 {
                 self.above += 1;
@@ -377,13 +384,23 @@ impl RollingDownside {
                 self.below -= 1;
             }
             let shortfall = -excess;
-            self.downside.add(sign * shortfall * shortfall);
+            if self.downside.add(sign * shortfall * shortfall).is_err() {
+                self.non_finite = true;
+            }
         }
     }
 
     fn valid(&self) -> bool {
-        let downside = self.downside.total();
-        self.sum.total().is_finite() && downside.is_finite() && downside >= 0.0
+        if self.non_finite {
+            return false;
+        }
+        let Ok(sum) = self.sum.get_total() else {
+            return false;
+        };
+        let Ok(downside) = self.downside.get_total() else {
+            return false;
+        };
+        sum.is_finite() && downside.is_finite() && downside >= 0.0
     }
 
     fn slide(&mut self, outgoing: f64, incoming: f64, mar: f64) -> bool {
@@ -394,10 +411,17 @@ impl RollingDownside {
             return false;
         }
         self.update(incoming, mar, 1.0);
-        self.peak = self.peak.max(self.downside.total());
+        let Ok(downside_mid) = self.downside.get_total() else {
+            self.non_finite = true;
+            return false;
+        };
+        self.peak = self.peak.max(downside_mid);
         self.update(outgoing, mar, -1.0);
         self.valid()
-            && !(self.peak > 0.0 && self.downside.total() <= f64::EPSILON.sqrt() * self.peak)
+            && self
+                .downside
+                .get_total()
+                .is_ok_and(|d| !(self.peak > 0.0 && d <= f64::EPSILON.sqrt() * self.peak))
     }
 }
 
@@ -445,8 +469,14 @@ pub(crate) fn rolling_sortino(
             output.dates.push(dates[end - 1]);
             continue;
         }
-        let downside = (state.downside.total() / window as f64).sqrt();
-        let reward = state.sum.total() / window as f64;
+        let downside = state
+            .downside
+            .get_total()
+            .map_or(f64::NAN, |d| (d / window as f64).sqrt());
+        let reward = state
+            .sum
+            .get_total()
+            .map_or(f64::NAN, |s| s / window as f64);
         let value = (reward / downside) * ann_factor.sqrt();
         let value = if !state.valid() || downside == 0.0 || !value.is_finite() || value == 0.0 {
             super::return_based::sortino(current, mar, ann_factor)?
@@ -459,17 +489,17 @@ pub(crate) fn rolling_sortino(
     Ok(output)
 }
 
-fn log_sum(window: &[f64]) -> (NeumaierAccumulator, usize) {
+fn log_sum(window: &[f64]) -> Result<(NeumaierAccumulator, usize)> {
     let mut sum = NeumaierAccumulator::new();
     let mut terminals = 0;
     for &value in window {
         if value <= -1.0 {
             terminals += 1;
         } else {
-            sum.add(value.ln_1p());
+            sum.add(value.ln_1p())?;
         }
     }
-    (sum, terminals)
+    Ok((sum, terminals))
 }
 
 /// Compounded return from each trailing window's own unit baseline.
@@ -483,32 +513,36 @@ pub(crate) fn rolling_returns(
         return Ok(DatedSeries::with_capacity(RollingMetric::Return, 0));
     }
     let mut output = DatedSeries::with_capacity(RollingMetric::Return, returns.len() - window + 1);
-    let (mut state, mut terminals) = log_sum(&returns[..window]);
+    let (mut state, mut terminals) = log_sum(&returns[..window])?;
     let mut slides = 0;
     for end in window..=returns.len() {
         if end > window {
             let incoming = returns[end - 1];
             let outgoing = returns[end - window - 1];
+            let mut add_err = false;
             if incoming <= -1.0 {
                 terminals += 1;
             } else {
-                state.add(incoming.ln_1p());
+                add_err |= state.add(incoming.ln_1p()).is_err();
             }
             if outgoing <= -1.0 {
                 terminals -= 1;
             } else {
-                state.add(-outgoing.ln_1p());
+                add_err |= state.add(-outgoing.ln_1p()).is_err();
             }
             slides += 1;
-            if !state.total().is_finite() || slides >= ROLLING_KERNEL_RECOMPUTE_INTERVAL {
-                (state, terminals) = log_sum(&returns[end - window..end]);
+            if add_err
+                || state.get_total().map_or(true, |v| !v.is_finite())
+                || slides >= ROLLING_KERNEL_RECOMPUTE_INTERVAL
+            {
+                (state, terminals) = log_sum(&returns[end - window..end])?;
                 slides = 0;
             }
         }
         let value = if terminals > 0 {
             -1.0
         } else {
-            crate::returns::finite_result(state.total().exp_m1(), "rolling compounded return")?
+            crate::returns::finite_result(state.get_total()?.exp_m1(), "rolling compounded return")?
         };
         output.values.push(value);
         output.dates.push(dates[end - 1]);

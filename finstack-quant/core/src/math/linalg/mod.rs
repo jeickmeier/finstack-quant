@@ -94,16 +94,6 @@ pub const DIAGONAL_TOLERANCE: f64 = 1e-10;
 /// above noise scale indicates a transposition or indexing bug in the caller.
 pub const SYMMETRY_TOLERANCE: f64 = 1e-10;
 
-/// Slack allowed on the `[-1, 1]` bound for off-diagonal correlations.
-///
-/// Unlike the diagonal and symmetry checks, this bound needs *some* give: two
-/// perfectly collinear series (a duplicated input, or genuinely identical
-/// instruments) produce a computed correlation of `1 +/- a few ulp`, which is a
-/// valid input that a strict bound would reject. The slack is therefore kept at
-/// rounding scale — wide enough for last-bit error, far too narrow to admit a
-/// value that is actually out of range.
-const CORRELATION_BOUND_SLACK: f64 = 1e-12;
-
 /// Relative pivot tolerance for [`cholesky_correlation`].
 ///
 /// A pivot is considered numerically zero when it is below
@@ -333,6 +323,29 @@ pub enum CholeskyError {
         /// Scale-relative symmetry tolerance that was exceeded.
         tolerance: f64,
     },
+    /// Computed correlated shock overflowed to a non-finite value.
+    #[error("Computed correlated shock at row {row} is non-finite: {value}")]
+    NonFiniteOutput {
+        /// Non-finite computed entry.
+        value: f64,
+        /// Row index where non-finite output occurred.
+        row: usize,
+    },
+}
+
+impl CholeskyError {
+    /// Coarse semantic error category matching [`crate::Error::kind`].
+    #[must_use]
+    pub const fn kind(&self) -> crate::ErrorKind {
+        match self {
+            Self::DimensionMismatch { .. }
+            | Self::NonFiniteInput { .. }
+            | Self::NotSymmetric { .. } => crate::ErrorKind::Validation,
+            Self::NotPositiveDefinite { .. }
+            | Self::Singular { .. }
+            | Self::NonFiniteOutput { .. } => crate::ErrorKind::Computation,
+        }
+    }
 }
 
 // ─── Pivoted correlation Cholesky ─────────────────────────────────────────────
@@ -403,7 +416,10 @@ impl CorrelationFactor {
     ///
     /// # Errors
     ///
-    /// Returns [`CholeskyError::DimensionMismatch`] if either slice length differs from `n`.
+    /// Returns [`CholeskyError::DimensionMismatch`] if either slice length differs from `n`,
+    /// [`CholeskyError::NonFiniteInput`] if `independent` contains a non-finite entry (leaving
+    /// `correlated` untouched), or [`CholeskyError::NonFiniteOutput`] if any computed shock
+    /// overflows to a non-finite value.
     ///
     /// # Arguments
     ///
@@ -426,16 +442,29 @@ impl CorrelationFactor {
                 actual: correlated.len(),
             });
         }
+        for (i, &z_i) in independent.iter().enumerate() {
+            if !z_i.is_finite() {
+                return Err(CholeskyError::NonFiniteInput {
+                    row: i,
+                    col: 0,
+                    value: z_i,
+                });
+            }
+        }
         let n = self.n;
         if self.triangular {
             // Half-matrix path: entries above the diagonal are exactly zero,
             // so skipping them cannot change the running sum on finite input.
-            lower_triangular_mul(&self.factor, n, independent, correlated);
+            lower_triangular_mul(&self.factor, n, independent, correlated)
+                .map_err(|(row, value)| CholeskyError::NonFiniteOutput { value, row })?;
         } else {
             for (i, out) in correlated.iter_mut().enumerate() {
                 let mut sum = 0.0;
                 for (j, &z_j) in independent.iter().enumerate() {
                     sum += self.factor[i * n + j] * z_j;
+                }
+                if !sum.is_finite() {
+                    return Err(CholeskyError::NonFiniteOutput { value: sum, row: i });
                 }
                 *out = sum;
             }
@@ -1055,23 +1084,57 @@ pub fn apply_lower_triangular(l: &[f64], n: usize, z: &[f64]) -> Result<Vec<f64>
             z.len()
         )));
     }
+    for &value in z {
+        if !value.is_finite() {
+            return Err(crate::Error::Input(
+                crate::error::InputError::NonFiniteValue {
+                    kind: crate::error::NonFiniteKind::classify(value),
+                },
+            ));
+        }
+    }
+    for i in 0..n {
+        let row = i * n;
+        for &value in &l[row..=row + i] {
+            if !value.is_finite() {
+                return Err(crate::Error::Input(
+                    crate::error::InputError::NonFiniteValue {
+                        kind: crate::error::NonFiniteKind::classify(value),
+                    },
+                ));
+            }
+        }
+    }
 
     let mut out = vec![0.0; n];
-    lower_triangular_mul(l, n, z, &mut out);
+    lower_triangular_mul(l, n, z, &mut out).map_err(|(row, value)| {
+        crate::Error::Internal(format!(
+            "lower-triangular product produced non-finite value at row {row}: {value}"
+        ))
+    })?;
     Ok(out)
 }
 
 /// `out = L z` for a row-major `n × n` lower-triangular `l`, reading only the
 /// lower half. Callers have checked `l.len() == n * n` and `z.len() == out.len() == n`.
-fn lower_triangular_mul(l: &[f64], n: usize, z: &[f64], out: &mut [f64]) {
+fn lower_triangular_mul(
+    l: &[f64],
+    n: usize,
+    z: &[f64],
+    out: &mut [f64],
+) -> std::result::Result<(), (usize, f64)> {
     for (i, slot) in out.iter_mut().enumerate() {
         let row = i * n;
         let mut sum = 0.0;
         for (&l_j, &z_j) in l[row..=row + i].iter().zip(z[..=i].iter()) {
             sum += l_j * z_j;
         }
+        if !sum.is_finite() {
+            return Err((i, sum));
+        }
         *slot = sum;
     }
+    Ok(())
 }
 
 /// Solve linear system Ax = b using Cholesky decomposition L of A (A = L L^T).
@@ -1225,14 +1288,17 @@ pub fn validate_correlation_matrix(
             }
 
             let value = matrix[i * n + j];
-            if !(-1.0 - CORRELATION_BOUND_SLACK..=1.0 + CORRELATION_BOUND_SLACK).contains(&value) {
+            if !(-1.0..=1.0).contains(&value) {
                 return Err(CorrelationError::OutOfBounds { i, j, value });
             }
-            if i < j {
-                let diff = (matrix[i * n + j] - matrix[j * n + i]).abs();
-                if diff > SYMMETRY_TOLERANCE {
-                    return Err(CorrelationError::NotSymmetric { i, j, diff });
-                }
+        }
+    }
+
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let diff = (matrix[i * n + j] - matrix[j * n + i]).abs();
+            if diff > SYMMETRY_TOLERANCE {
+                return Err(CorrelationError::NotSymmetric { i, j, diff });
             }
         }
     }
@@ -1362,7 +1428,7 @@ pub fn ledoit_wolf_shrinkage(
         let mean = if column_scale > 0.0 {
             crate::math::summation::neumaier_sum(
                 (0..t).map(|row| observations[row * n + col] / column_scale),
-            ) / tf
+            )? / tf
                 * column_scale
         } else {
             0.0
@@ -2551,6 +2617,128 @@ mod ledoit_wolf_tests {
         assert!(matches!(
             cholesky_correlation(&neg_diag, 2),
             Err(CholeskyError::NotPositiveDefinite { row: 1, diag }) if (diag - -0.25).abs() < 1e-15
+        ));
+    }
+
+    #[test]
+    fn cholesky_error_kind_separates_validation_and_computation() {
+        use crate::ErrorKind;
+        use crate::math::linalg::CholeskyError;
+
+        assert_eq!(
+            CholeskyError::DimensionMismatch {
+                expected: 2,
+                actual: 3
+            }
+            .kind(),
+            ErrorKind::Validation
+        );
+        assert_eq!(
+            CholeskyError::NonFiniteInput {
+                value: f64::NAN,
+                row: 0,
+                col: 0
+            }
+            .kind(),
+            ErrorKind::Validation
+        );
+        assert_eq!(
+            CholeskyError::NotSymmetric {
+                row: 0,
+                col: 1,
+                diff: 0.1,
+                tolerance: 1e-12
+            }
+            .kind(),
+            ErrorKind::Validation
+        );
+        assert_eq!(
+            CholeskyError::NotPositiveDefinite { diag: -0.1, row: 1 }.kind(),
+            ErrorKind::Computation
+        );
+        assert_eq!(
+            CholeskyError::Singular {
+                value: 0.0,
+                row: 1,
+                col: 1,
+                threshold: 1e-12
+            }
+            .kind(),
+            ErrorKind::Computation
+        );
+        assert_eq!(
+            CholeskyError::NonFiniteOutput {
+                value: f64::INFINITY,
+                row: 0,
+            }
+            .kind(),
+            ErrorKind::Computation
+        );
+    }
+
+    #[test]
+    fn correlation_factor_apply_rejects_non_finite_input_without_mutating_output() {
+        use crate::math::linalg::{CholeskyError, cholesky_correlation};
+
+        let matrix = [1.0, 0.5, 0.5, 1.0];
+        let factor = cholesky_correlation(&matrix, 2).expect("valid factor");
+        let mut correlated = [42.0, -7.0];
+        let err = factor
+            .apply(&[1.0, f64::NAN], &mut correlated)
+            .expect_err("non-finite independent sample must fail");
+        assert!(matches!(err, CholeskyError::NonFiniteInput { .. }));
+        assert_eq!(correlated, [42.0, -7.0]);
+    }
+
+    #[test]
+    fn correlation_factor_apply_rejects_non_finite_output() {
+        use crate::math::linalg::{CholeskyError, cholesky_correlation};
+
+        let matrix = [1.0, 0.5, 0.5, 1.0];
+        let factor = cholesky_correlation(&matrix, 2).expect("valid factor");
+        let mut correlated = [0.0; 2];
+        let err = factor
+            .apply(&[f64::MAX, f64::MAX], &mut correlated)
+            .expect_err("overflowing product must fail");
+        assert!(matches!(err, CholeskyError::NonFiniteOutput { .. }));
+    }
+
+    #[test]
+    fn apply_lower_triangular_rejects_non_finite_inputs_and_overflow() {
+        use crate::math::linalg::apply_lower_triangular;
+
+        let valid_l = [1.0, 0.0, 0.5, 1.0];
+        assert!(matches!(
+            apply_lower_triangular(&valid_l, 2, &[1.0, f64::INFINITY]),
+            Err(crate::Error::Input(
+                crate::error::InputError::NonFiniteValue { .. }
+            ))
+        ));
+        assert!(matches!(
+            apply_lower_triangular(&[1.0, 0.0, f64::NAN, 1.0], 2, &[1.0, 1.0]),
+            Err(crate::Error::Input(
+                crate::error::InputError::NonFiniteValue { .. }
+            ))
+        ));
+        assert!(matches!(
+            apply_lower_triangular(&valid_l, 2, &[f64::MAX, f64::MAX]),
+            Err(crate::Error::Internal(_))
+        ));
+    }
+
+    #[test]
+    fn validate_correlation_matrix_enforces_exact_unit_bounds() {
+        use crate::math::linalg::{CorrelationError, validate_correlation_matrix};
+
+        let over = [1.0, 1.0 + 1e-13, 1.0 + 1e-13, 1.0];
+        assert!(matches!(
+            validate_correlation_matrix(&over, 2),
+            Err(CorrelationError::OutOfBounds { i: 0, j: 1, .. })
+        ));
+        let under = [1.0, -1.0 - 1e-13, -1.0 - 1e-13, 1.0];
+        assert!(matches!(
+            validate_correlation_matrix(&under, 2),
+            Err(CorrelationError::OutOfBounds { i: 0, j: 1, .. })
         ));
     }
 }

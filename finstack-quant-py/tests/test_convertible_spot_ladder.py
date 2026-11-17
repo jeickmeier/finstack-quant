@@ -21,8 +21,8 @@ AS_OF = datetime.date(2025, 1, 15)
 def _market(spot: float) -> MarketContext:
     return (
         MarketContext()
-        .insert(DiscountCurve.flat("USD-IG", AS_OF, 0.04))
-        .insert(HazardCurve("USD-CREDIT-BBB", AS_OF, [(1.0, 0.025)], recovery_rate=0.0))
+        .insert(DiscountCurve.flat("USD-IG", AS_OF, 0.04, "act_365f"))
+        .insert(HazardCurve("USD-CREDIT-BBB", AS_OF, [(1.0, 0.025)], recovery_rate=0.0, day_count="act_365f"))
         .insert_price("TECH", spot, "USD")
         .insert_price("TECH-VOL", 0.30)
     )
@@ -71,7 +71,7 @@ def test_spots_the_tree_cannot_value_are_a_value_error(spots: list[float]) -> No
 
 
 def test_missing_share_price_is_a_key_error() -> None:
-    market = MarketContext().insert(DiscountCurve.flat("USD-IG", AS_OF, 0.04))
+    market = MarketContext().insert(DiscountCurve.flat("USD-IG", AS_OF, 0.04, "act_365f"))
     with pytest.raises(KeyError, match="TECH"):
         convertible_spot_ladder(_bond(), market, AS_OF, [100.0])
 

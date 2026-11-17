@@ -68,7 +68,7 @@ class SimulationDiagnostics:
     >>> envelope = json.loads(deal.to_json())
     >>> envelope["instrument"]["spec"]["calendar_id"] = "nyse"
     >>> deal = StructuredCredit.from_json(json.dumps(envelope))
-    >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03))
+    >>> market = MarketContext().insert(DiscountCurve.flat("USD-SOFR-DISC", as_of, 0.03, "act_365f"))
     >>> diagnostics = deal.run_simulation(market, as_of).diagnostics
     >>> diagnostics.unfunded_draws.amount
     0.0

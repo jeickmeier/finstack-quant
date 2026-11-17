@@ -2,7 +2,9 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
@@ -28,14 +30,20 @@ fn market() -> MarketContext {
             DiscountCurve::builder(id)
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (10.0, 1.0)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
         );
     }
     market.insert_surface(
         VolSurface::builder("EURUSD-VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[0.5, 1.5])
-            .strikes(&[1.0, 1.4])
+            .secondary_values(&[1.0, 1.4])
             .row(&[0.2, 0.2])
             .row(&[0.2, 0.2])
             .build()
@@ -100,6 +108,9 @@ fn fx01_follows_active_spot_and_forward_overrides() {
             DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (10.0, 1.0)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
         )
@@ -107,6 +118,9 @@ fn fx01_follows_active_spot_and_forward_overrides() {
             DiscountCurve::builder("EUR-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (10.0, 1.0)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .expect("curve"),
         );
@@ -134,11 +148,17 @@ fn equity_scalar_volatility_risk_is_separate_from_source_nodes() {
     option.spot_id = "EQ-SPOT".into();
     option.vol_surface_id = "EQ-VOL".into();
     option.div_yield_id = None;
-    let bare = market().insert_price("EQ-SPOT", MarketScalar::Unitless(100.0));
+    let bare = market().insert_price(
+        "EQ-SPOT",
+        MarketScalar::unitless(100.0).expect("valid scalar"),
+    );
     let quoted = bare.clone().insert_surface(
         VolSurface::builder("EQ-VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[1.0])
-            .strikes(&[120.0])
+            .secondary_values(&[120.0])
             .row(&[0.2])
             .build()
             .expect("surface"),
@@ -232,11 +252,15 @@ fn analytical_barrier_price_and_risk_use_the_active_quote() {
     option.vol_surface_id = "VOL".into();
     option.discount_curve_id = "USD-OIS".into();
     option.div_yield_id = None;
-    let market = market().insert_price("SPOT", MarketScalar::Unitless(100.0));
+    let market =
+        market().insert_price("SPOT", MarketScalar::unitless(100.0).expect("valid scalar"));
     let quoted = market.clone().insert_surface(
         VolSurface::builder("VOL")
+            .secondary_axis(VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(VolInterpolationMode::Vol)
             .expiries(&[1.0])
-            .strikes(&[100.0])
+            .secondary_values(&[100.0])
             .row(&[0.2])
             .build()
             .expect("surface"),

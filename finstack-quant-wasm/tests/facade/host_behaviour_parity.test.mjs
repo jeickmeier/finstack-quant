@@ -59,7 +59,7 @@ test('ScheduleBuilder setters update the builder in place and return it', () => 
 
 test('MarketContext inserts update the context in place and return it', () => {
   const market = new core.MarketContext();
-  const curve = core.DiscountCurve.flat('USD-OIS', '2025-01-02', 0.04);
+  const curve = core.DiscountCurve.flat('USD-OIS', '2025-01-02', 0.04, 'act_365f');
   assert.equal(market.insert(curve), market);
   assert.equal(market.insertPrice('SPX', 5900.0).insertPrice('SPOT', 185.25, 'USD'), market);
   assert.equal(market.contains('USD-OIS'), true);

@@ -291,11 +291,11 @@ pub(crate) fn price_bond_lsmc(
     )?;
     let mut stats = OnlineStats::new();
     for estimator in estimators {
-        stats.update(estimator);
+        stats.update(estimator)?;
     }
 
     if let Some(target) = config.target_ci_half_width {
-        let actual = stats.ci_half_width();
+        let actual = stats.get_ci_half_width(0.05)?.unwrap_or(f64::NAN);
         if !actual.is_finite() || actual > target {
             return Err(Error::Validation(format!(
                 "Bond '{}' hazard LSMC exhausted its fixed budget of {} independent pricing estimators with 95% CI half-width {actual}, above target {target}",
@@ -304,7 +304,7 @@ pub(crate) fn price_bond_lsmc(
             )));
         }
     }
-    let estimate = finstack_quant_models::monte_carlo::estimate::Estimate::from_stats(&stats)
+    let estimate = finstack_quant_models::monte_carlo::estimate::Estimate::from_stats(&stats)?
         .with_num_simulated_paths(pricing_simulated_paths);
     Ok(BondLsmcResult {
         estimate: MoneyEstimate::from_estimate(estimate, bond.notional.currency())?,

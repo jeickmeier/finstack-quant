@@ -13,7 +13,12 @@ def test_dependency_graph_matches_declared_structure() -> None:
             CalibrationStep.discount("D", {"currency": "USD", "base_date": "2026-05-08"}, quote_set="q"),
             CalibrationStep.forward(
                 "F",
-                {"currency": "USD", "base_date": "2026-05-08", "tenor_years": 0.25, "discount_curve_id": "D"},
+                {
+                    "currency": "USD",
+                    "base_date": "2026-05-08",
+                    "index_tenor": {"count": 3, "unit": "months"},
+                    "discount_curve_id": "D",
+                },
                 quote_set="q",
             ),
         ],

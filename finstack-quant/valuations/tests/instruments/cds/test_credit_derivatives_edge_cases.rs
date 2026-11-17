@@ -30,6 +30,8 @@ fn create_discount_curve(base: Date) -> DiscountCurve {
             (10.0, 0.65),
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -39,6 +41,7 @@ fn create_hazard_curve(base: Date, recovery: f64) -> HazardCurve {
         .base_date(base)
         .recovery_rate(recovery)
         .knots([(1.0, 0.02), (3.0, 0.025), (5.0, 0.03), (10.0, 0.035)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap()
 }
@@ -49,6 +52,7 @@ fn create_distressed_hazard_curve(base: Date, recovery: f64) -> HazardCurve {
         .base_date(base)
         .recovery_rate(recovery)
         .knots([(1.0, 0.30), (3.0, 0.35), (5.0, 0.40), (10.0, 0.45)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .build()
         .unwrap()
 }
@@ -400,7 +404,7 @@ fn test_recovery01_ignores_unreplayable_par_spread_sidecar() {
             .base_date(base)
             .recovery_rate(rec)
             .knots([(1.0, 0.05), (3.0, 0.05), (5.0, 0.05), (10.0, 0.05)])
-            .par_spreads([(1.0, 300.0), (3.0, 300.0), (5.0, 300.0), (10.0, 300.0)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .build()
             .unwrap()
     };

@@ -1,19 +1,106 @@
 //! Par cds bump tests for scenarios.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_core::market_data::term_structures::HazardCurve;
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve, Seniority};
+use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::money::Money;
 use finstack_quant_scenarios::{
-    CurveKind, ExecutionContext, HazardBumpMode, OperationSpec, ScenarioEngine, ScenarioSpec,
-    TenorMatchMode,
+    CurveKind, ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec, TenorMatchMode,
 };
 use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use time::Month;
+
+fn calibrate_test_hazard(
+    base_date: Date,
+    discount: &DiscountCurve,
+    curve_id: &str,
+    recovery_rate: f64,
+    spreads: &[(&str, f64)],
+) -> HazardCurve {
+    use finstack_quant_calibration::api::{
+        engine,
+        market_datum::MarketDatum,
+        prior_market::PriorMarketObject,
+        schema::{
+            CalibrationEnvelope, CalibrationPlan, CalibrationSchema, CalibrationStep,
+            HazardCurveParams, StepParams,
+        },
+    };
+    use finstack_quant_calibration::quotes::{CdsQuote, MarketQuote, Pillar, QuoteId};
+    use finstack_quant_calibration::{CalibrationConfig, CalibrationMethod};
+    use finstack_quant_core::types::CurveId;
+    use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+
+    let mut quotes = Vec::with_capacity(spreads.len());
+    let mut quote_ids = Vec::with_capacity(spreads.len());
+    for (tenor_str, spread_bp) in spreads {
+        let id = QuoteId::new(format!("{curve_id}-{tenor_str}"));
+        quote_ids.push(id.clone());
+        let pillar_date = Tenor::parse(tenor_str)
+            .expect("valid tenor")
+            .add_to_date(
+                base_date,
+                None,
+                finstack_quant_core::dates::BusinessDayConvention::Unadjusted,
+            )
+            .expect("valid pillar date");
+        quotes.push(MarketDatum::from(MarketQuote::Cds(
+            CdsQuote::CdsParSpread {
+                id,
+                entity: curve_id.to_string(),
+                pillar: Pillar::Date(pillar_date),
+                spread_bp: *spread_bp,
+                recovery_rate,
+                convention: CdsConventionKey {
+                    currency: Currency::USD,
+                    doc_clause: CdsDocClause::IsdaNa,
+                },
+            },
+        )));
+    }
+    let mut quote_sets = finstack_quant_core::FxHashMap::default();
+    quote_sets.insert("credit".to_string(), quote_ids);
+    let envelope = CalibrationEnvelope {
+        schema_url: None,
+        schema: CalibrationSchema::CURRENT,
+        plan: CalibrationPlan {
+            id: format!("{curve_id}-cal"),
+            description: None,
+            quote_sets: quote_sets.into_iter().collect(),
+            steps: vec![CalibrationStep {
+                id: curve_id.to_string(),
+                quote_set: "credit".to_string(),
+                params: StepParams::Hazard(HazardCurveParams {
+                    curve_id: CurveId::new(curve_id),
+                    entity: curve_id.to_string(),
+                    seniority: Seniority::Senior,
+                    currency: Currency::USD,
+                    base_date,
+                    discount_curve_id: discount.id().clone(),
+                    recovery_rate,
+                    notional: 1.0,
+                    method: CalibrationMethod::Bootstrap,
+                    doc_clause: None,
+                    cds_valuation_convention: None,
+                }),
+            }],
+            settings: CalibrationConfig::default(),
+        },
+        market_data: quotes,
+        prior_market: vec![PriorMarketObject::DiscountCurve(discount.clone())],
+    };
+    let calibrated = engine::calibrate(&envelope).expect("hazard calibration");
+    MarketContext::try_from(calibrated.result.final_market)
+        .expect("calibrated market")
+        .get_hazard(curve_id)
+        .expect("calibrated hazard")
+        .as_ref()
+        .clone()
+}
 
 #[test]
 fn test_par_cds_bump_integration() {
@@ -23,22 +110,21 @@ fn test_par_cds_bump_integration() {
     // Keep the discount curve present so the market matches a normal credit setup.
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
+        .day_count(DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .knots(vec![(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.60)])
         .build()
         .unwrap();
 
-    // The direct first-order path operates on hazard intensities; display par
-    // spreads are intentionally not used as a replay recipe.
-    // Par spread ≈ hazard_rate * 10000 * (1 - recovery)
-    // For 1Y: 0.01 * 10000 * 0.6 = 60 bp
-    // For 5Y: 0.02 * 10000 * 0.6 = 120 bp
-    let hazard = HazardCurve::builder("USD-CDS")
-        .base_date(base_date)
-        .recovery_rate(0.4)
-        .knots(vec![(1.0, 0.01), (5.0, 0.02)])
-        .par_spreads(vec![(1.0, 60.0), (5.0, 120.0)])
-        .build()
-        .unwrap();
+    let hazard = calibrate_test_hazard(
+        base_date,
+        &discount,
+        "USD-CDS",
+        0.4,
+        &[("1Y", 60.0), ("5Y", 120.0)],
+    );
+    let original_lambda = hazard.hazard_rate(5.0).unwrap();
 
     let mut market = MarketContext::new().insert(discount).insert(hazard);
     let mut model = FinancialModelSpec::new(
@@ -64,7 +150,6 @@ fn test_par_cds_bump_integration() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     let engine = ScenarioEngine::new();
@@ -85,8 +170,7 @@ fn test_par_cds_bump_integration() {
     let bumped = market.get_hazard("USD-CDS").unwrap();
 
     // Check lambda at the shocked 5Y node.
-    let l_5y = bumped.hazard_rate(5.0);
-    let original_lambda = 0.02;
+    let l_5y = bumped.hazard_rate(5.0).unwrap();
 
     // A positive direct shock must increase the target hazard intensity.
     println!("Original: {}, Bumped: {}", original_lambda, l_5y);
@@ -105,17 +189,20 @@ fn test_par_cds_bump_reprices_credit_bond() {
 
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
+        .day_count(DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .knots(vec![(0.0, 1.0), (1.0, 0.97), (5.0, 0.85), (10.0, 0.70)])
         .build()
         .unwrap();
 
-    let hazard = HazardCurve::builder("USD-CDS")
-        .base_date(base_date)
-        .recovery_rate(0.4)
-        .knots(vec![(1.0, 0.01), (5.0, 0.02)])
-        .par_spreads(vec![(1.0, 60.0), (5.0, 120.0)])
-        .build()
-        .unwrap();
+    let hazard = calibrate_test_hazard(
+        base_date,
+        &discount,
+        "USD-CDS",
+        0.4,
+        &[("1Y", 60.0), ("5Y", 120.0)],
+    );
 
     let market = MarketContext::new().insert(discount).insert(hazard);
     let mut bond = Bond::fixed(
@@ -144,7 +231,6 @@ fn test_par_cds_bump_reprices_credit_bond() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     let mut market_after = market;
@@ -206,6 +292,9 @@ fn roll_with_discount_and_par_cds_bump_survives_knot_on_roll_tenor() {
     ] {
         let discount = DiscountCurve::builder("USD-OIS")
             .base_date(base_date)
+            .day_count(DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Extend)
             .knots(vec![
                 (0.0, 1.0),
                 (1.0 / 12.0, 0.9963),
@@ -220,18 +309,18 @@ fn roll_with_discount_and_par_cds_bump_survives_knot_on_roll_tenor() {
             .build()
             .unwrap();
 
-        let hazard = HazardCurve::builder("CORP-HAZARD")
-            .base_date(base_date)
-            .recovery_rate(0.40)
-            .knots(vec![(1.0, 0.02), (3.0, 0.024), (5.0, 0.028), (10.0, 0.032)])
-            .par_spreads(vec![
-                (1.0, 116.639125),
-                (3.0, 134.717567),
-                (5.0, 147.417265),
-                (10.0, 166.063391),
-            ])
-            .build()
-            .unwrap();
+        let hazard = calibrate_test_hazard(
+            base_date,
+            &discount,
+            "CORP-HAZARD",
+            0.40,
+            &[
+                ("1Y", 116.639125),
+                ("3Y", 134.717567),
+                ("5Y", 147.417265),
+                ("10Y", 166.063391),
+            ],
+        );
 
         let mut market = MarketContext::new().insert(discount).insert(hazard);
         let mut model = FinancialModelSpec::new(
@@ -268,7 +357,6 @@ fn roll_with_discount_and_par_cds_bump_survives_knot_on_roll_tenor() {
             ],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: HazardBumpMode::FirstOrderShift,
         };
 
         let engine = ScenarioEngine::new();
@@ -293,10 +381,10 @@ fn roll_with_discount_and_par_cds_bump_survives_knot_on_roll_tenor() {
             "roll {period} should advance the base date",
         );
         let probe = tenor_years.max(2.0);
+        let bumped_df = bumped.df(probe).unwrap();
         assert!(
-            bumped.df(probe) > 0.0 && bumped.df(probe) < 1.0,
-            "roll {period}: bumped DF({probe}) out of range: {}",
-            bumped.df(probe),
+            bumped_df > 0.0 && bumped_df < 1.0,
+            "roll {period}: bumped DF({probe}) out of range: {bumped_df}",
         );
     }
 }
@@ -305,16 +393,19 @@ fn par_cds_market() -> (finstack_quant_core::dates::Date, MarketContext) {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
+        .day_count(DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .knots(vec![(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.60)])
         .build()
         .unwrap();
-    let hazard = HazardCurve::builder("USD-CDS")
-        .base_date(base_date)
-        .recovery_rate(0.4)
-        .knots(vec![(1.0, 0.01), (5.0, 0.02)])
-        .par_spreads(vec![(1.0, 60.0), (5.0, 120.0)])
-        .build()
-        .unwrap();
+    let hazard = calibrate_test_hazard(
+        base_date,
+        &discount,
+        "USD-CDS",
+        0.4,
+        &[("1Y", 60.0), ("5Y", 120.0)],
+    );
     (
         base_date,
         MarketContext::new().insert(discount).insert(hazard),
@@ -347,41 +438,45 @@ fn apply_par_cds(
 }
 
 #[test]
-fn first_order_par_spread_shift_scales_by_loss_given_default() {
-    let (base_date, market) = par_cds_market();
-    let original = market.get_hazard("USD-CDS").unwrap().hazard_rate(5.0);
-    let recovery = market.get_hazard("USD-CDS").unwrap().recovery_rate();
-
-    let mut shifted = market;
-    let report = apply_par_cds(
-        &mut shifted,
-        base_date,
-        &ScenarioSpec {
-            id: "first_order".into(),
-            name: None,
-            description: None,
-            operations: vec![OperationSpec::CurveParallelBp {
-                curve_kind: CurveKind::ParCDS,
-                curve_id: "USD-CDS".into(),
-                discount_curve_id: Some("USD-OIS".into()),
-                bp: 25.0,
-            }],
-            priority: 0,
-            resolution_mode: Default::default(),
-            hazard_bump_mode: HazardBumpMode::FirstOrderShift,
-        },
+fn par_cds_bump_rejects_uncalibrated_hazard_curve() {
+    let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let discount = DiscountCurve::builder("USD-OIS")
+        .base_date(base_date)
+        .day_count(DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
+        .knots(vec![(0.0, 1.0), (5.0, 0.80)])
+        .build()
+        .unwrap();
+    let hazard = HazardCurve::builder("USD-CDS")
+        .base_date(base_date)
+        .day_count(DayCount::Act365F)
+        .recovery_rate(0.4)
+        .knots(vec![(1.0, 0.01), (5.0, 0.02)])
+        .build()
+        .unwrap();
+    let mut market = MarketContext::new().insert(discount).insert(hazard);
+    let scenario = regression_scenario(
+        "reject-uncalibrated",
+        vec![OperationSpec::CurveParallelBp {
+            curve_kind: CurveKind::ParCDS,
+            curve_id: "USD-CDS".into(),
+            discount_curve_id: Some("USD-OIS".into()),
+            bp: 25.0,
+        }],
     );
-    let shifted_h = shifted.get_hazard("USD-CDS").unwrap().hazard_rate(5.0);
-    let expected = original + 0.0025 / (1.0 - recovery);
+    let mut ctx = ExecutionContext {
+        market: &mut market,
+        model: None,
+        instruments: None,
+        rate_bindings: None,
+        calendar: None,
+        as_of: base_date,
+    };
     assert!(
-        (shifted_h - expected).abs() < 1e-10,
-        "{shifted_h} vs {expected}"
+        ScenarioEngine::new().apply(&scenario, &mut ctx).is_err(),
+        "ParCDS bump must reject uncalibrated HazardCurve"
     );
-    assert!(report.warnings.iter().any(|warning| matches!(
-        warning,
-        finstack_quant_scenarios::Warning::HazardSpreadFirstOrder { curve_id, .. }
-            if curve_id == "USD-CDS"
-    )));
 }
 
 #[test]
@@ -394,7 +489,11 @@ fn default_engine_solves_to_par_without_explicit_provider_wiring() {
     let calibrated = engine::calibrate(&envelope).expect("source calibration");
     let mut market = MarketContext::try_from(calibrated.result.final_market).unwrap();
     let base = market.get_hazard("ISSUER-A-CDS").unwrap().base_date();
-    let before = market.get_hazard("ISSUER-A-CDS").unwrap().hazard_rate(5.0);
+    let before = market
+        .get_hazard("ISSUER-A-CDS")
+        .unwrap()
+        .hazard_rate(5.0)
+        .unwrap();
     let mut ctx = ExecutionContext {
         market: &mut market,
         model: None,
@@ -418,7 +517,11 @@ fn default_engine_solves_to_par_without_explicit_provider_wiring() {
         )
         .expect("the default engine carries a recalibration provider");
 
-    let after = market.get_hazard("ISSUER-A-CDS").unwrap().hazard_rate(5.0);
+    let after = market
+        .get_hazard("ISSUER-A-CDS")
+        .unwrap()
+        .hazard_rate(5.0)
+        .unwrap();
     assert!(after > before, "{after} vs {before}");
 }
 
@@ -439,7 +542,6 @@ fn sequential_same_curve_first_order_ops_compound() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
     let twice = ScenarioSpec {
         id: "twice".into(),
@@ -461,7 +563,6 @@ fn sequential_same_curve_first_order_ops_compound() {
         ],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
 
     let mut once_market = market.clone();
@@ -502,8 +603,16 @@ fn sequential_same_curve_first_order_ops_compound() {
     };
     engine.apply(&twice, &mut ctx).expect("twice");
 
-    let h_once = once_market.get_hazard("USD-CDS").unwrap().hazard_rate(5.0);
-    let h_twice = twice_market.get_hazard("USD-CDS").unwrap().hazard_rate(5.0);
+    let h_once = once_market
+        .get_hazard("USD-CDS")
+        .unwrap()
+        .hazard_rate(5.0)
+        .unwrap();
+    let h_twice = twice_market
+        .get_hazard("USD-CDS")
+        .unwrap()
+        .hazard_rate(5.0)
+        .unwrap();
     assert!(
         h_twice > h_once + 1e-6,
         "second sequential bump must not reuse the first cached curve: once={h_once} twice={h_twice}"
@@ -515,23 +624,26 @@ fn two_independent_par_cds_curves_match_separate_applies() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
+        .day_count(DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .knots(vec![(0.0, 1.0), (1.0, 0.95), (5.0, 0.80), (10.0, 0.60)])
         .build()
         .unwrap();
-    let ig = HazardCurve::builder("IG")
-        .base_date(base_date)
-        .recovery_rate(0.4)
-        .knots(vec![(1.0, 0.01), (5.0, 0.02)])
-        .par_spreads(vec![(1.0, 60.0), (5.0, 120.0)])
-        .build()
-        .unwrap();
-    let hy = HazardCurve::builder("HY")
-        .base_date(base_date)
-        .recovery_rate(0.3)
-        .knots(vec![(1.0, 0.05), (5.0, 0.07)])
-        .par_spreads(vec![(1.0, 350.0), (5.0, 490.0)])
-        .build()
-        .unwrap();
+    let ig = calibrate_test_hazard(
+        base_date,
+        &discount,
+        "IG",
+        0.4,
+        &[("1Y", 60.0), ("5Y", 120.0)],
+    );
+    let hy = calibrate_test_hazard(
+        base_date,
+        &discount,
+        "HY",
+        0.3,
+        &[("1Y", 350.0), ("5Y", 490.0)],
+    );
     let market = MarketContext::new().insert(discount).insert(ig).insert(hy);
 
     let together = ScenarioSpec {
@@ -554,7 +666,6 @@ fn two_independent_par_cds_curves_match_separate_applies() {
         ],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::FirstOrderShift,
     };
     let mut combined = market.clone();
     apply_par_cds(&mut combined, base_date, &together);
@@ -570,7 +681,6 @@ fn two_independent_par_cds_curves_match_separate_applies() {
             operations: vec![together.operations[0].clone()],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: HazardBumpMode::FirstOrderShift,
         },
     );
     let mut only_hy = market;
@@ -584,19 +694,18 @@ fn two_independent_par_cds_curves_match_separate_applies() {
             operations: vec![together.operations[1].clone()],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: HazardBumpMode::FirstOrderShift,
         },
     );
 
     assert!(
-        (combined.get_hazard("IG").unwrap().hazard_rate(5.0)
-            - only_ig.get_hazard("IG").unwrap().hazard_rate(5.0))
+        (combined.get_hazard("IG").unwrap().hazard_rate(5.0).unwrap()
+            - only_ig.get_hazard("IG").unwrap().hazard_rate(5.0).unwrap())
         .abs()
             < 1e-12
     );
     assert!(
-        (combined.get_hazard("HY").unwrap().hazard_rate(5.0)
-            - only_hy.get_hazard("HY").unwrap().hazard_rate(5.0))
+        (combined.get_hazard("HY").unwrap().hazard_rate(5.0).unwrap()
+            - only_hy.get_hazard("HY").unwrap().hazard_rate(5.0).unwrap())
         .abs()
             < 1e-12
     );
@@ -673,7 +782,7 @@ fn solve_to_par_after_roll_requotes_surviving_pillars_at_the_horizon() {
             let actual = ctx.market.get_hazard("ISSUER-A-CDS").unwrap();
             for (t, _) in expected.knot_points() {
                 assert!(
-                    (actual.sp(t) - expected.sp(t)).abs() < 1e-12,
+                    (actual.sp(t).unwrap() - expected.sp(t).unwrap()).abs() < 1e-12,
                     "cache must honor discount dependencies"
                 );
             }
@@ -688,11 +797,9 @@ fn solve_to_par_after_roll_requotes_surviving_pillars_at_the_horizon() {
                     .all(|input| input.pillar_date > horizon)
             );
             if bp == 0.0 && discount_bp == 0.0 {
-                let rolled = original
-                    .roll_forward((horizon - base).whole_days())
-                    .unwrap();
+                let rolled = original.condition(horizon).unwrap();
                 for (t, _) in rolled.knot_points() {
-                    assert!((curve.sp(t) - rolled.sp(t)).abs() < 1e-8);
+                    assert!((curve.sp(t).unwrap() - rolled.sp(t).unwrap()).abs() < 1e-8);
                 }
             }
             horizon_pars.push(
@@ -750,6 +857,9 @@ fn standalone_roll_preserves_calibrated_hazard_for_a_later_zero_spread_shock() {
         let unrelated_discount = DiscountCurve::builder("EUR-OIS")
             .base_date(base)
             .knots([(0.0, 1.0), (10.0, 0.8)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("second discount curve");
         let mut market = source.clone().insert(unrelated_discount);
@@ -788,11 +898,9 @@ fn standalone_roll_preserves_calibrated_hazard_for_a_later_zero_spread_shock() {
                 .iter()
                 .all(|input| input.pillar_date > horizon)
         );
-        let conditional = original
-            .roll_forward((horizon - base).whole_days())
-            .expect("conditional hazard");
+        let conditional = original.condition(horizon).expect("conditional hazard");
         for (t, _) in conditional.knot_points() {
-            assert!((rolled.sp(t) - conditional.sp(t)).abs() < 1e-8);
+            assert!((rolled.sp(t).unwrap() - conditional.sp(t).unwrap()).abs() < 1e-8);
         }
         engine
             .apply(
@@ -813,7 +921,7 @@ fn standalone_roll_preserves_calibrated_hazard_for_a_later_zero_spread_shock() {
             .get_hazard("ISSUER-A-CDS")
             .expect("replayed hazard");
         for (t, _) in rolled.knot_points() {
-            assert!((rolled.sp(t) - replayed.sp(t)).abs() < 1e-8);
+            assert!((rolled.sp(t).unwrap() - replayed.sp(t).unwrap()).abs() < 1e-8);
         }
     }
 }
@@ -830,7 +938,7 @@ fn default_provider_replays_calibrated_hazard_rolls_without_explicit_wiring() {
     let calibrated = engine::calibrate(&envelope).expect("source calibration");
     let source = MarketContext::try_from(calibrated.result.final_market)
         .expect("source market")
-        .insert_price("SPOT", MarketScalar::Unitless(100.0));
+        .insert_price("SPOT", MarketScalar::unitless(100.0).expect("valid scalar"));
     let original = source.get_hazard("ISSUER-A-CDS").expect("hazard");
     let base = original.base_date();
     // `ScenarioEngine::new()` is given no provider: it carries the default one,
@@ -871,11 +979,9 @@ fn default_provider_replays_calibrated_hazard_rolls_without_explicit_wiring() {
             .expect("rolled hazard");
         let recipe = rolled.hazard_calibration().expect("usable horizon recipe");
         assert_eq!(recipe.hazard_params()["base_date"], horizon.to_string());
-        let conditional = original
-            .roll_forward((horizon - base).whole_days())
-            .expect("conditional hazard");
+        let conditional = original.condition(horizon).expect("conditional hazard");
         for (t, _) in conditional.knot_points() {
-            assert!((rolled.sp(t) - conditional.sp(t)).abs() < 1e-8);
+            assert!((rolled.sp(t).unwrap() - conditional.sp(t).unwrap()).abs() < 1e-8);
         }
     }
 }
@@ -901,7 +1007,7 @@ fn zero_day_business_rolls_preserve_recipes_and_allow_subsequent_shocks_without_
     let calibrated = engine::calibrate(&envelope).expect("source calibration");
     let source = MarketContext::try_from(calibrated.result.final_market)
         .expect("source market")
-        .insert_price("SPOT", MarketScalar::Unitless(100.0));
+        .insert_price("SPOT", MarketScalar::unitless(100.0).expect("valid scalar"));
     let base = date!(2026 - 01 - 30);
     let original_hazard = source.get_hazard("ISSUER-A-CDS").expect("source hazard");
     let original_discount = source.get_discount("USD-OIS").expect("source discount");
@@ -966,7 +1072,13 @@ fn zero_day_business_rolls_preserve_recipes_and_allow_subsequent_shocks_without_
                 "zero-day roll must not rebuild discounts"
             );
             assert!(
-                matches!(ctx.market.get_price("SPOT").expect("spot"), MarketScalar::Unitless(spot) if (*spot - if apply_shocks { 110.0 } else { 100.0 }).abs() < 1e-12)
+                ctx.market
+                    .get_price("SPOT")
+                    .expect("spot")
+                    .get_unitless()
+                    .is_some_and(
+                        |spot| (spot - if apply_shocks { 110.0 } else { 100.0 }).abs() < 1e-12
+                    )
             );
             assert_eq!(report.operations_applied, if apply_shocks { 2 } else { 1 });
         }
@@ -1037,7 +1149,6 @@ fn several_failing_par_cds_ops_report_the_first_op_in_order() {
             .collect(),
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: HazardBumpMode::SolveToPar,
     };
     let engine = ScenarioEngine::new();
     for _ in 0..20 {

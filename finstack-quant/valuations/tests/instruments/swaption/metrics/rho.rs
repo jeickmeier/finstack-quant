@@ -172,13 +172,13 @@ fn test_rho_is_discount_curve_only_not_dual_curve() {
 
     // --- Reference: discount-curve-ONLY central difference ±1bp ---
     let market_disc_up = market
-        .bump([MarketBump::Curve {
+        .bump([MarketBump::DiscountCurve {
             id: "USD_OIS".to_string().into(),
             spec: BumpSpec::parallel_bp(1.0),
         }])
         .expect("discount up-bump should succeed");
     let market_disc_down = market
-        .bump([MarketBump::Curve {
+        .bump([MarketBump::DiscountCurve {
             id: "USD_OIS".to_string().into(),
             spec: BumpSpec::parallel_bp(-1.0),
         }])
@@ -191,11 +191,11 @@ fn test_rho_is_discount_curve_only_not_dual_curve() {
     // --- Reference: DUAL-curve central difference ±1bp (the old/wrong wiring) ---
     let market_both_up = market
         .bump([
-            MarketBump::Curve {
+            MarketBump::DiscountCurve {
                 id: "USD_OIS".to_string().into(),
                 spec: BumpSpec::parallel_bp(1.0),
             },
-            MarketBump::Curve {
+            MarketBump::ForwardCurve {
                 id: "USD_LIBOR_3M".to_string().into(),
                 spec: BumpSpec::parallel_bp(1.0),
             },
@@ -203,11 +203,11 @@ fn test_rho_is_discount_curve_only_not_dual_curve() {
         .expect("dual up-bump should succeed");
     let market_both_down = market
         .bump([
-            MarketBump::Curve {
+            MarketBump::DiscountCurve {
                 id: "USD_OIS".to_string().into(),
                 spec: BumpSpec::parallel_bp(-1.0),
             },
-            MarketBump::Curve {
+            MarketBump::ForwardCurve {
                 id: "USD_LIBOR_3M".to_string().into(),
                 spec: BumpSpec::parallel_bp(-1.0),
             },

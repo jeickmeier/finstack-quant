@@ -328,7 +328,7 @@ for sig1,sig2,rho,K in [(.8,.2,.99,0.),(.8,.8,.99,-5.),(.3,.28,.99,-74.9)]:
     m=tracks.build_market("vol");F=np.array([70.,75.]);vol=np.array([sig1,sig2])
     for name,f,v in zip(["WTI","BRENT"],F,vol):
         m.insert(PriceCurve(name+"-FORWARD",AS_OF,[(0.,float(f)),(2.,float(f))]))
-        m.insert(VolSurface(name+"-VOL",[.25,1.],[1.,100.,200.],[[float(v)]*3]*2))
+        m.insert(VolSurface(name+"-VOL",[.25,1.],[1.,100.,200.],[[float(v)]*3]*2,secondary_axis="strike",quote_type="black_lognormal",interpolation_mode="vol"))
     payload=deepcopy(inputs["WTI-BRENT-SPREAD"]);payload["instrument"]["spec"].update(correlation=rho,strike=K)
     approximate=price_instrument(json.dumps(payload),m,AS_OF,model="black76").value.amount
     correlated=np.column_stack([z[:,0],rho*z[:,0]+math.sqrt(1-rho*rho)*z[:,1]])

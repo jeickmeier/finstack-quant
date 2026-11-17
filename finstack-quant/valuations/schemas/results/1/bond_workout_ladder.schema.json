@@ -94,7 +94,7 @@
       "rows": [
         {
           "date": "2027-01-15",
-          "i_spread": -0.0124989752045,
+          "i_spread": -0.0124989752044,
           "is_worst": true,
           "kind": "call",
           "make_whole": false,
@@ -107,7 +107,7 @@
         },
         {
           "date": "2029-01-15",
-          "i_spread": -0.00508464353158,
+          "i_spread": -0.00508464353147,
           "is_worst": false,
           "kind": "call",
           "make_whole": false,
@@ -116,7 +116,7 @@
             "currency": "USD"
           },
           "redemption_price_pct": 101.0,
-          "yield_rate": 0.0309241980647
+          "yield_rate": 0.0309241980648
         },
         {
           "date": "2031-01-15",
@@ -133,7 +133,7 @@
         },
         {
           "date": "2034-01-16",
-          "i_spread": 0.00333392217268,
+          "i_spread": 0.00333392217282,
           "is_worst": false,
           "kind": "maturity",
           "make_whole": false,
@@ -142,7 +142,7 @@
             "currency": "USD"
           },
           "redemption_price_pct": 100.0,
-          "yield_rate": 0.0393402526507
+          "yield_rate": 0.0393402526508
         }
       ]
     }

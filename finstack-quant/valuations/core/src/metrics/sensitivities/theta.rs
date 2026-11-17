@@ -33,7 +33,7 @@
 //! ## Market Held Fixed
 //!
 //! Theta rolls only the valuation date: the market is held fixed. Curves
-//! are rolled with `MarketContext::roll_forward`, and spot, volatility and
+//! are conditioned with `MarketContext::condition`, and spot, volatility and
 //! every other quote stay at their `as_of` values. A path-dependent
 //! instrument therefore observes the `as_of` spot over the whole horizon.
 //! Before the rolled repricing, the calculator asks the
@@ -171,10 +171,10 @@ fn compute_theta_breakdown(context: &mut crate::metrics::MetricContext) -> Resul
 
     let horizon_days = (rolled_date - context.as_of).whole_days();
     // Coupon fixings the roll crosses are projected from the pre-roll schedule
-    // and written into the market before its curves roll.
+    // and written into the market before its curves condition onto `rolled_date`.
     let rolled_market = context
         .fixings_held_market(rolled_date)?
-        .roll_forward(horizon_days)?;
+        .condition(rolled_date)?;
     // Spot is held at its as-of level, so the observation state over the roll
     // is the one that spot implies (`Instrument::theta_observed_state`).
     let observed =

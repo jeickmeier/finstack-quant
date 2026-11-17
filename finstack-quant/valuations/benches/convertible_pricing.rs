@@ -76,14 +76,22 @@ fn create_market_context(spot: f64, vol: f64, div_yield: f64) -> MarketContext {
         .base_date(base)
         .knots([(0.0, 1.0), (10.0, 0.741)]) // ~3% rate
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
     MarketContext::new()
         .insert(discount_curve)
-        .insert_price("AAPL", MarketScalar::Unitless(spot))
-        .insert_price("AAPL-VOL", MarketScalar::Unitless(vol))
-        .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(div_yield))
+        .insert_price("AAPL", MarketScalar::unitless(spot).expect("valid scalar"))
+        .insert_price(
+            "AAPL-VOL",
+            MarketScalar::unitless(vol).expect("valid scalar"),
+        )
+        .insert_price(
+            "AAPL-DIVYIELD",
+            MarketScalar::unitless(div_yield).expect("valid scalar"),
+        )
 }
 
 fn create_standard_convertible() -> ConvertibleBond {

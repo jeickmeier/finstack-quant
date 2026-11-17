@@ -6,7 +6,7 @@ use crate::structured_credit::utils::amortization::{
 };
 use crate::structured_credit::utils::months::ClampedMonths;
 use crate::structured_credit::{DealType, PoolAsset, StructuredCredit};
-use finstack_quant_core::dates::{Date, DateExt};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_valuations_core::metrics::MetricContext;
@@ -29,12 +29,8 @@ fn loan_debt_service(
     let coupon = match asset.forward_curve_id.as_deref() {
         Some(index) => {
             let curve = market.get_forward(index)?;
-            // Project the next reset: the accrual starting one reset lag after
-            // `as_of` fixes on the curve rather than on a historical fixing.
-            let calendar = finstack_quant_core::dates::calendar_by_id_strict("weekends_only")?;
-            let next_reset = as_of.add_business_days(curve.reset_lag(), calendar)?;
             let projected =
-                term_rate_for_period(curve.as_ref(), market, next_reset, asset.day_count)?;
+                term_rate_for_period(curve.as_ref(), market, as_of, asset.day_count, 0)?;
             let floored = asset.index_floor_bp.map_or(projected, |floor_bp| {
                 projected.max(floor_bp / BASIS_POINTS_PER_UNIT)
             });

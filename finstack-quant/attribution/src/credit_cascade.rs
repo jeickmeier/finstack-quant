@@ -24,11 +24,11 @@
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
+use crate::metrics_based::shifts::{
+    measure_par_spread_shift_bp, measure_scalar_native_amount_diff,
+};
 use finstack_quant_core::Result;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::diff::{
-    TenorSamplingMethod, measure_par_spread_shift, measure_scalar_absolute_shift,
-};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, IssuerId};
 use finstack_quant_factor::credit::hierarchy::{CreditFactorModel, IssuerBetaRow};
@@ -116,7 +116,7 @@ pub(crate) fn credit_factor_model_id(model: &CreditFactorModel) -> Result<String
 pub(crate) const ADDER_MAGNITUDE_WARN_RATIO: f64 = 0.05;
 
 /// Minimum factor-series/par-spread scale ratio treated as a unit
-/// mismatch. Scalar factor series ([`MarketScalar::Unitless`]) are consumed
+/// mismatch. Scalar factor series ([`MarketScalar::unitless`]) are consumed
 /// directly as basis points; a percent-quoted series (e.g. `3.25` → `3.50`
 /// meaning 25bp) under-reads its move 100× and the idiosyncratic adder
 /// silently absorbs the difference. When a nonzero factor move is at least
@@ -129,7 +129,7 @@ pub(crate) const ADDER_MAGNITUDE_WARN_RATIO: f64 = 0.05;
 /// would reject correct attributions. The note lands in the attribution's
 /// `meta.notes` on every method, alongside a `tracing::warn!`.
 ///
-/// [`MarketScalar::Unitless`]: finstack_quant_core::market_data::scalars::MarketScalar::Unitless
+/// [`MarketScalar::unitless`]: finstack_quant_core::market_data::scalars::MarketScalar::unitless
 pub(crate) const FACTOR_UNIT_MISMATCH_RATIO: f64 = 99.0;
 
 /// What kind of cascade step a single bump represents.
@@ -370,11 +370,10 @@ pub(crate) fn plan_credit_cascade(
     let mut total_shift_bp = 0.0;
     let mut count = 0usize;
     for curve_id in &credit_curves {
-        if let Some(shift) = crate::helpers::measured_unless_missing(measure_par_spread_shift(
+        if let Some(shift) = crate::helpers::measured_unless_missing(measure_par_spread_shift_bp(
             curve_id.as_str(),
             market_t0,
             market_t1,
-            TenorSamplingMethod::Standard,
         ))? {
             total_shift_bp += shift;
             count += 1;
@@ -530,7 +529,7 @@ fn factor_move_bp(
     market_t0: &MarketContext,
     market_t1: &MarketContext,
 ) -> Option<f64> {
-    measure_scalar_absolute_shift(factor_id, market_t0, market_t1).ok()
+    measure_scalar_native_amount_diff(factor_id, market_t0, market_t1).ok()
 }
 
 /// Apply a parallel **par CDS spread** shift (in bp) to every hazard curve in
@@ -856,10 +855,70 @@ mod tests {
     // arithmetic (factor ordering, adder reconciliation), so keeping par-spread
     // and hazard units coincident isolates that structure from the LGD scaling.
     fn hazard(id: &str, as_of: finstack_quant_core::dates::Date, rate: f64) -> HazardCurve {
+        use finstack_quant_calibration::CalibrationMethod;
+        use finstack_quant_calibration::api::schema::HazardCurveParams;
+        use finstack_quant_calibration::quotes::{CdsQuote, Pillar, QuoteId};
+        use finstack_quant_core::dates::DayCountContext;
+        use finstack_quant_core::market_data::term_structures::{
+            HazardCalibrationInput, HazardCalibrationRecipe, Seniority,
+        };
+        use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
+
+        let day_count = finstack_quant_core::dates::DayCount::Act360;
+        let convention = CdsConventionKey {
+            currency: Currency::USD,
+            doc_clause: CdsDocClause::IsdaNa,
+        };
+        let spread_bp = rate * 10_000.0;
+        let inputs: Vec<HazardCalibrationInput> = [1_u32, 5_u32]
+            .into_iter()
+            .map(|years| {
+                let pillar_date = create_date(2025 + years as i32, Month::January, 1)
+                    .expect("contractual CDS pillar date");
+                let quote = CdsQuote::CdsParSpread {
+                    id: QuoteId::new(format!("{id}-{years}Y")),
+                    entity: "ISSUER-B".to_string(),
+                    convention: convention.clone(),
+                    pillar: Pillar::Date(pillar_date),
+                    spread_bp,
+                    recovery_rate: 0.0,
+                };
+                HazardCalibrationInput {
+                    quote: serde_json::to_value(quote).expect("quote json"),
+                    pillar_date,
+                    pillar_time: day_count
+                        .year_fraction(as_of, pillar_date, DayCountContext::default())
+                        .expect("pillar time"),
+                }
+            })
+            .collect();
+        let params = HazardCurveParams {
+            curve_id: CurveId::new(id),
+            entity: "ISSUER-B".to_string(),
+            seniority: Seniority::Senior,
+            currency: Currency::USD,
+            base_date: as_of,
+            discount_curve_id: CurveId::new("USD-OIS"),
+            recovery_rate: 0.0,
+            notional: 1.0,
+            method: CalibrationMethod::Bootstrap,
+            doc_clause: Some("isda_na".to_string()),
+            cds_valuation_convention: None,
+        };
+        let recipe = HazardCalibrationRecipe::new(
+            serde_json::to_value(params).expect("params json"),
+            inputs.clone(),
+            inputs,
+            serde_json::json!({"fail_on_bad_fit": true}),
+        )
+        .expect("recipe");
+
         HazardCurve::builder(id)
             .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
             .recovery_rate(0.0)
             .knots([(1.0, rate), (5.0, rate)])
+            .hazard_calibration(recipe)
             .build()
             .unwrap()
     }
@@ -873,19 +932,31 @@ mod tests {
         let instrument = canonical_credit_bond(curve_id.clone());
         let market_t0 = MarketContext::new()
             .insert(hazard(curve_id.as_str(), as_of_t0, 0.0100))
-            .insert_price("cdx.hy.5y", MarketScalar::Unitless(100.0))
-            .insert_price("credit::level0::Rating::B", MarketScalar::Unitless(0.0))
+            .insert_price(
+                "cdx.hy.5y",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "credit::level0::Rating::B",
+                MarketScalar::unitless(0.0).expect("valid scalar"),
+            )
             .insert_price(
                 "credit::level1::Rating.Region::B.US",
-                MarketScalar::Unitless(0.0),
+                MarketScalar::unitless(0.0).expect("valid scalar"),
             );
         let market_t1 = MarketContext::new()
             .insert(hazard(curve_id.as_str(), as_of_t1, 0.0130))
-            .insert_price("cdx.hy.5y", MarketScalar::Unitless(125.0))
-            .insert_price("credit::level0::Rating::B", MarketScalar::Unitless(7.0))
+            .insert_price(
+                "cdx.hy.5y",
+                MarketScalar::unitless(125.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "credit::level0::Rating::B",
+                MarketScalar::unitless(7.0).expect("valid scalar"),
+            )
             .insert_price(
                 "credit::level1::Rating.Region::B.US",
-                MarketScalar::Unitless(-2.0),
+                MarketScalar::unitless(-2.0).expect("valid scalar"),
             );
 
         let mut notes = Vec::new();
@@ -950,10 +1021,16 @@ mod tests {
         // Hazard 1.00% → 1.25% at recovery 0 → ΔS = 25bp par spread.
         let market_t0 = MarketContext::new()
             .insert(hazard(curve_id.as_str(), as_of_t0, 0.0100))
-            .insert_price("cdx.hy.5y", MarketScalar::Unitless(3.25));
+            .insert_price(
+                "cdx.hy.5y",
+                MarketScalar::unitless(3.25).expect("valid scalar"),
+            );
         let market_t1 = MarketContext::new()
             .insert(hazard(curve_id.as_str(), as_of_t1, 0.0125))
-            .insert_price("cdx.hy.5y", MarketScalar::Unitless(3.50));
+            .insert_price(
+                "cdx.hy.5y",
+                MarketScalar::unitless(3.50).expect("valid scalar"),
+            );
 
         let mut notes = Vec::new();
         plan_credit_cascade(&model, &instrument, &market_t0, &market_t1, &mut notes)
@@ -979,10 +1056,16 @@ mod tests {
         let instrument = canonical_credit_bond(curve_id.clone());
         let market_t0 = MarketContext::new()
             .insert(hazard(curve_id.as_str(), as_of_t0, 0.0100))
-            .insert_price("cdx.hy.5y", MarketScalar::Unitless(100.0));
+            .insert_price(
+                "cdx.hy.5y",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            );
         let market_t1 = MarketContext::new()
             .insert(hazard(curve_id.as_str(), as_of_t1, 0.0125))
-            .insert_price("cdx.hy.5y", MarketScalar::Unitless(125.0));
+            .insert_price(
+                "cdx.hy.5y",
+                MarketScalar::unitless(125.0).expect("valid scalar"),
+            );
 
         let mut notes = Vec::new();
         plan_credit_cascade(&model, &instrument, &market_t0, &market_t1, &mut notes)
@@ -1009,12 +1092,15 @@ mod tests {
         let instrument = canonical_credit_bond(curve_id.clone());
         let market_t0 = MarketContext::new()
             .insert(hazard(curve_id.as_str(), as_of_t0, 0.0100))
-            .insert_price("cdx.hy.5y", MarketScalar::Unitless(100.0));
+            .insert_price(
+                "cdx.hy.5y",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            );
         let market_t1 = MarketContext::new()
             .insert(hazard(curve_id.as_str(), as_of_t1, 0.0125))
             .insert_price(
                 "cdx.hy.5y",
-                MarketScalar::Price(Money::from((125_i64, Currency::USD))),
+                MarketScalar::price(Money::from((125_i64, Currency::USD))),
             );
 
         let mut notes = Vec::new();
@@ -1052,19 +1138,31 @@ mod tests {
         let instrument = canonical_credit_bond(curve_id.clone());
         let market_t0 = MarketContext::new()
             .insert(hazard(curve_id.as_str(), as_of_t0, 0.0100))
-            .insert_price("cdx.hy.5y", MarketScalar::Unitless(100.0))
-            .insert_price("credit::level0::Rating::B", MarketScalar::Unitless(0.0))
+            .insert_price(
+                "cdx.hy.5y",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "credit::level0::Rating::B",
+                MarketScalar::unitless(0.0).expect("valid scalar"),
+            )
             .insert_price(
                 "credit::level1::Rating.Region::B.US",
-                MarketScalar::Unitless(0.0),
+                MarketScalar::unitless(0.0).expect("valid scalar"),
             );
         let market_t1 = MarketContext::new()
             .insert(hazard(curve_id.as_str(), as_of_t1, 0.0130))
-            .insert_price("cdx.hy.5y", MarketScalar::Unitless(105.0))
-            .insert_price("credit::level0::Rating::B", MarketScalar::Unitless(25.0))
+            .insert_price(
+                "cdx.hy.5y",
+                MarketScalar::unitless(105.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "credit::level0::Rating::B",
+                MarketScalar::unitless(25.0).expect("valid scalar"),
+            )
             .insert_price(
                 "credit::level1::Rating.Region::B.US",
-                MarketScalar::Unitless(-2.0),
+                MarketScalar::unitless(-2.0).expect("valid scalar"),
             );
 
         let mut notes = Vec::new();

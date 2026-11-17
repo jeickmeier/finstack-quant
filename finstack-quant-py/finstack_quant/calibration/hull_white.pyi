@@ -768,7 +768,7 @@ def calibrate_hull_white_to_swaptions(
     ... )
     >>> import datetime
     >>> from finstack_quant.core.market_data import DiscountCurve
-    >>> curve = DiscountCurve.flat("USD-OIS", datetime.date(2025, 1, 1), 0.03)
+    >>> curve = DiscountCurve.flat("USD-OIS", datetime.date(2025, 1, 1), 0.03, "act_365f")
     >>> params, report = calibrate_hull_white_to_swaptions(
     ...     curve,
     ...     [SwaptionQuote(1.0, 5.0, 0.0085, True), SwaptionQuote(5.0, 5.0, 0.0080, True)],
@@ -828,7 +828,7 @@ def calibrate_hull_white_to_cap_floors(
     ... )
     >>> import datetime
     >>> from finstack_quant.core.market_data import DiscountCurve
-    >>> curve = DiscountCurve.flat("USD-OIS", datetime.date(2025, 1, 1), 0.03)
+    >>> curve = DiscountCurve.flat("USD-OIS", datetime.date(2025, 1, 1), 0.03, "act_365f")
     >>> params, report = calibrate_hull_white_to_cap_floors(
     ...     curve,
     ...     [CapFloorQuote(5.0, 0.03, 0.009, True, True)],
@@ -892,7 +892,7 @@ def bootstrap_hull_white_sigma_schedule_to_cap_floors(
     ... )
     >>> import datetime
     >>> from finstack_quant.core.market_data import DiscountCurve
-    >>> curve = DiscountCurve.flat("USD-OIS", datetime.date(2025, 1, 1), 0.03)
+    >>> curve = DiscountCurve.flat("USD-OIS", datetime.date(2025, 1, 1), 0.03, "act_365f")
     >>> params, report = bootstrap_hull_white_sigma_schedule_to_cap_floors(
     ...     curve,
     ...     [CapFloorQuote(2.0, 0.03, 0.009, True, True), CapFloorQuote(5.0, 0.03, 0.010, True, True)],

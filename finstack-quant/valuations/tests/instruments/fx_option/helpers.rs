@@ -6,7 +6,9 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::money::fx::FxMatrix;
@@ -95,6 +97,8 @@ pub fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> 
             (5.0, (-rate * 5.0).exp()),
             (10.0, (-rate * 10.0).exp()),
         ])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap()
 }
@@ -102,8 +106,11 @@ pub fn build_flat_discount_curve(rate: f64, base_date: Date, curve_id: &str) -> 
 /// Build a flat volatility surface.
 pub fn build_flat_vol_surface(vol: f64, vol_surface_id: &str) -> VolSurface {
     VolSurface::builder(vol_surface_id)
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .expiries(&[0.25, 0.5, 1.0, 2.0, 5.0])
-        .strikes(&[0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4])
+        .secondary_values(&[0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4])
         .row(&[vol; 7])
         .row(&[vol; 7])
         .row(&[vol; 7])

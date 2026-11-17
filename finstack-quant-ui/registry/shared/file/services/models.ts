@@ -129,9 +129,7 @@ export function createModelsService(
         try {
           const surface = native.models.volatility.materializeFxDeltaSurface(
             handle,
-            request.spot,
-            request.domesticRate,
-            request.foreignRate,
+            [...request.deliveryForwards],
           );
           try {
             return JSON.parse(surface.toJson()) as FxStrikeSurface;

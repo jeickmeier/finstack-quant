@@ -932,10 +932,7 @@
       ]
      ],
      "interp_style": "monotone_convex",
-     "extrapolation": "flat_forward",
-     "min_forward_rate": -0.005,
-     "allow_non_monotonic": false,
-     "min_forward_tenor": 1e-06,
+     "extrapolation": "extend",
      "rate_calibration": null,
      "fx_policy": null
     }

@@ -32,9 +32,18 @@ fn rbergomi_market(
 ) -> finstack_quant_core::market_data::context::MarketContext {
     use finstack_quant_core::market_data::scalars::MarketScalar;
     build_standard_market(as_of, spot, vol, rate, 0.0)
-        .insert_price("ROUGH_BERGOMI_ETA", MarketScalar::Unitless(eta))
-        .insert_price("ROUGH_BERGOMI_HURST", MarketScalar::Unitless(hurst))
-        .insert_price("ROUGH_BERGOMI_RHO", MarketScalar::Unitless(rho))
+        .insert_price(
+            "ROUGH_BERGOMI_ETA",
+            MarketScalar::unitless(eta).expect("valid scalar"),
+        )
+        .insert_price(
+            "ROUGH_BERGOMI_HURST",
+            MarketScalar::unitless(hurst).expect("valid scalar"),
+        )
+        .insert_price(
+            "ROUGH_BERGOMI_RHO",
+            MarketScalar::unitless(rho).expect("valid scalar"),
+        )
 }
 
 /// Price an ATM call through the rBergomi MC pricer with a capped path count.

@@ -496,9 +496,9 @@ fn standardized_residual(
 ) -> Option<f64> {
     let mut os = OnlineStats::new();
     for (x, y) in xs.iter().zip(ys.iter()) {
-        os.update(y - (intercept + slope * x));
+        os.update(y - (intercept + slope * x)).ok()?;
     }
-    let sd = os.std_dev();
+    let sd = os.get_std_dev().ok()??;
     if !sd.is_finite() || sd < 1e-15 {
         return None;
     }

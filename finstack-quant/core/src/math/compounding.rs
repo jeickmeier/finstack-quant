@@ -150,60 +150,63 @@ impl Compounding {
     /// Simple:       DF = 1 / (1 + r × t)
     /// ```
     ///
-    /// Returns `NaN` when `rate` or `t` is non-finite, when `t < 0.0`, or when
-    /// `rate` violates the convention domain (`1 + r/n <= 0` for `Periodic(n)`
-    /// or `1 + r × t <= 0` for `Simple`). When `t == 0.0` and `rate` is in the
-    /// valid convention domain, returns `1.0`.
-    ///
     /// # Arguments
     ///
     /// * `rate` - Annualized interest rate as a decimal (`0.05` = 5%) quoted in `self`.
     /// * `t` - Non-negative maturity in years on the curve day-count clock.
     ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`](crate::Error::Validation) when `rate` or `t`
+    /// is non-finite, `t < 0.0`, `rate` violates the convention domain even at
+    /// `t == 0.0` (`1 + r/n <= 0` for `Periodic(n)`, `1 + r × t <= 0` for `Simple`),
+    /// required intermediate scaling underflows a non-zero rate, or the computed
+    /// discount factor is non-finite or underflows to `<= 0.0`.
+    ///
     /// # References
     ///
     /// Hull, J. C. (2018). *Options, Futures, and Other Derivatives* (10th ed.),
     /// Chapter 4 — Interest Rates. `docs/REFERENCES.md#hull-options-futures`
-    #[must_use]
     #[inline]
-    pub fn df_from_rate(&self, rate: f64, t: f64) -> f64 {
+    pub fn df_from_rate(&self, rate: f64, t: f64) -> crate::Result<f64> {
         if !rate.is_finite() || !t.is_finite() || t < 0.0 {
-            return f64::NAN;
+            return Err(crate::Error::Validation(format!(
+                "df_from_rate requires finite rate and non-negative finite t (got rate={rate}, t={t})"
+            )));
         }
-        match self {
+        let df = match self {
             Compounding::Continuous => {
-                if t == 0.0 {
-                    1.0
-                } else {
-                    (-rate * t).exp()
+                if t == 0.0 || rate == 0.0 {
+                    return Ok(1.0);
                 }
+                (-rate * t).exp()
             }
-            // ln_1p formulations: (1 + r)^(-t) = exp(-t·ln(1+r)). Forming
-            // 1 + r explicitly rounds away rates below ~1e-16; ln_1p keeps
-            // full precision for small rates.
-            Compounding::Periodic(n) => {
-                let n = f64::from(n.get());
-                let x = rate / n;
-                if x <= -1.0 || !x.is_finite() {
-                    f64::NAN
-                } else if t == 0.0 {
-                    1.0
-                } else {
-                    (-n * t * x.ln_1p()).exp()
+            Compounding::Periodic(_) => {
+                let c = self.instantaneous_rate(rate)?;
+                if t == 0.0 || rate == 0.0 {
+                    return Ok(1.0);
                 }
+                (-c * t).exp()
             }
             Compounding::Simple => {
-                if t == 0.0 {
-                    return 1.0;
-                }
                 let denominator = rate.mul_add(t, 1.0);
-                if denominator <= 0.0 || !denominator.is_finite() {
-                    f64::NAN
-                } else {
-                    1.0 / denominator
+                if !denominator.is_finite() || denominator <= 0.0 {
+                    return Err(crate::Error::Validation(format!(
+                        "simple compounding denominator 1 + rate * t must be strictly positive (got {denominator} for rate={rate}, t={t})"
+                    )));
                 }
+                if t == 0.0 || rate == 0.0 {
+                    return Ok(1.0);
+                }
+                1.0 / denominator
             }
+        };
+        if !df.is_finite() || df <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "df_from_rate overflowed or underflowed to non-positive/non-finite DF ({df}) for {self}, rate={rate}, t={t}"
+            )));
         }
+        Ok(df)
     }
 
     /// Convert a discount factor to an interest rate for time `t` (in years).
@@ -216,86 +219,155 @@ impl Compounding {
     /// Simple: r = (1/DF - 1) / t
     /// ```
     ///
-    /// Returns `NaN` for non-positive or non-finite discount factors, or when
-    /// `t` is negative or non-finite.
-    ///
-    /// When `t == 0.0`, returns `0.0` (the rate is undefined for an
-    /// instantaneous observation; zero is a safe sentinel).
-    ///
     /// # Arguments
     ///
     /// * `df` - Strictly positive, finite discount factor.
-    /// * `t` - Non-negative maturity in years on the curve day-count clock.
+    /// * `t` - Strictly positive, finite maturity in years on the curve day-count clock.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`](crate::Error::Validation) when `df <= 0.0` or
+    /// non-finite, when `t <= 0.0` or non-finite, or when the converted rate is
+    /// non-finite or underflows a non-unit factor (`df != 1.0`) to zero.
     ///
     /// # References
     ///
     /// Hull, J. C. (2018). *Options, Futures, and Other Derivatives* (10th ed.),
     /// Chapter 4 — Interest Rates. `docs/REFERENCES.md#hull-options-futures`
-    #[must_use]
     #[inline]
-    pub fn rate_from_df(&self, df: f64, t: f64) -> f64 {
-        if !df.is_finite() || df <= 0.0 || !t.is_finite() || t < 0.0 {
-            return f64::NAN;
+    pub fn rate_from_df(&self, df: f64, t: f64) -> crate::Result<f64> {
+        if !df.is_finite() || df <= 0.0 || !t.is_finite() || t <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "rate_from_df requires finite positive df and strictly positive finite t (got df={df}, t={t})"
+            )));
         }
-        if t == 0.0 {
-            return 0.0;
+        if df.to_bits() == 1.0_f64.to_bits() {
+            return Ok(0.0);
         }
-        match self {
-            Compounding::Continuous => -df.ln() / t,
-            // exp_m1 formulations avoid cancellation when the exponent is
-            // small (DF near 1 and/or short tenors): exp(x) - 1 loses all
-            // significant digits for |x| ≲ 1e-8 while exp_m1 is exact.
+        let ln_df = if (df - 1.0).abs() < 0.5 {
+            (df - 1.0).ln_1p()
+        } else {
+            df.ln()
+        };
+        if !ln_df.is_finite() {
+            return Err(crate::Error::Validation(format!(
+                "rate_from_df failed to compute finite log discount factor for df={df}"
+            )));
+        }
+        let rate = match self {
+            Compounding::Continuous => -ln_df / t,
             Compounding::Periodic(n) => {
                 let n = f64::from(n.get());
-                n * (-df.ln() / (n * t)).exp_m1()
+                let c = -ln_df / t;
+                if !c.is_finite() {
+                    return Err(crate::Error::Validation(format!(
+                        "rate_from_df continuous equivalent overflowed for df={df}, t={t}"
+                    )));
+                }
+                let x = c / n;
+                if c != 0.0 && x == 0.0 {
+                    return Err(crate::Error::Validation(format!(
+                        "rate_from_df intermediate scaling c/n underflowed for {self}, df={df}, t={t}"
+                    )));
+                }
+                let r = n * x.exp_m1();
+                if r / n <= -1.0 {
+                    return Err(crate::Error::Validation(format!(
+                        "rate_from_df inverse rounded onto invalid periodic boundary -n for {self}, df={df}, t={t}"
+                    )));
+                }
+                r
             }
-            Compounding::Simple => (1.0 / df - 1.0) / t,
+            Compounding::Simple => {
+                let denom = df * t;
+                let r = if denom.is_finite() && denom > 0.0 {
+                    (1.0 - df) / denom
+                } else {
+                    (1.0 / df - 1.0) / t
+                };
+                if r.mul_add(t, 1.0) <= 0.0 {
+                    return Err(crate::Error::Validation(format!(
+                        "rate_from_df inverse rounded onto invalid simple denominator for df={df}, t={t}"
+                    )));
+                }
+                r
+            }
+        };
+        if !rate.is_finite() || rate == 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "rate_from_df overflowed or underflowed to zero for non-unit df={df}, t={t}"
+            )));
         }
+        Ok(rate)
     }
 
     /// Continuous-equivalent (instantaneous) rate of `rate` quoted under `self`.
-    ///
-    /// This is the `t → 0` limit of the conversion to continuous compounding:
-    ///
-    /// ```text
-    /// Continuous: c = r
-    /// Periodic(n): c = n × ln(1 + r/n)
-    /// Simple: c = r (DF = 1/(1 + r t) → e^(-r t) as t → 0)
-    /// ```
-    #[must_use]
     #[inline]
-    fn instantaneous_rate(&self, rate: f64) -> f64 {
+    fn instantaneous_rate(&self, rate: f64) -> crate::Result<f64> {
         match self {
-            Compounding::Continuous | Compounding::Simple => rate,
+            Compounding::Continuous | Compounding::Simple => {
+                if !rate.is_finite() {
+                    return Err(crate::Error::Validation(format!(
+                        "rate must be finite (got {rate})"
+                    )));
+                }
+                Ok(if rate == 0.0 { 0.0 } else { rate })
+            }
             Compounding::Periodic(n) => {
                 let n = f64::from(n.get());
                 let x = rate / n;
-                if x <= -1.0 || !x.is_finite() {
-                    f64::NAN
-                } else {
-                    n * x.ln_1p()
+                if !x.is_finite() || x <= -1.0 {
+                    return Err(crate::Error::Validation(format!(
+                        "periodic compounding factor 1 + rate/n must be positive and finite (got rate={rate}, n={n})"
+                    )));
                 }
+                if rate == 0.0 {
+                    return Ok(0.0);
+                }
+                if x == 0.0 {
+                    return Err(crate::Error::Validation(format!(
+                        "periodic rate/n underflowed non-zero rate ({rate}) for n={n}"
+                    )));
+                }
+                let c = n * x.ln_1p();
+                if !c.is_finite() || c == 0.0 {
+                    return Err(crate::Error::Validation(format!(
+                        "instantaneous continuous rate overflowed or underflowed for rate={rate}, n={n}"
+                    )));
+                }
+                Ok(c)
             }
         }
     }
 
     /// Rate quoted under `self` equivalent to the continuous rate `c` as `t → 0`.
-    ///
-    /// Inverse of [`instantaneous_rate`](Self::instantaneous_rate):
-    ///
-    /// ```text
-    /// Continuous: r = c
-    /// Periodic(n): r = n × (e^(c/n) − 1)
-    /// Simple: r = c
-    /// ```
-    #[must_use]
     #[inline]
-    fn rate_from_instantaneous(&self, c: f64) -> f64 {
+    fn rate_from_instantaneous(&self, c: f64) -> crate::Result<f64> {
+        if !c.is_finite() {
+            return Err(crate::Error::Validation(format!(
+                "continuous rate must be finite (got {c})"
+            )));
+        }
+        if c == 0.0 {
+            return Ok(0.0);
+        }
         match self {
-            Compounding::Continuous | Compounding::Simple => c,
+            Compounding::Continuous | Compounding::Simple => Ok(c),
             Compounding::Periodic(n) => {
                 let n = f64::from(n.get());
-                n * (c / n).exp_m1()
+                let x = c / n;
+                if x == 0.0 {
+                    return Err(crate::Error::Validation(format!(
+                        "periodic c/n underflowed non-zero continuous rate ({c}) for n={n}"
+                    )));
+                }
+                let r = n * x.exp_m1();
+                if !r.is_finite() || r == 0.0 || r / n <= -1.0 {
+                    return Err(crate::Error::Validation(format!(
+                        "periodic inverse rate overflowed or underflowed for c={c}, n={n}"
+                    )));
+                }
+                Ok(r)
             }
         }
     }
@@ -308,13 +380,14 @@ impl Compounding {
     /// level of the base rate:
     ///
     /// ```text
-    /// shift = c(r_self + spread) − c(r_self),   r_self = self-quoted rate of `continuous_rate`
-    /// Periodic(n): shift = n × ln(e^(c/n) + spread/n) − c
+    /// Periodic(n): shift = n × ln(1 + (spread / n) × exp(-c / n))
     /// Continuous:  shift = spread
     /// ```
     ///
     /// This is how a bond-equivalent (semiannual) option-adjusted spread is
     /// applied to each short rate of a lattice built on a semiannual curve.
+    /// It is an instantaneous (`t → 0`) quote restatement, not a finite-tenor
+    /// `Simple` zero-spread shift.
     ///
     /// # Arguments
     ///
@@ -323,33 +396,67 @@ impl Compounding {
     /// * `spread` - Spread as a decimal on the `self` compounding basis
     ///   (0.01 = 100 bp), added to the base rate restated on that basis.
     ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`](crate::Error::Validation) when `continuous_rate`
+    /// or `spread` is non-finite, when the shifted periodic base `exp(c/n) + spread/n`
+    /// is non-positive or non-finite, or when a non-zero `spread` underflows to zero
+    /// or produces a non-finite shift.
+    ///
     /// # Examples
     ///
     /// ```
     /// use finstack_quant_core::math::Compounding;
     ///
     /// let base = 0.04_f64;
-    /// assert_eq!(Compounding::Continuous.continuous_spread_shift(base, 0.01), 0.01);
+    /// assert_eq!(Compounding::Continuous.continuous_spread_shift(base, 0.01).unwrap(), 0.01);
     ///
     /// // Semiannual: (1 + (z + s)/2) per half year, not (1 + z/2)(1 + s/2).
-    /// let shift = Compounding::SEMI_ANNUAL.continuous_spread_shift(base, 0.01);
+    /// let shift = Compounding::SEMI_ANNUAL.continuous_spread_shift(base, 0.01).unwrap();
     /// let z = 2.0 * ((base / 2.0).exp() - 1.0);
     /// let expected = 2.0 * (1.0 + (z + 0.01) / 2.0).ln() - base;
     /// assert!((shift - expected).abs() < 1e-15);
     /// ```
-    #[must_use]
     #[inline]
-    pub fn continuous_spread_shift(&self, continuous_rate: f64, spread: f64) -> f64 {
+    pub fn continuous_spread_shift(&self, continuous_rate: f64, spread: f64) -> crate::Result<f64> {
         if !continuous_rate.is_finite() || !spread.is_finite() {
-            return f64::NAN;
+            return Err(crate::Error::Validation(format!(
+                "continuous_spread_shift requires finite inputs (got continuous_rate={continuous_rate}, spread={spread})"
+            )));
         }
-        match self {
+        if spread == 0.0 {
+            return Ok(0.0);
+        }
+        let shift = match self {
             Compounding::Continuous | Compounding::Simple => spread,
-            Compounding::Periodic(_) => {
-                self.instantaneous_rate(self.rate_from_instantaneous(continuous_rate) + spread)
-                    - continuous_rate
+            Compounding::Periodic(n) => {
+                let n = f64::from(n.get());
+                let c_n = continuous_rate / n;
+                if c_n >= -500.0 {
+                    let ratio = (spread / n) * (-c_n).exp();
+                    if !ratio.is_finite() || ratio <= -1.0 {
+                        return Err(crate::Error::Validation(format!(
+                            "continuous_spread_shift shifted periodic base is non-positive or non-finite for c={continuous_rate}, spread={spread}, n={n}"
+                        )));
+                    }
+                    n * ratio.ln_1p()
+                } else {
+                    let base = c_n.exp() + spread / n;
+                    if !base.is_finite() || base <= 0.0 {
+                        return Err(crate::Error::Validation(format!(
+                            "continuous_spread_shift shifted periodic base is non-positive for c={continuous_rate}, spread={spread}, n={n}"
+                        )));
+                    }
+                    n * base.ln() - continuous_rate
+                }
             }
+        };
+        if !shift.is_finite() || shift == 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "continuous_spread_shift overflowed or underflowed to zero for c={continuous_rate}, spread={spread}, compounding={self}"
+            )));
         }
+        Ok(shift)
     }
 
     /// Convert a rate quoted under `self` to the equivalent rate under `to`.
@@ -358,16 +465,7 @@ impl Compounding {
     /// an intermediate `DF(t)`, avoiding `exp(-r × t)` underflow/overflow at
     /// long maturities and cancellation at tiny tenors.
     ///
-    /// Returns `NaN` when `rate` or `t` is non-finite, when `t < 0.0`, or when
-    /// `rate` violates the domain of `self` (`1 + r/n <= 0` for `Periodic(n)`
-    /// or `1 + r × t <= 0` for `Simple`).
-    ///
-    /// When `t == 0.0`, returns the `t → 0` limit of the conversion: the
-    /// source rate is mapped to its continuous-equivalent
-    /// (`ln(1+r)` for annual, `n·ln(1+r/n)` for periodic, identity for
-    /// continuous/simple) and then back out under the target convention
-    /// (`e^c − 1` for annual, `n·(e^(c/n) − 1)` for periodic). For example,
-    /// continuous → annual at `t = 0` returns `e^r − 1`, not `0.0`.
+    /// When `t == 0.0`, returns the `t → 0` limit of the conversion.
     ///
     /// # Arguments
     ///
@@ -375,61 +473,97 @@ impl Compounding {
     /// * `t` - Non-negative maturity in years on the curve day-count clock.
     /// * `to` - Target compounding convention for the converted rate.
     ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`](crate::Error::Validation) when `rate` or `t`
+    /// is non-finite, `t < 0.0`, `rate` violates the domain of `self`
+    /// (`1 + r/n <= 0` for `Periodic(n)` or `1 + r × t <= 0` for `Simple`), or the
+    /// converted rate overflows, underflows a non-zero input to zero, or hits
+    /// an invalid target domain boundary.
+    ///
     /// # References
     ///
     /// Hull, J. C. (2018). *Options, Futures, and Other Derivatives* (10th ed.),
     /// Chapter 4 — Interest Rates. `docs/REFERENCES.md#hull-options-futures`
-    #[must_use]
     #[inline]
-    pub fn convert_rate(&self, rate: f64, t: f64, to: &Compounding) -> f64 {
+    pub fn convert_rate(&self, rate: f64, t: f64, to: &Compounding) -> crate::Result<f64> {
         if !rate.is_finite() || !t.is_finite() || t < 0.0 {
-            return f64::NAN;
+            return Err(crate::Error::Validation(format!(
+                "convert_rate requires finite rate and non-negative finite t (got rate={rate}, t={t})"
+            )));
         }
         let continuous = match self {
-            Compounding::Continuous => rate,
-            Compounding::Periodic(n) => {
-                let n = f64::from(n.get());
-                let x = rate / n;
-                if x <= -1.0 || !x.is_finite() {
-                    return f64::NAN;
+            Compounding::Continuous => {
+                if rate == 0.0 {
+                    0.0
+                } else {
+                    rate
                 }
-                if self == to {
-                    return rate;
-                }
-                n * x.ln_1p()
             }
+            Compounding::Periodic(_) => self.instantaneous_rate(rate)?,
             Compounding::Simple => {
                 if t == 0.0 {
-                    if self == to {
-                        return rate;
-                    }
-                    rate
+                    if rate == 0.0 { 0.0 } else { rate }
                 } else {
                     let rt = rate * t;
-                    if rt <= -1.0 || !rt.is_finite() {
-                        return f64::NAN;
+                    if !rt.is_finite() || rt <= -1.0 {
+                        return Err(crate::Error::Validation(format!(
+                            "convert_rate simple source rate domain violated (1 + r*t = {}) for rate={rate}, t={t}",
+                            1.0 + rt
+                        )));
                     }
-                    if self == to {
-                        return rate;
+                    if rate == 0.0 {
+                        0.0
+                    } else if rt == 0.0 {
+                        return Err(crate::Error::Validation(format!(
+                            "convert_rate intermediate product rate*t underflowed for rate={rate}, t={t}"
+                        )));
+                    } else {
+                        let c = rt.ln_1p() / t;
+                        if !c.is_finite() || c == 0.0 {
+                            return Err(crate::Error::Validation(format!(
+                                "convert_rate continuous equivalent overflowed or underflowed for rate={rate}, t={t}"
+                            )));
+                        }
+                        c
                     }
-                    rt.ln_1p() / t
                 }
             }
         };
         if self == to {
-            return rate;
+            return Ok(if rate == 0.0 { 0.0 } else { rate });
+        }
+        if rate == 0.0 {
+            return Ok(0.0);
         }
         if t == 0.0 {
             return to.rate_from_instantaneous(continuous);
         }
-        match to {
+        let out = match to {
             Compounding::Continuous => continuous,
-            Compounding::Periodic(k) => {
-                let k = f64::from(k.get());
-                k * (continuous / k).exp_m1()
+            Compounding::Periodic(_) => return to.rate_from_instantaneous(continuous),
+            Compounding::Simple => {
+                let ct = continuous * t;
+                if ct == 0.0 {
+                    return Err(crate::Error::Validation(format!(
+                        "convert_rate intermediate product c*t underflowed for rate={rate}, t={t}"
+                    )));
+                }
+                let r = ct.exp_m1() / t;
+                if r.mul_add(t, 1.0) <= 0.0 {
+                    return Err(crate::Error::Validation(format!(
+                        "convert_rate target simple denominator collapsed to non-positive for rate={rate}, t={t}"
+                    )));
+                }
+                r
             }
-            Compounding::Simple => (continuous * t).exp_m1() / t,
+        };
+        if !out.is_finite() || out == 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "convert_rate target rate overflowed or underflowed to zero for {self} -> {to}, rate={rate}, t={t}"
+            )));
         }
+        Ok(out)
     }
 }
 
@@ -446,7 +580,12 @@ impl std::str::FromStr for Compounding {
             other => other
                 .strip_prefix("periodic(")
                 .and_then(|rest| rest.strip_suffix(')'))
-                .and_then(|n| n.parse::<u32>().ok())
+                .filter(|digits| {
+                    !digits.is_empty()
+                        && !digits.starts_with('0')
+                        && digits.bytes().all(|b| b.is_ascii_digit())
+                })
+                .and_then(|digits| digits.parse::<u32>().ok())
                 .and_then(|n| std::num::NonZeroU32::new(n).map(Self::Periodic))
                 .ok_or_else(|| {
                     crate::Error::Validation(format!(
@@ -455,13 +594,6 @@ impl std::str::FromStr for Compounding {
                     ))
                 }),
         }
-    }
-}
-
-impl Default for Compounding {
-    /// Default to continuous compounding (most common for quant finance).
-    fn default() -> Self {
-        Compounding::Continuous
     }
 }
 
@@ -491,7 +623,7 @@ impl std::fmt::Display for Compounding {
 /// # Arguments
 ///
 /// * `df_base` - Positive, finite base-curve discount factor for the cashflow.
-///   Must equal `1.0` (within `1e-12`) when `t == 0.0`.
+///   Must equal `1.0` when `t == 0.0`.
 /// * `t` - Non-negative cashflow time in years on the discount curve clock.
 /// * `z` - Additive decimal spread on the zero rate in `compounding`.
 /// * `compounding` - Quote compounding of the zero rate and its spread.
@@ -500,7 +632,7 @@ impl std::fmt::Display for Compounding {
 ///
 /// Returns `Error::Validation` when `df_base` is non-finite or non-positive
 /// (a curve-data error), when `t` or `z` is non-finite, when `t < 0.0`, when
-/// `t == 0.0` and `|df_base - 1.0| > 1e-12`, or when the shifted rate has no
+/// `t == 0.0` and `df_base != 1.0`, or when the shifted rate has no
 /// valid discount factor in `compounding` (a periodic base
 /// `1 + (rate + z) / m` or simple base `1 + (rate + z) t` that is not
 /// positive), which only happens for spreads too negative to be meaningful.
@@ -527,7 +659,7 @@ pub fn z_spread_discount_factor(
         )));
     }
     if t == 0.0 {
-        if (df_base - 1.0).abs() > 1e-12 {
+        if df_base.to_bits() != 1.0_f64.to_bits() {
             return Err(crate::Error::Validation(format!(
                 "z_spread_discount_factor: df_base must equal 1.0 at t == 0.0 (got {df_base})"
             )));
@@ -628,11 +760,6 @@ mod tests {
     }
 
     #[test]
-    fn test_default() {
-        assert_eq!(Compounding::default(), Compounding::Continuous);
-    }
-
-    #[test]
     fn test_display() {
         assert_eq!(format!("{}", Compounding::Continuous), "continuous");
         assert_eq!(
@@ -662,14 +789,20 @@ mod tests {
         );
         for rate in [-0.5_f64, -1e-12, 0.0, 1e-12, 0.05, 1.5] {
             for time in [0.25, 1.0, 10.0] {
-                let df = annual.df_from_rate(rate, time);
+                let df = annual.df_from_rate(rate, time).expect("valid df");
                 assert!((df - (-time * rate.ln_1p()).exp()).abs() <= 1e-13 * df.max(1.0));
-                assert!((annual.rate_from_df(df, time) - rate).abs() < 1e-12);
+                assert!((annual.rate_from_df(df, time).expect("valid rate") - rate).abs() < 1e-12);
             }
-            let continuous = annual.convert_rate(rate, 0.0, &Compounding::Continuous);
+            let continuous = annual
+                .convert_rate(rate, 0.0, &Compounding::Continuous)
+                .expect("valid conversion");
             assert!((continuous - rate.ln_1p()).abs() < 1e-14);
             assert!(
-                (Compounding::Continuous.convert_rate(continuous, 0.0, &annual) - rate).abs()
+                (Compounding::Continuous
+                    .convert_rate(continuous, 0.0, &annual)
+                    .expect("valid back conversion")
+                    - rate)
+                    .abs()
                     < 1e-12
             );
         }
@@ -712,8 +845,8 @@ mod tests {
         let rate = 0.05;
         let t = 2.0;
         for conv in all_conventions() {
-            let df = conv.df_from_rate(rate, t);
-            let recovered = conv.rate_from_df(df, t);
+            let df = conv.df_from_rate(rate, t).expect("valid df");
+            let recovered = conv.rate_from_df(df, t).expect("valid rate");
             assert!(
                 (recovered - rate).abs() < TOL,
                 "{conv}: rate round-trip failed: {recovered} vs {rate}",
@@ -726,8 +859,8 @@ mod tests {
         let df = 0.92;
         let t = 1.5;
         for conv in all_conventions() {
-            let rate = conv.rate_from_df(df, t);
-            let recovered = conv.df_from_rate(rate, t);
+            let rate = conv.rate_from_df(df, t).expect("valid rate");
+            let recovered = conv.df_from_rate(rate, t).expect("valid df");
             assert!(
                 (recovered - df).abs() < TOL,
                 "{conv}: DF round-trip failed: {recovered} vs {df}",
@@ -742,8 +875,8 @@ mod tests {
         let conventions = all_conventions();
         for from in &conventions {
             for to in &conventions {
-                let converted = from.convert_rate(rate, t, to);
-                let back = to.convert_rate(converted, t, from);
+                let converted = from.convert_rate(rate, t, to).expect("valid convert");
+                let back = to.convert_rate(converted, t, from).expect("valid back");
                 assert!(
                     (back - rate).abs() < TOL,
                     "{from}->{to}->{from}: convert round-trip failed: {back} vs {rate}",
@@ -757,7 +890,7 @@ mod tests {
         let rate = 0.04;
         let t = 5.0;
         for conv in all_conventions() {
-            let converted = conv.convert_rate(rate, t, &conv);
+            let converted = conv.convert_rate(rate, t, &conv).expect("valid convert");
             assert!(
                 (converted - rate).abs() < TOL,
                 "{conv}: self-conversion should be identity, got {converted}",
@@ -767,7 +900,9 @@ mod tests {
 
     #[test]
     fn test_known_value_continuous_5pct_1y() {
-        let df = Compounding::Continuous.df_from_rate(0.05, 1.0);
+        let df = Compounding::Continuous
+            .df_from_rate(0.05, 1.0)
+            .expect("valid df");
         let expected = (-0.05_f64).exp(); // ≈ 0.951229424500714
         assert!(
             (df - expected).abs() < TOL,
@@ -777,7 +912,9 @@ mod tests {
 
     #[test]
     fn test_known_value_annual_5pct_1y() {
-        let df = Compounding::Periodic(std::num::NonZeroU32::MIN).df_from_rate(0.05, 1.0);
+        let df = Compounding::Periodic(std::num::NonZeroU32::MIN)
+            .df_from_rate(0.05, 1.0)
+            .expect("valid df");
         let expected = 1.0 / 1.05; // ≈ 0.952380952380952
         assert!(
             (df - expected).abs() < TOL,
@@ -787,7 +924,9 @@ mod tests {
 
     #[test]
     fn test_known_value_simple_5pct_half_year() {
-        let df = Compounding::Simple.df_from_rate(0.05, 0.5);
+        let df = Compounding::Simple
+            .df_from_rate(0.05, 0.5)
+            .expect("valid df");
         let expected = 1.0 / (1.0 + 0.05 * 0.5); // = 1 / 1.025
         assert!(
             (df - expected).abs() < TOL,
@@ -797,7 +936,9 @@ mod tests {
 
     #[test]
     fn test_known_value_semiannual_5pct_1y() {
-        let df = Compounding::SEMI_ANNUAL.df_from_rate(0.05, 1.0);
+        let df = Compounding::SEMI_ANNUAL
+            .df_from_rate(0.05, 1.0)
+            .expect("valid df");
         let expected = (1.0 + 0.05 / 2.0_f64).powf(-2.0); // (1.025)^-2
         assert!(
             (df - expected).abs() < TOL,
@@ -808,11 +949,12 @@ mod tests {
     #[test]
     fn test_edge_case_t_zero() {
         for conv in all_conventions() {
-            let df = conv.df_from_rate(0.10, 0.0);
+            let df = conv.df_from_rate(0.10, 0.0).expect("valid at t=0");
             assert_eq!(df, 1.0, "{conv}: df_from_rate(_, 0) should be 1.0");
-
-            let rate = conv.rate_from_df(0.95, 0.0);
-            assert_eq!(rate, 0.0, "{conv}: rate_from_df(_, 0) should be 0.0");
+            assert!(
+                conv.rate_from_df(0.95, 0.0).is_err(),
+                "{conv}: rate_from_df(_, 0) must reject t == 0.0"
+            );
         }
     }
 
@@ -820,7 +962,7 @@ mod tests {
     fn test_edge_case_zero_rate() {
         let t = 2.0;
         for conv in all_conventions() {
-            let df = conv.df_from_rate(0.0, t);
+            let df = conv.df_from_rate(0.0, t).expect("valid df");
             assert!(
                 (df - 1.0).abs() < TOL,
                 "{conv}: zero rate should give DF = 1.0, got {df}",
@@ -833,10 +975,10 @@ mod tests {
         let rate = 1.0; // 100%
         let t = 1.0;
         for conv in all_conventions() {
-            let df = conv.df_from_rate(rate, t);
+            let df = conv.df_from_rate(rate, t).expect("valid df");
             assert!(df > 0.0, "{conv}: DF must be positive for high rate");
             assert!(df < 1.0, "{conv}: DF must be < 1 for positive rate");
-            let recovered = conv.rate_from_df(df, t);
+            let recovered = conv.rate_from_df(df, t).expect("valid rate");
             assert!(
                 (recovered - rate).abs() < TOL,
                 "{conv}: high-rate round-trip failed: {recovered} vs {rate}",
@@ -851,52 +993,48 @@ mod tests {
         let t = 0.0;
 
         // continuous → annual: e^r − 1
-        let result = Compounding::Continuous.convert_rate(
-            rate,
-            t,
-            &Compounding::Periodic(std::num::NonZeroU32::MIN),
-        );
+        let result = Compounding::Continuous
+            .convert_rate(rate, t, &Compounding::Periodic(std::num::NonZeroU32::MIN))
+            .expect("valid convert");
         assert!(
             (result - rate.exp_m1()).abs() < 1e-15,
             "continuous→annual at t=0 should be e^r - 1, got {result}"
         );
 
         // annual → continuous: ln(1 + r)
-        let result = Compounding::Periodic(std::num::NonZeroU32::MIN).convert_rate(
-            rate,
-            t,
-            &Compounding::Continuous,
-        );
+        let result = Compounding::Periodic(std::num::NonZeroU32::MIN)
+            .convert_rate(rate, t, &Compounding::Continuous)
+            .expect("valid convert");
         assert!(
             (result - rate.ln_1p()).abs() < 1e-15,
             "annual→continuous at t=0 should be ln(1+r), got {result}"
         );
 
         // continuous → semi-annual: 2(e^{r/2} − 1)
-        let result = Compounding::Continuous.convert_rate(rate, t, &Compounding::SEMI_ANNUAL);
+        let result = Compounding::Continuous
+            .convert_rate(rate, t, &Compounding::SEMI_ANNUAL)
+            .expect("valid convert");
         assert!(
             (result - 2.0 * (rate / 2.0).exp_m1()).abs() < 1e-15,
             "continuous→semi-annual at t=0 should be 2(e^(r/2)-1), got {result}"
         );
 
         // same convention: identity
-        let result = Compounding::Continuous.convert_rate(rate, t, &Compounding::Continuous);
+        let result = Compounding::Continuous
+            .convert_rate(rate, t, &Compounding::Continuous)
+            .expect("valid convert");
         assert!((result - rate).abs() < 1e-15);
 
-        // Consistency: the t=0 limit matches the conversion at a tiny tenor.
-        // The tiny-tenor path itself loses ~ε/(r·t) relative precision in
-        // ln(DF), so the comparison tolerance is looser than the exact-limit
-        // assertions above.
-        let at_tiny_t = Compounding::Continuous.convert_rate(
-            rate,
-            1e-9,
-            &Compounding::Periodic(std::num::NonZeroU32::MIN),
-        );
-        let at_zero = Compounding::Continuous.convert_rate(
-            rate,
-            0.0,
-            &Compounding::Periodic(std::num::NonZeroU32::MIN),
-        );
+        let at_tiny_t = Compounding::Continuous
+            .convert_rate(
+                rate,
+                1e-9,
+                &Compounding::Periodic(std::num::NonZeroU32::MIN),
+            )
+            .expect("valid convert");
+        let at_zero = Compounding::Continuous
+            .convert_rate(rate, 0.0, &Compounding::Periodic(std::num::NonZeroU32::MIN))
+            .expect("valid convert");
         assert!(
             (at_tiny_t - at_zero).abs() < 1e-7,
             "t=0 limit {at_zero} should match tiny-tenor conversion {at_tiny_t}"
@@ -905,70 +1043,50 @@ mod tests {
 
     #[test]
     fn test_simple_df_from_rate_rejects_non_positive_denominator() {
-        let df = Compounding::Simple.df_from_rate(-2.0, 0.5);
-        assert!(df.is_nan(), "simple compounding should reject 1 + r*t <= 0");
+        assert!(Compounding::Simple.df_from_rate(-2.0, 0.5).is_err());
     }
 
     #[test]
     fn test_simple_rate_from_df_rejects_non_positive_discount_factor() {
-        let zero_df = Compounding::Simple.rate_from_df(0.0, 1.0);
-        assert!(zero_df.is_nan(), "simple compounding should reject df == 0");
-
-        let negative_df = Compounding::Simple.rate_from_df(-0.5, 1.0);
-        assert!(
-            negative_df.is_nan(),
-            "simple compounding should reject negative discount factors"
-        );
+        assert!(Compounding::Simple.rate_from_df(0.0, 1.0).is_err());
+        assert!(Compounding::Simple.rate_from_df(-0.5, 1.0).is_err());
     }
 
-    // ── H7 documentation tests: t == 0.0 float comparison semantics ──
-    //
-    // The reviewer suggested replacing `t == 0.0` with `t.abs() < 1e-12`.
-    // This was intentionally rejected because t is a year-fraction parameter
-    // whose zero-exactly semantics are part of the API contract.
-    // Year fractions close to zero but not exactly zero represent genuinely
-    // small maturities and should not be silently treated as zero.
-    // These tests document the accepted boundary behaviour.
     #[test]
-    fn test_compounding_t_exactly_zero_is_sentinel() {
-        // Exact t=0.0 is the only value that triggers the sentinel path.
+    fn test_compounding_t_exactly_zero_contract() {
         for conv in all_conventions() {
             assert_eq!(
-                conv.df_from_rate(0.10, 0.0),
+                conv.df_from_rate(0.10, 0.0).expect("valid at t=0"),
                 1.0,
                 "{conv}: df_from_rate(_, 0.0) must be 1.0"
             );
-            assert_eq!(
-                conv.rate_from_df(0.95, 0.0),
-                0.0,
-                "{conv}: rate_from_df(_, 0.0) must be 0.0"
+            assert!(
+                conv.rate_from_df(0.95, 0.0).is_err(),
+                "{conv}: rate_from_df(_, 0.0) must error"
             );
         }
     }
 
     #[test]
     fn test_compounding_very_small_t_is_not_zero() {
-        // A very small but nonzero t must NOT be treated as the zero sentinel.
-        let t = 1.0e-10; // One-tenth of a nanosecond in year-fraction terms
+        let t = 1.0e-10;
         for conv in all_conventions() {
-            let df = conv.df_from_rate(0.10, t);
-            // df != 1.0 (some discounting occurs, however tiny)
-            // Just confirm the function is finite and not exactly 1.0
+            let df = conv.df_from_rate(0.10, t).expect("valid df");
             assert!(df.is_finite(), "{conv}: df must be finite for tiny t");
         }
     }
 
     #[test]
     fn test_rate_ordering_simple_gt_annual_gt_continuous() {
-        // For positive rates and t > 0, less frequent compounding requires
-        // a higher quoted rate for the same discount factor.
-        // Note: at t=1 Simple and Annual collapse to the same formula
-        // (1/DF - 1), so we use t=2 where they diverge.
         let df = 0.90;
         let t = 2.0;
-        let r_cont = Compounding::Continuous.rate_from_df(df, t);
-        let r_ann = Compounding::Periodic(std::num::NonZeroU32::MIN).rate_from_df(df, t);
-        let r_simple = Compounding::Simple.rate_from_df(df, t);
+        let r_cont = Compounding::Continuous
+            .rate_from_df(df, t)
+            .expect("valid rate");
+        let r_ann = Compounding::Periodic(std::num::NonZeroU32::MIN)
+            .rate_from_df(df, t)
+            .expect("valid rate");
+        let r_simple = Compounding::Simple.rate_from_df(df, t).expect("valid rate");
 
         assert!(
             r_simple > r_ann,
@@ -981,15 +1099,14 @@ mod tests {
     }
 
     #[test]
-    fn test_rate_from_df_nan_for_invalid_discount_factors() {
+    fn test_rate_from_df_errors_for_invalid_discount_factors() {
         let bad_dfs = [0.0, -1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY];
         let t = 1.0;
         for conv in all_conventions() {
             for &df in &bad_dfs {
-                let rate = conv.rate_from_df(df, t);
                 assert!(
-                    rate.is_nan(),
-                    "{conv}: rate_from_df({df}, {t}) should be NaN, got {rate}",
+                    conv.rate_from_df(df, t).is_err(),
+                    "{conv}: rate_from_df({df}, {t}) should error",
                 );
             }
         }
@@ -997,13 +1114,17 @@ mod tests {
 
     #[test]
     fn test_rate_ordering_periodic_between_annual_and_continuous() {
-        // Semi-annual compounds more frequently than annual but less than
-        // continuous, so: r_annual > r_semi > r_continuous.
         let df = 0.90;
         let t = 2.0;
-        let r_cont = Compounding::Continuous.rate_from_df(df, t);
-        let r_semi = Compounding::SEMI_ANNUAL.rate_from_df(df, t);
-        let r_ann = Compounding::Periodic(std::num::NonZeroU32::MIN).rate_from_df(df, t);
+        let r_cont = Compounding::Continuous
+            .rate_from_df(df, t)
+            .expect("valid rate");
+        let r_semi = Compounding::SEMI_ANNUAL
+            .rate_from_df(df, t)
+            .expect("valid rate");
+        let r_ann = Compounding::Periodic(std::num::NonZeroU32::MIN)
+            .rate_from_df(df, t)
+            .expect("valid rate");
 
         assert!(
             r_ann > r_semi,
@@ -1017,15 +1138,17 @@ mod tests {
 
     #[test]
     fn test_all_conventions_agree_on_df() {
-        // Converting the same 5% continuous rate to each convention and back
-        // to a DF should always yield the same DF.
         let r_cont = 0.05;
         let t = 2.5;
-        let df_expected = Compounding::Continuous.df_from_rate(r_cont, t);
+        let df_expected = Compounding::Continuous
+            .df_from_rate(r_cont, t)
+            .expect("valid df");
 
         for conv in all_conventions() {
-            let r_conv = Compounding::Continuous.convert_rate(r_cont, t, &conv);
-            let df_conv = conv.df_from_rate(r_conv, t);
+            let r_conv = Compounding::Continuous
+                .convert_rate(r_cont, t, &conv)
+                .expect("valid convert");
+            let df_conv = conv.df_from_rate(r_conv, t).expect("valid df");
             assert!(
                 (df_conv - df_expected).abs() < TOL,
                 "{conv}: DF mismatch after conversion: {df_conv} vs {df_expected}",
@@ -1073,6 +1196,9 @@ mod tests {
         );
         for rejected in [
             "periodic(0)",
+            "periodic(01)",
+            "periodic(+2)",
+            "periodic( 2)",
             "periodic()",
             "periodic(-2)",
             "periodic(2",
@@ -1089,16 +1215,18 @@ mod tests {
         assert!(df.is_finite() && df > 0.0);
         assert!((df - 0.998).abs() < 1e-12);
 
-        // Negative-rate short-tenor DF > 1 also avoids exp(-u) overflow.
         let df_neg = z_spread_discount_factor(1.002, 1e-6, 0.01, Compounding::SEMI_ANNUAL)
             .expect("short-tenor DF > 1 periodic z-spread should remain finite");
         assert!(df_neg.is_finite() && df_neg > 0.0);
 
-        // Standard horizon matches explicit periodic rate shift.
         let df_1y = z_spread_discount_factor(0.95, 1.0, 0.01, Compounding::SEMI_ANNUAL)
             .expect("1Y periodic z-spread");
-        let base_r = Compounding::SEMI_ANNUAL.rate_from_df(0.95, 1.0);
-        let expected_1y = Compounding::SEMI_ANNUAL.df_from_rate(base_r + 0.01, 1.0);
+        let base_r = Compounding::SEMI_ANNUAL
+            .rate_from_df(0.95, 1.0)
+            .expect("valid base rate");
+        let expected_1y = Compounding::SEMI_ANNUAL
+            .df_from_rate(base_r + 0.01, 1.0)
+            .expect("valid shifted df");
         assert!((df_1y - expected_1y).abs() < 1e-15);
     }
 
@@ -1106,6 +1234,7 @@ mod tests {
     fn z_spread_discount_factor_validates_time_and_t_zero_df() {
         assert!(z_spread_discount_factor(0.99, -0.1, 0.01, Compounding::Continuous).is_err());
         assert!(z_spread_discount_factor(0.95, 0.0, 0.01, Compounding::Continuous).is_err());
+        assert!(z_spread_discount_factor(1.0 + 1e-14, 0.0, 0.01, Compounding::Continuous).is_err());
         let at_zero = z_spread_discount_factor(1.0, 0.0, 0.01, Compounding::SEMI_ANNUAL)
             .expect("unit DF at t == 0 is valid");
         assert_eq!(at_zero, 1.0);
@@ -1113,34 +1242,38 @@ mod tests {
 
     #[test]
     fn df_from_rate_and_convert_rate_validate_domain_at_t_zero_and_extreme_tenors() {
-        // Periodic(2) requires 1 + r/2 > 0 (r > -2.0), even at t == 0.0.
-        assert!(Compounding::SEMI_ANNUAL.df_from_rate(-2.0, 0.0).is_nan());
-        assert!(Compounding::SEMI_ANNUAL.df_from_rate(-2.5, 0.0).is_nan());
+        assert!(Compounding::SEMI_ANNUAL.df_from_rate(-2.0, 0.0).is_err());
+        assert!(Compounding::SEMI_ANNUAL.df_from_rate(-2.5, 0.0).is_err());
         assert!(
             Compounding::SEMI_ANNUAL
                 .convert_rate(-2.5, 0.0, &Compounding::Continuous)
-                .is_nan()
+                .is_err()
         );
 
-        // Negative times are rejected across df_from_rate, rate_from_df, and convert_rate.
         for conv in all_conventions() {
-            assert!(conv.df_from_rate(0.05, -0.25).is_nan());
-            assert!(conv.rate_from_df(0.95, -0.25).is_nan());
+            assert!(conv.df_from_rate(0.05, -0.25).is_err());
+            assert!(conv.rate_from_df(0.95, -0.25).is_err());
             assert!(
                 conv.convert_rate(0.05, -0.25, &Compounding::Continuous)
-                    .is_nan()
+                    .is_err()
             );
         }
 
-        // Long-horizon high-rate conversion avoids DF underflow to 0.0.
+        // Long-horizon high-rate DF underflow to 0.0 is rejected, while analytical rate conversion succeeds.
         let r_semi = 5.0;
         let t_long = 500.0;
-        assert_eq!(Compounding::SEMI_ANNUAL.df_from_rate(r_semi, t_long), 0.0);
-        let r_quart =
-            Compounding::SEMI_ANNUAL.convert_rate(r_semi, t_long, &Compounding::QUARTERLY);
+        assert!(
+            Compounding::SEMI_ANNUAL
+                .df_from_rate(r_semi, t_long)
+                .is_err()
+        );
+        let r_quart = Compounding::SEMI_ANNUAL
+            .convert_rate(r_semi, t_long, &Compounding::QUARTERLY)
+            .expect("analytical convert preserves extreme tenors");
         assert!(r_quart.is_finite());
-        let round_trip =
-            Compounding::QUARTERLY.convert_rate(r_quart, t_long, &Compounding::SEMI_ANNUAL);
+        let round_trip = Compounding::QUARTERLY
+            .convert_rate(r_quart, t_long, &Compounding::SEMI_ANNUAL)
+            .expect("round-trip convert");
         assert!((round_trip - r_semi).abs() < 1e-12);
     }
 }

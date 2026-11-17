@@ -8,7 +8,8 @@
 //! - Analytical verification
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::market_data::term_structures::{HazardCurve, ParInterp, Seniority};
+use finstack_quant_core::dates::DayCount;
+use finstack_quant_core::market_data::term_structures::{HazardCurve, Seniority};
 use time::{Date, Month};
 
 fn base_date() -> Date {
@@ -19,44 +20,73 @@ fn base_date() -> Date {
 
 #[test]
 fn flat_hazard_curve_has_constant_intensity() {
-    let curve = HazardCurve::flat("FLAT", base_date(), 0.02, 0.4).expect("valid flat curve");
-    assert!((curve.sp(3.0) - (-0.06_f64).exp()).abs() < 1e-12);
-    assert!((curve.hazard_rate(0.5) - 0.02).abs() < 1e-12);
-    assert!((curve.hazard_rate(7.0) - 0.02).abs() < 1e-12);
+    let curve = HazardCurve::flat("FLAT", base_date(), 0.02, 0.4, DayCount::Act365F)
+        .expect("valid flat curve");
+    assert!((curve.sp(3.0).unwrap() - (-0.06_f64).exp()).abs() < 1e-12);
+    assert!((curve.hazard_rate(0.5).unwrap() - 0.02).abs() < 1e-12);
+    assert!((curve.hazard_rate(7.0).unwrap() - 0.02).abs() < 1e-12);
     assert!((curve.recovery_rate() - 0.4).abs() < 1e-12);
-    assert!(HazardCurve::flat("NAN", base_date(), f64::NAN, 0.4).is_err());
-    assert!(HazardCurve::flat("NEG", base_date(), -0.01, 0.4).is_err());
-    let err = HazardCurve::flat("RR", base_date(), 0.02, 1.5).expect_err("recovery > 1");
+    assert!(HazardCurve::flat("NAN", base_date(), f64::NAN, 0.4, DayCount::Act365F).is_err());
+    assert!(HazardCurve::flat("NEG", base_date(), -0.01, 0.4, DayCount::Act365F).is_err());
+    let err = HazardCurve::flat("RR", base_date(), 0.02, 1.5, DayCount::Act365F)
+        .expect_err("recovery > 1");
     assert!(err.to_string().contains("recovery_rate"), "{err}");
 }
 
 #[test]
 fn from_survival_probs_reproduces_pillars() {
     let pillars = [(0.0, 1.0), (1.0, 0.98), (3.0, 0.93), (5.0, 0.85)];
-    let curve = HazardCurve::from_survival_probs("SP", base_date(), &pillars, 0.4)
-        .expect("valid survival pillars");
+    let curve =
+        HazardCurve::from_survival_probs("SP", base_date(), &pillars, 0.4, DayCount::Act365F)
+            .expect("valid survival pillars");
     for &(t, sp) in &pillars {
-        assert!((curve.sp(t) - sp).abs() < 1e-12, "S({t}) = {}", curve.sp(t));
+        let actual = curve.sp(t).unwrap();
+        assert!((actual - sp).abs() < 1e-12, "S({t}) = {actual}");
     }
     assert_eq!(curve.knot_points().count(), 3);
 
-    // Unsorted input is accepted; increasing survival is not.
+    // Unsorted and increasing survival are rejected.
     assert!(
-        HazardCurve::from_survival_probs("UNSORTED", base_date(), &[(3.0, 0.93), (1.0, 0.98)], 0.4)
-            .is_ok()
+        HazardCurve::from_survival_probs(
+            "UNSORTED",
+            base_date(),
+            &[(3.0, 0.93), (1.0, 0.98)],
+            0.4,
+            DayCount::Act365F,
+        )
+        .is_err()
     );
     assert!(
-        HazardCurve::from_survival_probs("UP", base_date(), &[(1.0, 0.9), (2.0, 0.95)], 0.4)
+        HazardCurve::from_survival_probs(
+            "UP",
+            base_date(),
+            &[(1.0, 0.9), (2.0, 0.95)],
+            0.4,
+            DayCount::Act365F,
+        )
+        .is_err()
+    );
+    assert!(
+        HazardCurve::from_survival_probs(
+            "ZERO",
+            base_date(),
+            &[(0.0, 0.9)],
+            0.4,
+            DayCount::Act365F
+        )
+        .is_err()
+    );
+    assert!(
+        HazardCurve::from_survival_probs("EMPTY", base_date(), &[], 0.4, DayCount::Act365F)
             .is_err()
     );
-    assert!(HazardCurve::from_survival_probs("ZERO", base_date(), &[(0.0, 0.9)], 0.4).is_err());
-    assert!(HazardCurve::from_survival_probs("EMPTY", base_date(), &[], 0.4).is_err());
 }
 
 #[test]
 fn nan_knots_carry_context() {
     let err = HazardCurve::builder("NAN")
         .base_date(base_date())
+        .day_count(DayCount::Act365F)
         .recovery_rate(0.4)
         .knots([(1.0, f64::NAN)])
         .build()
@@ -70,6 +100,7 @@ fn nan_knots_carry_context() {
 fn builder_requires_explicit_recovery_rate() {
     let err = HazardCurve::builder("MISSING-RECOVERY")
         .base_date(base_date())
+        .day_count(DayCount::Act365F)
         .knots([(1.0, 0.01)])
         .build()
         .expect_err("missing recovery rate must fail");
@@ -107,25 +138,22 @@ fn builder_rejects_negative_hazard_rate() {
 fn survival_and_default_probabilities() {
     let curve = HazardCurve::builder("HC")
         .base_date(base_date())
+        .day_count(DayCount::Act365F)
         .knots([(1.0, 0.01), (2.0, 0.015), (5.0, 0.02)])
-        .par_spreads([(1.0, 100.0), (3.0, 150.0)])
         .recovery_rate(0.40)
         .build()
         .unwrap();
 
-    assert!(curve.sp(0.0) - 1.0 < 1e-12);
-    assert!(curve.sp(4.0) < curve.sp(1.0));
+    assert!((curve.sp(0.0).unwrap() - 1.0).abs() < 1e-12);
+    assert!(curve.sp(4.0).unwrap() < curve.sp(1.0).unwrap());
     assert!(curve.default_prob(1.0, 3.0).unwrap() > 0.0);
-
-    let linear = curve.cds_quote_bp(2.0, ParInterp::Linear);
-    let log = curve.cds_quote_bp(2.0, ParInterp::LogLinear);
-    assert!(linear > 0.0 && log > 0.0);
 }
 
 #[test]
 fn hazard_shift_rejects_negative_rates() {
     let curve = HazardCurve::builder("HC")
         .base_date(base_date())
+        .day_count(DayCount::Act365F)
         .knots([(1.0, 0.01), (5.0, 0.02)])
         .recovery_rate(0.40)
         .build()
@@ -141,12 +169,12 @@ fn hazard_shift_rejects_negative_rates() {
 fn to_builder_preserves_metadata() {
     let curve = HazardCurve::builder("HC")
         .base_date(base_date())
+        .day_count(DayCount::Act365F)
         .recovery_rate(0.35)
         .issuer("ACME Corp")
         .seniority(Seniority::Senior)
         .currency(Currency::USD)
         .knots([(1.0, 0.01), (3.0, 0.02)])
-        .par_spreads([(2.0, 120.0)])
         .build()
         .unwrap();
 
@@ -170,6 +198,7 @@ fn sp_analytical_verification_constant_hazard() {
     // Constant hazard rate for simple verification
     let curve = HazardCurve::builder("SP-VERIFY")
         .base_date(base_date())
+        .day_count(DayCount::Act365F)
         .knots([(1.0, 0.02), (5.0, 0.02), (10.0, 0.02)])
         .recovery_rate(0.40)
         .build()
@@ -178,7 +207,7 @@ fn sp_analytical_verification_constant_hazard() {
     // S(t) = exp(-λ*t) for constant λ
     for t in [1.0, 2.5, 5.0, 7.5, 10.0] {
         let expected = (-0.02_f64 * t).exp();
-        let actual = curve.sp(t);
+        let actual = curve.sp(t).unwrap();
         assert!(
             (actual - expected).abs() < 1e-12,
             "SP at t={}: got {}, expected {}",
@@ -195,6 +224,7 @@ fn sp_piecewise_verification() {
     // Implementation uses the first lambda on [0, first_knot], then λ[i] on (knot[i-1], knot[i]].
     let curve = HazardCurve::builder("SP-PIECEWISE")
         .base_date(base_date())
+        .day_count(DayCount::Act365F)
         .knots([(1.0, 0.01), (2.0, 0.015), (5.0, 0.02)])
         .recovery_rate(0.40)
         .build()
@@ -203,18 +233,18 @@ fn sp_piecewise_verification() {
     // S(1) = exp(-0.01*1) - first lambda applies through the first pillar
     let expected_1 = (-0.01_f64 * 1.0).exp();
     assert!(
-        (curve.sp(1.0) - expected_1).abs() < 1e-12,
+        (curve.sp(1.0).unwrap() - expected_1).abs() < 1e-12,
         "SP at t=1: got {}, expected {}",
-        curve.sp(1.0),
+        curve.sp(1.0).unwrap(),
         expected_1
     );
 
     // S(3) = exp(-(0.01*1 + 0.015*1 + 0.02*1))
     let expected_3 = (-(0.01_f64 * 1.0 + 0.015 * 1.0 + 0.02 * 1.0)).exp();
     assert!(
-        (curve.sp(3.0) - expected_3).abs() < 1e-12,
+        (curve.sp(3.0).unwrap() - expected_3).abs() < 1e-12,
         "SP at t=3: got {}, expected {}",
-        curve.sp(3.0),
+        curve.sp(3.0).unwrap(),
         expected_3
     );
 
@@ -229,31 +259,15 @@ fn sp_piecewise_verification() {
 }
 
 #[test]
-fn explicit_zero_time_knot_is_ignored_for_survival() {
-    // A redundant t=0 knot does not own (0, t1]; ending-segment attribution
-    // uses λ at the first positive knot on that interval (ISDA-style).
-    let curve = HazardCurve::builder("SP-ZERO-KNOT")
+fn zero_time_knot_is_rejected() {
+    let err = HazardCurve::builder("SP-ZERO-KNOT")
         .base_date(base_date())
+        .day_count(DayCount::Act365F)
         .knots([(0.0, 0.01), (5.0, 0.02)])
         .recovery_rate(0.40)
         .build()
-        .unwrap();
-
-    let expected_1 = (-0.02_f64).exp();
-    assert!(
-        (curve.sp(1.0) - expected_1).abs() < 1e-12,
-        "SP at t=1: got {}, expected {}",
-        curve.sp(1.0),
-        expected_1
-    );
-
-    let expected_5 = (-0.02_f64 * 5.0).exp();
-    assert!(
-        (curve.sp(5.0) - expected_5).abs() < 1e-12,
-        "SP at t=5: got {}, expected {}",
-        curve.sp(5.0),
-        expected_5
-    );
+        .expect_err("t = 0 knot must be rejected");
+    assert!(!err.to_string().is_empty());
 }
 
 // Additional hazard curve behavior
@@ -266,18 +280,19 @@ fn test_date() -> Date {
 fn test_hazard_curve_sp() {
     let curve = HazardCurve::builder("CDS-TEST")
         .base_date(test_date())
+        .day_count(DayCount::Act365F)
         .knots([(1.0, 0.01), (2.0, 0.012), (5.0, 0.015)])
         .recovery_rate(0.4)
         .build()
         .unwrap();
 
     // Survival probability at t=0 should be 1.0
-    let surv_0 = curve.sp(0.0);
+    let surv_0 = curve.sp(0.0).unwrap();
     assert!((surv_0 - 1.0).abs() < 1e-12);
 
     // Survival should decrease with time
-    let surv_1 = curve.sp(1.0);
-    let surv_5 = curve.sp(5.0);
+    let surv_1 = curve.sp(1.0).unwrap();
+    let surv_5 = curve.sp(5.0).unwrap();
 
     assert!(surv_1 < 1.0 && surv_1 > 0.0);
     assert!(surv_5 < surv_1);
@@ -287,13 +302,14 @@ fn test_hazard_curve_sp() {
 fn test_hazard_curve_default_probability() {
     let curve = HazardCurve::builder("CDS-TEST")
         .base_date(test_date())
+        .day_count(DayCount::Act365F)
         .knots([(1.0, 0.01), (5.0, 0.02)])
         .recovery_rate(0.4)
         .build()
         .unwrap();
 
     // Default probability = 1 - survival
-    let surv = curve.sp(1.0);
+    let surv = curve.sp(1.0).unwrap();
     let default_prob = 1.0 - surv;
 
     assert!(default_prob > 0.0 && default_prob < 1.0);
@@ -306,13 +322,14 @@ fn test_hazard_curve_cds_spread_bootstrap() {
 
     let curve = HazardCurve::builder("CDS-BOOT")
         .base_date(test_date())
+        .day_count(DayCount::Act365F)
         .knots(spreads)
         .recovery_rate(0.4)
         .build()
         .unwrap();
 
     // Hazard rates should be consistent with spreads
-    let surv = curve.sp(1.0);
+    let surv = curve.sp(1.0).unwrap();
     assert!(surv > 0.95 && surv < 1.0);
 }
 
@@ -321,12 +338,13 @@ fn test_hazard_curve_recovery_rate_zero() {
     // Zero recovery (harshest case)
     let curve = HazardCurve::builder("ZERO-REC")
         .base_date(test_date())
+        .day_count(DayCount::Act365F)
         .knots([(1.0, 0.02), (5.0, 0.03)])
         .recovery_rate(0.0)
         .build()
         .unwrap();
 
-    let surv = curve.sp(1.0);
+    let surv = curve.sp(1.0).unwrap();
     assert!(surv < 1.0);
 }
 
@@ -335,13 +353,14 @@ fn test_hazard_curve_recovery_rate_full() {
     // Full recovery (no loss given default)
     let curve = HazardCurve::builder("FULL-REC")
         .base_date(test_date())
+        .day_count(DayCount::Act365F)
         .knots([(1.0, 0.02), (5.0, 0.03)])
         .recovery_rate(1.0)
         .build()
         .unwrap();
 
     // Even with defaults, full recovery means no expected loss
-    let surv = curve.sp(1.0);
+    let surv = curve.sp(1.0).unwrap();
     assert!(surv > 0.0);
 }
 
@@ -350,13 +369,14 @@ fn test_hazard_curve_edge_case_zero_spreads() {
     // Zero hazard rates (no default risk)
     let curve = HazardCurve::builder("RISK-FREE")
         .base_date(test_date())
+        .day_count(DayCount::Act365F)
         .knots([(1.0, 0.0), (10.0, 0.0)])
         .recovery_rate(0.4)
         .build()
         .unwrap();
 
     // Survival should remain 1.0
-    let surv = curve.sp(5.0);
+    let surv = curve.sp(5.0).unwrap();
     assert!((surv - 1.0).abs() < 1e-10);
 }
 
@@ -365,12 +385,13 @@ fn test_hazard_curve_very_long_tenor() {
     // Very long dated CDS
     let curve = HazardCurve::builder("LONG")
         .base_date(test_date())
+        .day_count(DayCount::Act365F)
         .knots([(1.0, 0.01), (30.0, 0.02)])
         .recovery_rate(0.4)
         .build()
         .unwrap();
 
-    let surv_30y = curve.sp(30.0);
+    let surv_30y = curve.sp(30.0).unwrap();
     assert!(surv_30y > 0.0 && surv_30y < 1.0);
 }
 
@@ -378,15 +399,16 @@ fn test_hazard_curve_very_long_tenor() {
 fn test_hazard_curve_interpolation() {
     let curve = HazardCurve::builder("INTERP")
         .base_date(test_date())
+        .day_count(DayCount::Act365F)
         .knots([(1.0, 0.01), (5.0, 0.02)])
         .recovery_rate(0.4)
         .build()
         .unwrap();
 
     // Interpolated hazard rate at t=3
-    let surv_3 = curve.sp(3.0);
-    let surv_1 = curve.sp(1.0);
-    let surv_5 = curve.sp(5.0);
+    let surv_3 = curve.sp(3.0).unwrap();
+    let surv_1 = curve.sp(1.0).unwrap();
+    let surv_5 = curve.sp(5.0).unwrap();
 
     // Should be between the pillars
     assert!(surv_3 < surv_1 && surv_3 > surv_5);
@@ -396,6 +418,7 @@ fn test_hazard_curve_interpolation() {
 fn test_hazard_curve_serde_round_trip() {
     let original = HazardCurve::builder("SERDE-TEST")
         .base_date(test_date())
+        .day_count(DayCount::Act365F)
         .knots([(1.0, 0.01), (2.0, 0.015), (5.0, 0.02)])
         .recovery_rate(0.4)
         .build()
@@ -408,8 +431,8 @@ fn test_hazard_curve_serde_round_trip() {
 
     // Verify survival probabilities match
     for t in [0.0, 1.0, 3.0, 5.0] {
-        let orig_surv = original.sp(t);
-        let deser_surv = deserialized.sp(t);
+        let orig_surv = original.sp(t).unwrap();
+        let deser_surv = deserialized.sp(t).unwrap();
         assert!((orig_surv - deser_surv).abs() < 1e-12);
     }
 }

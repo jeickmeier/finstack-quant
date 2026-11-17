@@ -189,7 +189,7 @@ test('models reject fractional, non-finite and wrapped counts before the WASM AB
 });
 
 test('stored expiry and hierarchy indices cannot silently select another grid row', () => {
-  const surface = new facade.core.FxDeltaVolSurface('FX', [1], [0.12], [0.01], [0.002]);
+  const surface = new facade.core.FxDeltaVolSurface('FX', 'EUR/USD', [1], [0.12], [0.01], [0.002]);
   const levels = models.factor.credit.LevelsAtDate.fromJson(
     JSON.stringify({
       date: '2025-01-01',

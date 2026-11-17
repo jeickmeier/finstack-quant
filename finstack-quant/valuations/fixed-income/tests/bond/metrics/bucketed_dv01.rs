@@ -31,6 +31,9 @@ fn build_multi_tenor_curve(as_of: finstack_quant_core::dates::Date) -> DiscountC
             (7.0, 0.715),
             (10.0, 0.640),
         ])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("multi-tenor discount curve should build")
 }

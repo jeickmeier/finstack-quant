@@ -1,6 +1,6 @@
 {
   "expected": {
-    "dv01": 130.68008891405157,
+    "dv01": 130.20680819969903,
     "npv": 4010.023780457605,
     "vega": 200.3346178474272
   },
@@ -44,10 +44,9 @@
       "credit_indices": [],
       "curves": [
         {
-          "allow_non_monotonic": false,
           "base": "2026-04-30",
           "day_count": "act_365f",
-          "extrapolation": "flat_forward",
+          "extrapolation": "extend",
           "id": "USD-OIS",
           "interp_style": "log_linear",
           "knot_points": [
@@ -60,36 +59,34 @@
               0.40656965974059917
             ]
           ],
-          "min_forward_rate": null,
-          "min_forward_tenor": 1e-06,
           "rate_calibration": null,
           "type": "discount"
         },
         {
           "base": "2026-04-30",
-          "day_count": "act_360",
-          "extrapolation": "flat_forward",
+          "day_count": "act_365f",
+          "extrapolation": "extend",
           "id": "USD-TERM-3M",
-          "interp_style": "linear",
+          "index_tenor": {
+            "count": 3,
+            "unit": "months"
+          },
+          "interp_style": "log_linear",
           "knot_points": [
             [
               0.0,
-              0.04
+              1.0
             ],
             [
-              30.0,
-              0.04
+              0.2493150684931507,
+              0.9899901000989989
+            ],
+            [
+              0.5013698630136987,
+              0.9799726023857227
             ]
           ],
-          "projection_grid": [
-            0.0,
-            0.25277777777777777,
-            0.5083333333333333,
-            30.0
-          ],
           "rate_calibration": null,
-          "reset_lag": 2,
-          "tenor": 0.25,
           "type": "forward"
         }
       ],
@@ -112,7 +109,7 @@
           "interpolation_mode": "vol",
           "quote_type": "black_lognormal",
           "secondary_axis": "strike",
-          "strikes": [
+          "secondary_values": [
             0.01,
             0.04,
             0.1

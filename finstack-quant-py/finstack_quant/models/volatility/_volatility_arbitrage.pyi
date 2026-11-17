@@ -401,7 +401,15 @@ def check_surface(surface: VolSurface, config: dict[str, Any] | str) -> Arbitrag
     --------
     >>> from finstack_quant.core.market_data import VolSurface
     >>> from finstack_quant.models.volatility import check_surface
-    >>> surface = VolSurface("SPX-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.2, 0.2, 0.2], [0.2, 0.2, 0.2]])
+    >>> surface = VolSurface(
+    ...     "SPX-VOL",
+    ...     [1.0, 2.0],
+    ...     [90.0, 100.0, 110.0],
+    ...     [[0.2, 0.2, 0.2], [0.2, 0.2, 0.2]],
+    ...     secondary_axis="strike",
+    ...     quote_type="black_lognormal",
+    ...     interpolation_mode="vol",
+    ... )
     >>> report = check_surface(surface, {"forward_prices": [100.0]})
     >>> (report.passed, report.vol_surface_id)
     (True, 'SPX-VOL')

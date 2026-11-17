@@ -24,10 +24,7 @@
           ]
         ],
         "interp_style": "monotone_convex",
-        "extrapolation": "flat_forward",
-        "min_forward_rate": -0.005,
-        "allow_non_monotonic": false,
-        "min_forward_tenor": 1e-06,
+        "extrapolation": "extend",
         "rate_calibration": null,
         "fx_policy": null
       },
@@ -35,22 +32,23 @@
         "type": "forward",
         "id": "USD-SOFR-3M",
         "base": "2024-01-01",
-        "reset_lag": 2,
         "day_count": "act_360",
-        "tenor": 0.25,
+        "index_tenor": {
+          "count": 3,
+          "unit": "months"
+        },
         "knot_points": [
           [
             0.0,
-            0.03
+            1.0
           ],
           [
-            5.0,
-            0.03
+            5.25,
+            0.8547790097243178
           ]
         ],
-        "projection_grid": null,
-        "interp_style": "linear",
-        "extrapolation": "flat_zero",
+        "interp_style": "log_linear",
+        "extrapolation": "extend",
         "rate_calibration": null,
         "fx_policy": null
       }

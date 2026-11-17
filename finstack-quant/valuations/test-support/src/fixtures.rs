@@ -50,6 +50,8 @@ pub fn usd_discount_curve(base_date: Date, curve_id: &str) -> DiscountCurve {
             (10.0, 0.80), // Implied rate: -ln(0.80)/10 ≈ 2.23%
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("valid test discount curve")
 }
@@ -80,6 +82,8 @@ pub fn usd_discount_curve_minimal(base_date: Date, curve_id: &str) -> DiscountCu
             (5.0, 0.90), // Implied rate: -ln(0.90)/5 ≈ 2.11%
         ])
         .interp(InterpStyle::Linear)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .expect("valid minimal test discount curve")
 }

@@ -223,7 +223,7 @@ impl ShortRateTreeConfig {
             model: ShortRateModel::HoLee,
             volatility: normal_vol,
             mean_reversion: 0.0,
-            compounding: Compounding::default(),
+            compounding: Compounding::Continuous,
             curve_fit_tolerance_bp: DEFAULT_CURVE_FIT_TOLERANCE_BP,
         }
     }
@@ -250,7 +250,7 @@ impl ShortRateTreeConfig {
             model: ShortRateModel::BlackDermanToy,
             volatility: lognormal_vol,
             mean_reversion: 0.0,
-            compounding: Compounding::default(),
+            compounding: Compounding::Continuous,
             curve_fit_tolerance_bp: DEFAULT_CURVE_FIT_TOLERANCE_BP,
         }
     }
@@ -290,7 +290,7 @@ impl ShortRateTreeConfig {
             model: ShortRateModel::BlackKarasinski,
             volatility: lognormal_vol,
             mean_reversion,
-            compounding: Compounding::default(),
+            compounding: Compounding::Continuous,
             curve_fit_tolerance_bp: DEFAULT_CURVE_FIT_TOLERANCE_BP,
         }
     }

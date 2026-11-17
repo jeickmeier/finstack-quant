@@ -100,13 +100,13 @@ pub(crate) fn business_day_average_price(
 
     while current < obs_end {
         if is_business_day(current)? {
-            sum.add(get_price(current)?);
+            sum.add(get_price(current)?)?;
             count += 1;
         }
         current += time::Duration::days(1);
     }
     if include_end && obs_end >= obs_start && is_business_day(obs_end)? {
-        sum.add(get_price(obs_end)?);
+        sum.add(get_price(obs_end)?)?;
         count += 1;
     }
 
@@ -117,7 +117,7 @@ pub(crate) fn business_day_average_price(
         return get_price(mid);
     }
 
-    Ok(sum.total() / count as f64)
+    Ok(sum.get_total()? / count as f64)
 }
 
 #[cfg(test)]

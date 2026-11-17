@@ -53,8 +53,8 @@ class CalibrationStep:
             - ``interpolation`` (str, optional, default ``"log_linear"``): Discount-factor interpolation:
               ``"linear"``, ``"log_linear"``, ``"monotone_convex"``, ``"cubic_hermite"`` or
               ``"piecewise_quadratic_forward"``.
-            - ``extrapolation`` (str, optional, default ``"flat_forward"``): Extrapolation policy:
-              ``"flat_zero"``, ``"flat_forward"`` or ``"none"``.
+            - ``extrapolation`` (str, optional, default ``"extend"``): Extrapolation policy:
+              ``"flat"``, ``"extend"`` or ``"error"``.
             - ``pricing_discount_id`` (str | None, optional, default ``None``): Separate discount curve used
               to price the quotes; ``None`` uses ``curve_id``.
             - ``pricing_forward_id`` (str | None, optional, default ``None``): Forward curve used to price the
@@ -104,15 +104,19 @@ class CalibrationStep:
             - ``currency`` (str | Currency, required): Upper-case ISO 4217 code (or a ``Currency``) of the
               curve currency.
             - ``base_date`` (str, required): Curve base date as an ISO-8601 date string (``"YYYY-MM-DD"``).
-            - ``tenor_years`` (float, required): Index accrual tenor in years (``0.25`` for a 3M index).
             - ``discount_curve_id`` (str, required): Identifier of the discount curve solved in an earlier
               step.
             - ``curve_id`` (str, optional, default ``id``): Identifier of the produced curve.
+            - ``index_tenor`` (dict, optional, default ``None``): Contractual index tenor metadata attached
+              to the calibrated curve in serde ``Tenor`` form (for example
+              ``{"count": 3, "unit": "months"}``).
             - ``method`` (dict, optional, default ``global_solve`` with a finite-difference Jacobian):
               Calibration method; forward curves require ``global_solve`` (``"bootstrap"`` is rejected).
-            - ``interpolation`` (str, optional, default ``"cubic_hermite"``): Forward-rate interpolation:
-              ``"linear"``, ``"log_linear"``, ``"monotone_convex"``, ``"cubic_hermite"`` or
-              ``"piecewise_quadratic_forward"``; ``"monotone_convex"`` is rejected.
+            - ``interpolation`` (str, optional, default ``"log_linear"``): Projection-factor interpolation:
+              ``"linear"``, ``"log_linear"``, ``"cubic_hermite"``, ``"piecewise_quadratic_forward"``,
+              or ``"monotone_convex"``.
+            - ``extrapolation`` (str, optional, default ``"extend"``): Tail policy beyond the last
+              calibrated pillar (``"extend"``, ``"flat"``, or ``"error"``).
             - ``conventions`` (dict, optional, default both ``None``): Step-level rates conventions
               ``{"curve_day_count": ..., "ois_compounding": ...}``; both entries default to ``None`` (the
               quote conventions apply).
@@ -139,7 +143,7 @@ class CalibrationStep:
         >>> params = {
         ...     "currency": "USD",
         ...     "base_date": "2024-06-28",
-        ...     "tenor_years": 0.25,
+        ...     "index_tenor": {"count": 3, "unit": "months"},
         ...     "discount_curve_id": "usd_ois",
         ... }
         >>> step = CalibrationStep.forward("usd_3m", params)
@@ -177,8 +181,6 @@ class CalibrationStep:
               calibration.
             - ``method`` (str | dict, optional, default ``"bootstrap"``): Calibration method: ``"bootstrap"``
               or ``{"global_solve": {"use_analytical_jacobian": bool}}``.
-            - ``par_interp`` (str, optional, default ``"linear"``): Interpolation of reported par spreads:
-              ``"linear"`` or ``"log_linear"``.
             - ``doc_clause`` (str | None, optional, default ``None``): CDS documentation-clause assertion;
               when set it must match the quote conventions.
             - ``cds_valuation_convention`` (str | None, optional, default ``None``): Synthetic-CDS valuation
@@ -233,8 +235,7 @@ class CalibrationStep:
             - ``currency`` (str | Currency, required): Upper-case ISO 4217 code (or a ``Currency``) of the
               curve currency.
             - ``base_date`` (str, required): Valuation and calibration-instrument start date as an ISO-8601
-              date string (``"YYYY-MM-DD"``). The curve's reference CPI date is this date minus
-              ``observation_lag``.
+              date string (``"YYYY-MM-DD"``), independent of the source origin.
             - ``discount_curve_id`` (str, required): Identifier of the discount curve solved in an earlier
               step.
             - ``index`` (str, required): Inflation index identifier, for example ``"USA-CPI-U"``.
@@ -242,16 +243,19 @@ class CalibrationStep:
               255 months. No lag accepts ``""``, ``"none"``, ``"0"``, ``"0M"`` or ``"0D"`` (case-insensitive);
               nonzero day lags are rejected.
             - ``base_cpi`` (float, required): Contractual reference CPI at the start date in index points,
-              after observation lag and monthly interpolation; supplied index fixings must reproduce it,
-              including seasonality.
+              after observation lag and monthly interpolation; independent of the source origin CPI.
+            - ``source_base_date`` (str, required): Original unlagged source anchor date as ISO-8601.
+            - ``source_base_cpi`` (float, required): Finite positive absolute CPI level at the source origin.
+            - ``day_count`` (str, required): Explicit source clock, for example ``"act_365f"``.
+            - ``calendar_id`` (str or None, optional): Registered source-clock calendar, required for Bus/252.
             - ``curve_id`` (str, optional, default ``id``): Identifier of the produced curve.
             - ``notional`` (float, optional, default ``1.0``): Notional of the synthetic inflation swaps
               repriced during calibration.
             - ``method`` (str | dict, optional, default ``"bootstrap"``): Calibration method: ``"bootstrap"``
               or ``{"global_solve": {"use_analytical_jacobian": bool}}``.
-            - ``interpolation`` (str, optional, default ``"linear"``): CPI interpolation: ``"linear"``,
-              ``"log_linear"``, ``"monotone_convex"``, ``"cubic_hermite"`` or
-              ``"piecewise_quadratic_forward"``.
+            - ``interpolation`` (str, required): CPI interpolation: ``"linear"``, ``"log_linear"`` or ``"cubic_hermite"``.
+            - ``extrapolation`` (str, required): Source tail policy: ``"flat"``, ``"extend"`` or ``"error"``.
+            Calibration requires an immutable fixing snapshot keyed by ``curve_id`` in ``market_data``, even when the history is empty.
 
         quote_set : str | None, default None
             Name of a quote set declared in ``CalibrationPlan.quote_sets``; ``None`` uses ``id``.
@@ -279,6 +283,11 @@ class CalibrationStep:
         ...     "index": "USA-CPI-U",
         ...     "observation_lag": "3M",
         ...     "base_cpi": 310.0,
+        ...     "source_base_date": "2024-10-01",
+        ...     "source_base_cpi": 310.0,
+        ...     "day_count": "act_365f",
+        ...     "interpolation": "linear",
+        ...     "extrapolation": "extend",
         ... }
         >>> step = CalibrationStep.inflation("us_cpi", params)
         >>> step.kind
@@ -737,15 +746,13 @@ class CalibrationStep:
               ``spot_fx``.
             - ``domestic_discount_id`` (str, required): Domestic discount curve solved in an earlier step.
             - ``curve_id`` (str, optional, default ``id``): Identifier of the produced foreign curve.
-            - ``basis_spread_curve_id`` (str | None, optional, default ``None``): Identifier of the byproduct
-              basis-spread curve.
             - ``method`` (str, optional, default ``"bootstrap"``): Sequential ``"bootstrap"``;
               ``global_solve`` is rejected.
             - ``interpolation`` (str, optional, default ``"log_linear"``): Discount-factor interpolation:
               ``"linear"``, ``"log_linear"``, ``"monotone_convex"``, ``"cubic_hermite"`` or
               ``"piecewise_quadratic_forward"``.
-            - ``extrapolation`` (str, optional, default ``"flat_forward"``): Extrapolation policy:
-              ``"flat_zero"``, ``"flat_forward"`` or ``"none"``.
+            - ``extrapolation`` (str, optional, default ``"extend"``): Extrapolation policy:
+              ``"flat"``, ``"extend"`` or ``"error"``.
             - ``conventions`` (dict, optional, default both ``None``): Step-level rates conventions
               ``{"curve_day_count": ..., "ois_compounding": ...}``; both entries default to ``None`` (the
               quote conventions apply).

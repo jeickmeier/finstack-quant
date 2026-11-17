@@ -3,14 +3,14 @@
 use crate::api::core::calendar::calendar_arg;
 use crate::api::core::imm::JsTenorUnit;
 use crate::utils::input::{
-    from_js_json, invalid_type, js_epoch_days, js_f64, js_int, js_opt_bool, js_opt_string,
-    js_opt_uint, js_string, js_uint,
+    from_js_json, invalid_type, is_plain_object, js_epoch_days, js_int, js_opt_bool, js_opt_string,
+    js_opt_uint, js_string, js_uint, wasm_handle_string,
 };
 use crate::utils::to_js_err;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount as RustDayCount, DayCountContextState, HolidayCalendar,
-    Tenor as RustTenor, adjust as core_adjust, available_calendars as core_available_calendars,
-    calendar_by_id_strict,
+    Tenor as RustTenor, VolatilityClock, adjust as core_adjust,
+    available_calendars as core_available_calendars, calendar_by_id_strict,
 };
 use wasm_bindgen::prelude::*;
 
@@ -124,25 +124,25 @@ impl JsDayCountContext {
     /// Holiday-calendar identifier, or `undefined`.
     #[wasm_bindgen(getter, js_name = calendarId)]
     pub fn calendar_id(&self) -> Option<String> {
-        self.inner.calendar_id.clone()
+        self.inner.get_calendar_id().map(str::to_owned)
     }
 
     /// Coupon frequency, or `undefined`.
     #[wasm_bindgen(getter, js_name = frequency)]
     pub fn frequency(&self) -> Option<JsTenor> {
-        self.inner.frequency.map(|inner| JsTenor { inner })
+        self.inner.get_frequency().map(|inner| JsTenor { inner })
     }
 
     /// Custom business-day denominator, or `undefined`.
     #[wasm_bindgen(getter, js_name = busBasis)]
     pub fn bus_basis(&self) -> Option<u16> {
-        self.inner.bus_basis
+        self.inner.get_bus_basis()
     }
 
     /// Reference coupon period as `[startEpochDays, endEpochDays]`, or `undefined`.
     #[wasm_bindgen(getter, js_name = couponPeriod)]
     pub fn coupon_period(&self) -> Option<Box<[i32]>> {
-        self.inner.coupon_period.map(|(start, end)| {
+        self.inner.get_coupon_period().map(|(start, end)| {
             Box::new([
                 finstack_quant_core::dates::days_since_epoch(start),
                 finstack_quant_core::dates::days_since_epoch(end),
@@ -153,7 +153,7 @@ impl JsDayCountContext {
     /// Whether the later accrual endpoint is the termination date, or `undefined` if unspecified.
     #[wasm_bindgen(getter, js_name = endIsTerminationDate)]
     pub fn end_is_termination_date(&self) -> Option<bool> {
-        self.inner.end_is_termination_date
+        self.inner.get_end_is_termination_date()
     }
 
     /// Serialize to the canonical JSON wire form shared with Python `DayCountContext.to_json`.
@@ -183,6 +183,245 @@ impl JsDayCountContext {
         #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
     ) -> Result<JsDayCountContext, JsValue> {
         from_js_json::<DayCountContextState>(&json, "json").map(|inner| JsDayCountContext { inner })
+    }
+}
+
+thread_local! {
+    static DAY_COUNT_PROTOTYPE: std::cell::OnceCell<js_sys::Object> = const { std::cell::OnceCell::new() };
+    static DAY_COUNT_CONTEXT_PROTOTYPE: std::cell::OnceCell<js_sys::Object> = const { std::cell::OnceCell::new() };
+    static VOLATILITY_CLOCK_PROTOTYPE: std::cell::OnceCell<js_sys::Object> = const { std::cell::OnceCell::new() };
+}
+
+fn js_day_count_arg(value: &JsValue, label: &str) -> Result<RustDayCount, JsValue> {
+    if let Some(s) = value.as_string() {
+        return s.parse::<RustDayCount>().map_err(to_js_err);
+    }
+    if let Some(name) = wasm_handle_string(
+        value,
+        label,
+        &DAY_COUNT_PROTOTYPE,
+        || Ok(JsDayCount::act365f()),
+        "toString",
+    )? {
+        return name.parse::<RustDayCount>().map_err(to_js_err);
+    }
+    Err(invalid_type(
+        label,
+        "expected a DayCount handle or canonical day-count string",
+    ))
+}
+
+fn js_opt_day_count_context_state(
+    value: Option<&JsValue>,
+    label: &str,
+) -> Result<DayCountContextState, JsValue> {
+    let Some(val) = value else {
+        return Ok(DayCountContextState::default());
+    };
+    if val.is_undefined() || val.is_null() {
+        return Ok(DayCountContextState::default());
+    }
+    if let Some(json) = wasm_handle_string(
+        val,
+        label,
+        &DAY_COUNT_CONTEXT_PROTOTYPE,
+        || {
+            Ok(JsDayCountContext {
+                inner: DayCountContextState::default(),
+            })
+        },
+        "toJson",
+    )? {
+        return serde_json::from_str::<DayCountContextState>(&json).map_err(to_js_err);
+    }
+    if is_plain_object(val) {
+        return from_js_json::<DayCountContextState>(val, label);
+    }
+    Err(invalid_type(
+        label,
+        "expected a DayCountContext handle, DayCountContextValue object, or null",
+    ))
+}
+
+/// Borrow a `VolatilityClock` from either a live `core.VolatilityClock` handle,
+/// a plain JSON object matching the wire schema, or `null`/`undefined`.
+///
+/// # Arguments
+///
+/// * `value` - Optional JavaScript value holding a `VolatilityClock` handle, plain object, or `null`.
+/// * `label` - Parameter name used in type/validation error messages.
+pub(crate) fn js_opt_volatility_clock(
+    value: Option<&JsValue>,
+    label: &str,
+) -> Result<Option<VolatilityClock>, JsValue> {
+    let Some(val) = value else {
+        return Ok(None);
+    };
+    if val.is_undefined() || val.is_null() {
+        return Ok(None);
+    }
+    if let Some(json) = wasm_handle_string(
+        val,
+        label,
+        &VOLATILITY_CLOCK_PROTOTYPE,
+        || {
+            let ref_date = Date::from_calendar_date(2025, time::Month::January, 1)
+                .map_err(|_| invalid_type(label, "failed to create prototype reference date"))?;
+            let inner = VolatilityClock::try_new(
+                ref_date,
+                RustDayCount::Act365F,
+                DayCountContextState::default(),
+            )
+            .map_err(to_js_err)?;
+            Ok(JsVolatilityClock { inner })
+        },
+        "toJson",
+    )? {
+        return serde_json::from_str::<VolatilityClock>(&json)
+            .map(Some)
+            .map_err(to_js_err);
+    }
+    if is_plain_object(val) {
+        return from_js_json::<VolatilityClock>(val, label).map(Some);
+    }
+    Err(invalid_type(
+        label,
+        "expected a VolatilityClock handle, VolatilityClockValue object, or null",
+    ))
+}
+
+/// Calendar and day-count clock used to map option expiry dates to year fractions.
+///
+/// Pairs an explicit valuation reference date, day-count convention, and optional
+/// `DayCountContext` so surfaces convert expiry dates into year fractions
+/// without implicit clocks or heuristics.
+///
+/// @example
+/// ```typescript
+/// import init, { core } from "finstack-quant-wasm";
+/// await init();
+/// const refDate = core.createDate(2025, 1, 15);
+/// const expiry = core.createDate(2026, 1, 15);
+/// const clock = new core.VolatilityClock(refDate, core.DayCount.act365f());
+/// console.log(clock.expiryTime(expiry));
+/// clock.free();
+/// ```
+#[wasm_bindgen(js_name = VolatilityClock)]
+pub struct JsVolatilityClock {
+    pub(crate) inner: VolatilityClock,
+}
+
+#[wasm_bindgen(js_class = VolatilityClock)]
+impl JsVolatilityClock {
+    /// Construct a validated volatility clock from a reference date, day-count
+    /// convention, and optional day-count context (Rust `VolatilityClock::try_new`).
+    ///
+    /// # Arguments
+    ///
+    /// * `reference_epoch_days` - Valuation reference date as days since 1970-01-01.
+    /// * `day_count` - Day-count convention as a `DayCount` handle or canonical snake_case name.
+    /// * `context` - Optional `DayCountContext` handle or plain object supplying metadata for context-dependent conventions (`bus_252`, `act_act_isma`, `act_365l`); omitted or `null` uses the empty default context.
+    ///
+    /// @returns A validated `VolatilityClock` handle.
+    /// @throws `TypeError` (kind `invalid_type`) if an input has the wrong JavaScript type; `FinstackError` (kind `validation` or `not_found`) if the date is invalid, the convention name is unknown, or the convention requires context metadata that was not supplied.
+    /// @param referenceEpochDays - Valuation reference date as days since 1970-01-01.
+    /// @param dayCount - Day-count convention as a `DayCount` handle or canonical snake_case name.
+    /// @param context - Optional `DayCountContext` handle or plain object; omitted or `null` uses the empty default context.
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        #[wasm_bindgen(js_name = "referenceEpochDays", unchecked_param_type = "number")]
+        reference_epoch_days: JsValue,
+        #[wasm_bindgen(js_name = "dayCount", unchecked_param_type = "DayCount | string")]
+        day_count: JsValue,
+        #[wasm_bindgen(
+            unchecked_optional_param_type = "DayCountContext | DayCountContextValue | null"
+        )]
+        context: Option<JsValue>,
+    ) -> Result<JsVolatilityClock, JsValue> {
+        let reference = js_epoch_days(&reference_epoch_days, "referenceEpochDays")?;
+        let dc = js_day_count_arg(&day_count, "dayCount")?;
+        let ctx = js_opt_day_count_context_state(context.as_ref(), "context")?;
+        VolatilityClock::try_new(reference, dc, ctx)
+            .map(|inner| JsVolatilityClock { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Reference date as epoch days (days since 1970-01-01).
+    #[wasm_bindgen(getter, js_name = referenceDate)]
+    pub fn reference_date(&self) -> i32 {
+        finstack_quant_core::dates::days_since_epoch(self.inner.get_reference_date())
+    }
+
+    /// Day-count convention used to map expiry dates to times.
+    #[wasm_bindgen(getter, js_name = dayCount)]
+    pub fn day_count(&self) -> JsDayCount {
+        JsDayCount {
+            inner: self.inner.get_day_count(),
+        }
+    }
+
+    /// Day-count context associated with the clock.
+    #[wasm_bindgen(getter, js_name = context)]
+    pub fn context(&self) -> JsDayCountContext {
+        JsDayCountContext {
+            inner: self.inner.get_context().clone(),
+        }
+    }
+
+    /// Compute the non-negative year fraction from the clock's reference date to
+    /// an option expiry date (Rust `VolatilityClock::expiry_time`).
+    ///
+    /// # Arguments
+    ///
+    /// * `expiry_epoch_days` - Option expiry date as days since 1970-01-01; must be strictly after `referenceDate`.
+    ///
+    /// @returns Positive year fraction in years under the clock's day count and context.
+    /// @throws `TypeError` (kind `invalid_type`) if `expiryEpochDays` is not an integer epoch-day number; `FinstackError` (kind `validation` or `not_found`) if the date is out of range or not strictly after `referenceDate`.
+    /// @param expiryEpochDays - Option expiry date as days since 1970-01-01; must be strictly after `referenceDate`.
+    #[wasm_bindgen(js_name = expiryTime)]
+    pub fn expiry_time(
+        &self,
+        #[wasm_bindgen(js_name = "expiryEpochDays", unchecked_param_type = "number")]
+        expiry_epoch_days: JsValue,
+    ) -> Result<f64, JsValue> {
+        let expiry = js_epoch_days(&expiry_epoch_days, "expiryEpochDays")?;
+        self.inner.expiry_time(expiry).map_err(to_js_err)
+    }
+
+    /// Serialize to the canonical JSON wire form accepted by `fromJson` and Python `VolatilityClock.to_json`.
+    ///
+    /// @returns Compact JSON text with ISO-8601 `reference_date`.
+    /// @throws If serialization fails (not expected for a valid clock).
+    #[wasm_bindgen(js_name = toJson)]
+    pub fn to_json(&self) -> Result<String, JsValue> {
+        serde_json::to_string(&self.inner).map_err(to_js_err)
+    }
+
+    /// Deserialize from the canonical JSON wire form produced by `toJson`.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - Canonical `VolatilityClock` JSON text or plain object `{ reference_date, day_count, context }`; unknown fields are rejected.
+    ///
+    /// @returns A validated `VolatilityClock` handle owned by the caller; release it with `free()`.
+    /// @throws `FinstackError` (kind `validation` or `not_found`) if `json` is malformed, has unknown/mistyped fields, or fails clock context validation.
+    /// @param json - Canonical `VolatilityClock` JSON text or plain object `{ reference_date, day_count, context }`; unknown fields are rejected.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { core } from "finstack-quant-wasm";
+    /// await init();
+    /// const original = new core.VolatilityClock(core.createDate(2025, 1, 15), core.DayCount.act365f());
+    /// const roundTripped = core.VolatilityClock.fromJson(original.toJson());
+    /// console.log(roundTripped.referenceDate === original.referenceDate);
+    /// roundTripped.free();
+    /// original.free();
+    /// ```
+    #[wasm_bindgen(js_name = fromJson)]
+    pub fn from_json(
+        #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
+    ) -> Result<JsVolatilityClock, JsValue> {
+        from_js_json::<VolatilityClock>(&json, "json").map(|inner| JsVolatilityClock { inner })
     }
 }
 
@@ -516,8 +755,8 @@ impl JsDayCount {
 /// Construct from a count and `TenorUnit` (`new Tenor(count, unit)`), parse
 /// from strings (`Tenor.parse(s)`), or use the named-period factories
 /// (`Tenor.daily`, `Tenor.weekly`, `Tenor.biweekly`, `Tenor.monthly`,
-/// `Tenor.bimonthly`, `Tenor.quarterly`, `Tenor.semiAnnual`, `Tenor.annual`),
-/// `Tenor.fromPaymentsPerYear` or `Tenor.fromYears`.
+/// `Tenor.bimonthly`, `Tenor.quarterly`, `Tenor.semiAnnual`, `Tenor.annual`), or
+/// `Tenor.fromPaymentsPerYear`.
 ///
 /// @example
 /// ```javascript
@@ -576,29 +815,6 @@ impl JsTenor {
     ) -> Result<JsTenor, JsValue> {
         let s: &str = &js_string(&s, "s")?;
         RustTenor::parse(s)
-            .map(|inner| JsTenor { inner })
-            .map_err(to_js_err)
-    }
-
-    /// Tenor for a year fraction under a day count (Rust `Tenor::from_years`):
-    /// a whole number of months when the fraction is one, otherwise days.
-    ///
-    /// # Arguments
-    ///
-    /// * `years` - Positive, finite length in years.
-    /// * `day_count` - Convention used to interpret `years`.
-    ///
-    /// @returns The matching `Tenor`.
-    /// @throws If `years` is not finite and positive or the tenor is out of range.
-    /// @param years - Positive, finite length in years.
-    /// @param dayCount - Convention used to interpret `years`.
-    #[wasm_bindgen(js_name = fromYears)]
-    pub fn from_years(
-        #[wasm_bindgen(unchecked_param_type = "number")] years: JsValue,
-        #[wasm_bindgen(js_name = "dayCount")] day_count: &JsDayCount,
-    ) -> Result<JsTenor, JsValue> {
-        let years = js_f64(&years, "years")?;
-        RustTenor::from_years(years, day_count.inner)
             .map(|inner| JsTenor { inner })
             .map_err(to_js_err)
     }
@@ -758,16 +974,17 @@ impl JsTenor {
     /// * `epoch_days` - Anchor date as days since 1970-01-01.
     /// * `calendar_code` - Registered holiday-calendar identifier used to roll
     ///   the result; omitted skips adjustment.
-    /// * `convention` - Business-day convention name applied with the
-    ///   calendar; omitted uses the Rust default (`"modified_following"`).
+    /// * `convention` - Business-day convention name applied whenever
+    ///   `calendar_code` is provided; required (there is no default convention).
     ///
     /// @returns The (optionally adjusted) end date as epoch days.
     /// @throws `TypeError` for a mistyped argument; `FinstackError` if the date
-    /// is out of range, the convention is unknown, the calendar is unknown
-    /// (kind `not_found`), or no business day is found.
+    /// is out of range, `calendarCode` is supplied without `convention`, the
+    /// convention is unknown, the calendar is unknown (kind `not_found`), or no
+    /// business day is found.
     /// @param epochDays - Anchor date as days since 1970-01-01.
     /// @param calendarCode - Registered holiday-calendar identifier used to roll the result; omitted skips adjustment.
-    /// @param convention - Business-day convention name; required (omitting it throws), there is no default convention.
+    /// @param convention - Business-day convention name applied with `calendarCode`; required (omitting it when `calendarCode` is given throws), there is no default convention.
     #[wasm_bindgen(js_name = addToDate)]
     pub fn add_to_date(
         &self,

@@ -48,6 +48,9 @@ fn minimal_market_context() -> MarketContext {
     let discount_curve = DiscountCurve::builder("USD-OIS")
         .base_date(base_date)
         .knots([(0.0, 1.0), (1.0, 0.95), (5.0, 0.80)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
@@ -57,11 +60,17 @@ fn minimal_market_context() -> MarketContext {
 /// Create a market context with equity prices
 fn equity_market_context() -> MarketContext {
     minimal_market_context()
-        .insert_price("AAPL", MarketScalar::Unitless(150.0))
-        .insert_price("MSFT", MarketScalar::Unitless(300.0))
-        .insert_price("GOOGL", MarketScalar::Unitless(2800.0))
-        .insert_price("AMZN", MarketScalar::Unitless(3200.0))
-        .insert_price("CASH", MarketScalar::Unitless(1.0))
+        .insert_price("AAPL", MarketScalar::unitless(150.0).expect("valid scalar"))
+        .insert_price("MSFT", MarketScalar::unitless(300.0).expect("valid scalar"))
+        .insert_price(
+            "GOOGL",
+            MarketScalar::unitless(2800.0).expect("valid scalar"),
+        )
+        .insert_price(
+            "AMZN",
+            MarketScalar::unitless(3200.0).expect("valid scalar"),
+        )
+        .insert_price("CASH", MarketScalar::unitless(1.0).expect("valid scalar"))
 }
 
 /// Create a market context with multi-currency FX
@@ -91,9 +100,9 @@ fn multi_currency_market_context() -> MarketContext {
     let fx = FxMatrix::new(Arc::new(TestFxProvider), None);
     minimal_market_context()
         .insert_fx(fx)
-        .insert_price("EUR_EQUITY", MarketScalar::Price(eur(100.0)))
-        .insert_price("GBP_EQUITY", MarketScalar::Price(gbp(50.0)))
-        .insert_price("USD_EQUITY", MarketScalar::Price(usd(200.0)))
+        .insert_price("EUR_EQUITY", MarketScalar::price(eur(100.0)))
+        .insert_price("GBP_EQUITY", MarketScalar::price(gbp(50.0)))
+        .insert_price("USD_EQUITY", MarketScalar::price(usd(200.0)))
 }
 
 /// Value one unit of `basket` (notional 1 in its reporting currency) through
@@ -570,7 +579,7 @@ fn test_fx_conversion_error_without_fx_provider() {
         .unwrap();
     // Context without FX provider
     let context =
-        minimal_market_context().insert_price("EUR_EQUITY", MarketScalar::Price(eur(100.0)));
+        minimal_market_context().insert_price("EUR_EQUITY", MarketScalar::price(eur(100.0)));
     let as_of = date(2025, 1, 1);
 
     // Act
@@ -925,8 +934,10 @@ fn test_unitless_scalar_defaults_to_basket_currency() {
         .pricing_config(BasketPricingConfig::default())
         .build()
         .unwrap();
-    let context =
-        minimal_market_context().insert_price("UNITLESS_PRICE", MarketScalar::Unitless(50.0));
+    let context = minimal_market_context().insert_price(
+        "UNITLESS_PRICE",
+        MarketScalar::unitless(50.0).expect("valid scalar"),
+    );
     let as_of = date(2025, 1, 1);
 
     // Act

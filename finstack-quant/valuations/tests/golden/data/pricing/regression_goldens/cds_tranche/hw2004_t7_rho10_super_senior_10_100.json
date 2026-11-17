@@ -63,10 +63,7 @@
             ]
           ],
           "interp_style": "log_linear",
-          "extrapolation": "flat_forward",
-          "min_forward_rate": null,
-          "allow_non_monotonic": false,
-          "min_forward_tenor": 1e-06,
+          "extrapolation": "extend",
           "rate_calibration": null,
           "fx_policy": null
         },
@@ -84,26 +81,7 @@
           "issuer": null,
           "seniority": null,
           "currency": null,
-          "day_count": "act_act",
-          "par_points": [
-            [
-              1.0,
-              60.0
-            ],
-            [
-              3.0,
-              60.0
-            ],
-            [
-              5.0,
-              60.0
-            ],
-            [
-              10.0,
-              60.0
-            ]
-          ],
-          "par_interp": "linear"
+          "day_count": "act_act"
         },
         {
           "kind": "base_correlation_curve",

@@ -15,7 +15,7 @@ Examples
 --------
 >>> import datetime
 >>> from finstack_quant.core.market_data import DiscountCurve
->>> round(DiscountCurve.flat("USD-OIS", datetime.date(2025, 1, 1), 0.05).df(1.0), 6)
+>>> round(DiscountCurve.flat("USD-OIS", datetime.date(2025, 1, 1), 0.05, "act_365f").df(1.0), 6)
 0.951229
 
 """
@@ -49,7 +49,9 @@ from finstack_quant.core.market_data._fx import (
 )
 from finstack_quant.core.market_data._context import ConvertedMoney as ConvertedMoney, MarketContext as MarketContext
 from finstack_quant.core.market_data._scalars import (
+    InflationExpectedRelease as InflationExpectedRelease,
     InflationIndex as InflationIndex,
+    InflationObservation as InflationObservation,
     ScalarTimeSeries as ScalarTimeSeries,
 )
 
@@ -66,7 +68,9 @@ __all__ = [
     "FxRateResult",
     "HazardCurve",
     "InflationCurve",
+    "InflationExpectedRelease",
     "InflationIndex",
+    "InflationObservation",
     "MarketContext",
     "PriceCurve",
     "SabrParameterData",

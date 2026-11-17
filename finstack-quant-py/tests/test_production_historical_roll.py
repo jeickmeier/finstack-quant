@@ -42,19 +42,33 @@ def test_materialized_fixings_roundtrip_and_failure_atomicity() -> None:
     assert json.loads(retained.to_json())["series"] == data["series"]
 
 
-def test_first_order_spread_shock_uses_loss_given_default() -> None:
+def test_direct_hazard_shock_and_retired_mode_rejection() -> None:
+    from finstack_quant.valuations.instruments import price_instrument
+
     fixture = json.loads((FIXTURES / "production_cds_option.json").read_text())
     hazard = next(curve for curve in fixture["market"]["curves"] if curve["type"] == "hazard")
-    scenario = {
-        "id": "units",
+    legacy = {
+        "id": "legacy",
         "hazard_bump_mode": "first_order_shift",
         "operations": [{"kind": "curve_parallel_bp", "curve_kind": "par_cds", "curve_id": hazard["id"], "bp": 10}],
     }
-    result = apply_scenario(json.dumps(scenario), json.dumps(fixture["market"]), fixture["as_of"])
-    actual = next(curve for curve in json.loads(result.market.to_json())["curves"] if curve["id"] == hazard["id"])
-    expected = hazard["knot_points"][0][1] + 0.001 / (1 - hazard["recovery_rate"])
-    assert actual["knot_points"][0][1] == pytest.approx(expected, abs=1e-12)
-    assert any("first_order" in warning["kind"] for warning in result.report.warnings)
+    with pytest.raises(ValueError, match=r"unknown field.*hazard_bump_mode"):
+        apply_scenario(json.dumps(legacy), json.dumps(fixture["market"]), fixture["as_of"])
+
+    par_cds = {
+        "id": "par-cds",
+        "operations": [{"kind": "curve_parallel_bp", "curve_kind": "par_cds", "curve_id": hazard["id"], "bp": 10}],
+    }
+    with pytest.raises(ValueError, match=r"(?i)calibration|recipe"):
+        apply_scenario(json.dumps(par_cds), json.dumps(fixture["market"]), fixture["as_of"])
+
+    with pytest.raises((ValueError, RuntimeError), match=r"(?i)calibration|recipe"):
+        price_instrument(
+            json.dumps(fixture["instrument"]),
+            json.dumps(fixture["market"]),
+            fixture["as_of"],
+            metrics=["cs01"],
+        )
 
 
 def test_frn_time_roll_preserves_raw_index_excluding_coupon_spread() -> None:
@@ -66,13 +80,12 @@ def test_frn_time_roll_preserves_raw_index_excluding_coupon_spread() -> None:
         "type": "forward",
         "id": "USD-SOFR-3M",
         "base": fixture["as_of"],
-        "reset_lag": 0,
         "day_count": "act_360",
-        "tenor": 0.25,
-        "knot_points": [[0, 0.03], [1, 0.03], [2, 0.03]],
-        "projection_grid": None,
-        "interp_style": "linear",
-        "extrapolation": "flat_forward",
+        "index_tenor": {"count": 3, "unit": "months"},
+        # Projection factors that reprice every 90/360 window at a 3% simple rate.
+        "knot_points": [[t, (1.0 + 0.03 * 0.25) ** (-4.0 * t)] for t in (0.0, 1.0, 2.0)],
+        "interp_style": "log_linear",
+        "extrapolation": "extend",
         "rate_calibration": None,
         "fx_policy": None,
     })

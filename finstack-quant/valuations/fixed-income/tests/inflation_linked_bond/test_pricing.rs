@@ -25,6 +25,9 @@ fn adjusted_final_payment_remains_live_after_raw_maturity() {
     let discount = DiscountCurve::builder("USD-OIS")
         .base_date(base)
         .knots([(0.0, 1.0), (2.0, (-0.10_f64).exp())])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let market = MarketContext::new()
@@ -33,19 +36,21 @@ fn adjusted_final_payment_remains_live_after_raw_maturity() {
         .insert(
             InflationCurve::builder("US-CPI")
                 .base_date(base)
-                .base_cpi(300.0)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(InterpStyle::LogLinear)
+                .extrapolation(ExtrapolationPolicy::Flat)
                 .knots([(0.0, 300.0), (2.0, 300.0)])
                 .build()
                 .unwrap(),
         );
     let market = market.insert_inflation_index(
-        finstack_quant_core::market_data::scalars::InflationIndex::new(
+        fixing_snapshot(
             "US-CPI",
             (1..=12).map(|month| (d(2025, month, 1), 300.0)).collect(),
             Currency::USD,
+            d(2026, 1, 1),
         )
-        .unwrap()
-        .with_interpolation(finstack_quant_core::market_data::scalars::SeriesInterpolation::Linear),
+        .unwrap(),
     );
     for (convention, payment) in [
         (BusinessDayConvention::Following, d(2026, 2, 2)),
@@ -160,13 +165,18 @@ fn test_npv_increases_with_inflation() {
             finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (5.0, 0.95), (10.0, 0.90)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .unwrap();
 
         let curve =
             finstack_quant_core::market_data::term_structures::InflationCurve::builder("US-CPI-U")
                 .base_date(as_of)
-                .base_cpi(300.0)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(InterpStyle::LogLinear)
+                .extrapolation(ExtrapolationPolicy::Flat)
                 .knots([
                     (0.0, 300.0),
                     (5.0, 303.0), // ~0.2% p.a.
@@ -178,6 +188,7 @@ fn test_npv_increases_with_inflation() {
             .insert_surface(zero_floor_vol())
             .insert(disc)
             .insert(curve)
+            .insert_inflation_index(simple_index("US-CPI-U", as_of, 300.0, Currency::USD))
     };
 
     // Context with high inflation
@@ -186,13 +197,18 @@ fn test_npv_increases_with_inflation() {
             finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
                 .base_date(as_of)
                 .knots([(0.0, 1.0), (5.0, 0.95), (10.0, 0.90)])
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+                .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
                 .build()
                 .unwrap();
 
         let curve =
             finstack_quant_core::market_data::term_structures::InflationCurve::builder("US-CPI-U")
                 .base_date(as_of)
-                .base_cpi(300.0)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(InterpStyle::LogLinear)
+                .extrapolation(ExtrapolationPolicy::Flat)
                 .knots([
                     (0.0, 300.0),
                     (5.0, 330.0), // ~10% p.a.
@@ -204,6 +220,7 @@ fn test_npv_increases_with_inflation() {
             .insert_surface(zero_floor_vol())
             .insert(disc)
             .insert(curve)
+            .insert_inflation_index(simple_index("US-CPI-U", as_of, 300.0, Currency::USD))
     };
 
     // Act
@@ -225,7 +242,9 @@ fn test_npv_decreases_with_higher_discount_rate() {
     let inflation_curve =
         finstack_quant_core::market_data::term_structures::InflationCurve::builder("US-CPI-U")
             .base_date(as_of)
-            .base_cpi(300.0)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .knots([(0.0, 300.0), (5.0, 315.0)])
             .build()
             .unwrap();
@@ -235,6 +254,9 @@ fn test_npv_decreases_with_higher_discount_rate() {
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.99), (10.0, 0.98)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
@@ -243,11 +265,15 @@ fn test_npv_decreases_with_higher_discount_rate() {
         finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
             .base_date(as_of)
             .knots([(0.0, 1.0), (5.0, 0.80), (10.0, 0.65)])
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .unwrap();
 
     let ctx_low = finstack_quant_core::market_data::context::MarketContext::new()
         .insert_surface(zero_floor_vol())
+        .insert_inflation_index(simple_index("US-CPI-U", as_of, 300.0, Currency::USD))
         .insert(disc_low)
         .insert(inflation_curve);
 
@@ -255,13 +281,16 @@ fn test_npv_decreases_with_higher_discount_rate() {
     let inflation_curve2 =
         finstack_quant_core::market_data::term_structures::InflationCurve::builder("US-CPI-U")
             .base_date(as_of)
-            .base_cpi(300.0)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::Flat)
             .knots([(0.0, 300.0), (5.0, 315.0)])
             .build()
             .unwrap();
 
     let ctx_high = finstack_quant_core::market_data::context::MarketContext::new()
         .insert_surface(zero_floor_vol())
+        .insert_inflation_index(simple_index("US-CPI-U", as_of, 300.0, Currency::USD))
         .insert(disc_high)
         .insert(inflation_curve2);
 
@@ -325,17 +354,13 @@ fn test_npv_with_deflation_protection() {
     let disc = finstack_quant_core::market_data::term_structures::DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
         .knots([(0.0, 1.0), (5.0, 0.95)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
 
-    let observations = (1..=12).map(|month| (d(2025, month, 1), 290.0)).collect(); // Deflation vs base of 300
-    let index = finstack_quant_core::market_data::scalars::InflationIndex::new(
-        "US-CPI-U",
-        observations,
-        Currency::USD,
-    )
-    .unwrap()
-    .with_interpolation(finstack_quant_core::market_data::scalars::SeriesInterpolation::Linear);
+    let index = simple_index("US-CPI-U", as_of, 290.0, Currency::USD);
 
     let ctx = finstack_quant_core::market_data::context::MarketContext::new()
         .insert_surface(zero_floor_vol())
@@ -343,7 +368,9 @@ fn test_npv_with_deflation_protection() {
         .insert(
             finstack_quant_core::market_data::term_structures::InflationCurve::builder("US-CPI-U")
                 .base_date(as_of)
-                .base_cpi(290.0)
+                .day_count(finstack_quant_core::dates::DayCount::Act365F)
+                .interp(InterpStyle::LogLinear)
+                .extrapolation(ExtrapolationPolicy::Flat)
                 .knots([(0.0, 290.0), (2.0, 290.0)])
                 .build()
                 .unwrap(),
@@ -515,8 +542,8 @@ fn test_pv_matches_projected_index_ratio_times_nominal_df() {
 
     // 2-year window containing no Feb 29 so ACT/365F gives t(maturity) = 730/365 = 2.0
     // exactly, landing on the curve knots and keeping the expectation hand-computable.
-    let as_of = d(2025, 1, 15);
-    let maturity = d(2027, 1, 15);
+    let as_of = d(2025, 1, 1);
+    let maturity = d(2027, 1, 1);
 
     let bond = InflationLinkedBond::builder()
         .id(InstrumentId::new("ILB-NOMINAL-PV"))
@@ -547,18 +574,23 @@ fn test_pv_matches_projected_index_ratio_times_nominal_df() {
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (1.0, 1.03_f64.powi(-1)), (2.0, df_2y)])
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()
         .unwrap();
     let inflation = InflationCurve::builder("US-CPI")
         .base_date(as_of)
-        .base_cpi(100.0)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::Flat)
         .knots([(0.0, 100.0), (1.0, 102.0), (2.0, 104.04)])
         .build()
         .unwrap();
     let ctx = MarketContext::new()
         .insert_surface(zero_floor_vol())
         .insert(discount)
-        .insert(inflation);
+        .insert(inflation)
+        .insert_inflation_index(simple_index("US-CPI", as_of, 100.0, Currency::USD));
 
     let pv = bond.value(&ctx, as_of).unwrap().amount();
 

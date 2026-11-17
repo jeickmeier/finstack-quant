@@ -15,7 +15,7 @@ use wasm_bindgen_test::*;
 fn usd_money(amount: f64) -> JsMoney {
     let usd = finstack_quant_wasm::api::core::currency::JsCurrency::new(JsValue::from("USD"))
         .expect("USD currency");
-    JsMoney::new(JsValue::from(amount), &usd).expect("money")
+    JsMoney::new(JsValue::from(amount), &usd, None).expect("money")
 }
 
 fn fixed_bond() -> JsBond {
@@ -32,12 +32,17 @@ fn fixed_bond() -> JsBond {
 }
 
 fn market_context_json() -> String {
+    use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
     let base = finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
         .unwrap();
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(base)
+        .day_count(DayCount::Act365F)
+        .interp(InterpStyle::MonotoneConvex)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .knots([(0.5, 0.99), (1.0, 0.98), (5.0, 0.90), (10.0, 0.80)])
         .build()
         .unwrap();
@@ -49,17 +54,21 @@ fn credit_market_context_json() -> String {
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
+    use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 
     let base = finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
         .unwrap();
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(base)
         .day_count(DayCount::Act365F)
+        .interp(InterpStyle::MonotoneConvex)
+        .extrapolation(ExtrapolationPolicy::Extend)
         .knots([(0.0, 1.0), (1.0, 0.96), (5.0, 0.82), (10.0, 0.67)])
         .build()
         .unwrap();
     let hazard = HazardCurve::builder("ACME-HZD")
         .base_date(base)
+        .day_count(DayCount::Act365F)
         .recovery_rate(0.4)
         .knots([(1.0, 0.02), (10.0, 0.02)])
         .build()

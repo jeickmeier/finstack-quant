@@ -195,14 +195,21 @@ impl EquityFuture {
 
     fn dividend_yield(&self, market: &MarketContext) -> finstack_quant_core::Result<f64> {
         self.div_yield_id.as_ref().map_or(Ok(0.0), |id| {
-            let yield_value = match market.get_price(id)? {
-                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
-                finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => {
+            let scalar = market.get_price(id)?;
+            let yield_value = match (scalar.get_unitless(), scalar.get_price()) {
+                (Some(value), _) => value,
+                (None, Some(money)) => {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "EquityFuture '{}' dividend yield '{}' must be unitless, got Price({})",
                         self.id,
                         id,
                         money.currency()
+                    )));
+                }
+                (None, None) => {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "EquityFuture '{}' dividend yield '{}' must be unitless",
+                        self.id, id
                     )));
                 }
             };
@@ -244,10 +251,10 @@ impl EquityFuture {
             let mut pv_dividends = finstack_quant_core::math::summation::NeumaierAccumulator::new();
             for (date, amount) in &self.discrete_dividends {
                 if *date > as_of {
-                    pv_dividends.add(amount * discount.df_between_dates(as_of, *date)?);
+                    pv_dividends.add(amount * discount.df_between_dates(as_of, *date)?)?;
                 }
             }
-            ((spot - pv_dividends.total()) / df, 1.0 / df)
+            ((spot - pv_dividends.get_total()?) / df, 1.0 / df)
         };
         if !forward.is_finite() || forward <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -281,13 +288,20 @@ impl EquityFuture {
             t,
             domestic_forward,
         );
-        let fx_spot = match market.get_price(&quanto.fx_spot_id)? {
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(money) => {
+        let fx_scalar = market.get_price(&quanto.fx_spot_id)?;
+        let fx_spot = match (fx_scalar.get_unitless(), fx_scalar.get_price()) {
+            (Some(value), _) => value,
+            (None, Some(money)) => {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "EquityFuture quanto FX spot '{}' must be unitless settlement-per-underlying, got Price({})",
                     quanto.fx_spot_id,
                     money.currency()
+                )));
+            }
+            (None, None) => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "EquityFuture quanto FX spot '{}' must be unitless settlement-per-underlying",
+                    quanto.fx_spot_id
                 )));
             }
         };
@@ -465,6 +479,8 @@ mod tests {
             .base_date(as_of)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 1.0), (1.0, (-rate).exp())])
+            .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
             .build()
             .expect("discount curve")
     }
@@ -472,7 +488,12 @@ mod tests {
     fn flat_vol(id: &str, strike: f64, volatility: f64) -> VolSurface {
         VolSurface::builder(id)
             .expiries(&[1.0])
-            .strikes(&[strike])
+            .secondary_values(&[strike])
+            .secondary_axis(finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike)
+            .quote_type(VolQuoteType::BlackLognormal)
+            .interpolation_mode(
+                finstack_quant_core::market_data::surfaces::VolInterpolationMode::Vol,
+            )
             .row(&[volatility])
             .build()
             .expect("vol surface")
@@ -484,8 +505,14 @@ mod tests {
         let settlement = date!(2027 - 01 - 01);
         let market = MarketContext::new()
             .insert(flat_discount("USD-OIS", as_of, 0.05))
-            .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0))
-            .insert_price("SPX-DIV", MarketScalar::Unitless(0.02));
+            .insert_price(
+                "SPX-SPOT",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "SPX-DIV",
+                MarketScalar::unitless(0.02).expect("valid scalar"),
+            );
         let future = EquityFuture::builder()
             .id(InstrumentId::new("ES"))
             .underlying_ticker("SPX".to_string())
@@ -527,9 +554,18 @@ mod tests {
         let market = MarketContext::new()
             .insert(flat_discount("EUR-OIS", as_of, 0.03))
             .insert(flat_discount("USD-OIS", as_of, 0.05))
-            .insert_price("SX5E-SPOT", MarketScalar::Unitless(100.0))
-            .insert_price("SX5E-DIV", MarketScalar::Unitless(0.01))
-            .insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.10))
+            .insert_price(
+                "SX5E-SPOT",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            )
+            .insert_price(
+                "SX5E-DIV",
+                MarketScalar::unitless(0.01).expect("valid scalar"),
+            )
+            .insert_price(
+                "EURUSD-SPOT",
+                MarketScalar::unitless(1.10).expect("valid scalar"),
+            )
             .insert_surface(flat_vol("SX5E-VOL", 100.0, 0.20))
             .insert_surface(flat_vol("EURUSD-VOL", 1.10, 0.10));
         let future = EquityFuture::builder()
@@ -574,20 +610,31 @@ mod tests {
                     "black_lognormal",
                 ),
                 (
-                    base.clone()
-                        .with_displacements(&[0.1])
-                        .expect("shifted surface"),
+                    finstack_quant_core::market_data::surfaces::VolSurface::from_grid(
+                        base.id(),
+                        base.expiries(),
+                        base.secondary_values(),
+                        base.vols(),
+                        finstack_quant_core::market_data::surfaces::VolGridOpts {
+                            secondary_axis: base.secondary_axis(),
+                            quote_type: VolQuoteType::ShiftedBlackLognormal,
+                            interpolation_mode: base.interpolation_mode(),
+                        },
+                        Some(&[0.1]),
+                    )
+                    .expect("shifted surface"),
                     "black_lognormal",
                 ),
                 (
                     finstack_quant_core::market_data::surfaces::VolSurface::from_grid(
                         base.id(),
                         base.expiries(),
-                        base.strikes(),
+                        base.secondary_values(),
                         base.vols(),
                         finstack_quant_core::market_data::surfaces::VolGridOpts {
                             secondary_axis: VolSurfaceAxis::Tenor,
-                            ..finstack_quant_core::market_data::surfaces::VolGridOpts::default()
+                            quote_type: base.quote_type(),
+                            interpolation_mode: base.interpolation_mode(),
                         },
                         None,
                     )
@@ -613,7 +660,10 @@ mod tests {
         let settlement = date!(2027 - 01 - 01);
         let market = MarketContext::new()
             .insert(flat_discount("USD-OIS", as_of, 0.05))
-            .insert_price("SPX-SPOT", MarketScalar::Unitless(100.0));
+            .insert_price(
+                "SPX-SPOT",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            );
         let future = EquityFuture::builder()
             .id(InstrumentId::new("ES-INVALID-DIVIDENDS"))
             .underlying_ticker("SPX".to_string())
@@ -654,10 +704,13 @@ mod tests {
         let future = EquityFuture::example().expect("example future");
         let market = MarketContext::new()
             .insert(flat_discount("EUR-OIS", as_of, 0.03))
-            .insert_price("SX5E-SPOT", MarketScalar::Unitless(100.0))
+            .insert_price(
+                "SX5E-SPOT",
+                MarketScalar::unitless(100.0).expect("valid scalar"),
+            )
             .insert_price(
                 "SX5E-DIV",
-                MarketScalar::Price(Money::new(0.02, Currency::EUR).expect("valid money fixture")),
+                MarketScalar::price(Money::new(0.02, Currency::EUR).expect("valid money fixture")),
             );
 
         let error = future

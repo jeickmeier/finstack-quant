@@ -95,8 +95,8 @@ impl PyEcfSweepSpec {
 
     /// Validate the sweep on its own (the Rust ``EcfSweepSpec::validate``).
     ///
-    /// The waterfall-level rule that a positive sweep needs a prepayment
-    /// priority is checked by :meth:`WaterfallSpec.validate`.
+    /// :meth:`WaterfallSpec.validate` checks the pairing between this
+    /// configuration and the `sweep` priority.
     ///
     /// Raises
     /// ------
@@ -353,8 +353,8 @@ impl PyPaymentClassSpec {
 /// payment classes, and separate mandatory / voluntary prepay nodes.
 /// Call `validate()` before passing to a model builder to surface configuration
 /// errors (e.g. `Sweep` ordered after `Equity` when a sweep is configured).
-/// Positive ECF sweeps require a `sweep` priority. Each configured mandatory or
-/// voluntary prepayment node requires its matching priority, and vice versa.
+/// The default priorities are fees, interest, scheduled principal, and equity.
+/// Prepayments require an explicit priority and sizing configuration.
 #[pyclass(
     name = "WaterfallSpec",
     module = "finstack_quant.statements",
@@ -376,14 +376,15 @@ impl PyWaterfallSpec {
     /// ----------
     /// priority_of_payments : list[str] | None
     ///     Priority order (strings: fees, interest, amortization, mandatory_prepayment,
-    ///     voluntary_prepayment, sweep, equity). Defaults to the standard
-    ///     [fees, interest, amortization, sweep, equity] order.
+    ///     voluntary_prepayment, sweep, equity). Defaults to
+    ///     [fees, interest, amortization, equity].
     /// available_cash_node : str | None
     ///     Pre-waterfall cash pool node or formula. ``None`` uses ``"cash"``.
     ///     Do not deduct ``cs.interest_expense``, ``cs.principal_payment``, or
     ///     ``cs.fees`` here — the waterfall allocates those.
     /// ecf_sweep : EcfSweepSpec | None
-    ///     Optional ECF sweep configuration.
+    ///     Optional ECF sweep configuration. List `sweep` explicitly before
+    ///     any `equity` priority to allocate excess cash to principal.
     /// pik_toggle : PikToggleSpec | None
     ///     Optional PIK toggle configuration.
     /// payment_classes : list[PaymentClassSpec] | None
@@ -440,8 +441,8 @@ impl PyWaterfallSpec {
     /// Validate the spec against internal consistency rules.
     ///
     /// Raises `ValueError` for inconsistent priorities or amounts, including
-    /// a positive ECF sweep without `sweep`, a configured prepayment node
-    /// without its matching priority, or a prepayment priority without its node.
+    /// a prepayment priority without its sizing configuration or a sizing
+    /// configuration without its priority.
     #[pyo3(text_signature = "($self)")]
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(statements_to_py)

@@ -72,7 +72,6 @@ fn apply_scenario_and_revalue_succeeds() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let finstack_quant_portfolio::scenarios::ScenarioRevalueView {
@@ -165,7 +164,6 @@ fn scenario_pnl_reconciles_end_to_end() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let finstack_quant_portfolio::scenarios::ScenarioPnlBatchItem { pnl, report, .. } =
@@ -245,7 +243,6 @@ fn scenario_pnl_no_op_scenario_is_flat() {
         operations: vec![],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let finstack_quant_portfolio::scenarios::ScenarioPnlBatchItem {
@@ -277,7 +274,6 @@ fn scenario_pnl_no_op_scenario_is_flat() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
     let market = market_with_usd();
     let config = FinstackConfig::default();
@@ -319,10 +315,13 @@ finstack_quant_valuations::impl_empty_cashflow_provider!(
 
 impl ScenarioFailureInstrument {
     fn checked_value(&self, market: &MarketContext) -> finstack_quant_core::Result<Money> {
-        let flag = match market.get_price("SCENARIO_FAILURE_FLAG")? {
-            MarketScalar::Unitless(value) => *value,
-            MarketScalar::Price(value) => value.amount(),
-        };
+        let price = market.get_price("SCENARIO_FAILURE_FLAG")?;
+        let flag = price
+            .get_unitless()
+            .or_else(|| price.get_price().map(|value| value.amount()))
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation("unsupported scalar".to_string())
+            })?;
         if flag <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(
                 "earlier scenario valuation failure".to_string(),
@@ -417,8 +416,10 @@ fn scenario_batch_reports_earliest_error_across_application_and_valuation_phases
         )
         .build()
         .expect("valid error-order portfolio");
-    let market =
-        market_with_usd().insert_price("SCENARIO_FAILURE_FLAG", MarketScalar::Unitless(1.0));
+    let market = market_with_usd().insert_price(
+        "SCENARIO_FAILURE_FLAG",
+        MarketScalar::unitless(1.0).expect("valid scalar"),
+    );
     let scenarios = vec![
         ScenarioSpec {
             id: "earlier_valuation_error".to_string(),
@@ -430,7 +431,6 @@ fn scenario_batch_reports_earliest_error_across_application_and_valuation_phases
             }],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         },
         ScenarioSpec {
             id: "later_application_error".to_string(),
@@ -444,7 +444,6 @@ fn scenario_batch_reports_earliest_error_across_application_and_valuation_phases
             }],
             priority: 0,
             resolution_mode: Default::default(),
-            hazard_bump_mode: Default::default(),
         },
     ];
 

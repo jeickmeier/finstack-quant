@@ -435,11 +435,6 @@ where
             "lm_final_weighted_resid_l2_norm",
             format!("{:.2e}", stats.final_residual_norm),
         )
-        .with_metadata(
-            "lm_final_step_norm",
-            format!("{:.2e}", stats.final_step_norm),
-        )
-        .with_metadata("lm_lambda_final", format!("{:.2e}", stats.lambda_final))
         .with_metadata("final_unweighted_resid_l2_norm", format!("{:.2e}", l2_norm))
         .with_metadata(
             "final_unweighted_max_abs_residual",
@@ -453,6 +448,13 @@ where
             "final_weighted_max_abs_residual",
             format!("{:.2e}", weighted_max_abs_residual),
         );
+
+    if let Some(step_norm) = stats.last_step_norm {
+        report = report.with_metadata("lm_final_step_norm", format!("{step_norm:.2e}"));
+    }
+    if let Some(lambda) = stats.last_lambda {
+        report = report.with_metadata("lm_lambda_final", format!("{lambda:.2e}"));
+    }
 
     if let Some(ms) = multi_start {
         report = report.with_metadata("multi_start_restarts", ms.num_restarts.to_string());
@@ -625,7 +627,7 @@ where
     // it out of this function without switching to `Mutex<Vec<f64>>`.
     let clamp_buffer: RefCell<Vec<f64>> = RefCell::new(Vec::with_capacity(initials.len()));
 
-    let residuals_func = |params: &[f64], resid: &mut [f64]| {
+    let residuals_func = |params: &[f64], resid: &mut [f64]| -> finstack_quant_core::Result<()> {
         let eval_idx = eval_counter.get() + 1;
         eval_counter.set(eval_idx);
 
@@ -642,7 +644,7 @@ where
                 ),
             );
             fill_penalty(resid, resid.len(), params, lb.as_deref(), ub.as_deref());
-            return;
+            return Ok(());
         }
 
         for r in resid.iter_mut().take(n_residuals) {
@@ -677,7 +679,7 @@ where
                     &format!("{}", e),
                 );
                 fill_penalty(resid, n_residuals, params_ref, lb.as_deref(), ub.as_deref());
-                return;
+                return Ok(());
             }
         };
 
@@ -691,7 +693,7 @@ where
                 &format!("while evaluating {} quotes: {}", active_quotes.len(), e),
             );
             fill_penalty(resid, n_residuals, params_ref, lb.as_deref(), ub.as_deref());
-            return;
+            return Ok(());
         }
 
         // Guard against NaN/Inf in residual values. LM consumes residuals as f64 and
@@ -710,75 +712,48 @@ where
                 ),
             );
             fill_penalty(resid, n_residuals, params_ref, lb.as_deref(), ub.as_deref());
-            return;
+            return Ok(());
         }
 
         for (r, w) in resid[..n_residuals].iter_mut().zip(weight_scales.iter()) {
             *r *= *w;
         }
+        Ok(())
     };
 
-    struct TargetDerivatives<'a, T: GlobalSolveTarget> {
-        target: &'a T,
-        active_quotes: &'a [T::Quote],
-        weight_scales: &'a [f64],
-        times: &'a [f64],
-        lb: &'a Option<Vec<f64>>,
-        ub: &'a Option<Vec<f64>>,
-    }
-
-    impl<'a, T: GlobalSolveTarget> finstack_quant_core::math::solver_multi::AnalyticalDerivatives
-        for TargetDerivatives<'a, T>
-    {
-        fn jacobian(&self, params: &[f64], jacobian: &mut [Vec<f64>]) -> Option<()> {
-            let mut params_to_use = Vec::new();
-            let params_ref = if self.lb.is_some() || self.ub.is_some() {
-                clamp_to_bounds(params, self.lb, self.ub, &mut params_to_use);
-                &params_to_use
+    let solution = if use_efficient {
+        let n_params = initials.len();
+        let mut jac_clamp_buffer: Vec<f64> = Vec::with_capacity(n_params);
+        let mut jac_rows: Vec<Vec<f64>> = vec![vec![0.0; n_params]; n_residuals];
+        let jacobian_func = |params: &[f64], jac: &mut [f64]| -> finstack_quant_core::Result<()> {
+            let params_ref = if lb.is_some() || ub.is_some() {
+                clamp_to_bounds(params, lb, ub, &mut jac_clamp_buffer);
+                &jac_clamp_buffer[..]
             } else {
                 params
             };
 
-            if self
-                .target
-                .build_curve_from_params(self.times, params_ref)
-                .is_err()
-            {
-                return None;
+            target.build_curve_from_params(times, params_ref)?;
+            for row in &mut jac_rows {
+                row.fill(0.0);
             }
+            target.jacobian(params_ref, times, active_quotes, &mut jac_rows)?;
 
-            if self
-                .target
-                .jacobian(params_ref, self.times, self.active_quotes, jacobian)
-                .is_err()
-            {
-                return None;
-            }
-
-            for (i, row) in jacobian.iter_mut().enumerate() {
-                let scale = self.weight_scales.get(i).copied().unwrap_or(1.0);
-                for val in row.iter_mut() {
-                    *val *= scale;
+            for (i, row) in jac_rows.iter().enumerate() {
+                let scale = weight_scales.get(i).copied().unwrap_or(1.0);
+                let dst = &mut jac[i * n_params..(i + 1) * n_params];
+                for (slot, &val) in dst.iter_mut().zip(row.iter()) {
+                    *slot = val * scale;
                 }
             }
-            Some(())
-        }
-
-        fn residual_count(&self) -> usize {
-            self.active_quotes.len()
-        }
-    }
-
-    let solution = if use_efficient {
-        let derivatives = TargetDerivatives {
-            target,
-            active_quotes,
-            weight_scales,
-            times,
-            lb,
-            ub,
+            Ok(())
         };
-        solver.solve_least_squares_with_jacobian(residuals_func, &derivatives, initials)?
+        solver.solve_least_squares_with_jacobian(
+            residuals_func,
+            jacobian_func,
+            initials,
+            n_residuals,
+        )?
     } else {
         solver.solve_least_squares(residuals_func, initials, n_residuals)?
     };

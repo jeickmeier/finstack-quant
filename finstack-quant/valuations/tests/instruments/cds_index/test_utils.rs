@@ -23,6 +23,8 @@ pub fn flat_discount_curve(id: &str, base: Date, rate: f64) -> DiscountCurve {
     DiscountCurve::builder(id)
         .base_date(base)
         .day_count(DayCount::Act360)
+        .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .knots([(0.0, 1.0), (5.0, (-rate * 5.0).exp()), (10.0, df_10y)])
         .build()
         .unwrap()
@@ -30,12 +32,11 @@ pub fn flat_discount_curve(id: &str, base: Date, rate: f64) -> DiscountCurve {
 
 /// Create a flat hazard curve for testing
 pub fn flat_hazard_curve(id: &str, base: Date, recovery: f64, hazard_rate: f64) -> HazardCurve {
-    let par_spread_bp = hazard_rate * 10000.0 * (1.0 - recovery);
     HazardCurve::builder(id)
         .base_date(base)
+        .day_count(DayCount::Act365F)
         .recovery_rate(recovery)
         .knots([(1.0, hazard_rate), (5.0, hazard_rate), (10.0, hazard_rate)])
-        .par_spreads([(1.0, par_spread_bp), (5.0, par_spread_bp)])
         .build()
         .unwrap()
 }

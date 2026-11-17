@@ -155,10 +155,7 @@ impl VolSource {
             return Err(InputError::NonPositiveValue.into());
         }
         match self {
-            Self::FxDelta(surface) => {
-                segment(surface.expiries(), expiry)?;
-                get_fx_delta_vol(surface, expiry, strike, forward)
-            }
+            Self::FxDelta(surface) => get_fx_delta_vol(surface, expiry, strike, forward),
             Self::Surface(surface) => {
                 surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
                 require_black_quotes(surface.quote_type())?;
@@ -171,18 +168,22 @@ impl VolSource {
         }
     }
 
-    /// Evaluate FX Black/lognormal volatility with flat coordinate extrapolation and an explicit FX forward rate.
+    /// Evaluate FX Black/lognormal volatility with flat strike extrapolation and an explicit FX forward rate.
+    ///
+    /// For [`VolSource::Surface`], both expiry and strike are clamped to the stored grid bounds.
+    /// For [`VolSource::FxDelta`], strikes extrapolate flat beyond the materialized wing range while
+    /// `expiry` remains strictly bounded by `[expiries.first(), expiries.last()]`.
     ///
     /// # Arguments
     ///
-    /// * `expiry` - Positive option expiry in years; clamped to stored expiry bounds.
+    /// * `expiry` - Positive option expiry in years; clamped to stored expiry bounds on `Surface`, or strictly bounded to the surface expiry range on `FxDelta`.
     /// * `strike` - Positive strike in domestic-per-foreign FX units; clamped to stored strike bounds.
     /// * `forward` - Positive FX forward rate in the same units as `strike`.
     ///
     /// # Errors
     ///
-    /// Returns an error for non-positive or non-finite coordinates, non-Black or
-    /// tenor-indexed surfaces, SABR cubes, or invalid FX smile wing volatilities.
+    /// Returns an error for non-positive or non-finite coordinates, out-of-range `FxDelta` expiry,
+    /// non-Black or tenor-indexed surfaces, SABR cubes, or invalid FX smile wing volatilities.
     pub fn get_fx_vol_clamped(&self, expiry: f64, strike: f64, forward: f64) -> Result<f64> {
         if !forward.is_finite() || forward <= 0.0 {
             return Err(InputError::NonPositiveValue.into());
@@ -266,13 +267,20 @@ impl VolSource {
                 "volatility coordinates must be finite".to_owned(),
             ));
         }
+        if expiry <= 0.0 {
+            return Err(InputError::NonPositiveValue.into());
+        }
         let clamp = |axis: &[f64], x: f64| x.clamp(axis[0], axis[axis.len() - 1]);
         Ok(match self {
             Self::Surface(surface) => {
                 let expiry = clamp(surface.expiries(), expiry);
                 match surface.secondary_axis() {
-                    VolSurfaceAxis::Strike => (expiry, tenor, clamp(surface.strikes(), strike)),
-                    VolSurfaceAxis::Tenor => (expiry, clamp(surface.strikes(), tenor), strike),
+                    VolSurfaceAxis::Strike => {
+                        (expiry, tenor, clamp(surface.secondary_values(), strike))
+                    }
+                    VolSurfaceAxis::Tenor => {
+                        (expiry, clamp(surface.secondary_values(), tenor), strike)
+                    }
                 }
             }
             Self::Cube(cube) => (
@@ -331,7 +339,7 @@ fn grid_convention(
     })
 }
 
-fn segment(axis: &[f64], value: f64) -> Result<(usize, usize, f64)> {
+pub(super) fn segment(axis: &[f64], value: f64) -> Result<(usize, usize, f64)> {
     if axis.is_empty() {
         return Err(InputError::TooFewPoints.into());
     }
@@ -398,7 +406,7 @@ pub(super) fn bilinear(q00: f64, q10: f64, q01: f64, q11: f64, t: f64, u: f64) -
 /// validation error if total-variance interpolation is invalid.
 pub fn get_surface_vol(surface: &VolSurface, expiry: f64, strike: f64) -> Result<f64> {
     let (e0, e1, t) = segment(surface.expiries(), expiry)?;
-    let (s0, s1, u) = segment(surface.strikes(), strike)?;
+    let (s0, s1, u) = segment(surface.secondary_values(), strike)?;
     interpolate_surface(surface, expiry, (e0, e1, t), (s0, s1, u))
 }
 
@@ -410,13 +418,17 @@ pub fn get_surface_vol(surface: &VolSurface, expiry: f64, strike: f64) -> Result
 /// * `expiry` - Option expiry in years; finite values are clamped.
 /// * `strike` - Secondary-axis coordinate; finite values are clamped.
 pub fn get_surface_vol_clamped(surface: &VolSurface, expiry: f64, strike: f64) -> f64 {
-    if !expiry.is_finite() || !strike.is_finite() {
+    if !expiry.is_finite() || expiry <= 0.0 || !strike.is_finite() {
         return f64::NAN;
     }
     let Some((&emin, &emax)) = surface.expiries().first().zip(surface.expiries().last()) else {
         return f64::NAN;
     };
-    let Some((&smin, &smax)) = surface.strikes().first().zip(surface.strikes().last()) else {
+    let Some((&smin, &smax)) = surface
+        .secondary_values()
+        .first()
+        .zip(surface.secondary_values().last())
+    else {
         return f64::NAN;
     };
     get_surface_vol(surface, expiry.clamp(emin, emax), strike.clamp(smin, smax)).unwrap_or(f64::NAN)
@@ -456,7 +468,10 @@ pub fn measure_vol_surface_shift(
             - get_surface_vol(&surface_t0, expiry, strike)?)
             * 100.0);
     }
-    let Some(&strike) = surface_t0.strikes().get(surface_t0.strikes().len() / 2) else {
+    let Some(&strike) = surface_t0
+        .secondary_values()
+        .get(surface_t0.secondary_values().len() / 2)
+    else {
         return Ok(0.0);
     };
     let mut total = 0.0;
@@ -484,7 +499,7 @@ fn interpolate_surface(
     (e0, e1, t): (usize, usize, f64),
     (s0, s1, u): (usize, usize, f64),
 ) -> Result<f64> {
-    let columns = surface.strikes().len();
+    let columns = surface.secondary_values().len();
     let values = surface.vols();
     let q00 = values[e0 * columns + s0];
     let q10 = values[e1 * columns + s0];
@@ -493,23 +508,54 @@ fn interpolate_surface(
     match surface.interpolation_mode() {
         VolInterpolationMode::Vol => Ok(bilinear(q00, q10, q01, q11, t, u)),
         VolInterpolationMode::TotalVariance => {
-            let x0 = surface.expiries()[e0];
-            let x1 = surface.expiries()[e1];
-            let variance = bilinear(
-                x0 * q00 * q00,
-                x1 * q10 * q10,
-                x0 * q01 * q01,
-                x1 * q11 * q11,
-                t,
-                u,
-            ) / expiry.max(f64::EPSILON);
-            if !variance.is_finite() || variance < 0.0 {
+            let at_t0 = e0 == e1 || t.total_cmp(&0.0).is_eq();
+            let at_t1 = t.total_cmp(&1.0).is_eq();
+            let at_u0 = s0 == s1 || u.total_cmp(&0.0).is_eq();
+            let at_u1 = u.total_cmp(&1.0).is_eq();
+            if at_t0 && at_u0 {
+                return Ok(q00);
+            }
+            if at_t1 && at_u0 {
+                return Ok(q10);
+            }
+            if at_t0 && at_u1 {
+                return Ok(q01);
+            }
+            if at_t1 && at_u1 {
+                return Ok(q11);
+            }
+            let scale = q00.max(q10).max(q01).max(q11);
+            if scale == 0.0 {
+                return Ok(0.0);
+            }
+            let r00 = q00 / scale;
+            let r10 = q10 / scale;
+            let r01 = q01 / scale;
+            let r11 = q11 / scale;
+            let w0_hat = (1.0 - u) * r00 * r00 + u * r01 * r01;
+            let w1_hat = (1.0 - u) * r10 * r10 + u * r11 * r11;
+            let mean_hat = if e0 == e1 {
+                w0_hat
+            } else {
+                let x0 = surface.expiries()[e0];
+                let x1 = surface.expiries()[e1];
+                let a0 = (1.0 - t) * (x0 / expiry);
+                let ratio1 = x1 / expiry;
+                let a1 = if ratio1.is_finite() {
+                    t * ratio1
+                } else {
+                    (t * x1) / expiry
+                };
+                a0 * w0_hat + a1 * w1_hat
+            };
+            let sigma = scale * mean_hat.sqrt();
+            if !sigma.is_finite() || (mean_hat > 0.0 && sigma == 0.0) {
                 return Err(Error::Validation(format!(
                     "vol surface '{}' produced invalid total variance at expiry {expiry}",
                     surface.id()
                 )));
             }
-            Ok(variance.sqrt())
+            Ok(sigma)
         }
     }
 }
@@ -739,9 +785,9 @@ fn materialize_cube_tenor_slice_with_convention(
             strikes,
             &values,
             VolGridOpts {
+                secondary_axis: VolSurfaceAxis::Strike,
                 quote_type: VolQuoteType::Normal,
                 interpolation_mode,
-                ..VolGridOpts::default()
             },
             None,
         );
@@ -768,9 +814,9 @@ fn materialize_cube_tenor_slice_with_convention(
         strikes,
         &values,
         VolGridOpts {
+            secondary_axis: VolSurfaceAxis::Strike,
             quote_type,
             interpolation_mode,
-            ..VolGridOpts::default()
         },
         displacements.as_deref(),
     )

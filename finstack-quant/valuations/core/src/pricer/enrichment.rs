@@ -341,8 +341,10 @@ mod tests {
     fn failed_scratch_calculation_discards_unreverted_market_changes() {
         use finstack_quant_core::market_data::scalars::MarketScalar;
 
-        let market =
-            Arc::new(MarketContext::new().insert_price("SPOT", MarketScalar::Unitless(100.0)));
+        let market = Arc::new(
+            MarketContext::new()
+                .insert_price("SPOT", MarketScalar::unitless(100.0).expect("valid scalar")),
+        );
         let mut context = MetricContext::new(
             Arc::new(Probe::default()),
             Arc::clone(&market),
@@ -355,7 +357,7 @@ mod tests {
             .with_market_scratch(|_, scratch| {
                 *scratch = scratch
                     .clone()
-                    .insert_price("CACHE", MarketScalar::Unitless(1.0));
+                    .insert_price("CACHE", MarketScalar::unitless(1.0).expect("valid scalar"));
                 Ok(())
             })
             .expect("successful scratch calculation");
@@ -366,7 +368,7 @@ mod tests {
             );
             *scratch = scratch
                 .clone()
-                .insert_price("SPOT", MarketScalar::Unitless(999.0));
+                .insert_price("SPOT", MarketScalar::unitless(999.0).expect("valid scalar"));
             Err(finstack_quant_core::Error::Validation(
                 "failed before restoring bump".into(),
             ))
@@ -374,10 +376,13 @@ mod tests {
         assert!(failed.is_err());
         context
             .with_market_scratch(|_, scratch| {
-                assert!(matches!(
-                    scratch.get_price("SPOT"),
-                    Ok(MarketScalar::Unitless(100.0))
-                ));
+                assert_eq!(
+                    scratch
+                        .get_price("SPOT")
+                        .ok()
+                        .and_then(|scalar| scalar.get_unitless()),
+                    Some(100.0)
+                );
                 assert!(
                     scratch.get_price("CACHE").is_err(),
                     "failed scratch is discarded completely"
@@ -385,9 +390,12 @@ mod tests {
                 Ok(())
             })
             .expect("fresh scratch calculation");
-        assert!(matches!(
-            market.get_price("SPOT"),
-            Ok(MarketScalar::Unitless(100.0))
-        ));
+        assert_eq!(
+            market
+                .get_price("SPOT")
+                .ok()
+                .and_then(|scalar| scalar.get_unitless()),
+            Some(100.0)
+        );
     }
 }

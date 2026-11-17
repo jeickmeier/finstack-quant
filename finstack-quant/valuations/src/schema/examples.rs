@@ -324,6 +324,9 @@ pub(super) fn bond_workout_ladder() -> Result<Vec<Value>> {
     let curve = DiscountCurve::builder(bond.discount_curve_id.as_str())
         .base_date(as_of)
         .knots([(0.0, 1.0), (10.0, 0.70)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()?;
     let market = MarketContext::new().insert(curve);
     example(&quote_conversions::bond_workout_ladder(
@@ -344,6 +347,9 @@ pub(super) fn bond_quote_set() -> Result<Vec<Value>> {
     let curve = DiscountCurve::builder(bond.discount_curve_id.as_str())
         .base_date(as_of)
         .knots([(0.0, 1.0), (10.0, 0.70)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
         .build()?;
     let market = MarketContext::new().insert(curve);
     example(&quote_conversions::compute_quotes(
@@ -745,6 +751,7 @@ pub(super) fn cms_swap_schedule_params() -> Result<Vec<Value>> {
             notional: Money::from((10_000_000_i64, Currency::USD)),
             day_count: DayCount::Act360,
             index_id: IndexId::new("USD-SOFR-OIS"),
+            cms_fixing_index_id: None,
             side: PayReceive::Pay,
             discount_curve_id: CurveId::new("USD-OIS"),
             forward_curve_id: CurveId::new("USD-SOFR-OIS"),

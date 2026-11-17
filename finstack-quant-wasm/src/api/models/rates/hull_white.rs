@@ -319,12 +319,13 @@ pub fn hw1f_cap_floor_price(
     let is_cap = js_bool(&is_cap, "isCap")?;
     let discount = Arc::clone(&discount_curve.inner);
     let forward = Arc::clone(&forward_curve.inner);
-    Ok(hull_white::hw1f_cap_floor_price(
+    hull_white::hw1f_cap_floor_price(
         params,
         &|t: f64| discount.df(t),
         &|t: f64| forward.df(t),
         &periods,
         strike,
         is_cap,
-    ))
+    )
+    .map_err(to_js_err)
 }

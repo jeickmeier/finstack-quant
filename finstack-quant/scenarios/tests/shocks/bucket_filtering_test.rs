@@ -1,8 +1,13 @@
 //! Tests for bucket filtering on volatility and base correlation surfaces.
 
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{
+    BusinessDayConvention, Date, DayCount, DayCountContextState, Tenor, VolatilityClock,
+};
+use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{
+    VolInterpolationMode, VolQuoteType, VolSurface, VolSurfaceAxis,
+};
 use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
 use finstack_quant_scenarios::{ExecutionContext, OperationSpec, ScenarioEngine, ScenarioSpec};
 use finstack_quant_statements::types::FinancialModelSpec;
@@ -11,11 +16,32 @@ use time::Month;
 #[test]
 fn test_vol_bucket_filtering_by_tenor() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let clock = VolatilityClock::try_new(
+        base_date,
+        DayCount::Act365F,
+        DayCountContextState::default(),
+    )
+    .expect("valid clock");
+    let map_tenor = |t: &str| -> f64 {
+        let d = Tenor::parse(t)
+            .unwrap()
+            .add_to_date(base_date, None, BusinessDayConvention::Unadjusted)
+            .unwrap();
+        clock.expiry_time(d).unwrap()
+    };
+    let t_3m = map_tenor("3M");
+    let t_6m = map_tenor("6M");
+    let t_1y = map_tenor("1Y");
+    let t_2y = map_tenor("2Y");
 
     // Create volatility surface with multiple expiries and strikes
     let surface = VolSurface::builder("SPX")
-        .expiries(&[0.25, 0.5, 1.0, 2.0]) // 3M, 6M, 1Y, 2Y
-        .strikes(&[90.0, 100.0, 110.0])
+        .expiries(&[t_3m, t_6m, t_1y, t_2y]) // 3M, 6M, 1Y, 2Y
+        .secondary_values(&[90.0, 100.0, 110.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
+        .expiry_clock(clock)
         .row(&[0.20, 0.18, 0.22]) // 3M row
         .row(&[0.21, 0.19, 0.23]) // 6M row
         .row(&[0.22, 0.20, 0.24]) // 1Y row
@@ -46,7 +72,6 @@ fn test_vol_bucket_filtering_by_tenor() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -67,7 +92,7 @@ fn test_vol_bucket_filtering_by_tenor() {
 
     // 1Y expiry should be shocked (+10%)
     let shocked_1y_100k =
-        finstack_quant_models::volatility::get_surface_vol(&shocked_surface, 1.0, 100.0)
+        finstack_quant_models::volatility::get_surface_vol(&shocked_surface, t_1y, 100.0)
             .expect("grid point lookup should succeed");
     let expected_1y = 0.20 * 1.10;
     assert!(
@@ -79,7 +104,7 @@ fn test_vol_bucket_filtering_by_tenor() {
 
     // Other expiries should be unchanged
     let unchanged_3m_100k =
-        finstack_quant_models::volatility::get_surface_vol(&shocked_surface, 0.25, 100.0)
+        finstack_quant_models::volatility::get_surface_vol(&shocked_surface, t_3m, 100.0)
             .expect("grid point lookup should succeed");
     assert!(
         (unchanged_3m_100k - 0.18).abs() < 1e-6,
@@ -94,7 +119,10 @@ fn test_vol_bucket_filtering_by_strike() {
 
     let surface = VolSurface::builder("SPX")
         .expiries(&[0.5, 1.0]) // Need at least 2 expiries
-        .strikes(&[90.0, 100.0, 110.0])
+        .secondary_values(&[90.0, 100.0, 110.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[0.21, 0.19, 0.23]) // 6M row
         .row(&[0.22, 0.20, 0.24]) // 1Y row
         .build()
@@ -123,7 +151,6 @@ fn test_vol_bucket_filtering_by_strike() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -163,12 +190,17 @@ fn test_vol_bucket_unfiltered_is_multiplicative() {
 
     let surface = VolSurface::builder("SPX")
         .expiries(&[0.5, 1.0])
-        .strikes(&[90.0, 100.0, 110.0])
+        .secondary_values(&[90.0, 100.0, 110.0])
+        .secondary_axis(VolSurfaceAxis::Strike)
+        .quote_type(VolQuoteType::BlackLognormal)
+        .interpolation_mode(VolInterpolationMode::Vol)
         .row(&[0.21, 0.19, 0.23]) // 6M row
         .row(&[0.22, 0.20, 0.24]) // 1Y row
         .build()
         .unwrap();
-    let preview = surface.apply_bucket_bump(None, None, 10.0).unwrap();
+    let preview = surface
+        .apply_bucket_bump(None, None, BumpSpec::multiplier(1.10))
+        .unwrap();
 
     let mut market = MarketContext::new().insert_surface(surface);
     let mut model = FinancialModelSpec::new(
@@ -192,7 +224,6 @@ fn test_vol_bucket_unfiltered_is_multiplicative() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -259,7 +290,6 @@ fn test_basecorr_bucket_filtering() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -330,7 +360,6 @@ fn test_basecorr_bucket_filtering_uses_tight_detachment_match() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let engine = ScenarioEngine::new();
@@ -385,7 +414,6 @@ fn test_basecorr_bucket_filtering_reports_clamp_and_no_match() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let mut ctx = ExecutionContext {
@@ -417,7 +445,6 @@ fn test_basecorr_bucket_filtering_reports_clamp_and_no_match() {
         }],
         priority: 0,
         resolution_mode: Default::default(),
-        hazard_bump_mode: Default::default(),
     };
 
     let no_match_report = engine.apply(&no_match_scenario, &mut ctx).unwrap();

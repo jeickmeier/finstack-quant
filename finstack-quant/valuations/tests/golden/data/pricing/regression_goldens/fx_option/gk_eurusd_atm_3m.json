@@ -74,10 +74,9 @@
       },
       "prior_market": [
         {
-          "allow_non_monotonic": false,
           "base": "2026-04-30",
           "day_count": "act_365f",
-          "extrapolation": "flat_forward",
+          "extrapolation": "extend",
           "fx_policy": null,
           "id": "EUR-OIS",
           "interp_style": "log_linear",
@@ -108,15 +107,12 @@
               0.8607
             ]
           ],
-          "min_forward_rate": null,
-          "min_forward_tenor": 1e-06,
           "rate_calibration": null
         },
         {
-          "allow_non_monotonic": false,
           "base": "2026-04-30",
           "day_count": "act_365f",
-          "extrapolation": "flat_forward",
+          "extrapolation": "extend",
           "fx_policy": null,
           "id": "JPY-OIS",
           "interp_style": "log_linear",
@@ -147,15 +143,12 @@
               0.9802
             ]
           ],
-          "min_forward_rate": null,
-          "min_forward_tenor": 1e-06,
           "rate_calibration": null
         },
         {
-          "allow_non_monotonic": false,
           "base": "2026-04-30",
           "day_count": "act_365f",
-          "extrapolation": "flat_forward",
+          "extrapolation": "extend",
           "fx_policy": null,
           "id": "USD-OIS",
           "interp_style": "log_linear",
@@ -186,8 +179,6 @@
               0.8187
             ]
           ],
-          "min_forward_rate": null,
-          "min_forward_tenor": 1e-06,
           "rate_calibration": null
         },
         {
@@ -202,7 +193,7 @@
           "kind": "vol_surface",
           "quote_type": "black_lognormal",
           "secondary_axis": "strike",
-          "strikes": [
+          "secondary_values": [
             1.0,
             1.05,
             1.1,
@@ -244,7 +235,7 @@
           "kind": "vol_surface",
           "quote_type": "black_lognormal",
           "secondary_axis": "strike",
-          "strikes": [
+          "secondary_values": [
             135.0,
             140.0,
             145.0,
