@@ -3,11 +3,11 @@
   "sources": [
     {
       "path": "finstack-quant-ui/tests/portfolio/workbench/cases.json",
-      "sha256": "c04fa92407f3091d5767d7ac855137f7473fa268cad8aedd2ecb08b87314aaf5"
+      "sha256": "96d2f29275cc417792fa643535a44acb63b6558cc71c44038b14f1e82b1d40eb"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-      "sha256": "91b9c85cfc0472093142fed8ccd69a008c068f3cfd8b484c7d9d09495ae91b89"
+      "sha256": "e136cc5320c3bfad8ad06fd111b6866ccfee6cd52e4c223521e10b065f36d4ff"
     },
     {
       "path": "finstack-quant/portfolio/tests/fixtures/host_parity.json",

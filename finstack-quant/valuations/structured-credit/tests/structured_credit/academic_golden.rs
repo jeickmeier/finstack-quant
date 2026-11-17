@@ -438,6 +438,7 @@ fn test_was_golden_calculation() {
             400.0,
             maturity,
             finstack_quant_core::dates::DayCount::Act360,
+            2,
         )
         .with_rating(CreditRating::BB),
     );
@@ -450,6 +451,7 @@ fn test_was_golden_calculation() {
             450.0,
             maturity,
             finstack_quant_core::dates::DayCount::Act360,
+            2,
         )
         .with_rating(CreditRating::B),
     );
@@ -462,6 +464,7 @@ fn test_was_golden_calculation() {
             500.0,
             maturity,
             finstack_quant_core::dates::DayCount::Act360,
+            2,
         )
         .with_rating(CreditRating::B),
     );

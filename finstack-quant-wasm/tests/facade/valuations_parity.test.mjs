@@ -612,7 +612,8 @@ test('instrument data-type constructors match Python', () => {
       'USD-SOFR-3M',
       350,
       '2030-01-15',
-      'act_360'
+      'act_360',
+      2
     ),
   ];
   same(plain(assets), data.pool_assets, 'pool assets');

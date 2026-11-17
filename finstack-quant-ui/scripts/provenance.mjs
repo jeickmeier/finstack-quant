@@ -411,7 +411,7 @@ const displays = [
     api: "models.volatility.getSurfaceVol",
     route: "returned-model",
     convention:
-      "Returned native values of one stored object per supplied point: DiscountCurve.df and zeroRate (default continuous compounding) and forward (continuously compounded, year fractions only), ForwardCurve.rate (simple, on the curve day count), HazardCurve.sp and hazardRate, and models.volatility.getSurfaceVol (expiry in years, strike in the surface's units, inside the grid). Curve dates pass through as ISO text for Rust to convert with the curve day count; no date, unit or tenor conversion happens here. A point Rust rejects keeps its native error in its cell.",
+      "Returned native values of one stored object per supplied point: DiscountCurve.df and zeroRate (continuous compounding) and forward (continuously compounded, year fractions only), ForwardCurve.df (unitless projection factor), HazardCurve.sp and hazardRate, and models.volatility.getSurfaceVol (expiry in years, strike in the surface's units, inside the grid). Curve dates pass through as ISO text for Rust to convert with the curve day count; no date, unit or tenor conversion happens here. A point Rust rejects keeps its native error in its cell.",
   },
   {
     id: "yield-workout-ladder",

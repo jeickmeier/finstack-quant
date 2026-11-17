@@ -36,7 +36,7 @@ export function createCoreService(
                 points: request.points.map((t) => ({
                   t,
                   df: attempt(() => curve.df(t)),
-                  zeroRate: attempt(() => curve.zeroRate(t)),
+                  zeroRate: attempt(() => curve.zeroRate(t, "continuous")),
                 })),
                 forwards: request.forwards.map(([t1, t2]) => ({
                   t1,
@@ -55,7 +55,7 @@ export function createCoreService(
                 kind: "forward",
                 points: request.points.map((t) => ({
                   t,
-                  rate: attempt(() => curve.rate(t)),
+                  df: attempt(() => curve.df(t)),
                 })),
               };
             } finally {

@@ -4255,7 +4255,7 @@
     {
       "name": "floating",
       "source": "finstack-quant/valuations/tests/golden/data/pricing/regression_goldens/structured_credit/clo_mezzanine_base_case.json",
-      "sha256": "8f42d41a972fd4086fba70a1457d189a746d2a3b9c1086377d45020606c1123e",
+      "sha256": "d4dad1ff07e3a0cb53ec64cc6f48b35f7918eb41f873f610a2e9ec1a206ab0c4",
       "asOf": "2026-04-30",
       "trancheId": "SENIOR",
       "marketPricePct": 25,
@@ -4283,6 +4283,7 @@
                   "rate": 0.035,
                   "spread_bp": 350,
                   "forward_curve_id": "SOFR-3M",
+                  "reset_lag_days": 2,
                   "maturity": "2030-01-01",
                   "rating": "BB",
                   "industry": "Technology",
@@ -5019,7 +5020,6 @@
             "currency": null,
             "observations": [
               ["2026-03-30", 0.0405],
-              ["2026-04-01", 0.0405],
               ["2026-04-29", 0.0405]
             ],
             "interpolation": "step",

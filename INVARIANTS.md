@@ -1371,6 +1371,41 @@ partition. Require exact opening weight sums and distinguish true absence
 from zero net active weight before applying centered effects.
 [Accepted grouped benchmark-relative returns](docs/decisions/financial/attribution/16-benchmark-relative-return.md#accepted-decision-for-checked-grouped-benchmark-relative-returns).
 
+Margin calculations bind an explicitly elected immutable parameter snapshot
+and actual dated agreement terms. Validate profiles once, preserve the exact
+effective identities and require an elected calculation route.
+[Accepted margin registry and terms](docs/decisions/financial/margin-collateral-im/01-registry-and-defaults.md#accepted-decision-for-explicit-margin-parameter-snapshots-and-contractual-terms).
+
+SIMM binds complete canonical parameter tables and positive concentration
+denominators. Apply read-only correlation admission to fixed and effective
+dependence, preserve the selected coefficients and check derived variances.
+[Accepted SIMM parameter validation](docs/decisions/financial/margin-collateral-im/02-simm-parameter-validation.md#accepted-decision-for-checked-simm-parameter-profiles-and-correlation-validation).
+
+SIMM sensitivities preserve the qualified factor, shock and currency basis.
+Net signed contributions within the elected scope, retain curvature expiry
+through weighting, and validate state before publication or restoration.
+[Accepted SIMM sensitivity inputs](docs/decisions/financial/margin-collateral-im/03-sensitivity-inputs.md#accepted-decision-for-checked-simm-sensitivity-identity-scaling-and-netting).
+
+SIMM ordinary IR delta retains subcurve and vertex identity. Form vega by
+option expiry after source volatility weighting. Use signed raw concentration
+and checked dependence within and across currencies at the reference horizon.
+[Accepted SIMM interest-rate aggregation](docs/decisions/financial/margin-collateral-im/04-simm-interest-rate.md#accepted-decision-for-checked-simm-interest-rate-delta-and-vega-aggregation).
+
+SIMM qualifying credit nets exact factors with contractual payment currency,
+groups concentration by issuer and seniority or qualified index volatility,
+and adds the residual norm after non-residual diversification.
+[Accepted SIMM qualifying-credit aggregation](docs/decisions/financial/margin-collateral-im/05-simm-qualifying-credit.md#accepted-decision-for-checked-simm-qualifying-credit-delta-and-vega).
+
+SIMM nonqualifying credit uses dated classification into two historical
+RMBS/CMBS buckets or explicit residual. Keep tranche concentration and
+classified correlation group distinct and preserve vega expiry identity.
+[Accepted SIMM nonqualifying-credit aggregation](docs/decisions/financial/margin-collateral-im/06-simm-nonqualifying-credit.md#accepted-decision-for-checked-simm-nonqualifying-credit-delta-and-vega).
+
+SIMM equity uses dated factor classification into 12 numbered buckets or
+explicit residual. Bind the vega proxy to the elected bucket, apply HVR before
+concentration and add the residual norm after classified diversification.
+[Accepted SIMM equity aggregation](docs/decisions/financial/margin-collateral-im/07-simm-equity.md#accepted-decision-for-checked-simm-equity-delta-and-vega).
+
 Valuation model inputs bind an exact source, unit, clock and parameter block.
 Use dated relative factors for GBM carry. Simulations retain explicit controls,
 exact seed identity and actual work. Apply each tree and quote control on its

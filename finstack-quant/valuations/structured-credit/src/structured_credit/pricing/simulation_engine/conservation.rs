@@ -1,4 +1,5 @@
 use super::*;
+use crate::structured_credit::types::pool::require_reset_lag;
 use crate::structured_credit::types::{AssetType, PoolAsset, ReinvestmentAssumptions};
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
@@ -168,14 +169,8 @@ pub(super) fn recycle_reinvestment_principal(
                     .as_ref(),
                 market,
                 payment_date,
-                period_helpers::CollateralCoupon {
-                    fallback_all_in_rate: state.pool_state.rates[i],
-                    spread_bp: state.pool_state.spread_bp[i],
-                    day_count: state.pool_state.day_counts[i],
-                    index_floor_rate: state.pool_state.index_floors[i],
-                },
+                period_helpers::CollateralCoupon::for_row(&state.pool_state, i)?,
                 state.floating_rate_shift,
-                2,
             )?
         } else {
             state.pool_state.rates[i]
@@ -251,8 +246,15 @@ fn purchase_replacement_collateral(
         return Ok(Money::from((0_i64, state.currency)));
     }
     let spread = assumptions.spread_bp / BASIS_POINTS_PER_UNIT;
-    let coupon = match &assumptions.forward_curve_id {
-        Some(index) => collateral_asset_rate_for_period(
+    let floating = match &assumptions.forward_curve_id {
+        Some(index) => Some((
+            index,
+            require_reset_lag("reinvestment assumptions", assumptions.reset_lag_days)?,
+        )),
+        None => None,
+    };
+    let coupon = match floating {
+        Some((index, reset_lag_days)) => collateral_asset_rate_for_period(
             market.get_forward(index)?.as_ref(),
             market,
             payment_date,
@@ -261,9 +263,9 @@ fn purchase_replacement_collateral(
                 spread_bp: Some(assumptions.spread_bp),
                 day_count: DayCount::Act360,
                 index_floor_rate: None,
+                reset_lag_days,
             },
             state.floating_rate_shift,
-            2,
         )?,
         None => spread,
     };
@@ -285,14 +287,15 @@ fn purchase_replacement_collateral(
         .filter(|id| id.starts_with("REINVEST-"))
         .count();
     let id = format!("REINVEST-{}", purchases + 1);
-    let mut asset = match &assumptions.forward_curve_id {
-        Some(index) => PoolAsset::floating_rate_loan(
+    let mut asset = match floating {
+        Some((index, reset_lag_days)) => PoolAsset::floating_rate_loan(
             id,
             par,
             index.clone(),
             assumptions.spread_bp,
             maturity,
             DayCount::Act360,
+            reset_lag_days,
         ),
         None => PoolAsset::fixed_rate_bond(id, par, spread, maturity, DayCount::Act360),
     };

@@ -49,6 +49,7 @@ class RepLine:
         spread_bp: float | Bps | None = None,
         forward_curve_id: str | None = None,
         index_floor_bp: float | None = None,
+        reset_lag_days: int | None = None,
         cpr: float | None = None,
         cdr: float | None = None,
         recovery_rate: float | None = None,
@@ -87,6 +88,11 @@ class RepLine:
         index_floor_bp : float, optional
             Floor on the floating index in basis points (``100`` = 1%), applied before
             ``spread_bp``; ignored on fixed-rate lines.
+        reset_lag_days : int, optional
+            Business days (``weekends_only`` calendar) before each accrual
+            start on which the index fixes. Required on a floating line and
+            absent on a fixed line; pool expansion rejects a mismatch or a
+            negative lag.
         cpr : float, optional
             Constant prepayment rate override, as an annual decimal (e.g.
             ``0.10`` = 10% CPR).
@@ -348,6 +354,23 @@ class RepLine:
         -------
         float | None
             ``None`` when the row is unfloored or fixed-rate.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def reset_lag_days(self) -> int | None:
+        """
+        Business days before each accrual start on which the floating index fixes.
+
+        Returns
+        -------
+        int | None
+            Non-negative lag on the ``weekends_only`` calendar; ``None`` on a
+            fixed-rate line.
 
         Notes
         -----

@@ -31,6 +31,7 @@ mod tests {
                 425.0, // SOFR + 425bps
                 maturity,
                 finstack_quant_core::dates::DayCount::Act360,
+                2,
             )
             .with_rating(CreditRating::BB)
         };
@@ -45,6 +46,7 @@ mod tests {
                 475.0, // SOFR + 475bps
                 maturity,
                 finstack_quant_core::dates::DayCount::Act360,
+                2,
             )
             .with_rating(CreditRating::B)
         };
@@ -103,6 +105,7 @@ mod tests {
                 200.0,
                 maturity,
                 finstack_quant_core::dates::DayCount::Act360,
+                2,
             )
             .with_rating(CreditRating::AAA),
         );
@@ -115,6 +118,7 @@ mod tests {
                 350.0,
                 maturity,
                 finstack_quant_core::dates::DayCount::Act360,
+                2,
             )
             .with_rating(CreditRating::A),
         );
@@ -127,6 +131,7 @@ mod tests {
                 450.0,
                 maturity,
                 finstack_quant_core::dates::DayCount::Act360,
+                2,
             )
             .with_rating(CreditRating::BB),
         );
@@ -139,6 +144,7 @@ mod tests {
                 550.0,
                 maturity,
                 finstack_quant_core::dates::DayCount::Act360,
+                2,
             )
             .with_rating(CreditRating::B),
         );
@@ -242,6 +248,7 @@ mod tests {
                 425.0,
                 maturity,
                 finstack_quant_core::dates::DayCount::Act360,
+                2,
             )
             .with_rating(CreditRating::BB)
         });
@@ -256,6 +263,7 @@ mod tests {
                 450.0,
                 maturity,
                 finstack_quant_core::dates::DayCount::Act360,
+                2,
             )
             .with_rating(CreditRating::B)
         });
@@ -270,6 +278,7 @@ mod tests {
                 500.0,
                 maturity,
                 finstack_quant_core::dates::DayCount::Act360,
+                2,
             )
             .with_rating(CreditRating::B)
         });

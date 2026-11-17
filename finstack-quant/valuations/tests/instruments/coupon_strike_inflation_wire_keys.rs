@@ -616,6 +616,7 @@ fn retired_structured_credit_floor_keys_are_rejected() {
         400.0,
         maturity,
         DayCount::Act360,
+        2,
     );
     assert_rejects_at(&asset, "", "index_floor", json!(0.01));
     let line = RepLine::new(
@@ -632,6 +633,7 @@ fn retired_structured_credit_floor_keys_are_rejected() {
         price_pct: 99.0,
         maturity_months: 60,
         forward_curve_id: Some("USD-SOFR-3M".into()),
+        reset_lag_days: Some(2),
         all_in_floor_bp: Some(100.0),
     };
     assert_rejects_at(&assumptions, "", "coupon_floor", json!(0.01));

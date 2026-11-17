@@ -233,6 +233,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
             350.0,
             Date::from_calendar_date(2030, Month::January, 1).unwrap(),
             DayCount::Act360,
+            2,
         )
         .with_rating(CreditRating::BB)
     };

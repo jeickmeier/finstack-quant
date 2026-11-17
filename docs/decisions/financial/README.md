@@ -2588,6 +2588,41 @@ comparators and centered closure before projection. All 16 attribution
 methodology records are accepted.
 [ATTRIBUTION-016](attribution/16-benchmark-relative-return.md#accepted-decision-for-checked-grouped-benchmark-relative-returns).
 
+Margin parameter snapshots and contractual terms were accepted on 2026-11-16.
+The package covers explicit immutable parameters, unified validation, elected
+calculation routes, actual agreement terms and exact effective provenance.
+[MARGIN-COLLATERAL-IM-001](margin-collateral-im/01-registry-and-defaults.md#accepted-decision-for-explicit-margin-parameter-snapshots-and-contractual-terms).
+
+SIMM parameter and correlation validation was accepted on 2026-11-16. The
+package covers complete canonical profiles, field-specific domains, read-only
+admission of fixed and effective dependence, and checked variance arithmetic.
+[MARGIN-COLLATERAL-IM-002](margin-collateral-im/02-simm-parameter-validation.md#accepted-decision-for-checked-simm-parameter-profiles-and-correlation-validation).
+
+SIMM sensitivity identity, scaling and netting were accepted on 2026-11-16.
+The package covers qualified factor and FX bases, signed checked aggregation,
+expiry-resolved curvature inputs and canonical restoration.
+[MARGIN-COLLATERAL-IM-003](margin-collateral-im/03-sensitivity-inputs.md#accepted-decision-for-checked-simm-sensitivity-identity-scaling-and-netting).
+
+SIMM interest-rate delta and vega aggregation was accepted on 2026-11-16.
+The package covers ordinary yield subcurves, expiry-based vega, signed
+currency concentration and checked reference-horizon aggregation.
+[MARGIN-COLLATERAL-IM-004](margin-collateral-im/04-simm-interest-rate.md#accepted-decision-for-checked-simm-interest-rate-delta-and-vega-aggregation).
+
+SIMM qualifying-credit delta and vega were accepted on 2026-11-16. The
+package covers exact factor netting, expiry-based ordinary vega, raw group
+concentration and checked bucket and residual aggregation.
+[MARGIN-COLLATERAL-IM-005](margin-collateral-im/05-simm-qualifying-credit.md#accepted-decision-for-checked-simm-qualifying-credit-delta-and-vega).
+
+SIMM nonqualifying-credit delta and vega were accepted on 2026-11-16. The
+package covers all three historical buckets, tranche concentration, ordinary
+vega expiry and separately qualified correlation groups.
+[MARGIN-COLLATERAL-IM-006](margin-collateral-im/06-simm-nonqualifying-credit.md#accepted-decision-for-checked-simm-nonqualifying-credit-delta-and-vega).
+
+SIMM equity delta and vega were accepted on 2026-11-16. The package covers
+all 12 numbered buckets and explicit residual, qualified index treatment,
+proxy-weighted vega and checked bucket and residual aggregation.
+[MARGIN-COLLATERAL-IM-007](margin-collateral-im/07-simm-equity.md#accepted-decision-for-checked-simm-equity-delta-and-vega).
+
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the
 accepted perspective/sign contracts; broader margin methodology retains its

@@ -2059,10 +2059,13 @@
           { "pointer": "#/$defs/OidPolicy", "keyword": "oneOf" }
         ],
         "int32": [
+          "#/$defs/PoolAsset/properties/reset_lag_days",
           "#/$defs/d_67346ed55fd8e55563e7/properties/payment_lag_days",
           "#/$defs/FloatingCouponSpec/properties/payment_lag_days",
           "#/$defs/FloatingRateSpec/properties/reset_lag_days",
-          "#/$defs/StepUpCouponSpec/properties/payment_lag_days"
+          "#/$defs/StepUpCouponSpec/properties/payment_lag_days",
+          "#/$defs/ReinvestmentAssumptions/properties/reset_lag_days",
+          "#/$defs/RepLine/properties/reset_lag_days"
         ],
         "internal-union": [
           {
@@ -2340,11 +2343,14 @@
           "#/$defs/EligibilityRule/properties/max_days_past_due",
           "#/$defs/PoolAsset/properties/amortization_term_months",
           "#/$defs/PoolAsset/properties/io_months",
+          "#/$defs/PoolAsset/properties/reset_lag_days",
           "#/$defs/DayCountContextState/properties/bus_basis",
           "#/$defs/d_572ad1befb7d94914652/properties/mc_paths",
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
+          "#/$defs/ReinvestmentAssumptions/properties/reset_lag_days",
           "#/$defs/RepLine/properties/amortization_term_months",
-          "#/$defs/RepLine/properties/io_months"
+          "#/$defs/RepLine/properties/io_months",
+          "#/$defs/RepLine/properties/reset_lag_days"
         ],
         "nullable-number": [
           "#/$defs/CardPortfolioSpec/properties/fixed_allocation_decimal",
@@ -5098,7 +5104,10 @@
           "#/$defs/ForwardRateAgreement/properties/reset_lag_days",
           "#/$defs/OvernightCouponConvention/properties/payment_lag_days",
           "#/$defs/CommoditySwap/properties/index_lag_days",
-          "#/$defs/d_176cce21985eadf0161c/properties/payment_lag_days"
+          "#/$defs/d_176cce21985eadf0161c/properties/payment_lag_days",
+          "#/$defs/PoolAsset/properties/reset_lag_days",
+          "#/$defs/ReinvestmentAssumptions/properties/reset_lag_days",
+          "#/$defs/RepLine/properties/reset_lag_days"
         ],
         "internal-union": [
           {
@@ -5470,8 +5479,11 @@
           "#/$defs/EligibilityRule/properties/max_days_past_due",
           "#/$defs/PoolAsset/properties/amortization_term_months",
           "#/$defs/PoolAsset/properties/io_months",
+          "#/$defs/PoolAsset/properties/reset_lag_days",
+          "#/$defs/ReinvestmentAssumptions/properties/reset_lag_days",
           "#/$defs/RepLine/properties/amortization_term_months",
-          "#/$defs/RepLine/properties/io_months"
+          "#/$defs/RepLine/properties/io_months",
+          "#/$defs/RepLine/properties/reset_lag_days"
         ],
         "nullable-number": [
           "#/$defs/CashFlowAccrual/properties/projected_index_rate",
@@ -16891,7 +16903,10 @@
           "#/$defs/ForwardRateAgreement/properties/reset_lag_days",
           "#/$defs/OvernightCouponConvention/properties/payment_lag_days",
           "#/$defs/CommoditySwap/properties/index_lag_days",
-          "#/$defs/d_176cce21985eadf0161c/properties/payment_lag_days"
+          "#/$defs/d_176cce21985eadf0161c/properties/payment_lag_days",
+          "#/$defs/PoolAsset/properties/reset_lag_days",
+          "#/$defs/ReinvestmentAssumptions/properties/reset_lag_days",
+          "#/$defs/RepLine/properties/reset_lag_days"
         ],
         "internal-union": [
           {
@@ -17263,8 +17278,11 @@
           "#/$defs/EligibilityRule/properties/max_days_past_due",
           "#/$defs/PoolAsset/properties/amortization_term_months",
           "#/$defs/PoolAsset/properties/io_months",
+          "#/$defs/PoolAsset/properties/reset_lag_days",
+          "#/$defs/ReinvestmentAssumptions/properties/reset_lag_days",
           "#/$defs/RepLine/properties/amortization_term_months",
-          "#/$defs/RepLine/properties/io_months"
+          "#/$defs/RepLine/properties/io_months",
+          "#/$defs/RepLine/properties/reset_lag_days"
         ],
         "nullable-number": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -37386,10 +37404,13 @@
           "#/$defs/FixedLegSpec/properties/payment_lag_days",
           "#/$defs/FloatLegSpec/properties/payment_lag_days",
           "#/$defs/FloatLegSpec/properties/reset_lag_days",
+          "#/$defs/PoolAsset/properties/reset_lag_days",
           "#/$defs/d_67346ed55fd8e55563e7/properties/payment_lag_days",
           "#/$defs/FloatingCouponSpec/properties/payment_lag_days",
           "#/$defs/FloatingRateSpec/properties/reset_lag_days",
-          "#/$defs/StepUpCouponSpec/properties/payment_lag_days"
+          "#/$defs/StepUpCouponSpec/properties/payment_lag_days",
+          "#/$defs/ReinvestmentAssumptions/properties/reset_lag_days",
+          "#/$defs/RepLine/properties/reset_lag_days"
         ],
         "internal-union": [
           {
@@ -37686,9 +37707,12 @@
           "#/$defs/d_572ad1befb7d94914652/properties/tree_steps",
           "#/$defs/PoolAsset/properties/amortization_term_months",
           "#/$defs/PoolAsset/properties/io_months",
+          "#/$defs/PoolAsset/properties/reset_lag_days",
           "#/$defs/DayCountContextState/properties/bus_basis",
+          "#/$defs/ReinvestmentAssumptions/properties/reset_lag_days",
           "#/$defs/RepLine/properties/amortization_term_months",
-          "#/$defs/RepLine/properties/io_months"
+          "#/$defs/RepLine/properties/io_months",
+          "#/$defs/RepLine/properties/reset_lag_days"
         ],
         "nullable-number": [
           "#/$defs/CardPortfolioSpec/properties/fixed_allocation_decimal",

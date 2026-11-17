@@ -7061,6 +7061,13 @@ export interface PoolAsset {
    */
   recovery_rate?: number | null;
   /**
+   * Business days before each coupon period start on which the floating
+   * index fixes (positive T-minus on a weekends-only calendar; `2` for
+   * term-SOFR loans, `0` fixes on the period start). Required when
+   * `forward_curve_id` is set; must be absent on fixed-rate rows.
+   */
+  reset_lag_days?: number | null;
+  /**
    * Optional decimal Single Monthly Mortality override.
    */
   smm_override?: number | null;
@@ -9230,6 +9237,11 @@ export interface ReinvestmentAssumptions {
    */
   price_pct: number;
   /**
+   * Business-day fixing lag of the purchased rows (see
+   * `PoolAsset::reset_lag_days`); required when `forward_curve_id` is set.
+   */
+  reset_lag_days?: number | null;
+  /**
    * Spread over the index in basis points (the whole coupon in basis
    * points when `forward_curve_id` is `None`).
    */
@@ -9315,6 +9327,11 @@ export interface RepLine {
    * Optional recovery rate override
    */
   recovery_rate?: number | null;
+  /**
+   * Business-day fixing lag before each coupon period start (see
+   * `PoolAsset::reset_lag_days`); required when `forward_curve_id` is set.
+   */
+  reset_lag_days?: number | null;
   /**
    * Weighted average seasoning in months
    */

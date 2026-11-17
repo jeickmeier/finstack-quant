@@ -243,6 +243,7 @@ fn reinvestment_assumptions_change_the_replacement_collateral() {
                 price_pct: 99.0,
                 maturity_months: 72,
                 forward_curve_id: None,
+                reset_lag_days: None,
                 all_in_floor_bp: None,
             }),
         )),
@@ -284,6 +285,7 @@ fn reinvestment_all_in_floor_is_quoted_in_basis_points() {
                 price_pct: 100.0,
                 maturity_months: 72,
                 forward_curve_id: None,
+                reset_lag_days: None,
                 all_in_floor_bp,
             }),
         ))
@@ -315,6 +317,7 @@ fn synthetic_purchases_mature_no_later_than_legal_final() {
                 price_pct: 100.0,
                 maturity_months: 240,
                 forward_curve_id: None,
+                reset_lag_days: None,
                 all_in_floor_bp: None,
             }),
         )),

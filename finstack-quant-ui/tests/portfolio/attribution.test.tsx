@@ -150,7 +150,8 @@ it(
   budget(30000),
 );
 it("says when Rust does not reconcile the book, and which positions' residuals fail", async () => {
-  const data = fixture.exact.report as unknown as PortfolioAttributionData;
+  const data = fixture.unreconciled
+    .report as unknown as PortfolioAttributionData;
   expect(data.reconciliation.is_reconciled).toBe(false);
   render(<PortfolioAttributionReport report={data} />);
   const view = screen.getByRole("region", { name: "Portfolio attribution" });

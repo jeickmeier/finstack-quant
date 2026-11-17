@@ -36,7 +36,7 @@ impl PyPoolAsset {
     #[new]
     #[pyo3(
         signature = (**fields),
-        text_signature = "(*, id, asset_type, balance, rate, maturity, day_count, spread_bp=None, forward_curve_id=None, index_floor_bp=None, rating=None, industry=None, obligor_id=None, defaulted=False, recovery_amount=None, default_date=None, purchase_price=None, acquisition_date=None, origination_date=None, smm_override=None, mdr_override=None, recovery_rate=None, commitment=None, contractual_payment=None, amortization_term_months=None, io_months=None, market_price_pct=None, delinquency_buckets=None, balloon=None, prepayment_penalty=None, special_servicing=None, noi=None, liquidation=None)"
+        text_signature = "(*, id, asset_type, balance, rate, maturity, day_count, spread_bp=None, forward_curve_id=None, index_floor_bp=None, reset_lag_days=None, rating=None, industry=None, obligor_id=None, defaulted=False, recovery_amount=None, default_date=None, purchase_price=None, acquisition_date=None, origination_date=None, smm_override=None, mdr_override=None, recovery_rate=None, commitment=None, contractual_payment=None, amortization_term_months=None, io_months=None, market_price_pct=None, delinquency_buckets=None, balloon=None, prepayment_penalty=None, special_servicing=None, noi=None, liquidation=None)"
     )]
     fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
         let inner: PoolAsset =
@@ -67,7 +67,9 @@ impl PyPoolAsset {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.pool_asset", "PoolAsset.floating_rate_loan")]
     #[staticmethod]
-    #[pyo3(text_signature = "(id, balance, forward_curve_id, spread_bp, maturity, day_count)")]
+    #[pyo3(
+        text_signature = "(id, balance, forward_curve_id, spread_bp, maturity, day_count, reset_lag_days)"
+    )]
     fn floating_rate_loan(
         id: &str,
         balance: PyRef<'_, PyMoney>,
@@ -75,6 +77,7 @@ impl PyPoolAsset {
         spread_bp: f64,
         maturity: &Bound<'_, PyAny>,
         day_count: PyRef<'_, PyDayCount>,
+        reset_lag_days: i32,
     ) -> PyResult<Self> {
         Ok(Self {
             inner: PoolAsset::floating_rate_loan(
@@ -84,6 +87,7 @@ impl PyPoolAsset {
                 spread_bp,
                 py_to_date(maturity)?,
                 day_count.inner,
+                reset_lag_days,
             ),
         })
     }
@@ -207,6 +211,9 @@ crate::bindings::macros::py_getters!(PyPoolAsset |s| {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.pool_asset", "PoolAsset.index_floor_bp")]
     index_floor_bp -> Option<f64> = s.inner.index_floor_bp;
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.pool_asset", "PoolAsset.reset_lag_days")]
+    reset_lag_days -> Option<i32> = s.inner.reset_lag_days;
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.pool_asset", "PoolAsset.industry")]
     industry -> Option<String> = s.inner.industry.clone();

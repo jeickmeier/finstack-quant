@@ -4,6 +4,8 @@
 //! The families follow the fixture directories, except that the
 //! structured-credit and CDS-tranche goldens, which dominate the run time, are
 //! carved out of `regression_goldens` into families of their own.
+//! Structured-credit horizons exceed the fast suite's 60-second CI budget
+//! and run in the nightly slow suite.
 //!
 //! Theta holds the market fixed and rolls the valuation date, so the rolled
 //! repricing crosses every index fixing inside the horizon. A fixture whose
@@ -310,8 +312,9 @@ fn registry() -> Vec<Case> {
 /// One `#[test]` per fixture family and horizon:
 /// `name => case source, index into [`HORIZONS`]`.
 macro_rules! theta_tests {
-    ($($test:ident => $family:ident, $horizon:expr_2021;)*) => {$(
+    ($($(#[$attr:meta])* $test:ident => $family:ident, $horizon:expr_2021;)*) => {$(
         #[test]
+        $(#[$attr])*
         fn $test() {
             assert_theta_finite(stringify!($family), &$family(), HORIZONS[$horizon]);
         }
@@ -325,8 +328,11 @@ theta_tests! {
     theta_is_finite_1d_quantlib_goldens => quantlib, 0;
     theta_is_finite_1m_quantlib_goldens => quantlib, 1;
     theta_is_finite_6m_quantlib_goldens => quantlib, 2;
+    #[ignore = "slow: structured-credit theta exceeds the 60s CI budget; covered by mise run rust-test --slow"]
     theta_is_finite_1d_structured_credit_goldens => structured_credit, 0;
+    #[ignore = "slow: structured-credit theta exceeds the 60s CI budget; covered by mise run rust-test --slow"]
     theta_is_finite_1m_structured_credit_goldens => structured_credit, 1;
+    #[ignore = "slow: structured-credit theta exceeds the 60s CI budget; covered by mise run rust-test --slow"]
     theta_is_finite_6m_structured_credit_goldens => structured_credit, 2;
     theta_is_finite_1d_cds_tranche_goldens => cds_tranche, 0;
     theta_is_finite_1m_cds_tranche_goldens => cds_tranche, 1;

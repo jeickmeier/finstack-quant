@@ -446,7 +446,7 @@ fn ordinary_records() -> Vec<Value> {
     records
 }
 
-fn precedence_records() -> Vec<Value> {
+fn target_resolution_records() -> Vec<Value> {
     let mut records = Vec::new();
     for (name, has_curve, has_surface, has_price, has_series, family, bump) in [
         (
@@ -830,7 +830,7 @@ fn credit_records() -> Vec<Value> {
 #[ignore = "CCM numerical export; run explicitly before matched benchmarks"]
 fn export_context_bump_reference() {
     let mut records = ordinary_records();
-    records.extend(precedence_records());
+    records.extend(target_resolution_records());
     records.extend(ordered_records());
     records.extend(error_records());
     records.extend(credit_records());

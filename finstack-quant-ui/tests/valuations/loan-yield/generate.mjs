@@ -26,6 +26,7 @@ const market = JSON.stringify({
         ["2023-12-28", 0.0535],
       ],
       interpolation: "step",
+      extrapolation: "flat",
     },
   ],
 });

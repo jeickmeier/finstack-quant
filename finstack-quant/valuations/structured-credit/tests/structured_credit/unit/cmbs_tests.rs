@@ -471,6 +471,7 @@ fn a_fixed_extension_rate_replaces_the_index_and_spread() {
         300.0,
         loan_maturity,
         DayCount::Act360,
+        2,
     );
     floating.asset_type = AssetType::CommercialMortgage { ltv: None };
     floating.io_months = Some(close().months_until(loan_maturity).expect("forward range"));
@@ -623,6 +624,7 @@ fn dscr_uses_the_live_floating_coupon_and_the_amortization_schedule() {
         300.0,
         maturity(),
         DayCount::Act360,
+        2,
     );
     floating.asset_type = AssetType::CommercialMortgage { ltv: None };
     floating.io_months = Some(close().months_until(maturity()).expect("forward range"));

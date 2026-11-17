@@ -706,7 +706,7 @@ export type CurveQueryResult =
       }[];
       forwards: { t1: number; t2: number; rate: Envelope<number> }[];
     }
-  | { kind: "forward"; points: { t: CurvePoint; rate: Envelope<number> }[] }
+  | { kind: "forward"; points: { t: CurvePoint; df: Envelope<number> }[] }
   | {
       kind: "hazard";
       points: {
@@ -1131,7 +1131,7 @@ export interface CoreApi {
   formatMoney(request: MoneyFormatRequest): Promise<Envelope<string>>;
   /** core.MarketContext.fromJson + toJson: canonicalize the complete market and cache its handle. */
   validateMarket(marketJson: string): Promise<Envelope<string>>;
-  /** MarketContext.getDiscount (df, zeroRate, forward), getForward (rate), getHazard (sp, hazardRate) or getSurface (models.volatility.getSurfaceVol), per supplied point, over the cached market handle; each point keeps its own native error and the curve handle is freed. */
+  /** MarketContext.getDiscount (df, zeroRate, forward), getForward (df, the projection factor), getHazard (sp, hazardRate) or getSurface (models.volatility.getSurfaceVol), per supplied point, over the cached market handle; each point keeps its own native error and the curve handle is freed. */
   curveQuery(request: CurveQueryRequest): Promise<Envelope<CurveQueryResult>>;
   /** core.availableCalendars. */
   calendars(): Promise<Envelope<string[]>>;

@@ -209,7 +209,7 @@ it("shows the native discount values and forwards, echoing each point as entered
   ).toBeTruthy();
 });
 it.each([
-  ["forward", "FORWARD", "Forward rate (simple, on the curve day count)"],
+  ["forward", "FORWARD", "Projection factor"],
   ["hazard", "HZ", "Survival probability"],
   ["surface", "EQ-VOL", "Volatility"],
 ] as const)("shows the native %s values", (kind, id, header) => {

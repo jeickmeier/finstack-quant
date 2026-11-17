@@ -500,7 +500,7 @@ def build_cases() -> dict[str, Any]:
     )
     bond_asset = ins.PoolAsset.fixed_rate_bond("B1", Money(1_000_000.0, USD), 0.07, "2030-01-15", DayCount.THIRTY_360)
     loan_asset = ins.PoolAsset.floating_rate_loan(
-        "L1", Money(2_000_000.0, USD), "USD-SOFR-3M", 350.0, "2030-01-15", DayCount.ACT_360
+        "L1", Money(2_000_000.0, USD), "USD-SOFR-3M", 350.0, "2030-01-15", DayCount.ACT_360, 2
     )
     pool = ins.AssetPool("POOL", "clo", USD)
     reinvestment_period = {

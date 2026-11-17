@@ -69,6 +69,21 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "A dated time-series column: scalar values aligned with window-end dates.",
+  "examples": [
+    {
+      "dates": [
+        "2025-01-09",
+        "2025-01-10",
+        "2025-01-13"
+      ],
+      "value_column": "volatility",
+      "values": [
+        0.227998252714,
+        0.253539015335,
+        0.164009946038
+      ]
+    }
+  ],
   "properties": {
     "dates": {
       "description": "Window-end dates aligned 1:1 with `values`.",

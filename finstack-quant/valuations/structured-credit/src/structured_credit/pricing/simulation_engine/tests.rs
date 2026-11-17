@@ -659,9 +659,9 @@ mod cases {
                 spread_bp: Some(100.0),
                 day_count: DayCount::Act360,
                 index_floor_rate: None,
+                reset_lag_days: 2,
             },
             0.0,
-            2,
         )
         .expect("unshifted rate");
         let shifted = collateral_asset_rate_for_period(
@@ -673,9 +673,9 @@ mod cases {
                 spread_bp: Some(100.0),
                 day_count: DayCount::Act360,
                 index_floor_rate: None,
+                reset_lag_days: 2,
             },
             0.01,
-            2,
         )
         .expect("shifted rate");
 
@@ -696,9 +696,9 @@ mod cases {
                 spread_bp: Some(400.0),
                 day_count: DayCount::Act360,
                 index_floor_rate: Some(0.01),
+                reset_lag_days: 2,
             },
             -0.05,
-            2,
         )
         .expect("index-floored rate");
         assert!(
@@ -716,9 +716,9 @@ mod cases {
                 spread_bp: Some(100.0),
                 day_count: DayCount::Act360,
                 index_floor_rate: None,
+                reset_lag_days: 2,
             },
             -0.50,
-            2,
         )
         .expect("floored rate");
         assert!(
@@ -847,9 +847,9 @@ mod cases {
                 spread_bp: Some(125.0),
                 day_count: DayCount::Act360,
                 index_floor_rate: None,
+                reset_lag_days: 2,
             },
             0.0, // no OAS rate shift in this unit test,
-            2,
         )
         .expect("stored current coupon is authoritative for an already-reset period");
 
@@ -923,6 +923,7 @@ mod cases {
             0.0,
             maturity,
             DayCount::Act360,
+            2,
         ));
         pool.assets.push(PoolAsset::floating_rate_loan(
             "A-6M",
@@ -931,6 +932,7 @@ mod cases {
             0.0,
             maturity,
             DayCount::Act360,
+            2,
         ));
         let tranche = Tranche::new(
             "AAA",
@@ -968,6 +970,57 @@ mod cases {
         assert!((rate_6m - old_shared_6m).abs() > 1e-6);
     }
 
+    #[test]
+    fn collateral_wac_fixes_each_asset_at_its_own_reset_lag() {
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid base");
+        let period_start =
+            Date::from_calendar_date(2025, Month::April, 1).expect("valid period start");
+        let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid maturity");
+        let curve = ForwardCurve::builder("USD-3M")
+            .base_date(base)
+            .day_count(DayCount::Act360)
+            .index_tenor(Tenor::quarterly())
+            .knots([(0.0, 1.0), (0.5, 0.9838), (1.0, 0.9512)])
+            .interp(finstack_quant_core::math::interp::InterpStyle::LogLinear)
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .expect("3M curve");
+        let context = MarketContext::new().insert(curve.clone());
+        let mut pool = AssetPool::new("LAGS", DealType::Clo, Currency::USD);
+        for (id, lag) in [("LAG-0", 0), ("LAG-5", 5)] {
+            pool.assets.push(PoolAsset::floating_rate_loan(
+                id,
+                Money::from((100_i64, Currency::USD)),
+                "USD-3M",
+                0.0,
+                maturity,
+                DayCount::Act360,
+                lag,
+            ));
+        }
+        let tranche = Tranche::new(
+            "AAA",
+            0.0,
+            100.0,
+            TrancheSeniority::Senior,
+            Money::from((200_i64, Currency::USD)),
+            RateSpec::Fixed { rate: 0.0 },
+            maturity,
+        )
+        .expect("tranche");
+        let tranches = TrancheStructure::new(vec![tranche]).expect("tranche structure");
+        let state = SimulationState::new(&pool, &tranches, base, base, 0).expect("state");
+
+        let rate_lag_0 = term_rate_for_period(&curve, &context, period_start, DayCount::Act360, 0)
+            .expect("lag-0 rate");
+        let rate_lag_5 = term_rate_for_period(&curve, &context, period_start, DayCount::Act360, 5)
+            .expect("lag-5 rate");
+        assert!((rate_lag_0 - rate_lag_5).abs() > 1e-6);
+        let actual =
+            current_collateral_wac(&state, &context, period_start).expect("collateral WAC");
+        assert!((actual - (rate_lag_0 + rate_lag_5) / 2.0).abs() < 1e-14);
+    }
+
     /// `AssetPool::wac` and the simulated `PeriodDiagnostics::wac` average
     /// one population (performing fixed-rate collateral), so on the closing
     /// state they agree bit for bit. Independent reference: the hand WAC of
@@ -997,6 +1050,7 @@ mod cases {
             400.0,
             maturity,
             DayCount::Act360,
+            2,
         ));
         let mut defaulted =
             PoolAsset::fixed_rate_bond("D1", usd(5), 0.12, maturity, DayCount::Thirty360);
@@ -1505,6 +1559,7 @@ mod cases {
             spread_bp: None,
             forward_curve_id: None,
             index_floor_bp: None,
+            reset_lag_days: None,
             maturity,
             rating: None,
             industry: None,
@@ -1650,6 +1705,7 @@ mod cases {
             spread_bp: None,
             forward_curve_id: None,
             index_floor_bp: None,
+            reset_lag_days: None,
             maturity,
             rating: None,
             industry: None,
@@ -2817,6 +2873,7 @@ mod cases {
                 spread_bp: None,
                 forward_curve_id: None,
                 index_floor_bp: None,
+                reset_lag_days: None,
                 maturity,
                 rating: None,
                 industry: None,

@@ -23807,6 +23807,14 @@
             "null"
           ]
         },
+        "reset_lag_days": {
+          "description": "Business days before each coupon period start on which the floating\nindex fixes (positive T-minus on a weekends-only calendar; `2` for\nterm-SOFR loans, `0` fixes on the period start). Required when\n`forward_curve_id` is set; must be absent on fixed-rate rows.",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "smm_override": {
           "default": null,
           "description": "Optional decimal Single Monthly Mortality override.",
@@ -26178,6 +26186,14 @@
           "format": "double",
           "type": "number"
         },
+        "reset_lag_days": {
+          "description": "Business-day fixing lag of the purchased rows (see\n`PoolAsset::reset_lag_days`); required when `forward_curve_id` is set.",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "spread_bp": {
           "description": "Spread over the index in basis points (the whole coupon in basis\npoints when `forward_curve_id` is `None`).",
           "format": "double",
@@ -26350,6 +26366,14 @@
           "format": "double",
           "type": [
             "number",
+            "null"
+          ]
+        },
+        "reset_lag_days": {
+          "description": "Business-day fixing lag before each coupon period start (see\n`PoolAsset::reset_lag_days`); required when `forward_curve_id` is set.",
+          "format": "int32",
+          "type": [
+            "integer",
             "null"
           ]
         },

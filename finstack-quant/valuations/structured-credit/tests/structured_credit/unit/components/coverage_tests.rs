@@ -79,6 +79,7 @@ fn test_oc_test_passing_scenario() {
         400.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     ));
 
     let equity = Tranche::new(
@@ -133,6 +134,7 @@ fn test_coverage_test_result_preserves_tranche_id_with_underscore() {
         400.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     ));
 
     let tranche = Tranche::new(
@@ -173,6 +175,7 @@ fn test_oc_test_failing_scenario() {
         400.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     ));
 
     let equity = Tranche::new(
@@ -227,6 +230,7 @@ fn test_oc_test_with_cash_balance() {
         400.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     ));
 
     let equity = Tranche::new(
@@ -283,6 +287,7 @@ fn oc_numerator_carries_pending_recovery_claims_at_recovery_value() {
         400.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     ));
     let equity = Tranche::new(
         "EQUITY",
@@ -340,6 +345,7 @@ fn test_oc_test_cure_amount_calculation() {
         400.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     ));
 
     let equity = Tranche::new(
@@ -657,6 +663,7 @@ fn test_oc_test_infinity_ratio_zero_debt() {
         400.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     ));
 
     let equity = Tranche::new(

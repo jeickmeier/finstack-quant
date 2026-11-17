@@ -226,12 +226,8 @@
               "value": 0.9748963708360785
             },
             "zeroRate": {
-              "ok": false,
-              "error": {
-                "name": "TypeError",
-                "message": "compounding: expected a string, got undefined",
-                "kind": "invalid_type"
-              }
+              "ok": true,
+              "value": 0.05084819991010406
             }
           },
           {
@@ -241,12 +237,8 @@
               "value": 0.9508100436414445
             },
             "zeroRate": {
-              "ok": false,
-              "error": {
-                "name": "TypeError",
-                "message": "compounding: expected a string, got undefined",
-                "kind": "invalid_type"
-              }
+              "ok": true,
+              "value": 0.05044098019319792
             }
           },
           {
@@ -256,12 +248,8 @@
               "value": 0.8006707147214256
             },
             "zeroRate": {
-              "ok": false,
-              "error": {
-                "name": "TypeError",
-                "message": "compounding: expected a string, got undefined",
-                "kind": "invalid_type"
-              }
+              "ok": true,
+              "value": 0.04446110183357255
             }
           },
           {
@@ -271,12 +259,8 @@
               "value": 0.8324546459978288
             },
             "zeroRate": {
-              "ok": false,
-              "error": {
-                "name": "TypeError",
-                "message": "compounding: expected a string, got undefined",
-                "kind": "invalid_type"
-              }
+              "ok": true,
+              "value": 0.04465139181528921
             }
           }
         ],
@@ -311,32 +295,23 @@
         "points": [
           {
             "t": 0.25,
-            "rate": {
-              "ok": false,
-              "error": {
-                "name": "TypeError",
-                "message": "curve.rate is not a function"
-              }
+            "df": {
+              "ok": true,
+              "value": 0.9893046338966404
             }
           },
           {
             "t": 2,
-            "rate": {
-              "ok": false,
-              "error": {
-                "name": "TypeError",
-                "message": "curve.rate is not a function"
-              }
+            "df": {
+              "ok": true,
+              "value": 0.9221757565694213
             }
           },
           {
             "t": "2028-01-15",
-            "rate": {
-              "ok": false,
-              "error": {
-                "name": "TypeError",
-                "message": "curve.rate is not a function"
-              }
+            "df": {
+              "ok": true,
+              "value": 0.8864905352804614
             }
           }
         ]
@@ -444,12 +419,8 @@
               "value": 0.9508100436414445
             },
             "zeroRate": {
-              "ok": false,
-              "error": {
-                "name": "TypeError",
-                "message": "compounding: expected a string, got undefined",
-                "kind": "invalid_type"
-              }
+              "ok": true,
+              "value": 0.05044098019319792
             }
           },
           {
@@ -465,9 +436,9 @@
             "zeroRate": {
               "ok": false,
               "error": {
-                "name": "TypeError",
-                "message": "compounding: expected a string, got undefined",
-                "kind": "invalid_type"
+                "name": "FinstackError",
+                "message": "Validation error: Invalid date 'not-a-date': the 'year' component could not be parsed",
+                "kind": "validation"
               }
             }
           }

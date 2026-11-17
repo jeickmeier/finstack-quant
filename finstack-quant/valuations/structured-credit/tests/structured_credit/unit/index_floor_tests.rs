@@ -38,6 +38,7 @@ fn deal(index_floor_bp: Option<f64>) -> StructuredCredit {
         400.0,
         maturity,
         DayCount::Act360,
+        2,
     );
     loan.index_floor_bp = index_floor_bp;
     pool.assets.push(loan);

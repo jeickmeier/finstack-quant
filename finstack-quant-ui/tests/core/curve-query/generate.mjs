@@ -46,7 +46,7 @@ function lookup(request) {
         points: request.points.map((t) => ({
           t,
           df: attempt(() => curve.df(t)),
-          zeroRate: attempt(() => curve.zeroRate(t)),
+          zeroRate: attempt(() => curve.zeroRate(t, "continuous")),
         })),
         forwards: request.forwards.map(([t1, t2]) => ({
           t1,
@@ -65,7 +65,7 @@ function lookup(request) {
         kind: "forward",
         points: request.points.map((t) => ({
           t,
-          rate: attempt(() => curve.rate(t)),
+          df: attempt(() => curve.df(t)),
         })),
       };
     } finally {

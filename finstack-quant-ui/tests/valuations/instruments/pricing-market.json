@@ -628,133 +628,633 @@
       "currency": "USD",
       "knowledge_date": "2023-12-28",
       "observations": [
-        { "reference_month": "2023-09-01", "value": 299, "available_on": "2023-10-12" },
-        { "reference_month": "2023-10-01", "value": 300, "available_on": "2023-11-14" },
-        { "reference_month": "2023-11-01", "value": 301, "available_on": "2023-12-12" }
+        {
+          "reference_month": "2023-09-01",
+          "value": 299,
+          "available_on": "2023-10-12"
+        },
+        {
+          "reference_month": "2023-10-01",
+          "value": 300,
+          "available_on": "2023-11-14"
+        },
+        {
+          "reference_month": "2023-11-01",
+          "value": 301,
+          "available_on": "2023-12-12"
+        }
       ],
       "expected_releases": [
-        { "reference_month": "2023-12-01", "expected_release": "2024-01-15", "known_on": "2023-12-28" },
-        { "reference_month": "2024-01-01", "expected_release": "2024-02-15", "known_on": "2023-12-28" },
-        { "reference_month": "2024-02-01", "expected_release": "2024-03-15", "known_on": "2023-12-28" },
-        { "reference_month": "2024-03-01", "expected_release": "2024-04-15", "known_on": "2023-12-28" },
-        { "reference_month": "2024-04-01", "expected_release": "2024-05-15", "known_on": "2023-12-28" },
-        { "reference_month": "2024-05-01", "expected_release": "2024-06-15", "known_on": "2023-12-28" },
-        { "reference_month": "2024-06-01", "expected_release": "2024-07-15", "known_on": "2023-12-28" },
-        { "reference_month": "2024-07-01", "expected_release": "2024-08-15", "known_on": "2023-12-28" },
-        { "reference_month": "2024-08-01", "expected_release": "2024-09-15", "known_on": "2023-12-28" },
-        { "reference_month": "2024-09-01", "expected_release": "2024-10-15", "known_on": "2023-12-28" },
-        { "reference_month": "2024-10-01", "expected_release": "2024-11-15", "known_on": "2023-12-28" },
-        { "reference_month": "2024-11-01", "expected_release": "2024-12-15", "known_on": "2023-12-28" },
-        { "reference_month": "2024-12-01", "expected_release": "2025-01-15", "known_on": "2023-12-28" },
-        { "reference_month": "2025-01-01", "expected_release": "2025-02-15", "known_on": "2023-12-28" },
-        { "reference_month": "2025-02-01", "expected_release": "2025-03-15", "known_on": "2023-12-28" },
-        { "reference_month": "2025-03-01", "expected_release": "2025-04-15", "known_on": "2023-12-28" },
-        { "reference_month": "2025-04-01", "expected_release": "2025-05-15", "known_on": "2023-12-28" },
-        { "reference_month": "2025-05-01", "expected_release": "2025-06-15", "known_on": "2023-12-28" },
-        { "reference_month": "2025-06-01", "expected_release": "2025-07-15", "known_on": "2023-12-28" },
-        { "reference_month": "2025-07-01", "expected_release": "2025-08-15", "known_on": "2023-12-28" },
-        { "reference_month": "2025-08-01", "expected_release": "2025-09-15", "known_on": "2023-12-28" },
-        { "reference_month": "2025-09-01", "expected_release": "2025-10-15", "known_on": "2023-12-28" },
-        { "reference_month": "2025-10-01", "expected_release": "2025-11-15", "known_on": "2023-12-28" },
-        { "reference_month": "2025-11-01", "expected_release": "2025-12-15", "known_on": "2023-12-28" },
-        { "reference_month": "2025-12-01", "expected_release": "2026-01-15", "known_on": "2023-12-28" },
-        { "reference_month": "2026-01-01", "expected_release": "2026-02-15", "known_on": "2023-12-28" },
-        { "reference_month": "2026-02-01", "expected_release": "2026-03-15", "known_on": "2023-12-28" },
-        { "reference_month": "2026-03-01", "expected_release": "2026-04-15", "known_on": "2023-12-28" },
-        { "reference_month": "2026-04-01", "expected_release": "2026-05-15", "known_on": "2023-12-28" },
-        { "reference_month": "2026-05-01", "expected_release": "2026-06-15", "known_on": "2023-12-28" },
-        { "reference_month": "2026-06-01", "expected_release": "2026-07-15", "known_on": "2023-12-28" },
-        { "reference_month": "2026-07-01", "expected_release": "2026-08-15", "known_on": "2023-12-28" },
-        { "reference_month": "2026-08-01", "expected_release": "2026-09-15", "known_on": "2023-12-28" },
-        { "reference_month": "2026-09-01", "expected_release": "2026-10-15", "known_on": "2023-12-28" },
-        { "reference_month": "2026-10-01", "expected_release": "2026-11-15", "known_on": "2023-12-28" },
-        { "reference_month": "2026-11-01", "expected_release": "2026-12-15", "known_on": "2023-12-28" },
-        { "reference_month": "2026-12-01", "expected_release": "2027-01-15", "known_on": "2023-12-28" },
-        { "reference_month": "2027-01-01", "expected_release": "2027-02-15", "known_on": "2023-12-28" },
-        { "reference_month": "2027-02-01", "expected_release": "2027-03-15", "known_on": "2023-12-28" },
-        { "reference_month": "2027-03-01", "expected_release": "2027-04-15", "known_on": "2023-12-28" },
-        { "reference_month": "2027-04-01", "expected_release": "2027-05-15", "known_on": "2023-12-28" },
-        { "reference_month": "2027-05-01", "expected_release": "2027-06-15", "known_on": "2023-12-28" },
-        { "reference_month": "2027-06-01", "expected_release": "2027-07-15", "known_on": "2023-12-28" },
-        { "reference_month": "2027-07-01", "expected_release": "2027-08-15", "known_on": "2023-12-28" },
-        { "reference_month": "2027-08-01", "expected_release": "2027-09-15", "known_on": "2023-12-28" },
-        { "reference_month": "2027-09-01", "expected_release": "2027-10-15", "known_on": "2023-12-28" },
-        { "reference_month": "2027-10-01", "expected_release": "2027-11-15", "known_on": "2023-12-28" },
-        { "reference_month": "2027-11-01", "expected_release": "2027-12-15", "known_on": "2023-12-28" },
-        { "reference_month": "2027-12-01", "expected_release": "2028-01-15", "known_on": "2023-12-28" },
-        { "reference_month": "2028-01-01", "expected_release": "2028-02-15", "known_on": "2023-12-28" },
-        { "reference_month": "2028-02-01", "expected_release": "2028-03-15", "known_on": "2023-12-28" },
-        { "reference_month": "2028-03-01", "expected_release": "2028-04-15", "known_on": "2023-12-28" },
-        { "reference_month": "2028-04-01", "expected_release": "2028-05-15", "known_on": "2023-12-28" },
-        { "reference_month": "2028-05-01", "expected_release": "2028-06-15", "known_on": "2023-12-28" },
-        { "reference_month": "2028-06-01", "expected_release": "2028-07-15", "known_on": "2023-12-28" },
-        { "reference_month": "2028-07-01", "expected_release": "2028-08-15", "known_on": "2023-12-28" },
-        { "reference_month": "2028-08-01", "expected_release": "2028-09-15", "known_on": "2023-12-28" },
-        { "reference_month": "2028-09-01", "expected_release": "2028-10-15", "known_on": "2023-12-28" },
-        { "reference_month": "2028-10-01", "expected_release": "2028-11-15", "known_on": "2023-12-28" },
-        { "reference_month": "2028-11-01", "expected_release": "2028-12-15", "known_on": "2023-12-28" },
-        { "reference_month": "2028-12-01", "expected_release": "2029-01-15", "known_on": "2023-12-28" },
-        { "reference_month": "2029-01-01", "expected_release": "2029-02-15", "known_on": "2023-12-28" },
-        { "reference_month": "2029-02-01", "expected_release": "2029-03-15", "known_on": "2023-12-28" },
-        { "reference_month": "2029-03-01", "expected_release": "2029-04-15", "known_on": "2023-12-28" },
-        { "reference_month": "2029-04-01", "expected_release": "2029-05-15", "known_on": "2023-12-28" },
-        { "reference_month": "2029-05-01", "expected_release": "2029-06-15", "known_on": "2023-12-28" },
-        { "reference_month": "2029-06-01", "expected_release": "2029-07-15", "known_on": "2023-12-28" },
-        { "reference_month": "2029-07-01", "expected_release": "2029-08-15", "known_on": "2023-12-28" },
-        { "reference_month": "2029-08-01", "expected_release": "2029-09-15", "known_on": "2023-12-28" },
-        { "reference_month": "2029-09-01", "expected_release": "2029-10-15", "known_on": "2023-12-28" },
-        { "reference_month": "2029-10-01", "expected_release": "2029-11-15", "known_on": "2023-12-28" },
-        { "reference_month": "2029-11-01", "expected_release": "2029-12-15", "known_on": "2023-12-28" },
-        { "reference_month": "2029-12-01", "expected_release": "2030-01-15", "known_on": "2023-12-28" },
-        { "reference_month": "2030-01-01", "expected_release": "2030-02-15", "known_on": "2023-12-28" },
-        { "reference_month": "2030-02-01", "expected_release": "2030-03-15", "known_on": "2023-12-28" },
-        { "reference_month": "2030-03-01", "expected_release": "2030-04-15", "known_on": "2023-12-28" },
-        { "reference_month": "2030-04-01", "expected_release": "2030-05-15", "known_on": "2023-12-28" },
-        { "reference_month": "2030-05-01", "expected_release": "2030-06-15", "known_on": "2023-12-28" },
-        { "reference_month": "2030-06-01", "expected_release": "2030-07-15", "known_on": "2023-12-28" },
-        { "reference_month": "2030-07-01", "expected_release": "2030-08-15", "known_on": "2023-12-28" },
-        { "reference_month": "2030-08-01", "expected_release": "2030-09-15", "known_on": "2023-12-28" },
-        { "reference_month": "2030-09-01", "expected_release": "2030-10-15", "known_on": "2023-12-28" },
-        { "reference_month": "2030-10-01", "expected_release": "2030-11-15", "known_on": "2023-12-28" },
-        { "reference_month": "2030-11-01", "expected_release": "2030-12-15", "known_on": "2023-12-28" },
-        { "reference_month": "2030-12-01", "expected_release": "2031-01-15", "known_on": "2023-12-28" },
-        { "reference_month": "2031-01-01", "expected_release": "2031-02-15", "known_on": "2023-12-28" },
-        { "reference_month": "2031-02-01", "expected_release": "2031-03-15", "known_on": "2023-12-28" },
-        { "reference_month": "2031-03-01", "expected_release": "2031-04-15", "known_on": "2023-12-28" },
-        { "reference_month": "2031-04-01", "expected_release": "2031-05-15", "known_on": "2023-12-28" },
-        { "reference_month": "2031-05-01", "expected_release": "2031-06-15", "known_on": "2023-12-28" },
-        { "reference_month": "2031-06-01", "expected_release": "2031-07-15", "known_on": "2023-12-28" },
-        { "reference_month": "2031-07-01", "expected_release": "2031-08-15", "known_on": "2023-12-28" },
-        { "reference_month": "2031-08-01", "expected_release": "2031-09-15", "known_on": "2023-12-28" },
-        { "reference_month": "2031-09-01", "expected_release": "2031-10-15", "known_on": "2023-12-28" },
-        { "reference_month": "2031-10-01", "expected_release": "2031-11-15", "known_on": "2023-12-28" },
-        { "reference_month": "2031-11-01", "expected_release": "2031-12-15", "known_on": "2023-12-28" },
-        { "reference_month": "2031-12-01", "expected_release": "2032-01-15", "known_on": "2023-12-28" },
-        { "reference_month": "2032-01-01", "expected_release": "2032-02-15", "known_on": "2023-12-28" },
-        { "reference_month": "2032-02-01", "expected_release": "2032-03-15", "known_on": "2023-12-28" },
-        { "reference_month": "2032-03-01", "expected_release": "2032-04-15", "known_on": "2023-12-28" },
-        { "reference_month": "2032-04-01", "expected_release": "2032-05-15", "known_on": "2023-12-28" },
-        { "reference_month": "2032-05-01", "expected_release": "2032-06-15", "known_on": "2023-12-28" },
-        { "reference_month": "2032-06-01", "expected_release": "2032-07-15", "known_on": "2023-12-28" },
-        { "reference_month": "2032-07-01", "expected_release": "2032-08-15", "known_on": "2023-12-28" },
-        { "reference_month": "2032-08-01", "expected_release": "2032-09-15", "known_on": "2023-12-28" },
-        { "reference_month": "2032-09-01", "expected_release": "2032-10-15", "known_on": "2023-12-28" },
-        { "reference_month": "2032-10-01", "expected_release": "2032-11-15", "known_on": "2023-12-28" },
-        { "reference_month": "2032-11-01", "expected_release": "2032-12-15", "known_on": "2023-12-28" },
-        { "reference_month": "2032-12-01", "expected_release": "2033-01-15", "known_on": "2023-12-28" },
-        { "reference_month": "2033-01-01", "expected_release": "2033-02-15", "known_on": "2023-12-28" },
-        { "reference_month": "2033-02-01", "expected_release": "2033-03-15", "known_on": "2023-12-28" },
-        { "reference_month": "2033-03-01", "expected_release": "2033-04-15", "known_on": "2023-12-28" },
-        { "reference_month": "2033-04-01", "expected_release": "2033-05-15", "known_on": "2023-12-28" },
-        { "reference_month": "2033-05-01", "expected_release": "2033-06-15", "known_on": "2023-12-28" },
-        { "reference_month": "2033-06-01", "expected_release": "2033-07-15", "known_on": "2023-12-28" },
-        { "reference_month": "2033-07-01", "expected_release": "2033-08-15", "known_on": "2023-12-28" },
-        { "reference_month": "2033-08-01", "expected_release": "2033-09-15", "known_on": "2023-12-28" },
-        { "reference_month": "2033-09-01", "expected_release": "2033-10-15", "known_on": "2023-12-28" },
-        { "reference_month": "2033-10-01", "expected_release": "2033-11-15", "known_on": "2023-12-28" },
-        { "reference_month": "2033-11-01", "expected_release": "2033-12-15", "known_on": "2023-12-28" },
-        { "reference_month": "2033-12-01", "expected_release": "2034-01-15", "known_on": "2023-12-28" },
-        { "reference_month": "2034-01-01", "expected_release": "2034-02-15", "known_on": "2023-12-28" }
+        {
+          "reference_month": "2023-12-01",
+          "expected_release": "2024-01-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2024-01-01",
+          "expected_release": "2024-02-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2024-02-01",
+          "expected_release": "2024-03-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2024-03-01",
+          "expected_release": "2024-04-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2024-04-01",
+          "expected_release": "2024-05-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2024-05-01",
+          "expected_release": "2024-06-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2024-06-01",
+          "expected_release": "2024-07-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2024-07-01",
+          "expected_release": "2024-08-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2024-08-01",
+          "expected_release": "2024-09-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2024-09-01",
+          "expected_release": "2024-10-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2024-10-01",
+          "expected_release": "2024-11-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2024-11-01",
+          "expected_release": "2024-12-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2024-12-01",
+          "expected_release": "2025-01-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2025-01-01",
+          "expected_release": "2025-02-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2025-02-01",
+          "expected_release": "2025-03-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2025-03-01",
+          "expected_release": "2025-04-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2025-04-01",
+          "expected_release": "2025-05-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2025-05-01",
+          "expected_release": "2025-06-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2025-06-01",
+          "expected_release": "2025-07-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2025-07-01",
+          "expected_release": "2025-08-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2025-08-01",
+          "expected_release": "2025-09-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2025-09-01",
+          "expected_release": "2025-10-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2025-10-01",
+          "expected_release": "2025-11-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2025-11-01",
+          "expected_release": "2025-12-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2025-12-01",
+          "expected_release": "2026-01-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2026-01-01",
+          "expected_release": "2026-02-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2026-02-01",
+          "expected_release": "2026-03-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2026-03-01",
+          "expected_release": "2026-04-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2026-04-01",
+          "expected_release": "2026-05-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2026-05-01",
+          "expected_release": "2026-06-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2026-06-01",
+          "expected_release": "2026-07-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2026-07-01",
+          "expected_release": "2026-08-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2026-08-01",
+          "expected_release": "2026-09-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2026-09-01",
+          "expected_release": "2026-10-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2026-10-01",
+          "expected_release": "2026-11-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2026-11-01",
+          "expected_release": "2026-12-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2026-12-01",
+          "expected_release": "2027-01-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2027-01-01",
+          "expected_release": "2027-02-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2027-02-01",
+          "expected_release": "2027-03-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2027-03-01",
+          "expected_release": "2027-04-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2027-04-01",
+          "expected_release": "2027-05-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2027-05-01",
+          "expected_release": "2027-06-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2027-06-01",
+          "expected_release": "2027-07-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2027-07-01",
+          "expected_release": "2027-08-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2027-08-01",
+          "expected_release": "2027-09-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2027-09-01",
+          "expected_release": "2027-10-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2027-10-01",
+          "expected_release": "2027-11-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2027-11-01",
+          "expected_release": "2027-12-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2027-12-01",
+          "expected_release": "2028-01-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2028-01-01",
+          "expected_release": "2028-02-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2028-02-01",
+          "expected_release": "2028-03-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2028-03-01",
+          "expected_release": "2028-04-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2028-04-01",
+          "expected_release": "2028-05-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2028-05-01",
+          "expected_release": "2028-06-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2028-06-01",
+          "expected_release": "2028-07-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2028-07-01",
+          "expected_release": "2028-08-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2028-08-01",
+          "expected_release": "2028-09-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2028-09-01",
+          "expected_release": "2028-10-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2028-10-01",
+          "expected_release": "2028-11-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2028-11-01",
+          "expected_release": "2028-12-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2028-12-01",
+          "expected_release": "2029-01-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2029-01-01",
+          "expected_release": "2029-02-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2029-02-01",
+          "expected_release": "2029-03-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2029-03-01",
+          "expected_release": "2029-04-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2029-04-01",
+          "expected_release": "2029-05-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2029-05-01",
+          "expected_release": "2029-06-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2029-06-01",
+          "expected_release": "2029-07-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2029-07-01",
+          "expected_release": "2029-08-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2029-08-01",
+          "expected_release": "2029-09-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2029-09-01",
+          "expected_release": "2029-10-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2029-10-01",
+          "expected_release": "2029-11-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2029-11-01",
+          "expected_release": "2029-12-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2029-12-01",
+          "expected_release": "2030-01-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2030-01-01",
+          "expected_release": "2030-02-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2030-02-01",
+          "expected_release": "2030-03-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2030-03-01",
+          "expected_release": "2030-04-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2030-04-01",
+          "expected_release": "2030-05-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2030-05-01",
+          "expected_release": "2030-06-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2030-06-01",
+          "expected_release": "2030-07-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2030-07-01",
+          "expected_release": "2030-08-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2030-08-01",
+          "expected_release": "2030-09-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2030-09-01",
+          "expected_release": "2030-10-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2030-10-01",
+          "expected_release": "2030-11-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2030-11-01",
+          "expected_release": "2030-12-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2030-12-01",
+          "expected_release": "2031-01-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2031-01-01",
+          "expected_release": "2031-02-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2031-02-01",
+          "expected_release": "2031-03-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2031-03-01",
+          "expected_release": "2031-04-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2031-04-01",
+          "expected_release": "2031-05-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2031-05-01",
+          "expected_release": "2031-06-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2031-06-01",
+          "expected_release": "2031-07-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2031-07-01",
+          "expected_release": "2031-08-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2031-08-01",
+          "expected_release": "2031-09-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2031-09-01",
+          "expected_release": "2031-10-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2031-10-01",
+          "expected_release": "2031-11-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2031-11-01",
+          "expected_release": "2031-12-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2031-12-01",
+          "expected_release": "2032-01-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2032-01-01",
+          "expected_release": "2032-02-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2032-02-01",
+          "expected_release": "2032-03-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2032-03-01",
+          "expected_release": "2032-04-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2032-04-01",
+          "expected_release": "2032-05-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2032-05-01",
+          "expected_release": "2032-06-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2032-06-01",
+          "expected_release": "2032-07-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2032-07-01",
+          "expected_release": "2032-08-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2032-08-01",
+          "expected_release": "2032-09-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2032-09-01",
+          "expected_release": "2032-10-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2032-10-01",
+          "expected_release": "2032-11-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2032-11-01",
+          "expected_release": "2032-12-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2032-12-01",
+          "expected_release": "2033-01-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2033-01-01",
+          "expected_release": "2033-02-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2033-02-01",
+          "expected_release": "2033-03-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2033-03-01",
+          "expected_release": "2033-04-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2033-04-01",
+          "expected_release": "2033-05-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2033-05-01",
+          "expected_release": "2033-06-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2033-06-01",
+          "expected_release": "2033-07-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2033-07-01",
+          "expected_release": "2033-08-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2033-08-01",
+          "expected_release": "2033-09-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2033-09-01",
+          "expected_release": "2033-10-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2033-10-01",
+          "expected_release": "2033-11-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2033-11-01",
+          "expected_release": "2033-12-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2033-12-01",
+          "expected_release": "2034-01-15",
+          "known_on": "2023-12-28"
+        },
+        {
+          "reference_month": "2034-01-01",
+          "expected_release": "2034-02-15",
+          "known_on": "2023-12-28"
+        }
       ]
     }
   ],

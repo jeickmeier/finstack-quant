@@ -105,6 +105,83 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Lookback returns for each period horizon.",
+  "examples": [
+    {
+      "fiscal_config": {
+        "start_day": 1,
+        "start_month": 1
+      },
+      "fytd": [
+        0.015,
+        0.01
+      ],
+      "fytd_samples": [
+        {
+          "holding_end": "2025-01-13",
+          "holding_start": "2025-01-06",
+          "n_obs": 5
+        },
+        {
+          "holding_end": "2025-01-13",
+          "holding_start": "2025-01-06",
+          "n_obs": 5
+        }
+      ],
+      "mtd": [
+        0.015,
+        0.01
+      ],
+      "mtd_samples": [
+        {
+          "holding_end": "2025-01-13",
+          "holding_start": "2025-01-06",
+          "n_obs": 5
+        },
+        {
+          "holding_end": "2025-01-13",
+          "holding_start": "2025-01-06",
+          "n_obs": 5
+        }
+      ],
+      "qtd": [
+        0.015,
+        0.01
+      ],
+      "qtd_samples": [
+        {
+          "holding_end": "2025-01-13",
+          "holding_start": "2025-01-06",
+          "n_obs": 5
+        },
+        {
+          "holding_end": "2025-01-13",
+          "holding_start": "2025-01-06",
+          "n_obs": 5
+        }
+      ],
+      "ref_date": "2025-01-13",
+      "ticker_names": [
+        "FUND",
+        "SPX"
+      ],
+      "ytd": [
+        0.015,
+        0.01
+      ],
+      "ytd_samples": [
+        {
+          "holding_end": "2025-01-13",
+          "holding_start": "2025-01-06",
+          "n_obs": 5
+        },
+        {
+          "holding_end": "2025-01-13",
+          "holding_start": "2025-01-06",
+          "n_obs": 5
+        }
+      ]
+    }
+  ],
   "properties": {
     "fiscal_config": {
       "$ref": "#/$defs/FiscalConfig",

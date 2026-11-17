@@ -220,7 +220,7 @@ it("summarizes the total, the stamped FX policy and entities in registration ord
   const reversed = { ...galleryReport, entityIds: ["RATES", "CREDIT"] };
   render(<PortfolioSummary report={reversed} />);
   // Exact returned money (MoneyValue keeps the raw amount as its title).
-  expect(screen.getAllByTitle("1110934.085252534").length).toBeGreaterThan(0);
+  expect(screen.getAllByTitle("1110944.2306887242").length).toBeGreaterThan(0);
   expect(screen.getByText("cashflow_date")).toBeTruthy();
   const rows = rowsOf(
     within(screen.getByRole("region", { name: "Value by entity" })).getByRole(
@@ -231,7 +231,7 @@ it("summarizes the total, the stamped FX policy and entities in registration ord
     "RATES",
     "CREDIT",
   ]);
-  expect(within(rows[1]!).getByTitle("8912.216324015288")).toBeTruthy();
+  expect(within(rows[1]!).getByTitle("8922.36176020559")).toBeTruthy();
   expect(screen.getByText("No position fell back to PV only.")).toBeTruthy();
 });
 it("lists degraded positions with their native risk error", () => {

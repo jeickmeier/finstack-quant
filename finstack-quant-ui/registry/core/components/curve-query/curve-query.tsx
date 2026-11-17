@@ -46,7 +46,7 @@ export type CurveQueryData =
       }[];
       forwards: { t1: number; t2: number; rate: Outcome<number> }[];
     }
-  | { kind: "forward"; points: { t: CurvePoint; rate: Outcome<number> }[] }
+  | { kind: "forward"; points: { t: CurvePoint; df: Outcome<number> }[] }
   | {
       kind: "hazard";
       points: {
@@ -132,7 +132,7 @@ const tables = {
   },
   forward: {
     inputs: [["t", "Point"]],
-    measures: [["rate", "Forward rate (simple, on the curve day count)"]],
+    measures: [["df", "Projection factor"]],
   },
   hazard: {
     inputs: [["t", "Point"]],

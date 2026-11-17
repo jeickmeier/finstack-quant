@@ -52,6 +52,7 @@ fn create_test_pool() -> AssetPool {
             spread_bp: None,
             forward_curve_id: None,
             index_floor_bp: None,
+            reset_lag_days: None,
             maturity: maturity_date(),
             rating: Some(CreditRating::BB),
             industry: Some(format!("Industry_{}", i % 3)),

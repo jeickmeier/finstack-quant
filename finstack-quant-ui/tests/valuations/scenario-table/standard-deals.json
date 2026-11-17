@@ -1,6 +1,6 @@
 {
   "marketSource": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-  "marketSha256": "91b9c85cfc0472093142fed8ccd69a008c068f3cfd8b484c7d9d09495ae91b89",
+  "marketSha256": "e136cc5320c3bfad8ad06fd111b6866ccfee6cd52e4c223521e10b065f36d4ff",
   "asOf": "2024-01-01",
   "grid": {
     "cprs": [0, 0.1],

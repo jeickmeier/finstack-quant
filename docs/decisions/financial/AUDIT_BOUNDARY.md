@@ -2194,6 +2194,47 @@ closure and a small active difference with equal projected side totals.
 Production arithmetic, wire and host qualification remain pending.
 [ATTRIBUTION-016](attribution/16-benchmark-relative-return.md#accepted-decision-for-checked-grouped-benchmark-relative-returns).
 
+The accepted margin registry and contractual terms package has live source
+inspection, primary reference checks and an exact three-rate gross schedule
+example. Production registry, calculator, agreement and host qualification
+remain pending.
+[MARGIN-COLLATERAL-IM-001](margin-collateral-im/01-registry-and-defaults.md#accepted-decision-for-explicit-margin-parameter-snapshots-and-contractual-terms).
+
+The accepted SIMM parameter package has exact positive-pivot checks of four
+bundled matrices and primary-source comparisons for the named CQ and commodity
+tables. Production arithmetic, portfolio and host qualification remain pending.
+[MARGIN-COLLATERAL-IM-002](margin-collateral-im/02-simm-parameter-validation.md#accepted-decision-for-checked-simm-parameter-profiles-and-correlation-validation).
+
+Independent examples for the accepted SIMM sensitivity package tested matching
+volatility units, FX translation and pair identity, compensation, distinct
+expiry weights and underflow. Source repricing, runtime and host qualification
+remain pending.
+[MARGIN-COLLATERAL-IM-003](margin-collateral-im/03-sensitivity-inputs.md#accepted-decision-for-checked-simm-sensitivity-identity-scaling-and-netting).
+
+Independent Decimal examples for the accepted SIMM IR package covered
+distinct subcurves, tenor and currency offsets, the signed sum cap, and
+vega weighting and concentration. Runtime, portfolio and host qualification
+remain pending.
+[MARGIN-COLLATERAL-IM-004](margin-collateral-im/04-simm-interest-rate.md#accepted-decision-for-checked-simm-interest-rate-delta-and-vega-aggregation).
+
+Independent Decimal examples for the accepted qualifying-credit package
+covered signed concentration, payment currency and seniority, volatility
+weighting, residual addition and invalid effective dependence. Runtime,
+portfolio and host qualification remain pending.
+[MARGIN-COLLATERAL-IM-005](margin-collateral-im/05-simm-qualifying-credit.md#accepted-decision-for-checked-simm-qualifying-credit-delta-and-vega).
+
+Independent Decimal examples for the accepted nonqualifying-credit package
+covered classified and residual weights, same and different tranche
+concentration, cross-bucket vega and linear residual addition. Runtime,
+portfolio and host qualification remain pending.
+[MARGIN-COLLATERAL-IM-006](margin-collateral-im/06-simm-nonqualifying-credit.md#accepted-decision-for-checked-simm-nonqualifying-credit-delta-and-vega).
+
+Exact-rational checks of the published classified equity correlation matrix
+and Decimal examples of classified and residual delta, HVR and bucket 12
+vega support the accepted equity package. Runtime, portfolio and host
+qualification remain pending.
+[MARGIN-COLLATERAL-IM-007](margin-collateral-im/07-simm-equity.md#accepted-decision-for-checked-simm-equity-delta-and-vega).
+
 Selected tests and references were inspected; this does not claim review of
 every test body. Numerical suites, simulation experiments and vendor comparisons
 were not executed for these documentation audits. Independent semantic reviews

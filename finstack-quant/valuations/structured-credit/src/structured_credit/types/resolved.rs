@@ -120,6 +120,13 @@ impl StructuredCredit {
                         .into(),
                 ));
             }
+            if let Some(assumptions) = &period.assumptions {
+                super::pool::validate_reset_lag(
+                    "reinvestment assumptions",
+                    assumptions.forward_curve_id.as_deref(),
+                    assumptions.reset_lag_days,
+                )?;
+            }
         }
         Ok(())
     }

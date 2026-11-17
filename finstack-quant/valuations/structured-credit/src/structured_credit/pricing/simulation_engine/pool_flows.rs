@@ -435,14 +435,8 @@ pub(super) fn calculate_pool_flows_with_rates(
                 resolved_curves[curve_idx].as_ref(),
                 request.context,
                 request.prev_date,
-                period_helpers::CollateralCoupon {
-                    fallback_all_in_rate: state.pool_state.rates[i],
-                    spread_bp: state.pool_state.spread_bp[i],
-                    day_count: state.pool_state.day_counts[i],
-                    index_floor_rate: state.pool_state.index_floors[i],
-                },
+                period_helpers::CollateralCoupon::for_row(&state.pool_state, i)?,
                 state.floating_rate_shift,
-                2,
             )?
         } else {
             state.pool_state.rates[i]

@@ -88,6 +88,24 @@ fn fixture() -> Performance {
 }
 
 #[test]
+fn published_examples_validate_against_their_schemas() {
+    for artifact in ARTIFACTS {
+        let schema = artifact.generate().expect("schema renders");
+        let examples = schema["examples"].as_array().expect(artifact.relative_path);
+        assert!(!examples.is_empty(), "{}", artifact.relative_path);
+        let validator = jsonschema::options()
+            .should_validate_formats(true)
+            .build(&schema)
+            .expect("schema compiles");
+        for example in examples {
+            validator
+                .validate(example)
+                .unwrap_or_else(|error| panic!("{}: {error}", artifact.relative_path));
+        }
+    }
+}
+
+#[test]
 fn computed_result_carriers_round_trip_through_their_schemas() {
     let perf = fixture();
     assert_strict_result::<Performance>(

@@ -231,7 +231,7 @@ fi
 ignored=""; [ "${usage_slow:-false}" = "true" ] && ignored="--run-ignored only --no-tests pass --profile slow"
 if [ "${usage_coverage:-false}" = "true" ]; then
   cargo llvm-cov clean --workspace
-  run_tests() { cargo llvm-cov nextest --no-report --remap-path-prefix "$@"; }
+  run_tests() { NEXTEST_PROFILE=coverage cargo llvm-cov nextest --no-report --remap-path-prefix "$@"; }
 else
   run_tests() { cargo nextest run "$@"; }
 fi

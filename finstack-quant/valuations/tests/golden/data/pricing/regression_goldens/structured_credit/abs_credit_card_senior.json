@@ -112,10 +112,6 @@
               0.0405
             ],
             [
-              "2026-04-01",
-              0.0405
-            ],
-            [
               "2026-04-29",
               0.0405
             ]
@@ -915,6 +911,7 @@
               "rate": 0.035,
               "spread_bp": 350.0,
               "forward_curve_id": "SOFR-3M",
+              "reset_lag_days": 2,
               "maturity": "2030-01-01",
               "rating": "BB",
               "industry": "Technology",

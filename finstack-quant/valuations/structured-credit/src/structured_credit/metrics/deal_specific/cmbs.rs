@@ -1,12 +1,13 @@
 //! CMBS-specific metrics (LTV, DSCR).
 
 use crate::structured_credit::pricing::simulation_engine::period_helpers::term_rate_for_period;
+use crate::structured_credit::types::pool::require_reset_lag;
 use crate::structured_credit::utils::amortization::{
     level_payment_per_unit, remaining_schedule_periods,
 };
 use crate::structured_credit::utils::months::ClampedMonths;
 use crate::structured_credit::{DealType, PoolAsset, StructuredCredit};
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::units::BASIS_POINTS_PER_UNIT;
 use finstack_quant_valuations_core::metrics::MetricContext;
@@ -29,8 +30,18 @@ fn loan_debt_service(
     let coupon = match asset.forward_curve_id.as_deref() {
         Some(index) => {
             let curve = market.get_forward(index)?;
-            let projected =
-                term_rate_for_period(curve.as_ref(), market, as_of, asset.day_count, 0)?;
+            // Project the next reset: the accrual starting one reset lag after
+            // `as_of` fixes on the curve rather than on a historical fixing.
+            let reset_lag_days = require_reset_lag(asset.id.as_str(), asset.reset_lag_days)?;
+            let calendar = finstack_quant_core::dates::calendar_by_id_strict("weekends_only")?;
+            let next_reset = as_of.add_business_days(reset_lag_days, calendar)?;
+            let projected = term_rate_for_period(
+                curve.as_ref(),
+                market,
+                next_reset,
+                asset.day_count,
+                reset_lag_days,
+            )?;
             let floored = asset.index_floor_bp.map_or(projected, |floor_bp| {
                 projected.max(floor_bp / BASIS_POINTS_PER_UNIT)
             });

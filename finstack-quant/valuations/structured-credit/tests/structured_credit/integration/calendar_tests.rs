@@ -43,6 +43,7 @@ fn create_test_pool() -> AssetPool {
         400.0,
         maturity_date(),
         DayCount::Act360,
+        2,
     ));
     pool
 }

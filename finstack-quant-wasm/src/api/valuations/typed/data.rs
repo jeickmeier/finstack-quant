@@ -10,7 +10,9 @@
 //! (`{ amount, currency }`, `"act_360"`), not WASM handles.
 
 use super::structured::JsTrancheBuilder;
-use crate::utils::input::{from_js_json, js_f64, js_opt_f64, js_opt_string, js_string, js_uint};
+use crate::utils::input::{
+    from_js_json, js_f64, js_int, js_opt_f64, js_opt_string, js_string, js_uint,
+};
 use crate::utils::wire::{js_date, js_opt_date, js_wire};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndexParams;
@@ -332,8 +334,9 @@ pub fn pool_asset_fixed_rate_bond(
 /// @param spreadBp - Margin over the index in basis points.
 /// @param maturity - Maturity date as an ISO-8601 string.
 /// @param dayCount - Day-count serde name, e.g. `"act_360"`.
+/// @param resetLagDays - Business days (`weekends_only` calendar) before each accrual start on which the index fixes, e.g. `2` for term SOFR; must be non-negative for the deal to validate.
 /// @returns The `PoolAsset` plain object.
-/// @throws Error - Throws with kind `validation` if `balance`, `maturity` or `dayCount` is malformed, and kind `invalid_type` for a wrong argument type.
+/// @throws Error - Throws with kind `validation` if `balance`, `maturity` or `dayCount` is malformed, and kind `invalid_type` for a wrong argument type or a non-integer `resetLagDays`.
 #[wasm_bindgen(js_name = poolAssetFloatingRateLoan, unchecked_return_type = "generated.valuations.PoolAsset")]
 pub fn pool_asset_floating_rate_loan(
     #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
@@ -347,6 +350,8 @@ pub fn pool_asset_floating_rate_loan(
         unchecked_param_type = "generated.valuations.PoolAsset['day_count']"
     )]
     day_count: JsValue,
+    #[wasm_bindgen(js_name = "resetLagDays", unchecked_param_type = "number")]
+    reset_lag_days: JsValue,
 ) -> Result<JsValue, JsValue> {
     to_js_value(&PoolAsset::floating_rate_loan(
         js_string(&id, "id")?,
@@ -355,6 +360,7 @@ pub fn pool_asset_floating_rate_loan(
         js_f64(&spread_bp, "spreadBp")?,
         js_date(&maturity, "maturity")?,
         js_wire(&day_count, "dayCount")?,
+        js_int(&reset_lag_days, "resetLagDays")?,
     ))
 }
 

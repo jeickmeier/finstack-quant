@@ -20,7 +20,10 @@ import manifest from "./pricing-cases.json";
 import { budget } from "../../shared/budget";
 import { priceExtras } from "../../shared/price-extras.mjs";
 
-type Case = (typeof manifest.cases)[number];
+// The JSON import types an all-empty `marketPatches` as `never[]`.
+type Case = Omit<(typeof manifest.cases)[number], "marketPatches"> & {
+  marketPatches: { path: (string | number)[]; value: unknown }[];
+};
 const repository = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../../../..",

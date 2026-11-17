@@ -542,10 +542,10 @@ resolve the stated scope question explicitly.
   calibration tag exists, use the exact edition and immutable source/parameter
   identity without inventing a tag or requiring a new runtime metadata API.
   The [SIMM calculator](../../finstack-quant/margin/src/calculators/im/simm.rs)
-  exposes historical v2.6 and accepts configuration overlays, while `version()`
-  reports only the methodology enum. Record effective overlay/parameter
-  provenance after [registry overlays](../../finstack-quant/margin/src/registry/mod.rs);
-  the registry's wire-format version is a separate identity.
+  exposes historical v2.6, while `version()` reports only the methodology enum.
+  Record the exact effective profile identity independently of the wire version
+  and methodology edition. The accepted margin registry contract replaces the
+  recursive overlay with explicit immutable snapshots.
   The historical v2.6 table tests now pin `SimmVersion::V2_6`, the
   [margin data guide](../../finstack-quant/margin/data/margin/README.md) matches
   the five embedded files, tests and
@@ -645,7 +645,7 @@ fixture locations, exact methodology/effective-parameter pins, and recorded
 execution evidence for measured accuracy. Inherited metadata permits explicit
 case overrides; genuinely inapplicable fields require an explanation. Policy,
 implementation and validation statuses remain distinct. Golden fixture
-derivation metadata, SIMM effective overlay provenance, and the audit of other
+derivation metadata, SIMM effective parameter provenance, and the audit of other
 published accuracy claims remain in the reference follow-ups above. Acceptance
 does not approve a methodology upgrade, certify existing references or change
 protected expectations and tolerances.
@@ -2355,6 +2355,41 @@ requiring reproduction, adoption choices and missing validation are distinct.
   dates, explicit benchmark and taxonomy, one-sided comparators and centered
   closure before projection under the
   [accepted benchmark-relative contract](financial/attribution/16-benchmark-relative-return.md#accepted-decision-for-checked-grouped-benchmark-relative-returns).
+
+- **Margin parameter snapshots and terms.** Reconcile selected reference
+  data and immutable replay across calculators, agreements, portfolio and
+  existing hosts under the
+  [accepted margin registry contract](financial/margin-collateral-im/01-registry-and-defaults.md#accepted-decision-for-explicit-margin-parameter-snapshots-and-contractual-terms).
+
+- **SIMM parameter and correlation validation.** Reconcile canonical tables,
+  source and target horizons, fixed and effective dependence, and checked
+  calculations and host ingress under the
+  [accepted SIMM parameter contract](financial/margin-collateral-im/02-simm-parameter-validation.md#accepted-decision-for-checked-simm-parameter-profiles-and-correlation-validation).
+
+- **SIMM sensitivity inputs.** Reconcile qualified factor and currency
+  context, position scaling, additive contributions, expiry preservation and
+  checked snapshots across valuation adapters, portfolio and hosts under the
+  [accepted sensitivity contract](financial/margin-collateral-im/03-sensitivity-inputs.md#accepted-decision-for-checked-simm-sensitivity-identity-scaling-and-netting).
+
+- **SIMM interest-rate delta and vega.** Reconcile qualified subcurve inputs,
+  expiry-based vega, signed currency concentration and checked aggregation
+  across model, MVA, portfolio and hosts under the
+  [accepted IR contract](financial/margin-collateral-im/04-simm-interest-rate.md#accepted-decision-for-checked-simm-interest-rate-delta-and-vega-aggregation).
+
+- **SIMM qualifying-credit delta and vega.** Reconcile dated classification,
+  constituent delta, direct index vega, expiry and payment currency identity,
+  concentration and residual aggregation under the
+  [accepted qualifying-credit contract](financial/margin-collateral-im/05-simm-qualifying-credit.md#accepted-decision-for-checked-simm-qualifying-credit-delta-and-vega).
+
+- **SIMM nonqualifying-credit delta and vega.** Reconcile explicit bucket and
+  correlation group, tranche spread and expiry vega, and checked concentration
+  and residual aggregation under the
+  [accepted nonqualifying-credit contract](financial/margin-collateral-im/06-simm-nonqualifying-credit.md#accepted-decision-for-checked-simm-nonqualifying-credit-delta-and-vega).
+
+- **SIMM equity delta and vega.** Reconcile all historical buckets, exact
+  factor and index treatment, the elected volatility proxy and checked
+  concentration and dependence under the
+  [accepted equity contract](financial/margin-collateral-im/07-simm-equity.md#accepted-decision-for-checked-simm-equity-delta-and-vega).
 
 ### Implementation reconciliation
 

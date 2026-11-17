@@ -63,6 +63,7 @@ fn create_test_pool(balance: f64, currency: Currency) -> AssetPool {
             spread_bp: Some(400.0),
             forward_curve_id: Some("SOFR-3M".into()),
             index_floor_bp: None,
+            reset_lag_days: Some(2),
             maturity: Date::from_calendar_date(2030, time::Month::January, 1).unwrap(),
             rating: Some(CreditRating::BB),
             industry: Some("Technology".into()),

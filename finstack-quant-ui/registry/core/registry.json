@@ -40,7 +40,7 @@
       "type": "registry:hook",
       "title": "useCurveQuery",
       "description": "Reads a stored curve or surface at supplied points through the WASM worker.",
-      "docs": "MarketContext.getDiscount (df, zeroRate, forward), getForward (rate), getHazard (sp, hazardRate) or getSurface (models.volatility.getSurfaceVol), per supplied point, over the cached market handle. Null means no request. Requires FinstackQueryProvider. Each point keeps its own native error; an id the market does not hold is the hook error.",
+      "docs": "MarketContext.getDiscount (df, zeroRate, forward), getForward (df), getHazard (sp, hazardRate) or getSurface (models.volatility.getSurfaceVol), per supplied point, over the cached market handle. Null means no request. Requires FinstackQueryProvider. Each point keeps its own native error; an id the market does not hold is the hook error.",
       "files": [
         {
           "path": "hooks/use-curve-query/use-curve-query.ts",

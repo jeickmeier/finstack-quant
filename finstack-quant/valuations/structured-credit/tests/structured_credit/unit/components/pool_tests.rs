@@ -38,6 +38,7 @@ fn test_pool_asset_floating_rate_loan_creation() {
         450.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     );
 
     // Assert
@@ -81,6 +82,7 @@ fn test_pool_asset_builder_methods() {
             500.0,
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
+            2,
         )
         .with_rating(CreditRating::BB)
     };
@@ -180,6 +182,7 @@ fn test_asset_pool_total_balance_calculation() {
         400.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     ));
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L2",
@@ -188,6 +191,7 @@ fn test_asset_pool_total_balance_calculation() {
         450.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     ));
 
     // Act
@@ -221,6 +225,7 @@ fn test_asset_pool_rejects_asset_currency_mismatch() {
         400.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     ));
 
     let err = pool
@@ -246,6 +251,7 @@ fn test_asset_pool_performing_balance_excludes_defaults() {
         400.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     ));
 
     // Add defaulted asset
@@ -256,6 +262,7 @@ fn test_asset_pool_performing_balance_excludes_defaults() {
         450.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     );
     defaulted.defaulted = true;
     defaulted.recovery_amount =
@@ -342,6 +349,7 @@ fn test_pool_weighted_avg_spread_floating_rate_assets() {
         400.0, // 400bps
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     ));
     pool.assets.push(PoolAsset::floating_rate_loan(
         "L2",
@@ -350,6 +358,7 @@ fn test_pool_weighted_avg_spread_floating_rate_assets() {
         500.0, // 500bps
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     ));
 
     // Act
@@ -372,6 +381,7 @@ fn test_pool_weighted_avg_spread_mixed_assets() {
         450.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     ));
 
     // Fixed rate: carries no explicit spread, so it is EXCLUDED from WAS
@@ -402,6 +412,7 @@ fn test_pool_weighted_avg_spread_excludes_defaulted() {
         400.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     ));
     let mut defaulted = PoolAsset::floating_rate_loan(
         "L2",
@@ -410,6 +421,7 @@ fn test_pool_weighted_avg_spread_excludes_defaulted() {
         900.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     );
     defaulted.defaulted = true;
     pool.assets.push(defaulted);
@@ -518,6 +530,7 @@ fn test_pool_diversity_score_single_obligor() {
             400.0,
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
+            2,
         )
     });
     pool.assets.push(PoolAsset {
@@ -529,6 +542,7 @@ fn test_pool_diversity_score_single_obligor() {
             450.0,
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
+            2,
         )
     });
 
@@ -552,6 +566,7 @@ fn test_pool_diversity_score_multiple_obligors() {
             400.0,
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
+            2,
         )
     });
     pool.assets.push(PoolAsset {
@@ -563,6 +578,7 @@ fn test_pool_diversity_score_multiple_obligors() {
             450.0,
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
+            2,
         )
     });
 
@@ -588,6 +604,7 @@ fn test_pool_diversity_score_is_independent_of_asset_order() {
             400.0,
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
+            2,
         )
     };
     let mut forward = AssetPool::new("POOL", DealType::Clo, Currency::USD);
@@ -638,6 +655,7 @@ fn test_pool_assets_by_industry() {
             400.0,
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
+            2,
         )
     });
     pool.assets.push(PoolAsset {
@@ -649,6 +667,7 @@ fn test_pool_assets_by_industry() {
             450.0,
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
+            2,
         )
     });
     pool.assets.push(PoolAsset {
@@ -660,6 +679,7 @@ fn test_pool_assets_by_industry() {
             500.0,
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
+            2,
         )
     });
 
@@ -687,6 +707,7 @@ fn test_pool_assets_by_obligor() {
             400.0,
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
+            2,
         )
     });
     pool.assets.push(PoolAsset {
@@ -698,6 +719,7 @@ fn test_pool_assets_by_obligor() {
             450.0,
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
+            2,
         )
     });
 
@@ -726,6 +748,7 @@ fn test_calculate_pool_stats_comprehensive() {
             400.0,
             maturity_date(),
             finstack_quant_core::dates::DayCount::Act360,
+            2,
         )
         .with_rating(CreditRating::BB)
     });
@@ -771,6 +794,7 @@ fn test_calculate_pool_stats_with_defaults() {
         400.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     ));
 
     // Add defaulted asset
@@ -781,6 +805,7 @@ fn test_calculate_pool_stats_with_defaults() {
         450.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     );
     defaulted.defaulted = true;
     defaulted.recovery_amount =
@@ -848,6 +873,7 @@ fn test_pool_asset_type_classification() {
         spread_bp: Some(450.0),
         forward_curve_id: Some("SOFR-3M".to_string()),
         index_floor_bp: None,
+        reset_lag_days: Some(2),
         maturity: maturity_date(),
         rating: Some(CreditRating::BB),
         industry: Some("Technology".to_string()),
@@ -903,6 +929,7 @@ fn test_pool_wac_excludes_floating_and_defaulted_collateral() {
         400.0,
         maturity_date(),
         finstack_quant_core::dates::DayCount::Act360,
+        2,
     ));
     let mut defaulted = PoolAsset::fixed_rate_bond(
         "D1",
@@ -1117,6 +1144,7 @@ mod pool_report_tests {
             finstack_quant_core::dates::DayCount::Thirty360,
         );
         loan.forward_curve_id = Some("USD-SOFR".into());
+        loan.reset_lag_days = Some(0);
         loan.spread_bp = Some(350.0);
         floating.assets.push(loan);
         let report = pool_report(&floating, test_date()).expect("report");

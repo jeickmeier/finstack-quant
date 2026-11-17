@@ -46,6 +46,12 @@ pub struct PoolAsset {
     /// `None` for no floor. Ignored on fixed-rate rows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_floor_bp: Option<f64>,
+    /// Business days before each coupon period start on which the floating
+    /// index fixes (positive T-minus on a weekends-only calendar; `2` for
+    /// term-SOFR loans, `0` fixes on the period start). Required when
+    /// `forward_curve_id` is set; must be absent on fixed-rate rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reset_lag_days: Option<i32>,
     /// Contractual maturity date of the asset.
     #[cfg_attr(
         feature = "json-schema",
@@ -213,6 +219,7 @@ impl PoolAsset {
             forward_curve_id,
             maturity: bond.maturity,
             index_floor_bp: None,
+            reset_lag_days: None,
             rating: None,
             industry,
             obligor_id: None,
@@ -256,6 +263,9 @@ impl PoolAsset {
     /// * `spread_bp` - Spread over index in basis points
     /// * `maturity` - Maturity date
     /// * `day_count` - Day count convention
+    /// * `reset_lag_days` - Business days before each coupon period start on
+    ///   which the index fixes (positive T-minus; `2` for term-SOFR loans,
+    ///   `0` fixes on the period start).
     ///
     /// # Example
     /// ```text
@@ -275,6 +285,7 @@ impl PoolAsset {
     ///     450.0,  // 450bps spread
     ///     maturity_date,
     ///     DayCount::Act360,
+    ///     2,      // fixes two business days before each period
     /// );
     /// // asset.rate will be 0.0 initially (set after index fixings)
     /// // asset.spread_bp will be Some(450.0) for WAS calculation
@@ -286,6 +297,7 @@ impl PoolAsset {
         spread_bp: f64,
         maturity: Date,
         day_count: DayCount,
+        reset_lag_days: i32,
     ) -> Self {
         Self {
             id: id.into(),
@@ -296,6 +308,7 @@ impl PoolAsset {
             forward_curve_id: Some(forward_curve_id.into().as_str().to_string()),
             maturity,
             index_floor_bp: None,
+            reset_lag_days: Some(reset_lag_days),
             rating: None,
             industry: None,
             obligor_id: None,
@@ -342,6 +355,7 @@ impl PoolAsset {
             forward_curve_id: None,
             maturity,
             index_floor_bp: None,
+            reset_lag_days: None,
             rating: None,
             industry: None,
             obligor_id: None,
@@ -454,6 +468,10 @@ pub struct ReinvestmentAssumptions {
     /// Floating-rate index id (a forward curve in the market context), or
     /// `None` for a fixed coupon.
     pub forward_curve_id: Option<String>,
+    /// Business-day fixing lag of the purchased rows (see
+    /// `PoolAsset::reset_lag_days`); required when `forward_curve_id` is set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reset_lag_days: Option<i32>,
     /// Minimum all-in annual coupon in basis points (a floor on the resolved
     /// index plus spread, 100 = 1%), if any.
     pub all_in_floor_bp: Option<f64>,
@@ -607,6 +625,51 @@ fn is_zero(value: &f64) -> bool {
     *value == 0.0
 }
 
+/// Check that a collateral row carries a non-negative `reset_lag_days`
+/// exactly when it floats on a `forward_curve_id`.
+///
+/// # Arguments
+///
+/// * `row` - Row identifier quoted in the error message.
+/// * `forward_curve_id` - The row's index curve; `None` for a fixed coupon.
+/// * `reset_lag_days` - The row's business-day fixing lag.
+pub(crate) fn validate_reset_lag(
+    row: &str,
+    forward_curve_id: Option<&str>,
+    reset_lag_days: Option<i32>,
+) -> finstack_quant_core::Result<()> {
+    match (forward_curve_id, reset_lag_days) {
+        (Some(_), Some(lag)) if lag < 0 => Err(finstack_quant_core::Error::Validation(format!(
+            "collateral row '{row}' has a negative reset_lag_days ({lag}); use 0 to fix on the \
+             period start or a positive number of business days before it"
+        ))),
+        (Some(index), None) => Err(finstack_quant_core::Error::Validation(format!(
+            "floating collateral row '{row}' on '{index}' requires reset_lag_days"
+        ))),
+        (None, Some(_)) => Err(finstack_quant_core::Error::Validation(format!(
+            "fixed-rate collateral row '{row}' must not set reset_lag_days"
+        ))),
+        _ => Ok(()),
+    }
+}
+
+/// The business-day fixing lag of a floating collateral row.
+///
+/// # Arguments
+///
+/// * `row` - Row identifier quoted in the error message.
+/// * `reset_lag_days` - The row's lag; `None` is a validation error.
+pub(crate) fn require_reset_lag(
+    row: &str,
+    reset_lag_days: Option<i32>,
+) -> finstack_quant_core::Result<i32> {
+    reset_lag_days.ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "floating collateral row '{row}' requires reset_lag_days"
+        ))
+    })
+}
+
 /// Representative line for aggregated pool modeling
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -628,6 +691,10 @@ pub struct RepLine {
     /// `spread_bp`; `None` for no floor.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_floor_bp: Option<f64>,
+    /// Business-day fixing lag before each coupon period start (see
+    /// `PoolAsset::reset_lag_days`); required when `forward_curve_id` is set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reset_lag_days: Option<i32>,
     /// Weighted average maturity date
     #[cfg_attr(
         feature = "json-schema",
@@ -684,6 +751,7 @@ impl RepLine {
             spread_bp: None,
             forward_curve_id: None,
             index_floor_bp: None,
+            reset_lag_days: None,
             maturity,
             seasoning_months: 0,
             day_count,
@@ -936,6 +1004,7 @@ impl AssetPool {
                     spread_bp: line.spread_bp,
                     forward_curve_id: line.forward_curve_id,
                     index_floor_bp: line.index_floor_bp,
+                    reset_lag_days: line.reset_lag_days,
                     maturity: line.maturity,
                     rating: None,
                     industry: None,
@@ -1005,6 +1074,11 @@ impl AssetPool {
     fn validate_rows(&self) -> finstack_quant_core::Result<()> {
         for asset in &self.assets {
             self.validate_asset_currency(asset)?;
+            validate_reset_lag(
+                asset.id.as_str(),
+                asset.forward_curve_id.as_deref(),
+                asset.reset_lag_days,
+            )?;
             for (name, value) in [
                 ("SMM", asset.smm_override),
                 ("MDR", asset.mdr_override),
@@ -1529,6 +1603,71 @@ mod tests {
         assert_eq!(pool.id.as_str(), "TEST_POOL");
         assert_eq!(pool.deal_type, DealType::Clo);
         assert_eq!(pool.get_currency(), Currency::USD);
+    }
+
+    #[test]
+    fn reset_lag_is_required_exactly_on_floating_rows() {
+        use finstack_quant_core::dates::DayCount;
+        let closing = Date::from_calendar_date(2025, time::Month::January, 1).expect("closing");
+        let maturity = Date::from_calendar_date(2030, time::Month::January, 1).expect("maturity");
+        let balance = Money::from((100_i64, Currency::USD));
+        let validate = |asset: PoolAsset| {
+            let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
+            pool.assets.push(asset);
+            pool.normalized_view(closing).map(|_| ())
+        };
+        let floating = PoolAsset::floating_rate_loan(
+            "L",
+            balance,
+            "SOFR-3M",
+            300.0,
+            maturity,
+            DayCount::Act360,
+            2,
+        );
+        let fixed = PoolAsset::fixed_rate_bond("B", balance, 0.06, maturity, DayCount::Thirty360);
+
+        assert!(validate(floating.clone()).is_ok());
+        assert!(validate(fixed.clone()).is_ok());
+        let error = validate(PoolAsset {
+            reset_lag_days: None,
+            ..floating.clone()
+        })
+        .expect_err("floating row without a lag");
+        assert!(error.to_string().contains("requires reset_lag_days"));
+        let error = validate(PoolAsset {
+            reset_lag_days: Some(-1),
+            ..floating
+        })
+        .expect_err("negative lag");
+        assert!(error.to_string().contains("negative reset_lag_days"));
+        let error = validate(PoolAsset {
+            reset_lag_days: Some(2),
+            ..fixed
+        })
+        .expect_err("fixed row with a lag");
+        assert!(error.to_string().contains("must not set reset_lag_days"));
+
+        let mut line = RepLine::new(
+            "RL",
+            balance,
+            0.03,
+            maturity,
+            DayCount::Act360,
+            AssetType::FirstLienLoan {},
+        );
+        line.spread_bp = Some(300.0);
+        line.forward_curve_id = Some("SOFR-3M".into());
+        let mut pool = AssetPool::new("POOL", DealType::Clo, Currency::USD);
+        pool.rep_lines = Some(vec![line.clone()]);
+        let error = pool
+            .normalized(closing)
+            .expect_err("floating rep line without a lag");
+        assert!(error.to_string().contains("requires reset_lag_days"));
+        line.reset_lag_days = Some(2);
+        pool.rep_lines = Some(vec![line]);
+        let expanded = pool.normalized(closing).expect("lagged rep line expands");
+        assert_eq!(expanded.assets[0].reset_lag_days, Some(2));
     }
 }
 

@@ -1,14 +1,24 @@
-# MARGIN-COLLATERAL-IM-006 — SIMM nonqualifying residual credit
+# MARGIN-COLLATERAL-IM-006 — SIMM nonqualifying-credit delta and vega
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-16 for checked SIMM nonqualifying-credit delta and vega.
 
-**Implementation status:** Observed for the source scope below, including the stated limitations and discrepancies.
+**Implementation status:** Existing behavior is described below. Classification, factor identity, valuation adapter, aggregation, portfolio and host reconciliation with the accepted contract are pending.
 
-**Validation status:** Evidence inspected or specifically located; no tests/builds executed. Audit date **2026-11-05**; source revision `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` (scope and coverage in [README](README.md)).
+**Validation status:** Independent Decimal examples checked tranche concentration, classified and residual delta, cross-bucket vega and linear residual addition. Runtime, portfolio and host qualification remain pending. Audit date **2026-11-05** and source revision `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` (scope and coverage in [README](README.md)).
+
+## Accepted decision for checked SIMM nonqualifying-credit delta and vega
+
+1. Elect the historical USD profile within a qualified netting and product-class partition. Require dated authoritative classification into bucket 1 for investment-grade RMBS/CMBS, bucket 2 for high-yield or unrated RMBS/CMBS, or explicit residual with a documented basis. Net delta by qualified issuer, tranche and spread vertex on `1Y`, `2Y`, `3Y`, `5Y` or `10Y`. For a nonqualifying securitization, the valuation owner shocks the instrument or tranche spread. Preserve source, series and native currency evidence. [Accepted margin repricing contract](../valuations-framework/margin-bridge.md#accepted-decision-for-checked-margin-repricing-and-identity) · [ISDA SIMM v2.6, §§C and F](https://www.isda.org/a/b4ugE/ISDA-SIMM_v2.6_PUBLIC.pdf).
+2. Ordinary nonqualifying-credit vega uses option expiry on the five-vertex grid and carries underlying maturity in the source evidence. Form signed `σ × ∂PV/∂σ` with matching ATM volatility and derivative units before summing qualified contributions at the same expiry. Direct index vega retains its own qualified volatility identity and documented bucket, explicitly residual for cross-sector indexes. Apply the elected vega risk weight once, `0.76` in the bundled historical profile, with a credit HVR multiplier of one. [Record 003](03-sensitivity-inputs.md#accepted-decision-for-checked-simm-sensitivity-identity-scaling-and-netting) carries the expiry clarification. [ISDA SIMM v2.6, §§B.10, C.1 and F.1](https://www.isda.org/a/b4ugE/ISDA-SIMM_v2.6_PUBLIC.pdf).
+3. Compute `C = max(1, sqrt(abs(sum(raw)) / threshold))` independently for delta and vega on signed raw totals across vertices of the same qualified issuer and tranche or the same qualified index-volatility identity. Store nonqualifying-credit weights, thresholds and dependence in the elected profile. Historical delta uses `280 bp` and USD `9.5 million/bp` for bucket 1, and `1,300 bp` and USD `500,000/bp` for bucket 2 and residual. Vega uses a USD `70 million` threshold in all three buckets. Apply the selected weight and `C` to each retained factor. [ISDA SIMM v2.6, §§B, F and J](https://www.isda.org/a/b4ugE/ISDA-SIMM_v2.6_PUBLIC.pdf).
+4. Require the applicable correlation group for classified buckets, such as CMBX or ABX, independently of the tranche used for concentration. Use unit diagonals and historical off-diagonals `0.83` for the same classified group, `0.32` for different classified groups and `0.50` for distinct residual factors. Apply `min(C₁,C₂)/max(C₁,C₂)` to each off-diagonal. Compute `K = sqrt(wᵀRw)` and `S = clamp(sum(w), −K, K)` per bucket. Combine buckets 1 and 2 using `K²` diagonal terms and `2 × 0.43 × S₁ × S₂` at the historical correlation. Add residual `K` after the classified square root. [ISDA SIMM v2.6, §F.2](https://www.isda.org/a/b4ugE/ISDA-SIMM_v2.6_PUBLIC.pdf) · [ORE residual aggregation](https://github.com/OpenSourceRisk/Engine/blob/master/OREAnalytics/orea/simm/simmcalculator.cpp#L1000-L1034).
+5. Return checked delta and vega charges at the reference horizon. Use fixed bucket and factor order, compensated sums and scaled quadratics. Establish effective PSD structurally or apply the [accepted read-only dependence gate](02-simm-parameter-validation.md#accepted-decision-for-checked-simm-parameter-profiles-and-correlation-validation). Return typed errors for missing classification, invalid dependence, negative variance and unusable arithmetic. Preserve factor, bucket, concentration and aggregation evidence through the same Rust path for portfolio, MVA and hosts. A complete margin result requires all applicable components. [Record 010](10-simm-curvature.md) owns curvature, [record 011](11-simm-total-and-mpor.md) owns assembly and MPOR, and [record 022](22-wire-tables-and-provenance.md) owns wire format.
+
+Independent Decimal examples gave USD 14 million using the bucket 1 weight on `50,000 USD/bp` of investment-grade RMBS/CMBS delta and USD 65 million using the residual weight. Residual `±600,000 USD/bp` at distinct vertices of the same tranche gave USD 780 million. The same exposures on separate tranches gave USD 854,447,189.71 because each tranche concentrated independently.
 
 ## Choice and rationale
 
-Observed: the CNQ input lacks a rating or sector bucket, so the implementation applies a single residual model. Proposed rationale: retain name-level concentration and signed hedges without inventing absent classification.
+The observed input lacks a nonqualifying-credit bucket, so the implementation uses one residual calculation and groups concentration by name.
 
 ## Input domain and conventions
 
@@ -27,7 +37,7 @@ This residual classification is an explicit supported limitation, reflected in t
 
 ## Alternatives and tradeoffs
 
-A fully classified CNQ model can represent distinct bucket/rating rules; treating all CNQ as residual avoids unsupported inference but may materially change offset and charge behavior. Independent per-name portfolio scenarios can reveal the cost of that simplification.
+The accepted calculation represents all three historical buckets, with the tranche determining concentration and a separately qualified group determining classified dependence. Independent portfolio comparison remains an open qualification item.
 
 ## Source and validation evidence
 
@@ -39,5 +49,5 @@ Existing evidence: [src/calculators/im/simm.rs](../../../../finstack-quant/margi
 
 ## Follow-up tracking
 
-Adoption, implementation reconciliation and qualification work is tracked in the
+Implementation reconciliation and qualification work is tracked in the
 [collateral and initial-margin register](../FOLLOW_UPS.md#margin-collateral-and-initial-margin).

@@ -51,6 +51,33 @@ pub(crate) struct CollateralCoupon {
     pub(crate) day_count: DayCount,
     /// Decimal floor applied to the index before adding the spread.
     pub(crate) index_floor_rate: Option<f64>,
+    /// Business days before the period start on which the index fixes.
+    pub(crate) reset_lag_days: i32,
+}
+
+impl CollateralCoupon {
+    /// Coupon terms of pool-state row `i`.
+    ///
+    /// # Arguments
+    ///
+    /// * `pool` - Simulation pool state holding the per-row coupon terms.
+    /// * `i` - Row index into `pool`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when the row carries no `reset_lag_days`.
+    pub(crate) fn for_row(pool: &PoolState, i: usize) -> Result<Self> {
+        Ok(Self {
+            fallback_all_in_rate: pool.rates[i],
+            spread_bp: pool.spread_bp[i],
+            day_count: pool.day_counts[i],
+            index_floor_rate: pool.index_floors[i],
+            reset_lag_days: crate::structured_credit::types::pool::require_reset_lag(
+                &pool.ids[i],
+                pool.reset_lags[i],
+            )?,
+        })
+    }
 }
 
 /// Resolve an asset's all-in coupon without re-projecting an already-reset
@@ -63,20 +90,19 @@ pub(crate) struct CollateralCoupon {
 /// * `fwd` - Projection curve identifying the index and `index_tenor` metadata.
 /// * `context` - Market data supplying historical fixings for already-reset coupons.
 /// * `accrual_start` - Start date of the collateral coupon period.
-/// * `coupon` - Contractual accrual, spread, floor, and current all-in coupon terms.
+/// * `coupon` - Contractual accrual, spread, floor, reset lag, and current
+///   all-in coupon terms.
 /// * `rate_shift` - Additive decimal-rate shift applied only to projected index
 ///   rates, before the index floor and contractual spread.
-/// * `reset_lag_days` - Business-day observation lag prior to `accrual_start`.
 pub(crate) fn collateral_asset_rate_for_period(
     fwd: &ForwardCurve,
     context: &MarketContext,
     accrual_start: Date,
     coupon: CollateralCoupon,
     rate_shift: f64,
-    reset_lag_days: i32,
 ) -> Result<f64> {
     let calendar = finstack_quant_core::dates::calendar_by_id_strict("weekends_only")?;
-    let fixing_date = accrual_start.add_business_days(-reset_lag_days, calendar)?;
+    let fixing_date = accrual_start.add_business_days(-coupon.reset_lag_days, calendar)?;
     let spread = coupon.spread_bp.unwrap_or(0.0) / BASIS_POINTS_PER_UNIT;
     // The floor applies to the index before the spread (`FloatingRateSpec`
     // convention), so a floored loan pays `max(index, floor) + spread`.
@@ -106,7 +132,7 @@ pub(crate) fn collateral_asset_rate_for_period(
             context,
             accrual_start,
             coupon.day_count,
-            reset_lag_days,
+            coupon.reset_lag_days,
         )? + rate_shift,
     ) + spread)
         .max(0.0))
@@ -142,14 +168,8 @@ pub(super) fn current_collateral_wac(
                 fwd.as_ref(),
                 context,
                 period_start,
-                CollateralCoupon {
-                    fallback_all_in_rate: state.pool_state.rates[i],
-                    spread_bp: state.pool_state.spread_bp[i],
-                    day_count: state.pool_state.day_counts[i],
-                    index_floor_rate: state.pool_state.index_floors[i],
-                },
+                CollateralCoupon::for_row(&state.pool_state, i)?,
                 state.floating_rate_shift,
-                2,
             )?
         } else {
             state.pool_state.rates[i]

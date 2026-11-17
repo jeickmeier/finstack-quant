@@ -64,6 +64,7 @@ fn collateral() -> AssetPool {
             0.0,
             d(2032, 1, 1),
             DayCount::Act360,
+            2,
         );
         loan.forward_curve_id = None;
         loan.spread_bp = None;

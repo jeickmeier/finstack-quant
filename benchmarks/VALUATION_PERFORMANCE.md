@@ -180,6 +180,13 @@ the retained independent reference fixture:
 mise run rust-test-filter -- finstack-quant-valuations-credit tranche_check_exact_reference --lib --slow
 ```
 
+Independent oracle values and their sealed accuracy bounds are separate from
+target-specific implementation bit pins. Derived error-bound calculations admit
+at most eight ULPs of arithmetic noise; pricing checks always use the sealed
+bounds. The implementation pins reflect compensated cumulative-hazard evaluation,
+verified against the unchanged independent raw-cap, Student-t conditional-cap,
+loss, writedown, PV and correlation-delta bounds.
+
 The [independent oracle generator](../scripts/golden/valuation_tranche_reference.py)
 documents its pinned NumPy/SciPy invocation. It consumes a reviewed Rust
 numerical diagnostic export, not the instrument-input fixture directly.

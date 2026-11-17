@@ -65,6 +65,52 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Central performance analytics engine.",
+  "examples": [
+    {
+      "benchmark_idx": 1,
+      "end_idx": 5,
+      "frequency": "daily",
+      "price_dates": [
+        "2025-01-06",
+        "2025-01-07",
+        "2025-01-08",
+        "2025-01-09",
+        "2025-01-10",
+        "2025-01-13"
+      ],
+      "return_spans": [
+        {
+          "end": 5,
+          "start": 0
+        },
+        {
+          "end": 5,
+          "start": 0
+        }
+      ],
+      "returns": [
+        [
+          0.01,
+          -0.0148514851485,
+          0.0100502512563,
+          0.0149253731343,
+          -0.00490196078431
+        ],
+        [
+          0.006,
+          -0.00795228628231,
+          0.00501002004008,
+          0.00897308075773,
+          -0.00197628458498
+        ]
+      ],
+      "start_idx": 0,
+      "ticker_names": [
+        "FUND",
+        "SPX"
+      ]
+    }
+  ],
   "properties": {
     "benchmark_idx": {
       "format": "uint",

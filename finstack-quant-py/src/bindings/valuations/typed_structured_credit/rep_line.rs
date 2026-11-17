@@ -25,7 +25,7 @@ impl PyRepLine {
     #[new]
     #[pyo3(
         signature = (**fields),
-        text_signature = "(*, id, balance, rate, maturity, seasoning_months, day_count, asset_type, spread_bp=None, forward_curve_id=None, index_floor_bp=None, cpr=None, cdr=None, recovery_rate=None, contractual_payment=None, amortization_term_months=None, io_months=None)"
+        text_signature = "(*, id, balance, rate, maturity, seasoning_months, day_count, asset_type, spread_bp=None, forward_curve_id=None, index_floor_bp=None, reset_lag_days=None, cpr=None, cdr=None, recovery_rate=None, contractual_payment=None, amortization_term_months=None, io_months=None)"
     )]
     fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
         let inner: RepLine = crate::bindings::module_utils::fields_from_py(py, fields, "RepLine")?;
@@ -103,6 +103,9 @@ crate::bindings::macros::py_getters!(PyRepLine |s| {
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.index_floor_bp")]
     index_floor_bp -> Option<f64> = s.inner.index_floor_bp;
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.reset_lag_days")]
+    reset_lag_days -> Option<i32> = s.inner.reset_lag_days;
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_structured_credit.rep_line", "RepLine.contractual_payment")]
     contractual_payment -> Option<PyMoney> = s.inner.contractual_payment.map(money_to_py);

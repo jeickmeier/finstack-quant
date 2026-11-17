@@ -62,6 +62,27 @@ const t0 = native.MarketContext.fromJson(marketT0Json);
 // The worker's attributePortfolioPnl over the raw package: one native
 // attribution, then Rust's explain text, reconciliation and buckets for the
 // book and for each by_position entry.
+function reportOf(attribution, tolerance) {
+  return {
+    attribution,
+    explain: native.portfolioAttributionExplainText(attribution),
+    reconciliation: native.portfolioAttributionReconciliationCheck(
+      attribution,
+      tolerance,
+    ),
+    buckets: native.portfolioAttributionPctOfTotalByBucket(attribution),
+    positions: Object.entries(attribution.by_position).map(
+      ([positionId, position]) => ({
+        positionId,
+        attribution: position,
+        explain: native.pnlAttributionExplainText(position),
+        residualWithinTolerance:
+          native.pnlAttributionResidualWithinTolerance(position),
+        buckets: native.pnlAttributionPctOfTotalByBucket(position),
+      }),
+    ),
+  };
+}
 function attributed(t1, asOfT1, method, tolerance = reconciliationTolerance) {
   try {
     const attribution = native.attributePortfolioPnl(
@@ -72,40 +93,19 @@ function attributed(t1, asOfT1, method, tolerance = reconciliationTolerance) {
       asOfT1,
       method,
     );
-    return {
-      ok: true,
-      report: {
-        attribution,
-        explain: native.portfolioAttributionExplainText(attribution),
-        reconciliation: native.portfolioAttributionReconciliationCheck(
-          attribution,
-          tolerance,
-        ),
-        buckets: native.portfolioAttributionPctOfTotalByBucket(attribution),
-        positions: Object.entries(attribution.by_position).map(
-          ([positionId, position]) => ({
-            positionId,
-            attribution: position,
-            explain: native.pnlAttributionExplainText(position),
-            residualWithinTolerance:
-              native.pnlAttributionResidualWithinTolerance(position),
-            buckets: native.pnlAttributionPctOfTotalByBucket(position),
-          }),
-        ),
-      },
-    };
+    return { ok: true, report: reportOf(attribution, tolerance) };
   } catch (error) {
     return { ok: false, kind: error.kind, message: error.message };
   }
 }
-// A host demanding exact reconciliation (tolerance 0): Rust's twelve buckets
-// include the residual, so the book reconciles by construction and only the
-// floating-point remainder of their sum (about 5e-13 USD under metrics_based)
-// is left; at zero tolerance Rust says it does not reconcile. Positions under
-// metrics_based keep residuals outside Rust's own tolerance either way.
+// A host demanding exact reconciliation (tolerance 0). Rust's twelve buckets
+// include the residual, so the book reconciles up to the floating-point
+// remainder of their sum, and only a zero tolerance can expose it. Positions
+// under metrics_based keep residuals outside Rust's own tolerance either way.
 const exactTolerance = 0;
 let cases;
 let exact;
+let unreconciled;
 try {
   cases = Object.entries(closing).flatMap(([scenario, point]) => {
     const t1 = native.MarketContext.fromJson(point.marketT1Json);
@@ -133,6 +133,25 @@ try {
   } finally {
     t1.free();
   }
+  if (!exact.ok) throw new Error(`exact attribution failed: ${exact.message}`);
+  // Rust's residual bucket closes every native book, so the one book it does
+  // not reconcile is a host's whose total disagrees with its buckets: here the
+  // metrics_based book total misstated by one dollar, at the one-cent tolerance.
+  const { attribution } = exact.report;
+  const misstated = {
+    ...attribution,
+    total_pnl: {
+      ...attribution.total_pnl,
+      amount: String(Number(attribution.total_pnl.amount) + 1),
+    },
+  };
+  unreconciled = {
+    scenario: "usd-ois-50bp",
+    name: "metrics_based",
+    method: "metrics_based",
+    reconciliationTolerance,
+    report: reportOf(misstated, reconciliationTolerance),
+  };
 } finally {
   book.free();
   t0.free();
@@ -141,7 +160,7 @@ await emit(
   new URL("cases.json", import.meta.url),
   serializeHost({
     description:
-      "Native portfolio P&L attribution of the workbench's margined rates book (two bilateral swaps and a deposit) from the pricing market on the margin fixture's date to two host closing markets, under every Rust method: portfolio.attributePortfolioPnl, then portfolioAttributionExplainText, portfolioAttributionReconciliationCheck at a one-cent tolerance and portfolioAttributionPctOfTotalByBucket, and per position attribution.pnlAttributionExplainText, pnlAttributionResidualWithinTolerance and pnlAttributionPctOfTotalByBucket. The usd-ois-50bp closing market keeps the date; the roll-1m-25bp one rolls a month, where every method returns Rust's missing-fixing error. exact repeats metrics_based on usd-ois-50bp at a host tolerance of zero, where Rust reports the book not reconciled. The closing markets are stored because a host supplies them.",
+      "Native portfolio P&L attribution of the workbench's margined rates book (two bilateral swaps and a deposit) from the pricing market on the margin fixture's date to two host closing markets, under every Rust method: portfolio.attributePortfolioPnl, then portfolioAttributionExplainText, portfolioAttributionReconciliationCheck at a one-cent tolerance and portfolioAttributionPctOfTotalByBucket, and per position attribution.pnlAttributionExplainText, pnlAttributionResidualWithinTolerance and pnlAttributionPctOfTotalByBucket. The usd-ois-50bp closing market keeps the date; the roll-1m-25bp one rolls a month, where every method returns Rust's missing-fixing error. exact repeats metrics_based on usd-ois-50bp at a host tolerance of zero. unreconciled is that book with its total misstated by one dollar, which Rust does not reconcile at the one-cent tolerance. The closing markets are stored because a host supplies them.",
     sources: [workbench.source, market.source, scenarios.source],
     specJson,
     asOfT0,
@@ -149,6 +168,7 @@ await emit(
     closing,
     cases,
     exact,
+    unreconciled,
   }),
 );
 console.log(

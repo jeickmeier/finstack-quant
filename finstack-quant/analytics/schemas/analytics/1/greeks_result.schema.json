@@ -39,6 +39,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Greeks (alpha, beta, R-squared, adjusted R-squared) from a single-factor regression.",
+  "examples": [
+    {
+      "adjusted_r_squared": 0.992222088072,
+      "alpha": -0.150547458039,
+      "beta": 1.81104749028,
+      "n_obs": 5,
+      "r_squared": 0.994166566054
+    }
+  ],
   "properties": {
     "adjusted_r_squared": {
       "$ref": "#/$defs/NonFiniteF64Wire",

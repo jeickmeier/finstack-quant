@@ -29,6 +29,25 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Rolling greeks output.",
+  "examples": [
+    {
+      "alphas": [
+        -0.0361333978134,
+        -0.0611481907447,
+        -0.178208228685
+      ],
+      "betas": [
+        1.84088153236,
+        1.79944083273,
+        1.84854916947
+      ],
+      "dates": [
+        "2025-01-09",
+        "2025-01-10",
+        "2025-01-13"
+      ]
+    }
+  ],
   "properties": {
     "alphas": {
       "description": "Annual arithmetic Jensen alpha; undefined windows serialize as `\"nan\"`.",

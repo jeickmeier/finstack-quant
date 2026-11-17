@@ -64,6 +64,8 @@ pub(crate) struct PoolState {
     /// Floor on the floating index per asset (annual decimal), applied
     /// before the spread; `None` for unfloored or fixed-rate rows.
     pub(crate) index_floors: Vec<Option<f64>>,
+    /// Business-day fixing lag per asset; `None` on fixed-rate rows.
+    pub(crate) reset_lags: Vec<Option<i32>>,
     /// Delinquent balance per bucket for each asset (empty until a
     /// delinquency model sizes it); the asset's `balances` entry includes
     /// these amounts.
@@ -137,6 +139,7 @@ impl PoolState {
         self.rate_floors.push(rate_floor);
         self.index_floors
             .push(asset.index_floor_bp.map(|bp| bp / BASIS_POINTS_PER_UNIT));
+        self.reset_lags.push(asset.reset_lag_days);
         let curve_index = asset.forward_curve_id.as_ref().map(|id| {
             self.unique_curves
                 .iter()
@@ -255,6 +258,11 @@ impl PoolState {
                 .assets
                 .iter()
                 .map(|asset| asset.index_floor_bp.map(|bp| bp / BASIS_POINTS_PER_UNIT))
+                .collect(),
+            reset_lags: pool
+                .assets
+                .iter()
+                .map(|asset| asset.reset_lag_days)
                 .collect(),
             delinquent,
             balloon,

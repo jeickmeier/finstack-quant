@@ -81,7 +81,7 @@ it("pins Rust's horizon figures and leaves the annualized return undefined witho
   const rolled = report("roll-3m-50bp");
   expect(rolled.horizon_days).toBe(90);
   expect(rolled.summary.total_return).toBeCloseTo(0.008994543549970735, 15);
-  expect(rolled.summary.annualized_return).toBeCloseTo(0.03698223430599468, 15);
+  expect(rolled.summary.annualized_return).toBeCloseTo(0.03698223430599268, 15);
   // Parallel attribution returns no waterfall steps.
   expect(rolled.attribution.waterfall_steps).toBeUndefined();
   expect(rolled.attribution.meta.method).toBe("parallel");

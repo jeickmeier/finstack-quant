@@ -44,6 +44,7 @@ fn make_asset(id: &str, balance: f64, rate: f64, maturity: Date, defaulted: bool
         spread_bp: None,
         forward_curve_id: None,
         index_floor_bp: None,
+        reset_lag_days: None,
         maturity,
         rating: Some(CreditRating::BB),
         industry: Some("Test".to_string()),

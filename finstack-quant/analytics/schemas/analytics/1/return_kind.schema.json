@@ -2,6 +2,14 @@
   "$id": "https://finstack_quant.dev/schemas/analytics/1/return_kind.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "How the dependent return series is interpreted in a multi-factor regression.",
+  "examples": [
+    "excess",
+    {
+      "total": {
+        "risk_free_rate": 0.02
+      }
+    }
+  ],
   "oneOf": [
     {
       "const": "excess",

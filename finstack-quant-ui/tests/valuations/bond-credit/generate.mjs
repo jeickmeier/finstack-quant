@@ -54,9 +54,11 @@ const callable = withSpec(bullet, {
   },
 });
 const exampleFloating = native.Bond.exampleFloating();
-// Issued on the valuation date, so no past fixing is needed.
+// Issued two business days after the valuation date, so its first reset (a
+// two-business-day lag) is the valuation date: the horizon reprice holds that
+// projected fixing and no published fixing is needed.
 const frn = withSpec(JSON.parse(exampleFloating.toJson()), {
-  issue_date: asOf,
+  issue_date: "2024-07-17",
   instrument_pricing_overrides: {
     market_quotes: { quoted_clean_price_pct: 99.5 },
   },

@@ -79,6 +79,12 @@
   "$id": "https://finstack_quant.dev/schemas/analytics/1/cagr_day_count.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Day-count convention for CAGR annualization over explicit calendar dates.",
+  "examples": [
+    "act365_25",
+    {
+      "day_count": "act_365f"
+    }
+  ],
   "oneOf": [
     {
       "const": "act365_25",

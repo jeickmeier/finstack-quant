@@ -59,6 +59,7 @@ class PoolAsset:
         spread_bp: float | None = None,
         forward_curve_id: str | None = None,
         index_floor_bp: float | None = None,
+        reset_lag_days: int | None = None,
         rating: str | None = None,
         industry: str | None = None,
         obligor_id: str | None = None,
@@ -117,6 +118,11 @@ class PoolAsset:
         index_floor_bp : float, optional
             Floor on the floating index in basis points (``100`` = 1%),
             applied before ``spread_bp`` is added; ignored on fixed-rate rows.
+        reset_lag_days : int, optional
+            Business days (``weekends_only`` calendar) before each accrual
+            start on which the index fixes, e.g. ``2`` for term SOFR. Required
+            on a floating row and absent on a fixed row; deal validation
+            rejects a mismatch or a negative lag.
         rating : str, optional
             Credit rating (``"BB"``, ``"CCC"``, ``"NR"`` ...), used by the
             coverage-test haircuts and the CCC bucket.
@@ -249,7 +255,13 @@ class PoolAsset:
 
     @staticmethod
     def floating_rate_loan(
-        id: str, balance: Money, forward_curve_id: str, spread_bp: float, maturity: datetime.date, day_count: DayCount
+        id: str,
+        balance: Money,
+        forward_curve_id: str,
+        spread_bp: float,
+        maturity: datetime.date,
+        day_count: DayCount,
+        reset_lag_days: int,
     ) -> PoolAsset:
         """
         Floating-rate first-lien loan row (mirrors Rust ``PoolAsset::floating_rate_loan``).
@@ -268,6 +280,10 @@ class PoolAsset:
             Loan maturity.
         day_count : DayCount
             Accrual convention.
+        reset_lag_days : int
+            Business days (``weekends_only`` calendar) before each accrual
+            start on which the index fixes, e.g. ``2`` for term SOFR; must be
+            non-negative for the deal to validate.
 
         Returns
         -------
@@ -293,9 +309,10 @@ class PoolAsset:
         ...     350.0,
         ...     datetime.date(2030, 1, 1),
         ...     DayCount.ACT_360,
+        ...     2,
         ... )
-        >>> loan.forward_curve_id, loan.spread_bp
-        ('USD-SOFR-3M', 350.0)
+        >>> loan.forward_curve_id, loan.spread_bp, loan.reset_lag_days
+        ('USD-SOFR-3M', 350.0, 2)
         """
         ...
 
@@ -495,6 +512,23 @@ class PoolAsset:
         -------
         float | None
             ``None`` when the row is unfloored or fixed-rate.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def reset_lag_days(self) -> int | None:
+        """
+        Business days before each accrual start on which the floating index fixes.
+
+        Returns
+        -------
+        int | None
+            Non-negative lag on the ``weekends_only`` calendar; ``None`` on a
+            fixed-rate row.
 
         Notes
         -----

@@ -353,7 +353,8 @@ impl InstrumentCollateral {
     pub(crate) fn materialize(&self, closing_date: Date) -> Result<Vec<PoolAsset>> {
         let mut rows = Vec::with_capacity(self.len());
         for bond in &self.bonds {
-            let (rate, spread_bp, forward_curve_id) = bond_economics(&bond.cashflow_spec)?;
+            let (rate, spread_bp, forward_curve_id, reset_lag_days) =
+                bond_economics(&bond.cashflow_spec)?;
             rows.push(PoolAsset {
                 id: bond.id.clone(),
                 asset_type: AssetType::HighYieldBond {},
@@ -363,6 +364,7 @@ impl InstrumentCollateral {
                 forward_curve_id,
                 maturity: bond.maturity,
                 index_floor_bp: None,
+                reset_lag_days,
                 rating: None,
                 industry: None,
                 obligor_id: None,
@@ -390,8 +392,8 @@ impl InstrumentCollateral {
             });
         }
         for loan in &self.term_loans {
-            let (rate, spread_bp, forward_curve_id) = match &loan.rate {
-                RateSpec::Fixed { rate } => (*rate, None, None),
+            let (rate, spread_bp, forward_curve_id, reset_lag_days) = match &loan.rate {
+                RateSpec::Fixed { rate } => (*rate, None, None, None),
                 RateSpec::Floating(spec) => floating_economics(spec)?,
             };
             rows.push(PoolAsset {
@@ -403,6 +405,7 @@ impl InstrumentCollateral {
                 forward_curve_id,
                 maturity: loan.maturity,
                 index_floor_bp: None,
+                reset_lag_days,
                 rating: None,
                 industry: None,
                 obligor_id: None,
@@ -430,8 +433,8 @@ impl InstrumentCollateral {
             });
         }
         for facility in &self.revolvers {
-            let (rate, spread_bp, forward_curve_id) = match &facility.rate {
-                RateSpec::Fixed { rate } => (*rate, None, None),
+            let (rate, spread_bp, forward_curve_id, reset_lag_days) = match &facility.rate {
+                RateSpec::Fixed { rate } => (*rate, None, None, None),
                 RateSpec::Floating(spec) => floating_economics(spec)?,
             };
             rows.push(PoolAsset {
@@ -443,6 +446,7 @@ impl InstrumentCollateral {
                 forward_curve_id,
                 maturity: facility.maturity,
                 index_floor_bp: None,
+                reset_lag_days,
                 rating: None,
                 industry: None,
                 obligor_id: None,
@@ -508,23 +512,28 @@ fn require_currency(actual: Currency, expected: Currency, id: &InstrumentId) -> 
     Ok(())
 }
 
-/// `(rate, spread_bp, forward_curve_id)` for a floating-rate spec: the row's coupon
-/// is the spread until the index is projected by the engine.
-fn floating_economics(spec: &FloatingRateSpec) -> Result<(f64, Option<f64>, Option<String>)> {
+/// Coupon economics of a materialized row: `(rate, spread_bp,
+/// forward_curve_id, reset_lag_days)`.
+type RowEconomics = (f64, Option<f64>, Option<String>, Option<i32>);
+
+/// [`RowEconomics`] for a floating-rate spec: the row's coupon is the spread
+/// until the engine projects the index, fixing at the spec's reset lag.
+fn floating_economics(spec: &FloatingRateSpec) -> Result<RowEconomics> {
     let spread_bp = spec.spread_bp.as_f64();
     Ok((
         spread_bp / BASIS_POINTS_PER_UNIT,
         Some(spread_bp),
         Some(spec.forward_curve_id.to_string()),
+        Some(spec.reset_lag_days),
     ))
 }
 
-/// `(rate, spread_bp, forward_curve_id)` for a bond cashflow specification.
-fn bond_economics(spec: &CashflowSpec) -> Result<(f64, Option<f64>, Option<String>)> {
+/// [`RowEconomics`] for a bond cashflow specification.
+fn bond_economics(spec: &CashflowSpec) -> Result<RowEconomics> {
     match spec {
-        CashflowSpec::Fixed(fixed) => Ok((fixed.rate.as_f64(), None, None)),
+        CashflowSpec::Fixed(fixed) => Ok((fixed.rate.as_f64(), None, None, None)),
         CashflowSpec::Floating(floating) => floating_economics(&floating.rate_spec),
-        CashflowSpec::StepUp(step_up) => Ok((step_up.initial_rate.as_f64(), None, None)),
+        CashflowSpec::StepUp(step_up) => Ok((step_up.initial_rate.as_f64(), None, None, None)),
         CashflowSpec::Amortizing { base, .. } => bond_economics(base),
     }
 }

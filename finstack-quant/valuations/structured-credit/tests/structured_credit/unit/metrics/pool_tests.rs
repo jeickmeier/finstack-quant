@@ -64,6 +64,7 @@ fn test_pool_stats_weighted_spread_and_coupon() {
         400.0,
         maturity_date(),
         DayCount::Act360,
+        2,
     ));
     pool.assets.push(PoolAsset::fixed_rate_bond(
         "B1",

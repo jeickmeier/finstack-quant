@@ -8867,8 +8867,9 @@ export interface ValuationsInstrumentsNamespace {
    * @param spreadBp - Margin over the index in basis points.
    * @param maturity - Maturity date as an ISO-8601 string.
    * @param dayCount - Day-count serde name, e.g. `"act_360"`.
+   * @param resetLagDays - Business days (`weekends_only` calendar) before each accrual start on which the index fixes, e.g. `2` for term SOFR; must be non-negative for the deal to validate.
    * @returns The `PoolAsset` plain object.
-   * @throws Error - Throws with kind `validation` if `balance`, `maturity` or `dayCount` is malformed, and kind `invalid_type` for a wrong argument type.
+   * @throws Error - Throws with kind `validation` if `balance`, `maturity` or `dayCount` is malformed, and kind `invalid_type` for a wrong argument type or a non-integer `resetLagDays`.
    */
   readonly poolAssetFloatingRateLoan: typeof wasm.poolAssetFloatingRateLoan;
   /**

@@ -10,6 +10,27 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Common-sample Pearson correlation with ticker and sample provenance.",
+  "examples": [
+    {
+      "end_date": "2025-01-13",
+      "matrix": [
+        [
+          1.0,
+          0.997079016956
+        ],
+        [
+          0.997079016956,
+          1.0
+        ]
+      ],
+      "n_obs": 5,
+      "start_date": "2025-01-07",
+      "tickers": [
+        "FUND",
+        "SPX"
+      ]
+    }
+  ],
   "properties": {
     "end_date": {
       "$ref": "#/$defs/DateWire",

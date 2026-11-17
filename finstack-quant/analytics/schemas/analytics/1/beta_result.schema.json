@@ -39,6 +39,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "OLS beta result with standard error and 95% confidence interval.",
+  "examples": [
+    {
+      "beta": 1.81104749028,
+      "ci_lower": 1.55615158331,
+      "ci_upper": 2.06594339725,
+      "confidence_level": 0.95,
+      "n_obs": 5,
+      "std_err": 0.0800943307503
+    }
+  ],
   "properties": {
     "beta": {
       "$ref": "#/$defs/NonFiniteF64Wire",

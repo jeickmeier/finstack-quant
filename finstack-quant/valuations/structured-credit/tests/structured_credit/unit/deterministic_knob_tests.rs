@@ -147,6 +147,7 @@ fn window() -> ReinvestmentPeriod {
             price_pct: 100.0,
             maturity_months: 60,
             forward_curve_id: None,
+            reset_lag_days: None,
             all_in_floor_bp: None,
         }),
     }
@@ -303,6 +304,7 @@ fn floating_first_asset(deal: &mut StructuredCredit) {
         400.0,
         maturity(),
         DayCount::Act360,
+        2,
     );
     loating.rating = Some(CreditRating::BB);
     deal.pool.assets[0] = loating;

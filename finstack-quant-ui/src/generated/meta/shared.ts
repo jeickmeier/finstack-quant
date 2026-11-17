@@ -24894,6 +24894,12 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/PoolAsset/properties/reset_lag_days",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PoolAsset/properties/reset_lag_days",
+    "description": "Business days before each coupon period start on which the floating\nindex fixes (positive T-minus on a weekends-only calendar; `2` for\nterm-SOFR loans, `0` fixes on the period start). Required when\n`forward_curve_id` is set; must be absent on fixed-rate rows.",
+    "format": "int32"
+  },
+  {
     "path": "#/$defs/PoolAsset/properties/smm_override",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PoolAsset/properties/smm_override",
     "default": null,
@@ -26816,6 +26822,12 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/ReinvestmentAssumptions/properties/reset_lag_days",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ReinvestmentAssumptions/properties/reset_lag_days",
+    "description": "Business-day fixing lag of the purchased rows (see\n`PoolAsset::reset_lag_days`); required when `forward_curve_id` is set.",
+    "format": "int32"
+  },
+  {
     "path": "#/$defs/ReinvestmentAssumptions/properties/spread_bp",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ReinvestmentAssumptions/properties/spread_bp",
     "description": "Spread over the index in basis points (the whole coupon in basis\npoints when `forward_curve_id` is `None`).",
@@ -26989,6 +27001,12 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RepLine/properties/recovery_rate",
     "description": "Optional recovery rate override",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/RepLine/properties/reset_lag_days",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/RepLine/properties/reset_lag_days",
+    "description": "Business-day fixing lag before each coupon period start (see\n`PoolAsset::reset_lag_days`); required when `forward_curve_id` is set.",
+    "format": "int32"
   },
   {
     "path": "#/$defs/RepLine/properties/seasoning_months",
