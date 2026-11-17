@@ -129,8 +129,6 @@ fn valid_series_transforms_preserve_currency() {
         "fiscal_ytd(usd, 4)",
         "annualize(usd, 4)",
         "round(usd, 2)",
-        "floor(usd)",
-        "ceil(usd)",
     ] {
         let model = model_with_formula(formula)
             .unwrap_or_else(|error| panic!("{formula} should build: {error}"));
@@ -374,4 +372,22 @@ fn declared_units_agree_and_every_unit_resolves() {
     inconsistent
         .build()
         .expect_err("the final pass checks every formula against resolved units");
+}
+
+/// STATEMENTS-EVALUATION-002 #4: rounding money needs its decimal places
+/// stated, so the forms that cannot state them are rejected at build.
+#[test]
+fn rounding_money_needs_an_explicit_scale() {
+    for formula in ["round(usd)", "floor(usd)", "ceil(usd)"] {
+        let error = model_with_formula(formula).expect_err(formula);
+        assert!(
+            error
+                .to_string()
+                .contains("explicit number of decimal places"),
+            "{formula}: {error}"
+        );
+    }
+    for formula in ["round(rate)", "floor(rate)", "ceil(rate)", "round(usd, 2)"] {
+        model_with_formula(formula).unwrap_or_else(|error| panic!("{formula}: {error}"));
+    }
 }

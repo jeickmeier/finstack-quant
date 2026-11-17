@@ -679,7 +679,7 @@ export default [
   {
     "path": "#/$defs/d_76adf23abc095fd56514/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/0",
-    "description": "Division by zero encountered"
+    "description": "A percentage change or growth rate was measured from a zero base, so\nits cell is unavailable. A division by zero in a formula is an error,\nnot this warning."
   },
   {
     "path": "#/$defs/d_76adf23abc095fd56514/oneOf/0/properties/division_by_zero",

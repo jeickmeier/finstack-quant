@@ -301,7 +301,18 @@ impl UnitContext<'_> {
             | "ewm_mean" | "ewm_std" | "median" | "std" | "ttm" | "ytd" | "qtd" | "fiscal_ytd"
             | "annualize" | "round" | "floor" | "ceil" => {
                 require_scalar_arguments(func, auxiliary_dims)?;
-                Ok(first_arg_dimension(&arg_dims))
+                let first = first_arg_dimension(&arg_dims);
+                // Rounding money needs its decimal places stated, which only
+                // two-argument `round` can do.
+                if matches!(first, Dimension::Monetary(_))
+                    && (matches!(func, "floor" | "ceil") || (func == "round" && args.len() == 1))
+                {
+                    return Err(crate::error::Error::build(format!(
+                        "Unsupported units in {func}: rounding money needs an explicit number \
+                         of decimal places; use round(value, digits)"
+                    )));
+                }
+                Ok(first)
             }
             // Ratios, counts, signs and predicates remove the leading
             // argument's units. Their offsets, windows and flags are scalar.

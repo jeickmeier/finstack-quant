@@ -378,9 +378,11 @@ for_all_functions! {
     /// Returns weighted population variance without a sample-bias correction;
     /// the first non-NaN observation has variance zero.
     EwmVar => ("ewm_var", false),
-    /// Sum multiple values, skipping NaN values.
+    /// Sum of the arguments. Evaluated in the `statements` layer, where every
+    /// argument must be available.
     Sum => ("sum", false),
-    /// Average of multiple values, skipping NaN values.
+    /// Mean of the arguments. Evaluated in the `statements` layer, where every
+    /// argument must be available.
     Mean => ("mean", false),
     /// Annualize a flow value by multiplying by a required annualization
     /// factor: `annualize(value, annualization_factor)`. No factor is
@@ -419,20 +421,17 @@ for_all_functions! {
     /// Evaluated in the `statements` layer for monthly periods. The fiscal
     /// start month is provided as a numeric argument (1-12).
     FiscalYtd => ("fiscal_ytd", false),
-    /// Return first non-NaN/non-zero value (coalesce).
+    /// First available argument, including zero (coalesce). Evaluated in the
+    /// `statements` layer.
     Coalesce => ("coalesce", false),
     /// Minimum of two or more values.
     ///
-    /// Evaluated in the `statements` layer as an n-ary reducer. NaN handling
-    /// is order-dependent and follows IEEE 754 comparison semantics: with a
-    /// left-to-right fold of `if acc < arg { acc } else { arg }`, a leading
-    /// `NaN` is dropped in favor of a finite peer while a trailing `NaN`
-    /// propagates.
+    /// Evaluated in the `statements` layer as an n-ary reducer over operands
+    /// that must all be available and in the same units.
     Min => ("min", false),
     /// Maximum of two or more values.
     ///
-    /// Evaluated in the `statements` layer as an n-ary reducer. NaN handling
-    /// is order-dependent and follows IEEE 754 comparison semantics (see
+    /// Evaluated in the `statements` layer as an n-ary reducer (see
     /// [`Function::Min`]).
     Max => ("max", false),
     /// Absolute value helper (`abs(expr)`).

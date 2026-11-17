@@ -660,7 +660,7 @@
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Division by zero encountered",
+          "description": "A percentage change or growth rate was measured from a zero base, so\nits cell is unavailable. A division by zero in a formula is an error,\nnot this warning.",
           "properties": {
             "division_by_zero": {
               "properties": {

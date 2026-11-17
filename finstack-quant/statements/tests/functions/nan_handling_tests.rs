@@ -88,22 +88,27 @@ fn controls_are_lazy_and_propagate_an_unavailable_condition() {
     let (t, f, u) = ("seed > 0", "seed < 0", "gone > 0");
     let error = "1 / 0 > 0";
 
-    // and: a false left decides; otherwise the right decides.
+    // and: a false operand decides, and a false left skips the right.
     assert_eq!(flag(&format!("({t}) and ({t})")), Some(1.0));
     assert_eq!(flag(&format!("({t}) and ({f})")), Some(0.0));
     assert_eq!(flag(&format!("({f}) and ({u})")), Some(0.0));
     assert_eq!(flag(&format!("({f}) and ({error})")), Some(0.0));
     assert_eq!(flag(&format!("({t}) and ({u})")), None);
-    assert_eq!(flag(&format!("({u}) and ({f})")), None);
+    assert_eq!(flag(&format!("({u}) and ({f})")), Some(0.0));
+    assert_eq!(flag(&format!("({u}) and ({t})")), None);
+    assert_eq!(flag(&format!("({u}) and ({u})")), None);
+    assert!(failure(&format!("if(({u}) and ({error}), 1, 0)")).contains("division by zero"));
     assert!(failure(&format!("if(({t}) and ({error}), 1, 0)")).contains("division by zero"));
 
-    // or: a true left decides; otherwise the right decides.
+    // or: a true operand decides, and a true left skips the right.
     assert_eq!(flag(&format!("({f}) or ({f})")), Some(0.0));
     assert_eq!(flag(&format!("({f}) or ({t})")), Some(1.0));
     assert_eq!(flag(&format!("({t}) or ({u})")), Some(1.0));
     assert_eq!(flag(&format!("({t}) or ({error})")), Some(1.0));
     assert_eq!(flag(&format!("({f}) or ({u})")), None);
-    assert_eq!(flag(&format!("({u}) or ({t})")), None);
+    assert_eq!(flag(&format!("({u}) or ({t})")), Some(1.0));
+    assert_eq!(flag(&format!("({u}) or ({f})")), None);
+    assert_eq!(flag(&format!("({u}) or ({u})")), None);
     assert!(failure(&format!("if(({f}) or ({error}), 1, 0)")).contains("division by zero"));
 
     // not
@@ -185,6 +190,7 @@ fn rounding_defaults_to_zero_places_and_rounds_ties_away_from_zero() {
     assert_eq!(value("round(seed / 4, 1)"), Some(2.5));
     assert_eq!(value("round(1234.5, 0 - 2)"), Some(1200.0));
     assert!(failure("round(seed, 0.5)").contains("integer"));
+    assert!(failure("round(seed, 1.0000000001)").contains("integer"));
     assert_eq!(value("clamp(seed, 0, 10)"), Some(10.0));
     assert_eq!(value("clamp(seed, 0, 5)"), Some(5.0));
     assert_eq!(value("clamp(gone, 0, 5)"), None);

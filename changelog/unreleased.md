@@ -973,6 +973,9 @@ exact money, a Boolean or an unavailable value.
   and the `non_finite_skipped` warning is removed. `coalesce` returns the
   first available value, including zero, and does not recover an error.
   `is_missing` is true only for an unavailable value.
+- **Three-valued logic.** `false and x` is false and `true or x` is true
+  even when `x` is unavailable, in either operand order; otherwise an
+  unavailable operand makes the result unavailable.
 - **Boolean controls.** `if`, `and`, `or`, `not` and `where` need a Boolean:
   a comparison, a logical operator or `is_missing`. A number is rejected when
   the model is built (`if(flag, a, b)` becomes `if(flag == 1, a, b)`; a
@@ -982,8 +985,10 @@ exact money, a Boolean or an unavailable value.
 - **Exact comparisons.** `==` and `!=` compare the represented values; the
   `1e-10` tolerance is gone. Same-currency money compares, adds, subtracts,
   sums and averages as exact decimals.
-- **Rounding and clamp.** `round` of money needs its decimal places stated.
-  `clamp` with a lower bound above its upper bound is an error.
+- **Rounding and clamp.** `round` of money needs its decimal places stated;
+  `floor`, `ceil` and one-argument `round` of money are rejected when the
+  model is built. The digits of `round` and the offset of `shift` must be
+  exact integers. `clamp` with a lower bound above its upper bound is an error.
 - **Annualization.** `annualize_rate` takes method `0` (simple) or `1`
   (compound); any other value is an error, as is compounding a rate below
   -100%. An annualization factor must be positive and finite.

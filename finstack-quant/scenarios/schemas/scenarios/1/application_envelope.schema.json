@@ -12963,12 +12963,12 @@
         },
         {
           "const": "sum",
-          "description": "Sum multiple values, skipping NaN values.",
+          "description": "Sum of the arguments. Evaluated in the `statements` layer, where every\nargument must be available.",
           "type": "string"
         },
         {
           "const": "mean",
-          "description": "Average of multiple values, skipping NaN values.",
+          "description": "Mean of the arguments. Evaluated in the `statements` layer, where every\nargument must be available.",
           "type": "string"
         },
         {
@@ -13003,17 +13003,17 @@
         },
         {
           "const": "coalesce",
-          "description": "Return first non-NaN/non-zero value (coalesce).",
+          "description": "First available argument, including zero (coalesce). Evaluated in the\n`statements` layer.",
           "type": "string"
         },
         {
           "const": "min",
-          "description": "Minimum of two or more values.\n\nEvaluated in the `statements` layer as an n-ary reducer. NaN handling\nis order-dependent and follows IEEE 754 comparison semantics: with a\nleft-to-right fold of `if acc < arg { acc } else { arg }`, a leading\n`NaN` is dropped in favor of a finite peer while a trailing `NaN`\npropagates.",
+          "description": "Minimum of two or more values.\n\nEvaluated in the `statements` layer as an n-ary reducer over operands\nthat must all be available and in the same units.",
           "type": "string"
         },
         {
           "const": "max",
-          "description": "Maximum of two or more values.\n\nEvaluated in the `statements` layer as an n-ary reducer. NaN handling\nis order-dependent and follows IEEE 754 comparison semantics (see\n[`Function::Min`]).",
+          "description": "Maximum of two or more values.\n\nEvaluated in the `statements` layer as an n-ary reducer (see\n[`Function::Min`]).",
           "type": "string"
         },
         {

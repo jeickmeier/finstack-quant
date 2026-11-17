@@ -134,7 +134,7 @@ pub(crate) fn evaluate_integer_arg(
             format!("{func_name}() requires a finite integer argument"),
         ));
     }
-    if value.fract().abs() > ZERO_TOLERANCE {
+    if value.fract() != 0.0 {
         return Err(eval_error(
             node_id,
             format!("{func_name}() requires an integer argument"),
@@ -388,8 +388,11 @@ pub fn evaluate_formula(
 
 /// Evaluate a compiled expression to a typed value.
 ///
-/// `if`, `and` and `or` evaluate only the operands they need. An unavailable
-/// control or operand makes the result unavailable.
+/// `if`, `and` and `or` evaluate only the operands they need. `and` and
+/// `or` use strong three-valued logic: a false operand decides `and` and a
+/// true operand decides `or` even when the other is unavailable; otherwise an
+/// unavailable operand makes the result unavailable. An unavailable `if`
+/// condition makes the result unavailable.
 pub(crate) fn evaluate_value(
     expr: &Expr,
     context: &mut EvaluationContext,
@@ -418,18 +421,22 @@ pub(crate) fn evaluate_value(
         ExprNode::BinOp { op, left, right } => match op {
             BinOp::And | BinOp::Or => {
                 let what = if *op == BinOp::And { "and" } else { "or" };
+                // `and` is decided by a false operand, `or` by a true one.
+                let deciding = *op == BinOp::Or;
                 let left_val = evaluate_value(left, context, node_id)?;
-                let Some(left_flag) = value::control(left_val, what, at)? else {
-                    return Ok(left_val);
-                };
-                // `and` is decided by a false left operand, `or` by a true one.
-                if left_flag != (*op == BinOp::And) {
-                    return Ok(Value::Bool(left_flag));
+                let left_flag = value::control(left_val, what, at)?;
+                if left_flag == Some(deciding) {
+                    return Ok(Value::Bool(deciding));
                 }
+                // The right operand is needed. With an unavailable left it
+                // can still decide the result; otherwise the result is
+                // unavailable.
                 let right_val = evaluate_value(right, context, node_id)?;
-                Ok(match value::control(right_val, what, at)? {
-                    Some(flag) => Value::Bool(flag),
-                    None => right_val,
+                Ok(match (left_flag, value::control(right_val, what, at)?) {
+                    (_, Some(flag)) if flag == deciding => Value::Bool(deciding),
+                    (Some(_), Some(flag)) => Value::Bool(flag),
+                    (None, _) => left_val,
+                    (Some(_), None) => right_val,
                 })
             }
             BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => {

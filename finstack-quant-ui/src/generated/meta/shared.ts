@@ -18038,13 +18038,13 @@ export default [
     "path": "#/$defs/Function/oneOf/25",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/25",
     "const": "sum",
-    "description": "Sum multiple values, skipping NaN values."
+    "description": "Sum of the arguments. Evaluated in the `statements` layer, where every\nargument must be available."
   },
   {
     "path": "#/$defs/Function/oneOf/26",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/26",
     "const": "mean",
-    "description": "Average of multiple values, skipping NaN values."
+    "description": "Mean of the arguments. Evaluated in the `statements` layer, where every\nargument must be available."
   },
   {
     "path": "#/$defs/Function/oneOf/27",
@@ -18092,19 +18092,19 @@ export default [
     "path": "#/$defs/Function/oneOf/33",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/33",
     "const": "coalesce",
-    "description": "Return first non-NaN/non-zero value (coalesce)."
+    "description": "First available argument, including zero (coalesce). Evaluated in the\n`statements` layer."
   },
   {
     "path": "#/$defs/Function/oneOf/34",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/34",
     "const": "min",
-    "description": "Minimum of two or more values.\n\nEvaluated in the `statements` layer as an n-ary reducer. NaN handling\nis order-dependent and follows IEEE 754 comparison semantics: with a\nleft-to-right fold of `if acc < arg { acc } else { arg }`, a leading\n`NaN` is dropped in favor of a finite peer while a trailing `NaN`\npropagates."
+    "description": "Minimum of two or more values.\n\nEvaluated in the `statements` layer as an n-ary reducer over operands\nthat must all be available and in the same units."
   },
   {
     "path": "#/$defs/Function/oneOf/35",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/35",
     "const": "max",
-    "description": "Maximum of two or more values.\n\nEvaluated in the `statements` layer as an n-ary reducer. NaN handling\nis order-dependent and follows IEEE 754 comparison semantics (see\n[`Function::Min`])."
+    "description": "Maximum of two or more values.\n\nEvaluated in the `statements` layer as an n-ary reducer (see\n[`Function::Min`])."
   },
   {
     "path": "#/$defs/Function/oneOf/36",

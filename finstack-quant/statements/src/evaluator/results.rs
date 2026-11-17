@@ -885,7 +885,9 @@ pub enum CapitalStructureWarning {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum EvalWarning {
-    /// Division by zero encountered
+    /// A percentage change or growth rate was measured from a zero base, so
+    /// its cell is unavailable. A division by zero in a formula is an error,
+    /// not this warning.
     DivisionByZero {
         /// Identifier of the node that triggered the warning.
         node_id: String,

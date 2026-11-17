@@ -28,9 +28,10 @@
 //! currencies are evaluation errors naming the node and period. An
 //! unavailable operand makes the result unavailable. `==` and `!=` compare
 //! the represented values with no tolerance; same-currency money compares as
-//! exact decimals. `and`, `or` and `not` need Boolean operands and `and` /
+//! exact decimals. `and`, `or` and `not` need Boolean operands. `and` and
 //! `or` evaluate their right operand only when the left does not decide the
-//! result. A node whose formula is Boolean is published as `1` or `0`.
+//! result, and use strong three-valued logic: a false operand decides `and`
+//! and a true operand decides `or` even when the other is unavailable. A node whose formula is Boolean is published as `1` or `0`.
 //!
 //! ### Function Reference
 //!
@@ -40,8 +41,8 @@
 //! | `min(a, b, ...)`, `max(a, b, ...)` | 1+ | Smallest or largest argument. Every argument must be available and in the same units; an unavailable argument makes the result unavailable. |
 //! | `abs(expr)`, `sign(expr)` | 1 | Absolute value (exact for money) and sign indicator (`-1`, `0` or `1`). |
 //! | `pow(base, exp)` | 2 | Exponentiation of unitless numbers. An undefined or overflowing result (`pow(-1, 0.5)`, `pow(0, -1)`) is an error. |
-//! | `round(expr[, digits])` | 1-2 | Round to `digits` decimal places (default 0 for a scalar), midpoint ties away from zero. Negative `digits` rounds a scalar to tens/hundreds. Money needs `digits` stated and non-negative. |
-//! | `floor(expr)`, `ceil(expr)` | 1 | Largest/smallest integer at or below/above the value. |
+//! | `round(expr[, digits])` | 1-2 | Round to `digits` decimal places (default 0 for a scalar), midpoint ties away from zero. Negative `digits` rounds a scalar to tens/hundreds. Money needs `digits` stated and non-negative; one-argument `round` of money is rejected at build. `digits` must be an exact integer. |
+//! | `floor(expr)`, `ceil(expr)` | 1 | Largest/smallest integer at or below/above a unitless value. Money is rejected at build: use `round(value, digits)`. |
 //! | `ln(expr)`, `exp(expr)`, `log10(expr)`, `sqrt(expr)` | 1 | Natural log, exponential, base-10 log and square root of a unitless number. A value outside the domain (`ln(0)`, `sqrt(-1)`) or an overflow is an error. |
 //! | `clamp(expr, lo, hi)` | 3 | Clamp to the inclusive range `[lo, hi]` in the same units. `lo > hi` is an error; an unavailable argument makes the result unavailable. |
 //! | `is_missing(expr)` | 1 | Boolean: true when the value is missing, masked or unavailable. An error in `expr` still propagates. |
