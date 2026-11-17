@@ -135,7 +135,7 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
             Money::from((0_i64, Currency::USD)),
             &market,
             as_of,
-            Some(&dated),
+            Some(crate::capital_structure::SuppliedSchedule::holder(&dated)),
         )
         .expect("dated hedge schedule");
         assert_eq!(closing.amount(), 0.0);

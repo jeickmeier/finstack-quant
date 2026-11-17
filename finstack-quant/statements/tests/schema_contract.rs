@@ -317,26 +317,37 @@ fn root_types_generate_typed_schemas() {
 fn capital_structure_warning_uses_typed_canonical_values() {
     let warning = EvalWarning::CapitalStructure {
         period: PeriodId::quarter(2025, 1).expect("valid period fixture"),
-        warning: CapitalStructureWarning::CashflowIgnored {
-            cashflow_kind: CFKind::Recovery,
-            cashflow_date: Date::from_calendar_date(2025, Month::March, 31)
-                .expect("valid fixture date"),
-        },
+        warning: CapitalStructureWarning::ResidualScaleMismatch { applied_ratio: 1.5 },
     };
 
     let json = serde_json::to_value(warning).expect("warning should serialize");
     assert_eq!(
         json["capital_structure"]["warning"]["kind"],
-        "cashflow_ignored"
+        "residual_scale_mismatch"
     );
-    assert_eq!(
-        json["capital_structure"]["warning"]["cashflow_kind"],
-        "recovery"
-    );
-    assert_eq!(
-        json["capital_structure"]["warning"]["cashflow_date"],
-        "2025-03-31"
-    );
+    assert_eq!(json["capital_structure"]["warning"]["applied_ratio"], 1.5);
+}
+
+/// Distress cash keeps its instrument, kind, payment date and signed amount.
+#[test]
+fn distress_cashflow_uses_typed_canonical_values() {
+    let row = finstack_quant_statements::capital_structure::DistressCashflow {
+        instrument_id: "TL".into(),
+        payment_date: Date::from_calendar_date(2025, Month::March, 31).expect("valid date"),
+        kind: CFKind::Recovery,
+        amount: finstack_quant_core::money::Money::new(
+            -15.0,
+            finstack_quant_core::currency::Currency::USD,
+        )
+        .expect("valid money"),
+    };
+    let json = serde_json::to_value(&row).expect("row should serialize");
+    assert_eq!(json["kind"], "recovery");
+    assert_eq!(json["payment_date"], "2025-03-31");
+    assert_eq!(json["amount"]["amount"], "-15");
+    let back: finstack_quant_statements::capital_structure::DistressCashflow =
+        serde_json::from_value(json).expect("round trip");
+    assert_eq!(back, row);
 }
 
 #[test]

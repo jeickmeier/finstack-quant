@@ -2013,6 +2013,37 @@ export default [
     "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$"
   },
   {
+    "path": "#/$defs/d_b74dc9ca475664736351",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DistressCashflow",
+    "description": "One distress cash amount of a capital-structure instrument.\n\nDistress cash is a recovery, an accrual paid on default or a protection\npayment. It is reported separately from scheduled debt service."
+  },
+  {
+    "path": "#/$defs/d_b74dc9ca475664736351/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DistressCashflow/properties/amount",
+    "description": "Signed cash in the company's perspective and the instrument's native\ncurrency: a receipt is positive and a payment is negative.",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_b74dc9ca475664736351/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DistressCashflow/properties/instrument_id",
+    "description": "Capital-structure identifier of the instrument."
+  },
+  {
+    "path": "#/$defs/d_b74dc9ca475664736351/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DistressCashflow/properties/kind",
+    "description": "The cashflow kind: `recovery`, `accrued_on_default` or\n`protection_payment`.",
+    "ref": "#/$defs/CFKind",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CFKind"
+  },
+  {
+    "path": "#/$defs/d_b74dc9ca475664736351/properties/payment_date",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DistressCashflow/properties/payment_date",
+    "description": "Actual payment date of the cash.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DateWire"
+  },
+  {
     "path": "#/$defs/d_ba2543cd986556705dcc",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json#/$defs/SensitivityScenario",
     "description": "Result of a single sensitivity scenario."
@@ -2312,80 +2343,77 @@ export default [
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1",
-    "description": "A contractual cashflow kind is not represented in statement debt service."
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/cashflow_date",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/cashflow_date",
-    "description": "Original contractual payment date.",
-    "ref": "#/$defs/DateWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DateWire"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/cashflow_kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/cashflow_kind",
-    "description": "Canonical cashflow classification that was excluded.",
-    "ref": "#/$defs/CFKind",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CFKind"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/kind",
-    "const": "cashflow_ignored"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2",
     "description": "A negative creditor claim was neutralized instead of reducing other claims."
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/amount",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/amount",
     "description": "Negative claim amount in the waterfall currency.",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/category",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/category",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/category",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/category",
     "description": "Payment category containing the invalid negative claim.",
     "ref": "#/$defs/CapitalStructureClaimCategory",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureClaimCategory"
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/instrument_id",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/instrument_id",
     "description": "Instrument whose claim was neutralized."
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/kind",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/kind",
     "const": "negative_claim_neutralized"
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/3",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2",
     "description": "A negative available-cash pool was floored to zero before allocation."
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/amount",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/amount",
     "description": "Negative amount that was floored, in the waterfall currency.",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/kind",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/kind",
     "const": "negative_available_cash_floored"
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3/properties/node_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/node_id",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/node_id",
     "description": "Statement node supplying the available-cash amount."
+  },
+  {
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/3",
+    "description": "Available cash was insufficient to pay a cash-interest claim."
+  },
+  {
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/amount",
+    "description": "Unpaid amount in the waterfall currency.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/instrument_id",
+    "description": "Instrument carrying the unpaid claim forward."
+  },
+  {
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/kind",
+    "const": "interest_shortfall"
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/4",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/4",
-    "description": "Available cash was insufficient to pay a cash-interest claim."
+    "description": "Available cash was insufficient to pay a fee claim."
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/4/properties/amount",
@@ -2401,12 +2429,12 @@ export default [
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/4/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/4/properties/kind",
-    "const": "interest_shortfall"
+    "const": "fee_shortfall"
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/5",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/5",
-    "description": "Available cash was insufficient to pay a fee claim."
+    "description": "Available cash was insufficient to pay scheduled principal."
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/5/properties/amount",
@@ -2422,27 +2450,6 @@ export default [
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/5/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/5/properties/kind",
-    "const": "fee_shortfall"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/6",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/6",
-    "description": "Available cash was insufficient to pay scheduled principal."
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/6/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/6/properties/amount",
-    "description": "Unpaid amount in the waterfall currency.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/6/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/6/properties/instrument_id",
-    "description": "Instrument carrying the unpaid claim forward."
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/6/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/6/properties/kind",
     "const": "principal_shortfall"
   },
   {
@@ -2659,6 +2666,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/by_instrument/additionalProperties/additionalProperties",
     "ref": "#/$defs/CashflowBreakdown",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown"
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/distress_cash",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/distress_cash",
+    "description": "Distress cash by period: recoveries, accrual paid on default and\nprotection payments, each with its instrument, native currency and\nactual payment date, in schedule order.\n\nThese amounts are outside scheduled debt service: they are in no\nbreakdown, total or waterfall claim, and they change no principal.\nOnly periods with a distress row have an entry."
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/distress_cash/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/distress_cash/additionalProperties"
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/distress_cash/additionalProperties/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/distress_cash/additionalProperties/items",
+    "ref": "#/$defs/DistressCashflow",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DistressCashflow"
   },
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/equity_distribution",

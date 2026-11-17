@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pandas as pd
 from finstack_quant.core.money import Money
 
@@ -910,6 +912,30 @@ class CapitalStructureCashflows:
         -------
         dict[str, Money]
             Period id to ``Money``; empty unless a waterfall ran.
+        """
+        ...
+
+    @property
+    def distress_cash(self) -> dict[str, list[dict[str, Any]]]:
+        """
+        Distress cash by period id: recoveries, accrual paid on default and protection payments.
+
+        Distress cash is outside scheduled debt service. It is in no
+        breakdown, total or waterfall claim and changes no principal; an
+        explicit write-down moves ``debt_balance`` on its own date.
+
+        This property does not raise.
+
+        Returns
+        -------
+        dict[str, list[dict[str, Any]]]
+            Period id to its rows in schedule order. Each row has
+            ``instrument_id``, ``payment_date`` (ISO date of the actual
+            payment), ``kind`` (``"recovery"``, ``"accrued_on_default"`` or
+            ``"protection_payment"``) and ``amount`` (``{"amount", "currency"}``
+            in the instrument's native currency, signed for the company: a
+            receipt is positive and a payment negative). Only periods with a
+            distress row have an entry.
         """
         ...
 

@@ -74,45 +74,6 @@ export type DCf776B61125046D84B45 =
             }
           | {
               /**
-               * Original contractual payment date.
-               */
-              cashflow_date: string;
-              /**
-               * Canonical cashflow classification that was excluded.
-               */
-              cashflow_kind:
-                | "fixed"
-                | "floating"
-                | "inflation_coupon"
-                | "fee"
-                | "commitment_fee"
-                | "usage_fee"
-                | "facility_fee"
-                | "lc_fee"
-                | "fronting_fee"
-                | "notional"
-                | "pik"
-                | "amortization"
-                | "pre_payment"
-                | "revolving_draw"
-                | "revolving_repayment"
-                | "defaulted_notional"
-                | "recovery"
-                | "accrued_on_default"
-                | "protection_payment"
-                | "stub"
-                | "initial_margin_post"
-                | "initial_margin_return"
-                | "variation_margin_receive"
-                | "variation_margin_pay"
-                | "margin_interest"
-                | "collateral_substitution_in"
-                | "collateral_substitution_out";
-              kind: "cashflow_ignored";
-              [k: string]: unknown;
-            }
-          | {
-              /**
                * Negative claim amount in the waterfall currency.
                */
               amount: number;

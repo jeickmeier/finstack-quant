@@ -700,6 +700,12 @@ impl PyCapitalStructureCashflows {
         Ok(dict)
     }
 
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "CapitalStructureCashflows.distress_cash")]
+    #[getter]
+    fn distress_cash<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.distress_cash)
+    }
+
     /// Export per-instrument cashflows as a long pandas ``DataFrame``.
     ///
     /// Columns: ``instrument``, ``period`` (period id string),

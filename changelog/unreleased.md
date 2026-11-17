@@ -1243,3 +1243,26 @@ builder.add_debt("IRS", swap)
 `InterestRateSwap.from_conventions` takes its conventions from the named
 index, which may differ from the fixed semi-annual 30/360 against quarterly
 ACT/360 legs `add_swap` used; author the legs explicitly where they matter.
+
+### Statements: capital cash is classified by name and sign; distress cash is reported
+
+STATEMENTS-CAPITAL-002.
+
+- **Distress cash.** Recoveries, accrual paid on default and protection
+  payments are reported in `cs_cashflows.distress_cash`: per period, each row
+  has its instrument, payment date, kind and the company's signed amount.
+  They are outside debt service, totals and the waterfall. They used to be
+  dropped with a `cashflow_ignored` warning, which is removed.
+- **Rejected instead of ignored or absolute-valued.** A cashflow kind with no
+  capital-structure classification (margin, collateral, unknown) fails the
+  run. A fee or repayment row that is a company receipt fails instead of
+  being counted as a claim. An empty or reversed reporting period fails
+  before a schedule is read. A zero opening balance in another currency than
+  the schedule's fails.
+- **Inflation coupons** are netted with the other coupons; they used to be
+  ignored.
+- **PIK** is its signed principal effect, so a correction reduces the
+  capitalized total.
+- **Rust.** `calculate_period_flows` takes a supplied schedule as
+  `SuppliedSchedule { schedule, perspective }`
+  (`SuppliedSchedule::holder(&schedule)` for the canonical form).

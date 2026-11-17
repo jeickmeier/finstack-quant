@@ -351,7 +351,6 @@ enum WarningKey<'a> {
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 enum CapitalStructureKey<'a> {
     ResidualScaleMismatch(u64),
-    CashflowIgnored(finstack_quant_core::dates::Date, String),
     NegativeClaimNeutralized(CapitalStructureClaimCategory, &'a str, u64),
     NegativeAvailableCashFloored(&'a str, u64),
     InterestShortfall(&'a str, u64),
@@ -396,10 +395,6 @@ impl<'a> CapitalStructureKey<'a> {
             CapitalStructureWarning::ResidualScaleMismatch { applied_ratio } => {
                 Self::ResidualScaleMismatch(applied_ratio.to_bits())
             }
-            CapitalStructureWarning::CashflowIgnored {
-                cashflow_kind,
-                cashflow_date,
-            } => Self::CashflowIgnored(*cashflow_date, cashflow_kind.to_string()),
             CapitalStructureWarning::NegativeClaimNeutralized {
                 category,
                 instrument_id,

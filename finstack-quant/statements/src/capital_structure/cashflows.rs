@@ -118,6 +118,44 @@ pub struct CapitalStructureCashflows {
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[cfg_attr(feature = "json-schema", schemars(with = "IndexMap<String, Money>"))]
     pub available_cash: IndexMap<PeriodId, Money>,
+
+    /// Distress cash by period: recoveries, accrual paid on default and
+    /// protection payments, each with its instrument, native currency and
+    /// actual payment date, in schedule order.
+    ///
+    /// These amounts are outside scheduled debt service: they are in no
+    /// breakdown, total or waterfall claim, and they change no principal.
+    /// Only periods with a distress row have an entry.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "IndexMap<String, Vec<DistressCashflow>>")
+    )]
+    pub distress_cash: IndexMap<PeriodId, Vec<DistressCashflow>>,
+}
+
+/// One distress cash amount of a capital-structure instrument.
+///
+/// Distress cash is a recovery, an accrual paid on default or a protection
+/// payment. It is reported separately from scheduled debt service.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct DistressCashflow {
+    /// Capital-structure identifier of the instrument.
+    pub instrument_id: String,
+    /// Actual payment date of the cash.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
+    pub payment_date: finstack_quant_core::dates::Date,
+    /// The cashflow kind: `recovery`, `accrued_on_default` or
+    /// `protection_payment`.
+    pub kind: finstack_quant_core::cashflow::CFKind,
+    /// Signed cash in the company's perspective and the instrument's native
+    /// currency: a receipt is positive and a payment is negative.
+    pub amount: Money,
 }
 
 /// Breakdown of cashflows by type for a single period.
@@ -578,6 +616,9 @@ impl CapitalStructureCashflows {
         if let Some(cash) = self.available_cash.get(&period_id) {
             snapshot.available_cash.insert(period_id, *cash);
         }
+        if let Some(rows) = self.distress_cash.get(&period_id) {
+            snapshot.distress_cash.insert(period_id, rows.clone());
+        }
         snapshot.reporting_currency = self.reporting_currency;
         snapshot
     }
@@ -608,6 +649,9 @@ impl CapitalStructureCashflows {
         }
         for (pid, cash) in period_cs.available_cash {
             self.available_cash.insert(pid, cash);
+        }
+        for (pid, rows) in period_cs.distress_cash {
+            self.distress_cash.insert(pid, rows);
         }
         if self.reporting_currency.is_none() {
             self.reporting_currency = period_cs.reporting_currency;

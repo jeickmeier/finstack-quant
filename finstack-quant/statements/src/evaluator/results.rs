@@ -2,7 +2,6 @@
 
 use crate::evaluator::cell::UnavailableReason;
 use crate::types::{AmountOrScalar, NodeValueType};
-use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{Date, PeriodId, PeriodPlan};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::wire::SchemaVersion;
@@ -889,17 +888,6 @@ pub enum CapitalStructureWarning {
     ResidualScaleMismatch {
         /// Actual ratio of stateful to scheduled opening applied to the cashflows.
         applied_ratio: f64,
-    },
-    /// A contractual cashflow kind is not represented in statement debt service.
-    CashflowIgnored {
-        /// Canonical cashflow classification that was excluded.
-        cashflow_kind: CFKind,
-        /// Original contractual payment date.
-        #[cfg_attr(
-            feature = "json-schema",
-            schemars(with = "finstack_quant_core::wire::DateWire")
-        )]
-        cashflow_date: Date,
     },
     /// A negative creditor claim was neutralized instead of reducing other claims.
     NegativeClaimNeutralized {

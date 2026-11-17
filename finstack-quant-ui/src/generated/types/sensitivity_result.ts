@@ -291,45 +291,6 @@ export type D_76Adf23Abc095Fd56514 =
             }
           | {
               /**
-               * Original contractual payment date.
-               */
-              cashflow_date: string;
-              /**
-               * Canonical cashflow classification that was excluded.
-               */
-              cashflow_kind:
-                | "fixed"
-                | "floating"
-                | "inflation_coupon"
-                | "fee"
-                | "commitment_fee"
-                | "usage_fee"
-                | "facility_fee"
-                | "lc_fee"
-                | "fronting_fee"
-                | "notional"
-                | "pik"
-                | "amortization"
-                | "pre_payment"
-                | "revolving_draw"
-                | "revolving_repayment"
-                | "defaulted_notional"
-                | "recovery"
-                | "accrued_on_default"
-                | "protection_payment"
-                | "stub"
-                | "initial_margin_post"
-                | "initial_margin_return"
-                | "variation_margin_receive"
-                | "variation_margin_pay"
-                | "margin_interest"
-                | "collateral_substitution_in"
-                | "collateral_substitution_out";
-              kind: "cashflow_ignored";
-              [k: string]: unknown;
-            }
-          | {
-              /**
                * Negative claim amount in the waterfall currency.
                */
               amount: number;
@@ -1157,6 +1118,18 @@ export interface DF840Db5F4C38222F7Ca7 {
     [k: string]: {
       [k: string]: D_677810Bf9653Cfb0A467;
     };
+  };
+  /**
+   * Distress cash by period: recoveries, accrual paid on default and
+   * protection payments, each with its instrument, native currency and
+   * actual payment date, in schedule order.
+   *
+   * These amounts are outside scheduled debt service: they are in no
+   * breakdown, total or waterfall claim, and they change no principal.
+   * Only periods with a distress row have an entry.
+   */
+  distress_cash?: {
+    [k: string]: DB74Dc9Ca475664736351[];
   };
   /**
    * Post-waterfall residual cash distributed to equity per period.
@@ -2443,6 +2416,247 @@ export interface D_1B5716Dde9957A614F3C6 {
  * ```
  */
 export interface D_1B5716Dde9957A614F3C7 {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency:
+    | "AED"
+    | "AFN"
+    | "ALL"
+    | "AMD"
+    | "ANG"
+    | "AOA"
+    | "ARS"
+    | "AUD"
+    | "AWG"
+    | "AZN"
+    | "BAM"
+    | "BBD"
+    | "BDT"
+    | "BGN"
+    | "BHD"
+    | "BIF"
+    | "BMD"
+    | "BND"
+    | "BOB"
+    | "BRL"
+    | "BSD"
+    | "BTN"
+    | "BWP"
+    | "BYN"
+    | "BZD"
+    | "CAD"
+    | "CDF"
+    | "CHF"
+    | "CLF"
+    | "CLP"
+    | "CNY"
+    | "COP"
+    | "CRC"
+    | "CUC"
+    | "CUP"
+    | "CVE"
+    | "CZK"
+    | "DJF"
+    | "DKK"
+    | "DOP"
+    | "DZD"
+    | "EGP"
+    | "ERN"
+    | "ETB"
+    | "EUR"
+    | "FJD"
+    | "FKP"
+    | "GBP"
+    | "GEL"
+    | "GHS"
+    | "GIP"
+    | "GMD"
+    | "GNF"
+    | "GTQ"
+    | "GYD"
+    | "HKD"
+    | "HNL"
+    | "HRK"
+    | "HTG"
+    | "HUF"
+    | "IDR"
+    | "ILS"
+    | "INR"
+    | "IQD"
+    | "IRR"
+    | "ISK"
+    | "JMD"
+    | "JOD"
+    | "JPY"
+    | "KES"
+    | "KGS"
+    | "KHR"
+    | "KMF"
+    | "KPW"
+    | "KRW"
+    | "KWD"
+    | "KYD"
+    | "KZT"
+    | "LAK"
+    | "LBP"
+    | "LKR"
+    | "LRD"
+    | "LSL"
+    | "LYD"
+    | "MAD"
+    | "MDL"
+    | "MGA"
+    | "MKD"
+    | "MMK"
+    | "MNT"
+    | "MOP"
+    | "MRU"
+    | "MUR"
+    | "MVR"
+    | "MWK"
+    | "MXN"
+    | "MYR"
+    | "MZN"
+    | "NAD"
+    | "NGN"
+    | "NIO"
+    | "NOK"
+    | "NPR"
+    | "NZD"
+    | "OMR"
+    | "PAB"
+    | "PEN"
+    | "PGK"
+    | "PHP"
+    | "PKR"
+    | "PLN"
+    | "PYG"
+    | "QAR"
+    | "RON"
+    | "RSD"
+    | "RUB"
+    | "RWF"
+    | "SAR"
+    | "SBD"
+    | "SCR"
+    | "SDG"
+    | "SEK"
+    | "SGD"
+    | "SHP"
+    | "SLE"
+    | "SLL"
+    | "SOS"
+    | "SRD"
+    | "SSP"
+    | "STN"
+    | "SYP"
+    | "SZL"
+    | "THB"
+    | "TJS"
+    | "TMT"
+    | "TND"
+    | "TOP"
+    | "TRY"
+    | "TTD"
+    | "TWD"
+    | "TZS"
+    | "UAH"
+    | "UGX"
+    | "USD"
+    | "UYU"
+    | "UZS"
+    | "VED"
+    | "VES"
+    | "VND"
+    | "VUV"
+    | "WST"
+    | "XAF"
+    | "XCD"
+    | "XCG"
+    | "XOF"
+    | "XPF"
+    | "YER"
+    | "ZAR"
+    | "ZMW"
+    | "ZWG"
+    | "ZWL";
+}
+/**
+ * One distress cash amount of a capital-structure instrument.
+ *
+ * Distress cash is a recovery, an accrual paid on default or a protection
+ * payment. It is reported separately from scheduled debt service.
+ */
+export interface DB74Dc9Ca475664736351 {
+  amount: D_1B5716Dde9957A614F3C8;
+  /**
+   * Capital-structure identifier of the instrument.
+   */
+  instrument_id: string;
+  /**
+   * The cashflow kind: `recovery`, `accrued_on_default` or
+   * `protection_payment`.
+   */
+  kind:
+    | "fixed"
+    | "floating"
+    | "inflation_coupon"
+    | "fee"
+    | "commitment_fee"
+    | "usage_fee"
+    | "facility_fee"
+    | "lc_fee"
+    | "fronting_fee"
+    | "notional"
+    | "pik"
+    | "amortization"
+    | "pre_payment"
+    | "revolving_draw"
+    | "revolving_repayment"
+    | "defaulted_notional"
+    | "recovery"
+    | "accrued_on_default"
+    | "protection_payment"
+    | "stub"
+    | "initial_margin_post"
+    | "initial_margin_return"
+    | "variation_margin_receive"
+    | "variation_margin_pay"
+    | "margin_interest"
+    | "collateral_substitution_in"
+    | "collateral_substitution_out";
+  /**
+   * Actual payment date of the cash.
+   */
+  payment_date: string;
+}
+/**
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ *
+ * # Examples
+ * ```rust
+ * use finstack_quant_core::money::Money;
+ * use finstack_quant_core::currency::Currency;
+ *
+ * let notional = Money::from((1_000_000_i64, Currency::EUR));
+ * assert_eq!(notional.currency(), Currency::EUR);
+ * assert_eq!(notional.amount(), 1_000_000.0);
+ * ```
+ */
+export interface D_1B5716Dde9957A614F3C8 {
   /**
    * Monetary amount, carried on the wire as an exact decimal string rather
    * than a JSON number so no precision is lost in transit. Construction with

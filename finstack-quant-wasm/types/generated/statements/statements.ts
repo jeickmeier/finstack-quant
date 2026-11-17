@@ -1758,18 +1758,6 @@ export type CapitalStructureWarning =
     }
   | {
       /**
-       * Original contractual payment date.
-       */
-      cashflow_date: DateWire;
-      /**
-       * Canonical cashflow classification that was excluded.
-       */
-      cashflow_kind: CFKind;
-      kind: "cashflow_ignored";
-      [k: string]: unknown;
-    }
-  | {
-      /**
        * Negative claim amount in the waterfall currency.
        */
       amount: number;
@@ -4706,6 +4694,18 @@ export interface CapitalStructureCashflows {
     };
   };
   /**
+   * Distress cash by period: recoveries, accrual paid on default and
+   * protection payments, each with its instrument, native currency and
+   * actual payment date, in schedule order.
+   *
+   * These amounts are outside scheduled debt service: they are in no
+   * breakdown, total or waterfall claim, and they change no principal.
+   * Only periods with a distress row have an entry.
+   */
+  distress_cash?: {
+    [k: string]: DistressCashflow[];
+  };
+  /**
    * Post-waterfall residual cash distributed to equity per period.
    *
    * Only populated by waterfall evaluation when `available_cash_node` is
@@ -4837,6 +4837,32 @@ export interface CashflowBreakdown {
    * [`Self::scheduled_principal`].
    */
   voluntary_prepayment?: Money | null;
+}
+/**
+ * One distress cash amount of a capital-structure instrument.
+ *
+ * Distress cash is a recovery, an accrual paid on default or a protection
+ * payment. It is reported separately from scheduled debt service.
+ */
+export interface DistressCashflow {
+  /**
+   * Signed cash in the company's perspective and the instrument's native
+   * currency: a receipt is positive and a payment is negative.
+   */
+  amount: Money;
+  /**
+   * Capital-structure identifier of the instrument.
+   */
+  instrument_id: string;
+  /**
+   * The cashflow kind: `recovery`, `accrued_on_default` or
+   * `protection_payment`.
+   */
+  kind: CFKind;
+  /**
+   * Actual payment date of the cash.
+   */
+  payment_date: DateWire;
 }
 /**
  * Capital structure specification.

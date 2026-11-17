@@ -90,12 +90,20 @@ impl Evaluator {
         } = cs;
         let period_id = period.id;
 
-        let (contractual_flows, mut contractual_warnings) =
-            compute_contractual_flows(instruments, cs_state, period, market_ctx, as_of)?;
+        // The period is validated before any schedule is read.
+        crate::capital_structure::period_flows::validate_period(period)?;
+        let ContractualFlows {
+            flows: contractual_flows,
+            distress: distress_cash,
+            warnings: mut contractual_warnings,
+        } = compute_contractual_flows(instruments, cs_state, period, market_ctx, as_of)?;
 
         let fx_ctx = build_fx_context(model, market_ctx, period)?;
         let mut cs_cashflows = crate::capital_structure::CapitalStructureCashflows::new();
         merge_updated_flows(&mut cs_cashflows, &contractual_flows, period_id);
+        if !distress_cash.is_empty() {
+            cs_cashflows.distress_cash.insert(period_id, distress_cash);
+        }
         recompute_cs_totals(&mut cs_cashflows, period_id, fx_ctx.as_ref())?;
 
         let mut context = EvaluationContext::new_with_history(
@@ -247,19 +255,30 @@ pub(crate) fn resolve_opening_balance(
     Ok(schedule.get_notional().initial.abs())
 }
 
+/// One period's contractual capital-structure reading.
+struct ContractualFlows {
+    /// Debt-service breakdown per instrument.
+    flows: IndexMap<String, crate::capital_structure::CashflowBreakdown>,
+    /// Distress cash rows of the period, outside debt service.
+    distress: Vec<crate::capital_structure::DistressCashflow>,
+    /// Warnings raised while reading the schedules.
+    warnings: Vec<EvalWarning>,
+}
+
 fn compute_contractual_flows(
     instruments: &Instruments,
     cs_state: &mut crate::capital_structure::CapitalStructureState,
     period: &Period,
     market_ctx: &finstack_quant_core::market_data::context::MarketContext,
     as_of: Date,
-) -> Result<(
-    IndexMap<String, crate::capital_structure::CashflowBreakdown>,
-    Vec<EvalWarning>,
-)> {
-    use crate::capital_structure::period_flows::calculate_period_flows;
+) -> Result<ContractualFlows> {
+    use crate::capital_structure::period_flows::{
+        SuppliedSchedule, calculate_period_flows, is_debt_kind, period_distress_cash,
+    };
 
+    crate::capital_structure::period_flows::validate_period(period)?;
     let mut flows = IndexMap::new();
+    let mut distress = Vec::new();
     let mut warnings = Vec::new();
     for (instrument_id, instrument) in instruments {
         let opening_balance =
@@ -278,7 +297,12 @@ fn compute_contractual_flows(
                 .residual_schedules
                 .insert(instrument_id.clone(), schedule);
         }
-        let residual = cs_state.residual_schedules.get(instrument_id.as_str());
+        // A residual schedule is rebuilt from the instrument's own rows and
+        // keeps their holder perspective.
+        let residual = cs_state
+            .residual_schedules
+            .get(instrument_id.as_str())
+            .map(SuppliedSchedule::holder);
         let (breakdown, closing_balance, net_new_funding, period_warnings) =
             calculate_period_flows(
                 instrument.as_ref(),
@@ -288,6 +312,22 @@ fn compute_contractual_flows(
                 as_of,
                 residual,
             )?;
+        let is_debt = is_debt_kind(instrument.key())?;
+        let raw;
+        let source = match residual {
+            Some(supplied) => supplied,
+            None => {
+                raw = instrument.raw_cashflow_schedule(market_ctx, as_of)?;
+                SuppliedSchedule::holder(&raw)
+            }
+        };
+        distress.extend(period_distress_cash(
+            instrument_id.as_str(),
+            is_debt,
+            source,
+            period,
+        )?);
+        let residual = residual.map(|supplied| supplied.schedule);
         let principal_claims = residual.map(|schedule| {
             crate::capital_structure::period_flows::period_principal_claims(schedule, period)
         });
@@ -304,7 +344,11 @@ fn compute_contractual_flows(
             .period_new_funding
             .insert(instrument_id.to_string(), net_new_funding);
     }
-    Ok((flows, warnings))
+    Ok(ContractualFlows {
+        flows,
+        distress,
+        warnings,
+    })
 }
 
 /// Build the reporting-FX context for one period's `cs.*` totals.

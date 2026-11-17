@@ -309,12 +309,6 @@ export default [
     ]
   },
   {
-    "path": "#/$defs/d_6ebc05ff50e5cef14048",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/DateWire",
-    "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
-    "format": "date"
-  },
-  {
     "path": "#/$defs/d_797699a3f0493b0ba6f3",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning",
     "description": "Typed reason for a capital-structure evaluation warning."
@@ -338,80 +332,77 @@ export default [
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1",
-    "description": "A contractual cashflow kind is not represented in statement debt service."
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/cashflow_date",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/cashflow_date",
-    "description": "Original contractual payment date.",
-    "ref": "#/$defs/DateWire",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/DateWire"
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/cashflow_kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/cashflow_kind",
-    "description": "Canonical cashflow classification that was excluded.",
-    "ref": "#/$defs/CFKind",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind"
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/kind",
-    "const": "cashflow_ignored"
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2",
     "description": "A negative creditor claim was neutralized instead of reducing other claims."
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/amount",
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/amount",
     "description": "Negative claim amount in the waterfall currency.",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2/properties/category",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/category",
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/category",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/category",
     "description": "Payment category containing the invalid negative claim.",
     "ref": "#/$defs/CapitalStructureClaimCategory",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureClaimCategory"
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/instrument_id",
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/instrument_id",
     "description": "Instrument whose claim was neutralized."
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/kind",
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/kind",
     "const": "negative_claim_neutralized"
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/3",
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2",
     "description": "A negative available-cash pool was floored to zero before allocation."
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/3/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/amount",
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/amount",
     "description": "Negative amount that was floored, in the waterfall currency.",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/3/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/kind",
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/kind",
     "const": "negative_available_cash_floored"
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/3/properties/node_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/node_id",
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/node_id",
     "description": "Statement node supplying the available-cash amount."
+  },
+  {
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/3",
+    "description": "Available cash was insufficient to pay a cash-interest claim."
+  },
+  {
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/3/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/amount",
+    "description": "Unpaid amount in the waterfall currency.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/3/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/instrument_id",
+    "description": "Instrument carrying the unpaid claim forward."
+  },
+  {
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/3/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/kind",
+    "const": "interest_shortfall"
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/4",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/4",
-    "description": "Available cash was insufficient to pay a cash-interest claim."
+    "description": "Available cash was insufficient to pay a fee claim."
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/4/properties/amount",
@@ -427,12 +418,12 @@ export default [
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/4/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/4/properties/kind",
-    "const": "interest_shortfall"
+    "const": "fee_shortfall"
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/5",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/5",
-    "description": "Available cash was insufficient to pay a fee claim."
+    "description": "Available cash was insufficient to pay scheduled principal."
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/5/properties/amount",
@@ -448,27 +439,6 @@ export default [
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/5/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/5/properties/kind",
-    "const": "fee_shortfall"
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/6",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/6",
-    "description": "Available cash was insufficient to pay scheduled principal."
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/6/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/6/properties/amount",
-    "description": "Unpaid amount in the waterfall currency.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/6/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/6/properties/instrument_id",
-    "description": "Instrument carrying the unpaid claim forward."
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/6/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/6/properties/kind",
     "const": "principal_shortfall"
   },
   {
@@ -741,173 +711,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureClaimCategory/oneOf/1",
     "const": "interest",
     "description": "Cash-interest claims."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind",
-    "description": "Enumeration of cash-flow kinds for classification and ordering.\n\nUsed to distinguish between different types of cashflows for\nproper sequencing, risk calculation, and accounting treatment.\n\n# Sign Convention\n\nThe enum itself is **view agnostic**: individual instruments are\nresponsible for mapping these kinds into a holder or issuer view.\nBy convention in this crate:\n\n| Kind | Holder View (Long) | Issuer View (Short) |\n|------|-------------------|---------------------|\n| Interest (Fixed/Float) | Positive (receive) | Negative (pay) |\n| Notional (initial) | Negative (pay) | Positive (receive) |\n| Notional (final) | Positive (receive) | Negative (pay) |\n| Amortization | Positive (receive) | Negative (pay) |\n| PIK | Increases notional | Increases liability |\n| Fee | Negative (pay) | Positive (receive) |\n\nWhen constructing cashflow schedules, instruments should apply the appropriate\nsign based on the economic perspective being represented.\n\n# Cashflow Categories\n\nVariants are grouped by category:\n- **Interest**: `Fixed`, `Floating`, `Stub`\n- **Inflation**: `InflationCoupon`\n- **Fees**: `Fee`, `CommitmentFee`, `UsageFee`, `FacilityFee`, `LcFee`, `FrontingFee`\n- **Principal**: `Notional`, `PIK`, `Amortization`, `PrePayment`\n- **Revolving**: `RevolvingDraw`, `RevolvingRepayment`\n- **Credit Events**: `DefaultedNotional`, `Recovery`\n- **Margin/Collateral**: `InitialMarginPost`, `VariationMarginPay`, etc.\n\n# Labels\n\n`Display`, `FromStr`, and serde share one snake_case label per kind\n(`\"fixed\"`, `\"floating\"`, `\"pre_payment\"`). `FromStr` is ASCII\ncase-insensitive and ignores surrounding whitespace; serde accepts only\nthe canonical label."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/0",
-    "const": "fixed",
-    "description": "Fixed-rate coupon cash-flow.\n\nPeriodic interest payment calculated as: `notional × rate × accrual_factor`.\nThe `rate` field on [`CashFlow`] stores the coupon rate used."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/1",
-    "const": "floating",
-    "description": "Floating-rate coupon cash settlement.\n\nInterest payment based on a reference rate (e.g., SOFR, EURIBOR) plus\nspread; never a standalone fixing event. The `reset_date` field on\n[`CashFlow`] is the index observation date (metadata, not the payment\ndate). The `rate` field stores the all-in rate (index + spread) if known."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/10",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/10",
-    "const": "pik",
-    "description": "Payment-in-kind interest capitalization.\n\nInterest that is added to the outstanding principal rather than paid in cash.\nCreates a new notional amount: `new_notional = old_notional + PIK_interest`.\nThe amount field represents the interest capitalized."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/11",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/11",
-    "const": "amortization",
-    "description": "Scheduled amortization (principal repayment).\n\nReduces the outstanding principal per the amortization schedule.\nAmount is positive from holder perspective (principal returned).\nAfter amortization: `remaining_notional = previous_notional - amortization`."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/12",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/12",
-    "const": "pre_payment",
-    "description": "Prepayment of principal (unscheduled early repayment).\n\nVoluntary or mandatory early return of principal, common in:\n- Mortgage-backed securities (borrower refinancing)\n- CLO/CDO structures (collateral prepayments)\n- Callable bonds (issuer exercise)"
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/13",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/13",
-    "const": "revolving_draw",
-    "description": "Revolving facility draw (borrowing).\n\nIncrease in outstanding principal when borrower draws on a revolving facility.\nFrom holder (lender) view: negative (cash out to borrower).\nIncreases the drawn balance used for interest calculations."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/14",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/14",
-    "const": "revolving_repayment",
-    "description": "Revolving facility repayment.\n\nDecrease in outstanding principal when borrower repays revolving facility.\nFrom holder (lender) view: positive (cash in from borrower).\nRestores availability under the commitment."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/15",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/15",
-    "const": "defaulted_notional",
-    "description": "Defaulted notional (principal written down due to credit event).\n\nRepresents the portion of principal that has experienced a credit event\n(failure to pay, bankruptcy, restructuring). Amount reflects the\nwrite-down from par."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/16",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/16",
-    "const": "recovery",
-    "description": "Recovery cashflow from defaulted principal.\n\nAmount recovered through workout, liquidation, or settlement of defaulted\ndebt. Typically expressed as a percentage of defaulted notional\n(recovery rate × defaulted amount)."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/17",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/17",
-    "const": "accrued_on_default",
-    "description": "Accrued-on-default interest (ISDA standard for CDS).\n\nInterest accrued but unpaid at the time of a credit event.\nUnder ISDA standard conventions, the protection buyer pays\nthe accrued premium from the last payment date to the default date."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/18",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/18",
-    "const": "protection_payment",
-    "description": "Credit protection payment.\n\nActual cash paid by the protection seller on a credit event (for\nexample a CDS default leg settlement). Distinct from asset recovery\ncash ([`Self::Recovery`]) and from a noncash principal write-down\n([`Self::DefaultedNotional`])."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/19",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/19",
-    "const": "stub",
-    "description": "Irregular stub period interest.\n\nInterest payment for a non-standard accrual period at the beginning (front stub)\nor end (back stub) of a schedule. May be short stub (< regular period) or\nlong stub (> regular period). Accrual factor reflects actual period length."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/2",
-    "const": "inflation_coupon",
-    "description": "Inflation-linked coupon cash-flow.\n\nPeriodic coupon payment on an inflation-linked bond or swap leg where the\nreal coupon is multiplied by an index ratio (e.g., CPI / base CPI).\nThe `rate` field stores the real coupon rate when known."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/20",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/20",
-    "const": "initial_margin_post",
-    "description": "Initial margin posting (collateral transfer out to counterparty).\n\nRepresents the posting of initial margin collateral under CSA or clearing\nhouse rules. The amount is typically calculated using SIMM, schedule-based,\nor haircut methodologies."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/21",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/21",
-    "const": "initial_margin_return",
-    "description": "Initial margin return (collateral returned from counterparty).\n\nRepresents the return of previously posted initial margin when exposure\ndecreases or trade is terminated."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/22",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/22",
-    "const": "variation_margin_receive",
-    "description": "Variation margin received (positive VM payment to us).\n\nDaily or periodic mark-to-market payment received when exposure moves\nin our favor. Governed by CSA threshold, MTA, and rounding rules."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/23",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/23",
-    "const": "variation_margin_pay",
-    "description": "Variation margin paid (negative VM payment from us).\n\nDaily or periodic mark-to-market payment made when exposure moves\nagainst us. Governed by CSA threshold, MTA, and rounding rules."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/24",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/24",
-    "const": "margin_interest",
-    "description": "Interest accrued on posted margin collateral.\n\nRepresents interest paid or received on cash collateral posted as margin.\nRate typically defined in CSA (e.g., Fed Funds, EONIA, SONIA)."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/25",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/25",
-    "const": "collateral_substitution_in",
-    "description": "Collateral substitution inflow (replacement collateral received).\n\nWhen a counterparty substitutes one form of eligible collateral for another,\nthis represents the incoming replacement asset."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/26",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/26",
-    "const": "collateral_substitution_out",
-    "description": "Collateral substitution outflow (original collateral returned).\n\nWhen a counterparty substitutes collateral, this represents the return\nof the original collateral being replaced."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/3",
-    "const": "fee",
-    "description": "Up-front fee or cost paid at inception.\n\nOne-time fee paid at trade date or settlement date, such as origination fees,\narrangement fees, or underwriting fees."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/4",
-    "const": "commitment_fee",
-    "description": "Commitment fee on undrawn balance.\n\nPeriodic fee charged on the undrawn portion of a revolving facility.\nTypically quoted in basis points per annum on the unused commitment."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/5",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/5",
-    "const": "usage_fee",
-    "description": "Usage fee on drawn balance.\n\nAdditional fee charged when facility utilization exceeds a threshold,\ncommon in leveraged loan facilities."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/6",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/6",
-    "const": "facility_fee",
-    "description": "Facility fee on total commitment.\n\nFee charged on the entire committed amount regardless of utilization,\ncovering the lender's cost of keeping the facility available."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/7",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/7",
-    "const": "lc_fee",
-    "description": "Letter-of-credit fee.\n\nPeriodic fee on the face of letters of credit issued under a revolving\nfacility's LC sublimit, typically at the drawn margin."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/8",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/8",
-    "const": "fronting_fee",
-    "description": "Fronting fee.\n\nPeriodic fee paid to the issuing bank on the face of letters of credit\noutstanding under a revolving facility."
-  },
-  {
-    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/9",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/9",
-    "const": "notional",
-    "description": "Principal exchange or notional flow.\n\nUsed for initial notional payment (at inception), final notional repayment\n(at maturity), or intermediate notional exchanges in cross-currency swaps.\nFor bonds: initial = purchase price, final = par redemption."
   },
   {
     "path": "#/properties/forecast_periods",

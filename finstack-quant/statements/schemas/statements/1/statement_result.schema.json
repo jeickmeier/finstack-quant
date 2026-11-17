@@ -175,6 +175,16 @@
           "description": "Map of instrument_id → (period_id → cashflow_type → amount)",
           "type": "object"
         },
+        "distress_cash": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/DistressCashflow"
+            },
+            "type": "array"
+          },
+          "description": "Distress cash by period: recoveries, accrual paid on default and\nprotection payments, each with its instrument, native currency and\nactual payment date, in schedule order.\n\nThese amounts are outside scheduled debt service: they are in no\nbreakdown, total or waterfall claim, and they change no principal.\nOnly periods with a distress row have an entry.",
+          "type": "object"
+        },
         "equity_distribution": {
           "additionalProperties": {
             "$ref": "#/$defs/Money"
@@ -250,29 +260,6 @@
           "required": [
             "kind",
             "applied_ratio"
-          ],
-          "type": "object"
-        },
-        {
-          "description": "A contractual cashflow kind is not represented in statement debt service.",
-          "properties": {
-            "cashflow_date": {
-              "$ref": "#/$defs/DateWire",
-              "description": "Original contractual payment date."
-            },
-            "cashflow_kind": {
-              "$ref": "#/$defs/CFKind",
-              "description": "Canonical cashflow classification that was excluded."
-            },
-            "kind": {
-              "const": "cashflow_ignored",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "cashflow_kind",
-            "cashflow_date"
           ],
           "type": "object"
         },
@@ -1633,6 +1620,35 @@
       "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
       "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
       "type": "string"
+    },
+    "DistressCashflow": {
+      "additionalProperties": false,
+      "description": "One distress cash amount of a capital-structure instrument.\n\nDistress cash is a recovery, an accrual paid on default or a protection\npayment. It is reported separately from scheduled debt service.",
+      "properties": {
+        "amount": {
+          "$ref": "#/$defs/Money",
+          "description": "Signed cash in the company's perspective and the instrument's native\ncurrency: a receipt is positive and a payment is negative."
+        },
+        "instrument_id": {
+          "description": "Capital-structure identifier of the instrument.",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/CFKind",
+          "description": "The cashflow kind: `recovery`, `accrued_on_default` or\n`protection_payment`."
+        },
+        "payment_date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Actual payment date of the cash."
+        }
+      },
+      "required": [
+        "instrument_id",
+        "payment_date",
+        "kind",
+        "amount"
+      ],
+      "type": "object"
     },
     "EvalWarning": {
       "description": "Warning emitted during evaluation.",

@@ -344,7 +344,10 @@ mod period_flow_waterfall_integration {
                 .copied()
                 .expect("opening balance");
 
-            let residual = state.residual_schedules.get("TL-PIK");
+            let residual = state
+                .residual_schedules
+                .get("TL-PIK")
+                .map(crate::capital_structure::SuppliedSchedule::holder);
             let (breakdown, _, _, warnings) =
                 calculate_period_flows(&instrument, &period, opening, &market_ctx, issue, residual)
                     .expect("period flows");
@@ -479,7 +482,10 @@ mod period_flow_waterfall_integration {
             .residual_schedules
             .insert("TL-1".to_string(), instrument.schedule.clone());
 
-        let residual = state.residual_schedules.get("TL-1");
+        let residual = state
+            .residual_schedules
+            .get("TL-1")
+            .map(crate::capital_structure::SuppliedSchedule::holder);
         let (breakdown, _, _, warnings) = calculate_period_flows(
             &instrument,
             &q1,
@@ -521,7 +527,10 @@ mod period_flow_waterfall_integration {
 
         state.advance_period();
         let opening = state.opening_balances["TL-1"];
-        let residual = state.residual_schedules.get("TL-1");
+        let residual = state
+            .residual_schedules
+            .get("TL-1")
+            .map(crate::capital_structure::SuppliedSchedule::holder);
         let (q2_flows, _, _, q2_warnings) =
             calculate_period_flows(&instrument, &q2, opening, &market_ctx, issue, residual)
                 .expect("q2 flows");
