@@ -694,18 +694,40 @@ fn test_as_of_hidden_actuals_are_forecast_with_visible_base() {
                 params: indexmap! { "rate".into() => serde_json::json!(0.10) },
             },
         );
+        // Each observation is published on its period's exclusive end.
+        model_builder
+            .availability_dates(
+                "revenue",
+                &[
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        Date::from_calendar_date(2025, Month::April, 1).unwrap(),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        Date::from_calendar_date(2025, Month::July, 1).unwrap(),
+                    ),
+                ],
+            )
+            .unwrap();
+        model_builder.source_snapshot("original");
         model_builder.build().unwrap()
     };
 
-    // Q1's explicit value becomes visible at its exclusive period end; Q2
-    // remains hidden until its own period end.
+    // Q1 is published on the cutoff day; Q2 is published later and stays
+    // hidden.
     let as_of = Date::from_calendar_date(2025, Month::April, 1).unwrap();
     let mut evaluator = Evaluator::new();
     let results = evaluator
-        .evaluate_with_market(&model, &MarketContext::new(), as_of)
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            as_of,
+            finstack_quant_statements::evaluator::ObservationCutoff::Through(as_of),
+        )
         .expect("hidden actuals must resolve through the forecast, not hard-error");
 
-    // Q1 actual is visible at its default period-end availability date.
+    // Q1 is visible: its availability date is the cutoff day (inclusive).
     assert_eq!(
         results.get(
             "revenue",
@@ -769,21 +791,41 @@ fn test_explicit_availability_date_controls_actual_visibility() {
             },
         );
         model_builder
-            .availability_dates("revenue", &[(q1_2025, release_date)])
+            .availability_dates(
+                "revenue",
+                &[
+                    (
+                        q4_2024,
+                        Date::from_calendar_date(2025, Month::January, 1).unwrap(),
+                    ),
+                    (q1_2025, release_date),
+                ],
+            )
             .unwrap();
+        model_builder.source_snapshot("original");
         model_builder.build().unwrap()
     };
 
     let before_release = Date::from_calendar_date(2025, Month::April, 1).unwrap();
     let mut evaluator = Evaluator::new();
     let hidden = evaluator
-        .evaluate_with_market(&model, &MarketContext::new(), before_release)
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            before_release,
+            finstack_quant_statements::evaluator::ObservationCutoff::Through(before_release),
+        )
         .unwrap();
     assert!((hidden.get("revenue", &q1_2025).unwrap() - 110.0).abs() < 1e-12);
 
     let mut evaluator = Evaluator::new();
     let visible = evaluator
-        .evaluate_with_market(&model, &MarketContext::new(), release_date)
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            release_date,
+            finstack_quant_statements::evaluator::ObservationCutoff::Through(release_date),
+        )
         .unwrap();
     assert_eq!(visible.get("revenue", &q1_2025), Some(999.0));
     assert!((visible.get("revenue", &q2_2025).unwrap() - 1_098.9).abs() < 1e-12);

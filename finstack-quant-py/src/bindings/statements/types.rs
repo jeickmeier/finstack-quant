@@ -986,6 +986,22 @@ impl PyFinancialModelSpec {
         &self.inner.id
     }
 
+    #[doc = pydoc!("finstack_quant.statements._types", "FinancialModelSpec.source_snapshot")]
+    #[getter]
+    fn source_snapshot(&self) -> Option<&str> {
+        self.inner.source_snapshot.as_deref()
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._types", "FinancialModelSpec.apply_edits")]
+    #[pyo3(text_signature = "($self, edits)")]
+    fn apply_edits(&self, py: Python<'_>, edits: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let edits: Vec<finstack_quant_statements::types::ModelEdit> =
+            crate::bindings::module_utils::spec_from_py(py, edits, "model edits")?;
+        let mut inner = self.inner.clone();
+        inner.apply_edits(&edits).map_err(statements_to_py)?;
+        Ok(Self { inner })
+    }
+
     /// Number of periods in the model timeline.
     ///
     /// Counted in **periods** on the model's own cadence (quarters, months,

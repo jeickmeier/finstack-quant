@@ -5171,7 +5171,7 @@ export default [
   {
     "path": "#/$defs/d_7b4cd44901322286925a/properties/availability_dates",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NodeSpec/properties/availability_dates",
-    "description": "Point-in-time availability date for each explicit period value.\n\nWhen absent for a value, market-aware evaluation conservatively makes\nthat value visible on the period's exclusive end date. An explicit\nentry permits filing/release dates later than period end, or earlier\navailability for operational data known before the reporting period\ncloses."
+    "description": "Publication date of each explicit period value.\n\nAn evaluation with an observation cutoff reads an observation only\nwhen this date is on or before the cutoff, and needs a date for every\nobservation in an actual period. An explicit value in a forecast\nperiod without a date is a forecast assumption, not a published\nobservation, and is always visible."
   },
   {
     "path": "#/$defs/d_7b4cd44901322286925a/properties/availability_dates/additionalProperties",
@@ -9114,5 +9114,10 @@ export default [
     "description": "Required schema version. Only version `1` is accepted.",
     "ref": "#/$defs/SchemaVersion",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SchemaVersion"
+  },
+  {
+    "path": "#/properties/source_snapshot",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/properties/source_snapshot",
+    "description": "Identity of the source snapshot the explicit observations were taken\nfrom, for example `\"FY2025-10K-original\"`.\n\nRequired for an evaluation with an observation cutoff. Keep a revised\nset of observations in a model with a different snapshot identity, so\na dated evaluation can replay the information set of its day."
   }
 ];

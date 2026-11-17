@@ -3935,6 +3935,7 @@
       "MixedNodeBuilder",
       "ModelBuilder",
       "Registry",
+      "applyModelEdits",
       "capitalStructureCashflowsGetComponent",
       "checkConfigValidate",
       "checkReportFindingsBySeverity",
@@ -4017,8 +4018,11 @@
       "mixed",
       "periods",
       "periodsExplicit",
+      "removeNode",
+      "replaceNode",
       "reportingCurrency",
       "rollup",
+      "sourceSnapshot",
       "value",
       "valueMoney",
       "valueScalar",
@@ -4040,6 +4044,9 @@
     "kind": "function"
   },
   "statements.modelNodeIds": {
+    "kind": "function"
+  },
+  "statements.applyModelEdits": {
     "kind": "function"
   },
   "statements.validateCheckSuiteSpecJson": {

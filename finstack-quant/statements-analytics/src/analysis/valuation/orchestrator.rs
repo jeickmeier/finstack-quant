@@ -379,9 +379,12 @@ impl CorporateAnalysisBuilder {
             finstack_quant_statements::evaluator::Evaluator::new()
         };
         let statement = match (self.market.as_ref(), self.as_of) {
-            (Some(market), Some(as_of)) => {
-                evaluator.evaluate_with_market(&self.model, market, as_of)?
-            }
+            (Some(market), Some(as_of)) => evaluator.evaluate_with_market(
+                &self.model,
+                market,
+                as_of,
+                finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+            )?,
             (Some(_), None) => {
                 return Err(Error::eval(
                     "Corporate analysis requires as_of when market context is provided".to_string(),

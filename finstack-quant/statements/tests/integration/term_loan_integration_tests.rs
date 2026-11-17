@@ -94,7 +94,12 @@ fn term_loan_capital_structure_evaluates_with_market() {
 
     let mut evaluator = Evaluator::new();
     let result = evaluator
-        .evaluate_with_market(&model, &market, issue)
+        .evaluate_with_market(
+            &model,
+            &market,
+            issue,
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .expect("term loan capital structure should evaluate with market");
 
     let cashflows = result

@@ -992,6 +992,15 @@ export interface FinancialModelSpecWire {
    * Required schema version. Only version `1` is accepted.
    */
   schema_version: number;
+  /**
+   * Identity of the source snapshot the explicit observations were taken
+   * from, for example `"FY2025-10K-original"`.
+   *
+   * Required for an evaluation with an observation cutoff. Keep a revised
+   * set of observations in a model with a different snapshot identity, so
+   * a dated evaluation can replay the information set of its day.
+   */
+  source_snapshot?: string | null;
 }
 /**
  * Capital structure specification.
@@ -16061,13 +16070,13 @@ export interface D_321Bf35B4A9Ae99F3Cf3 {
  */
 export interface D_7B4Cd44901322286925A {
   /**
-   * Point-in-time availability date for each explicit period value.
+   * Publication date of each explicit period value.
    *
-   * When absent for a value, market-aware evaluation conservatively makes
-   * that value visible on the period's exclusive end date. An explicit
-   * entry permits filing/release dates later than period end, or earlier
-   * availability for operational data known before the reporting period
-   * closes.
+   * An evaluation with an observation cutoff reads an observation only
+   * when this date is on or before the cutoff, and needs a date for every
+   * observation in an actual period. An explicit value in a forecast
+   * period without a date is a forecast assumption, not a published
+   * observation, and is always visible.
    */
   availability_dates?: {
     [k: string]: D_2331411247Fb4Fdd46Dd;

@@ -34,7 +34,12 @@ fn all_plan_building_entry_points_revalidate_mutated_formulas() {
     for error in [
         evaluator.evaluate(&model).unwrap_err(),
         evaluator
-            .evaluate_with_market(&model, &market, as_of)
+            .evaluate_with_market(
+                &model,
+                &market,
+                as_of,
+                finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+            )
             .unwrap_err(),
         evaluator
             .evaluate_monte_carlo(&model, &MonteCarloConfig::new(2, 42))

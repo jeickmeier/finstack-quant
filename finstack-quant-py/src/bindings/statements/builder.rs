@@ -22,7 +22,7 @@ use finstack_quant_statements::capital_structure::{
     BondConventionParams, SwapConventions, SwapParams,
 };
 use finstack_quant_statements::types::{
-    AmountOrScalar, FinancialStatementInstrument, RollupMethod,
+    AmountOrScalar, FinancialStatementInstrument, NodeId, RollupMethod,
 };
 use pyo3::prelude::*;
 
@@ -212,37 +212,31 @@ impl PyModelBuilder {
     }
 
     #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.from_dataframe")]
-    #[pyo3(signature = (df, actuals_until=None, node_id_column=None), text_signature = "($self, df, actuals_until=None, node_id_column=None)")]
+    #[pyo3(signature = (df, node_id_column=None), text_signature = "($self, df, node_id_column=None)")]
     fn from_dataframe<'py>(
         mut slf: PyRefMut<'py, Self>,
         df: &Bound<'py, PyAny>,
-        actuals_until: Option<&str>,
         node_id_column: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let frame = match node_id_column {
             Some(column) => df.call_method1("set_index", (column,))?,
             None => df.clone(),
         };
-        let columns: Vec<PeriodId> = frame
+        let columns: Vec<String> = frame
             .getattr("columns")?
             .try_iter()?
-            .map(|column| super::parse_period_id(&column?.str()?.to_string()))
+            .map(|column| Ok(column?.str()?.to_string()))
             .collect::<PyResult<Vec<_>>>()?;
-        let periods = slf
-            .builder_mut()?
-            .resolve_period_columns(&columns, actuals_until)
-            .map_err(statements_to_py)?;
 
-        let mut rows: Vec<(String, Vec<(PeriodId, AmountOrScalar)>)> = Vec::new();
+        let mut rows: Vec<(NodeId, Vec<Option<AmountOrScalar>>)> = Vec::new();
         for row in frame.call_method0("iterrows")?.try_iter()? {
             let (index, series): (Bound<'py, PyAny>, Bound<'py, PyAny>) = row?.extract()?;
             let node_id = index.str()?.to_string();
-            finstack_quant_statements::builder::validate_node_id(&node_id)
-                .map_err(statements_to_py)?;
-            let mut pairs = Vec::new();
+            let mut cells = Vec::with_capacity(columns.len());
             for item in series.call_method0("items")?.try_iter()? {
                 let (column, cell): (Bound<'py, PyAny>, Bound<'py, PyAny>) = item?.extract()?;
                 if cell.is_none() {
+                    cells.push(None);
                     continue;
                 }
                 let value: f64 = cell.extract().map_err(|_| {
@@ -250,27 +244,16 @@ impl PyModelBuilder {
                         "from_dataframe cell ({node_id:?}, {column}) is not numeric"
                     ))
                 })?;
-                if value.is_nan() {
-                    continue;
-                }
-                let period = super::parse_period_id(&column.str()?.to_string())?;
-                pairs.push((period, AmountOrScalar::scalar(value)));
+                // pandas stores a missing numeric cell as NaN.
+                cells.push((!value.is_nan()).then(|| AmountOrScalar::scalar(value)));
             }
-            rows.push((node_id, pairs));
+            rows.push((NodeId::new(node_id), cells));
         }
 
-        let builder = slf.builder_mut()?;
-        if builder.periods_slice().is_empty() {
-            let plan = finstack_quant_core::dates::PeriodPlan::try_new(
-                finstack_quant_core::dates::PeriodCalendar::Gregorian,
-                periods,
-            )
-            .map_err(crate::errors::core_to_py)?;
-            builder.periods_explicit(plan).map_err(statements_to_py)?;
-        }
-        for (node_id, pairs) in rows {
-            builder.value(node_id, &pairs);
-        }
+        let labels: Vec<&str> = columns.iter().map(String::as_str).collect();
+        slf.builder_mut()?
+            .import_observations(&labels, &rows)
+            .map_err(statements_to_py)?;
         Ok(slf)
     }
 
@@ -330,6 +313,41 @@ impl PyModelBuilder {
         Ok(slf)
     }
 
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.replace_node")]
+    #[pyo3(text_signature = "($self, node)")]
+    fn replace_node<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        node: PyRef<'_, PyNodeSpec>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let spec = node.inner.clone();
+        slf.builder_mut()?
+            .replace_node(spec)
+            .map_err(statements_to_py)?;
+        Ok(slf)
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.remove_node")]
+    #[pyo3(text_signature = "($self, node_id)")]
+    fn remove_node<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        node_id: &str,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        slf.builder_mut()?
+            .remove_node(node_id)
+            .map_err(statements_to_py)?;
+        Ok(slf)
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.source_snapshot")]
+    #[pyo3(text_signature = "($self, snapshot_id)")]
+    fn source_snapshot<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        snapshot_id: &str,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        slf.builder_mut()?.source_snapshot(snapshot_id);
+        Ok(slf)
+    }
+
     #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.mixed")]
     #[pyo3(text_signature = "($self, node_id)")]
     fn mixed(&mut self, node_id: &str) -> PyResult<PyMixedNodeBuilder> {
@@ -352,12 +370,15 @@ impl PyModelBuilder {
     }
 
     #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.where_clause")]
-    #[pyo3(text_signature = "($self, where_clause)")]
+    #[pyo3(text_signature = "($self, node_id, where_clause)")]
     fn where_clause<'py>(
         mut slf: PyRefMut<'py, Self>,
+        node_id: &str,
         where_clause: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        slf.builder_mut()?.where_clause(where_clause);
+        slf.builder_mut()?
+            .where_clause(node_id, where_clause)
+            .map_err(statements_to_py)?;
         Ok(slf)
     }
 

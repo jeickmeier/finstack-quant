@@ -40,10 +40,20 @@ Every node resolution for a `(node, period)` pair walks the same ladder
 forecast can never silently shadow a formula it was not declared alongside.
 
 The actuals boundary comes from the second argument to `ModelBuilder::periods`
-(`actuals_until`). `Evaluator::evaluate_with_market` additionally applies the
-`as_of` visibility cutoff. Explicit actuals become visible on their node-level
-availability date; when omitted, availability defaults to the period's
-exclusive end date.
+(`actuals_until`). `Evaluator::evaluate_with_market` takes an explicit
+`ObservationCutoff`: `FullSnapshot` reads every observation, and
+`Through(date)` reads an observation only when its availability date is on or
+before that date. A cutoff date needs a model that names its
+`source_snapshot` and dates every observation in an actual period; an undated
+explicit value in a forecast period is a forecast assumption and stays
+visible. Keep an original filing and its revision as two models with different
+snapshot identities to replay a past information set.
+
+Node ids are unique. The defining setters (`value`, `compute`, `insert_node`,
+`mixed().build()`, `import_observations`) reject a repeated id or a repeated
+period; change an existing node with `replace_node`, `remove_node`, or the
+atomic `FinancialModelSpec::apply_edits`. `where_clause` names its target
+node.
 
 ## Public surface
 
@@ -197,8 +207,8 @@ market as of the first period's start, which serves fixed-rate debt: contractual
 coupons, amortization and balances need no curves. Instruments whose cashflows
 need market data (floating coupons, swaps, caps, swaptions) fail there with a
 missing-data error naming the instrument and must be evaluated with
-`Evaluator::evaluate_with_market(&model, &market_ctx, as_of)`, which also hides
-actuals not yet available at `as_of`.
+`Evaluator::evaluate_with_market(&model, &market_ctx, as_of, cutoff)`; `as_of`
+dates pricing and `cutoff` selects the visible observations.
 
 The evaluator owns dated principal claims and waterfall state. It retains each
 claim's cash payment date, economic principal-reduction date, and native-currency

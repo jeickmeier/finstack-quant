@@ -20,7 +20,7 @@ mod specs;
 pub use builder::{JsMixedNodeBuilder, JsModelBuilder};
 pub use handles::{JsEvaluator, JsRegistry};
 
-use crate::utils::input::{js_opt_string, js_string, json_text, validated_json};
+use crate::utils::input::{from_js_json, js_opt_string, js_string, json_text, validated_json};
 use crate::utils::to_js_err;
 use finstack_quant_statements::types::FinancialModelSpec;
 use wasm_bindgen::prelude::*;
@@ -71,6 +71,30 @@ pub fn model_node_ids(
     let model = FinancialModelSpec::from_json(json).map_err(to_js_err)?;
     let ids: Vec<&str> = model.nodes.keys().map(|k| k.as_str()).collect();
     crate::utils::to_js_value(&ids)
+}
+
+/// Apply named edits to a financial model atomically.
+///
+/// Twin of Python `FinancialModelSpec.apply_edits` (Rust
+/// `FinancialModelSpec::apply_edits`). Edits apply in order to a copy of the
+/// model, which must pass the runnable-model validation; the input model is
+/// never changed.
+///
+/// @param model - `FinancialModelSpec` to edit (object or JSON).
+/// @param edits - `ModelEdit` objects, each tagged by `edit`: `add_node` and `replace_node` (`node`); `remove_node`, `remove_forecast` and `remove_where` (`node_id`); `set_observation` (`node_id`, `period`, `value`, optional `availability_date`); `remove_observation` (`node_id`, `period`); `set_formula` (`node_id`, `formula`); `set_forecast` (`node_id`, `forecast`; the node becomes mixed); `set_where` (`node_id`, `predicate`). An array or its JSON text.
+/// @returns The edited `FinancialModelSpec` plain object.
+/// @throws Error with kind `validation` if the model or an edit is malformed, an edit adds an id that is already defined or names a node or observation that does not exist, or the edited model fails validation.
+#[wasm_bindgen(js_name = applyModelEdits, unchecked_return_type = "generated.statements.FinancialModelSpec")]
+pub fn apply_model_edits(
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "generated.statements.ModelEdit[] | string")]
+    edits: JsValue,
+) -> Result<JsValue, JsValue> {
+    let mut model =
+        FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
+    let edits: Vec<finstack_quant_statements::types::ModelEdit> = from_js_json(&edits, "edits")?;
+    model.apply_edits(&edits).map_err(to_js_err)?;
+    crate::utils::to_js_value(&model)
 }
 
 /// Validate a `CheckSuiteSpec` JSON string.

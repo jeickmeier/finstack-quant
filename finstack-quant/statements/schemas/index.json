@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
-      "bytes": 393967,
+      "bytes": 394406,
       "kind": "input",
       "path": "schemas/statements/1/financial_model_spec.schema.json",
       "summary": "Statement model graph: periods, nodes and the Value > Forecast > Formula precedence.",
@@ -44,6 +44,15 @@
       "summary": "Namespaced catalog of reusable metric definitions.",
       "title": "MetricRegistry",
       "type_name": "MetricRegistry"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements/1/model_edit.schema.json",
+      "bytes": 38373,
+      "kind": "input",
+      "path": "schemas/statements/1/model_edit.schema.json",
+      "summary": "One named change to a financial model, applied atomically with the others in its batch.",
+      "title": "ModelEdit",
+      "type_name": "ModelEdit"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",

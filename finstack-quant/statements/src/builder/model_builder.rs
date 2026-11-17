@@ -115,8 +115,10 @@ pub struct ModelBuilder {
     pub(crate) nodes: IndexMap<NodeId, NodeSpec>,
     meta: IndexMap<String, serde_json::Value>,
     pub(crate) capital_structure: Option<crate::types::CapitalStructureSpec>,
-    /// Node most recently defined or modified; the target of `where_clause`.
-    last_node: Option<NodeId>,
+    source_snapshot: Option<String>,
+    /// First duplicate definition or observation seen by an infallible
+    /// setter; [`ModelBuilder::build`] returns it.
+    rejected: Option<Error>,
 }
 
 impl ModelBuilder {
@@ -126,40 +128,94 @@ impl ModelBuilder {
     /// nodes programmatically. Prefer `.compute()` and `.value()` for
     /// standard model construction.
     ///
+    /// A node with the same id is a duplicate definition:
+    /// [`build`](Self::build) rejects it. Use
+    /// [`replace_node`](Self::replace_node) to change an existing node.
+    ///
     /// # Arguments
     ///
-    /// * `spec` - Node to insert under its own `node_id`, replacing any node
-    ///   already stored with that id.
+    /// * `spec` - Node to insert under its own `node_id`.
     pub fn insert_node(&mut self, spec: NodeSpec) -> &mut Self {
-        self.put_node(spec.node_id.clone(), spec);
+        self.define_node(spec.node_id.clone(), spec);
         self
     }
 
-    /// Insert or replace a node and record it as the `where_clause` target.
+    /// Replace an existing node with a complete new definition.
     ///
-    /// `IndexMap::insert` keeps a redefined key in its original slot, so the
-    /// map's last entry is not necessarily the node defined last.
-    fn put_node(&mut self, id: NodeId, spec: NodeSpec) {
-        self.last_node = Some(id.clone());
-        self.nodes.insert(id, spec);
+    /// This is the named edit for changing a node already in the builder;
+    /// the defining setters reject a repeated id instead.
+    ///
+    /// # Arguments
+    ///
+    /// * `spec` - Complete replacement stored under its own `node_id`, in the
+    ///   original node's position.
+    ///
+    /// # Errors
+    ///
+    /// Returns a build error if no node with that id exists. The builder is
+    /// unchanged.
+    pub fn replace_node(&mut self, spec: NodeSpec) -> Result<&mut Self> {
+        let Some(node) = self.nodes.get_mut(&spec.node_id) else {
+            return Err(Error::build(format!(
+                "Cannot replace unknown node '{}'",
+                spec.node_id
+            )));
+        };
+        *node = spec;
+        Ok(self)
     }
 
-    /// Warn when a node-creating builder method would overwrite an existing
-    /// node with a fresh definition (silently discarding the prior values /
-    /// forecast / formula). The legitimate `value()` + `forecast()` mixed-node
-    /// pattern goes through the node-*modifying* methods, which do not call
-    /// this. `insert_node` is the explicit overwrite escape hatch.
-    fn warn_if_redefining(&self, node_id: &NodeId, method: &str) {
-        if self.nodes.contains_key(node_id) {
-            tracing::warn!(
-                node = node_id.as_str(),
-                method,
-                "node '{}' redefined by {}(); the previous definition is discarded. Use a \
-                 distinct id, or build a mixed node via value() + forecast().",
-                node_id.as_str(),
-                method
-            );
+    /// Remove an existing node.
+    ///
+    /// # Arguments
+    ///
+    /// * `node_id` - Identifier of the node to remove. Formulas that still
+    ///   reference it fail [`build`](Self::build).
+    ///
+    /// # Errors
+    ///
+    /// Returns a build error if no node with that id exists.
+    pub fn remove_node(&mut self, node_id: &str) -> Result<&mut Self> {
+        if self.nodes.shift_remove(node_id).is_none() {
+            return Err(Error::build(format!(
+                "Cannot remove unknown node '{node_id}'"
+            )));
         }
+        Ok(self)
+    }
+
+    /// Store a new node, or record a duplicate definition for `build`.
+    fn define_node(&mut self, id: NodeId, spec: NodeSpec) {
+        if self.nodes.contains_key(&id) {
+            self.reject(Error::build(format!(
+                "Node '{id}' is defined more than once; change an existing node with \
+                 replace_node or a model edit"
+            )));
+        } else {
+            self.nodes.insert(id, spec);
+        }
+    }
+
+    /// Keep the first rejection for [`ModelBuilder::build`] to return.
+    fn reject(&mut self, error: Error) {
+        self.rejected.get_or_insert(error);
+    }
+
+    /// Collect one node's observations, recording a repeated period.
+    fn unique_observations(
+        &mut self,
+        node_id: &NodeId,
+        values: impl Iterator<Item = (PeriodId, AmountOrScalar)>,
+    ) -> IndexMap<PeriodId, AmountOrScalar> {
+        let mut unique = IndexMap::new();
+        for (period_id, value) in values {
+            if unique.insert(period_id, value).is_some() {
+                self.reject(Error::build(format!(
+                    "Node '{node_id}' has more than one observation for period {period_id}"
+                )));
+            }
+        }
+        unique
     }
 
     /// Return a read-only slice of the model's periods.
@@ -170,49 +226,97 @@ impl ModelBuilder {
         self.periods.as_deref().unwrap_or(&[])
     }
 
-    /// Resolve and validate the timeline for importing period-labelled values.
+    /// Import period-labelled observations as new value nodes.
     ///
-    /// An existing timeline is retained. Otherwise the first and last columns
-    /// define an inclusive range, including any intervening periods. Every
-    /// column must belong to the resolved timeline, even when its cells are
-    /// missing. This method does not mutate the builder.
+    /// The model timeline must already be set: an import never infers a
+    /// plan. Columns map to periods by label, in any order. A `None` cell is
+    /// a missing observation and is left out of the series; a zero is kept as
+    /// a known zero. The import is atomic: any rejection leaves the builder
+    /// unchanged.
     ///
     /// # Arguments
     ///
-    /// * `columns` - Parsed period identifiers in input-column order. Must
-    ///   contain at least one column; duplicate identifiers retain the normal
-    ///   last-value-wins semantics of value-node construction.
-    /// * `actuals_until` - Inclusive actual-period cutoff used only when the
-    ///   builder has no timeline. It must share the inferred range's period
-    ///   family. Existing timelines retain their actual/forecast flags.
+    /// * `columns` - Period labels (for example `"2025Q1"`), one per column.
+    ///   Labels must be unique and belong to the model timeline, including a
+    ///   column whose cells are all missing. Order is free.
+    /// * `rows` - One `(node id, cells)` pair per new value node. `cells`
+    ///   holds one entry per column, in column order. A node's observations
+    ///   must be finite and share one unit: all scalar, or `Money` in one
+    ///   currency.
     ///
     /// # Errors
     ///
-    /// Returns a period error for empty columns, an invalid inferred range or
-    /// cutoff, or a column outside the resolved model timeline.
-    pub fn resolve_period_columns(
-        &self,
-        columns: &[PeriodId],
-        actuals_until: Option<&str>,
-    ) -> Result<Vec<Period>> {
-        let (Some(first), Some(last)) = (columns.first(), columns.last()) else {
+    /// Returns a period error if the timeline is not set, `columns` is empty,
+    /// or a label is invalid, repeated or outside the timeline. Returns a
+    /// build error for an invalid or repeated node id, an id the builder
+    /// already defines, a row whose length differs from the column count, a
+    /// non-finite observation, or mixed units within a row.
+    pub fn import_observations(
+        &mut self,
+        columns: &[&str],
+        rows: &[(NodeId, Vec<Option<AmountOrScalar>>)],
+    ) -> Result<&mut Self> {
+        let Some(plan) = &self.periods else {
             return Err(Error::period(
-                "Value import requires at least one period column",
+                "Set the model timeline before importing observations",
             ));
         };
-        let periods = match &self.periods {
-            None => build_periods(&format!("{first}..{last}"), actuals_until)?.periods,
-            Some(plan) => plan.periods.clone(),
-        };
-        let period_ids: IndexSet<_> = periods.iter().map(|period| period.id).collect();
-        for column in columns {
-            if !period_ids.contains(column) {
+        if columns.is_empty() {
+            return Err(Error::period(
+                "Observation import requires at least one period column",
+            ));
+        }
+        let plan_ids: IndexSet<_> = plan.iter().map(|period| period.id).collect();
+        let mut column_ids = IndexSet::new();
+        for label in columns {
+            let period_id: PeriodId = label
+                .parse()
+                .map_err(|error| Error::period(format!("Period column '{label}': {error}")))?;
+            if !plan_ids.contains(&period_id) {
                 return Err(Error::period(format!(
-                    "Period column {column} is not present in the model timeline"
+                    "Period column {period_id} is not present in the model timeline"
+                )));
+            }
+            if !column_ids.insert(period_id) {
+                return Err(Error::period(format!(
+                    "Period column {period_id} appears more than once"
                 )));
             }
         }
-        Ok(periods)
+
+        let mut imported: IndexMap<NodeId, NodeSpec> = IndexMap::new();
+        for (node_id, cells) in rows {
+            validate_node_id(node_id.as_str())?;
+            if self.nodes.contains_key(node_id) || imported.contains_key(node_id) {
+                return Err(Error::build(format!(
+                    "Node '{node_id}' is defined more than once; change an existing node with \
+                     replace_node or a model edit"
+                )));
+            }
+            if cells.len() != column_ids.len() {
+                return Err(Error::build(format!(
+                    "Import row '{node_id}' has {} cells for {} period columns",
+                    cells.len(),
+                    column_ids.len()
+                )));
+            }
+            let mut values = IndexMap::new();
+            for (period_id, cell) in column_ids.iter().zip(cells) {
+                let Some(value) = cell else { continue };
+                if !value.value().is_finite() {
+                    return Err(Error::build(format!(
+                        "Import cell ('{node_id}', {period_id}) is not finite; leave a \
+                         missing cell empty"
+                    )));
+                }
+                values.insert(*period_id, *value);
+            }
+            let mut node = NodeSpec::new(node_id.clone(), NodeType::Value).with_values(values);
+            node.value_type = crate::types::validated_explicit_value_type(&node)?;
+            imported.insert(node_id.clone(), node);
+        }
+        self.nodes.extend(imported);
+        Ok(self)
     }
 
     /// Model identifier this builder will stamp on the built specification.
@@ -244,7 +348,8 @@ impl ModelBuilder {
             nodes: IndexMap::new(),
             meta: IndexMap::new(),
             capital_structure: None,
-            last_node: None,
+            source_snapshot: None,
+            rejected: None,
         }
     }
 
@@ -338,14 +443,14 @@ impl ModelBuilder {
                 "Period list must contain at least one period",
             ));
         }
-        let last_node = spec.nodes.last().map(|(id, _)| id.clone());
         Ok(Self {
             id: spec.id,
             periods: Some(spec.periods),
             nodes: spec.nodes,
             meta: spec.meta,
             capital_structure: spec.capital_structure,
-            last_node,
+            source_snapshot: spec.source_snapshot,
+            rejected: None,
         })
     }
 
@@ -360,7 +465,7 @@ impl ModelBuilder {
             .with_name(stored_metric.definition.name.clone())
             .with_formula(formula);
         node.rollup = stored_metric.definition.rollup;
-        self.put_node(key, node);
+        self.nodes.insert(key, node);
     }
 
     /// Add a value node with explicit period values.
@@ -395,20 +500,19 @@ impl ModelBuilder {
     /// the final entry for a period is retained. The values' monetary/scalar
     /// consistency is inferred and checked at [`build`](Self::build), so this
     /// fluent method can remain useful while a node is being assembled.
-    /// Reusing an existing node identifier replaces its former definition and
-    /// emits a warning because its values, forecast, and formula are discarded.
+    /// Reusing an existing node identifier, or giving one period two
+    /// observations, is a duplicate that [`build`](Self::build) rejects.
     pub fn value(
         &mut self,
         node_id: impl Into<NodeId>,
         values: &[(PeriodId, AmountOrScalar)],
     ) -> &mut Self {
         let node_id = node_id.into();
-        let values_map: IndexMap<PeriodId, AmountOrScalar> = values.iter().cloned().collect();
+        let values_map = self.unique_observations(&node_id, values.iter().cloned());
 
         let node = NodeSpec::new(node_id.clone(), NodeType::Value).with_values(values_map);
 
-        self.warn_if_redefining(&node_id, "value");
-        self.put_node(node_id, node);
+        self.define_node(node_id, node);
         self
     }
 
@@ -453,10 +557,12 @@ impl ModelBuilder {
         values: &[(PeriodId, finstack_quant_core::money::Money)],
     ) -> &mut Self {
         let node_id = node_id.into();
-        let values_map: IndexMap<PeriodId, AmountOrScalar> = values
-            .iter()
-            .map(|(period_id, money)| (*period_id, AmountOrScalar::Amount(*money)))
-            .collect();
+        let values_map = self.unique_observations(
+            &node_id,
+            values
+                .iter()
+                .map(|(period_id, money)| (*period_id, AmountOrScalar::Amount(*money))),
+        );
 
         let value_type = values.first().and_then(|(_, first_money)| {
             let first_currency = first_money.currency();
@@ -471,8 +577,7 @@ impl ModelBuilder {
         let mut node = NodeSpec::new(node_id.clone(), NodeType::Value).with_values(values_map);
         node.value_type = value_type;
 
-        self.warn_if_redefining(&node_id, "value_money");
-        self.put_node(node_id, node);
+        self.define_node(node_id, node);
         self
     }
 
@@ -513,16 +618,17 @@ impl ModelBuilder {
         values: &[(PeriodId, f64)],
     ) -> &mut Self {
         let node_id = node_id.into();
-        let values_map: IndexMap<PeriodId, AmountOrScalar> = values
-            .iter()
-            .map(|(period_id, value)| (*period_id, AmountOrScalar::Scalar(*value)))
-            .collect();
+        let values_map = self.unique_observations(
+            &node_id,
+            values
+                .iter()
+                .map(|(period_id, value)| (*period_id, AmountOrScalar::Scalar(*value))),
+        );
 
         let mut node = NodeSpec::new(node_id.clone(), NodeType::Value).with_values(values_map);
         node.value_type = Some(crate::types::NodeValueType::Scalar);
 
-        self.warn_if_redefining(&node_id, "value_scalar");
-        self.put_node(node_id, node);
+        self.define_node(node_id, node);
         self
     }
 
@@ -546,12 +652,20 @@ impl ModelBuilder {
         node_id: &str,
         availability_dates: &[(PeriodId, finstack_quant_core::dates::Date)],
     ) -> Result<&mut Self> {
+        let mut unique = IndexMap::new();
+        for (period_id, date) in availability_dates {
+            if unique.insert(*period_id, *date).is_some() {
+                return Err(Error::build(format!(
+                    "Node '{node_id}' has more than one availability date for period {period_id}"
+                )));
+            }
+        }
         let node = self.nodes.get_mut(node_id).ok_or_else(|| {
             Error::build(format!(
                 "Cannot set availability dates for unknown node '{node_id}'"
             ))
         })?;
-        node.availability_dates = availability_dates.iter().copied().collect();
+        node.availability_dates = unique;
         Ok(self)
     }
 
@@ -655,8 +769,13 @@ impl ModelBuilder {
 
         let node = NodeSpec::new(node_id.clone(), NodeType::Calculated).with_formula(formula);
 
-        self.warn_if_redefining(&node_id, "compute");
-        self.put_node(node_id, node);
+        if self.nodes.contains_key(&node_id) {
+            return Err(Error::build(format!(
+                "Node '{node_id}' is defined more than once; change an existing node with \
+                 replace_node or a model edit"
+            )));
+        }
+        self.nodes.insert(node_id, node);
         Ok(self)
     }
 
@@ -748,7 +867,6 @@ impl ModelBuilder {
 
         if let Some(node) = self.nodes.get_mut(node_id.as_str()) {
             node.forecast = Some(forecast_spec);
-            self.last_node = Some(node_id);
 
             // A node carrying a forecast must be Mixed so precedence resolves
             // Value > Forecast > Formula. Upgrade both Value AND Calculated:
@@ -760,9 +878,23 @@ impl ModelBuilder {
             }
         } else {
             let node = NodeSpec::new(node_id.clone(), NodeType::Mixed).with_forecast(forecast_spec);
-            self.put_node(node_id, node);
+            self.nodes.insert(node_id, node);
         }
 
+        self
+    }
+
+    /// Name the source snapshot the model's observations were taken from.
+    ///
+    /// An evaluation with an observation cutoff needs this identity. Keep an
+    /// original filing and its later revision as two models with different
+    /// snapshot identities.
+    ///
+    /// # Arguments
+    /// * `snapshot_id` - Nonempty identifier of the source snapshot, for
+    ///   example `"FY2025-10K-original"`.
+    pub fn source_snapshot(&mut self, snapshot_id: impl Into<String>) -> &mut Self {
+        self.source_snapshot = Some(snapshot_id.into());
         self
     }
 
@@ -794,19 +926,20 @@ impl ModelBuilder {
         self
     }
 
-    /// Add a where clause to the node most recently defined or modified.
+    /// Attach a where clause to a named node.
     ///
-    /// The target is the node named by the previous `value`, `compute`,
-    /// `forecast`, `mixed().build()` or `insert_node` call, including when that
-    /// call redefined an existing node. Called before any node is defined, it
-    /// logs a warning and does nothing.
-    ///
-    /// The where clause is a conditional expression that determines whether
-    /// the node should be evaluated for a given period. If the where clause
-    /// evaluates to false (0.0), the node value will be set to 0.0 for that period.
+    /// The where clause is a scalar predicate evaluated before the node's
+    /// value source. Where it is false for a period, the node's value,
+    /// forecast and formula are not consulted.
     ///
     /// # Arguments
-    /// * `where_clause` - DSL expression evaluated as a predicate
+    /// * `node_id` - Existing node the predicate masks
+    /// * `where_clause` - DSL expression evaluated as a scalar predicate
+    ///
+    /// # Errors
+    ///
+    /// Returns a formula error if the predicate does not parse and compile,
+    /// or a build error if `node_id` is not defined. The builder is unchanged.
     ///
     /// # Example
     ///
@@ -815,31 +948,31 @@ impl ModelBuilder {
     /// # use finstack_quant_statements::types::AmountOrScalar;
     /// # use finstack_quant_core::dates::PeriodId;
     /// # fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    /// let model = {
-    ///     let mut model_builder = ModelBuilder::new("test");
-    ///     model_builder.periods("2025Q1..Q4", Some("2025Q2"))?;
-    ///     model_builder.value("revenue", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(1500000.0))]);
-    ///     model_builder.compute("bonus", "revenue * 0.01")?;
-    ///     model_builder.where_clause("revenue > 1000000");
-    ///     model_builder
-    /// }  // Only compute bonus if revenue > 1M
-    ///     .build()?;
+    /// let mut model_builder = ModelBuilder::new("test");
+    /// model_builder.periods("2025Q1..Q4", Some("2025Q2"))?;
+    /// model_builder.value("revenue", &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(1500000.0))]);
+    /// model_builder.compute("bonus", "revenue * 0.01")?;
+    /// // Only compute bonus if revenue > 1M
+    /// model_builder.where_clause("bonus", "revenue > 1000000")?;
+    /// let model = model_builder.build()?;
+    /// # let _ = model;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn where_clause(&mut self, where_clause: impl Into<String>) -> &mut Self {
-        match self
-            .last_node
-            .as_ref()
-            .and_then(|id| self.nodes.get_mut(id))
-        {
-            Some(node) => node.where_text = Some(where_clause.into()),
-            None => tracing::warn!(
-                model_id = %self.id,
-                "where_clause ignored: no node has been defined on this builder yet"
-            ),
-        }
-        self
+    pub fn where_clause(
+        &mut self,
+        node_id: &str,
+        where_clause: impl Into<String>,
+    ) -> Result<&mut Self> {
+        let where_clause = where_clause.into();
+        crate::dsl::parse_and_compile(&where_clause)?;
+        let node = self.nodes.get_mut(node_id).ok_or_else(|| {
+            Error::build(format!(
+                "Cannot attach a where clause to unknown node '{node_id}'"
+            ))
+        })?;
+        node.where_text = Some(where_clause);
+        Ok(self)
     }
 
     /// Load built-in metrics (fin.* namespace) and add them to the model.
@@ -1033,6 +1166,9 @@ impl ModelBuilder {
         )
         .entered();
 
+        if let Some(rejected) = self.rejected {
+            return Err(rejected);
+        }
         let plan = self
             .periods
             .ok_or_else(|| Error::period("Periods must be set before building the model"))?;
@@ -1040,6 +1176,7 @@ impl ModelBuilder {
         spec.nodes = self.nodes;
         spec.meta = self.meta;
         spec.capital_structure = self.capital_structure;
+        spec.source_snapshot = self.source_snapshot;
         spec.validate_semantics()?;
 
         Ok(spec)
@@ -1278,7 +1415,14 @@ impl MixedNodeBuilder {
         }
         node.rollup = self.rollup;
 
-        self.parent.put_node(self.node_id, node);
+        if self.parent.nodes.contains_key(&self.node_id) {
+            return Err(Error::build(format!(
+                "Node '{}' is defined more than once; change an existing node with \
+                 replace_node or a model edit",
+                self.node_id
+            )));
+        }
+        self.parent.nodes.insert(self.node_id, node);
         Ok(self.parent)
     }
 }
@@ -1308,52 +1452,122 @@ mod tests {
         assert!(builder.nodes().contains_key("fin.roa"));
     }
 
+    /// STATEMENTS-CONTRACTS-002 #1: a repeated node id, a repeated period
+    /// and a repeated availability date are duplicates, not replacements.
     #[test]
-    fn where_clause_targets_a_redefined_node_not_the_last_map_slot() {
+    fn duplicate_definitions_and_observations_are_rejected() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = {
-            let mut model_builder_1 = ModelBuilder::new("where-target");
-            model_builder_1
-                .periods("2025Q1..Q1", None)
-                .expect("valid periods");
-            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
-            model_builder_1
-                .compute("bonus", "revenue * 0.1")
-                .expect("valid formula");
-            model_builder_1
-                .compute("tax", "revenue * 0.2")
-                .expect("valid formula");
-            // Redefining `bonus` keeps its original slot ahead of `tax`.
-            model_builder_1
-                .compute("bonus", "revenue * 0.5")
-                .expect("valid formula");
-            model_builder_1.where_clause("revenue > 1000");
-            model_builder_1.build().expect("model builds")
+        let base = || {
+            let mut builder = ModelBuilder::new("duplicates");
+            builder.periods("2025Q1..Q1", None).expect("valid periods");
+            builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+            builder
         };
+        let rejected = |builder: ModelBuilder, expected: &str| {
+            let error = builder.build().expect_err(expected);
+            assert!(error.to_string().contains(expected), "{error}");
+        };
+
+        let mut builder = base();
+        builder.value("revenue", &[]);
+        rejected(builder, "defined more than once");
+        let mut builder = base();
+        builder.value_scalar("revenue", &[]);
+        rejected(builder, "defined more than once");
+        let mut builder = base();
+        builder.value_money("revenue", &[]);
+        rejected(builder, "defined more than once");
+        let mut builder = base();
+        builder.insert_node(NodeSpec::new("revenue", NodeType::Value));
+        rejected(builder, "defined more than once");
+
+        let mut builder = base();
+        let error = builder
+            .compute("revenue", "1")
+            .expect_err("compute rejects a defined id");
+        assert!(
+            error.to_string().contains("defined more than once"),
+            "{error}"
+        );
+        let error = base()
+            .mixed("revenue")
+            .build()
+            .expect_err("a mixed node rejects a defined id");
+        assert!(
+            error.to_string().contains("defined more than once"),
+            "{error}"
+        );
+
+        let mut builder = base();
+        builder.value(
+            "cost",
+            &[
+                (period, AmountOrScalar::scalar(1.0)),
+                (period, AmountOrScalar::scalar(2.0)),
+            ],
+        );
+        rejected(builder, "more than one observation for period 2025Q1");
+
+        let date =
+            finstack_quant_core::dates::Date::from_calendar_date(2025, time::Month::April, 25)
+                .expect("date");
+        let mut builder = base();
+        let error = builder
+            .availability_dates("revenue", &[(period, date), (period, date)])
+            .expect_err("a repeated availability date is rejected");
+        assert!(
+            error
+                .to_string()
+                .contains("more than one availability date"),
+            "{error}"
+        );
+        assert!(builder.nodes()["revenue"].availability_dates.is_empty());
+
+        // The named edits change an existing node.
+        let mut builder = base();
+        builder
+            .replace_node(
+                NodeSpec::new("revenue", NodeType::Value)
+                    .with_values(IndexMap::from([(period, AmountOrScalar::scalar(110.0))])),
+            )
+            .expect("replace an existing node");
+        builder
+            .replace_node(NodeSpec::new("absent", NodeType::Value))
+            .expect_err("replace needs an existing node");
+        builder
+            .remove_node("absent")
+            .expect_err("remove needs an existing node");
+        let model = builder.build().expect("model builds");
+        assert_eq!(
+            model.nodes["revenue"].values.as_ref().expect("values")[&period].value(),
+            110.0
+        );
+    }
+
+    /// STATEMENTS-CONTRACTS-002 #1: a `where` clause needs a valid named
+    /// target and a predicate that compiles.
+    #[test]
+    fn where_clause_needs_a_named_target() {
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let mut builder = ModelBuilder::new("where-target");
+        builder.periods("2025Q1..Q1", None).expect("valid periods");
+        builder.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
+        builder.compute("bonus", "revenue * 0.1").expect("formula");
+        builder.compute("tax", "revenue * 0.2").expect("formula");
+        builder
+            .where_clause("bonus", "revenue > 1000")
+            .expect("named target");
+        builder
+            .where_clause("absent", "revenue > 1000")
+            .expect_err("an unknown target is rejected");
+        builder
+            .where_clause("tax", "revenue >")
+            .expect_err("an invalid predicate is rejected");
+        let model = builder.build().expect("model builds");
 
         let where_text = |id: &str| model.get_node(id).expect("node exists").where_text.clone();
         assert_eq!(where_text("bonus").as_deref(), Some("revenue > 1000"));
         assert_eq!(where_text("tax"), None);
-    }
-
-    #[test]
-    fn where_clause_targets_a_node_modified_by_forecast() {
-        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let model = {
-            let mut model_builder_1 = ModelBuilder::new("where-forecast");
-            model_builder_1
-                .periods("2025Q1..Q2", Some("2025Q1"))
-                .expect("valid periods");
-            model_builder_1.value("revenue", &[(period, AmountOrScalar::scalar(100.0))]);
-            model_builder_1.value("costs", &[(period, AmountOrScalar::scalar(40.0))]);
-            model_builder_1.forecast("revenue", crate::types::ForecastSpec::forward_fill());
-            model_builder_1.where_clause("costs > 0");
-            model_builder_1.build().expect("model builds")
-        };
-
-        let where_text = |id: &str| model.get_node(id).expect("node exists").where_text.clone();
-        assert_eq!(where_text("revenue").as_deref(), Some("costs > 0"));
-        assert_eq!(where_text("costs"), None);
     }
 
     #[test]

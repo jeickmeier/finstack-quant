@@ -142,7 +142,12 @@ it("uses exact market and date inputs and rejects incomplete requests", async ()
   const request = { modelJson, marketJson: market, asOf: "2025-04-02" };
   const actual = unwrap(await harness.proxy.evaluateStatement(request));
   expect(actual).toEqual(
-    new native.Evaluator().evaluateWithMarket(modelJson, market, request.asOf),
+    new native.Evaluator().evaluateWithMarket(
+      modelJson,
+      market,
+      request.asOf,
+      "full_snapshot",
+    ),
   );
   const incomplete = await harness.proxy.evaluateStatement({
     modelJson,

@@ -294,8 +294,8 @@ It is implemented and qualified.
 
 The Statements authoring, import and observation availability contract was
 accepted on 2026-11-15. It covers named atomic edits, validated period-label
-imports, dated publication snapshots and full-snapshot mode. Implementation
-and independent qualification remain pending.
+imports, dated publication snapshots and full-snapshot mode. It is
+implemented and qualified.
 [STATEMENTS-CONTRACTS-002](statements-contracts/02-authoring-and-availability.md#accepted-decision-for-authoring-imports-and-observation-availability).
 
 The Statements typed forecast and validation staging contract was accepted

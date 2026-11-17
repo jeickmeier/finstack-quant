@@ -664,8 +664,10 @@ impl PyEvaluator {
 
     /// Evaluate a financial model with market context and an as-of date.
     ///
-    /// Use this for capital-structure-aware models and for as-of evaluation
-    /// that hides future actual values. Releases the GIL during evaluation.
+    /// Use this for capital-structure-aware models and for point-in-time
+    /// evaluation. ``as_of`` dates pricing; ``observation_cutoff`` separately
+    /// selects which explicit observations the evaluation may read. Releases
+    /// the GIL during evaluation.
     ///
     /// Parameters
     /// ----------
@@ -676,7 +678,21 @@ impl PyEvaluator {
     ///     Market data context used for instrument pricing — typed or its
     ///     canonical JSON.
     /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-    ///     Valuation/as-of date; ISO ``YYYY-MM-DD`` strings are accepted.
+    ///     Valuation date for pricing the capital structure; ISO
+    ///     ``YYYY-MM-DD`` strings are accepted.
+    /// observation_cutoff : str | datetime.date | datetime.datetime | pandas.Timestamp
+    ///     ``"full_snapshot"`` reads every observation in the model. A date
+    ///     (or its ISO string) reads an observation only when its availability
+    ///     date is on or before that date, inclusive; the model must then
+    ///     name its ``source_snapshot`` and give an availability date to
+    ///     every observation in an actual period. An undated explicit value
+    ///     in a forecast period is a forecast assumption and stays visible.
+    ///
+    /// Returns
+    /// -------
+    /// StatementResult
+    ///     Evaluation results with per-node, per-period values and any
+    ///     capital-structure cashflows.
     ///
     /// Raises
     /// ------
@@ -684,26 +700,36 @@ impl PyEvaluator {
     ///     If a formula references an unknown node or a required curve is
     ///     missing from ``market``.
     /// ValueError
-    ///     If ``as_of`` is not date-like, the model/market JSON is
-    ///     malformed, or evaluation fails.
+    ///     If ``as_of`` or ``observation_cutoff`` is not date-like, the
+    ///     model/market JSON is malformed, a cutoff date is used on a model
+    ///     with no ``source_snapshot`` or with an undated observation in an
+    ///     actual period, an observation hidden by the cutoff has no forecast
+    ///     or formula to fall back on, or evaluation fails.
     /// RuntimeError
     ///     If capital-structure cashflow generation or the waterfall fails.
-    #[pyo3(text_signature = "($self, model, market, as_of)")]
+    #[pyo3(text_signature = "($self, model, market, as_of, observation_cutoff)")]
     fn evaluate_with_market(
         &mut self,
         py: Python<'_>,
         model: &Bound<'_, PyAny>,
         market: &Bound<'_, PyAny>,
         as_of: &Bound<'_, PyAny>,
+        observation_cutoff: &Bound<'_, PyAny>,
     ) -> PyResult<PyStatementResult> {
+        use finstack_quant_statements::evaluator::ObservationCutoff;
+
         let as_of = py_to_date(as_of)?;
+        let cutoff = match observation_cutoff.extract::<String>() {
+            Ok(mode) if mode == "full_snapshot" => ObservationCutoff::FullSnapshot,
+            _ => ObservationCutoff::Through(py_to_date(observation_cutoff)?),
+        };
         let model = extract_model_ref(model)?;
         let market = extract_market_ref(py, market)?;
         let model_inner: &finstack_quant_statements::types::FinancialModelSpec = &model;
         let market_inner: &finstack_quant_core::market_data::context::MarketContext = &market;
         let evaluator = &mut self.inner;
         let result = py
-            .detach(|| evaluator.evaluate_with_market(model_inner, market_inner, as_of))
+            .detach(|| evaluator.evaluate_with_market(model_inner, market_inner, as_of, cutoff))
             .map_err(statements_to_py)?;
         Ok(PyStatementResult { inner: result })
     }

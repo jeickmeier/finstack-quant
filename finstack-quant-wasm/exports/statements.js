@@ -17,6 +17,7 @@ export const statements = {
   MixedNodeBuilder: wasm.MixedNodeBuilder,
   validateFinancialModelJson: wasm.validateFinancialModelJson,
   modelNodeIds: wasm.modelNodeIds,
+  applyModelEdits: wasm.applyModelEdits,
   validateCheckSuiteSpecJson: wasm.validateCheckSuiteSpecJson,
   validateCapitalStructureSpecJson: wasm.validateCapitalStructureSpecJson,
   validateWaterfallSpecJson: wasm.validateWaterfallSpecJson,

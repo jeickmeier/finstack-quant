@@ -799,13 +799,13 @@ class Evaluator:
         model: FinancialModelSpec,
         market: MarketContext,
         as_of: date,
+        observation_cutoff: date | str,
     ) -> StatementResult:
         """
         Evaluate ``model`` with market data and an as-of date.
 
         Use this when capital-structure instruments need market data
-        (floating coupons, swaps, caps) and for as-of filtering of future
-        actual periods.
+        (floating coupons, swaps, caps) and for point-in-time evaluation.
 
         Parameters
         ----------
@@ -814,13 +814,17 @@ class Evaluator:
         market:
             A :class:`MarketContext` with curves, FX, and vol surfaces.
         as_of:
-            Valuation date for pricing, and the cutoff for explicit-value
-            visibility. A value whose declared availability date falls
-            after ``as_of`` is hidden in any period; an actual with no
-            declared date becomes visible at its period's end; an undated
-            value in a forecast period is an assumption and stays visible. A
-            hidden value makes the node fall back to its forecast or formula
-            (a value-only node then raises).
+            Valuation date for pricing the capital structure. It does not
+            hide observations.
+        observation_cutoff:
+            ``"full_snapshot"`` reads every observation in the model. A date
+            (or ISO ``YYYY-MM-DD`` string) reads an observation only when its
+            availability date is on or before that date, inclusive; the model
+            must then name its ``source_snapshot`` and give an availability
+            date to every observation in an actual period. An undated
+            explicit value in a forecast period is a forecast assumption and
+            stays visible. A hidden value makes the node fall back to its
+            forecast or formula (a value-only node then raises).
 
         Returns
         -------
@@ -830,7 +834,9 @@ class Evaluator:
         Raises
         ------
         ValueError
-            If ``as_of`` or a formula is invalid.
+            If ``as_of``, ``observation_cutoff`` or a formula is invalid, or a
+            cutoff date is used on a model with no ``source_snapshot`` or
+            with an undated observation in an actual period.
         KeyError
             If a referenced node, input data or required market data is missing.
         RuntimeError

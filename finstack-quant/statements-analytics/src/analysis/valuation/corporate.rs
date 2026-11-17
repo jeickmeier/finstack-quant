@@ -406,7 +406,12 @@ pub fn evaluate_dcf(
     };
     let mut evaluator = Evaluator::new();
     let results = match (market, as_of) {
-        (Some(market), Some(as_of)) => evaluator.evaluate_with_market(model, market, as_of)?,
+        (Some(market), Some(as_of)) => evaluator.evaluate_with_market(
+            model,
+            market,
+            as_of,
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+        )?,
         (Some(_), None) => {
             return Err(finstack_quant_statements::Error::Eval(
                 "evaluate_dcf requires as_of when a market context is provided; \

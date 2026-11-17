@@ -2078,6 +2078,108 @@ export type SeasonalMode = "additive" | "multiplicative";
  */
 export type UnitType = "percentage" | "currency" | "ratio" | "count" | "time_period";
 /**
+ * One named change to a financial model, applied atomically with the others in its batch.
+ */
+export type ModelEdit =
+  | {
+      edit: "add_node";
+      /**
+       * Complete node to add under its own `node_id`.
+       */
+      node: NodeSpec;
+    }
+  | {
+      edit: "replace_node";
+      /**
+       * Complete replacement, stored in the original node's position.
+       */
+      node: NodeSpec;
+    }
+  | {
+      edit: "remove_node";
+      /**
+       * Identifier of the node to remove.
+       */
+      node_id: Id;
+    }
+  | {
+      /**
+       * Date the observation was published. `None` clears a stored date.
+       */
+      availability_date?: DateWire | null;
+      edit: "set_observation";
+      /**
+       * Node that takes the observation.
+       */
+      node_id: Id;
+      /**
+       * Period of the model timeline the observation belongs to.
+       */
+      period: string;
+      /**
+       * Finite scalar, or `Money` in the node's currency.
+       */
+      value: AmountOrScalar;
+    }
+  | {
+      edit: "remove_observation";
+      /**
+       * Node that holds the observation.
+       */
+      node_id: Id;
+      /**
+       * Period whose observation is removed.
+       */
+      period: string;
+    }
+  | {
+      edit: "set_formula";
+      /**
+       * Statements DSL formula text.
+       */
+      formula: string;
+      /**
+       * Node that takes the formula.
+       */
+      node_id: Id;
+    }
+  | {
+      edit: "set_forecast";
+      /**
+       * Forecast method and parameters.
+       */
+      forecast: ForecastSpec;
+      /**
+       * Node that takes the forecast.
+       */
+      node_id: Id;
+    }
+  | {
+      edit: "remove_forecast";
+      /**
+       * Node whose forecast is removed.
+       */
+      node_id: Id;
+    }
+  | {
+      edit: "set_where";
+      /**
+       * Node the predicate masks.
+       */
+      node_id: Id;
+      /**
+       * Scalar DSL predicate.
+       */
+      predicate: string;
+    }
+  | {
+      edit: "remove_where";
+      /**
+       * Node whose predicate is removed.
+       */
+      node_id: Id;
+    };
+/**
  * Column storage variants supported by the table envelope.
  */
 export type TableColumnData =
@@ -7194,6 +7296,15 @@ export interface FinancialModelSpec {
    * Required schema version. Only version `1` is accepted.
    */
   schema_version: SchemaVersion;
+  /**
+   * Identity of the source snapshot the explicit observations were taken
+   * from, for example `"FY2025-10K-original"`.
+   *
+   * Required for an evaluation with an observation cutoff. Keep a revised
+   * set of observations in a model with a different snapshot identity, so
+   * a dated evaluation can replay the information set of its day.
+   */
+  source_snapshot?: string | null;
 }
 /**
  * Specification for a single node (metric/line item) in the financial model.
@@ -7205,13 +7316,13 @@ export interface FinancialModelSpec {
  */
 export interface NodeSpec {
   /**
-   * Point-in-time availability date for each explicit period value.
+   * Publication date of each explicit period value.
    *
-   * When absent for a value, market-aware evaluation conservatively makes
-   * that value visible on the period's exclusive end date. An explicit
-   * entry permits filing/release dates later than period end, or earlier
-   * availability for operational data known before the reporting period
-   * closes.
+   * An evaluation with an observation cutoff reads an observation only
+   * when this date is on or before the cutoff, and needs a date for every
+   * observation in an actual period. An explicit value in a forecast
+   * period without a date is a forecast assumption, not a published
+   * observation, and is always visible.
    */
   availability_dates?: {
     [k: string]: DateWire;

@@ -65,6 +65,15 @@ pub struct FinancialModelSpec {
     /// Map of node_id → NodeSpec
     pub nodes: IndexMap<NodeId, NodeSpec>,
 
+    /// Identity of the source snapshot the explicit observations were taken
+    /// from, for example `"FY2025-10K-original"`.
+    ///
+    /// Required for an evaluation with an observation cutoff. Keep a revised
+    /// set of observations in a model with a different snapshot identity, so
+    /// a dated evaluation can replay the information set of its day.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_snapshot: Option<String>,
+
     /// Capital structure specification (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub capital_structure: Option<CapitalStructureSpec>,
@@ -131,6 +140,37 @@ impl FinancialModelSpec {
             }
         }
         Ok(inferred_types)
+    }
+
+    /// Check that the model can be evaluated at an observation cutoff.
+    ///
+    /// # Errors
+    ///
+    /// Returns a build error if the model names no source snapshot, or an
+    /// explicit observation in an actual period has no availability date.
+    pub(crate) fn validate_point_in_time(&self) -> Result<()> {
+        if self.source_snapshot.is_none() {
+            return Err(Error::build(
+                "An evaluation with an observation cutoff needs an identified source snapshot: \
+                 set the model's source_snapshot",
+            ));
+        }
+        for (node_id, node) in &self.nodes {
+            let Some(values) = &node.values else { continue };
+            for period in self.periods.iter().filter(|period| period.is_actual) {
+                if values.contains_key(&period.id)
+                    && !node.availability_dates.contains_key(&period.id)
+                {
+                    return Err(Error::build(format!(
+                        "Node '{node_id}' has no availability date for its {} observation; an \
+                         evaluation with an observation cutoff needs an explicit publication \
+                         date for every observation in an actual period",
+                        period.id
+                    )));
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Resolve explicit reporting currency, or infer one unambiguous monetary currency.
@@ -213,6 +253,7 @@ impl FinancialModelSpec {
             id: id.into(),
             periods,
             nodes: IndexMap::new(),
+            source_snapshot: None,
             capital_structure: None,
             meta: IndexMap::new(),
             schema_version: SchemaVersion::CURRENT,
@@ -439,6 +480,15 @@ impl FinancialModelSpec {
             return Err(Error::build("Model must have at least one period"));
         }
         Self::validate_period_timeline(&self.periods)?;
+        if self
+            .source_snapshot
+            .as_ref()
+            .is_some_and(|id| id.trim().is_empty())
+        {
+            return Err(Error::build(
+                "Model source_snapshot must be a nonempty identifier when set",
+            ));
+        }
         let evaluable_capital_structure = self
             .capital_structure
             .as_ref()

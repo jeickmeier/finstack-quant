@@ -226,16 +226,19 @@ impl Evaluator {
     /// be cut off at an as-of date. [`Evaluator::evaluate`] also evaluates the
     /// capital structure, but from an empty market with every value visible.
     ///
-    /// # As-of visibility
+    /// # Observation cutoff
     ///
-    /// The `as_of` date is also the explicit-value visibility cutoff:
+    /// `cutoff` selects which explicit observations the evaluation may read.
+    /// It is separate from `as_of`, which dates pricing only.
     ///
-    /// - A value with a declared availability date is visible only when that
-    ///   date is on or before `as_of`, in any period.
-    /// - A value without one in an actual period becomes visible at the
-    ///   period's exclusive end date.
-    /// - A value without one in a forecast period is an assumption, not an
-    ///   observation, and is always visible.
+    /// - [`ObservationCutoff::FullSnapshot`] reads every observation in the
+    ///   model.
+    /// - [`ObservationCutoff::Through`] reads an observation only when its
+    ///   availability date is on or before the cutoff date, inclusive through
+    ///   the end of that day. The model must name its source snapshot and
+    ///   give an availability date to every observation in an actual period.
+    ///   An undated explicit value in a forecast period is a forecast
+    ///   assumption and is always visible.
     ///
     /// A hidden value keeps its place in the model timeline, but the node
     /// resolves through forecast or formula fallbacks under normal precedence.
@@ -248,7 +251,9 @@ impl Evaluator {
     ///
     /// * `model` - The financial model specification
     /// * `market_ctx` - Market context for pricing instruments
-    /// * `as_of` - Valuation date for pricing and explicit-value visibility
+    /// * `as_of` - Valuation date for pricing the capital structure
+    /// * `cutoff` - Explicit observations the evaluation may read: the full
+    ///   snapshot, or those published on or before a date
     ///
     /// # Returns
     ///
@@ -262,16 +267,25 @@ impl Evaluator {
     /// Returns an error if model formulas cannot be parsed or compiled, its
     /// dependency graph is invalid or cyclic, a required value or forecast
     /// cannot be resolved, capital-structure instruments cannot be built or
-    /// priced from `market_ctx`, or final checks fail. Explicit values not yet
-    /// available at `as_of` are intentionally hidden rather than used as known
-    /// data.
+    /// priced from `market_ctx`, or final checks fail. Under a cutoff date it
+    /// also returns an error if the model names no source snapshot, an
+    /// observation in an actual period has no availability date, or a hidden
+    /// observation has no forecast or formula to fall back on.
     pub fn evaluate_with_market(
         &mut self,
         model: &FinancialModelSpec,
         market_ctx: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
+        cutoff: ObservationCutoff,
     ) -> Result<StatementResult> {
-        self.evaluate_inner(model, Some((market_ctx, as_of)), Some(as_of))
+        let visibility_cutoff = match cutoff {
+            ObservationCutoff::FullSnapshot => None,
+            ObservationCutoff::Through(date) => {
+                model.validate_point_in_time()?;
+                Some(date)
+            }
+        };
+        self.evaluate_inner(model, Some((market_ctx, as_of)), visibility_cutoff)
             .inspect_err(|err| {
                 tracing::error!(
                     model_id = %model.id,
@@ -1060,6 +1074,17 @@ impl Default for Evaluator {
     }
 }
 
+/// Which explicit observations an evaluation may read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ObservationCutoff {
+    /// Read every observation in the model's snapshot, with no publication
+    /// cutoff.
+    FullSnapshot,
+    /// Read an observation only when its availability date is on or before
+    /// this date, inclusive through the end of the day.
+    Through(finstack_quant_core::dates::Date),
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1081,7 +1106,9 @@ mod tests {
             model_builder_1
                 .compute("guarded_metric", "42")
                 .expect("valid formula");
-            model_builder_1.where_clause("0 / 0");
+            model_builder_1
+                .where_clause("guarded_metric", "0 / 0")
+                .expect("valid predicate");
             model_builder_1.build().expect("valid model")
         };
 
@@ -1293,8 +1320,14 @@ mod tests {
                     .with_availability_dates(availability)
                     .with_formula("123"),
             );
+            model.source_snapshot = Some("original".to_string());
             Evaluator::new()
-                .evaluate_with_market(&model, &MarketContext::new(), as_of)
+                .evaluate_with_market(
+                    &model,
+                    &MarketContext::new(),
+                    as_of,
+                    crate::evaluator::ObservationCutoff::Through(as_of),
+                )
                 .expect("evaluation")
                 .get("revenue", &q2)
         };
@@ -1329,17 +1362,29 @@ mod tests {
         model.add_node(
             NodeSpec::new("revenue", NodeType::Mixed)
                 .with_values(values)
-                .with_availability_dates(IndexMap::from([(
-                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    Date::from_calendar_date(2025, Month::January, 1).expect("date"),
-                )]))
+                .with_availability_dates(IndexMap::from([
+                    (
+                        PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                        Date::from_calendar_date(2025, Month::January, 1).expect("date"),
+                    ),
+                    (
+                        PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                        Date::from_calendar_date(2025, Month::July, 1).expect("date"),
+                    ),
+                ]))
                 .with_formula("123"),
         );
+        model.source_snapshot = Some("original".to_string());
 
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         let mut evaluator = Evaluator::new();
         let results = evaluator
-            .evaluate_with_market(&model, &MarketContext::new(), as_of)
+            .evaluate_with_market(
+                &model,
+                &MarketContext::new(),
+                as_of,
+                crate::evaluator::ObservationCutoff::Through(as_of),
+            )
             .expect("evaluation");
 
         assert_eq!(

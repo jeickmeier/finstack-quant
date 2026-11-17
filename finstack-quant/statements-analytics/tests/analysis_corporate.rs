@@ -156,7 +156,12 @@ fn test_cs_cashflows_populated_on_statement_result() {
 
     let mut evaluator = Evaluator::new();
     let result = evaluator
-        .evaluate_with_market(&model, &market_ctx, issue)
+        .evaluate_with_market(
+            &model,
+            &market_ctx,
+            issue,
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .expect("evaluation should succeed");
 
     // cs_cashflows should be populated when model has a capital structure
@@ -1012,20 +1017,13 @@ fn dcf_with_market_as_of(as_of: Date) -> finstack_quant_statements::Result<()> {
     .map(|_| ())
 }
 
-/// A quarter-end `as_of` hides that quarter's actuals (they become visible on
-/// the period's exclusive end); the error names both dates and the remedy
-/// instead of only reporting a missing value.
+/// The valuation reads the model's full snapshot: `as_of` dates pricing and
+/// does not hide observations. An `as_of` after the model has no forecast
+/// flow left, and the error names the valuation date.
 #[test]
-fn dcf_as_of_errors_explain_visibility_and_valuation_date() {
-    let quarter_end = Date::from_calendar_date(2025, Month::June, 30).expect("date");
-    let message = dcf_with_market_as_of(quarter_end)
-        .expect_err("2025Q2 actuals are not visible on 2025-06-30")
-        .to_string();
-    assert!(
-        message.contains("its actual is available on 2025-07-01, after as_of 2025-06-30")
-            && message.contains("availability_dates"),
-        "{message}"
-    );
+fn dcf_as_of_reads_the_full_snapshot_and_explains_the_valuation_date() {
+    dcf_with_market_as_of(Date::from_calendar_date(2025, Month::June, 30).expect("date"))
+        .expect("quarter-end valuation reads the 2025Q2 observation");
 
     dcf_with_market_as_of(Date::from_calendar_date(2025, Month::July, 1).expect("date"))
         .expect("the day after quarter end sees 2025Q2");

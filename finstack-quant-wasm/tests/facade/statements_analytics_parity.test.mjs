@@ -44,7 +44,8 @@ function evaluatedCapitalStructure() {
       results: evaluator.evaluateWithMarket(
         model,
         INPUTS.capital_structure_market,
-        INPUTS.capital_structure_as_of
+        INPUTS.capital_structure_as_of,
+        'full_snapshot'
       ),
     };
   } finally {

@@ -1,10 +1,12 @@
 //! Core types for financial statement modeling.
 
+mod edit;
 mod forecast_params;
 mod model;
 mod node;
 mod value;
 
+pub use edit::ModelEdit;
 pub use forecast_params::{
     BootstrapParams, BoundsParams, CurvePctParams, DistributionParams, FadeToTargetParams,
     ForecastBootstrapMode, ForecastFadeShape, ForecastParameters, ForecastTrendMethod,

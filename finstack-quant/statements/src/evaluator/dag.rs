@@ -570,7 +570,9 @@ mod tests {
             let mut model_builder_1 = model_builder_1.mixed("margin");
             model_builder_1.formula("1.0").unwrap();
             let mut model_builder_1 = model_builder_1.build().unwrap();
-            model_builder_1.where_clause("revenue > 0.0");
+            model_builder_1
+                .where_clause("margin", "revenue > 0.0")
+                .unwrap();
             model_builder_1.build().unwrap()
         };
 

@@ -95,39 +95,121 @@ fn build_rejects_values_that_evaluation_would_silently_drop() {
     );
 }
 
+/// STATEMENTS-CONTRACTS-002 #3: an import needs a plan, maps unique columns
+/// by period label in any order, keeps sparse cells missing and known zeros
+/// distinct, and rejects a column outside the plan.
 #[test]
-fn period_columns_validate_null_only_columns_without_changing_builder_state() {
-    let builder = {
-        let mut model_builder = ModelBuilder::new("period-import");
-        model_builder.periods("2025Q1..Q2", Some("2025Q1")).unwrap();
-        model_builder.value("existing", &[(quarter(1), 7.0.into())]);
-        model_builder
-    };
-    let error = builder
-        .resolve_period_columns(&[quarter(1), quarter(3)], None)
-        .expect_err("column membership is independent of its cell values");
-    assert!(error.to_string().contains("2025Q3"));
-    let retained = builder.build().unwrap();
-    assert!(retained.periods[0].is_actual);
-    assert_eq!(retained.nodes["existing"].values.as_ref().unwrap().len(), 1);
-}
+fn observation_import_is_plan_validated_sparse_and_atomic() {
+    use finstack_quant_statements::types::{AmountOrScalar, NodeId};
 
-#[test]
-fn inferred_import_timeline_includes_gaps_and_checks_interior_columns() {
-    let builder = ModelBuilder::new("inferred-import");
-    let periods = builder
-        .resolve_period_columns(&[quarter(1), quarter(3)], Some("2025Q1"))
-        .unwrap();
-    assert_eq!(periods.len(), 3);
-    assert!(periods[0].is_actual);
-    assert!(!periods[1].is_actual);
-
-    assert!(
+    let usd = |amount: i64| Some(AmountOrScalar::from(Money::from((amount, Currency::USD))));
+    let scalar = |value: f64| Some(AmountOrScalar::scalar(value));
+    let row = |id: &str, cells: Vec<Option<AmountOrScalar>>| (NodeId::new(id), cells);
+    let base = || {
+        let mut builder = ModelBuilder::new("period-import");
+        builder.periods("2025Q1..Q3", Some("2025Q1")).unwrap();
+        builder.value("existing", &[(quarter(1), 7.0.into())]);
         builder
-            .resolve_period_columns(&[quarter(1), quarter(4), quarter(3)], None)
-            .is_err()
+    };
+
+    // Unordered columns, a sparse row, a known zero and an all-missing column.
+    let mut builder = base();
+    builder
+        .import_observations(
+            &["2025Q3", "2025Q1", "2025Q2"],
+            &[
+                row("revenue", vec![scalar(300.0), scalar(100.0), None]),
+                row("cash", vec![usd(0), usd(50), None]),
+                row("empty", vec![None, None, None]),
+            ],
+        )
+        .unwrap();
+    let model = builder.build().unwrap();
+    let values = |id: &str| model.nodes[id].values.clone().unwrap();
+    assert_eq!(values("revenue").len(), 2);
+    assert_eq!(values("revenue")[&quarter(1)].value(), 100.0);
+    assert_eq!(values("revenue")[&quarter(3)].value(), 300.0);
+    assert!(!values("revenue").contains_key(&quarter(2)));
+    assert_eq!(
+        values("cash")[&quarter(3)].value(),
+        0.0,
+        "a zero is a known zero"
     );
-    assert!(builder.resolve_period_columns(&[], None).is_err());
+    assert_eq!(
+        model.nodes["cash"].value_type,
+        Some(NodeValueType::Monetary {
+            currency: Currency::USD
+        })
+    );
+    assert!(values("empty").is_empty());
+    assert!(
+        model.periods[0].is_actual,
+        "the plan keeps its actuals flags"
+    );
+
+    let rejected =
+        |columns: &[&str], rows: Vec<(NodeId, Vec<Option<AmountOrScalar>>)>, expected: &str| {
+            let mut builder = base();
+            let error = builder
+                .import_observations(columns, &rows)
+                .map(|_| ())
+                .expect_err(expected);
+            assert!(error.to_string().contains(expected), "{error}");
+            assert_eq!(
+                builder.nodes().len(),
+                1,
+                "a rejected import changes nothing"
+            );
+        };
+    let good = || vec![row("revenue", vec![scalar(1.0), scalar(2.0)])];
+    rejected(
+        &["2025Q1", "2025Q4"],
+        good(),
+        "not present in the model timeline",
+    );
+    rejected(&["2025Q1", "2025Q1"], good(), "more than once");
+    rejected(&["2025Q1", "typo"], good(), "Period column 'typo'");
+    rejected(&[], vec![], "at least one period column");
+    rejected(
+        &["2025Q1", "2025Q2"],
+        vec![row("revenue", vec![scalar(1.0)])],
+        "has 1 cells for 2 period columns",
+    );
+    rejected(
+        &["2025Q1", "2025Q2"],
+        vec![row("revenue", vec![scalar(1.0), usd(2)])],
+        "",
+    );
+    rejected(
+        &["2025Q1", "2025Q2"],
+        vec![row("revenue", vec![scalar(f64::NAN), None])],
+        "not finite",
+    );
+    rejected(
+        &["2025Q1", "2025Q2"],
+        vec![row("existing", vec![scalar(1.0), None])],
+        "defined more than once",
+    );
+    rejected(
+        &["2025Q1", "2025Q2"],
+        vec![good().remove(0), good().remove(0)],
+        "defined more than once",
+    );
+    rejected(
+        &["2025Q1", "2025Q2"],
+        vec![row("not-valid", vec![None, None])],
+        "not a valid identifier",
+    );
+
+    let mut no_plan = ModelBuilder::new("no-plan");
+    let error = no_plan
+        .import_observations(&["2025Q1"], &good())
+        .map(|_| ())
+        .expect_err("an import never infers the timeline");
+    assert!(
+        error.to_string().contains("Set the model timeline"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -421,4 +503,260 @@ fn observations_are_finite_and_a_runnable_model_is_not_empty() {
         .build()
         .expect_err("a model with no node is not runnable");
     assert!(error.to_string().contains("at least one node"), "{error}");
+}
+
+/// STATEMENTS-CONTRACTS-002 #1–#2: named edits commit atomically, a forecast
+/// attaches to an existing node preserving its formula and observations, and
+/// a rejected batch leaves the model unchanged.
+#[test]
+fn named_edits_commit_atomically() {
+    use finstack_quant_statements::types::{ModelEdit, NodeId, NodeSpec, NodeType};
+
+    let mut model = forecast_model();
+    let before = serde_json::to_value(&model).unwrap();
+    let node = |id: &str| NodeId::new(id);
+
+    model
+        .apply_edits(&[
+            ModelEdit::SetObservation {
+                node_id: node("cost"),
+                period: quarter(1),
+                value: 45.0.into(),
+                availability_date: Some(date!(2025 - 04 - 25)),
+            },
+            ModelEdit::SetForecast {
+                node_id: node("profit"),
+                forecast: ForecastSpec::growth(0.0),
+            },
+            ModelEdit::AddNode {
+                node: NodeSpec::new("margin", NodeType::Calculated)
+                    .with_formula("profit / revenue"),
+            },
+            ModelEdit::SetWhere {
+                node_id: node("margin"),
+                predicate: "revenue > 0".into(),
+            },
+        ])
+        .expect("a valid batch commits");
+    assert_eq!(
+        model.nodes["cost"].values.as_ref().unwrap()[&quarter(1)].value(),
+        45.0
+    );
+    assert_eq!(
+        model.nodes["cost"].availability_dates[&quarter(1)],
+        date!(2025 - 04 - 25)
+    );
+    let profit = &model.nodes["profit"];
+    assert_eq!(
+        profit.node_type,
+        NodeType::Mixed,
+        "a forecast promotes to Mixed"
+    );
+    assert_eq!(profit.formula_text.as_deref(), Some("revenue - cost"));
+    assert!(profit.forecast.is_some());
+    assert_eq!(
+        model.nodes["margin"].where_text.as_deref(),
+        Some("revenue > 0")
+    );
+
+    // Each batch below fails on its last edit or on revalidation; none commits.
+    let committed = serde_json::to_value(&model).unwrap();
+    assert_ne!(committed, before);
+    let good = ModelEdit::SetObservation {
+        node_id: node("cost"),
+        period: quarter(1),
+        value: 1.0.into(),
+        availability_date: None,
+    };
+    for (bad, expected) in [
+        (
+            ModelEdit::AddNode {
+                node: NodeSpec::new("cost", NodeType::Value),
+            },
+            "already defined",
+        ),
+        (
+            ModelEdit::ReplaceNode {
+                node: NodeSpec::new("absent", NodeType::Value),
+            },
+            "unknown node 'absent'",
+        ),
+        (
+            ModelEdit::RemoveNode {
+                node_id: node("absent"),
+            },
+            "unknown node 'absent'",
+        ),
+        (
+            ModelEdit::RemoveNode {
+                node_id: node("revenue"),
+            },
+            "Unknown identifier 'revenue'",
+        ),
+        (
+            ModelEdit::RemoveObservation {
+                node_id: node("cost"),
+                period: quarter(2),
+            },
+            "no observation for period 2025Q2",
+        ),
+        (
+            ModelEdit::SetObservation {
+                node_id: node("margin"),
+                period: quarter(1),
+                value: 1.0.into(),
+                availability_date: None,
+            },
+            "cannot have explicit values",
+        ),
+        (
+            ModelEdit::SetFormula {
+                node_id: node("profit"),
+                formula: "revenue -".into(),
+            },
+            "Invalid formula",
+        ),
+        (
+            ModelEdit::SetWhere {
+                node_id: node("profit"),
+                predicate: "revenue >".into(),
+            },
+            "Invalid where clause",
+        ),
+    ] {
+        let error = model
+            .apply_edits(&[good.clone(), bad])
+            .expect_err("the batch is rejected");
+        assert!(error.to_string().contains(expected), "{expected}: {error}");
+        assert_eq!(
+            serde_json::to_value(&model).unwrap(),
+            committed,
+            "a rejected batch leaves the model unchanged"
+        );
+    }
+
+    // Edits round-trip through their wire form.
+    let wire = serde_json::json!([
+        {"edit": "remove_where", "node_id": "margin"},
+        {"edit": "remove_forecast", "node_id": "profit"},
+        {"edit": "remove_observation", "node_id": "cost", "period": "2025Q1"},
+    ]);
+    let edits: Vec<ModelEdit> = serde_json::from_value(wire.clone()).unwrap();
+    assert_eq!(serde_json::to_value(&edits).unwrap(), wire);
+    model.apply_edits(&edits).unwrap();
+    assert!(model.nodes["margin"].where_text.is_none());
+    assert!(model.nodes["cost"].availability_dates.is_empty());
+    serde_json::from_value::<ModelEdit>(serde_json::json!({"edit": "rename_node"}))
+        .expect_err("an unknown edit is rejected");
+}
+
+/// STATEMENTS-CONTRACTS-002 #4 worked example: a $100 observation published
+/// on April 25 is visible at that day's cutoff. A revision to $110 published
+/// on May 15 is visible in the revised snapshot at the May 15 cutoff. An
+/// April 25 replay uses the original snapshot and obtains $100.
+#[test]
+fn point_in_time_evaluation_replays_identified_snapshots() {
+    use finstack_quant_core::dates::Date;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_statements::evaluator::ObservationCutoff;
+
+    let snapshot = |id: Option<&str>, amount: i64, published: Option<Date>| {
+        let mut builder = ModelBuilder::new("revision-replay");
+        builder.periods("2025Q1..Q2", Some("2025Q1")).unwrap();
+        builder.value_money(
+            "revenue",
+            &[
+                (quarter(1), Money::from((amount, Currency::USD))),
+                // An undated value in a forecast period is an assumption.
+                (quarter(2), Money::from((125_i64, Currency::USD))),
+            ],
+        );
+        if let Some(published) = published {
+            builder
+                .availability_dates("revenue", &[(quarter(1), published)])
+                .unwrap();
+        }
+        if let Some(id) = id {
+            builder.source_snapshot(id);
+        }
+        builder.build().unwrap()
+    };
+    let original = snapshot(Some("original"), 100, Some(date!(2025 - 04 - 25)));
+    let revised = snapshot(Some("revised"), 110, Some(date!(2025 - 05 - 15)));
+    let read = |model: &FinancialModelSpec, cutoff: ObservationCutoff| {
+        Evaluator::new()
+            .evaluate_with_market(model, &MarketContext::new(), date!(2025 - 06 - 30), cutoff)
+            .map(|result| {
+                (
+                    result.get("revenue", &quarter(1)).unwrap(),
+                    result.get("revenue", &quarter(2)).unwrap(),
+                )
+            })
+    };
+    let through = ObservationCutoff::Through;
+
+    // Inclusive through the end of the publication day.
+    assert_eq!(
+        read(&original, through(date!(2025 - 04 - 25))).unwrap(),
+        (100.0, 125.0)
+    );
+    let error = read(&original, through(date!(2025 - 04 - 24)))
+        .expect_err("the observation is not yet published");
+    assert!(
+        error.to_string().contains("available on 2025-04-25"),
+        "{error}"
+    );
+
+    assert_eq!(
+        read(&revised, through(date!(2025 - 05 - 15))).unwrap(),
+        (110.0, 125.0)
+    );
+    read(&revised, through(date!(2025 - 05 - 14))).expect_err("the revision is not yet published");
+    // The April 25 replay uses the original snapshot.
+    assert_eq!(
+        read(&original, through(date!(2025 - 04 - 25))).unwrap().0,
+        100.0
+    );
+    assert_eq!(original.source_snapshot.as_deref(), Some("original"));
+    assert_eq!(revised.source_snapshot.as_deref(), Some("revised"));
+
+    // Full-snapshot mode reads the selected snapshot with no cutoff.
+    assert_eq!(
+        read(&revised, ObservationCutoff::FullSnapshot).unwrap(),
+        (110.0, 125.0)
+    );
+    assert_eq!(
+        Evaluator::new()
+            .evaluate(&original)
+            .unwrap()
+            .get("revenue", &quarter(1)),
+        Some(100.0)
+    );
+
+    // A cutoff needs an identified snapshot and a date on every observation
+    // in an actual period.
+    let unidentified = snapshot(None, 100, Some(date!(2025 - 04 - 25)));
+    let error = read(&unidentified, through(date!(2025 - 04 - 25)))
+        .expect_err("a cutoff needs an identified snapshot");
+    assert!(
+        error.to_string().contains("identified source snapshot"),
+        "{error}"
+    );
+    read(&unidentified, ObservationCutoff::FullSnapshot).expect("full snapshot needs no identity");
+    let undated = snapshot(Some("undated"), 100, None);
+    let error = read(&undated, through(date!(2025 - 04 - 25)))
+        .expect_err("a cutoff needs explicit publication dates");
+    assert!(
+        error.to_string().contains("no availability date"),
+        "{error}"
+    );
+
+    let mut blank = original;
+    blank.source_snapshot = Some("  ".to_string());
+    blank
+        .validate_semantics()
+        .expect_err("a snapshot identity is not blank");
+    let round_trip =
+        FinancialModelSpec::from_json(&serde_json::to_string(&revised).unwrap()).unwrap();
+    assert_eq!(round_trip.source_snapshot.as_deref(), Some("revised"));
 }

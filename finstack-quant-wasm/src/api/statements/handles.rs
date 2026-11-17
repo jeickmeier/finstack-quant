@@ -102,30 +102,43 @@ impl JsEvaluator {
     ///
     /// Twin of Python `Evaluator.evaluate_with_market` (Rust
     /// `Evaluator::evaluate_with_market`). Required when capital-structure
-    /// instruments need market data (floating coupons, swaps, caps) or
-    /// explicit values need an as-of cutoff.
+    /// instruments need market data (floating coupons, swaps, caps) and for
+    /// point-in-time evaluation.
     ///
     /// @param model - `FinancialModelSpec` to evaluate (object or JSON).
     /// @param market - `MarketContext` state supplying curves, quotes and FX (object or JSON).
-    /// @param asOf - ISO 8601 date (`"2025-01-15"`): the pricing date for capital-structure instruments and the cutoff for explicit-value visibility. A value whose declared availability date falls after `asOf` is hidden in any period; an actual with no declared date becomes visible at its period's end; an undated value in a forecast period is an assumption and stays visible. A hidden value makes the node fall back to its forecast or formula, and a value-only node then fails.
+    /// @param asOf - ISO 8601 date (`"2025-01-15"`): the pricing date for capital-structure instruments. It does not hide observations.
+    /// @param observationCutoff - `"full_snapshot"` reads every observation in the model. An ISO 8601 date reads an observation only when its availability date is on or before that date, inclusive; the model must then name its `source_snapshot` and give an availability date to every observation in an actual period. An undated explicit value in a forecast period is a forecast assumption and stays visible. A hidden value makes the node fall back to its forecast or formula, and a value-only node then fails.
     /// @returns `StatementResult` plain object, including `cs_cashflows` for capital-structure models.
-    /// @throws Error with kind `validation` if an input is malformed, `asOf` is not an ISO date, or a formula fails to evaluate; kind `not_found` if a node or market datum is missing; kind `computation` for a dependency cycle or a capital-structure failure.
+    /// @throws Error with kind `validation` if an input is malformed, `asOf` or `observationCutoff` is not an ISO date (or `"full_snapshot"`), a cutoff date is used on a model with no `source_snapshot` or with an undated observation in an actual period, or a formula fails to evaluate; kind `not_found` if a node or market datum is missing; kind `computation` for a dependency cycle or a capital-structure failure.
     #[wasm_bindgen(js_name = evaluateWithMarket, unchecked_return_type = "StatementResult")]
     pub fn evaluate_with_market(
         &mut self,
         #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
         #[wasm_bindgen(unchecked_param_type = "JsonInput")] market: JsValue,
         #[wasm_bindgen(js_name = "asOf", unchecked_param_type = "string")] as_of: JsValue,
+        #[wasm_bindgen(js_name = "observationCutoff", unchecked_param_type = "string")]
+        observation_cutoff: JsValue,
     ) -> Result<JsValue, JsValue> {
+        use finstack_quant_statements::evaluator::ObservationCutoff;
+
         let model =
             FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
         let market: finstack_quant_core::market_data::context::MarketContext =
             from_js_json(&market, "market")?;
         let as_of = crate::utils::wire::js_date(&as_of, "asOf")?;
+        let cutoff = if observation_cutoff.as_string().as_deref() == Some("full_snapshot") {
+            ObservationCutoff::FullSnapshot
+        } else {
+            ObservationCutoff::Through(crate::utils::wire::js_date(
+                &observation_cutoff,
+                "observationCutoff",
+            )?)
+        };
         to_js_value(
             &self
                 .inner
-                .evaluate_with_market(&model, &market, as_of)
+                .evaluate_with_market(&model, &market, as_of, cutoff)
                 .map_err(to_js_err)?,
         )
     }

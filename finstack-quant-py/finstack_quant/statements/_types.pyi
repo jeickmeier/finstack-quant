@@ -1092,6 +1092,7 @@ class FinancialModelSpec:
     >>> from finstack_quant.statements import ModelBuilder
     >>> builder = ModelBuilder("demo")
     >>> _ = builder.periods("2025Q1..Q1")
+    >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
     >>> builder.build().id
     'demo'
 
@@ -1122,10 +1123,11 @@ class FinancialModelSpec:
         >>> from finstack_quant.statements import FinancialModelSpec
         >>> payload = (
         ...     '{"id":"demo","periods":{"calendar": "gregorian", "periods": [{"id":"2025Q1","start":"2025-01-01",'
-        ...     '"end":"2025-04-01","is_actual":false}]},"nodes":{},"schema_version":1}'
+        ...     '"end":"2025-04-01","is_actual":false}]},'
+        ...     '"nodes":{"revenue":{"node_id":"revenue","node_type":"value"}},"schema_version":1}'
         ... )
         >>> (FinancialModelSpec.from_json(payload).id, FinancialModelSpec.from_json(payload).node_count)
-        ('demo', 0)
+        ('demo', 1)
 
         """
         ...
@@ -1150,6 +1152,7 @@ class FinancialModelSpec:
         >>> from finstack_quant.statements import ModelBuilder
         >>> builder = ModelBuilder("demo")
         >>> _ = builder.periods("2025Q1..Q1")
+        >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
         >>> '"id":"demo"' in builder.build().to_json()
         True
 
@@ -1180,8 +1183,62 @@ class FinancialModelSpec:
         >>> from finstack_quant.statements import ModelBuilder
         >>> builder = ModelBuilder("demo")
         >>> _ = builder.periods("2025Q1..Q1")
+        >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
         >>> builder.build().content_hash().startswith("sha256:")
         True
+        """
+        ...
+
+    @property
+    def source_snapshot(self) -> str | None:
+        """
+        Identity of the source snapshot the observations were taken from.
+
+        Returns
+        -------
+        str | None
+            The snapshot identifier, or ``None`` when the model names none. An evaluation with an observation cutoff needs it.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def apply_edits(self, edits: list[dict[str, Any]] | str) -> FinancialModelSpec:
+        """
+        Apply named edits atomically and return the edited model.
+
+        Edits apply in order to a copy, which must pass the runnable-model
+        validation. This model is never changed.
+
+        Parameters
+        ----------
+        edits:
+            Edit objects (or their JSON array text), each tagged by ``"edit"``: ``add_node`` and ``replace_node`` (``node``); ``remove_node``, ``remove_forecast`` and ``remove_where`` (``node_id``); ``set_observation`` (``node_id``, ``period``, ``value``, optional ``availability_date``); ``remove_observation`` (``node_id``, ``period``); ``set_formula`` (``node_id``, ``formula``); ``set_forecast`` (``node_id``, ``forecast``; the node becomes mixed); ``set_where`` (``node_id``, ``predicate``).
+
+        Returns
+        -------
+        FinancialModelSpec
+            A new model with every edit applied.
+
+        Raises
+        ------
+        ValueError
+            If an edit is malformed, adds an identifier that is already defined, names a node or observation that does not exist, or the edited model fails validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ModelBuilder
+        >>> builder = ModelBuilder("demo")
+        >>> _ = builder.periods("2025Q1..Q1")
+        >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
+        >>> edited = builder.build().apply_edits([
+        ...     {"edit": "set_observation", "node_id": "revenue", "period": "2025Q1", "value": 110.0}
+        ... ])
+        >>> edited.get_node("revenue").values
+        {'2025Q1': 110.0}
+
         """
         ...
 
@@ -1251,8 +1308,9 @@ class FinancialModelSpec:
         >>> from finstack_quant.statements import ModelBuilder
         >>> builder = ModelBuilder("demo")
         >>> _ = builder.periods("2025Q1..Q1")
+        >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
         >>> builder.build().node_ids()
-        []
+        ['revenue']
         """
         ...
 
@@ -1279,8 +1337,10 @@ class FinancialModelSpec:
         >>> from finstack_quant.statements import ModelBuilder
         >>> builder = ModelBuilder("demo")
         >>> _ = builder.periods("2025Q1..Q1")
-        >>> builder.build().has_node("revenue")
-        False
+        >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
+        >>> model = builder.build()
+        >>> (model.has_node("revenue"), model.has_node("cogs"))
+        (True, False)
         """
         ...
 

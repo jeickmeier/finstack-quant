@@ -243,7 +243,12 @@ fn test_mixed_currency_capital_structure_requires_reporting_fx() {
         .insert(flat_discount_curve(0.03, as_of, "EUR-OIS"));
     let mut evaluator = Evaluator::new();
     let error = evaluator
-        .evaluate_with_market(&model, &market, as_of)
+        .evaluate_with_market(
+            &model,
+            &market,
+            as_of,
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .expect_err("USD reporting requires FX for the EUR debt");
     // Reporting currency is explicit through metadata. Missing conversion inputs
     // must return a typed error, without panicking or summing unlike currencies.

@@ -181,7 +181,12 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
                     .expect("both swap sides are supported")
             };
             let result = Evaluator::new()
-                .evaluate_with_market(&model, &market, as_of)
+                .evaluate_with_market(
+                    &model,
+                    &market,
+                    as_of,
+                    crate::evaluator::ObservationCutoff::FullSnapshot,
+                )
                 .expect("signed IRS evaluation");
             assert_eq!(result.get("balance", &period.id), Some(0.0));
             assert!(
@@ -257,7 +262,12 @@ fn canonical_negative_debt_coupons_are_income() {
         model_builder.build().expect("negative-rate debt model")
     };
     let result = Evaluator::new()
-        .evaluate_with_market(&model, &market, as_of)
+        .evaluate_with_market(
+            &model,
+            &market,
+            as_of,
+            crate::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .expect("negative-rate debt evaluation");
     assert_eq!(result.get("expense", &period.id), Some(0.0));
     assert!((result.get("income", &period.id).expect("income") + net).abs() < 1e-9);
@@ -291,7 +301,12 @@ fn placeholder_rate_option_schedule_is_rejected_explicitly() {
         model_builder.build().expect("valid model specification")
     };
     let error = Evaluator::new()
-        .evaluate_with_market(&model, &MarketContext::new(), as_of)
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            as_of,
+            crate::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .expect_err("runtime must reject the placeholder too");
     assert!(error.to_string().contains("placeholder cashflow schedule"));
 }
@@ -511,7 +526,12 @@ fn loan_issuance_is_funded_once_before_on_and_after_first_period_start() {
                 model_builder_1.build().expect("valid model")
             };
             let results = Evaluator::new()
-                .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 01))
+                .evaluate_with_market(
+                    &model,
+                    &MarketContext::new(),
+                    date!(2025 - 01 - 01),
+                    crate::evaluator::ObservationCutoff::FullSnapshot,
+                )
                 .expect("issuance evaluation");
             for period in [q1, q2] {
                 assert_eq!(
@@ -551,7 +571,12 @@ fn plain_evaluate_generates_fixed_rate_capital_structure_cashflows() {
 
     let plain = Evaluator::new().evaluate(&model).expect("plain evaluation");
     let empty_market = Evaluator::new()
-        .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 01))
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            date!(2025 - 01 - 01),
+            crate::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .expect("empty-market evaluation");
 
     let cashflows = plain
@@ -634,7 +659,12 @@ fn plain_evaluate_names_instruments_that_need_market_data() {
     assert!(message.contains("evaluate_with_market"), "{message}");
 
     Evaluator::new()
-        .evaluate_with_market(&model, &swap_market(0.03), date!(2025 - 01 - 01))
+        .evaluate_with_market(
+            &model,
+            &swap_market(0.03),
+            date!(2025 - 01 - 01),
+            crate::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .expect("the swap evaluates against a market");
 }
 
@@ -694,7 +724,12 @@ fn bond_issuance_is_funded_once_before_on_and_after_first_period_start() {
                     .expect("bond waterfall has no prepayment priority")
             };
             let results = Evaluator::new()
-                .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 01))
+                .evaluate_with_market(
+                    &model,
+                    &MarketContext::new(),
+                    date!(2025 - 01 - 01),
+                    crate::evaluator::ObservationCutoff::FullSnapshot,
+                )
                 .expect("bond evaluation");
             for period in [q1, q2] {
                 assert_eq!(
@@ -785,7 +820,12 @@ fn oid_funding_preserves_loan_face_and_cash_at_boundaries() {
                     model_builder_1.build().expect("valid OID model")
                 };
                 let result = Evaluator::new()
-                    .evaluate_with_market(&model, &market, periods[0].start)
+                    .evaluate_with_market(
+                        &model,
+                        &market,
+                        periods[0].start,
+                        crate::evaluator::ObservationCutoff::FullSnapshot,
+                    )
                     .expect("OID model evaluation");
                 for period in &periods {
                     assert_eq!(
@@ -903,7 +943,12 @@ fn oid_funding_preserves_custom_bond_face_with_separate_cash_dates() {
                     model_builder_1.build().expect("valid custom bond model")
                 };
                 let result = Evaluator::new()
-                    .evaluate_with_market(&model, &market, periods[0].start)
+                    .evaluate_with_market(
+                        &model,
+                        &market,
+                        periods[0].start,
+                        crate::evaluator::ObservationCutoff::FullSnapshot,
+                    )
                     .expect("custom bond evaluation");
                 for period in &periods {
                     assert_eq!(
@@ -1054,7 +1099,12 @@ fn newly_funded_loan_preserves_contractual_pik_in_its_first_period() {
             model_builder_1.build().expect("valid model")
         };
         let results = Evaluator::new()
-            .evaluate_with_market(&model, &market, issue)
+            .evaluate_with_market(
+                &model,
+                &market,
+                issue,
+                crate::evaluator::ObservationCutoff::FullSnapshot,
+            )
             .expect("PIK issuance evaluation");
         let actual = results
             .get("balance", &period)
@@ -1125,7 +1175,12 @@ fn contractual_pik_is_redeemed_at_maturity_and_capitalized_once() {
             model_builder_1.build().expect("valid maturity model")
         };
         let result = Evaluator::new()
-            .evaluate_with_market(&model, &market, issue)
+            .evaluate_with_market(
+                &model,
+                &market,
+                issue,
+                crate::evaluator::ObservationCutoff::FullSnapshot,
+            )
             .expect("PIK maturity evaluation");
         assert!(
             (result.get("principal", &period).expect("principal") - expected_principal).abs()
@@ -1195,7 +1250,12 @@ fn loan_swept_after_issuance_stays_repaid_in_later_periods() {
         model_builder.build().expect("valid model")
     };
     let result = Evaluator::new()
-        .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 01))
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            date!(2025 - 01 - 01),
+            crate::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .expect("issuance and sweep");
     assert_eq!(result.get("balance", &periods[0]), Some(100.0));
     assert_eq!(result.get("balance", &periods[1]), Some(0.0));

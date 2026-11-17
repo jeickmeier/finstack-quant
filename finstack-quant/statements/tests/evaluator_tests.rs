@@ -710,7 +710,12 @@ fn test_evaluate_with_market_basic() {
 
     let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
     let results = evaluator
-        .evaluate_with_market(&model, &market_ctx, as_of)
+        .evaluate_with_market(
+            &model,
+            &market_ctx,
+            as_of,
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .unwrap();
 
     assert_eq!(
@@ -746,7 +751,12 @@ fn test_evaluate_with_market_no_capital_structure() {
 
     let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
     let results = evaluator
-        .evaluate_with_market(&model, &market_ctx, as_of)
+        .evaluate_with_market(
+            &model,
+            &market_ctx,
+            as_of,
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .unwrap();
 
     assert_eq!(

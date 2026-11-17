@@ -165,7 +165,7 @@ def test_swap_with_two_receiving_legs_reports_interest_income(
         .insert(DiscountCurve.flat("USD-OIS", "2025-01-01", 0.02, "act_365f"))
         .insert(projection_curve("USD-SOFR-3M", "2025-01-01", [(10.0, forward_rate)]))
     )
-    results = s.Evaluator().evaluate_with_market(model, market, "2025-01-01")
+    results = s.Evaluator().evaluate_with_market(model, market, "2025-01-01", "full_snapshot")
     assert results.cs_cashflows is not None
     cashflows = json.loads(results.cs_cashflows.to_json())
     flow = cashflows["by_instrument"]["IRS"]["2025"]

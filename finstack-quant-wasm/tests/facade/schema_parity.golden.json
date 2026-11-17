@@ -2340,7 +2340,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 393967
+            "bytes": 394406
           },
           {
             "path": "schemas/statements/1/forecast_parameters.schema.json",
@@ -2355,6 +2355,13 @@
             "type_name": "MetricRegistry",
             "kind": "input",
             "bytes": 5807
+          },
+          {
+            "path": "schemas/statements/1/model_edit.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/statements/1/model_edit.schema.json",
+            "type_name": "ModelEdit",
+            "kind": "input",
+            "bytes": 38373
           },
           {
             "path": "schemas/statements/1/monte_carlo_config.schema.json",
@@ -5125,7 +5132,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 393967
+            "bytes": 394406
           },
           {
             "domain": "statements",
@@ -5142,6 +5149,14 @@
             "type_name": "MetricRegistry",
             "kind": "input",
             "bytes": 5807
+          },
+          {
+            "domain": "statements",
+            "path": "schemas/statements/1/model_edit.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/statements/1/model_edit.schema.json",
+            "type_name": "ModelEdit",
+            "kind": "input",
+            "bytes": 38373
           },
           {
             "domain": "statements",

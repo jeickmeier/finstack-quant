@@ -90,8 +90,14 @@ fn forecasts_rebase_at_each_visible_actual_without_looking_ahead() {
         Some(serde_json::from_value(json!({"method":"growth_pct","params":{"rate":0.1}})).unwrap());
     node.node_type = finstack_quant_statements::types::NodeType::Mixed;
     node.availability_dates = indexmap! {q(2025,1) => date!(2025-04-10), q(2025,2) => date!(2025-12-01), q(2025,3) => date!(2025-10-10)};
+    model.source_snapshot = Some("original".to_string());
     let result = Evaluator::new()
-        .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 11 - 01))
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            date!(2025 - 11 - 01),
+            finstack_quant_statements::evaluator::ObservationCutoff::Through(date!(2025 - 11 - 01)),
+        )
         .unwrap();
     assert!((result.get("x", &q(2025, 2)).unwrap() - 110.0).abs() < 1e-10);
     assert!((result.get("x", &q(2025, 4)).unwrap() - 330.0).abs() < 1e-10);
@@ -240,6 +246,7 @@ fn reporting_grid_does_not_reprice_contractual_amortizing_interest() {
             &amortizing_loan_model("2025Q1..Q3", Currency::USD),
             &market,
             date!(2025 - 01 - 15),
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
         )
         .unwrap();
     let monthly = Evaluator::new()
@@ -247,6 +254,7 @@ fn reporting_grid_does_not_reprice_contractual_amortizing_interest() {
             &amortizing_loan_model("2025M1..M9", Currency::USD),
             &market,
             date!(2025 - 01 - 15),
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
         )
         .unwrap();
     for quarter in 1..=3 {
@@ -274,7 +282,12 @@ fn reporting_currency_requires_fx_even_with_one_native_currency() {
     }
     assert!(
         Evaluator::new()
-            .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 15))
+            .evaluate_with_market(
+                &model,
+                &MarketContext::new(),
+                date!(2025 - 01 - 15),
+                finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot
+            )
             .is_err()
     );
 }
@@ -316,7 +329,12 @@ fn single_currency_totals_are_converted_at_the_reporting_snapshot() {
     let market =
         MarketContext::new().insert_fx(FxMatrix::new(std::sync::Arc::new(SnapshotFx), None));
     let result = Evaluator::new()
-        .evaluate_with_market(&model, &market, date!(2025 - 01 - 15))
+        .evaluate_with_market(
+            &model,
+            &market,
+            date!(2025 - 01 - 15),
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .unwrap();
     let flows = result.cs_cashflows.as_ref().unwrap();
     assert_eq!(flows.reporting_currency, Some(Currency::USD));
@@ -363,10 +381,20 @@ fn fx_pivot_does_not_choose_reporting_currency() {
     let model = amortizing_loan_model("2025Q1..Q1", Currency::EUR);
     let market = MarketContext::new().insert_fx(FxMatrix::new(std::sync::Arc::new(UnusedFx), None));
     let actual = Evaluator::new()
-        .evaluate_with_market(&model, &market, date!(2025 - 01 - 15))
+        .evaluate_with_market(
+            &model,
+            &market,
+            date!(2025 - 01 - 15),
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .unwrap();
     let native = Evaluator::new()
-        .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 01 - 15))
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            date!(2025 - 01 - 15),
+            finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .unwrap();
     assert_eq!(
         actual.get_money("debt", &q(2025, 1)),
@@ -396,8 +424,14 @@ fn a_dated_value_hidden_by_as_of_is_not_a_forecast_base_outside_the_actuals_rang
     node.node_type = finstack_quant_statements::types::NodeType::Mixed;
     node.availability_dates =
         indexmap! {q(2025,1) => date!(2025-04-10), q(2025,2) => date!(2025-12-01)};
+    model.source_snapshot = Some("original".to_string());
     let result = Evaluator::new()
-        .evaluate_with_market(&model, &MarketContext::new(), date!(2025 - 11 - 01))
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            date!(2025 - 11 - 01),
+            finstack_quant_statements::evaluator::ObservationCutoff::Through(date!(2025 - 11 - 01)),
+        )
         .unwrap();
     assert!((result.get("x", &q(2025, 2)).unwrap() - 110.0).abs() < 1e-10);
     assert!((result.get("x", &q(2025, 3)).unwrap() - 121.0).abs() < 1e-10);

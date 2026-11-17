@@ -68,9 +68,9 @@ product consequences remain in their product scope.
 | [Calibration: Hull–White and LMM](#calibration-hullwhite-and-lmm) | 18 |
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
 | [Statements: capital structure](#statements-capital-structure) | 14 |
-| [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 15 |
+| [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 14 |
 | [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 15 |
-| [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 16 |
+| [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 17 |
 | [Statements analytics: credit checks and impairment](#statements-analytics-credit-checks-and-impairment) | 18 |
 | [Scenarios](#scenarios) | 16 |
 | [Portfolio execution](#portfolio-execution) | 15 |
@@ -1050,8 +1050,6 @@ product consequences remain in their product scope.
 
 - **Reconciliation — Typed capital selectors in Statements formulas.** Replace the `cs.<component>.<instrument or total>` reference form with the typed capital reporting components and selectors, including instrument, native-currency total and consolidated scopes, and qualify each selector through parsing, rendering, compilation and evaluation. The rest of the formula grammar, signature and AST-validation contract is reconciled. [Accepted STATEMENTS-CONTRACTS-004](statements-contracts/04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation) · [Capital reporting and selectors](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
 
-- **Reconciliation — Statements authoring, imports and point-in-time availability.** Implement shared DSL identifier checks, duplicate rejection, named atomic edits and forecast attachment, validated period-label imports and explicit availability on identified source snapshots. Qualify sparse and unordered imports, publication-date cutoffs, revision replay, distinguished forecast assumptions and full-snapshot mode. [Accepted STATEMENTS-CONTRACTS-002](statements-contracts/02-authoring-and-availability.md#accepted-decision-for-authoring-imports-and-observation-availability).
-
 - **Reconciliation — Typed forecasts and staged validation.** Implement the common typed forecast specification, explicit method controls, complete static validation and runtime checks for the eligible horizon and history. Qualify build/load, inactive configurations, units, peer compatibility and exact stochastic seed round-trips in Rust, Python, WASM and JSON. [Accepted STATEMENTS-CONTRACTS-003](statements-contracts/03-forecast-parameter-contract.md#accepted-decision-for-typed-forecasts-and-validation-staging).
 
 - **Reconciliation — Statements formula units and currency.** Resolve all runnable dimensions, reject unsupported operations including monetary variance, enforce units and decimal scales, and reconcile exact monetary arithmetic and explicit floating-point forecast conversion. Use the accepted capital reporting scopes and qualify missing required FX across hosts. [Accepted STATEMENTS-CONTRACTS-005](statements-contracts/05-currency-dimensions.md#accepted-decision-for-formula-units-and-currency).
@@ -1113,6 +1111,8 @@ product consequences remain in their product scope.
 ## Statements analytics: valuation, comparisons and templates
 
 [Scope inventory](statements-analytics-valuation/README.md).
+
+- **Reconciliation — Statements analytics evaluations read the full snapshot.** Corporate valuation, the valuation orchestrator and scenario-set evaluation pass `ObservationCutoff::FullSnapshot` to the Statements evaluator, so `as_of` dates pricing and no longer hides unpublished observations. Expose the observation cutoff on these entry points and their hosts, and qualify a dated replay against an identified snapshot. [Accepted STATEMENTS-CONTRACTS-002](statements-contracts/02-authoring-and-availability.md#accepted-decision-for-authoring-imports-and-observation-availability).
 
 - **Reconciliation — Statement cashflows and the corporate DCF bridge.** Require an authored valuation date, snapshot and cutoff, explicit native currency, complete dated FCFF, a qualified terminal basis and a same-date equity bridge. Reconcile WACC admission, pricing-owner results and replayable provenance. Independently qualify cutoff and bridge dates, annual basis, mixed-frequency and leap-year timing, WACC and tax assumptions, terminal selection, and enterprise-to-equity reconciliation. [Accepted STATEMENTS-ANALYTICS-VALUATION-01](statements-analytics-valuation/01-corporate-dcf.md#accepted-decision-for-statements-corporate-dcf).
 

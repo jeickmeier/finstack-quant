@@ -293,7 +293,12 @@ impl ScenarioSet {
         as_of: Date,
     ) -> Result<ScenarioResults> {
         self.evaluate_each(base_model, |evaluator, model| {
-            evaluator.evaluate_with_market(model, market, as_of)
+            evaluator.evaluate_with_market(
+                model,
+                market,
+                as_of,
+                finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+            )
         })
     }
 

@@ -149,7 +149,12 @@ fn test_ecf_sweep_basic() {
     // Evaluate model
     let mut evaluator = Evaluator::new();
     let results = evaluator
-        .evaluate_with_market(&model, &market_ctx, issue)
+        .evaluate_with_market(
+            &model,
+            &market_ctx,
+            issue,
+            crate::evaluator::ObservationCutoff::FullSnapshot,
+        )
         .expect("evaluation should succeed");
 
     // Verify that EBITDA values are present

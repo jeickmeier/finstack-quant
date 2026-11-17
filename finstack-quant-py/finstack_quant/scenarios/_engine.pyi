@@ -613,7 +613,7 @@ def apply_scenario(
     >>> model = (
     ...     '{"schema_version":1,"id":"m","periods":{"calendar": "gregorian", "periods": ['
     ...     '{"id":"2025Q1","start":"2025-01-01","end":"2025-04-01",'
-    ...     '"is_actual":false}]},"nodes":{}}'
+    ...     '"is_actual":false}]},"nodes":{"x":{"node_id":"x","node_type":"value"}}}'
     ... )
     >>> applied = apply_scenario(compose_scenarios([]), MarketContext(), "2025-01-15", model)
     >>> applied.report.operations_applied

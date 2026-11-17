@@ -37,7 +37,7 @@ function evaluateModel(input) {
 function evaluateModelWithMarket(input, market, asOf) {
   const evaluator = new statements.Evaluator();
   try {
-    return evaluator.evaluateWithMarket(input, market, asOf);
+    return evaluator.evaluateWithMarket(input, market, asOf, 'full_snapshot');
   } finally {
     evaluator.free();
   }

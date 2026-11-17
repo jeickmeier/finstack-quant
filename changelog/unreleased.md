@@ -864,3 +864,30 @@ instrument, so `with_builtin_metrics` needs every catalogue input defined.
 An absent observation on a `value` or `mixed` node evaluates as a missing
 cell (NaN) with the new cell source `missing`, where it was an evaluation
 error.
+
+### Statements: authoring, imports and point-in-time availability follow the accepted contract
+
+STATEMENTS-CONTRACTS-002. Node ids are unique: `value`, `value_money`,
+`value_scalar`, `compute`, `insert_node`, `mixed().build()` and imports reject
+a repeated id, a repeated period within one call, and a repeated availability
+date, where the last definition used to win. Change an existing node with the
+new `replace_node` / `remove_node` builder edits or the atomic
+`FinancialModelSpec::apply_edits` (Python `FinancialModelSpec.apply_edits`,
+WASM `statements.applyModelEdits`), which takes a batch of named `ModelEdit`s
+and commits all or none. `where_clause(node_id, clause)` names its target and
+validates the predicate; it no longer applies to the last touched node.
+
+Imports need a timeline: Rust `ModelBuilder::import_observations(columns,
+rows)` replaces `resolve_period_columns`, and Python `from_dataframe` no longer
+infers periods or takes `actuals_until`. Period labels are unique, may be in
+any order, and must belong to the timeline; a missing cell stays missing and a
+zero stays a known zero.
+
+Point-in-time evaluation is explicit: `evaluate_with_market(model, market,
+as_of, cutoff)` takes `ObservationCutoff::FullSnapshot` or `Through(date)`
+(Python and WASM: `"full_snapshot"` or a date as the fourth argument). `as_of`
+dates pricing only. A cutoff date needs the model's new `source_snapshot`
+identity and an availability date on every observation in an actual period;
+the default of "visible at the period's end" is removed. Statements analytics
+entry points (`evaluate_dcf`, the orchestrator, scenario sets) read the full
+snapshot.

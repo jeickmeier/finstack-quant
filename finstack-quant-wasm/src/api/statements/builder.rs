@@ -311,10 +311,12 @@ impl JsModelBuilder {
         Ok(())
     }
 
-    /// Insert a fully specified node, replacing any node with the same id.
+    /// Insert a fully specified node under a new id.
     ///
     /// Twin of Python `ModelBuilder.insert_node` (Rust
-    /// `ModelBuilder::insert_node`). Allowed before `periods`.
+    /// `ModelBuilder::insert_node`). Allowed before `periods`. A node whose
+    /// id is already defined is a duplicate that `build` rejects; use
+    /// `replaceNode` to change an existing node.
     ///
     /// @param node - `NodeSpec` to insert under its own `node_id` (object or JSON).
     /// @throws Error with kind `validation` if `node` is malformed or the builder was consumed.
@@ -326,6 +328,43 @@ impl JsModelBuilder {
     ) -> Result<(), JsValue> {
         let spec: NodeSpec = from_js_json(&node, "node")?;
         self.builder_mut()?.insert_node(spec);
+        Ok(())
+    }
+
+    /// Replace an existing node with a complete new definition.
+    ///
+    /// Twin of Python `ModelBuilder.replace_node` (Rust
+    /// `ModelBuilder::replace_node`).
+    ///
+    /// @param node - Complete `NodeSpec` replacement, stored under its own `node_id` in the original node's position (object or JSON).
+    /// @throws Error with kind `validation` if `node` is malformed, no node with that id exists, or the builder was consumed; the builder is unchanged.
+    #[wasm_bindgen(js_name = replaceNode)]
+    pub fn replace_node(
+        &mut self,
+        #[wasm_bindgen(unchecked_param_type = "generated.statements.NodeSpec | string")]
+        node: JsValue,
+    ) -> Result<(), JsValue> {
+        let spec: NodeSpec = from_js_json(&node, "node")?;
+        self.builder_mut()?.replace_node(spec).map_err(to_js_err)?;
+        Ok(())
+    }
+
+    /// Remove an existing node.
+    ///
+    /// Twin of Python `ModelBuilder.remove_node` (Rust
+    /// `ModelBuilder::remove_node`).
+    ///
+    /// @param nodeId - Identifier of the node to remove; formulas that still reference it fail `build`.
+    /// @throws Error with kind `validation` if no node with that id exists or the builder was consumed.
+    #[wasm_bindgen(js_name = removeNode)]
+    pub fn remove_node(
+        &mut self,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
+    ) -> Result<(), JsValue> {
+        let node_id = js_string(&node_id, "nodeId")?;
+        self.builder_mut()?
+            .remove_node(&node_id)
+            .map_err(to_js_err)?;
         Ok(())
     }
 
@@ -371,21 +410,48 @@ impl JsModelBuilder {
         Ok(())
     }
 
-    /// Attach a where clause to the most recently added node.
+    /// Attach a scalar predicate to a named node.
     ///
     /// Twin of Python `ModelBuilder.where_clause` (Rust
-    /// `ModelBuilder::where_clause`).
+    /// `ModelBuilder::where_clause`). The predicate is evaluated before the
+    /// node's value source; where it is false for a period, the node's value,
+    /// forecast and formula are not consulted.
     ///
-    /// @param whereClause - Boolean DSL expression; the node evaluates only in periods where it is true.
-    /// @throws Error with kind `validation` if the builder was consumed.
+    /// @param nodeId - Identifier of an existing node the predicate masks.
+    /// @param whereClause - Scalar DSL predicate evaluated per period.
+    /// @throws Error with kind `validation` if the predicate does not parse and compile, `nodeId` is not defined, or the builder was consumed; a rejected call leaves the builder unchanged.
     #[wasm_bindgen(js_name = whereClause)]
     pub fn where_clause(
         &mut self,
+        #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
         #[wasm_bindgen(js_name = "whereClause", unchecked_param_type = "string")]
         where_clause: JsValue,
     ) -> Result<(), JsValue> {
+        let node_id = js_string(&node_id, "nodeId")?;
         let where_clause = js_string(&where_clause, "whereClause")?;
-        self.builder_mut()?.where_clause(where_clause);
+        self.builder_mut()?
+            .where_clause(&node_id, where_clause)
+            .map_err(to_js_err)?;
+        Ok(())
+    }
+
+    /// Name the source snapshot the model's observations were taken from.
+    ///
+    /// Twin of Python `ModelBuilder.source_snapshot` (Rust
+    /// `ModelBuilder::source_snapshot`). An evaluation with an observation
+    /// cutoff needs this identity; keep an original filing and its later
+    /// revision as two models with different snapshot identities.
+    ///
+    /// @param snapshotId - Nonempty identifier of the source snapshot, for example `"FY2025-10K-original"`; `build` rejects a blank one.
+    /// @throws Error with kind `validation` if the builder was consumed.
+    #[wasm_bindgen(js_name = sourceSnapshot)]
+    pub fn source_snapshot(
+        &mut self,
+        #[wasm_bindgen(js_name = "snapshotId", unchecked_param_type = "string")]
+        snapshot_id: JsValue,
+    ) -> Result<(), JsValue> {
+        let snapshot_id = js_string(&snapshot_id, "snapshotId")?;
+        self.builder_mut()?.source_snapshot(snapshot_id);
         Ok(())
     }
 

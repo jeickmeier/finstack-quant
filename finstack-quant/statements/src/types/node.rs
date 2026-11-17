@@ -48,13 +48,13 @@ pub struct NodeSpec {
         schemars(with = "Option<IndexMap<String, AmountOrScalar>>")
     )]
     pub values: Option<IndexMap<PeriodId, AmountOrScalar>>,
-    /// Point-in-time availability date for each explicit period value.
+    /// Publication date of each explicit period value.
     ///
-    /// When absent for a value, market-aware evaluation conservatively makes
-    /// that value visible on the period's exclusive end date. An explicit
-    /// entry permits filing/release dates later than period end, or earlier
-    /// availability for operational data known before the reporting period
-    /// closes.
+    /// An evaluation with an observation cutoff reads an observation only
+    /// when this date is on or before the cutoff, and needs a date for every
+    /// observation in an actual period. An explicit value in a forecast
+    /// period without a date is a forecast assumption, not a published
+    /// observation, and is always visible.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[cfg_attr(
         feature = "json-schema",
@@ -138,9 +138,9 @@ impl NodeSpec {
 
     /// Set point-in-time availability dates for explicit observations.
     ///
-    /// Dates are keyed by the same periods as [`Self::values`]. During
-    /// market-aware evaluation an explicit value is visible only when its
-    /// availability date is on or before the requested `as_of` date.
+    /// Dates are keyed by the same periods as [`Self::values`]. Under an
+    /// observation cutoff an explicit value is visible only when its
+    /// availability date is on or before the cutoff.
     ///
     /// # Arguments
     ///
@@ -157,18 +157,15 @@ impl NodeSpec {
 
     /// Date from which the explicit observation for `period` is visible.
     ///
-    /// A declared availability date always applies, in any period. Without
-    /// one, an actual becomes visible at its period's exclusive end, and a
-    /// value in a forecast period is an assumption rather than an observation:
-    /// it has no availability date (`None`) and is always visible.
+    /// A declared availability date always applies, in any period. A value
+    /// without one is a forecast assumption rather than a published
+    /// observation and is always visible; point-in-time evaluation rejects an
+    /// undated observation in an actual period before it reaches this.
     pub(crate) fn explicit_value_available_on(
         &self,
         period: &finstack_quant_core::dates::Period,
     ) -> Option<finstack_quant_core::dates::Date> {
-        self.availability_dates
-            .get(&period.id)
-            .copied()
-            .or_else(|| period.is_actual.then_some(period.end))
+        self.availability_dates.get(&period.id).copied()
     }
 
     /// Return whether an explicit observation is visible at the cutoff.

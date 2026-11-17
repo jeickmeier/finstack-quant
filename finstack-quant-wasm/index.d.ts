@@ -9504,6 +9504,20 @@ export interface StatementsNamespace {
    */
   readonly modelNodeIds: typeof wasm.modelNodeIds;
   /**
+   * Apply named edits to a financial model atomically.
+   *
+   * Twin of Python `FinancialModelSpec.apply_edits` (Rust
+   * `FinancialModelSpec::apply_edits`). Edits apply in order to a copy of the
+   * model, which must pass the runnable-model validation; the input model is
+   * never changed.
+   *
+   * @param model - `FinancialModelSpec` to edit (object or JSON).
+   * @param edits - `ModelEdit` objects, each tagged by `edit`: `add_node` and `replace_node` (`node`); `remove_node`, `remove_forecast` and `remove_where` (`node_id`); `set_observation` (`node_id`, `period`, `value`, optional `availability_date`); `remove_observation` (`node_id`, `period`); `set_formula` (`node_id`, `formula`); `set_forecast` (`node_id`, `forecast`; the node becomes mixed); `set_where` (`node_id`, `predicate`). An array or its JSON text.
+   * @returns The edited `FinancialModelSpec` plain object.
+   * @throws Error with kind `validation` if the model or an edit is malformed, an edit adds an id that is already defined or names a node or observation that does not exist, or the edited model fails validation.
+   */
+  readonly applyModelEdits: typeof wasm.applyModelEdits;
+  /**
    * Validate a `CheckSuiteSpec` JSON string.
    *
    * Deserializes the spec, validates default configuration thresholds, and

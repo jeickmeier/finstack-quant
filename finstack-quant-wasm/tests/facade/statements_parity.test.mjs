@@ -248,7 +248,7 @@ test('statements matches the cross-host golden', () => {
 test('ModelBuilder.fromSpec resumes a model and periodsExplicit takes a PeriodPlan', () => {
   const resumed = statements.ModelBuilder.fromSpec(MODEL);
   resumed.compute('double', 'revenue * 2');
-  resumed.whereClause('revenue > 0');
+  resumed.whereClause('double', 'revenue > 0');
   assert.deepEqual(statements.modelNodeIds(resumed.build()), [
     'revenue',
     'cogs',
@@ -456,7 +456,7 @@ test('builder lines roll up with their declared method under an empty spec', () 
 test('Evaluator.evaluateWithMarket and evaluateMonteCarlo keep their Rust twins', () => {
   const evaluator = new statements.Evaluator();
   assert.throws(
-    () => evaluator.evaluateWithMarket(MODEL, {}, 'not-a-date'),
+    () => evaluator.evaluateWithMarket(MODEL, {}, 'not-a-date', 'full_snapshot'),
     (e) => e.kind === 'validation'
   );
   assert.throws(
@@ -606,4 +606,61 @@ test('component lookup covers all flows and scopes', () => {
       ),
     (e) => e.kind === 'validation'
   );
+});
+
+test('named edits, snapshot identity and the observation cutoff replay a revision', () => {
+  const snapshot = () => {
+    const builder = new statements.ModelBuilder('replay');
+    builder.periods('2025Q1..Q2', '2025Q1');
+    builder.valueScalar('revenue', { '2025Q1': 100.0, '2025Q2': 125.0 });
+    builder.availabilityDates('revenue', { '2025Q1': '2025-04-25' });
+    builder.sourceSnapshot('original');
+    return builder.build();
+  };
+  const original = snapshot();
+  assert.equal(original.source_snapshot, 'original');
+  const revised = statements.applyModelEdits(original, [
+    {
+      edit: 'set_observation',
+      node_id: 'revenue',
+      period: '2025Q1',
+      value: 110.0,
+      availability_date: '2025-05-15',
+    },
+  ]);
+  assert.equal(original.nodes.revenue.values['2025Q1'], 100.0);
+
+  const read = (model, cutoff) => {
+    const evaluator = new statements.Evaluator();
+    try {
+      return evaluator.evaluateWithMarket(
+        model,
+        INPUTS.capital_structure_market,
+        '2025-06-30',
+        cutoff
+      ).nodes.revenue['2025Q1'];
+    } finally {
+      evaluator.free();
+    }
+  };
+  assert.equal(read(original, '2025-04-25'), 100.0);
+  assert.throws(() => read(original, '2025-04-24'), /available on 2025-04-25/);
+  assert.equal(read(revised, '2025-05-15'), 110.0);
+  assert.throws(() => read(revised, '2025-05-14'), /available on 2025-05-15/);
+  assert.equal(read(revised, 'full_snapshot'), 110.0);
+
+  assert.throws(
+    () => statements.applyModelEdits(original, [{ edit: 'remove_node', node_id: 'absent' }]),
+    /unknown node 'absent'/
+  );
+  const duplicate = new statements.ModelBuilder('duplicates');
+  duplicate.periods('2025Q1..Q1');
+  duplicate.valueScalar('revenue', { '2025Q1': 1.0 });
+  duplicate.valueScalar('revenue', { '2025Q1': 2.0 });
+  assert.throws(() => duplicate.build(), /defined more than once/);
+  const edited = statements.ModelBuilder.fromSpec(original);
+  edited.removeNode('revenue');
+  edited.valueScalar('revenue', { '2025Q1': 1.0 });
+  edited.replaceNode({ node_id: 'revenue', node_type: 'value', values: { '2025Q1': 2.0 } });
+  assert.equal(edited.build().nodes.revenue.values['2025Q1'], 2.0);
 });

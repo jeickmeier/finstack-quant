@@ -65,6 +65,7 @@ class ModelBuilder:
         >>> from finstack_quant.statements import ModelBuilder
         >>> builder = ModelBuilder("demo")
         >>> _ = builder.periods("2025Q1..Q1")
+        >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
         >>> builder.build().id
         'demo'
 
@@ -97,10 +98,10 @@ class ModelBuilder:
         Examples
         --------
         >>> from finstack_quant.statements import ModelBuilder
-        >>> original = ModelBuilder("demo").periods("2025Q1..Q1").build()
-        >>> rebuilt = ModelBuilder.from_spec(original).value("revenue", [("2025Q1", 100.0)]).build()
+        >>> original = ModelBuilder("demo").periods("2025Q1..Q1").value("revenue", [("2025Q1", 100.0)]).build()
+        >>> rebuilt = ModelBuilder.from_spec(original).compute("double", "revenue * 2").build()
         >>> rebuilt.node_ids()
-        ['revenue']
+        ['revenue', 'double']
         """
         ...
 
@@ -339,14 +340,20 @@ class ModelBuilder:
         """
         ...
 
-    def where_clause(self, where_clause: str) -> ModelBuilder:
+    def where_clause(self, node_id: str, where_clause: str) -> ModelBuilder:
         """
-        Attach a conditional expression to the last added node.
+        Attach a scalar predicate to a named node.
+
+        The predicate is evaluated before the node's value source. Where it
+        is false for a period, the node's value, forecast and formula are not
+        consulted.
 
         Parameters
         ----------
+        node_id:
+            Identifier of an existing node the predicate masks.
         where_clause:
-            DSL expression evaluated per period to gate the node's value.
+            DSL expression evaluated per period as a scalar predicate.
 
         Returns
         -------
@@ -356,7 +363,9 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If periods have not been configured or the builder has already been consumed.
+            If the predicate does not parse and compile, ``node_id`` is not
+            defined, or the builder has already been consumed. A rejected
+            call leaves the builder unchanged.
 
         """
         ...
@@ -832,41 +841,40 @@ class ModelBuilder:
         """
         ...
 
-    def from_dataframe(
-        self, df: pd.DataFrame, actuals_until: str | None = None, node_id_column: str | None = None
-    ) -> ModelBuilder:
-        """Load scalar value nodes from a wide pandas DataFrame.
+    def from_dataframe(self, df: pd.DataFrame, node_id_column: str | None = None) -> ModelBuilder:
+        """Import scalar value nodes from a wide pandas DataFrame.
+
+        The model timeline must already be set; an import never infers it.
+        Columns map to periods by label in any order. The import is atomic.
 
         Parameters
         ----------
         df:
-            Node rows with period-identifier columns; every label must belong to the model timeline, including all-null columns. Numeric cells use the node's own units and NaN/None cells are skipped.
-        actuals_until:
-            Inclusive actuals cutoff used when deriving an unset timeline from the first and last period columns; ignored if periods are already set.
+            One row per new value node and one column per period label (for example ``"2025Q1"``). Labels must be unique and belong to the model timeline, including all-null columns. A numeric cell is a scalar observation in the node's own units; a ``None`` or NaN cell is a missing observation and is left out; ``0`` is kept as a known zero.
         node_id_column:
             Column containing node identifiers; None takes identifiers from the frame index.
 
         Returns
         -------
         ModelBuilder
-            This builder populated with one value node per row.
+            This builder with one value node added per row.
 
         Raises
         ------
         ValueError
-            If any period label is invalid or outside the model timeline, a node identifier is reserved, numeric cells are invalid, or the builder was consumed. Rejected input leaves the builder unchanged.
+            If the timeline is not set, a period label is invalid, repeated or outside the timeline, a node identifier is invalid, repeated or already defined, a cell is not numeric or is infinite, or the builder was consumed. Rejected input leaves the builder unchanged.
         KeyError
             If node_id_column names an absent frame column.
         """
         ...
 
     def insert_node(self, node: NodeSpec) -> ModelBuilder:
-        """Insert a complete node specification, replacing a node with the same identifier.
+        """Insert a complete node specification under a new identifier.
 
         Parameters
         ----------
         node:
-            Fully configured node; semantic validity is checked together with the model at build.
+            Fully configured node; semantic validity is checked together with the model at build. A node whose identifier is already defined is a duplicate that ``build`` rejects; use ``replace_node`` to change an existing node.
 
         Returns
         -------
@@ -877,6 +885,70 @@ class ModelBuilder:
         ------
         ValueError
             If this builder has already been consumed.
+        """
+        ...
+
+    def replace_node(self, node: NodeSpec) -> ModelBuilder:
+        """Replace an existing node with a complete new definition.
+
+        Parameters
+        ----------
+        node:
+            Complete replacement, stored under its own identifier in the original node's position.
+
+        Returns
+        -------
+        ModelBuilder
+            This builder with the node replaced.
+
+        Raises
+        ------
+        ValueError
+            If no node with that identifier exists or the builder was consumed. The builder is unchanged.
+        """
+        ...
+
+    def remove_node(self, node_id: str) -> ModelBuilder:
+        """Remove an existing node.
+
+        Parameters
+        ----------
+        node_id:
+            Identifier of the node to remove. Formulas that still reference it fail ``build``.
+
+        Returns
+        -------
+        ModelBuilder
+            This builder without the node.
+
+        Raises
+        ------
+        ValueError
+            If no node with that identifier exists or the builder was consumed.
+        """
+        ...
+
+    def source_snapshot(self, snapshot_id: str) -> ModelBuilder:
+        """Name the source snapshot the model's observations were taken from.
+
+        An evaluation with an observation cutoff needs this identity. Keep an
+        original filing and its later revision as two models with different
+        snapshot identities, so a dated evaluation can replay its day.
+
+        Parameters
+        ----------
+        snapshot_id:
+            Nonempty identifier of the source snapshot, for example ``"FY2025-10K-original"``.
+
+        Returns
+        -------
+        ModelBuilder
+            This builder, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was consumed. A blank identifier is rejected by ``build``.
         """
         ...
 

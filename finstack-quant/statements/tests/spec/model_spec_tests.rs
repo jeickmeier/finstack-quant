@@ -266,7 +266,9 @@ fn test_where_clause_masking() {
             ],
         );
         model_builder.compute("bonus", "revenue * 0.01").unwrap();
-        model_builder.where_clause("revenue > 1000000");
+        model_builder
+            .where_clause("bonus", "revenue > 1000000")
+            .unwrap();
         model_builder.build().unwrap()
     };
 
@@ -352,7 +354,9 @@ fn test_where_clause_with_complex_condition() {
         model_builder
             .compute("incentive", "revenue * 0.05")
             .unwrap();
-        model_builder.where_clause("revenue > 100000 and margin > 0.15");
+        model_builder
+            .where_clause("incentive", "revenue > 100000 and margin > 0.15")
+            .unwrap();
         model_builder.build().unwrap()
     };
 

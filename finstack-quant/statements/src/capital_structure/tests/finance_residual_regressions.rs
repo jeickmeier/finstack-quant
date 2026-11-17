@@ -503,7 +503,12 @@ fn model_preserves_economic_amortization_across_quarter_end_with_optional_sweep(
                 .expect("canonical amortizing-loan model")
         };
         let result = Evaluator::new()
-            .evaluate_with_market(&model, &market, issue)
+            .evaluate_with_market(
+                &model,
+                &market,
+                issue,
+                crate::evaluator::ObservationCutoff::FullSnapshot,
+            )
             .expect("amortizing-loan model evaluation");
 
         // March/June economic amortization belongs to Q1/Q2 respectively,
@@ -715,7 +720,12 @@ fn loan_funded_inside_the_model_repays_its_face_once() {
                 .expect("principal formula");
             let model = builder.build().expect("amortizing-loan model");
             let result = Evaluator::new()
-                .evaluate_with_market(&model, &market, as_of)
+                .evaluate_with_market(
+                    &model,
+                    &market,
+                    as_of,
+                    crate::evaluator::ObservationCutoff::FullSnapshot,
+                )
                 .expect("amortizing-loan model evaluation");
             let mut total_principal = 0.0;
             for (period, (balance, principal)) in

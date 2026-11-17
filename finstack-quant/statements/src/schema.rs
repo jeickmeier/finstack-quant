@@ -7,7 +7,7 @@ use crate::capital_structure::{BondConventionParams, SwapConventions, SwapParams
 use crate::checks::CheckSuiteSpec;
 use crate::evaluator::{MonteCarloConfig, MonteCarloResults, RollupSpec, StatementResult};
 use crate::registry::MetricRegistry;
-use crate::types::{FinancialModelSpec, ForecastParameters};
+use crate::types::{FinancialModelSpec, ForecastParameters, ModelEdit};
 
 /// Stable base URI for statements-owned schemas.
 pub const STATEMENTS_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/statements/1/";
@@ -127,6 +127,16 @@ fn forecast_parameters_examples() -> finstack_quant_core::Result<Vec<Value>> {
     finstack_quant_core::schema::example_from_json::<ForecastParameters>(serde_json::json!({
         "method": "fade_to_target",
         "params": { "target": 0.35, "shape": "linear" }
+    }))
+}
+
+fn model_edit_examples() -> finstack_quant_core::Result<Vec<Value>> {
+    finstack_quant_core::schema::example_from_json::<ModelEdit>(serde_json::json!({
+        "edit": "set_observation",
+        "node_id": "revenue",
+        "period": "2025Q1",
+        "value": 110.0,
+        "availability_date": "2025-05-15"
     }))
 }
 
@@ -377,6 +387,14 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "Identity, notional, decimal fixed rate, dates and curves of a capital-structure pay-fixed swap."
     )
     .with_examples(swap_params_examples),
+    finstack_quant_core::schema_artifact!(
+        ModelEdit,
+        "statements",
+        "model_edit",
+        Input,
+        "One named change to a financial model, applied atomically with the others in its batch."
+    )
+    .with_examples(model_edit_examples),
     finstack_quant_core::schema_artifact!(
         SwapConventions,
         "statements",

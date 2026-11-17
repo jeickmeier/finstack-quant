@@ -185,6 +185,7 @@ def capital_structure_cases() -> dict[str, Any]:
         st.FinancialModelSpec.from_json(model_json),
         MarketContext.from_json(json.dumps(INPUTS["capital_structure_market"])),
         INPUTS["capital_structure_as_of"],
+        "full_snapshot",
     )
     return {
         "full_year": doc(
