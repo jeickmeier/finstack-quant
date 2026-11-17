@@ -80,7 +80,9 @@ fn test_seasonal_forecast_with_decomposition() {
 
     let model = {
         let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..2025Q4", None).unwrap();
+        model_builder
+            .periods("2025Q1..2025Q4", Some("2025Q1"))
+            .unwrap();
         model_builder.value(
             "seasonal_sales",
             &[(

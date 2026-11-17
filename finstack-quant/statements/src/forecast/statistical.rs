@@ -696,6 +696,7 @@ mod tests {
 
     fn distribution(mean: f64, std_dev: f64, seed: u64) -> DistributionParams {
         DistributionParams {
+            start: None,
             mean,
             std_dev,
             seed,
@@ -868,6 +869,7 @@ mod tests {
 
     fn mean_reverting_params() -> MeanRevertingParams {
         MeanRevertingParams {
+            start: None,
             long_run_mean: 0.05,
             reversion_speed: 0.25,
             std_dev: 0.01,
@@ -1019,6 +1021,7 @@ mod tests {
 
     fn bootstrap_params() -> BootstrapParams {
         BootstrapParams {
+            start: None,
             historical: vec![100.0, 105.0, 99.75, 109.725],
             mode: ForecastBootstrapMode::Growth,
             seed: 42,
@@ -1074,6 +1077,7 @@ mod tests {
             .map(|q| PeriodId::quarter(2025, q).expect("valid period fixture"))
             .collect();
         let params = BootstrapParams {
+            start: None,
             historical: vec![-10.0, 5.0, -2.0, 8.0],
             mode: ForecastBootstrapMode::Diff,
             seed: 7,

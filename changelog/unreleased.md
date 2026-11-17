@@ -1114,3 +1114,26 @@ The schema `forecast_parameters` is renamed `forecast_spec`.
   growth curve with one rate per forecast period, override keys that are
   periods of the model, and a correlation peer that is another stochastic
   forecast node.
+
+### Statements: one forecast suffix per node, an explicit base and recorded clipping
+
+STATEMENTS-EVALUATION-005. A forecast is generated once per node and run over
+the model's forecast periods, one step per period.
+
+- **Base.** A method that steps from a level (`growth_pct`, `curve_pct`,
+  `fade_to_target`, `normal`, `log_normal`, `mean_reverting`, `bootstrap`)
+  takes an optional `start` level. Without it the base is the visible value
+  in the period just before the first forecast period. A forecast with
+  neither is unavailable with reason `missing_forecast_base`, where it used to
+  search further back or fail the run.
+- **Explicit values do not restart the forecast.** A value published in a
+  forecast period replaces that cell only; later cells follow the same
+  recurrence, seasonal phase and draws. A model whose periods are all
+  forecast periods needs `start`, since an explicit value in a forecast
+  period is no longer a base.
+- **Hidden actuals.** An actual hidden by the observation cutoff is
+  unavailable (`hidden_by_cutoff`); it is not forecast, and the forecast that
+  follows it has no base.
+- **Bounds.** `min` / `max` clip the published value only, for every method;
+  later steps build on the unclipped level. Each clipped cell adds a
+  `forecast_clipped` warning with the raw and published values.

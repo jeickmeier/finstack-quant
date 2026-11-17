@@ -1886,7 +1886,8 @@ export type CheckSeverity = "info" | "warning" | "error";
  * continues. Invalid arithmetic, an invalid mask and unrepresentable money
  * are errors instead and fail the run.
  */
-export type UnavailableReason = "missing_mask" | "hidden_by_cutoff" | "missing_input" | "undefined_base";
+export type UnavailableReason =
+  "missing_mask" | "hidden_by_cutoff" | "missing_input" | "undefined_base" | "missing_forecast_base";
 /**
  * Identifier for a Gregorian period like `2025Q1` or a fiscal period like
  * `FY2025W53`.
@@ -1936,6 +1937,27 @@ export type EvalWarning =
          * Typed reason and associated diagnostic values.
          */
         warning: CapitalStructureWarning;
+        [k: string]: unknown;
+      };
+    }
+  | {
+      forecast_clipped: {
+        /**
+         * Identifier of the forecast node.
+         */
+        node_id: string;
+        /**
+         * Period whose published level was clipped.
+         */
+        period: string;
+        /**
+         * Level published after the bound, in the node's units.
+         */
+        published: number;
+        /**
+         * Level the forecast generated, in the node's units.
+         */
+        raw: number;
         [k: string]: unknown;
       };
     }
@@ -4359,6 +4381,12 @@ export interface BootstrapParams {
    * Random seed; the same seed reproduces the same path.
    */
   seed: string;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
 }
 /**
  * Parameters of a method with only the cross-cutting bounds.
@@ -4372,6 +4400,12 @@ export interface BoundsParams {
    * Lower bound clamped onto generated values, in the line's base units.
    */
   min?: number | null;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
 }
 /**
  * Checks that retained earnings flow correctly across periods:
@@ -7253,6 +7287,12 @@ export interface CurvePctParams {
    * Lower bound clamped onto generated values, in the line's base units.
    */
   min?: number | null;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
 }
 /**
  * One period of a dated statement export: the anchor date, the period and its typed cell.
@@ -7328,6 +7368,12 @@ export interface DistributionParams {
    */
   seed: string;
   /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
+  /**
    * Standard deviation of the shock per period; non-negative.
    */
   std_dev: number;
@@ -7352,6 +7398,12 @@ export interface FadeToTargetParams {
    * Path to the target; defaults to linear.
    */
   shape: ForecastFadeShape;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
   /**
    * Terminal level, in the line's base units.
    */
@@ -7492,6 +7544,12 @@ export interface GrowthPctParams {
    * Growth per period as a decimal: 0.03 = 3%.
    */
   rate: number;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
 }
 /**
  * Parameters of [`ForecastSpec::Override`].
@@ -7610,6 +7668,12 @@ export interface MeanRevertingParams {
    * Random seed; the same seed reproduces the same path.
    */
   seed: string;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
   /**
    * Standard deviation of the shock per period; non-negative.
    */

@@ -8,7 +8,8 @@
  * continues. Invalid arithmetic, an invalid mask and unrepresentable money
  * are errors instead and fail the run.
  */
-export type D_6C08F5490Eda9E343593 = "missing_mask" | "hidden_by_cutoff" | "missing_input" | "undefined_base";
+export type D_6C08F5490Eda9E343593 =
+  "missing_mask" | "hidden_by_cutoff" | "missing_input" | "undefined_base" | "missing_forecast_base";
 /**
  * Which value source produced a statement cell (one node in one period).
  *
@@ -386,6 +387,27 @@ export type D_76Adf23Abc095Fd56514 =
               kind: "principal_shortfall";
               [k: string]: unknown;
             };
+        [k: string]: unknown;
+      };
+    }
+  | {
+      forecast_clipped: {
+        /**
+         * Identifier of the forecast node.
+         */
+        node_id: string;
+        /**
+         * Period whose published level was clipped.
+         */
+        period: string;
+        /**
+         * Level published after the bound, in the node's units.
+         */
+        published: number;
+        /**
+         * Level the forecast generated, in the node's units.
+         */
+        raw: number;
         [k: string]: unknown;
       };
     }

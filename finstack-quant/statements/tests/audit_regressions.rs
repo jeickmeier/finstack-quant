@@ -71,7 +71,7 @@ fn sparse_period_plans_are_rejected() {
 }
 
 #[test]
-fn forecasts_rebase_at_each_visible_actual_without_looking_ahead() {
+fn a_hidden_actual_is_not_forecast_and_the_suffix_starts_from_the_last_actual() {
     let mut model = {
         let mut model_builder = ModelBuilder::new("availability");
         model_builder.periods("2025Q1..Q4", Some("2025Q3")).unwrap();
@@ -99,7 +99,15 @@ fn forecasts_rebase_at_each_visible_actual_without_looking_ahead() {
             finstack_quant_statements::evaluator::ObservationCutoff::Through(date!(2025 - 11 - 01)),
         )
         .unwrap();
-    assert!((result.get("x", &q(2025, 2)).unwrap() - 110.0).abs() < 1e-10);
+    // Q2 is an actual period whose observation is not yet published at the
+    // cutoff. A forecast is eligible only in a forecast period, so Q2 is
+    // unavailable, not forecast.
+    let hidden = result.get_cell("x", &q(2025, 2)).unwrap();
+    assert_eq!(
+        hidden.reason,
+        Some(finstack_quant_statements::evaluator::UnavailableReason::HiddenByCutoff)
+    );
+    // The suffix is Q4 and its base is the visible Q3 observation.
     assert!((result.get("x", &q(2025, 4)).unwrap() - 330.0).abs() < 1e-10);
 }
 
@@ -452,6 +460,14 @@ fn a_dated_value_hidden_by_as_of_is_not_a_forecast_base_outside_the_actuals_rang
             finstack_quant_statements::evaluator::ObservationCutoff::Through(date!(2025 - 11 - 01)),
         )
         .unwrap();
-    assert!((result.get("x", &q(2025, 2)).unwrap() - 110.0).abs() < 1e-10);
-    assert!((result.get("x", &q(2025, 3)).unwrap() - 121.0).abs() < 1e-10);
+    // Every period is a forecast period, so the suffix opens at Q1 and no
+    // slot precedes it. Without a selected start level the forecast has no
+    // base; the hidden Q2 value is not one.
+    assert_eq!(result.get("x", &q(2025, 1)), Some(100.0));
+    for quarter in [2, 3] {
+        assert_eq!(
+            result.get_cell("x", &q(2025, quarter)).unwrap().reason,
+            Some(finstack_quant_statements::evaluator::UnavailableReason::MissingForecastBase)
+        );
+    }
 }

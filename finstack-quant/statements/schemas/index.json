@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/dated_cell.schema.json",
-      "bytes": 27658,
+      "bytes": 27896,
       "kind": "output",
       "path": "schemas/statements/1/dated_cell.schema.json",
       "summary": "One period of a dated statement export: the anchor date, the period and its typed cell.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
-      "bytes": 412116,
+      "bytes": 414307,
       "kind": "input",
       "path": "schemas/statements/1/financial_model_spec.schema.json",
       "summary": "Statement model graph: periods, nodes and the Value > Forecast > Formula precedence.",
@@ -47,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_spec.schema.json",
-      "bytes": 19688,
+      "bytes": 21879,
       "kind": "input",
       "path": "schemas/statements/1/forecast_spec.schema.json",
       "summary": "One forecast method with its typed parameters, in the wire shape of ForecastSpec.",
@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/model_edit.schema.json",
-      "bytes": 56083,
+      "bytes": 58274,
       "kind": "input",
       "path": "schemas/statements/1/model_edit.schema.json",
       "summary": "One named change to a financial model, applied atomically with the others in its batch.",
@@ -83,7 +83,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
-      "bytes": 34580,
+      "bytes": 35932,
       "kind": "output",
       "path": "schemas/statements/1/monte_carlo_results.schema.json",
       "summary": "Percentile summaries of a Monte Carlo statement-model evaluation.",
@@ -128,7 +128,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
-      "bytes": 82440,
+      "bytes": 84030,
       "kind": "output",
       "path": "schemas/statements/1/statement_result.schema.json",
       "summary": "Evaluated node values per period, with policy stamps.",

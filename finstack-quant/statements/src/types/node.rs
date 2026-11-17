@@ -168,18 +168,6 @@ impl NodeSpec {
         self.availability_dates.get(&period.id).copied()
     }
 
-    /// Return whether an explicit observation is visible at the cutoff.
-    pub(crate) fn explicit_value_is_visible(
-        &self,
-        period: &finstack_quant_core::dates::Period,
-        cutoff: Option<finstack_quant_core::dates::Date>,
-    ) -> bool {
-        cutoff.is_none_or(|as_of| {
-            self.explicit_value_available_on(period)
-                .is_none_or(|available_on| available_on <= as_of)
-        })
-    }
-
     /// Set the formula text.
     ///
     /// # Arguments

@@ -254,9 +254,10 @@ impl PyForecastSpec {
     ///     ``half_life``, ``long_run_mean``, ``reversion_speed``,
     ///     ``historical``, ``mode``, ``phi``, ...). Rates are decimal
     ///     fractions per period. Every method also accepts optional
-    ///     ``min`` / ``max`` bounds that clamp generated values to a band
-    ///     (in the node's own units). ``None`` means no parameters, which
-    ///     is only valid for ``forward_fill``.
+    ///     ``min`` / ``max`` bounds that clamp the published values to a
+    ///     band (in the node's own units), and methods that step from a
+    ///     base accept an optional ``start`` level. ``None`` means no
+    ///     parameters, which is only valid for ``forward_fill``.
     ///
     /// Raises
     /// ------

@@ -260,6 +260,7 @@ impl ForecastSpec {
     #[must_use]
     pub fn forward_fill() -> Self {
         Self::ForwardFill(BoundsParams {
+            start: None,
             min: None,
             max: None,
         })
@@ -274,6 +275,7 @@ impl ForecastSpec {
     pub fn growth(rate: f64) -> Self {
         Self::GrowthPct(GrowthPctParams {
             rate,
+            start: None,
             min: None,
             max: None,
         })
@@ -289,6 +291,7 @@ impl ForecastSpec {
     pub fn curve(curve: Vec<f64>) -> Self {
         Self::CurvePct(CurvePctParams {
             curve,
+            start: None,
             min: None,
             max: None,
         })
@@ -299,6 +302,7 @@ impl ForecastSpec {
             mean,
             std_dev,
             seed,
+            start: None,
             correlation_with: None,
             correlation: None,
             min: None,
@@ -404,6 +408,7 @@ impl ForecastSpec {
         Self::FadeToTarget(FadeToTargetParams {
             target,
             shape,
+            start: None,
             half_life: None,
             min: None,
             max: None,
@@ -433,6 +438,7 @@ impl ForecastSpec {
             reversion_speed,
             std_dev,
             seed,
+            start: None,
             correlation_with: None,
             correlation: None,
             min: None,
@@ -455,6 +461,7 @@ impl ForecastSpec {
             historical,
             mode,
             seed,
+            start: None,
             min: None,
             max: None,
         })
@@ -501,7 +508,7 @@ impl ForecastSpec {
         };
 
         let (min, max) = self.bounds();
-        for (name, bound) in [("min", min), ("max", max)] {
+        for (name, bound) in [("min", min), ("max", max), ("start", self.start())] {
             if let Some(bound) = bound {
                 finite(name, bound)?;
             }
@@ -589,6 +596,21 @@ impl ForecastSpec {
         }
     }
 
+    /// The explicit start level selected for the opening of the forecast
+    /// suffix, when the method takes one and it is set.
+    pub(crate) fn start(&self) -> Option<f64> {
+        match self {
+            Self::ForwardFill(p) => p.start,
+            Self::GrowthPct(p) => p.start,
+            Self::CurvePct(p) => p.start,
+            Self::Normal(p) | Self::LogNormal(p) => p.start,
+            Self::MeanReverting(p) => p.start,
+            Self::Bootstrap(p) => p.start,
+            Self::FadeToTarget(p) => p.start,
+            Self::Override(_) | Self::TimeSeries(_) | Self::Seasonal(_) => None,
+        }
+    }
+
     /// The `(min, max)` bounds clamped onto generated values.
     pub(crate) fn bounds(&self) -> (Option<f64>, Option<f64>) {
         match self {
@@ -654,6 +676,11 @@ mod seed {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct BoundsParams {
+    /// Level at the opening of the forecast suffix, in the series' own units.
+    /// When omitted, the value of the slot immediately before the suffix is
+    /// the base.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start: Option<f64>,
     /// Lower bound clamped onto generated values, in the line's base units.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min: Option<f64>,
@@ -669,6 +696,11 @@ pub struct BoundsParams {
 pub struct GrowthPctParams {
     /// Growth per period as a decimal: 0.03 = 3%.
     pub rate: f64,
+    /// Level at the opening of the forecast suffix, in the series' own units.
+    /// When omitted, the value of the slot immediately before the suffix is
+    /// the base.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start: Option<f64>,
     /// Lower bound clamped onto generated values, in the line's base units.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min: Option<f64>,
@@ -684,6 +716,11 @@ pub struct GrowthPctParams {
 pub struct CurvePctParams {
     /// Growth rate per forecast period as decimals, one per period in order.
     pub curve: Vec<f64>,
+    /// Level at the opening of the forecast suffix, in the series' own units.
+    /// When omitted, the value of the slot immediately before the suffix is
+    /// the base.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start: Option<f64>,
     /// Lower bound clamped onto generated values, in the line's base units.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min: Option<f64>,
@@ -726,6 +763,11 @@ pub struct DistributionParams {
     /// Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correlation: Option<f64>,
+    /// Level at the opening of the forecast suffix, in the series' own units.
+    /// When omitted, the value of the slot immediately before the suffix is
+    /// the base.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start: Option<f64>,
     /// Lower bound clamped onto generated values, in the line's base units.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min: Option<f64>,
@@ -755,6 +797,11 @@ pub struct MeanRevertingParams {
     /// Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub correlation: Option<f64>,
+    /// Level at the opening of the forecast suffix, in the series' own units.
+    /// When omitted, the value of the slot immediately before the suffix is
+    /// the base.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start: Option<f64>,
     /// Lower bound clamped onto generated values, in the line's base units.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min: Option<f64>,
@@ -787,6 +834,11 @@ pub struct BootstrapParams {
     #[serde(with = "seed")]
     #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
     pub seed: u64,
+    /// Level at the opening of the forecast suffix, in the series' own units.
+    /// When omitted, the value of the slot immediately before the suffix is
+    /// the base.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start: Option<f64>,
     /// Lower bound clamped onto generated values, in the line's base units.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min: Option<f64>,
@@ -884,6 +936,11 @@ pub struct FadeToTargetParams {
     /// Periods to close half the gap; required for, and legal only with, the exponential shape.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub half_life: Option<f64>,
+    /// Level at the opening of the forecast suffix, in the series' own units.
+    /// When omitted, the value of the slot immediately before the suffix is
+    /// the base.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start: Option<f64>,
     /// Lower bound clamped onto generated values, in the line's base units.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min: Option<f64>,

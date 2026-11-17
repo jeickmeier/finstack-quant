@@ -124,6 +124,12 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_1b5f98440d110c152454/properties/start",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/GrowthPctParams/properties/start",
+    "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_22985de49498160e6347",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/Money",
     "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```"
@@ -1449,6 +1455,12 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_93aff92b5684afb10a6d/properties/start",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/CurvePctParams/properties/start",
+    "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_94898fbe50f273d757c5",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/DistributionParams",
     "description": "Parameters of [`ForecastSpec::Normal`] and [`ForecastSpec::LogNormal`]."
@@ -1486,6 +1498,12 @@ export default [
     "path": "#/$defs/d_94898fbe50f273d757c5/properties/seed",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/DistributionParams/properties/seed",
     "description": "Random seed; the same seed reproduces the same path."
+  },
+  {
+    "path": "#/$defs/d_94898fbe50f273d757c5/properties/start",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/DistributionParams/properties/start",
+    "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_94898fbe50f273d757c5/properties/std_dev",
@@ -1556,6 +1574,12 @@ export default [
     "description": "Random seed; the same seed reproduces the same path."
   },
   {
+    "path": "#/$defs/d_aa6b6e2b1dab3c4d1d7e/properties/start",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/BootstrapParams/properties/start",
+    "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_b358c7ce89d7a5feef27",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/BoundsParams",
     "description": "Parameters of a method with only the cross-cutting bounds."
@@ -1570,6 +1594,12 @@ export default [
     "path": "#/$defs/d_b358c7ce89d7a5feef27/properties/min",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/BoundsParams/properties/min",
     "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_b358c7ce89d7a5feef27/properties/start",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/BoundsParams/properties/start",
+    "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
     "format": "double"
   },
   {
@@ -1658,6 +1688,12 @@ export default [
     "description": "Random seed; the same seed reproduces the same path."
   },
   {
+    "path": "#/$defs/d_fb6c2b90cbcd2299d868/properties/start",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/MeanRevertingParams/properties/start",
+    "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_fb6c2b90cbcd2299d868/properties/std_dev",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/MeanRevertingParams/properties/std_dev",
     "description": "Standard deviation of the shock per period; non-negative.",
@@ -1692,6 +1728,12 @@ export default [
     "description": "Path to the target; defaults to linear.",
     "ref": "#/$defs/ForecastFadeShape",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastFadeShape"
+  },
+  {
+    "path": "#/$defs/d_ff81303313e8d987d8df/properties/start",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/FadeToTargetParams/properties/start",
+    "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_ff81303313e8d987d8df/properties/target",

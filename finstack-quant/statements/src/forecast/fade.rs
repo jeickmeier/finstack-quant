@@ -154,6 +154,7 @@ mod tests {
 
     fn params(target: f64, shape: ForecastFadeShape, half_life: Option<f64>) -> FadeToTargetParams {
         FadeToTargetParams {
+            start: None,
             target,
             shape,
             half_life,

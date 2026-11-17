@@ -888,6 +888,12 @@ export interface BootstrapParams {
    * Random seed; the same seed reproduces the same path.
    */
   seed: string;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
 }
 /**
  * Parameters of a method with only the cross-cutting bounds.
@@ -901,6 +907,12 @@ export interface BoundsParams {
    * Lower bound clamped onto generated values, in the line's base units.
    */
   min?: number | null;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
 }
 /**
  * Bridge chart for a single target metric and period.
@@ -2316,6 +2328,12 @@ export interface CurvePctParams {
    * Lower bound clamped onto generated values, in the line's base units.
    */
   min?: number | null;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
 }
 /**
  * Headline DCF assumptions: decimal WACC, terminal value, unlevered free cash flow node and optional net-debt override.
@@ -2610,6 +2628,12 @@ export interface DistributionParams {
    * Random seed; the same seed reproduces the same path.
    */
   seed: string;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
   /**
    * Standard deviation of the shock per period; non-negative.
    */
@@ -3050,6 +3074,12 @@ export interface GrowthPctParams {
    * Growth per period as a decimal: 0.03 = 3%.
    */
   rate: number;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
 }
 /**
  * Parameters of [`ForecastSpec::Override`].
@@ -3169,6 +3199,12 @@ export interface MeanRevertingParams {
    */
   seed: string;
   /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
+  /**
    * Standard deviation of the shock per period; non-negative.
    */
   std_dev: number;
@@ -3193,6 +3229,12 @@ export interface FadeToTargetParams {
    * Path to the target; defaults to linear.
    */
   shape: ForecastFadeShape;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
   /**
    * Terminal level, in the line's base units.
    */

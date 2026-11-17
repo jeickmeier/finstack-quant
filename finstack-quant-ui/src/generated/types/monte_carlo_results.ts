@@ -179,6 +179,27 @@ export type DCf776B61125046D84B45 =
       };
     }
   | {
+      forecast_clipped: {
+        /**
+         * Identifier of the forecast node.
+         */
+        node_id: string;
+        /**
+         * Period whose published level was clipped.
+         */
+        period: string;
+        /**
+         * Level published after the bound, in the node's units.
+         */
+        published: number;
+        /**
+         * Level the forecast generated, in the node's units.
+         */
+        raw: number;
+        [k: string]: unknown;
+      };
+    }
+  | {
       gapped_sample: {
         /**
          * Name of the statistic.

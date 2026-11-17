@@ -9,17 +9,21 @@
 //! - **TimeSeries**: trend detection (linear, Holt / damped Holt via `phi`,
 //!   moving average) and Seasonal patterns
 //!
-//! All forecast methods operate on a base value (typically the last actual value)
-//! and project forward for a specified number of periods.
+//! A node has one forecast suffix per run: the model's forecast periods, one
+//! step per period whether or not an explicit value is published there.
+//! Methods that step from a base use the `start` level of the specification,
+//! or else the visible value in the period just before the suffix; without
+//! either the forecast is unavailable.
 //!
 //! # Bounds
 //!
 //! Every method accepts optional `min` / `max` parameters that clamp the
 //! generated values to a band: ratios that must stay
 //! in a range, levels that cannot go negative, or trend extrapolations that
-//! must not explode. The clamp applies to output values only — stochastic
-//! recurrences evolve unclamped, and Monte Carlo evaluation records
-//! correlation Z-scores before clamping.
+//! must not explode. The clamp applies to published values only and each
+//! clipped cell is recorded as a warning — every recurrence evolves
+//! unclamped, and Monte Carlo evaluation records correlation Z-scores before
+//! clamping.
 //!
 //! # Random Number Generation
 //!
@@ -87,6 +91,7 @@ type ForecastSeries = indexmap::IndexMap<PeriodId, f64>;
 /// Without this mix, two stochastic nodes configured with the same `seed`
 /// would receive identical shock paths within a single evaluation run.
 /// Deterministic methods are unaffected.
+#[cfg(test)]
 pub(crate) fn apply_forecast_for_node(
     parameters: &ForecastSpec,
     base_value: f64,
@@ -105,9 +110,20 @@ pub(crate) fn apply_forecast_for_node(
              (only Monte Carlo honors it); this node's draws are independent here"
         );
     }
-    let (mut results, _) = apply_forecast(parameters, base_value, forecast_periods, node_id, None)?;
+    let mut results = apply_forecast_unbounded(parameters, base_value, forecast_periods, node_id)?;
     apply_bounds(parameters, &mut results)?;
     Ok(results)
+}
+
+/// The single-run forecast series as generated, before output bounds.
+pub(crate) fn apply_forecast_unbounded(
+    parameters: &ForecastSpec,
+    base_value: f64,
+    forecast_periods: &[PeriodId],
+    node_id: &str,
+) -> Result<ForecastSeries> {
+    apply_forecast(parameters, base_value, forecast_periods, node_id, None)
+        .map(|(series, _)| series)
 }
 
 /// Run a forecast method without bounds.

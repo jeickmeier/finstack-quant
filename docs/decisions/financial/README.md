@@ -412,7 +412,8 @@ It is implemented and qualified across Rust, Python and WASM.
 The Statements forecast segment, anchoring and bounds contract was accepted
 on 2026-11-15. It covers one forecast suffix per node and run or path,
 method-specific anchors and history, and output-only bounds.
-Implementation and independent qualification remain pending.
+The suffix, the start level or preceding-slot base, the typed unavailable
+forecast and recorded output clipping are implemented and qualified.
 [STATEMENTS-EVALUATION-005](statements-evaluation/05-forecast-segments-and-bounds.md#accepted-decision-for-forecast-segments-anchoring-and-output-bounds).
 
 The Statements deterministic forecast and fade contract was accepted on

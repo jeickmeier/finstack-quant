@@ -767,6 +767,45 @@
         },
         {
           "additionalProperties": false,
+          "description": "A forecast's published level was clipped to its `min` / `max` bound.\nThe raw level still drives the forecast's later steps.",
+          "properties": {
+            "forecast_clipped": {
+              "properties": {
+                "node_id": {
+                  "description": "Identifier of the forecast node.",
+                  "type": "string"
+                },
+                "period": {
+                  "description": "Period whose published level was clipped.",
+                  "type": "string"
+                },
+                "published": {
+                  "description": "Level published after the bound, in the node's units.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "raw": {
+                  "description": "Level the forecast generated, in the node's units.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "node_id",
+                "period",
+                "raw",
+                "published"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "forecast_clipped"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "A full-history statistic (`std`, `var`, `median`) was computed over a\nhistory with gaps, so its sample is smaller than its slot count.",
           "properties": {
             "gapped_sample": {

@@ -918,6 +918,19 @@ pub enum EvalWarning {
         /// Typed reason and associated diagnostic values.
         warning: CapitalStructureWarning,
     },
+    /// A forecast's published level was clipped to its `min` / `max` bound.
+    /// The raw level still drives the forecast's later steps.
+    ForecastClipped {
+        /// Identifier of the forecast node.
+        node_id: String,
+        /// Period whose published level was clipped.
+        #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
+        period: PeriodId,
+        /// Level the forecast generated, in the node's units.
+        raw: f64,
+        /// Level published after the bound, in the node's units.
+        published: f64,
+    },
     /// A full-history statistic (`std`, `var`, `median`) was computed over a
     /// history with gaps, so its sample is smaller than its slot count.
     GappedSample {

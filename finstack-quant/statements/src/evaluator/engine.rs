@@ -204,7 +204,7 @@ pub struct Evaluator {
     node_value_types: std::sync::Arc<IndexMap<NodeId, NodeValueType>>,
 
     /// Cached forecast results: node_id → (period_id → value)
-    forecast_cache: IndexMap<NodeId, IndexMap<PeriodId, f64>>,
+    forecast_cache: IndexMap<NodeId, forecast_eval::ForecastRun>,
 
     /// Optional check suite run after evaluation to produce inline validation
     check_suite: Option<std::sync::Arc<crate::checks::CheckSuite>>,
@@ -1016,7 +1016,9 @@ impl Evaluator {
                     .explicit_value_available_on(period)
                     .is_some_and(|available_on| available_on > cutoff)
             });
-            let source = resolve_node_value(node_spec, period_id, is_actual && !hidden, hidden)?;
+            // A forecast is eligible only in a forecast period: an actual
+            // hidden by the cutoff is not forecast.
+            let source = resolve_node_value(node_spec, period_id, is_actual, hidden)?;
             let cell_source = match source {
                 NodeValueSource::Value(_) => Some(CellSource::Value),
                 NodeValueSource::Forecast => Some(CellSource::Forecast),
@@ -1042,9 +1044,26 @@ impl Evaluator {
                         &mut self.forecast_cache,
                         seed_offset,
                         &mut mc_z_wrapper,
-                        visibility_cutoff,
                     )
-                    .and_then(|value| computed_cell(value, value_type, node_id, period_id)),
+                    .and_then(|forecast| match forecast {
+                        forecast_eval::ForecastCell::Unavailable(reason) => {
+                            Ok(Cell::Unavailable(reason))
+                        }
+                        forecast_eval::ForecastCell::Value {
+                            value,
+                            clipped_from,
+                        } => {
+                            if let Some(raw) = clipped_from {
+                                context.warnings.push(EvalWarning::ForecastClipped {
+                                    node_id: node_id.as_str().to_string(),
+                                    period: *period_id,
+                                    raw,
+                                    published: value,
+                                });
+                            }
+                            computed_cell(value, value_type, node_id, period_id)
+                        }
+                    }),
                     NodeValueSource::Formula => {
                         let expr = self.compiled_cache.get(node_id).ok_or_else(|| {
                             Error::eval(format!("No compiled formula for node '{}'", node_id))

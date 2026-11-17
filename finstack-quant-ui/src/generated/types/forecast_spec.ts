@@ -73,6 +73,12 @@ export interface DCdf57B2C9052D7E6A3F1 {
    * Lower bound clamped onto generated values, in the line's base units.
    */
   min?: number | null;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
 }
 /**
  * Parameters of [`ForecastSpec::GrowthPct`].
@@ -90,6 +96,12 @@ export interface DB5031E2Afd1019Fb5366 {
    * Growth per period as a decimal: 0.03 = 3%.
    */
   rate: number;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
 }
 /**
  * Parameters of [`ForecastSpec::CurvePct`].
@@ -107,6 +119,12 @@ export interface D_9B3D81606Bb357B45C25 {
    * Lower bound clamped onto generated values, in the line's base units.
    */
   min?: number | null;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
 }
 /**
  * Parameters of [`ForecastSpec::Normal`] and [`ForecastSpec::LogNormal`].
@@ -136,6 +154,12 @@ export interface DC17C93B81Aa1Aa394Bd9 {
    * Random seed; the same seed reproduces the same path.
    */
   seed: string;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
   /**
    * Standard deviation of the shock per period; non-negative.
    */
@@ -259,6 +283,12 @@ export interface D_61Ab76E17B1A0D1860Ae {
    */
   seed: string;
   /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
+  /**
    * Standard deviation of the shock per period; non-negative.
    */
   std_dev: number;
@@ -287,6 +317,12 @@ export interface D_789205379096953Ae54B {
    * Random seed; the same seed reproduces the same path.
    */
   seed: string;
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
 }
 /**
  * Parameters of [`ForecastSpec::FadeToTarget`].
@@ -308,6 +344,12 @@ export interface D_253D6Ee6E653433D50Cd {
    * Path to the target; defaults to linear.
    */
   shape: "linear" | "geometric" | "exponential";
+  /**
+   * Level at the opening of the forecast suffix, in the series' own units.
+   * When omitted, the value of the slot immediately before the suffix is
+   * the base.
+   */
+  start?: number | null;
   /**
    * Terminal level, in the line's base units.
    */

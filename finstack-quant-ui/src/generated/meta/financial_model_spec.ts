@@ -2932,6 +2932,12 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastFadeShape"
   },
   {
+    "path": "#/$defs/d_44123d832feea816e1b8/properties/start",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FadeToTargetParams/properties/start",
+    "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_44123d832feea816e1b8/properties/target",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FadeToTargetParams/properties/target",
     "description": "Terminal level, in the line's base units.",
@@ -3545,6 +3551,12 @@ export default [
     "path": "#/$defs/d_540ac8fb2e11ac940d17/properties/seed",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BootstrapParams/properties/seed",
     "description": "Random seed; the same seed reproduces the same path."
+  },
+  {
+    "path": "#/$defs/d_540ac8fb2e11ac940d17/properties/start",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BootstrapParams/properties/start",
+    "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_540b029baeeb4469863b",
@@ -7182,6 +7194,12 @@ export default [
     "description": "Random seed; the same seed reproduces the same path."
   },
   {
+    "path": "#/$defs/d_a9879b1ecf56bb1c1e5d/properties/start",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MeanRevertingParams/properties/start",
+    "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_a9879b1ecf56bb1c1e5d/properties/std_dev",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MeanRevertingParams/properties/std_dev",
     "description": "Standard deviation of the shock per period; non-negative.",
@@ -8406,6 +8424,12 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_d161ae86daa94ad6c7ee/properties/start",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CurvePctParams/properties/start",
+    "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_d2a51b402e236fa27cc5",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TimeSeriesParams",
     "description": "Parameters of [`ForecastSpec::TimeSeries`]."
@@ -8774,6 +8798,12 @@ export default [
     "path": "#/$defs/d_dfb113784288659a8f2c/properties/min",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BoundsParams/properties/min",
     "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_dfb113784288659a8f2c/properties/start",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BoundsParams/properties/start",
+    "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
     "format": "double"
   },
   {
@@ -9270,6 +9300,12 @@ export default [
     "description": "Random seed; the same seed reproduces the same path."
   },
   {
+    "path": "#/$defs/d_fb167be7e6dcd5c363b6/properties/start",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DistributionParams/properties/start",
+    "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_fb167be7e6dcd5c363b6/properties/std_dev",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DistributionParams/properties/std_dev",
     "description": "Standard deviation of the shock per period; non-negative.",
@@ -9319,6 +9355,12 @@ export default [
     "path": "#/$defs/d_fcbfa69172f239f37e64/properties/rate",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/GrowthPctParams/properties/rate",
     "description": "Growth per period as a decimal: 0.03 = 3%.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fcbfa69172f239f37e64/properties/start",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/GrowthPctParams/properties/start",
+    "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
     "format": "double"
   },
   {

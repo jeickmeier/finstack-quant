@@ -466,3 +466,151 @@ fn zero_correlation_keeps_the_uncorrelated_draws() {
     };
     assert_eq!(paths(true), paths(false));
 }
+
+// STATEMENTS-EVALUATION-005 qualification: one forecast suffix per node, an
+// explicit start level or the slot before the suffix as base, and bounds on
+// published outputs only.
+
+fn growth_model(
+    forecast: ForecastSpec,
+    actual: Option<f64>,
+    explicit: &[(u8, f64)],
+) -> FinancialModelSpec {
+    let mut builder = ModelBuilder::new("suffix");
+    builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+    let values: Vec<_> = actual
+        .map(|value| (quarter(1), value))
+        .into_iter()
+        .chain(
+            explicit
+                .iter()
+                .map(|(index, value)| (quarter(*index), *value)),
+        )
+        .collect();
+    builder.value_scalar("x", &values);
+    builder.forecast("x", forecast);
+    builder.build().unwrap()
+}
+
+#[test]
+fn an_explicit_value_mid_suffix_does_not_change_the_recurrence() {
+    let plain = Evaluator::new()
+        .evaluate(&growth_model(ForecastSpec::growth(0.1), Some(100.0), &[]))
+        .unwrap();
+    let overridden = Evaluator::new()
+        .evaluate(&growth_model(
+            ForecastSpec::growth(0.1),
+            Some(100.0),
+            &[(3, 999.0)],
+        ))
+        .unwrap();
+    // Q3 publishes the explicit value; Q4 continues the raw recurrence
+    // 100 x 1.1^3, not 999 x 1.1.
+    assert_eq!(overridden.get("x", &quarter(3)), Some(999.0));
+    for index in [2, 4] {
+        assert_eq!(
+            overridden.get("x", &quarter(index)),
+            plain.get("x", &quarter(index))
+        );
+    }
+    assert!((plain.get("x", &quarter(4)).unwrap() - 133.1).abs() < 1e-9);
+
+    // The same holds for a seasonal phase and a stochastic draw sequence.
+    for forecast in [
+        ForecastSpec::seasonal(
+            vec![10.0, 20.0, 30.0, 40.0, 11.0, 21.0, 31.0, 41.0],
+            4,
+            SeasonalMode::Additive,
+        ),
+        ForecastSpec::normal(0.0, 5.0, 11),
+    ] {
+        let plain = Evaluator::new()
+            .evaluate(&growth_model(forecast.clone(), Some(100.0), &[]))
+            .unwrap();
+        let overridden = Evaluator::new()
+            .evaluate(&growth_model(forecast, Some(100.0), &[(2, 1.0)]))
+            .unwrap();
+        for index in [3, 4] {
+            assert_eq!(
+                overridden.get("x", &quarter(index)),
+                plain.get("x", &quarter(index))
+            );
+        }
+    }
+}
+
+#[test]
+fn the_base_is_the_start_level_or_the_slot_before_the_suffix() {
+    use finstack_quant_statements::evaluator::UnavailableReason;
+    // The slot before the suffix holds no value: the forecast is unavailable
+    // with a reason, not an error and not zero.
+    let missing = Evaluator::new()
+        .evaluate(&growth_model(ForecastSpec::growth(0.1), None, &[]))
+        .unwrap();
+    for index in [2, 3, 4] {
+        let cell = missing.get_cell("x", &quarter(index)).unwrap();
+        assert_eq!(cell.reason, Some(UnavailableReason::MissingForecastBase));
+    }
+    // An explicit value inside the suffix is still published.
+    let published = Evaluator::new()
+        .evaluate(&growth_model(ForecastSpec::growth(0.1), None, &[(3, 7.0)]))
+        .unwrap();
+    assert_eq!(published.get("x", &quarter(3)), Some(7.0));
+    assert_eq!(
+        published.get_cell("x", &quarter(4)).unwrap().reason,
+        Some(UnavailableReason::MissingForecastBase)
+    );
+
+    // A selected start level is the base, with or without a preceding value.
+    let start = ForecastSpec::growth(0.1)
+        .with_param("start", json!(200.0))
+        .unwrap();
+    for actual in [None, Some(100.0)] {
+        let result = Evaluator::new()
+            .evaluate(&growth_model(start.clone(), actual, &[]))
+            .unwrap();
+        assert!((result.get("x", &quarter(2)).unwrap() - 220.0).abs() < 1e-9);
+        assert!((result.get("x", &quarter(4)).unwrap() - 266.2).abs() < 1e-9);
+    }
+    assert!(
+        ForecastSpec::growth(0.1)
+            .with_param("start", json!(f64::NAN))
+            .is_err()
+    );
+}
+
+#[test]
+fn bounds_clip_published_outputs_and_do_not_feed_the_next_step() {
+    use finstack_quant_statements::evaluator::EvalWarning;
+    // Growth of -50% from 100: raw 50, 25, 12.5. A floor of 30 clips Q3 and
+    // Q4; if clipping fed the recurrence, Q4 would be 15, then floored at 30
+    // from a different raw value.
+    let floored = ForecastSpec::growth(-0.5)
+        .with_param("min", json!(30.0))
+        .unwrap();
+    let result = Evaluator::new()
+        .evaluate(&growth_model(floored, Some(100.0), &[]))
+        .unwrap();
+    assert_eq!(result.get("x", &quarter(2)), Some(50.0));
+    assert_eq!(result.get("x", &quarter(3)), Some(30.0));
+    assert_eq!(result.get("x", &quarter(4)), Some(30.0));
+    let clipped: Vec<(PeriodId, f64, f64)> = result
+        .meta
+        .warnings
+        .iter()
+        .filter_map(|warning| match warning {
+            EvalWarning::ForecastClipped {
+                node_id,
+                period,
+                raw,
+                published,
+            } if node_id == "x" => Some((*period, *raw, *published)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        clipped,
+        [(quarter(3), 25.0, 30.0), (quarter(4), 12.5, 30.0)],
+        "each clip records the raw level the recurrence kept"
+    );
+}

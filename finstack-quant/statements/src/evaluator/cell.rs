@@ -26,6 +26,9 @@ pub enum UnavailableReason {
     /// negative ending value for a growth rate, and a non-positive base for
     /// `ratio`.
     UndefinedBase,
+    /// A forecast has no base: no start level is selected and the slot
+    /// immediately before the forecast suffix has no value.
+    MissingForecastBase,
 }
 
 impl UnavailableReason {
@@ -37,6 +40,7 @@ impl UnavailableReason {
             Self::HiddenByCutoff => "hidden_by_cutoff",
             Self::MissingInput => "missing_input",
             Self::UndefinedBase => "undefined_base",
+            Self::MissingForecastBase => "missing_forecast_base",
         }
     }
 }

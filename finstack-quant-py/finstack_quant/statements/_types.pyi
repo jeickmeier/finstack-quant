@@ -387,8 +387,16 @@ class ForecastSpec:
             ``target``, ``shape``, ``half_life``, ``long_run_mean``,
             ``reversion_speed``, ``historical``, ``mode``, ``phi``, ...).
             Rates are decimal fractions per period. Every method also accepts
-            optional ``min`` / ``max`` bounds that clamp generated values to a
-            band (in the node's own units). ``None`` means no parameters,
+            optional ``min`` / ``max`` bounds that clamp the published values
+            to a band (in the node's own units) without changing the levels
+            later steps build on; each clipped cell is reported as a
+            ``forecast_clipped`` warning. Methods that step from a base
+            (``growth_pct``, ``curve_pct``, ``fade_to_target``, ``normal``,
+            ``log_normal``, ``mean_reverting``, ``bootstrap``) accept an
+            optional ``start`` level in the node's own units; without it
+            the base is the visible value in the period just before the
+            first forecast period, and a forecast with no base is
+            unavailable (``missing_forecast_base``). ``None`` means no parameters,
             which is only valid for ``forward_fill``. ``seed`` is an exact
             unsigned 64-bit ``int`` (a decimal string in a JSON object
             string). The ``time_series`` ``method``, the ``bootstrap``

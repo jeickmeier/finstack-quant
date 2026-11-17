@@ -661,11 +661,13 @@ fn test_lognormal_forecast_always_positive() {
     );
 }
 
-/// As-of visibility: actual periods hidden by `as_of` must be treated as
-/// forecast periods (no hard error) and the forecast base must come from the
-/// last *visible* actual, never from hidden future actuals (no look-ahead).
+/// As-of visibility: an actual hidden by the cutoff is unavailable, not
+/// forecast (a forecast is eligible only in a forecast period), and it is not
+/// a forecast base either: the slot before the suffix has no visible value,
+/// so the forecast is unavailable with a reason. Nothing reads the hidden
+/// value.
 #[test]
-fn test_as_of_hidden_actuals_are_forecast_with_visible_base() {
+fn test_as_of_hidden_actual_is_unavailable_and_is_not_a_forecast_base() {
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
     use time::Month;
@@ -737,29 +739,23 @@ fn test_as_of_hidden_actuals_are_forecast_with_visible_base() {
         Some(100_000.0)
     );
 
-    // Q2 (hidden actual) and Q3/Q4 are forecast from the visible Q1 base:
-    // 110k, 121k, 133.1k. Anchoring on the hidden 999k would leak look-ahead.
-    let q2 = results
-        .get(
-            "revenue",
-            &PeriodId::quarter(2025, 2).expect("valid period fixture"),
-        )
-        .unwrap();
-    let q3 = results
-        .get(
-            "revenue",
-            &PeriodId::quarter(2025, 3).expect("valid period fixture"),
-        )
-        .unwrap();
-    let q4 = results
-        .get(
-            "revenue",
-            &PeriodId::quarter(2025, 4).expect("valid period fixture"),
-        )
-        .unwrap();
-    assert!((q2 - 110_000.0).abs() < 1.0, "got q2={q2}");
-    assert!((q3 - 121_000.0).abs() < 1.0, "got q3={q3}");
-    assert!((q4 - 133_100.0).abs() < 1.0, "got q4={q4}");
+    use finstack_quant_statements::evaluator::UnavailableReason;
+    let reason = |quarter: u8| {
+        results
+            .get_cell(
+                "revenue",
+                &PeriodId::quarter(2025, quarter).expect("valid period fixture"),
+            )
+            .expect("cell")
+            .reason
+    };
+    assert_eq!(reason(2), Some(UnavailableReason::HiddenByCutoff));
+    for quarter in [3, 4] {
+        assert_eq!(
+            reason(quarter),
+            Some(UnavailableReason::MissingForecastBase)
+        );
+    }
 }
 
 #[test]
@@ -818,7 +814,17 @@ fn test_explicit_availability_date_controls_actual_visibility() {
             finstack_quant_statements::evaluator::ObservationCutoff::Through(before_release),
         )
         .unwrap();
-    assert!((hidden.get("revenue", &q1_2025).unwrap() - 110.0).abs() < 1e-12);
+    // Before the release Q1 is hidden: it is unavailable, and it leaves the
+    // forecast that follows it without a base.
+    use finstack_quant_statements::evaluator::UnavailableReason;
+    assert_eq!(
+        hidden.get_cell("revenue", &q1_2025).unwrap().reason,
+        Some(UnavailableReason::HiddenByCutoff)
+    );
+    assert_eq!(
+        hidden.get_cell("revenue", &q2_2025).unwrap().reason,
+        Some(UnavailableReason::MissingForecastBase)
+    );
 
     let mut evaluator = Evaluator::new();
     let visible = evaluator

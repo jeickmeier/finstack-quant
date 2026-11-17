@@ -655,6 +655,12 @@ export default [
     "description": "A change, growth rate or ratio has no defined value for its base: an\nexactly zero base for a percentage change, a non-positive base or a\nnegative ending value for a growth rate, and a non-positive base for\n`ratio`."
   },
   {
+    "path": "#/$defs/d_6c08f5490eda9e343593/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason/oneOf/4",
+    "const": "missing_forecast_base",
+    "description": "A forecast has no base: no start level is selected and the slot\nimmediately before the forecast suffix has no value."
+  },
+  {
     "path": "#/$defs/d_6f601764dacadc213e87",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodPlan",
     "description": "Builder/plan for a contiguous sequence of periods and their actual/forecast split.\n\nPeriods are returned in ascending order and are intended to form a contiguous\nrun of model periods. Each [`Period`] uses the crate-wide `[start, end)`\ninterval convention, so the `end` of one period naturally aligns with the\n`start` of the next."
@@ -751,37 +757,68 @@ export default [
   {
     "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3",
+    "description": "A forecast's published level was clipped to its `min` / `max` bound.\nThe raw level still drives the forecast's later steps."
+  },
+  {
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/forecast_clipped",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped"
+  },
+  {
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/forecast_clipped/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped/properties/node_id",
+    "description": "Identifier of the forecast node."
+  },
+  {
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/forecast_clipped/properties/period",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped/properties/period",
+    "description": "Period whose published level was clipped."
+  },
+  {
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/forecast_clipped/properties/published",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped/properties/published",
+    "description": "Level published after the bound, in the node's units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/forecast_clipped/properties/raw",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped/properties/raw",
+    "description": "Level the forecast generated, in the node's units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4",
     "description": "A full-history statistic (`std`, `var`, `median`) was computed over a\nhistory with gaps, so its sample is smaller than its slot count."
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/gapped_sample",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/gapped_sample"
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4/properties/gapped_sample",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample"
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/gapped_sample/properties/function",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/gapped_sample/properties/function",
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4/properties/gapped_sample/properties/function",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/function",
     "description": "Name of the statistic."
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/gapped_sample/properties/node_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/gapped_sample/properties/node_id",
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4/properties/gapped_sample/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/node_id",
     "description": "Identifier of the node whose statistic has gaps."
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/gapped_sample/properties/observations",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/gapped_sample/properties/observations",
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4/properties/gapped_sample/properties/observations",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/observations",
     "description": "Observations that had a value.",
     "format": "uint",
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/gapped_sample/properties/period",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/gapped_sample/properties/period",
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4/properties/gapped_sample/properties/period",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/period",
     "description": "Period the statistic was computed for."
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/gapped_sample/properties/slots",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/gapped_sample/properties/slots",
+    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/4/properties/gapped_sample/properties/slots",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/slots",
     "description": "Plan slots from the model start through the period.",
     "format": "uint",
     "minimum": 0

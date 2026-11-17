@@ -345,6 +345,7 @@ enum WarningKey<'a> {
     NonFiniteValue(&'a PeriodId, &'a str, u64),
     CapitalStructure(&'a PeriodId, CapitalStructureKey<'a>),
     GappedSample(&'a PeriodId, &'a str, &'a str, usize),
+    ForecastClipped(&'a PeriodId, &'a str, u64),
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -379,6 +380,12 @@ impl<'a> WarningKey<'a> {
                 observations,
                 ..
             } => Self::GappedSample(period, node_id, function, *observations),
+            EvalWarning::ForecastClipped {
+                node_id,
+                period,
+                published,
+                ..
+            } => Self::ForecastClipped(period, node_id, published.to_bits()),
         }
     }
 }
@@ -423,7 +430,8 @@ fn warning_period(warning: &EvalWarning) -> &PeriodId {
         EvalWarning::DivisionByZero { period, .. }
         | EvalWarning::NonFiniteValue { period, .. }
         | EvalWarning::CapitalStructure { period, .. }
-        | EvalWarning::GappedSample { period, .. } => period,
+        | EvalWarning::GappedSample { period, .. }
+        | EvalWarning::ForecastClipped { period, .. } => period,
     }
 }
 

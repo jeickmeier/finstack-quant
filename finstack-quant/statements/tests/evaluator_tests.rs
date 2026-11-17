@@ -1386,7 +1386,7 @@ fn test_cumulative_functions() {
 // Forecast Evaluation Error Paths
 
 #[test]
-fn test_forecast_error_no_actual_periods() {
+fn test_forecast_without_a_base_is_unavailable() {
     // All periods are forecast - should error
     let model = {
         let mut model_builder = ModelBuilder::new("test");
@@ -1408,11 +1408,15 @@ fn test_forecast_error_no_actual_periods() {
         model_builder.build().unwrap()
     };
 
-    let mut evaluator = Evaluator::new();
-    let result = evaluator.evaluate(&model);
+    let result = Evaluator::new().evaluate(&model).unwrap();
 
-    // Should error due to missing base value
-    assert!(result.is_err());
+    // No start level and no preceding slot: the forecast has no base.
+    let period = *model.periods.last().map(|period| &period.id).unwrap();
+    let cell = result.get_cell("revenue", &period).unwrap();
+    assert_eq!(
+        cell.reason,
+        Some(finstack_quant_statements::evaluator::UnavailableReason::MissingForecastBase)
+    );
 }
 
 #[test]

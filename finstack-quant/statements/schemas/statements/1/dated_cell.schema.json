@@ -966,6 +966,11 @@
           "const": "undefined_base",
           "description": "A change, growth rate or ratio has no defined value for its base: an\nexactly zero base for a percentage change, a non-positive base or a\nnegative ending value for a growth rate, and a non-positive base for\n`ratio`.",
           "type": "string"
+        },
+        {
+          "const": "missing_forecast_base",
+          "description": "A forecast has no base: no start level is selected and the slot\nimmediately before the forecast suffix has no value.",
+          "type": "string"
         }
       ]
     }

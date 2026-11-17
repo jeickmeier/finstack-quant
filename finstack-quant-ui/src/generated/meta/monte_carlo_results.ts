@@ -659,37 +659,68 @@ export default [
   {
     "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3",
+    "description": "A forecast's published level was clipped to its `min` / `max` bound.\nThe raw level still drives the forecast's later steps."
+  },
+  {
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/forecast_clipped",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped"
+  },
+  {
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/forecast_clipped/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped/properties/node_id",
+    "description": "Identifier of the forecast node."
+  },
+  {
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/forecast_clipped/properties/period",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped/properties/period",
+    "description": "Period whose published level was clipped."
+  },
+  {
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/forecast_clipped/properties/published",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped/properties/published",
+    "description": "Level published after the bound, in the node's units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/forecast_clipped/properties/raw",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/forecast_clipped/properties/raw",
+    "description": "Level the forecast generated, in the node's units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/4",
     "description": "A full-history statistic (`std`, `var`, `median`) was computed over a\nhistory with gaps, so its sample is smaller than its slot count."
   },
   {
-    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/gapped_sample",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/gapped_sample"
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/4/properties/gapped_sample",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample"
   },
   {
-    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/gapped_sample/properties/function",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/gapped_sample/properties/function",
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/4/properties/gapped_sample/properties/function",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/function",
     "description": "Name of the statistic."
   },
   {
-    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/gapped_sample/properties/node_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/gapped_sample/properties/node_id",
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/4/properties/gapped_sample/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/node_id",
     "description": "Identifier of the node whose statistic has gaps."
   },
   {
-    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/gapped_sample/properties/observations",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/gapped_sample/properties/observations",
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/4/properties/gapped_sample/properties/observations",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/observations",
     "description": "Observations that had a value.",
     "format": "uint",
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/gapped_sample/properties/period",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/gapped_sample/properties/period",
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/4/properties/gapped_sample/properties/period",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/period",
     "description": "Period the statistic was computed for."
   },
   {
-    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/3/properties/gapped_sample/properties/slots",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/3/properties/gapped_sample/properties/slots",
+    "path": "#/$defs/d_cf776b61125046d84b45/oneOf/4/properties/gapped_sample/properties/slots",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/EvalWarning/oneOf/4/properties/gapped_sample/properties/slots",
     "description": "Plan slots from the model start through the period.",
     "format": "uint",
     "minimum": 0

@@ -97,6 +97,15 @@ function warningEntry(warning: EvalWarning): WarningEntry {
       detail: String(value),
     };
   }
+  if ("forecast_clipped" in warning) {
+    const { node_id, period, raw, published } = warning.forecast_clipped;
+    return {
+      nodeId: node_id,
+      period,
+      kind: "forecast_clipped",
+      detail: `${raw} published as ${published}`,
+    };
+  }
   if ("gapped_sample" in warning) {
     const {
       node_id,

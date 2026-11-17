@@ -226,17 +226,11 @@ impl PeriodHistory {
     ///
     /// * `node_id` - Node name matching an interned column.
     /// * `period` - Historical period to read.
+    #[cfg(test)]
     #[must_use]
     pub fn get_value(&self, node_id: &str, period: &PeriodId) -> Option<f64> {
         let col = *self.node_to_column.get(node_id)?;
         self.row(period)?.get(col).copied().flatten()
-    }
-
-    /// Iterate `(period, row)` pairs in insertion order.
-    pub fn iter(&self) -> impl Iterator<Item = (PeriodId, &[Option<f64>])> {
-        self.period_index
-            .iter()
-            .filter_map(|(period, &idx)| self.rows.get(idx).map(|row| (*period, row.as_slice())))
     }
 }
 

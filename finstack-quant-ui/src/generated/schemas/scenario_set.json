@@ -134,6 +134,14 @@
           "description": "Growth per period as a decimal: 0.03 = 3%.",
           "format": "double",
           "type": "number"
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
       "required": [
@@ -1328,6 +1336,14 @@
             "number",
             "null"
           ]
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
       "required": [
@@ -1378,6 +1394,14 @@
         "seed": {
           "description": "Random seed; the same seed reproduces the same path.",
           "type": "string"
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "std_dev": {
           "description": "Standard deviation of the shock per period; non-negative.",
@@ -1447,6 +1471,14 @@
         "seed": {
           "description": "Random seed; the same seed reproduces the same path.",
           "type": "string"
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         }
       },
       "required": [
@@ -1470,6 +1502,14 @@
         },
         "min": {
           "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
           "format": "double",
           "type": [
             "number",
@@ -1563,6 +1603,14 @@
           "description": "Random seed; the same seed reproduces the same path.",
           "type": "string"
         },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "std_dev": {
           "description": "Standard deviation of the shock per period; non-negative.",
           "format": "double",
@@ -1608,6 +1656,14 @@
         "shape": {
           "$ref": "#/$defs/d_978c4e1eab840443601f",
           "description": "Path to the target; defaults to linear."
+        },
+        "start": {
+          "description": "Level at the opening of the forecast suffix, in the series' own units.\nWhen omitted, the value of the slot immediately before the suffix is\nthe base.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "target": {
           "description": "Terminal level, in the line's base units.",

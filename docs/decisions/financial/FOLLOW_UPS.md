@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **650 review items across 33 source scopes with open items**
+This backlog consolidates **649 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -26,7 +26,7 @@ The labels distinguish the work required:
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (503): implementation and verification work against an
+- **Reconciliation** (502): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (38): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -69,7 +69,7 @@ product consequences remain in their product scope.
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
 | [Statements: capital structure](#statements-capital-structure) | 14 |
 | [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 12 |
-| [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 13 |
+| [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 12 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
 | [Statements analytics: credit checks and impairment](#statements-analytics-credit-checks-and-impairment) | 18 |
 | [Scenarios](#scenarios) | 16 |
@@ -1048,7 +1048,7 @@ product consequences remain in their product scope.
 
 - **Reconciliation — Typed capital selectors in Statements formulas.** Replace the `cs.<component>.<instrument or total>` reference form with the typed capital reporting components and selectors, including instrument, native-currency total and consolidated scopes, and qualify each selector through parsing, rendering, compilation and evaluation. The rest of the formula grammar, signature and AST-validation contract is reconciled. [Accepted STATEMENTS-CONTRACTS-004](statements-contracts/04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation) · [Capital reporting and selectors](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
 
-- **Reconciliation — JavaScript `bigint` forecast seeds and evaluation-time forecast checks.** Accept a JavaScript `bigint` for a forecast seed at the WASM boundary; today a seed crosses as its decimal wire text, and a `bigint` is written as a bare JSON integer that the exact string codec rejects. Verify the actual horizon, the eligible base and history and the selected execution mode when each forecast method runs, with the forecast suffix and method slices. The one typed specification, explicit method choices, static validation at build and load and exact string seeds in Rust, Python and JSON are reconciled. [Accepted STATEMENTS-CONTRACTS-003](statements-contracts/03-forecast-parameter-contract.md#accepted-decision-for-typed-forecasts-and-validation-staging) · [Forecast suffix and anchoring](statements-evaluation/05-forecast-segments-and-bounds.md).
+- **Reconciliation — JavaScript `bigint` forecast seeds and evaluation-time forecast checks.** Accept a JavaScript `bigint` for a forecast seed at the WASM boundary; today a seed crosses as its decimal wire text, and a `bigint` is written as a bare JSON integer that the exact string codec rejects. Verify the actual horizon and the supplied history and the selected execution mode when each forecast method runs, with the forecast suffix and method slices. The one typed specification, explicit method choices, static validation at build and load and exact string seeds in Rust, Python and JSON are reconciled. [Accepted STATEMENTS-CONTRACTS-003](statements-contracts/03-forecast-parameter-contract.md#accepted-decision-for-typed-forecasts-and-validation-staging) · [Forecast suffix and anchoring](statements-evaluation/05-forecast-segments-and-bounds.md).
 
 - **Reconciliation — Capital reference units in Statements formulas.** Resolve `cs` references through the accepted instrument-native, native-currency total and consolidated reporting scopes, and delete the unresolved unit a formula may still carry when a capital reference has no resolved currency; a required missing quote makes consolidated reporting unavailable. Qualify missing required FX across hosts. The unit rules, monetary-variance rejection, resolution of every other unit before execution and exact currency-tagged monetary results are reconciled. [Accepted STATEMENTS-CONTRACTS-005](statements-contracts/05-currency-dimensions.md#accepted-decision-for-formula-units-and-currency) · [Capital reporting and FX](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
 
@@ -1087,8 +1087,6 @@ product consequences remain in their product scope.
 - **Reconciliation — Complete Monte Carlo paths, typed samples and exact quantiles.** Implement the path-ID and resource limits, fresh complete paths with deterministic failure order, explicit metric coverage and typed sample validation. Qualify R-7, exact percentile keys, sample count and units, complete path restoration and finite typed strict-upper breach probability. Establish independent moment, quantile and sampling-error evidence. [Accepted STATEMENTS-EVALUATION-011](statements-evaluation/11-monte-carlo-evaluation.md#accepted-decision-for-monte-carlo-paths-quantiles-and-breach-probabilities).
 
 - **Reconciliation — Checked stochastic forecast kernels and replay.** Implement signed normal and mean-reverting steps, unclipped positive lognormal restoration, explicit growth or difference bootstrap with unbiased draws, zero-volatility transitions without draws, and versioned PCG64 streams. Independently qualify moments, extremes, subnormals, bootstrap indices, seed provenance and replay. [Accepted STATEMENTS-EVALUATION-007](statements-evaluation/07-stochastic-forecast-kernels.md#accepted-decision-for-stochastic-forecast-kernels-and-replay).
-
-- **Reconciliation — Canonical forecast suffix, anchoring and output bounds.** Implement one suffix per node and run/path, explicit starting levels and eligible immediate anchors by method, and aligned supplied history. Qualify missing inputs, masked and explicit slots, keyed override carry and clipping provenance while preserving raw recurrence, phase and shocks. [Accepted STATEMENTS-EVALUATION-005](statements-evaluation/05-forecast-segments-and-bounds.md#accepted-decision-for-forecast-segments-anchoring-and-output-bounds).
 
 - **Reconciliation — Deterministic forecast levels, keyed carry and fades.** Enforce signed per-slot growth, canonical keyed overrides with unavailable leading slots, checked signed convex and log-magnitude fades, and finite half-life and empty-horizon validation. Independently qualify sign changes and extreme endpoints, including representable geometric paths whose endpoint ratio overflows or underflows. [Accepted STATEMENTS-EVALUATION-006](statements-evaluation/06-deterministic-forecasts-and-fades.md#accepted-decision-for-deterministic-forecasts-and-fades).
 
