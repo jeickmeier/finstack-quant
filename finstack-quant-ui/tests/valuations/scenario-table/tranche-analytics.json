@@ -4255,7 +4255,7 @@
     {
       "name": "floating",
       "source": "finstack-quant/valuations/tests/golden/data/pricing/regression_goldens/structured_credit/clo_mezzanine_base_case.json",
-      "sha256": "d4dad1ff07e3a0cb53ec64cc6f48b35f7918eb41f873f610a2e9ec1a206ab0c4",
+      "sha256": "4ff2bac91fcad1aa63daf621a41d5df4d923b5a8e348f77b9cbe55997e0fa81b",
       "asOf": "2026-04-30",
       "trancheId": "SENIOR",
       "marketPricePct": 25,
