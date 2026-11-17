@@ -5,13 +5,15 @@
 //! credit-reasonableness checks.
 
 use finstack_quant_statements::checks::builtins::{
-    BalanceSheetArticulation, CashReconciliation, MissingValueCheck, NonFiniteCheck,
+    BalanceSheetArticulation, CashReconciliation, MissingValueCheck, NodeSelection, NonFiniteCheck,
     RetainedEarningsReconciliation,
 };
 use finstack_quant_statements::checks::{
     Check, CheckCategory, CheckContext, CheckResult, CheckSuite, PeriodScope, Severity,
     SignConventionPolicy,
 };
+
+use finstack_quant_statements::types::NodeId;
 
 use super::consistency::{EffectiveTaxRateCheck, GrowthRateConsistency, WorkingCapitalConsistency};
 use super::credit::{
@@ -203,18 +205,22 @@ pub fn three_statement_checks(
     });
 
     // Data quality: NaN/Inf detection.
+    // A node may serve several mapping roles; the check names it once.
+    let mapped: indexmap::IndexSet<NodeId> = mapping.all_nodes().into_iter().collect();
     builder = builder.add_check(NonFiniteCheck {
-        nodes: mapping.all_nodes(),
+        nodes: NodeSelection::named(mapped.into_iter().collect()),
     });
 
     // Data quality: required nodes present.
-    let required = vec![
+    let required: indexmap::IndexSet<NodeId> = [
         mapping.cash_node,
         mapping.retained_earnings_node,
         mapping.net_income_node,
-    ];
+    ]
+    .into_iter()
+    .collect();
     builder = builder.add_check(MissingValueCheck {
-        required_nodes: required,
+        required_nodes: required.into_iter().collect(),
         scope: PeriodScope::AllPeriods,
     });
 
@@ -300,8 +306,9 @@ pub fn credit_underwriting_checks(
     if let Some(ref fcf_node) = mapping.fcf_node {
         credit_nodes.push(fcf_node.clone());
     }
+    let credit_nodes: indexmap::IndexSet<NodeId> = credit_nodes.into_iter().collect();
     builder = builder.add_check(CreditInputsFinite(NonFiniteCheck {
-        nodes: credit_nodes,
+        nodes: NodeSelection::named(credit_nodes.into_iter().collect()),
     }));
 
     builder = builder.add_check(LeverageRangeCheck {

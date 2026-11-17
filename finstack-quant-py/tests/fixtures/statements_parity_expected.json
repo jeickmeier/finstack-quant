@@ -934,7 +934,7 @@
               "category": "data_quality",
               "check_id": "non_finite",
               "check_name": "Non-Finite Value",
-              "evaluated": 30,
+              "evaluated": 15,
               "findings": [],
               "outcome": "pass"
             },
@@ -950,7 +950,7 @@
               "category": "data_quality",
               "check_id": "credit_inputs_non_finite",
               "check_name": "Credit Inputs Non-Finite",
-              "evaluated": 15,
+              "evaluated": 10,
               "findings": [],
               "outcome": "pass"
             },

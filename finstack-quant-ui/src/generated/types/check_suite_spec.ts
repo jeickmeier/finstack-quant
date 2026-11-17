@@ -603,52 +603,73 @@ export interface D_7E4Df57C89Fa33D753141 {
   value: D_598048De9D4527D8B97C | number;
 }
 /**
- * Flags required nodes that lack values in applicable periods.
+ * Checks that every required node has a value in every period of the
+ * selected scope.
  *
- * Missing actual observations produce `Severity::Error` and fail the check.
- * Missing forecast observations produce advisory `Severity::Warning` findings.
+ * The required nodes and the period scope (actuals, forecasts or both) are
+ * stated explicitly. An observation that is missing, or unavailable for a
+ * stated reason, makes the covered scope incomplete: it is a coverage
+ * finding, and the check's outcome is `incomplete`. A typed zero is a valid
+ * observation. A scope with no required node or no period in it examines
+ * nothing and is `unevaluated`. `evaluated` counts the required cells
+ * examined; the findings list the missing and unavailable ones.
+ *
+ * A required node the model does not know, or one listed twice, is a
+ * configuration error.
  */
 export interface DB45Cf940E78A8E787A32 {
   /**
-   * Nodes that must have values in every in-scope period.
+   * Nodes that must have a value in every in-scope period.
    */
   required_nodes: D_695249Af9946117B99A3[];
   /**
-   * Which periods to inspect.
+   * Which periods are in scope: all, actuals only or forecasts only.
    */
   scope: "all_periods" | "actuals_only" | "forecast_only";
   [k: string]: unknown;
 }
 /**
- * Flags values with unexpected signs (e.g., revenue < 0 or expense > 0).
+ * Flags finite values with an unexpected sign (revenue below zero, an
+ * expense above zero).
  *
- * **Advisory-only**: every finding is `Severity::Warning`, so this check's
- * `CheckResult::passed` is always `true` and it never fails a pipeline gate.
- * Treat its findings as review prompts, not assertions.
+ * **Advisory only**: every finding is `Severity::Warning`, so the check
+ * never fails. Zero is valid in either group, and a cell without a value is
+ * not examined: mandatory sign rules belong to the operation that owns
+ * them (the retained-earnings dividend convention, for example).
+ *
+ * A node the model does not know, a node listed twice, or a node in both
+ * groups is a configuration error.
  */
 export interface D_596Da27A7E87322Af664 {
   /**
-   * Nodes expected to carry negative values.
+   * Nodes expected to be non-positive.
    */
   negative_nodes?: D_695249Af9946117B99A3[];
   /**
-   * Nodes expected to carry positive values.
+   * Nodes expected to be non-negative.
    */
   positive_nodes?: D_695249Af9946117B99A3[];
   [k: string]: unknown;
 }
 /**
- * Detects NaN or infinite values in node results.
+ * Detects values that are not valid numbers: a NaN or an infinity.
  *
- * **Gating**: findings are `Severity::Error`, so any non-finite cell sets
- * `CheckResult::passed` to `false` and fails a pipeline gate. Non-finite
- * values poison every downstream calculation, so they are never advisory.
+ * **Gating**: findings are `Severity::Error`, so one invalid value fails
+ * the check, whether or not any other check requires the cell. A typed
+ * zero is valid, and a cell that is missing, masked or unavailable for a
+ * stated reason is not a value and is not examined: coverage belongs to
+ * [`MissingValueCheck`](super::MissingValueCheck).
+ *
+ * The covered nodes are selected explicitly: all modeled nodes, or a named
+ * list in which an unknown or repeated identifier is a configuration
+ * error. A cell in a period the model's plan does not have, and a node
+ * whose result units contradict the model's, are errors.
  */
 export interface D_2Bc9B0F4Efb33830F0A7 {
   /**
-   * Specific nodes to check; if empty, all nodes in results are inspected.
+   * The nodes to check: `"all"` or a list of node identifiers.
    */
-  nodes?: D_695249Af9946117B99A3[];
+  nodes: "all" | D_695249Af9946117B99A3[];
   [k: string]: unknown;
 }
 /**

@@ -180,7 +180,7 @@ pub fn standard_check_suite() -> CheckSuite {
             tolerance: Some(1.0),
             dividends_sign_convention: Default::default(),
         })
-        .add_check(NonFiniteCheck { nodes: vec![] })
+        .add_check(NonFiniteCheck { nodes: finstack_quant_statements::checks::builtins::NodeSelection::all() })
         .add_check(MissingValueCheck {
             required_nodes: vec![NodeId::new("cash"), NodeId::new("assets")],
             scope: PeriodScope::AllPeriods,

@@ -397,7 +397,7 @@ def test_check_specs_have_no_python_only_defaults_or_grammar() -> None:
     assert json.loads(spec.to_json())["severity"] == "error"
     with pytest.raises(ValueError, match="dict"):
         CheckSuiteSpec("s", builtin_checks=["non_finite"])  # type: ignore[list-item]
-    suite = CheckSuiteSpec("s", builtin_checks=[{"type": "non_finite"}], formula_checks=[spec])
+    suite = CheckSuiteSpec("s", builtin_checks=[{"type": "non_finite", "nodes": "all"}], formula_checks=[spec])
     report = run_checks(goal_seek_model(), suite)
     assert report.total_findings == 0
     with pytest.raises(ValueError, match="missing field `assets_nodes`"):

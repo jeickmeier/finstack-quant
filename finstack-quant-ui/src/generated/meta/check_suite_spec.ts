@@ -66,6 +66,29 @@ export default [
     "description": "Error — indicates a likely problem that should be addressed."
   },
   {
+    "path": "#/$defs/d_0a6e10d87c8ea378057d",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/NodeSelection",
+    "description": "The nodes a validity check covers: every modeled node, selected\nexplicitly, or a named list.\n\nThe JSON form is the string `\"all\"` or an array of node identifiers."
+  },
+  {
+    "path": "#/$defs/d_0a6e10d87c8ea378057d/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/NodeSelection/anyOf/0",
+    "description": "Every node of the evaluated results.",
+    "ref": "#/$defs/AllNodes",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/AllNodes"
+  },
+  {
+    "path": "#/$defs/d_0a6e10d87c8ea378057d/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/NodeSelection/anyOf/1",
+    "description": "The listed nodes, each a known node named once."
+  },
+  {
+    "path": "#/$defs/d_0a6e10d87c8ea378057d/anyOf/1/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/NodeSelection/anyOf/1/items",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Id"
+  },
+  {
     "path": "#/$defs/d_16c0d07694c2c99e93aa",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/CashReconciliation",
     "description": "Reconciles closing cash to opening cash plus classified cash flows and\nseparately identified adjustments, and independently reconciles total\nclassified cash flows to CFO + CFI + CFF.\n\nThe roll-forward is evaluated for every model period:\n`closing = opening + total cash flow + adjustments`. The first opening is\nthe explicit `opening_balance` at the first period boundary; each later\nopening is the close of the immediately adjacent prior period. Cash\ninflows are positive and outflows negative. All inputs share one cash\nscope, compatible units and one currency; the check performs no FX\nconversion.\n\nThe component identity `total cash flow = CFO + CFI + CFF` runs for every\nperiod when all three component nodes are configured, and not at all when\nnone is; configuring only some of them is an error.\n\nMonetary comparisons are exact and scalar ones compensated. The relative\nreference of the tolerance is `|opening cash|` for the roll-forward and\n`|total cash flow|` for the components, with no floor. A comparison with\na missing input is incomplete; the check passes only when every enabled\ncomparison is complete and within tolerance."
@@ -201,19 +224,14 @@ export default [
   {
     "path": "#/$defs/d_2bc9b0f4efb33830f0a7",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/NonFiniteCheck",
-    "description": "Detects NaN or infinite values in node results.\n\n**Gating**: findings are `Severity::Error`, so any non-finite cell sets\n`CheckResult::passed` to `false` and fails a pipeline gate. Non-finite\nvalues poison every downstream calculation, so they are never advisory."
+    "description": "Detects values that are not valid numbers: a NaN or an infinity.\n\n**Gating**: findings are `Severity::Error`, so one invalid value fails\nthe check, whether or not any other check requires the cell. A typed\nzero is valid, and a cell that is missing, masked or unavailable for a\nstated reason is not a value and is not examined: coverage belongs to\n[`MissingValueCheck`](super::MissingValueCheck).\n\nThe covered nodes are selected explicitly: all modeled nodes, or a named\nlist in which an unknown or repeated identifier is a configuration\nerror. A cell in a period the model's plan does not have, and a node\nwhose result units contradict the model's, are errors."
   },
   {
     "path": "#/$defs/d_2bc9b0f4efb33830f0a7/properties/nodes",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/NonFiniteCheck/properties/nodes",
-    "default": [],
-    "description": "Specific nodes to check; if empty, all nodes in results are inspected."
-  },
-  {
-    "path": "#/$defs/d_2bc9b0f4efb33830f0a7/properties/nodes/items",
-    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/NonFiniteCheck/properties/nodes/items",
-    "ref": "#/$defs/Id",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/Id"
+    "description": "The nodes to check: `\"all\"` or a list of node identifiers.",
+    "ref": "#/$defs/NodeSelection",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/NodeSelection"
   },
   {
     "path": "#/$defs/d_32be215bf9263ac78fcf",
@@ -243,6 +261,12 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/DateWire",
     "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
     "format": "date"
+  },
+  {
+    "path": "#/$defs/d_4a5c42eb61628440a2ae",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/AllNodes",
+    "const": "all",
+    "description": "The explicit selection of every modeled node (`\"all\"`)."
   },
   {
     "path": "#/$defs/d_4b696037173a5f0c74fb",
@@ -300,13 +324,13 @@ export default [
   {
     "path": "#/$defs/d_596da27a7e87322af664",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/SignConventionCheck",
-    "description": "Flags values with unexpected signs (e.g., revenue < 0 or expense > 0).\n\n**Advisory-only**: every finding is `Severity::Warning`, so this check's\n`CheckResult::passed` is always `true` and it never fails a pipeline gate.\nTreat its findings as review prompts, not assertions."
+    "description": "Flags finite values with an unexpected sign (revenue below zero, an\nexpense above zero).\n\n**Advisory only**: every finding is `Severity::Warning`, so the check\nnever fails. Zero is valid in either group, and a cell without a value is\nnot examined: mandatory sign rules belong to the operation that owns\nthem (the retained-earnings dividend convention, for example).\n\nA node the model does not know, a node listed twice, or a node in both\ngroups is a configuration error."
   },
   {
     "path": "#/$defs/d_596da27a7e87322af664/properties/negative_nodes",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/SignConventionCheck/properties/negative_nodes",
     "default": [],
-    "description": "Nodes expected to carry negative values."
+    "description": "Nodes expected to be non-positive."
   },
   {
     "path": "#/$defs/d_596da27a7e87322af664/properties/negative_nodes/items",
@@ -318,7 +342,7 @@ export default [
     "path": "#/$defs/d_596da27a7e87322af664/properties/positive_nodes",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/SignConventionCheck/properties/positive_nodes",
     "default": [],
-    "description": "Nodes expected to carry positive values."
+    "description": "Nodes expected to be non-negative."
   },
   {
     "path": "#/$defs/d_596da27a7e87322af664/properties/positive_nodes/items",
@@ -1538,12 +1562,12 @@ export default [
   {
     "path": "#/$defs/d_b45cf940e78a8e787a32",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/MissingValueCheck",
-    "description": "Flags required nodes that lack values in applicable periods.\n\nMissing actual observations produce `Severity::Error` and fail the check.\nMissing forecast observations produce advisory `Severity::Warning` findings."
+    "description": "Checks that every required node has a value in every period of the\nselected scope.\n\nThe required nodes and the period scope (actuals, forecasts or both) are\nstated explicitly. An observation that is missing, or unavailable for a\nstated reason, makes the covered scope incomplete: it is a coverage\nfinding, and the check's outcome is `incomplete`. A typed zero is a valid\nobservation. A scope with no required node or no period in it examines\nnothing and is `unevaluated`. `evaluated` counts the required cells\nexamined; the findings list the missing and unavailable ones.\n\nA required node the model does not know, or one listed twice, is a\nconfiguration error."
   },
   {
     "path": "#/$defs/d_b45cf940e78a8e787a32/properties/required_nodes",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/MissingValueCheck/properties/required_nodes",
-    "description": "Nodes that must have values in every in-scope period."
+    "description": "Nodes that must have a value in every in-scope period."
   },
   {
     "path": "#/$defs/d_b45cf940e78a8e787a32/properties/required_nodes/items",
@@ -1554,7 +1578,7 @@ export default [
   {
     "path": "#/$defs/d_b45cf940e78a8e787a32/properties/scope",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/MissingValueCheck/properties/scope",
-    "description": "Which periods to inspect.",
+    "description": "Which periods are in scope: all, actuals only or forecasts only.",
     "ref": "#/$defs/PeriodScope",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/PeriodScope"
   },

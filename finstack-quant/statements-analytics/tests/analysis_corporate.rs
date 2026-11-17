@@ -17,7 +17,9 @@ use time::Month;
 
 fn non_finite_suite() -> CheckSuite {
     CheckSuite::builder("corporate-test")
-        .add_check(NonFiniteCheck { nodes: vec![] })
+        .add_check(NonFiniteCheck {
+            nodes: finstack_quant_statements::checks::builtins::NodeSelection::all(),
+        })
         .build()
         .expect("unique check ids")
 }

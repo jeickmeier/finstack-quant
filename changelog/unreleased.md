@@ -1316,3 +1316,22 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
 - **Arithmetic.** Money is summed exactly and scalars with compensated sums;
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
+
+### Statements checks: data-quality coverage and validity are separate
+
+STATEMENTS-CONTRACTS-013. **Breaking.**
+
+- **`non_finite` needs a selection.** `nodes` is required: `"all"` or a list
+  of node ids (`{"type": "non_finite", "nodes": "all"}`). The empty list no
+  longer means all nodes. Rust: `NodeSelection::all()` /
+  `NodeSelection::named(..)`.
+- **Unavailable is not invalid.** `non_finite` fails only on a NaN or
+  infinity in a value cell. A missing or unavailable cell is coverage:
+  require it with `missing_value`.
+- **`missing_value`.** A missing required observation is a coverage finding
+  and the check is `incomplete`, in actual and forecast periods alike (it
+  used to be an error in actuals and a warning in forecasts). An empty scope
+  is `unevaluated`.
+- **Configuration errors.** Unknown or duplicate node ids in any of the three
+  checks, overlapping sign groups, and a result cell outside the model's
+  periods.

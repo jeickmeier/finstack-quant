@@ -1,63 +1,13 @@
 {
-  "outcome": "fail",
+  "outcome": "incomplete",
   "results": [
     {
       "check_id": "non_finite",
       "check_name": "Non-Finite Value",
       "category": "data_quality",
-      "outcome": "fail",
-      "evaluated": 208,
-      "findings": [
-        {
-          "check_id": "non_finite",
-          "severity": "error",
-          "message": "Non-finite value (NaN) for node 'ltm_ebitda' in period 2024Q1",
-          "period": "2024Q1",
-          "nodes": ["ltm_ebitda"]
-        },
-        {
-          "check_id": "non_finite",
-          "severity": "error",
-          "message": "Non-finite value (NaN) for node 'ltm_ebitda' in period 2024Q2",
-          "period": "2024Q2",
-          "nodes": ["ltm_ebitda"]
-        },
-        {
-          "check_id": "non_finite",
-          "severity": "error",
-          "message": "Non-finite value (NaN) for node 'ltm_ebitda' in period 2024Q3",
-          "period": "2024Q3",
-          "nodes": ["ltm_ebitda"]
-        },
-        {
-          "check_id": "non_finite",
-          "severity": "error",
-          "message": "Non-finite value (NaN) for node 'leverage' in period 2024Q1",
-          "period": "2024Q1",
-          "nodes": ["leverage"]
-        },
-        {
-          "check_id": "non_finite",
-          "severity": "error",
-          "message": "Non-finite value (NaN) for node 'leverage' in period 2024Q2",
-          "period": "2024Q2",
-          "nodes": ["leverage"]
-        },
-        {
-          "check_id": "non_finite",
-          "severity": "error",
-          "message": "Non-finite value (NaN) for node 'leverage' in period 2024Q3",
-          "period": "2024Q3",
-          "nodes": ["leverage"]
-        },
-        {
-          "check_id": "non_finite",
-          "severity": "error",
-          "message": "Non-finite value (NaN) for node 'revenue_growth_qoq' in period 2024Q1",
-          "period": "2024Q1",
-          "nodes": ["revenue_growth_qoq"]
-        }
-      ]
+      "outcome": "pass",
+      "evaluated": 201,
+      "findings": []
     },
     {
       "check_id": "leverage_covenant",
@@ -185,11 +135,11 @@
   ],
   "summary": {
     "total_checks": 6,
-    "passed": 4,
-    "failed": 1,
+    "passed": 5,
+    "failed": 0,
     "incomplete": 1,
     "unevaluated": 0,
-    "errors": 7,
+    "errors": 0,
     "warnings": 3,
     "infos": 0
   }

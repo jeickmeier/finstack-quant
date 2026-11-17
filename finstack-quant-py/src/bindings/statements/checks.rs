@@ -370,7 +370,7 @@ impl PyCheckSuiteSpec {
     /// builtin_checks : list[dict] | None
     ///     Built-in checks to run, each the Rust ``BuiltinCheckSpec`` serde
     ///     form: a dict with the check's ``type`` tag plus its fields, e.g.
-    ///     ``{"type": "non_finite"}`` or ``{"type":
+    ///     ``{"type": "non_finite", "nodes": "all"}`` or ``{"type":
     ///     "balance_sheet_articulation", "assets_nodes": ["assets"],
     ///     "liabilities_nodes": ["liabilities"], "equity_nodes":
     ///     ["equity"]}``. See :meth:`builtin_check_names` for the catalog.

@@ -231,7 +231,7 @@ impl CheckSuite {
     ///
     /// # fn main() -> finstack_quant_statements::Result<()> {
     /// let suite = CheckSuite::builder("demo")
-    ///     .add_check(NonFiniteCheck { nodes: vec![] })
+    ///     .add_check(NonFiniteCheck { nodes: finstack_quant_statements::checks::builtins::NodeSelection::all() })
     ///     .build()?;
     /// assert_eq!(suite.check_ids(), vec!["non_finite"]);
     /// # Ok(())
@@ -533,12 +533,17 @@ mod tests {
                 .to_string()
                 .contains("unknown variant")
         );
-        // Tag-only construction succeeds for the checks whose fields all
-        // default, which is what a host's `builtin_checks=["non_finite"]`
-        // shorthand relies on.
-        for name in ["non_finite", "sign_convention"] {
-            serde_json::from_value::<BuiltinCheckSpec>(serde_json::json!({ "type": name }))
-                .expect("defaultable builtin");
-        }
+        // The sign check's groups default to empty; the validity check's
+        // node selection is explicit and has no default.
+        serde_json::from_value::<BuiltinCheckSpec>(
+            serde_json::json!({ "type": "sign_convention" }),
+        )
+        .expect("defaultable builtin");
+        serde_json::from_value::<BuiltinCheckSpec>(serde_json::json!({ "type": "non_finite" }))
+            .expect_err("the node selection is required");
+        serde_json::from_value::<BuiltinCheckSpec>(
+            serde_json::json!({ "type": "non_finite", "nodes": "all" }),
+        )
+        .expect("explicit selection of all nodes");
     }
 }

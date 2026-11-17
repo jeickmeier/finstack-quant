@@ -1872,7 +1872,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-checks.json",
-      "sha256": "5d6b62d74046ac0eb1285859d824c261cd2d387b8b1918bbe14ff3bc6c2181b2"
+      "sha256": "143b1b7c1d74a9dbdf4ac6fab9add7dd080bd64991a6a4f4fc43cb3478ebaad0"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-result.json",
@@ -1880,7 +1880,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-check-report.json",
-      "sha256": "48de3cae3c41cc3b2dc5f9783ea9bce36af2823d565f806dc4be546c61fa6cc2"
+      "sha256": "54f39f07e09e355e19f62bc39bb52b3731b0c2afe9c6fd154319153954c259b2"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-pl-summary.json",

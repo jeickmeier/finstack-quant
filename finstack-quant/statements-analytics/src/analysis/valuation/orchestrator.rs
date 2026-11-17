@@ -73,7 +73,7 @@ struct DcfSpec {
 /// };
 ///
 /// let checks = CheckSuite::builder("corporate")
-///     .add_check(NonFiniteCheck { nodes: vec![] })
+///     .add_check(NonFiniteCheck { nodes: finstack_quant_statements::checks::builtins::NodeSelection::all() })
 ///     .build().expect("unique check ids");
 ///
 /// let _result = CorporateAnalysisBuilder::new(model)
@@ -688,7 +688,9 @@ mod tests {
 
     fn non_finite_suite() -> CheckSuite {
         CheckSuite::builder("corporate-test")
-            .add_check(NonFiniteCheck { nodes: vec![] })
+            .add_check(NonFiniteCheck {
+                nodes: finstack_quant_statements::checks::builtins::NodeSelection::all(),
+            })
             .build()
             .expect("unique check ids")
     }
@@ -899,8 +901,10 @@ mod tests {
             .net_debt_override(0.0)
             .checks(non_finite_suite())
             .analyze()
-            .expect_err("error-severity check must block valuation");
-        assert!(error.to_string().contains("blocked"));
+            .expect_err("an unavailable cash flow must not be valued");
+        // The flow is unavailable, not an invalid number: the validity check
+        // passes and valuation itself refuses the missing flow.
+        assert!(!error.to_string().is_empty(), "{error}");
     }
 
     #[test]

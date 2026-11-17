@@ -364,8 +364,7 @@ qualified.
 
 The Statements data-quality contract was accepted on 2026-11-15. It covers
 required observation scope, missing and unavailable values, invalid inputs
-and advisory sign diagnostics. Implementation and independent qualification
-remain pending.
+and advisory sign diagnostics. It is implemented and qualified.
 [STATEMENTS-CONTRACTS-013](statements-contracts/13-data-quality-checks.md#accepted-decision-for-data-quality-coverage-and-validity).
 
 The Statements numerical comparison and check-suite contract was accepted on

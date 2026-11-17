@@ -101,19 +101,13 @@ proptest! {
         let mut ev = Evaluator::new();
         let mut results = ev.evaluate(&model).unwrap();
 
-        results.set_cell(
+        // A raw invalid number in a value cell, as a foreign producer could
+        // write it; a typed constructor would reject it.
+        let mut bad = finstack_quant_statements::evaluator::ResultCell::scalar(0.0).unwrap();
+        bad.value = Some(AmountOrScalar::scalar(f64::NAN));
+        results.set_cell("bad_node", q1(), bad);
 
-            "bad_node",
-
-            q1(),
-
-            finstack_quant_statements::evaluator::ResultCell::unavailable(
-            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
-        ),
-
-        );
-
-        let check = NonFiniteCheck { nodes: vec![] };
+        let check = NonFiniteCheck { nodes: finstack_quant_statements::checks::builtins::NodeSelection::all() };
         let ctx = CheckContext::new(&model, &results);
         let result = check.execute(&ctx).unwrap();
         prop_assert!(!result.passed(), "NonFiniteCheck should catch NaN");
@@ -133,19 +127,13 @@ proptest! {
         let mut ev = Evaluator::new();
         let mut results = ev.evaluate(&model).unwrap();
 
-        results.set_cell(
+        // A raw invalid number in a value cell, as a foreign producer could
+        // write it; a typed constructor would reject it.
+        let mut bad = finstack_quant_statements::evaluator::ResultCell::scalar(0.0).unwrap();
+        bad.value = Some(AmountOrScalar::scalar(f64::INFINITY));
+        results.set_cell("bad_node", q1(), bad);
 
-            "bad_node",
-
-            q1(),
-
-            finstack_quant_statements::evaluator::ResultCell::unavailable(
-            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
-        ),
-
-        );
-
-        let check = NonFiniteCheck { nodes: vec![] };
+        let check = NonFiniteCheck { nodes: finstack_quant_statements::checks::builtins::NodeSelection::all() };
         let ctx = CheckContext::new(&model, &results);
         let result = check.execute(&ctx).unwrap();
         prop_assert!(!result.passed(), "NonFiniteCheck should catch Inf");
@@ -165,19 +153,13 @@ proptest! {
         let mut ev = Evaluator::new();
         let mut results = ev.evaluate(&model).unwrap();
 
-        results.set_cell(
+        // A raw invalid number in a value cell, as a foreign producer could
+        // write it; a typed constructor would reject it.
+        let mut bad = finstack_quant_statements::evaluator::ResultCell::scalar(0.0).unwrap();
+        bad.value = Some(AmountOrScalar::scalar(f64::NEG_INFINITY));
+        results.set_cell("bad_node", q1(), bad);
 
-            "bad_node",
-
-            q1(),
-
-            finstack_quant_statements::evaluator::ResultCell::unavailable(
-            finstack_quant_statements::evaluator::UnavailableReason::MissingInput,
-        ),
-
-        );
-
-        let check = NonFiniteCheck { nodes: vec![] };
+        let check = NonFiniteCheck { nodes: finstack_quant_statements::checks::builtins::NodeSelection::all() };
         let ctx = CheckContext::new(&model, &results);
         let result = check.execute(&ctx).unwrap();
         prop_assert!(!result.passed(), "NonFiniteCheck should catch -Inf");

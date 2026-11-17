@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
-      "bytes": 47914,
+      "bytes": 49675,
       "kind": "input",
       "path": "schemas/statements/1/check_suite_spec.schema.json",
       "summary": "Serializable check suite: built-in checks, formula checks and filtering configuration.",

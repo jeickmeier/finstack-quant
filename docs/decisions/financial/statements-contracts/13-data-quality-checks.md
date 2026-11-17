@@ -2,9 +2,9 @@
 
 **Decision status:** Accepted for the full Statements data-quality contract (2026-11-15).
 
-**Implementation status:** Reconciliation pending. The audited checks can pass on empty coverage or warn on non-finite input.
+**Implementation status:** Reconciled (2026-11-17). The coverage check (`missing_value`) takes explicit required nodes and a period scope; a required cell that is missing, masked or unavailable for a stated reason is a coverage finding and makes the check incomplete, a typed zero is a valid observation, and a scope with nothing in it is unevaluated. `evaluated` counts the required cells examined and the findings list the missing and unavailable ones. The validity check (`non_finite`) selects its nodes explicitly, as `"all"` or a named list with no default; a NaN or infinity in a value cell fails it, including on a cell no other check requires, while a cell without a value is not examined. Unknown or duplicate configured identifiers, a cell outside the model's period plan and result units that contradict the model's are errors. Sign diagnostics are advisory warnings on finite values with zero valid in either group; overlapping groups are rejected. The sections after the accepted decision describe the implementation audited before reconciliation.
 
-**Validation status:** Existing source and regression evidence mapped. Independent qualification of coverage, invalid inputs and sign diagnostics remains pending.
+**Validation status:** Qualified by missing and unavailable required cells in actual and forecast scopes, a typed zero, an empty scope, unknown and duplicate identifiers, NaN and both infinities on an optional cell under the all-nodes and a named selection, an off-plan cell, an omitted selection, swapped sign expectations and overlapping sign groups.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
 

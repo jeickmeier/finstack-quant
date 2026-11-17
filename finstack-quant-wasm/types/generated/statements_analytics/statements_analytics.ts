@@ -6,6 +6,10 @@ import type * as statements from '../statements/index.js';
  */
 export type AccountType = "asset" | "liability" | "equity";
 /**
+ * The explicit selection of every modeled node (`"all"`).
+ */
+export type AllNodes = "all";
+/**
  * Value that can be currency-aware or unitless.
  *
  * Used for node values that can represent:
@@ -286,6 +290,13 @@ export type DateWire = string;
  * Scope that determines which periods a check applies to.
  */
 export type PeriodScope = "all_periods" | "actuals_only" | "forecast_only";
+/**
+ * The nodes a validity check covers: every modeled node, selected
+ * explicitly, or a named list.
+ *
+ * The JSON form is the string `"all"` or an array of node identifiers.
+ */
+export type NodeSelection = AllNodes | Id[];
 /**
  * Instrument type of a tranche in the debt stack.
  */
@@ -1125,52 +1136,73 @@ export interface CashReconciliation {
   [k: string]: unknown;
 }
 /**
- * Flags required nodes that lack values in applicable periods.
+ * Checks that every required node has a value in every period of the
+ * selected scope.
  *
- * Missing actual observations produce `Severity::Error` and fail the check.
- * Missing forecast observations produce advisory `Severity::Warning` findings.
+ * The required nodes and the period scope (actuals, forecasts or both) are
+ * stated explicitly. An observation that is missing, or unavailable for a
+ * stated reason, makes the covered scope incomplete: it is a coverage
+ * finding, and the check's outcome is `incomplete`. A typed zero is a valid
+ * observation. A scope with no required node or no period in it examines
+ * nothing and is `unevaluated`. `evaluated` counts the required cells
+ * examined; the findings list the missing and unavailable ones.
+ *
+ * A required node the model does not know, or one listed twice, is a
+ * configuration error.
  */
 export interface MissingValueCheck {
   /**
-   * Nodes that must have values in every in-scope period.
+   * Nodes that must have a value in every in-scope period.
    */
   required_nodes: Id[];
   /**
-   * Which periods to inspect.
+   * Which periods are in scope: all, actuals only or forecasts only.
    */
   scope: PeriodScope;
   [k: string]: unknown;
 }
 /**
- * Flags values with unexpected signs (e.g., revenue < 0 or expense > 0).
+ * Flags finite values with an unexpected sign (revenue below zero, an
+ * expense above zero).
  *
- * **Advisory-only**: every finding is `Severity::Warning`, so this check's
- * `CheckResult::passed` is always `true` and it never fails a pipeline gate.
- * Treat its findings as review prompts, not assertions.
+ * **Advisory only**: every finding is `Severity::Warning`, so the check
+ * never fails. Zero is valid in either group, and a cell without a value is
+ * not examined: mandatory sign rules belong to the operation that owns
+ * them (the retained-earnings dividend convention, for example).
+ *
+ * A node the model does not know, a node listed twice, or a node in both
+ * groups is a configuration error.
  */
 export interface SignConventionCheck {
   /**
-   * Nodes expected to carry negative values.
+   * Nodes expected to be non-positive.
    */
   negative_nodes?: Id[];
   /**
-   * Nodes expected to carry positive values.
+   * Nodes expected to be non-negative.
    */
   positive_nodes?: Id[];
   [k: string]: unknown;
 }
 /**
- * Detects NaN or infinite values in node results.
+ * Detects values that are not valid numbers: a NaN or an infinity.
  *
- * **Gating**: findings are `Severity::Error`, so any non-finite cell sets
- * `CheckResult::passed` to `false` and fails a pipeline gate. Non-finite
- * values poison every downstream calculation, so they are never advisory.
+ * **Gating**: findings are `Severity::Error`, so one invalid value fails
+ * the check, whether or not any other check requires the cell. A typed
+ * zero is valid, and a cell that is missing, masked or unavailable for a
+ * stated reason is not a value and is not examined: coverage belongs to
+ * [`MissingValueCheck`](super::MissingValueCheck).
+ *
+ * The covered nodes are selected explicitly: all modeled nodes, or a named
+ * list in which an unknown or repeated identifier is a configuration
+ * error. A cell in a period the model's plan does not have, and a node
+ * whose result units contradict the model's, are errors.
  */
 export interface NonFiniteCheck {
   /**
-   * Specific nodes to check; if empty, all nodes in results are inspected.
+   * The nodes to check: `"all"` or a list of node identifiers.
    */
-  nodes?: Id[];
+  nodes: NodeSelection;
   [k: string]: unknown;
 }
 /**

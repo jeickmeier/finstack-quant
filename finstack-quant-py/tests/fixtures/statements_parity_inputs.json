@@ -53,7 +53,7 @@
     "builtin_checks": [
       {
         "type": "non_finite",
-        "nodes": []
+        "nodes": "all"
       }
     ],
     "formula_checks": [

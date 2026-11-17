@@ -54,7 +54,9 @@ fn suite_spec_json_roundtrip_and_resolve() {
                 tolerance: Some(0.5),
             }),
             BuiltinCheckSpec::NonFinite(NonFiniteCheck {
-                nodes: vec![NodeId::new("revenue")],
+                nodes: finstack_quant_statements::checks::builtins::NodeSelection::named(vec![
+                    NodeId::new("revenue"),
+                ]),
             }),
             BuiltinCheckSpec::MissingValue(MissingValueCheck {
                 required_nodes: vec![NodeId::new("revenue"), NodeId::new("cogs")],

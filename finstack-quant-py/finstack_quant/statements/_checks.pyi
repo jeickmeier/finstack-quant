@@ -40,7 +40,7 @@ class CheckSuiteSpec:
         builtin_checks : list[dict] | None
             Ordered built-in specifications, each the Rust ``BuiltinCheckSpec``
             serde form: a dict with the check's canonical ``type`` tag plus its
-            node fields, e.g. ``{"type": "non_finite"}`` or ``{"type":
+            node fields, e.g. ``{"type": "non_finite", "nodes": "all"}`` or ``{"type":
             "balance_sheet_articulation", "assets_nodes": ["assets"],
             "liabilities_nodes": ["liabilities"], "equity_nodes":
             ["equity"]}``. None means no built-in checks.
@@ -64,7 +64,7 @@ class CheckSuiteSpec:
         Examples
         --------
         >>> from finstack_quant.statements import CheckSuiteSpec
-        >>> CheckSuiteSpec("quality", builtin_checks=[{"type": "non_finite"}]).builtin_check_count
+        >>> CheckSuiteSpec("quality", builtin_checks=[{"type": "non_finite", "nodes": "all"}]).builtin_check_count
         1
         """
         ...

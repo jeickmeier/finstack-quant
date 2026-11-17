@@ -1,5 +1,10 @@
 {
   "$defs": {
+    "AllNodes": {
+      "const": "all",
+      "description": "The explicit selection of every modeled node (`\"all\"`).",
+      "type": "string"
+    },
     "AmountOrScalar": {
       "anyOf": [
         {
@@ -1185,10 +1190,10 @@
       "type": "string"
     },
     "MissingValueCheck": {
-      "description": "Flags required nodes that lack values in applicable periods.\n\nMissing actual observations produce `Severity::Error` and fail the check.\nMissing forecast observations produce advisory `Severity::Warning` findings.",
+      "description": "Checks that every required node has a value in every period of the\nselected scope.\n\nThe required nodes and the period scope (actuals, forecasts or both) are\nstated explicitly. An observation that is missing, or unavailable for a\nstated reason, makes the covered scope incomplete: it is a coverage\nfinding, and the check's outcome is `incomplete`. A typed zero is a valid\nobservation. A scope with no required node or no period in it examines\nnothing and is `unevaluated`. `evaluated` counts the required cells\nexamined; the findings list the missing and unavailable ones.\n\nA required node the model does not know, or one listed twice, is a\nconfiguration error.",
       "properties": {
         "required_nodes": {
-          "description": "Nodes that must have values in every in-scope period.",
+          "description": "Nodes that must have a value in every in-scope period.",
           "items": {
             "$ref": "#/$defs/Id"
           },
@@ -1196,7 +1201,7 @@
         },
         "scope": {
           "$ref": "#/$defs/PeriodScope",
-          "description": "Which periods to inspect."
+          "description": "Which periods are in scope: all, actuals only or forecasts only."
         }
       },
       "required": [
@@ -1224,18 +1229,33 @@
       ],
       "type": "object"
     },
-    "NonFiniteCheck": {
-      "description": "Detects NaN or infinite values in node results.\n\n**Gating**: findings are `Severity::Error`, so any non-finite cell sets\n`CheckResult::passed` to `false` and fails a pipeline gate. Non-finite\nvalues poison every downstream calculation, so they are never advisory.",
-      "properties": {
-        "nodes": {
-          "default": [],
-          "description": "Specific nodes to check; if empty, all nodes in results are inspected.",
+    "NodeSelection": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AllNodes",
+          "description": "Every node of the evaluated results."
+        },
+        {
+          "description": "The listed nodes, each a known node named once.",
           "items": {
             "$ref": "#/$defs/Id"
           },
           "type": "array"
         }
+      ],
+      "description": "The nodes a validity check covers: every modeled node, selected\nexplicitly, or a named list.\n\nThe JSON form is the string `\"all\"` or an array of node identifiers."
+    },
+    "NonFiniteCheck": {
+      "description": "Detects values that are not valid numbers: a NaN or an infinity.\n\n**Gating**: findings are `Severity::Error`, so one invalid value fails\nthe check, whether or not any other check requires the cell. A typed\nzero is valid, and a cell that is missing, masked or unavailable for a\nstated reason is not a value and is not examined: coverage belongs to\n[`MissingValueCheck`](super::MissingValueCheck).\n\nThe covered nodes are selected explicitly: all modeled nodes, or a named\nlist in which an unknown or repeated identifier is a configuration\nerror. A cell in a period the model's plan does not have, and a node\nwhose result units contradict the model's, are errors.",
+      "properties": {
+        "nodes": {
+          "$ref": "#/$defs/NodeSelection",
+          "description": "The nodes to check: `\"all\"` or a list of node identifiers."
+        }
       },
+      "required": [
+        "nodes"
+      ],
       "type": "object"
     },
     "PeriodScope": {
@@ -1314,11 +1334,11 @@
       "type": "object"
     },
     "SignConventionCheck": {
-      "description": "Flags values with unexpected signs (e.g., revenue < 0 or expense > 0).\n\n**Advisory-only**: every finding is `Severity::Warning`, so this check's\n`CheckResult::passed` is always `true` and it never fails a pipeline gate.\nTreat its findings as review prompts, not assertions.",
+      "description": "Flags finite values with an unexpected sign (revenue below zero, an\nexpense above zero).\n\n**Advisory only**: every finding is `Severity::Warning`, so the check\nnever fails. Zero is valid in either group, and a cell without a value is\nnot examined: mandatory sign rules belong to the operation that owns\nthem (the retained-earnings dividend convention, for example).\n\nA node the model does not know, a node listed twice, or a node in both\ngroups is a configuration error.",
       "properties": {
         "negative_nodes": {
           "default": [],
-          "description": "Nodes expected to carry negative values.",
+          "description": "Nodes expected to be non-positive.",
           "items": {
             "$ref": "#/$defs/Id"
           },
@@ -1326,7 +1346,7 @@
         },
         "positive_nodes": {
           "default": [],
-          "description": "Nodes expected to carry positive values.",
+          "description": "Nodes expected to be non-negative.",
           "items": {
             "$ref": "#/$defs/Id"
           },

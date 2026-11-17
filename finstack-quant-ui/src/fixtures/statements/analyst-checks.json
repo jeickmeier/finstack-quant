@@ -2,7 +2,8 @@
   "name": "Acme quarterly review",
   "builtin_checks": [
     {
-      "type": "non_finite"
+      "type": "non_finite",
+      "nodes": "all"
     }
   ],
   "formula_checks": [
