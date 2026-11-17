@@ -889,3 +889,62 @@ fn constructors_validate_actual_gregorian_bounds() {
     assert!(PeriodId::week(2026, 53).is_ok());
     assert!(PeriodId::week(2025, 53).is_err());
 }
+
+#[test]
+fn canonical_plans_are_nonempty_exact_and_contiguous() {
+    for range in [
+        "2025Q1..Q3",
+        "2024M11..2025M02",
+        "2024W51..2025W02",
+        "2024D365..2025D002",
+    ] {
+        build_periods(range, None)
+            .expect("range")
+            .validate_canonical()
+            .expect(range);
+    }
+    let fiscal = build_fiscal_periods(
+        "FY2025Q1..FY2026Q2",
+        FiscalConfig::new(10, 1).expect("config"),
+        None,
+    )
+    .expect("fiscal range");
+    fiscal.validate_canonical().expect("fiscal plan");
+
+    let plan = build_periods("2025Q1..Q4", None).expect("range");
+    let rebuilt = |periods: Vec<Period>| PeriodPlan::try_new(plan.calendar, periods).expect("plan");
+
+    let empty = rebuilt(Vec::new()).validate_canonical().expect_err("empty");
+    assert!(empty.to_string().contains("at least one period"), "{empty}");
+
+    let mut gap = plan.periods.clone();
+    gap.remove(1);
+    let error = rebuilt(gap).validate_canonical().expect_err("gap");
+    assert!(error.to_string().contains("contiguous"), "{error}");
+
+    let mut reversed = plan.periods.clone();
+    reversed.swap(0, 1);
+    rebuilt(reversed)
+        .validate_canonical()
+        .expect_err("out of order");
+
+    let mut shifted = plan.periods.clone();
+    shifted[2].end = d(2025, Month::September, 30);
+    let error = rebuilt(shifted).validate_canonical().expect_err("bounds");
+    assert!(
+        error.to_string().contains("differ from the calendar"),
+        "{error}"
+    );
+
+    let mut mixed = plan.periods.clone();
+    mixed.push(
+        build_periods("2026M01..2026M01", None)
+            .expect("month")
+            .periods[0]
+            .clone(),
+    );
+    let error = rebuilt(mixed)
+        .validate_canonical()
+        .expect_err("mixed kinds");
+    assert!(error.to_string().contains("one period kind"), "{error}");
+}

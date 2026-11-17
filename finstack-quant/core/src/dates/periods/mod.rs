@@ -700,6 +700,78 @@ impl PeriodPlan {
         }
         Ok(Self { calendar, periods })
     }
+
+    /// Check that the plan is a canonical reporting timeline.
+    ///
+    /// A canonical plan is nonempty, holds one period kind, gives every
+    /// period the exact `[start, end)` bounds its identifier has in the
+    /// plan's calendar, and is contiguous: each period starts where the
+    /// previous one ends (record CORE-CONVENTIONS-014 #1). The actual or
+    /// forecast flags are not examined.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` naming the first period that breaks one of
+    /// these rules, or when the plan is empty.
+    ///
+    /// # Example
+    /// ```
+    /// use finstack_quant_core::dates::{build_periods, PeriodPlan};
+    ///
+    /// let plan = build_periods("2025Q1..Q3", None)?;
+    /// plan.validate_canonical()?;
+    ///
+    /// let mut periods = plan.periods.clone();
+    /// periods.remove(1);
+    /// let gap = PeriodPlan::try_new(plan.calendar, periods)?;
+    /// assert!(gap.validate_canonical().is_err());
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn validate_canonical(&self) -> crate::Result<()> {
+        let Some(first) = self.periods.first() else {
+            return Err(crate::Error::Validation(
+                "a period plan must hold at least one period".to_string(),
+            ));
+        };
+        for period in &self.periods {
+            let id = period.id;
+            if id.kind() != first.id.kind() {
+                return Err(invalid_period(
+                    &id.to_string(),
+                    &format!(
+                        "a plan holds one period kind, but this {} period follows {} period {}",
+                        id.kind(),
+                        first.id.kind(),
+                        first.id
+                    ),
+                ));
+            }
+            let (start, end) = self.calendar.bounds(id.year(), id.kind(), id.index())?;
+            if (period.start, period.end) != (start, end) {
+                return Err(invalid_period(
+                    &id.to_string(),
+                    &format!(
+                        "its bounds [{}, {}) differ from the calendar's [{start}, {end})",
+                        period.start, period.end
+                    ),
+                ));
+            }
+        }
+        for pair in self.periods.windows(2) {
+            if let [previous, next] = pair
+                && next.start != previous.end
+            {
+                return Err(invalid_period(
+                    &next.id.to_string(),
+                    &format!(
+                        "a plan is contiguous, but this period starts at {} and {} ends at {}",
+                        next.start, previous.id, previous.end
+                    ),
+                ));
+            }
+        }
+        Ok(())
+    }
 }
 
 impl std::ops::Deref for PeriodPlan {
