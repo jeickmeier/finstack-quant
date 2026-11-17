@@ -931,7 +931,7 @@ fn parity_add_metric_matches_with_builtin_metrics_for_same_nodes() {
         model_builder.value("depreciation", &zero_periods(0.0));
         model_builder.value("amortization", &zero_periods(0.0));
         model_builder.value("principal_payment", &zero_periods(0.0));
-        model_builder.value("total_assets", &zero_periods(1.0));
+        model_builder.value("total_assets", &zero_periods(2.0));
         model_builder.value("total_debt", &zero_periods(0.0));
         model_builder.value("total_equity", &zero_periods(1.0));
         model_builder.value("taxes", &zero_periods(0.0));
@@ -1166,11 +1166,11 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
             &[
                 (
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
-                    AmountOrScalar::scalar(1.0),
+                    AmountOrScalar::scalar(2.0),
                 ),
                 (
                     PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                    AmountOrScalar::scalar(1.0),
+                    AmountOrScalar::scalar(2.0),
                 ),
             ],
         );

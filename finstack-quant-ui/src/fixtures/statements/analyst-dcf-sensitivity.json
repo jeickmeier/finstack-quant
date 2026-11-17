@@ -1,13 +1,13 @@
 {
   "baseline_enterprise_value": {
-    "amount": "1700820565.3516035",
+    "amount": "1700820565.351604",
     "currency": "USD"
   },
   "entries": [
     {
       "parameter_id": "terminal_growth",
-      "downside": -191902948.39315915,
-      "upside": 246732362.21977592
+      "downside": -191902948.3931594,
+      "upside": 246732362.21977568
     },
     {
       "parameter_id": "wacc",

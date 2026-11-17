@@ -1,174 +1,213 @@
-//! Tests for NaN handling in custom functions
+//! Checked scalar formulas and unavailable values (STATEMENTS-EVALUATION-002).
 
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::builder::ModelBuilder;
-use finstack_quant_statements::evaluator::Evaluator;
+use finstack_quant_statements::evaluator::{
+    CellStatus, Evaluator, StatementResult, UnavailableReason,
+};
 use finstack_quant_statements::types::AmountOrScalar;
 
-#[test]
-fn test_sum_with_nan() {
-    // Create a model with NaN values using division by zero
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..2025Q1", None).unwrap();
-        model_builder.compute("value1", "10.0").unwrap();
-        model_builder
-            .compute("value2", "0.0 / 0.0") // Produces NaN
-            .unwrap();
-        model_builder.compute("value3", "20.0").unwrap();
-        model_builder
-            .compute("total", "sum(value1, value2, value3)")
-            .unwrap();
-        model_builder.build().unwrap()
-    };
+fn q1() -> PeriodId {
+    PeriodId::quarter(2025, 1).expect("valid period fixture")
+}
 
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
+/// Evaluate named formulas over one quarter. `gone` is unavailable in that
+/// quarter (a lag reaching before the first period) and `seed` is 10.
+fn evaluate(formulas: &[(&str, &str)]) -> finstack_quant_statements::Result<StatementResult> {
+    let mut builder = ModelBuilder::new("test");
+    builder.periods("2025Q1..2025Q1", None).unwrap();
+    builder.value("seed", &[(q1(), AmountOrScalar::scalar(10.0))]);
+    builder.compute("gone", "lag(seed, 1)").unwrap();
+    for (node, formula) in formulas {
+        builder.compute(*node, *formula)?;
+    }
+    Evaluator::new().evaluate(&builder.build()?)
+}
 
-    // sum should skip NaN and return 10.0 + 20.0 = 30.0
-    let total = results
-        .get(
-            "total",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-        )
-        .unwrap();
-    assert_eq!(total, 30.0, "sum() should skip NaN values");
+/// The value of `formula`, or `None` when it is unavailable.
+fn value(formula: &str) -> Option<f64> {
+    let results = evaluate(&[("result", formula)]).expect("evaluation");
+    let cell = results.get_cell("result", &q1()).expect("cell");
+    match cell.status {
+        CellStatus::Value => cell.numeric(),
+        CellStatus::Unavailable => {
+            assert_eq!(cell.reason, Some(UnavailableReason::MissingInput));
+            None
+        }
+        other => panic!("unexpected status {other:?}"),
+    }
+}
+
+/// The error text of a formula that must fail the run.
+fn failure(formula: &str) -> String {
+    evaluate(&[("result", formula)])
+        .expect_err("the formula must fail")
+        .to_string()
 }
 
 #[test]
-fn test_mean_with_nan() {
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..2025Q1", None).unwrap();
-        model_builder.compute("value1", "10.0").unwrap();
-        model_builder
-            .compute("value2", "0.0 / 0.0") // Produces NaN
-            .unwrap();
-        model_builder.compute("value3", "20.0").unwrap();
-        model_builder
-            .compute("average", "mean(value1, value2, value3)")
-            .unwrap();
-        model_builder.build().unwrap()
-    };
-
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-
-    // mean should skip NaN and return (10.0 + 20.0) / 2 = 15.0
-    let average = results
-        .get(
-            "average",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-        )
-        .unwrap();
-    assert_eq!(average, 15.0, "mean() should skip NaN values");
+fn aggregates_need_every_operand_to_be_available() {
+    assert_eq!(value("sum(seed, 20, 30)"), Some(60.0));
+    assert_eq!(value("mean(seed, 20, 30)"), Some(20.0));
+    assert_eq!(value("min(seed, 20, 30)"), Some(10.0));
+    assert_eq!(value("max(seed, 20, 30)"), Some(30.0));
+    for function in ["sum", "mean", "min", "max"] {
+        assert_eq!(
+            value(&format!("{function}(seed, gone, 20)")),
+            None,
+            "{function}() must not skip an unavailable operand"
+        );
+        assert_eq!(value(&format!("{function}(gone, gone)")), None);
+    }
 }
 
 #[test]
-fn test_all_nan_values() {
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..2025Q1", None).unwrap();
-        model_builder
-            .compute("value1", "0.0 / 0.0") // NaN
-            .unwrap();
-        model_builder
-            .compute("value2", "0.0 / 0.0") // NaN
-            .unwrap();
-        model_builder
-            .compute("sum_result", "sum(value1, value2)")
-            .unwrap();
-        model_builder
-            .compute("mean_result", "mean(value1, value2)")
-            .unwrap();
-        model_builder.build().unwrap()
-    };
-
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-
-    // If all values are NaN, sum and mean should return NaN
-    let sum = results.get(
-        "sum_result",
-        &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-    );
-    assert!(
-        sum.is_none(),
-        "sum() should return NaN when all values are NaN"
-    );
-
-    let mean = results.get(
-        "mean_result",
-        &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-    );
-    assert!(
-        mean.is_none(),
-        "mean() should return NaN when all values are NaN"
-    );
+fn coalesce_returns_the_first_available_value_including_zero() {
+    assert_eq!(value("coalesce(gone, 0, 10)"), Some(0.0));
+    assert_eq!(value("coalesce(seed, gone)"), Some(10.0));
+    assert_eq!(value("coalesce(gone, gone)"), None);
+    // Arguments after the first available one are not evaluated.
+    assert_eq!(value("coalesce(seed, 1 / 0)"), Some(10.0));
+    // An error in an evaluated argument is not recovered.
+    assert!(failure("coalesce(1 / 0, seed)").contains("division by zero"));
 }
 
 #[test]
-fn test_coalesce_with_nan() {
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..2025Q1", None).unwrap();
-        model_builder
-            .compute("value1", "0.0 / 0.0") // NaN
-            .unwrap();
-        model_builder
-            .compute("value2", "0.0") // Zero
-            .unwrap();
-        model_builder
-            .compute("value3", "10.0") // Valid value
-            .unwrap();
-        model_builder
-            .compute("result", "coalesce(value1, value2, value3)")
-            .unwrap();
-        model_builder.build().unwrap()
-    };
+fn is_missing_is_true_only_for_an_unavailable_value() {
+    assert_eq!(value("if(is_missing(gone), 1, 2)"), Some(1.0));
+    assert_eq!(value("if(is_missing(seed), 1, 2)"), Some(2.0));
+    assert_eq!(value("if(is_missing(0), 1, 2)"), Some(2.0));
+    assert!(failure("if(is_missing(1 / 0), 1, 2)").contains("division by zero"));
+}
 
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
+/// Truth table of each control over available, unavailable and error
+/// operands. `T` and `F` are true and false, `U` is unavailable.
+#[test]
+fn controls_are_lazy_and_propagate_an_unavailable_condition() {
+    let flag = |formula: &str| value(&format!("if({formula}, 1, 0)"));
+    let (t, f, u) = ("seed > 0", "seed < 0", "gone > 0");
+    let error = "1 / 0 > 0";
 
-    // coalesce skips NaN values; returns first non-NaN which is 0.0 (value2)
-    let result = results
-        .get(
-            "result",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-        )
-        .unwrap();
-    assert_eq!(
-        result, 0.0,
-        "coalesce() should skip NaN but return first non-NaN (including zero)"
-    );
+    // and: a false left decides; otherwise the right decides.
+    assert_eq!(flag(&format!("({t}) and ({t})")), Some(1.0));
+    assert_eq!(flag(&format!("({t}) and ({f})")), Some(0.0));
+    assert_eq!(flag(&format!("({f}) and ({u})")), Some(0.0));
+    assert_eq!(flag(&format!("({f}) and ({error})")), Some(0.0));
+    assert_eq!(flag(&format!("({t}) and ({u})")), None);
+    assert_eq!(flag(&format!("({u}) and ({f})")), None);
+    assert!(failure(&format!("if(({t}) and ({error}), 1, 0)")).contains("division by zero"));
+
+    // or: a true left decides; otherwise the right decides.
+    assert_eq!(flag(&format!("({f}) or ({f})")), Some(0.0));
+    assert_eq!(flag(&format!("({f}) or ({t})")), Some(1.0));
+    assert_eq!(flag(&format!("({t}) or ({u})")), Some(1.0));
+    assert_eq!(flag(&format!("({t}) or ({error})")), Some(1.0));
+    assert_eq!(flag(&format!("({f}) or ({u})")), None);
+    assert_eq!(flag(&format!("({u}) or ({t})")), None);
+    assert!(failure(&format!("if(({f}) or ({error}), 1, 0)")).contains("division by zero"));
+
+    // not
+    assert_eq!(flag(&format!("!({f})")), Some(1.0));
+    assert_eq!(flag(&format!("!({u})")), None);
+
+    // if: only the selected branch is evaluated.
+    assert_eq!(value(&format!("if({t}, seed, 1 / 0)")), Some(10.0));
+    assert_eq!(value(&format!("if({f}, 1 / 0, seed)")), Some(10.0));
+    assert_eq!(value(&format!("if({t}, gone, seed)")), None);
+    assert_eq!(value(&format!("if({u}, 1, 2)")), None);
+    assert!(failure(&format!("if({error}, 1, 2)")).contains("division by zero"));
+    assert!(failure(&format!("if({t}, 1 / 0, 2)")).contains("division by zero"));
 }
 
 #[test]
-fn test_annualize_with_nan() {
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..2025Q1", None).unwrap();
-        model_builder
-            .compute("quarterly_value", "0.0 / 0.0") // NaN
-            .unwrap();
-        model_builder
-            .compute("annual", "annualize(quarterly_value, 4)")
-            .unwrap();
-        model_builder.build().unwrap()
-    };
+fn controls_must_be_boolean() {
+    for formula in [
+        "if(seed, 1, 2)",
+        "if(1, 1, 2)",
+        "seed and seed > 0",
+        "!seed",
+    ] {
+        let error = failure(formula);
+        assert!(error.contains("must be Boolean"), "{formula}: {error}");
+    }
+    // A Boolean is not a number, and a branch cannot mix the two.
+    for formula in [
+        "(seed > 0) + 1",
+        "if(seed > 0, 1, seed > 5)",
+        "sum(seed > 0, 1)",
+    ] {
+        let error = failure(formula);
+        assert!(error.contains("Boolean"), "{formula}: {error}");
+    }
+    // A Boolean node is published as 1 or 0 and is a number when read back.
+    let results = evaluate(&[("flag", "seed > 0"), ("uses", "if(flag == 1, 5, 6)")]).unwrap();
+    assert_eq!(results.get("flag", &q1()), Some(1.0));
+    assert_eq!(results.get("uses", &q1()), Some(5.0));
+}
 
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
+#[test]
+fn invalid_arithmetic_is_an_error_naming_the_node_and_period() {
+    for (formula, cause) in [
+        ("1 / 0", "division by zero"),
+        ("seed % 0", "remainder by zero"),
+        ("ln(0 - 5)", "ln() is undefined"),
+        ("log10(0)", "log10() is undefined"),
+        ("sqrt(0 - 1)", "sqrt() is undefined"),
+        ("exp(1000)", "exp() is undefined or overflows"),
+        ("pow(10, 400)", "pow() is undefined or overflows"),
+        ("pow(0 - 8, 0.5)", "pow() is undefined or overflows"),
+        ("1e308 * 10", "multiplication is undefined or overflows"),
+        ("clamp(seed, 5, 1)", "lower bound is above"),
+    ] {
+        let error = failure(formula);
+        assert!(error.contains(cause), "{formula}: {error}");
+        assert!(
+            error.contains("result") && error.contains("2025Q1"),
+            "{error}"
+        );
+    }
+    // An unavailable operand is not an error: nothing is computed.
+    assert_eq!(value("gone / 0"), None);
+    assert_eq!(value("ln(gone)"), None);
+}
 
-    // annualize with NaN input should return NaN
-    let annual = results.get(
-        "annual",
-        &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-    );
-    assert!(
-        annual.is_none(),
-        "annualize() should return NaN when input is NaN"
-    );
+#[test]
+fn comparisons_are_exact() {
+    assert_eq!(value("if(0.1 + 0.2 == 0.3, 1, 0)"), Some(0.0));
+    assert_eq!(value("if(seed == 10, 1, 0)"), Some(1.0));
+    assert_eq!(value("if(seed + 0.00000000001 != seed, 1, 0)"), Some(1.0));
+}
+
+#[test]
+fn rounding_defaults_to_zero_places_and_rounds_ties_away_from_zero() {
+    assert_eq!(value("round(2.5)"), Some(3.0));
+    assert_eq!(value("round(0 - 2.5)"), Some(-3.0));
+    assert_eq!(value("round(seed / 4, 1)"), Some(2.5));
+    assert_eq!(value("round(1234.5, 0 - 2)"), Some(1200.0));
+    assert!(failure("round(seed, 0.5)").contains("integer"));
+    assert_eq!(value("clamp(seed, 0, 10)"), Some(10.0));
+    assert_eq!(value("clamp(seed, 0, 5)"), Some(5.0));
+    assert_eq!(value("clamp(gone, 0, 5)"), None);
+}
+
+#[test]
+fn annualization_needs_an_explicit_positive_finite_factor() {
+    assert_eq!(value("annualize(seed, 4)"), Some(40.0));
+    assert_eq!(value("annualize(gone, 4)"), None);
+    for formula in ["annualize(seed, 0)", "annualize(seed, 0 - 4)"] {
+        assert!(failure(formula).contains("must be positive and finite"));
+    }
+    // Simple: rate × factor. Compound: (1 + rate)^factor − 1.
+    assert_eq!(value("annualize_rate(0.02, 4, 0)"), Some(0.08));
+    let compound = value("annualize_rate(0.02, 4, 1)").expect("value");
+    assert!((compound - (1.02_f64.powi(4) - 1.0)).abs() < 1e-15);
+    // The compound domain includes −100% and rejects rates below it.
+    assert_eq!(value("annualize_rate(0 - 1, 4, 1)"), Some(-1.0));
+    assert!(failure("annualize_rate(0 - 1.5, 4, 1)").contains("below -100%"));
+    assert_eq!(value("annualize_rate(0 - 1.5, 4, 0)"), Some(-6.0));
+    assert!(failure("annualize_rate(0.02, 4, 2)").contains("0 (simple) or 1 (compound)"));
+    assert!(failure("annualize_rate(0.02, 0, 1)").contains("must be positive and finite"));
+    assert_eq!(value("annualize_rate(gone, 4, 1)"), None);
 }
 
 #[test]
@@ -221,39 +260,9 @@ fn test_ttm_with_nan() {
 }
 
 #[test]
-fn test_mixed_operations_with_nan() {
-    let model = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder.periods("2025Q1..2025Q1", None).unwrap();
-        model_builder.compute("a", "10.0").unwrap();
-        model_builder
-            .compute("b", "0.0 / 0.0") // NaN
-            .unwrap();
-        model_builder.compute("c", "20.0").unwrap();
-        model_builder.compute("d", "0.0").unwrap();
-        model_builder
-            // Complex formula mixing custom functions
-            .compute("result", "mean(sum(a, b), coalesce(d, c))")
-            .unwrap();
-        model_builder.build().unwrap()
-    };
-
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-
-    // sum(a, b) = 10.0 (skips NaN)
-    // coalesce(d, c) = 0.0 (d is 0.0 which is non-NaN; coalesce returns first non-NaN)
-    // mean(10.0, 0.0) = 5.0
-    let result = results
-        .get(
-            "result",
-            &PeriodId::quarter(2025, 1).expect("valid period fixture"),
-        )
-        .unwrap();
-    assert_eq!(
-        result, 5.0,
-        "Complex operations should handle NaN correctly"
-    );
+fn an_unavailable_operand_propagates_through_nested_functions() {
+    assert_eq!(value("mean(sum(seed, gone), coalesce(gone, 20))"), None);
+    assert_eq!(value("mean(sum(seed, 10), coalesce(gone, 20))"), Some(20.0));
 }
 
 #[test]

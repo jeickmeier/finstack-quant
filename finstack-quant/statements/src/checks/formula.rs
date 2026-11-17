@@ -11,7 +11,7 @@ use super::{
 };
 use crate::Result;
 use crate::evaluator::{
-    EvalWarning, EvaluationContext, PeriodHistory, StatementResult, formula::evaluate_formula,
+    EvaluationContext, PeriodHistory, StatementResult, formula::evaluate_value,
 };
 use crate::types::NodeId;
 
@@ -109,21 +109,16 @@ impl Check for FormulaCheckSpec {
                 }
             }
 
-            let value = evaluate_formula(&expression, &mut evaluation, Some(&self.id))?;
-            // A division by zero over finite inputs is a real defect in the
-            // checked figures, so it still fails below. Any other non-finite
-            // value reached the formula as data it could not judge: a lag or
-            // window reaching before the first period, or a non-finite value
-            // from history.
-            let divided_by_zero = evaluation
-                .warnings
-                .iter()
-                .any(|warning| matches!(warning, EvalWarning::DivisionByZero { .. }));
-            if !divided_by_zero && (!value.is_finite() || evaluation.non_finite_operand) {
+            // An invalid formula (division by zero, an undefined domain, an
+            // overflow) is an execution error. An unavailable result reached
+            // the formula as data it could not judge: a missing or masked
+            // cell, or a lag or window reaching before the first period.
+            let typed = evaluate_value(&expression, &mut evaluation, Some(&self.id))?;
+            if typed.is_unavailable() {
                 findings.push(
                     self.insufficient_data(
                         period.id,
-                        "the formula consumed a non-finite value (for example a lag or rolling \
+                        "the formula consumed an unavailable value (for example a lag or rolling \
                      window reaching before the first period)"
                             .to_string(),
                         current_inputs.clone(),
@@ -131,6 +126,7 @@ impl Check for FormulaCheckSpec {
                 );
                 continue;
             }
+            let value = typed.float();
             let passes = if !value.is_finite() {
                 false
             } else if let Some(tolerance) = self.tolerance {

@@ -146,12 +146,12 @@ fn prepared_plan_rejects_calculated_overrides_and_orphaned_availability() {
 }
 
 #[test]
-fn monetary_nonfinite_results_emit_one_diagnostic_per_cell() {
+fn monetary_unavailable_results_emit_one_diagnostic_per_cell() {
     let model = {
         let mut model_builder = ModelBuilder::new("nonfinite monetary diagnostics");
         model_builder.periods("2025Q1..Q1", None).unwrap();
         model_builder.value_money("usd", &[(quarter(), Money::from((1_i64, Currency::USD)))]);
-        model_builder.compute("undefined", "usd / 0").unwrap();
+        model_builder.compute("undefined", "lag(usd, 1)").unwrap();
         model_builder.build().unwrap()
     };
     let mut evaluator = Evaluator::new();
@@ -196,8 +196,9 @@ fn unrepresentable_money_is_an_error_in_both_paths() {
     ] {
         let message = error.to_string();
         assert!(
-            message.contains("Node 'large' in period 2025Q1")
-                && message.contains("cannot be represented as USD money"),
+            message.contains("[node large]")
+                && message.contains("in period 2025Q1")
+                && message.contains("overflow"),
             "{message}"
         );
     }
@@ -242,10 +243,10 @@ fn monte_carlo_reports_each_forecast_warning_once() {
         model_builder
             .compute("growth", "pct_change(revenue, 1)")
             .unwrap();
-        // A finite 2025Q3 forecast cell that warns on every path: the division
-        // by zero is skipped by `sum`.
+        // A finite 2025Q4 forecast cell that warns on every path: the
+        // percentage change is measured from the zero 2025Q3 denominator.
         model_builder
-            .compute("total", "sum(revenue, revenue / denominator)")
+            .compute("total", "coalesce(pct_change(denominator, 1), 0)")
             .unwrap();
         model_builder.build().unwrap()
     };
@@ -253,7 +254,7 @@ fn monte_carlo_reports_each_forecast_warning_once() {
         .evaluate_monte_carlo(&model, &MonteCarloConfig::new(50, 7))
         .unwrap();
 
-    assert!(!results.warnings.is_empty(), "the 2025Q3 warning is kept");
+    assert!(!results.warnings.is_empty(), "the 2025Q4 warning is kept");
     let mut keys: Vec<String> = results
         .warnings
         .iter()
@@ -261,8 +262,7 @@ fn monte_carlo_reports_each_forecast_warning_once() {
             let period = match warning {
                 EvalWarning::DivisionByZero { period, .. }
                 | EvalWarning::NonFiniteValue { period, .. }
-                | EvalWarning::CapitalStructure { period, .. }
-                | EvalWarning::NonFiniteSkipped { period, .. } => *period,
+                | EvalWarning::CapitalStructure { period, .. } => *period,
             };
             assert!(results.forecast_periods.contains(&period), "{warning:?}");
             format!("{warning:?}")

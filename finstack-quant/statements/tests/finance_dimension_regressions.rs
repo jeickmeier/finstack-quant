@@ -38,7 +38,8 @@ fn assert_dimension_error(formula: &str) {
     let error = model_with_formula(formula)
         .expect_err("invalid financial dimensions must fail during model construction");
     assert!(
-        error.to_string().contains("Dimensional mismatch"),
+        error.to_string().contains("Dimensional mismatch")
+            || error.to_string().contains("Type mismatch"),
         "{formula} failed for an unrelated reason: {error}"
     );
 }

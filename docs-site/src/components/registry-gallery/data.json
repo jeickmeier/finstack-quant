@@ -88649,7 +88649,7 @@
         "2025Q3": {
           "status": "value",
           "value": {
-            "amount": "12213201.825",
+            "amount": "12213201.82499999835",
             "currency": "USD"
           },
           "source": "formula"
@@ -88657,7 +88657,7 @@
         "2025Q4": {
           "status": "value",
           "value": {
-            "amount": "12726156.301649999",
+            "amount": "12726156.30164999835",
             "currency": "USD"
           },
           "source": "formula"
@@ -88715,7 +88715,7 @@
         "2025Q3": {
           "status": "value",
           "value": {
-            "amount": "74944647.5625",
+            "amount": "74944647.562499989875",
             "currency": "USD"
           },
           "source": "formula"
@@ -88723,7 +88723,7 @@
         "2025Q4": {
           "status": "value",
           "value": {
-            "amount": "78092322.760125",
+            "amount": "78092322.760124989875",
             "currency": "USD"
           },
           "source": "formula"
@@ -88781,7 +88781,7 @@
         "2025Q3": {
           "status": "value",
           "value": {
-            "amount": "147113567.43749997",
+            "amount": "147113567.437499980125",
             "currency": "USD"
           },
           "source": "formula"
@@ -88789,7 +88789,7 @@
         "2025Q4": {
           "status": "value",
           "value": {
-            "amount": "153292337.269875",
+            "amount": "153292337.269874980125",
             "currency": "USD"
           },
           "source": "formula"
@@ -88847,7 +88847,7 @@
         "2025Q3": {
           "status": "value",
           "value": {
-            "amount": "57183495.037499964",
+            "amount": "57183495.037499980125",
             "currency": "USD"
           },
           "source": "formula"
@@ -88855,7 +88855,7 @@
         "2025Q4": {
           "status": "value",
           "value": {
-            "amount": "61383803.27707498",
+            "amount": "61383803.277074970125",
             "currency": "USD"
           },
           "source": "formula"
@@ -88894,12 +88894,12 @@
         },
         "2025Q3": {
           "status": "value",
-          "value": 6.408909502661806,
+          "value": 6.408909502661808,
           "source": "formula"
         },
         "2025Q4": {
           "status": "value",
-          "value": 6.7977633750913595,
+          "value": 6.797763375091359,
           "source": "formula"
         }
       },
@@ -89054,7 +89054,7 @@
         "2025Q3": {
           "status": "value",
           "value": {
-            "amount": "44643974.637499966",
+            "amount": "44643974.637499980125",
             "currency": "USD"
           },
           "source": "formula"
@@ -89062,7 +89062,7 @@
         "2025Q4": {
           "status": "value",
           "value": {
-            "amount": "48618571.50987498",
+            "amount": "48618571.509874970125",
             "currency": "USD"
           },
           "source": "formula"
@@ -89120,7 +89120,7 @@
         "2025Q3": {
           "status": "value",
           "value": {
-            "amount": "34478959.17268747",
+            "amount": "34478959.172687486445625",
             "currency": "USD"
           },
           "source": "formula"
@@ -89128,7 +89128,7 @@
         "2025Q4": {
           "status": "value",
           "value": {
-            "amount": "37232282.67060436",
+            "amount": "37232282.670604353795625",
             "currency": "USD"
           },
           "source": "formula"
@@ -89186,7 +89186,7 @@
         "2025Q3": {
           "status": "value",
           "value": {
-            "amount": "35721474.637499966",
+            "amount": "35721474.637499980125",
             "currency": "USD"
           },
           "source": "formula"
@@ -89194,7 +89194,7 @@
         "2025Q4": {
           "status": "value",
           "value": {
-            "amount": "39588571.50987498",
+            "amount": "39588571.509874970125",
             "currency": "USD"
           },
           "source": "formula"
@@ -89252,7 +89252,7 @@
         "2025Q3": {
           "status": "value",
           "value": {
-            "amount": "8394546.539812492",
+            "amount": "8394546.539812495329375",
             "currency": "USD"
           },
           "source": "formula"
@@ -89260,7 +89260,7 @@
         "2025Q4": {
           "status": "value",
           "value": {
-            "amount": "9303314.30482062",
+            "amount": "9303314.304820617979375",
             "currency": "USD"
           },
           "source": "formula"
@@ -89318,7 +89318,7 @@
         "2025Q3": {
           "status": "value",
           "value": {
-            "amount": "36575746.67268747",
+            "amount": "36575746.672687486445625",
             "currency": "USD"
           },
           "source": "formula"
@@ -89326,7 +89326,7 @@
         "2025Q4": {
           "status": "value",
           "value": {
-            "amount": "39354332.67060436",
+            "amount": "39354332.670604353795625",
             "currency": "USD"
           },
           "source": "formula"
@@ -89384,7 +89384,7 @@
         "2025Q3": {
           "status": "value",
           "value": {
-            "amount": "27326928.097687475",
+            "amount": "27326928.097687484795625",
             "currency": "USD"
           },
           "source": "formula"
@@ -89392,7 +89392,7 @@
         "2025Q4": {
           "status": "value",
           "value": {
-            "amount": "30285257.205054358",
+            "amount": "30285257.205054352145625",
             "currency": "USD"
           },
           "source": "formula"
@@ -89431,7 +89431,7 @@
         },
         "2025Q3": {
           "status": "value",
-          "value": 0.2575157826856348,
+          "value": 0.25751578268563485,
           "source": "formula"
         },
         "2025Q4": {
@@ -91632,11 +91632,11 @@
           "type": "nullable_float64",
           "values": [
             208300000, 214549000, 222058214.99999997, 231384660.02999997,
-            70820000, 72410287.5, 74944647.5625, 78092322.760125, 137480000,
+            70820000, 72410287.5, 74944647.56249999, 78092322.760125, 137480000,
             142138712.5, 147113567.43749997, 153292337.269875, 86100000,
             87994200, 89930072.4, 91908533.99280001, 51380000, 54144512.5,
-            57183495.037499964, 61383803.27707498, 23100131.25, 25007247.5625,
-            27326928.097687475, 30285257.205054358
+            57183495.03749998, 61383803.27707497, 23100131.25, 25007247.5625,
+            27326928.097687487, 30285257.205054354
           ]
         },
         "role": "measure"
@@ -91649,9 +91649,9 @@
   },
   "statementCreditAssessment": {
     "period": "2025Q4",
-    "leverage_ratio": 1.9188563760404616,
-    "interest_coverage": 6.194873653258923,
-    "free_cash_flow": 39354332.67060436,
+    "leverage_ratio": 1.9188563760404618,
+    "interest_coverage": 6.194873653258922,
+    "free_cash_flow": 39354332.670604356,
     "series": [
       {
         "period": "2024Q1",
@@ -91693,13 +91693,13 @@
         "period": "2025Q3",
         "leverage_ratio": 1.888721960602909,
         "interest_coverage": 5.992078049478986,
-        "free_cash_flow": 36575746.67268747
+        "free_cash_flow": 36575746.672687486
       },
       {
         "period": "2025Q4",
-        "leverage_ratio": 1.9188563760404616,
-        "interest_coverage": 6.194873653258923,
-        "free_cash_flow": 39354332.67060436
+        "leverage_ratio": 1.9188563760404618,
+        "interest_coverage": 6.194873653258922,
+        "free_cash_flow": 39354332.670604356
       }
     ]
   },
@@ -91716,11 +91716,11 @@
   },
   "statementDcf": {
     "equity_value": {
-      "amount": "1384420565.3516035",
+      "amount": "1384420565.351604",
       "currency": "USD"
     },
     "enterprise_value": {
-      "amount": "1700820565.3516035",
+      "amount": "1700820565.351604",
       "currency": "USD"
     },
     "net_debt": {
@@ -91732,10 +91732,10 @@
       "currency": "USD"
     },
     "terminal_value_pv": {
-      "amount": "1601517332.9538176",
+      "amount": "1601517332.953818",
       "currency": "USD"
     },
-    "equity_value_per_share": 27.68841130703207,
+    "equity_value_per_share": 27.68841130703208,
     "diluted_shares": 50000000,
     "wacc": 0.1,
     "periods": [
@@ -91750,26 +91750,26 @@
       {
         "period_id": "2025Q3",
         "date": "2025-09-30",
-        "free_cash_flow": 34478959.17268747,
+        "free_cash_flow": 34478959.172687486,
         "discount_years": 0.49828884325804246,
         "discount_factor": 0.9536181027665147,
-        "present_value": 32879759.631622344
+        "present_value": 32879759.63162236
       },
       {
         "period_id": "2025Q4",
         "date": "2025-12-31",
-        "free_cash_flow": 37232282.67060436,
+        "free_cash_flow": 37232282.670604356,
         "discount_years": 0.7501711156741958,
         "discount_factor": 0.9309972608029365,
-        "present_value": 34663153.17977331
+        "present_value": 34663153.1797733
       }
     ],
     "pv_explicit": {
-      "amount": "99303232.39778598",
+      "amount": "99303232.39778599",
       "currency": "USD"
     },
     "terminal_value": {
-      "amount": "1720217019.2988458",
+      "amount": "1720217019.2988462",
       "currency": "USD"
     },
     "terminal_discount_years": 0.7501711156741958,
@@ -91783,14 +91783,14 @@
   },
   "statementDcfSensitivity": {
     "baseline_enterprise_value": {
-      "amount": "1700820565.3516035",
+      "amount": "1700820565.351604",
       "currency": "USD"
     },
     "entries": [
       {
         "parameter_id": "terminal_growth",
-        "downside": -191902948.39315915,
-        "upside": 246732362.21977592
+        "downside": -191902948.3931594,
+        "upside": 246732362.21977568
       },
       {
         "parameter_id": "wacc",
@@ -91849,7 +91849,7 @@
       "amount": "552454229.4936748",
       "currency": "USD"
     },
-    "exit_metric": 61383803.27707498,
+    "exit_metric": 61383803.27707497,
     "exit_net_debt": {
       "amount": "430000000",
       "currency": "USD"
@@ -92671,7 +92671,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "12213201.825",
+                    "amount": "12213201.82499999835",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -92679,7 +92679,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "11453540.671485",
+                    "amount": "11453540.6714849989",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -92737,7 +92737,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "74944647.5625",
+                    "amount": "74944647.562499989875",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -92745,7 +92745,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "70283090.4841125",
+                    "amount": "70283090.48411249325",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -92803,7 +92803,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "147113567.43749997",
+                    "amount": "147113567.437499980125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -92811,7 +92811,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "137963103.54288748",
+                    "amount": "137963103.54288748675",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -92869,7 +92869,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "57183495.037499964",
+                    "amount": "57183495.037499980125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -92877,7 +92877,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "46054569.55008747",
+                    "amount": "46054569.55008747675",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -92916,12 +92916,12 @@
                 },
                 "2025Q3": {
                   "status": "value",
-                  "value": 6.408909502661806,
+                  "value": 6.408909502661808,
                   "source": "formula"
                 },
                 "2025Q4": {
                   "status": "value",
-                  "value": 5.100173815070594,
+                  "value": 5.100173815070595,
                   "source": "formula"
                 }
               },
@@ -92976,7 +92976,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "208762577.08758742",
+                    "amount": "208762577.08758745",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -93020,7 +93020,7 @@
                 },
                 "2025Q4": {
                   "status": "value",
-                  "value": 2.059756140199358,
+                  "value": 2.0597561401993576,
                   "source": "formula"
                 }
               },
@@ -93076,7 +93076,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "44643974.637499966",
+                    "amount": "44643974.637499980125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -93084,7 +93084,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "33289337.782887466",
+                    "amount": "33289337.78288747675",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -93142,7 +93142,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "34478959.17268747",
+                    "amount": "34478959.172687486445625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -93150,7 +93150,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "26778034.499623917",
+                    "amount": "26778034.49962392081375",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -93208,7 +93208,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "35721474.637499966",
+                    "amount": "35721474.637499980125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -93216,7 +93216,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "24259337.782887466",
+                    "amount": "24259337.78288747675",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -93274,7 +93274,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "8394546.539812492",
+                    "amount": "8394546.539812495329375",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -93282,7 +93282,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "5700944.378978554",
+                    "amount": "5700944.37897855703625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -93340,7 +93340,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "36575746.67268747",
+                    "amount": "36575746.672687486445625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -93348,7 +93348,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "28900084.499623917",
+                    "amount": "28900084.49962392081375",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -93406,7 +93406,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "27326928.097687475",
+                    "amount": "27326928.097687484795625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -93414,7 +93414,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "18558393.403908912",
+                    "amount": "18558393.40390891971375",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -93453,12 +93453,12 @@
                 },
                 "2025Q3": {
                   "status": "value",
-                  "value": 0.2575157826856348,
+                  "value": 0.25751578268563485,
                   "source": "formula"
                 },
                 "2025Q4": {
                   "status": "value",
-                  "value": 0.22115443581224012,
+                  "value": 0.22115443581224015,
                   "source": "formula"
                 }
               },
@@ -96168,7 +96168,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "12213201.825",
+                    "amount": "12213201.82499999835",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96234,7 +96234,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "74944647.5625",
+                    "amount": "74944647.562499989875",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96300,7 +96300,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "147113567.43749997",
+                    "amount": "147113567.437499980125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96308,7 +96308,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "168621570.99686247",
+                    "amount": "168621570.9968625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96366,7 +96366,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "57183495.037499964",
+                    "amount": "57183495.037499980125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96374,7 +96374,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "76713037.00406246",
+                    "amount": "76713037.00406249",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96413,12 +96413,12 @@
                 },
                 "2025Q3": {
                   "status": "value",
-                  "value": 6.408909502661806,
+                  "value": 6.408909502661808,
                   "source": "formula"
                 },
                 "2025Q4": {
                   "status": "value",
-                  "value": 8.495352935112122,
+                  "value": 8.495352935112125,
                   "source": "formula"
                 }
               },
@@ -96473,7 +96473,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "239421044.54156244",
+                    "amount": "239421044.54156247",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96517,7 +96517,7 @@
                 },
                 "2025Q4": {
                   "status": "value",
-                  "value": 1.795999181372521,
+                  "value": 1.7959991813725207,
                   "source": "formula"
                 }
               },
@@ -96573,7 +96573,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "44643974.637499966",
+                    "amount": "44643974.637499980125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96581,7 +96581,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "63947805.23686246",
+                    "amount": "63947805.23686249",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96639,7 +96639,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "34478959.17268747",
+                    "amount": "34478959.172687486445625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96647,7 +96647,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "47686530.84158479",
+                    "amount": "47686530.84158480485",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96705,7 +96705,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "35721474.637499966",
+                    "amount": "35721474.637499980125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96713,7 +96713,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "54917805.23686246",
+                    "amount": "54917805.23686249",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96771,7 +96771,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "8394546.539812492",
+                    "amount": "8394546.539812495329375",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96779,7 +96779,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "12905684.230662677",
+                    "amount": "12905684.23066268515",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96837,7 +96837,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "36575746.67268747",
+                    "amount": "36575746.672687486445625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96845,7 +96845,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "49808580.84158479",
+                    "amount": "49808580.84158480485",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96903,7 +96903,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "27326928.097687475",
+                    "amount": "27326928.097687484795625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96911,7 +96911,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "42012121.00619978",
+                    "amount": "42012121.00619980485",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -96950,12 +96950,12 @@
                 },
                 "2025Q3": {
                   "status": "value",
-                  "value": 0.2575157826856348,
+                  "value": 0.25751578268563485,
                   "source": "formula"
                 },
                 "2025Q4": {
                   "status": "value",
-                  "value": 0.30139908384637826,
+                  "value": 0.30139908384637837,
                   "source": "formula"
                 }
               },
@@ -96997,7 +96997,7 @@
                 },
                 "2025Q4": {
                   "status": "value",
-                  "value": 0.6624999999999999,
+                  "value": 0.6625,
                   "source": "formula"
                 }
               },
@@ -99665,7 +99665,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "12213201.825",
+                    "amount": "12213201.82499999835",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -99673,7 +99673,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "12726156.301649999",
+                    "amount": "12726156.30164999835",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -99731,7 +99731,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "74944647.5625",
+                    "amount": "74944647.562499989875",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -99739,7 +99739,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "78092322.760125",
+                    "amount": "78092322.760124989875",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -99797,7 +99797,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "147113567.43749997",
+                    "amount": "147113567.437499980125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -99805,7 +99805,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "153292337.269875",
+                    "amount": "153292337.269874980125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -99863,7 +99863,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "57183495.037499964",
+                    "amount": "57183495.037499980125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -99871,7 +99871,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "70574656.67635497",
+                    "amount": "70574656.676354960125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -99910,12 +99910,12 @@
                 },
                 "2025Q3": {
                   "status": "value",
-                  "value": 6.408909502661806,
+                  "value": 6.408909502661808,
                   "source": "formula"
                 },
                 "2025Q4": {
                   "status": "value",
-                  "value": 7.815576597602988,
+                  "value": 7.815576597602986,
                   "source": "formula"
                 }
               },
@@ -100070,7 +100070,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "44643974.637499966",
+                    "amount": "44643974.637499980125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -100078,7 +100078,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "57809424.909154974",
+                    "amount": "57809424.909154960125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -100136,7 +100136,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "34478959.17268747",
+                    "amount": "34478959.172687486445625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -100144,7 +100144,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "44263285.52105355",
+                    "amount": "44263285.521053546145625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -100202,7 +100202,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "35721474.637499966",
+                    "amount": "35721474.637499980125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -100210,7 +100210,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "48779424.909154974",
+                    "amount": "48779424.909154960125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -100268,7 +100268,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "8394546.539812492",
+                    "amount": "8394546.539812495329375",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -100276,7 +100276,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "11463164.853651417",
+                    "amount": "11463164.853651415629375",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -100334,7 +100334,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "36575746.67268747",
+                    "amount": "36575746.672687486445625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -100342,7 +100342,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "46385335.52105355",
+                    "amount": "46385335.521053546145625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -100400,7 +100400,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "27326928.097687475",
+                    "amount": "27326928.097687484795625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -100408,7 +100408,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "37316260.055503555",
+                    "amount": "37316260.055503544495625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -100447,12 +100447,12 @@
                 },
                 "2025Q3": {
                   "status": "value",
-                  "value": 0.2575157826856348,
+                  "value": 0.25751578268563485,
                   "source": "formula"
                 },
                 "2025Q4": {
                   "status": "value",
-                  "value": 0.30501009300791454,
+                  "value": 0.3050100930079145,
                   "source": "formula"
                 }
               },
@@ -103162,7 +103162,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "12213201.825",
+                    "amount": "12213201.82499999835",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103170,7 +103170,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "12726156.301649999",
+                    "amount": "12726156.30164999835",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103228,7 +103228,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "74944647.5625",
+                    "amount": "74944647.562499989875",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103236,7 +103236,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "78092322.760125",
+                    "amount": "78092322.760124989875",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103294,7 +103294,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "147113567.43749997",
+                    "amount": "147113567.437499980125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103302,7 +103302,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "153292337.269875",
+                    "amount": "153292337.269874980125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103360,7 +103360,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "57183495.037499964",
+                    "amount": "57183495.037499980125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103368,7 +103368,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "52192949.877794966",
+                    "amount": "52192949.877794960125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103407,12 +103407,12 @@
                 },
                 "2025Q3": {
                   "status": "value",
-                  "value": 6.408909502661806,
+                  "value": 6.408909502661808,
                   "source": "formula"
                 },
                 "2025Q4": {
                   "status": "value",
-                  "value": 5.7799501525797305,
+                  "value": 5.77995015257973,
                   "source": "formula"
                 }
               },
@@ -103567,7 +103567,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "44643974.637499966",
+                    "amount": "44643974.637499980125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103575,7 +103575,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "39427718.110594966",
+                    "amount": "39427718.110594960125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103633,7 +103633,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "34478959.17268747",
+                    "amount": "34478959.172687486445625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103641,7 +103641,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "30201279.820155147",
+                    "amount": "30201279.820155146145625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103699,7 +103699,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "35721474.637499966",
+                    "amount": "35721474.637499980125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103707,7 +103707,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "30397718.110594966",
+                    "amount": "30397718.110594960125",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103765,7 +103765,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "8394546.539812492",
+                    "amount": "8394546.539812495329375",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103773,7 +103773,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "7143463.755989816",
+                    "amount": "7143463.755989815629375",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103831,7 +103831,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "36575746.67268747",
+                    "amount": "36575746.672687486445625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103839,7 +103839,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "32323329.820155147",
+                    "amount": "32323329.820155146145625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103897,7 +103897,7 @@
                 "2025Q3": {
                   "status": "value",
                   "value": {
-                    "amount": "27326928.097687475",
+                    "amount": "27326928.097687484795625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103905,7 +103905,7 @@
                 "2025Q4": {
                   "status": "value",
                   "value": {
-                    "amount": "23254254.35460515",
+                    "amount": "23254254.354605144495625",
                     "currency": "USD"
                   },
                   "source": "formula"
@@ -103944,12 +103944,12 @@
                 },
                 "2025Q3": {
                   "status": "value",
-                  "value": 0.2575157826856348,
+                  "value": 0.25751578268563485,
                   "source": "formula"
                 },
                 "2025Q4": {
                   "status": "value",
-                  "value": 0.22556789145411774,
+                  "value": 0.2255678914541177,
                   "source": "formula"
                 }
               },
@@ -106656,7 +106656,7 @@
             "2025Q3": {
               "status": "value",
               "value": {
-                "amount": "12213201.825",
+                "amount": "12213201.82499999835",
                 "currency": "USD"
               },
               "source": "formula"
@@ -106664,7 +106664,7 @@
             "2025Q4": {
               "status": "value",
               "value": {
-                "amount": "12726156.301649999",
+                "amount": "12726156.30164999835",
                 "currency": "USD"
               },
               "source": "formula"
@@ -106722,7 +106722,7 @@
             "2025Q3": {
               "status": "value",
               "value": {
-                "amount": "74944647.5625",
+                "amount": "74944647.562499989875",
                 "currency": "USD"
               },
               "source": "formula"
@@ -106730,7 +106730,7 @@
             "2025Q4": {
               "status": "value",
               "value": {
-                "amount": "78092322.760125",
+                "amount": "78092322.760124989875",
                 "currency": "USD"
               },
               "source": "formula"
@@ -106788,7 +106788,7 @@
             "2025Q3": {
               "status": "value",
               "value": {
-                "amount": "147113567.43749997",
+                "amount": "147113567.437499980125",
                 "currency": "USD"
               },
               "source": "formula"
@@ -106796,7 +106796,7 @@
             "2025Q4": {
               "status": "value",
               "value": {
-                "amount": "153292337.269875",
+                "amount": "153292337.269874980125",
                 "currency": "USD"
               },
               "source": "formula"
@@ -106854,7 +106854,7 @@
             "2025Q3": {
               "status": "value",
               "value": {
-                "amount": "57183495.037499964",
+                "amount": "57183495.037499980125",
                 "currency": "USD"
               },
               "source": "formula"
@@ -106862,7 +106862,7 @@
             "2025Q4": {
               "status": "value",
               "value": {
-                "amount": "61383803.27707498",
+                "amount": "61383803.277074970125",
                 "currency": "USD"
               },
               "source": "formula"
@@ -106901,12 +106901,12 @@
             },
             "2025Q3": {
               "status": "value",
-              "value": 6.408909502661806,
+              "value": 6.408909502661808,
               "source": "formula"
             },
             "2025Q4": {
               "status": "value",
-              "value": 6.7977633750913595,
+              "value": 6.797763375091359,
               "source": "formula"
             }
           },
@@ -107061,7 +107061,7 @@
             "2025Q3": {
               "status": "value",
               "value": {
-                "amount": "44643974.637499966",
+                "amount": "44643974.637499980125",
                 "currency": "USD"
               },
               "source": "formula"
@@ -107069,7 +107069,7 @@
             "2025Q4": {
               "status": "value",
               "value": {
-                "amount": "48618571.50987498",
+                "amount": "48618571.509874970125",
                 "currency": "USD"
               },
               "source": "formula"
@@ -107127,7 +107127,7 @@
             "2025Q3": {
               "status": "value",
               "value": {
-                "amount": "34478959.17268747",
+                "amount": "34478959.172687486445625",
                 "currency": "USD"
               },
               "source": "formula"
@@ -107135,7 +107135,7 @@
             "2025Q4": {
               "status": "value",
               "value": {
-                "amount": "37232282.67060436",
+                "amount": "37232282.670604353795625",
                 "currency": "USD"
               },
               "source": "formula"
@@ -107193,7 +107193,7 @@
             "2025Q3": {
               "status": "value",
               "value": {
-                "amount": "35721474.637499966",
+                "amount": "35721474.637499980125",
                 "currency": "USD"
               },
               "source": "formula"
@@ -107201,7 +107201,7 @@
             "2025Q4": {
               "status": "value",
               "value": {
-                "amount": "39588571.50987498",
+                "amount": "39588571.509874970125",
                 "currency": "USD"
               },
               "source": "formula"
@@ -107259,7 +107259,7 @@
             "2025Q3": {
               "status": "value",
               "value": {
-                "amount": "8394546.539812492",
+                "amount": "8394546.539812495329375",
                 "currency": "USD"
               },
               "source": "formula"
@@ -107267,7 +107267,7 @@
             "2025Q4": {
               "status": "value",
               "value": {
-                "amount": "9303314.30482062",
+                "amount": "9303314.304820617979375",
                 "currency": "USD"
               },
               "source": "formula"
@@ -107325,7 +107325,7 @@
             "2025Q3": {
               "status": "value",
               "value": {
-                "amount": "36575746.67268747",
+                "amount": "36575746.672687486445625",
                 "currency": "USD"
               },
               "source": "formula"
@@ -107333,7 +107333,7 @@
             "2025Q4": {
               "status": "value",
               "value": {
-                "amount": "39354332.67060436",
+                "amount": "39354332.670604353795625",
                 "currency": "USD"
               },
               "source": "formula"
@@ -107391,7 +107391,7 @@
             "2025Q3": {
               "status": "value",
               "value": {
-                "amount": "27326928.097687475",
+                "amount": "27326928.097687484795625",
                 "currency": "USD"
               },
               "source": "formula"
@@ -107399,7 +107399,7 @@
             "2025Q4": {
               "status": "value",
               "value": {
-                "amount": "30285257.205054358",
+                "amount": "30285257.205054352145625",
                 "currency": "USD"
               },
               "source": "formula"
@@ -107438,7 +107438,7 @@
             },
             "2025Q3": {
               "status": "value",
-              "value": 0.2575157826856348,
+              "value": 0.25751578268563485,
               "source": "formula"
             },
             "2025Q4": {
@@ -109384,12 +109384,12 @@
     "tornado": [
       {
         "parameter_id": "revenue@2025Q4",
-        "downside": -15329233.72698751,
-        "upside": 15329233.726987481
+        "downside": -15329233.726987496,
+        "upside": 15329233.726987518
       },
       {
         "parameter_id": "opex@2025Q4",
-        "downside": 9190853.399279997,
+        "downside": 9190853.39927999,
         "upside": -9190853.399280012
       }
     ]
@@ -109405,7 +109405,7 @@
   "statementGoalSeek": {
     "solved_value": 244390239.98913205,
     "model": null,
-    "residual": -1.4901161193847656e-8,
+    "residual": -2.9802322387695312e-8,
     "tolerance": 0.07,
     "evaluations": 7,
     "converged": true
@@ -109714,9 +109714,9 @@
           "2025Q2": [
             [0.05, 10893292.337754134],
             [0.25, 11372454.879345171],
-            [0.5, 11795717.396918556],
+            [0.5, 11795717.396918558],
             [0.75, 12193612.837431284],
-            [0.95, 12771895.256588092]
+            [0.95, 12771895.25658809]
           ],
           "2025Q3": [
             [0.05, 10695705.968512233],
@@ -109738,15 +109738,15 @@
         "metric": "cogs",
         "values": {
           "2025Q2": [
-            [0.05, 66845202.98167311],
+            [0.05, 66845202.9816731],
             [0.25, 69785518.57779992],
             [0.5, 72382811.29927295],
             [0.75, 74824442.41151015],
             [0.95, 78372993.61997238]
           ],
           "2025Q3": [
-            [0.05, 65632741.170415975],
-            [0.25, 71331823.26523581],
+            [0.05, 65632741.17041597],
+            [0.25, 71331823.2652358],
             [0.5, 74999615.28968628],
             [0.75, 77874762.19816767],
             [0.95, 83770754.64749038]
@@ -109765,7 +109765,7 @@
         "values": {
           "2025Q2": [
             [0.05, 131214657.7047657],
-            [0.25, 136986388.319385],
+            [0.25, 136986388.31938502],
             [0.5, 142084777.7356099],
             [0.75, 146877609.17814955],
             [0.95, 153843283.77253836]
@@ -109774,7 +109774,7 @@
             [0.05, 128834640.07526098],
             [0.25, 140021727.15027767],
             [0.5, 147221467.0501249],
-            [0.75, 152865273.94455132],
+            [0.75, 152865273.94455135],
             [0.95, 164438888.7524811]
           ],
           "2025Q4": [
@@ -109790,21 +109790,21 @@
         "metric": "ebitda",
         "values": {
           "2025Q2": [
-            [0.05, 43220457.70476571],
-            [0.25, 48992188.31938501],
+            [0.05, 43220457.704765715],
+            [0.25, 48992188.31938502],
             [0.5, 54090577.735609874],
             [0.75, 58883409.17814955],
-            [0.95, 65849083.77253836]
+            [0.95, 65849083.77253837]
           ],
           "2025Q3": [
-            [0.05, 38904567.675260976],
-            [0.25, 50091654.75027767],
-            [0.5, 57291394.65012491],
-            [0.75, 62935201.54455132],
-            [0.95, 74508816.3524811]
+            [0.05, 38904567.67526098],
+            [0.25, 50091654.75027768],
+            [0.5, 57291394.650124915],
+            [0.75, 62935201.54455134],
+            [0.95, 74508816.35248111]
           ],
           "2025Q4": [
-            [0.05, 37886961.47057362],
+            [0.05, 37886961.47057363],
             [0.25, 51061955.91329761],
             [0.5, 59346704.2192073],
             [0.75, 69730866.11046778],
@@ -109816,21 +109816,21 @@
         "metric": "interest_coverage",
         "values": {
           "2025Q2": [
-            [0.05, 4.7300090511371495],
-            [0.25, 5.361662196375924],
+            [0.05, 4.73000905113715],
+            [0.25, 5.361662196375925],
             [0.5, 5.919625470381382],
             [0.75, 6.444148747266709],
-            [0.95, 7.206466076337987]
+            [0.95, 7.206466076337989]
           ],
           "2025Q3": [
-            [0.05, 4.360276567695262],
-            [0.25, 5.614082908408816],
+            [0.05, 4.360276567695263],
+            [0.25, 5.614082908408818],
             [0.5, 6.421002482502091],
-            [0.75, 7.053538979495805],
-            [0.95, 8.350665884279193]
+            [0.75, 7.053538979495807],
+            [0.95, 8.350665884279195]
           ],
           "2025Q4": [
-            [0.05, 4.195676796298296],
+            [0.05, 4.195676796298298],
             [0.25, 5.654701651527974],
             [0.5, 6.572171009878993],
             [0.75, 7.722133567050696],
@@ -109850,16 +109850,16 @@
           ],
           "2025Q3": [
             [0.05, 187794304.1904912],
-            [0.25, 206454400.11171088],
-            [0.5, 216514597.12144017],
+            [0.25, 206454400.1117109],
+            [0.5, 216514597.1214402],
             [0.75, 227110408.02339214],
-            [0.95, 242563796.49883395]
+            [0.95, 242563796.49883398]
           ],
           "2025Q4": [
-            [0.05, 172911021.3218612],
-            [0.25, 202824150.790439],
-            [0.5, 221984568.91677976],
-            [0.75, 240316910.92526478],
+            [0.05, 172911021.32186124],
+            [0.25, 202824150.79043904],
+            [0.5, 221984568.9167798],
+            [0.75, 240316910.9252648],
             [0.95, 275909597.8658849]
           ]
         }
@@ -109875,18 +109875,18 @@
             [0.95, 2.134792832354602]
           ],
           "2025Q3": [
-            [0.05, 1.690278798446863],
-            [0.25, 1.8052893627533593],
-            [0.5, 1.893636761960163],
-            [0.75, 1.9859109744849368],
+            [0.05, 1.6902787984468628],
+            [0.25, 1.805289362753359],
+            [0.5, 1.8936367619601628],
+            [0.75, 1.9859109744849364],
             [0.95, 2.183240249702429]
           ],
           "2025Q4": [
             [0.05, 1.558485122912271],
-            [0.25, 1.7893068350294485],
+            [0.25, 1.789306835029448],
             [0.5, 1.9370718030641827],
             [0.75, 2.1200631823808265],
-            [0.95, 2.486828192410455]
+            [0.95, 2.4868281924104547]
           ]
         }
       },
@@ -109894,23 +109894,23 @@
         "metric": "ebit",
         "values": {
           "2025Q2": [
-            [0.05, 30902657.704765704],
-            [0.25, 36674388.31938501],
+            [0.05, 30902657.70476571],
+            [0.25, 36674388.31938502],
             [0.5, 41772777.735609874],
             [0.75, 46565609.17814955],
-            [0.95, 53531283.77253836]
+            [0.95, 53531283.77253837]
           ],
           "2025Q3": [
-            [0.05, 26365047.275260977],
-            [0.25, 37552134.35027767],
-            [0.5, 44751874.25012491],
-            [0.75, 50395681.14455132],
-            [0.95, 61969295.9524811]
+            [0.05, 26365047.27526098],
+            [0.25, 37552134.350277685],
+            [0.5, 44751874.25012492],
+            [0.75, 50395681.14455134],
+            [0.95, 61969295.95248111]
           ],
           "2025Q4": [
-            [0.05, 25121729.703373615],
+            [0.05, 25121729.703373622],
             [0.25, 38296724.14609761],
-            [0.5, 46581472.4520073],
+            [0.5, 46581472.45200731],
             [0.75, 56965634.343267776],
             [0.95, 72481546.82871693]
           ]
@@ -109920,23 +109920,23 @@
         "metric": "ufcf",
         "values": {
           "2025Q2": [
-            [0.05, 25065040.80639163],
-            [0.25, 29001252.18498436],
+            [0.05, 25065040.806391634],
+            [0.25, 29001252.18498437],
             [0.5, 32478257.570823],
-            [0.75, 35746878.18385313],
-            [0.95, 40497336.82940375]
+            [0.75, 35746878.18385312],
+            [0.95, 40497336.829403765]
           ],
           "2025Q3": [
-            [0.05, 22013075.597062416],
-            [0.25, 29642457.905109175],
+            [0.05, 22013075.59706242],
+            [0.25, 29642457.905109186],
             [0.5, 34552544.67265594],
-            [0.75, 38401514.48773222],
-            [0.95, 46294501.41664961]
+            [0.75, 38401514.48773223],
+            [0.95, 46294501.41664962]
           ],
           "2025Q4": [
-            [0.05, 21207879.895208288],
+            [0.05, 21207879.89520829],
             [0.25, 30192977.520345245],
-            [0.5, 35843019.54896988],
+            [0.5, 35843019.54896989],
             [0.75, 42924822.03122668],
             [0.95, 53506381.593237236]
           ]
@@ -109946,23 +109946,23 @@
         "metric": "pretax_income",
         "values": {
           "2025Q2": [
-            [0.05, 21765157.704765704],
-            [0.25, 27536888.319385007],
-            [0.5, 32635277.735609874],
+            [0.05, 21765157.70476571],
+            [0.25, 27536888.31938502],
+            [0.5, 32635277.735609878],
             [0.75, 37428109.17814955],
-            [0.95, 44393783.77253836]
+            [0.95, 44393783.77253837]
           ],
           "2025Q3": [
-            [0.05, 17442547.275260977],
-            [0.25, 28629634.35027767],
-            [0.5, 35829374.25012491],
-            [0.75, 41473181.14455132],
-            [0.95, 53046795.9524811]
+            [0.05, 17442547.27526098],
+            [0.25, 28629634.35027768],
+            [0.5, 35829374.25012492],
+            [0.75, 41473181.14455134],
+            [0.95, 53046795.95248111]
           ],
           "2025Q4": [
-            [0.05, 16091729.703373617],
+            [0.05, 16091729.703373622],
             [0.25, 29266724.146097608],
-            [0.5, 37551472.4520073],
+            [0.5, 37551472.45200731],
             [0.75, 47935634.343267776],
             [0.95, 63451546.82871694]
           ]
@@ -109972,25 +109972,25 @@
         "metric": "taxes",
         "values": {
           "2025Q2": [
-            [0.05, 5114812.06061994],
-            [0.25, 6471168.755055476],
-            [0.5, 7669290.2678683195],
+            [0.05, 5114812.060619942],
+            [0.25, 6471168.75505548],
+            [0.5, 7669290.267868321],
             [0.75, 8795605.656865144],
-            [0.95, 10432539.186546514]
+            [0.95, 10432539.186546518]
           ],
           "2025Q3": [
-            [0.05, 4098998.6096863295],
-            [0.25, 6727964.072315251],
-            [0.5, 8419902.948779352],
-            [0.75, 9746197.568969559],
-            [0.95, 12465997.048833057]
+            [0.05, 4098998.60968633],
+            [0.25, 6727964.072315255],
+            [0.5, 8419902.948779354],
+            [0.75, 9746197.568969565],
+            [0.95, 12465997.048833061]
           ],
           "2025Q4": [
-            [0.05, 3781556.4802928],
+            [0.05, 3781556.4802928013],
             [0.25, 6877680.174332937],
-            [0.5, 8824596.026221715],
+            [0.5, 8824596.026221717],
             [0.75, 11264874.070667926],
-            [0.95, 14911113.50474848]
+            [0.95, 14911113.504748482]
           ]
         }
       },
@@ -109998,25 +109998,25 @@
         "metric": "free_cash_flow",
         "values": {
           "2025Q2": [
-            [0.05, 27212353.30639163],
-            [0.25, 31148564.68498436],
+            [0.05, 27212353.306391634],
+            [0.25, 31148564.68498437],
             [0.5, 34625570.070823],
-            [0.75, 37894190.68385313],
-            [0.95, 42644649.32940375]
+            [0.75, 37894190.68385312],
+            [0.95, 42644649.329403765]
           ],
           "2025Q3": [
-            [0.05, 24109863.097062416],
-            [0.25, 31739245.405109175],
+            [0.05, 24109863.09706242],
+            [0.25, 31739245.405109186],
             [0.5, 36649332.17265594],
-            [0.75, 40498301.98773222],
-            [0.95, 48391288.91664961]
+            [0.75, 40498301.98773223],
+            [0.95, 48391288.91664962]
           ],
           "2025Q4": [
-            [0.05, 23329929.895208288],
+            [0.05, 23329929.89520829],
             [0.25, 32315027.520345245],
-            [0.5, 37965069.54896988],
+            [0.5, 37965069.54896989],
             [0.75, 45046872.03122668],
-            [0.95, 55628431.59323725]
+            [0.95, 55628431.593237236]
           ]
         }
       },
@@ -110024,25 +110024,25 @@
         "metric": "net_income",
         "values": {
           "2025Q2": [
-            [0.05, 16650345.644145764],
-            [0.25, 21065719.56432953],
+            [0.05, 16650345.644145768],
+            [0.25, 21065719.564329542],
             [0.5, 24965987.467741556],
             [0.75, 28632503.52128441],
-            [0.95, 33961244.585991845]
+            [0.95, 33961244.58599185]
           ],
           "2025Q3": [
-            [0.05, 13343548.665574647],
-            [0.25, 21901670.27796242],
+            [0.05, 13343548.665574651],
+            [0.25, 21901670.277962428],
             [0.5, 27409471.301345557],
-            [0.75, 31726983.57558176],
-            [0.95, 40580798.90364804]
+            [0.75, 31726983.575581774],
+            [0.95, 40580798.90364805]
           ],
           "2025Q4": [
-            [0.05, 12310173.223080818],
-            [0.25, 22389043.971764673],
+            [0.05, 12310173.223080821],
+            [0.25, 22389043.97176467],
             [0.5, 28726876.425785586],
-            [0.75, 36670760.272599846],
-            [0.95, 48540433.323968455]
+            [0.75, 36670760.27259985],
+            [0.95, 48540433.32396846]
           ]
         }
       },
@@ -110050,23 +110050,23 @@
         "metric": "ebitda_margin_pct",
         "values": {
           "2025Q2": [
-            [0.05, 0.21821888327435965],
-            [0.25, 0.23693797708647085],
+            [0.05, 0.2182188832743597],
+            [0.25, 0.2369379770864709],
             [0.5, 0.2522086330465514],
             [0.75, 0.26559696074084493],
-            [0.95, 0.28356789606842814]
+            [0.95, 0.2835678960684282]
           ],
           "2025Q3": [
-            [0.05, 0.20005701187067843],
-            [0.25, 0.237004035420392],
+            [0.05, 0.20005701187067848],
+            [0.25, 0.23700403542039206],
             [0.5, 0.25781252205656946],
-            [0.75, 0.27275307982866426],
-            [0.95, 0.30018471097410926]
+            [0.75, 0.27275307982866437],
+            [0.95, 0.3001847109741093]
           ],
           "2025Q4": [
-            [0.05, 0.19338192731709047],
+            [0.05, 0.19338192731709053],
             [0.25, 0.23661203308090165],
-            [0.5, 0.25993937003002626],
+            [0.5, 0.2599393700300263],
             [0.75, 0.2858009050155676],
             [0.95, 0.3187930898802031]
           ]
@@ -110076,21 +110076,21 @@
         "metric": "gross_margin_pct",
         "values": {
           "2025Q2": [
-            [0.05, 0.6624999999999999],
+            [0.05, 0.6625],
             [0.25, 0.6625],
             [0.5, 0.6625],
-            [0.75, 0.6625],
+            [0.75, 0.6625000000000001],
             [0.95, 0.6625000000000001]
           ],
           "2025Q3": [
-            [0.05, 0.6624999999999999],
+            [0.05, 0.6625],
             [0.25, 0.6625],
             [0.5, 0.6625],
             [0.75, 0.6625],
             [0.95, 0.6625000000000001]
           ],
           "2025Q4": [
-            [0.05, 0.6624999999999999],
+            [0.05, 0.6625],
             [0.25, 0.6625],
             [0.5, 0.6625],
             [0.75, 0.6625],
@@ -110226,10 +110226,10 @@
           {
             "period": "2025Q3",
             "metric": "cogs",
-            "baseline": 74944647.5625,
+            "baseline": 74944647.56249999,
             "comparison": 67517320.5,
-            "abs_var": -7427327.0625,
-            "pct_var": -0.09910416959804887
+            "abs_var": -7427327.062499985,
+            "pct_var": -0.0991041695980487
           },
           {
             "period": "2025Q4",
@@ -110267,9 +110267,9 @@
             "period": "2025Q4",
             "metric": "gross_profit",
             "baseline": 153292337.269875,
-            "comparison": 129883319.50999999,
-            "abs_var": -23409017.759875,
-            "pct_var": -0.1527083360902955
+            "comparison": 129883319.51,
+            "abs_var": -23409017.759874985,
+            "pct_var": -0.15270833609029538
           },
           {
             "period": "2025Q1",
@@ -110322,18 +110322,18 @@
           {
             "period": "2025Q3",
             "metric": "ebitda",
-            "baseline": 57183495.037499964,
-            "comparison": 42603927.099999994,
-            "abs_var": -14579567.93749997,
-            "pct_var": -0.2549611199514639
+            "baseline": 57183495.03749998,
+            "comparison": 42603927.1,
+            "abs_var": -14579567.937499978,
+            "pct_var": -0.254961119951464
           },
           {
             "period": "2025Q4",
             "metric": "ebitda",
-            "baseline": 61383803.27707498,
-            "comparison": 37974785.51719998,
-            "abs_var": -23409017.759875,
-            "pct_var": -0.38135495863967706
+            "baseline": 61383803.27707497,
+            "comparison": 37974785.51719999,
+            "abs_var": -23409017.759874977,
+            "pct_var": -0.3813549586396767
           },
           {
             "period": "2025Q1",
@@ -110354,18 +110354,18 @@
           {
             "period": "2025Q3",
             "metric": "net_income",
-            "baseline": 27326928.097687475,
-            "comparison": 16173558.625499997,
-            "abs_var": -11153369.472187478,
-            "pct_var": -0.4081457466538775
+            "baseline": 27326928.097687487,
+            "comparison": 16173558.6255,
+            "abs_var": -11153369.472187487,
+            "pct_var": -0.40814574665387765
           },
           {
             "period": "2025Q4",
             "metric": "net_income",
-            "baseline": 30285257.205054358,
-            "comparison": 12377358.618749984,
-            "abs_var": -17907898.586304374,
-            "pct_var": -0.591307462408333
+            "baseline": 30285257.205054354,
+            "comparison": 12377358.618749993,
+            "abs_var": -17907898.58630436,
+            "pct_var": -0.5913074624083325
           }
         ]
       }
@@ -110421,17 +110421,17 @@
             "period": "2025Q2",
             "metric": "cogs",
             "baseline": 68895225,
-            "comparison": 66083175.00000001,
-            "abs_var": -2812049.9999999925,
-            "pct_var": -0.04081632653061214
+            "comparison": 66083175,
+            "abs_var": -2812050,
+            "pct_var": -0.04081632653061224
           },
           {
             "period": "2025Q3",
             "metric": "cogs",
             "baseline": 67517320.5,
-            "comparison": 62118184.50000001,
-            "abs_var": -5399135.999999993,
-            "pct_var": -0.07996668054977082
+            "comparison": 62118184.5,
+            "abs_var": -5399136,
+            "pct_var": -0.07996668054977094
           },
           {
             "period": "2025Q4",
@@ -110468,10 +110468,10 @@
           {
             "period": "2025Q4",
             "metric": "gross_profit",
-            "baseline": 129883319.50999999,
-            "comparison": 114619553.76999998,
+            "baseline": 129883319.51,
+            "comparison": 114619553.77,
             "abs_var": -15263765.74000001,
-            "pct_var": -0.11751906093549465
+            "pct_var": -0.11751906093549463
           },
           {
             "period": "2025Q1",
@@ -110524,18 +110524,18 @@
           {
             "period": "2025Q3",
             "metric": "ebitda",
-            "baseline": 42603927.099999994,
+            "baseline": 42603927.1,
             "comparison": 28809935.5,
-            "abs_var": -13793991.599999994,
-            "pct_var": -0.3237727725808637
+            "abs_var": -13793991.600000001,
+            "pct_var": -0.32377277258086384
           },
           {
             "period": "2025Q4",
             "metric": "ebitda",
-            "baseline": 37974785.51719998,
-            "comparison": 17768763.369999975,
-            "abs_var": -20206022.147200003,
-            "pct_var": -0.5320904877276544
+            "baseline": 37974785.51719999,
+            "comparison": 17768763.37,
+            "abs_var": -20206022.147199992,
+            "pct_var": -0.5320904877276539
           },
           {
             "period": "2025Q1",
@@ -110556,18 +110556,18 @@
           {
             "period": "2025Q3",
             "metric": "net_income",
-            "baseline": 16173558.625499997,
+            "baseline": 16173558.6255,
             "comparison": 5621155.0515,
-            "abs_var": -10552403.573999997,
+            "abs_var": -10552403.574,
             "pct_var": -0.6524478513567558
           },
           {
             "period": "2025Q4",
             "metric": "net_income",
-            "baseline": 12377358.618749984,
-            "comparison": -3080248.32385802,
-            "abs_var": -15457606.942608003,
-            "pct_var": -1.2488615235880673
+            "baseline": 12377358.618749993,
+            "comparison": -3080248.323858,
+            "abs_var": -15457606.942607993,
+            "pct_var": -1.2488615235880658
           }
         ]
       }
@@ -112794,7 +112794,7 @@
           "currency": "USD"
         },
         "period": "2025Q3",
-        "base_value": 57183495.037499964,
+        "base_value": 57183495.03749998,
         "adjustments": [
           {
             "adjustment_id": "restructuring",
@@ -112802,7 +112802,7 @@
             "raw_amount": 0,
             "capped_amount": 0,
             "is_capped": false,
-            "adjusted_value": 57183495.037499964
+            "adjusted_value": 57183495.03749998
           },
           {
             "adjustment_id": "run_rate_synergies",
@@ -112810,7 +112810,7 @@
             "raw_amount": 5551455.375,
             "capped_amount": 5551455.375,
             "is_capped": false,
-            "adjusted_value": 62734950.412499964
+            "adjusted_value": 62734950.41249998
           },
           {
             "adjustment_id": "management_fees",
@@ -112818,7 +112818,7 @@
             "raw_amount": 0,
             "capped_amount": 0,
             "is_capped": false,
-            "adjusted_value": 62734950.412499964
+            "adjusted_value": 62734950.41249998
           },
           {
             "adjustment_id": "one_time_gain",
@@ -112826,10 +112826,10 @@
             "raw_amount": 0,
             "capped_amount": 0,
             "is_capped": false,
-            "adjusted_value": 62734950.412499964
+            "adjusted_value": 62734950.41249998
           }
         ],
-        "final_value": 62734950.412499964
+        "final_value": 62734950.41249998
       },
       {
         "value_type": {
@@ -112837,7 +112837,7 @@
           "currency": "USD"
         },
         "period": "2025Q4",
-        "base_value": 61383803.27707498,
+        "base_value": 61383803.27707497,
         "adjustments": [
           {
             "adjustment_id": "restructuring",
@@ -112845,7 +112845,7 @@
             "raw_amount": 0,
             "capped_amount": 0,
             "is_capped": false,
-            "adjusted_value": 61383803.27707498
+            "adjusted_value": 61383803.27707497
           },
           {
             "adjustment_id": "run_rate_synergies",
@@ -112853,7 +112853,7 @@
             "raw_amount": 5784616.50075,
             "capped_amount": 5784616.50075,
             "is_capped": false,
-            "adjusted_value": 67168419.77782498
+            "adjusted_value": 67168419.77782497
           },
           {
             "adjustment_id": "management_fees",
@@ -112861,7 +112861,7 @@
             "raw_amount": 0,
             "capped_amount": 0,
             "is_capped": false,
-            "adjusted_value": 67168419.77782498
+            "adjusted_value": 67168419.77782497
           },
           {
             "adjustment_id": "one_time_gain",
@@ -112869,10 +112869,10 @@
             "raw_amount": 0,
             "capped_amount": 0,
             "is_capped": false,
-            "adjusted_value": 67168419.77782498
+            "adjusted_value": 67168419.77782497
           }
         ],
-        "final_value": 67168419.77782498
+        "final_value": 67168419.77782497
       }
     ],
     "errors": {
@@ -116237,7 +116237,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "12213201.825",
+                  "amount": "12213201.82499999835",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116245,7 +116245,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "12726156.301649999",
+                  "amount": "12726156.30164999835",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116303,7 +116303,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "74944647.5625",
+                  "amount": "74944647.562499989875",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116311,7 +116311,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "78092322.760125",
+                  "amount": "78092322.760124989875",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116369,7 +116369,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "147113567.43749997",
+                  "amount": "147113567.437499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116377,7 +116377,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "153292337.269875",
+                  "amount": "153292337.269874980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116435,7 +116435,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "57183495.037499964",
+                  "amount": "57183495.037499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116443,7 +116443,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "61383803.27707498",
+                  "amount": "61383803.277074970125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116482,12 +116482,12 @@
               },
               "2025Q3": {
                 "status": "value",
-                "value": 6.408909502661806,
+                "value": 6.408909502661808,
                 "source": "formula"
               },
               "2025Q4": {
                 "status": "value",
-                "value": 6.7977633750913595,
+                "value": 6.797763375091359,
                 "source": "formula"
               }
             },
@@ -116642,7 +116642,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "44643974.637499966",
+                  "amount": "44643974.637499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116650,7 +116650,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "48618571.50987498",
+                  "amount": "48618571.509874970125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116708,7 +116708,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "34478959.17268747",
+                  "amount": "34478959.172687486445625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116716,7 +116716,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "37232282.67060436",
+                  "amount": "37232282.670604353795625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116774,7 +116774,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "35721474.637499966",
+                  "amount": "35721474.637499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116782,7 +116782,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "39588571.50987498",
+                  "amount": "39588571.509874970125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116840,7 +116840,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "8394546.539812492",
+                  "amount": "8394546.539812495329375",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116848,7 +116848,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "9303314.30482062",
+                  "amount": "9303314.304820617979375",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116906,7 +116906,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "36575746.67268747",
+                  "amount": "36575746.672687486445625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116914,7 +116914,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "39354332.67060436",
+                  "amount": "39354332.670604353795625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116972,7 +116972,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "27326928.097687475",
+                  "amount": "27326928.097687484795625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -116980,7 +116980,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "30285257.205054358",
+                  "amount": "30285257.205054352145625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -117019,7 +117019,7 @@
               },
               "2025Q3": {
                 "status": "value",
-                "value": 0.2575157826856348,
+                "value": 0.25751578268563485,
                 "source": "formula"
               },
               "2025Q4": {
@@ -118640,7 +118640,7 @@
               "type": "nullable_float64",
               "values": [
                 63840000, 66100000, 68130000, 72930000, 70820000, 72410287.5,
-                74944647.5625, 78092322.760125
+                74944647.56249999, 78092322.760125
               ]
             },
             "role": "measure",
@@ -118670,7 +118670,7 @@
               "type": "nullable_float64",
               "values": [
                 40160000, 45000000, 47770000, 54370000, 51380000, 54144512.5,
-                57183495.037499964, 61383803.27707498
+                57183495.03749998, 61383803.27707497
               ]
             },
             "role": "measure",
@@ -118686,7 +118686,7 @@
               "values": [
                 4.500980666853461, 4.924760601915184, 5.10772520716386,
                 5.985413513141599, 5.656254300261456, 5.92552804377565,
-                6.408909502661806, 6.7977633750913595
+                6.408909502661808, 6.797763375091359
               ]
             },
             "role": "measure",
@@ -118741,7 +118741,7 @@
               "type": "nullable_float64",
               "values": [
                 28960000, 33600000, 36120000, 42470000, 39280000, 41826712.5,
-                44643974.637499966, 48618571.50987498
+                44643974.63749998, 48618571.50987497
               ]
             },
             "role": "measure",
@@ -118756,7 +118756,7 @@
               "type": "nullable_float64",
               "values": [
                 23322400, 26566000, 28292800, 32592050, 30692700, 32515040.0625,
-                34478959.17268747, 37232282.67060436
+                34478959.172687486, 37232282.670604356
               ]
             },
             "role": "measure",
@@ -118771,7 +118771,7 @@
               "type": "nullable_float64",
               "values": [
                 20037500, 24462500, 26767500, 33386250, 30196250, 32689212.5,
-                35721474.637499966, 39588571.50987498
+                35721474.63749998, 39588571.50987497
               ]
             },
             "role": "measure",
@@ -118786,7 +118786,7 @@
               "type": "nullable_float64",
               "values": [
                 4708812.5, 5748687.5, 6290362.5, 7845768.75, 7096118.75,
-                7681964.9375, 8394546.539812492, 9303314.30482062
+                7681964.9375, 8394546.539812496, 9303314.304820618
               ]
             },
             "role": "measure",
@@ -118801,7 +118801,7 @@
               "type": "nullable_float64",
               "values": [
                 25419187.5, 28713312.5, 30490637.5, 34726731.25, 32827381.25,
-                34662352.5625, 36575746.67268747, 39354332.67060436
+                34662352.5625, 36575746.672687486, 39354332.670604356
               ]
             },
             "role": "measure",
@@ -118816,7 +118816,7 @@
               "type": "nullable_float64",
               "values": [
                 15328687.5, 18713812.5, 20477137.5, 25540481.25, 23100131.25,
-                25007247.5625, 27326928.097687475, 30285257.205054358
+                25007247.5625, 27326928.097687487, 30285257.205054354
               ]
             },
             "role": "measure",
@@ -118832,7 +118832,7 @@
               "values": [
                 0.22017543859649122, 0.2348643006263048, 0.2390890890890891,
                 0.25347319347319347, 0.24666346615458473, 0.252364320038779,
-                0.2575157826856348, 0.26528899223101615
+                0.25751578268563485, 0.26528899223101615
               ]
             },
             "role": "measure",
@@ -119633,7 +119633,7 @@
                 72930000,
                 70820000,
                 72410287.5,
-                74944647.5625,
+                74944647.56249999,
                 78092322.760125,
                 118560000,
                 125500000,
@@ -119649,16 +119649,16 @@
                 54370000,
                 51380000,
                 54144512.5,
-                57183495.037499964,
-                61383803.27707498,
+                57183495.03749998,
+                61383803.27707497,
                 4.500980666853461,
                 4.924760601915184,
                 5.10772520716386,
                 5.985413513141599,
                 5.656254300261456,
                 5.92552804377565,
-                6.408909502661806,
-                6.7977633750913595,
+                6.408909502661808,
+                6.797763375091359,
                 null,
                 null,
                 null,
@@ -119681,55 +119681,55 @@
                 42470000,
                 39280000,
                 41826712.5,
-                44643974.637499966,
-                48618571.50987498,
+                44643974.63749998,
+                48618571.50987497,
                 23322400,
                 26566000,
                 28292800,
                 32592050,
                 30692700,
                 32515040.0625,
-                34478959.17268747,
-                37232282.67060436,
+                34478959.172687486,
+                37232282.670604356,
                 20037500,
                 24462500,
                 26767500,
                 33386250,
                 30196250,
                 32689212.5,
-                35721474.637499966,
-                39588571.50987498,
+                35721474.63749998,
+                39588571.50987497,
                 4708812.5,
                 5748687.5,
                 6290362.5,
                 7845768.75,
                 7096118.75,
                 7681964.9375,
-                8394546.539812492,
-                9303314.30482062,
+                8394546.539812496,
+                9303314.304820618,
                 25419187.5,
                 28713312.5,
                 30490637.5,
                 34726731.25,
                 32827381.25,
                 34662352.5625,
-                36575746.67268747,
-                39354332.67060436,
+                36575746.672687486,
+                39354332.670604356,
                 15328687.5,
                 18713812.5,
                 20477137.5,
                 25540481.25,
                 23100131.25,
                 25007247.5625,
-                27326928.097687475,
-                30285257.205054358,
+                27326928.097687487,
+                30285257.205054354,
                 0.22017543859649122,
                 0.2348643006263048,
                 0.2390890890890891,
                 0.25347319347319347,
                 0.24666346615458473,
                 0.252364320038779,
-                0.2575157826856348,
+                0.25751578268563485,
                 0.26528899223101615,
                 0.65,
                 0.6550104384133612,
@@ -119842,32 +119842,32 @@
                 "11797500",
                 "11456500",
                 "11800195",
-                "12213201.825",
-                "12726156.301649999",
+                "12213201.82499999835",
+                "12726156.30164999835",
                 "63840000",
                 "66100000",
                 "68130000",
                 "72930000",
                 "70820000",
                 "72410287.5",
-                "74944647.5625",
-                "78092322.760125",
+                "74944647.562499989875",
+                "78092322.760124989875",
                 "118560000",
                 "125500000",
                 "131670000",
                 "141570000",
                 "137480000",
                 "142138712.5",
-                "147113567.43749997",
-                "153292337.269875",
+                "147113567.437499980125",
+                "153292337.269874980125",
                 "40160000",
                 "45000000",
                 "47770000",
                 "54370000",
                 "51380000",
                 "54144512.5",
-                "57183495.037499964",
-                "61383803.27707498",
+                "57183495.037499980125",
+                "61383803.277074970125",
                 null,
                 null,
                 null,
@@ -119898,48 +119898,48 @@
                 "42470000",
                 "39280000",
                 "41826712.5",
-                "44643974.637499966",
-                "48618571.50987498",
+                "44643974.637499980125",
+                "48618571.509874970125",
                 "23322400",
                 "26566000",
                 "28292800",
                 "32592050",
                 "30692700",
                 "32515040.0625",
-                "34478959.17268747",
-                "37232282.67060436",
+                "34478959.172687486445625",
+                "37232282.670604353795625",
                 "20037500",
                 "24462500",
                 "26767500",
                 "33386250",
                 "30196250",
                 "32689212.5",
-                "35721474.637499966",
-                "39588571.50987498",
+                "35721474.637499980125",
+                "39588571.509874970125",
                 "4708812.5",
                 "5748687.5",
                 "6290362.5",
                 "7845768.75",
                 "7096118.75",
                 "7681964.9375",
-                "8394546.539812492",
-                "9303314.30482062",
+                "8394546.539812495329375",
+                "9303314.304820617979375",
                 "25419187.5",
                 "28713312.5",
                 "30490637.5",
                 "34726731.25",
                 "32827381.25",
                 "34662352.5625",
-                "36575746.67268747",
-                "39354332.67060436",
+                "36575746.672687486445625",
+                "39354332.670604353795625",
                 "15328687.5",
                 "18713812.5",
                 "20477137.5",
                 "25540481.25",
                 "23100131.25",
                 "25007247.5625",
-                "27326928.097687475",
-                "30285257.205054358",
+                "27326928.097687484795625",
+                "30285257.205054352145625",
                 null,
                 null,
                 null,
@@ -121048,7 +121048,7 @@
               "type": "nullable_float64",
               "values": [
                 63840000, 66100000, 68130000, 72930000, 70820000, 72410287.5,
-                74944647.5625, 78092322.760125
+                74944647.56249999, 78092322.760125
               ]
             },
             "role": "measure",
@@ -121078,7 +121078,7 @@
               "type": "nullable_float64",
               "values": [
                 40160000, 45000000, 47770000, 54370000, 51380000, 54144512.5,
-                57183495.037499964, 61383803.27707498
+                57183495.03749998, 61383803.27707497
               ]
             },
             "role": "measure",
@@ -121094,7 +121094,7 @@
               "values": [
                 4.500980666853461, 4.924760601915184, 5.10772520716386,
                 5.985413513141599, 5.656254300261456, 5.92552804377565,
-                6.408909502661806, 6.7977633750913595
+                6.408909502661808, 6.797763375091359
               ]
             },
             "role": "measure",
@@ -121149,7 +121149,7 @@
               "type": "nullable_float64",
               "values": [
                 28960000, 33600000, 36120000, 42470000, 39280000, 41826712.5,
-                44643974.637499966, 48618571.50987498
+                44643974.63749998, 48618571.50987497
               ]
             },
             "role": "measure",
@@ -121164,7 +121164,7 @@
               "type": "nullable_float64",
               "values": [
                 23322400, 26566000, 28292800, 32592050, 30692700, 32515040.0625,
-                34478959.17268747, 37232282.67060436
+                34478959.172687486, 37232282.670604356
               ]
             },
             "role": "measure",
@@ -121179,7 +121179,7 @@
               "type": "nullable_float64",
               "values": [
                 20037500, 24462500, 26767500, 33386250, 30196250, 32689212.5,
-                35721474.637499966, 39588571.50987498
+                35721474.63749998, 39588571.50987497
               ]
             },
             "role": "measure",
@@ -121194,7 +121194,7 @@
               "type": "nullable_float64",
               "values": [
                 4708812.5, 5748687.5, 6290362.5, 7845768.75, 7096118.75,
-                7681964.9375, 8394546.539812492, 9303314.30482062
+                7681964.9375, 8394546.539812496, 9303314.304820618
               ]
             },
             "role": "measure",
@@ -121209,7 +121209,7 @@
               "type": "nullable_float64",
               "values": [
                 25419187.5, 28713312.5, 30490637.5, 34726731.25, 32827381.25,
-                34662352.5625, 36575746.67268747, 39354332.67060436
+                34662352.5625, 36575746.672687486, 39354332.670604356
               ]
             },
             "role": "measure",
@@ -121224,7 +121224,7 @@
               "type": "nullable_float64",
               "values": [
                 15328687.5, 18713812.5, 20477137.5, 25540481.25, 23100131.25,
-                25007247.5625, 27326928.097687475, 30285257.205054358
+                25007247.5625, 27326928.097687487, 30285257.205054354
               ]
             },
             "role": "measure",
@@ -121240,7 +121240,7 @@
               "values": [
                 0.22017543859649122, 0.2348643006263048, 0.2390890890890891,
                 0.25347319347319347, 0.24666346615458473, 0.252364320038779,
-                0.2575157826856348, 0.26528899223101615
+                0.25751578268563485, 0.26528899223101615
               ]
             },
             "role": "measure",
@@ -122073,7 +122073,7 @@
                 72930000,
                 70820000,
                 72410287.5,
-                74944647.5625,
+                74944647.56249999,
                 78092322.760125,
                 118560000,
                 125500000,
@@ -122089,16 +122089,16 @@
                 54370000,
                 51380000,
                 54144512.5,
-                57183495.037499964,
-                61383803.27707498,
+                57183495.03749998,
+                61383803.27707497,
                 4.500980666853461,
                 4.924760601915184,
                 5.10772520716386,
                 5.985413513141599,
                 5.656254300261456,
                 5.92552804377565,
-                6.408909502661806,
-                6.7977633750913595,
+                6.408909502661808,
+                6.797763375091359,
                 null,
                 null,
                 null,
@@ -122121,55 +122121,55 @@
                 42470000,
                 39280000,
                 41826712.5,
-                44643974.637499966,
-                48618571.50987498,
+                44643974.63749998,
+                48618571.50987497,
                 23322400,
                 26566000,
                 28292800,
                 32592050,
                 30692700,
                 32515040.0625,
-                34478959.17268747,
-                37232282.67060436,
+                34478959.172687486,
+                37232282.670604356,
                 20037500,
                 24462500,
                 26767500,
                 33386250,
                 30196250,
                 32689212.5,
-                35721474.637499966,
-                39588571.50987498,
+                35721474.63749998,
+                39588571.50987497,
                 4708812.5,
                 5748687.5,
                 6290362.5,
                 7845768.75,
                 7096118.75,
                 7681964.9375,
-                8394546.539812492,
-                9303314.30482062,
+                8394546.539812496,
+                9303314.304820618,
                 25419187.5,
                 28713312.5,
                 30490637.5,
                 34726731.25,
                 32827381.25,
                 34662352.5625,
-                36575746.67268747,
-                39354332.67060436,
+                36575746.672687486,
+                39354332.670604356,
                 15328687.5,
                 18713812.5,
                 20477137.5,
                 25540481.25,
                 23100131.25,
                 25007247.5625,
-                27326928.097687475,
-                30285257.205054358,
+                27326928.097687487,
+                30285257.205054354,
                 0.22017543859649122,
                 0.2348643006263048,
                 0.2390890890890891,
                 0.25347319347319347,
                 0.24666346615458473,
                 0.252364320038779,
-                0.2575157826856348,
+                0.25751578268563485,
                 0.26528899223101615,
                 0.65,
                 0.6550104384133612,
@@ -122290,32 +122290,32 @@
                 "11797500",
                 "11456500",
                 "11800195",
-                "12213201.825",
-                "12726156.301649999",
+                "12213201.82499999835",
+                "12726156.30164999835",
                 "63840000",
                 "66100000",
                 "68130000",
                 "72930000",
                 "70820000",
                 "72410287.5",
-                "74944647.5625",
-                "78092322.760125",
+                "74944647.562499989875",
+                "78092322.760124989875",
                 "118560000",
                 "125500000",
                 "131670000",
                 "141570000",
                 "137480000",
                 "142138712.5",
-                "147113567.43749997",
-                "153292337.269875",
+                "147113567.437499980125",
+                "153292337.269874980125",
                 "40160000",
                 "45000000",
                 "47770000",
                 "54370000",
                 "51380000",
                 "54144512.5",
-                "57183495.037499964",
-                "61383803.27707498",
+                "57183495.037499980125",
+                "61383803.277074970125",
                 null,
                 null,
                 null,
@@ -122346,48 +122346,48 @@
                 "42470000",
                 "39280000",
                 "41826712.5",
-                "44643974.637499966",
-                "48618571.50987498",
+                "44643974.637499980125",
+                "48618571.509874970125",
                 "23322400",
                 "26566000",
                 "28292800",
                 "32592050",
                 "30692700",
                 "32515040.0625",
-                "34478959.17268747",
-                "37232282.67060436",
+                "34478959.172687486445625",
+                "37232282.670604353795625",
                 "20037500",
                 "24462500",
                 "26767500",
                 "33386250",
                 "30196250",
                 "32689212.5",
-                "35721474.637499966",
-                "39588571.50987498",
+                "35721474.637499980125",
+                "39588571.509874970125",
                 "4708812.5",
                 "5748687.5",
                 "6290362.5",
                 "7845768.75",
                 "7096118.75",
                 "7681964.9375",
-                "8394546.539812492",
-                "9303314.30482062",
+                "8394546.539812495329375",
+                "9303314.304820617979375",
                 "25419187.5",
                 "28713312.5",
                 "30490637.5",
                 "34726731.25",
                 "32827381.25",
                 "34662352.5625",
-                "36575746.67268747",
-                "39354332.67060436",
+                "36575746.672687486445625",
+                "39354332.670604353795625",
                 "15328687.5",
                 "18713812.5",
                 "20477137.5",
                 "25540481.25",
                 "23100131.25",
                 "25007247.5625",
-                "27326928.097687475",
-                "30285257.205054358",
+                "27326928.097687484795625",
+                "30285257.205054352145625",
                 null,
                 null,
                 null,
@@ -123582,10 +123582,10 @@
           "covenant_type": "Interest Coverage >= 3.00x",
           "covenant_id": "min_interest_coverage",
           "passed": true,
-          "actual_value": 6.408909502661806,
+          "actual_value": 6.408909502661808,
           "threshold": 3,
           "details": null,
-          "headroom": 1.1363031675539352,
+          "headroom": 1.136303167553936,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -123631,10 +123631,10 @@
           "covenant_type": "Interest Coverage >= 3.00x",
           "covenant_id": "min_interest_coverage",
           "passed": true,
-          "actual_value": 6.7977633750913595,
+          "actual_value": 6.797763375091359,
           "threshold": 3,
           "details": null,
-          "headroom": 1.2659211250304532,
+          "headroom": 1.265921125030453,
           "meta": {
             "numeric_mode": "f64",
             "rounding": {
@@ -123869,9 +123869,9 @@
         "covenant_id": "min_interest_coverage",
         "covenant_description": "Interest Coverage >= 5.50x",
         "breach_date": "2025-09-30",
-        "projected_value": 6.408909502661806,
+        "projected_value": 6.408909502661808,
         "threshold": 5.5,
-        "headroom": 0.16525627321123745,
+        "headroom": 0.16525627321123776,
         "breach_probability": 0.3755
       },
       {
@@ -123887,9 +123887,9 @@
         "covenant_id": "min_interest_coverage",
         "covenant_description": "Interest Coverage >= 5.50x",
         "breach_date": "2025-12-31",
-        "projected_value": 6.7977633750913595,
+        "projected_value": 6.797763375091359,
         "threshold": 5.5,
-        "headroom": 0.2359569772893381,
+        "headroom": 0.23595697728933793,
         "breach_probability": 0.3275
       }
     ]

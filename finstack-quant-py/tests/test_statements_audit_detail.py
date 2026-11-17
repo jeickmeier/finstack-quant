@@ -39,7 +39,7 @@ def _mixed_result() -> StatementResult:
     mixed.formula("123")
     builder = mixed.build()
     builder.compute("masked", "42")
-    builder.where_clause("masked", "0")
+    builder.where_clause("masked", "1 == 0")
     return Evaluator().evaluate(builder.build())
 
 

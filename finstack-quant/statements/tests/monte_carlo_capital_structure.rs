@@ -92,7 +92,8 @@ fn levered_model(
     builder
         .compute(
             "coverage",
-            "cs.debt_balance.total / cs.interest_expense.total",
+            "if(sign(cs.interest_expense.total) > 0, \
+             cs.debt_balance.total / cs.interest_expense.total, 0)",
         )
         .expect("valid formula");
     builder.add_debt("TL-001", term_loan());

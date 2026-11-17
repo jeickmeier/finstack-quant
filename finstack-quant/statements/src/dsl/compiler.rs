@@ -13,6 +13,9 @@ enum Dimension {
     Unknown,
     Scalar,
     Monetary(finstack_quant_core::currency::Currency),
+    /// The result of a comparison, a logical operator or `is_missing`. A
+    /// node whose formula is Boolean stores the scalar `1` or `0`.
+    Boolean,
 }
 
 /// Compile a [`StmtExpr`] into a core [`Expr`].
@@ -107,9 +110,19 @@ pub(crate) fn infer_value_type(
 ) -> Result<Option<NodeValueType>> {
     Ok(match context.infer(ast)? {
         Dimension::Unknown => None,
-        Dimension::Scalar => Some(NodeValueType::Scalar),
+        Dimension::Scalar | Dimension::Boolean => Some(NodeValueType::Scalar),
         Dimension::Monetary(currency) => Some(NodeValueType::Monetary { currency }),
     })
+}
+
+/// Whether `ast` is a Boolean expression: a comparison, a logical operator
+/// or `is_missing`, possibly selected by `if` or `coalesce`.
+///
+/// # Errors
+///
+/// Returns a build error for an operation the unit rules reject.
+pub(crate) fn is_boolean(ast: &StmtExpr, context: UnitContext<'_>) -> Result<bool> {
+    Ok(context.infer(ast)? == Dimension::Boolean)
 }
 
 /// Whether `ast` reads a capital-structure reference whose currency is not
@@ -161,8 +174,11 @@ impl UnitContext<'_> {
             StmtExpr::UnaryOp { op, operand } => {
                 let dim = self.infer(operand)?;
                 match op {
-                    UnaryOp::Neg => Ok(dim),
-                    UnaryOp::Not => require_scalar_arguments("logical negation", &[dim]),
+                    UnaryOp::Neg => {
+                        reject_boolean("negation", &[dim])?;
+                        Ok(dim)
+                    }
+                    UnaryOp::Not => require_boolean("logical negation", &[dim]),
                 }
             }
             StmtExpr::BinOp { op, left, right } => {
@@ -177,7 +193,7 @@ impl UnitContext<'_> {
                 else_expr,
             } => {
                 let condition = self.infer(condition)?;
-                require_scalar_arguments("if condition", &[condition])?;
+                require_boolean("if condition", &[condition])?;
                 let then_dim = self.infer(then_expr)?;
                 let else_dim = self.infer(else_expr)?;
                 self.compatible("if branches", then_dim, else_dim)
@@ -187,15 +203,29 @@ impl UnitContext<'_> {
 
     fn bin_op(self, op: BinOp, left: Dimension, right: Dimension) -> Result<Dimension> {
         match op {
-            BinOp::Add | BinOp::Sub => self.compatible("arithmetic operands", left, right),
-            BinOp::Mul => multiply_dimensions(left, right),
-            BinOp::Div => divide_dimensions(left, right),
-            BinOp::Mod => require_scalar_arguments("modulo", &[left, right]),
-            BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => {
-                self.compatible("comparison operands", left, right)?;
-                Ok(Dimension::Scalar)
+            BinOp::Add | BinOp::Sub => {
+                reject_boolean("arithmetic operands", &[left, right])?;
+                self.compatible("arithmetic operands", left, right)
             }
-            BinOp::And | BinOp::Or => require_scalar_arguments("logical operands", &[left, right]),
+            BinOp::Mul => {
+                reject_boolean("multiplication", &[left, right])?;
+                multiply_dimensions(left, right)
+            }
+            BinOp::Div => {
+                reject_boolean("division", &[left, right])?;
+                divide_dimensions(left, right)
+            }
+            BinOp::Mod => require_scalar_arguments("modulo", &[left, right]),
+            BinOp::Eq | BinOp::Ne => {
+                self.compatible("comparison operands", left, right)?;
+                Ok(Dimension::Boolean)
+            }
+            BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => {
+                reject_boolean("ordered comparison", &[left, right])?;
+                self.compatible("comparison operands", left, right)?;
+                Ok(Dimension::Boolean)
+            }
+            BinOp::And | BinOp::Or => require_boolean("logical operands", &[left, right]),
         }
     }
 
@@ -209,6 +239,10 @@ impl UnitContext<'_> {
                 Dimension::Unknown
             }),
             (Dimension::Scalar, Dimension::Scalar) => Ok(Dimension::Scalar),
+            (Dimension::Boolean, Dimension::Boolean) => Ok(Dimension::Boolean),
+            (Dimension::Boolean, _) | (_, Dimension::Boolean) => Err(crate::error::Error::build(
+                format!("Dimensional mismatch in {context}: cannot combine a Boolean and a number"),
+            )),
             (Dimension::Monetary(lhs), Dimension::Monetary(rhs)) if lhs == rhs => {
                 Ok(Dimension::Monetary(lhs))
             }
@@ -230,6 +264,11 @@ impl UnitContext<'_> {
             .map(|arg| self.infer(arg))
             .collect::<Result<Vec<_>>>()?;
         let auxiliary_dims = arg_dims.get(1..).unwrap_or_default();
+        // `coalesce` may select between Boolean alternatives and `is_missing`
+        // may test one. Every other function takes numbers.
+        if !matches!(func, "coalesce" | "is_missing") {
+            reject_boolean(func, &arg_dims)?;
+        }
         match func {
             // Value-variadic: every argument is a value carried in the same
             // units, so a mismatch between them is a modelling error.
@@ -266,10 +305,11 @@ impl UnitContext<'_> {
             }
             // Ratios, counts, signs and predicates remove the leading
             // argument's units. Their offsets, windows and flags are scalar.
-            "sign" | "pct_change" | "rolling_count" | "growth_rate" | "is_missing" => {
+            "sign" | "pct_change" | "rolling_count" | "growth_rate" => {
                 require_scalar_arguments(func, auxiliary_dims)?;
                 Ok(Dimension::Scalar)
             }
+            "is_missing" => Ok(Dimension::Boolean),
             // Products, rate compounding and nonlinear math cannot turn money
             // into a dimensionless output by dropping its currency tag.
             "cumprod" | "annualize_rate" | "pow" | "ln" | "exp" | "log10" | "sqrt" => {
@@ -308,9 +348,10 @@ fn multiply_dimensions(left: Dimension, right: Dimension) -> Result<Dimension> {
             format!("Dimensional mismatch in multiplication: cannot multiply {lhs} by {rhs}"),
         )),
         (Dimension::Unknown, _) | (_, Dimension::Unknown) => Ok(Dimension::Unknown),
-        (Dimension::Scalar, Dimension::Scalar) => Ok(Dimension::Scalar),
         (Dimension::Scalar, Dimension::Monetary(ccy))
         | (Dimension::Monetary(ccy), Dimension::Scalar) => Ok(Dimension::Monetary(ccy)),
+        // Booleans are rejected before this rule runs.
+        _ => Ok(Dimension::Scalar),
     }
 }
 
@@ -325,13 +366,43 @@ fn divide_dimensions(left: Dimension, right: Dimension) -> Result<Dimension> {
             )))
         }
         (Dimension::Unknown, _) | (_, Dimension::Unknown) => Ok(Dimension::Unknown),
-        (Dimension::Scalar, Dimension::Scalar)
-        | (Dimension::Monetary(_), Dimension::Monetary(_)) => Ok(Dimension::Scalar),
         (Dimension::Monetary(ccy), Dimension::Scalar) => Ok(Dimension::Monetary(ccy)),
+        // Booleans are rejected before this rule runs.
+        _ => Ok(Dimension::Scalar),
     }
 }
 
+/// Reject a Boolean where a number is required.
+fn reject_boolean(context: &str, dimensions: &[Dimension]) -> Result<()> {
+    if dimensions.contains(&Dimension::Boolean) {
+        return Err(crate::error::Error::build(format!(
+            "Type mismatch in {context}: a Boolean is not a number; select a number with if()"
+        )));
+    }
+    Ok(())
+}
+
+/// Operands that must be Boolean: the condition of `if` and the operands of
+/// `and`, `or` and `not`.
+fn require_boolean(context: &str, dimensions: &[Dimension]) -> Result<Dimension> {
+    if dimensions
+        .iter()
+        .any(|dimension| matches!(dimension, Dimension::Scalar | Dimension::Monetary(_)))
+    {
+        return Err(crate::error::Error::build(format!(
+            "Type mismatch in {context}: operands must be Boolean (a comparison, a logical \
+             operator or is_missing)"
+        )));
+    }
+    Ok(if dimensions.contains(&Dimension::Unknown) {
+        Dimension::Unknown
+    } else {
+        Dimension::Boolean
+    })
+}
+
 fn require_scalar_arguments(context: &str, dimensions: &[Dimension]) -> Result<Dimension> {
+    reject_boolean(context, dimensions)?;
     // An unresolved argument cannot excuse a known monetary argument, nor can
     // it prove that the resulting expression is dimensionless.
     if dimensions
@@ -737,7 +808,12 @@ mod tests {
                 &IndexMap::new(),
             )
             .unwrap_or_else(|error| panic!("{}: {error}", signature.name));
-            assert_eq!(dimension, Dimension::Scalar, "{}", signature.name);
+            let expected = if signature.name == "is_missing" {
+                Dimension::Boolean
+            } else {
+                Dimension::Scalar
+            };
+            assert_eq!(dimension, expected, "{}", signature.name);
         }
     }
 }

@@ -388,27 +388,6 @@ export type D_76Adf23Abc095Fd56514 =
             };
         [k: string]: unknown;
       };
-    }
-  | {
-      non_finite_skipped: {
-        /**
-         * Number of non-finite inputs dropped.
-         */
-        count: number;
-        /**
-         * Name of the aggregate function that dropped values.
-         */
-        function: string;
-        /**
-         * Identifier of the node whose aggregate dropped inputs.
-         */
-        node_id: string;
-        /**
-         * Period in which the drop occurred.
-         */
-        period: string;
-        [k: string]: unknown;
-      };
     };
 /**
  * Node value type classification.

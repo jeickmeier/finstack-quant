@@ -791,7 +791,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "12213201.825",
+                  "amount": "12213201.82499999835",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -799,7 +799,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "11453540.671485",
+                  "amount": "11453540.6714849989",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -857,7 +857,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "74944647.5625",
+                  "amount": "74944647.562499989875",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -865,7 +865,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "70283090.4841125",
+                  "amount": "70283090.48411249325",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -923,7 +923,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "147113567.43749997",
+                  "amount": "147113567.437499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -931,7 +931,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "137963103.54288748",
+                  "amount": "137963103.54288748675",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -989,7 +989,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "57183495.037499964",
+                  "amount": "57183495.037499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -997,7 +997,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "46054569.55008747",
+                  "amount": "46054569.55008747675",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -1036,12 +1036,12 @@
               },
               "2025Q3": {
                 "status": "value",
-                "value": 6.408909502661806,
+                "value": 6.408909502661808,
                 "source": "formula"
               },
               "2025Q4": {
                 "status": "value",
-                "value": 5.100173815070594,
+                "value": 5.100173815070595,
                 "source": "formula"
               }
             },
@@ -1096,7 +1096,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "208762577.08758742",
+                  "amount": "208762577.08758745",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -1140,7 +1140,7 @@
               },
               "2025Q4": {
                 "status": "value",
-                "value": 2.059756140199358,
+                "value": 2.0597561401993576,
                 "source": "formula"
               }
             },
@@ -1196,7 +1196,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "44643974.637499966",
+                  "amount": "44643974.637499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -1204,7 +1204,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "33289337.782887466",
+                  "amount": "33289337.78288747675",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -1262,7 +1262,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "34478959.17268747",
+                  "amount": "34478959.172687486445625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -1270,7 +1270,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "26778034.499623917",
+                  "amount": "26778034.49962392081375",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -1328,7 +1328,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "35721474.637499966",
+                  "amount": "35721474.637499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -1336,7 +1336,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "24259337.782887466",
+                  "amount": "24259337.78288747675",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -1394,7 +1394,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "8394546.539812492",
+                  "amount": "8394546.539812495329375",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -1402,7 +1402,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "5700944.378978554",
+                  "amount": "5700944.37897855703625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -1460,7 +1460,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "36575746.67268747",
+                  "amount": "36575746.672687486445625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -1468,7 +1468,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "28900084.499623917",
+                  "amount": "28900084.49962392081375",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -1526,7 +1526,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "27326928.097687475",
+                  "amount": "27326928.097687484795625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -1534,7 +1534,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "18558393.403908912",
+                  "amount": "18558393.40390891971375",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -1573,12 +1573,12 @@
               },
               "2025Q3": {
                 "status": "value",
-                "value": 0.2575157826856348,
+                "value": 0.25751578268563485,
                 "source": "formula"
               },
               "2025Q4": {
                 "status": "value",
-                "value": 0.22115443581224012,
+                "value": 0.22115443581224015,
                 "source": "formula"
               }
             },
@@ -4288,7 +4288,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "12213201.825",
+                  "amount": "12213201.82499999835",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -4354,7 +4354,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "74944647.5625",
+                  "amount": "74944647.562499989875",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -4420,7 +4420,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "147113567.43749997",
+                  "amount": "147113567.437499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -4428,7 +4428,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "168621570.99686247",
+                  "amount": "168621570.9968625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -4486,7 +4486,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "57183495.037499964",
+                  "amount": "57183495.037499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -4494,7 +4494,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "76713037.00406246",
+                  "amount": "76713037.00406249",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -4533,12 +4533,12 @@
               },
               "2025Q3": {
                 "status": "value",
-                "value": 6.408909502661806,
+                "value": 6.408909502661808,
                 "source": "formula"
               },
               "2025Q4": {
                 "status": "value",
-                "value": 8.495352935112122,
+                "value": 8.495352935112125,
                 "source": "formula"
               }
             },
@@ -4593,7 +4593,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "239421044.54156244",
+                  "amount": "239421044.54156247",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -4637,7 +4637,7 @@
               },
               "2025Q4": {
                 "status": "value",
-                "value": 1.795999181372521,
+                "value": 1.7959991813725207,
                 "source": "formula"
               }
             },
@@ -4693,7 +4693,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "44643974.637499966",
+                  "amount": "44643974.637499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -4701,7 +4701,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "63947805.23686246",
+                  "amount": "63947805.23686249",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -4759,7 +4759,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "34478959.17268747",
+                  "amount": "34478959.172687486445625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -4767,7 +4767,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "47686530.84158479",
+                  "amount": "47686530.84158480485",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -4825,7 +4825,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "35721474.637499966",
+                  "amount": "35721474.637499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -4833,7 +4833,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "54917805.23686246",
+                  "amount": "54917805.23686249",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -4891,7 +4891,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "8394546.539812492",
+                  "amount": "8394546.539812495329375",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -4899,7 +4899,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "12905684.230662677",
+                  "amount": "12905684.23066268515",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -4957,7 +4957,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "36575746.67268747",
+                  "amount": "36575746.672687486445625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -4965,7 +4965,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "49808580.84158479",
+                  "amount": "49808580.84158480485",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -5023,7 +5023,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "27326928.097687475",
+                  "amount": "27326928.097687484795625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -5031,7 +5031,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "42012121.00619978",
+                  "amount": "42012121.00619980485",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -5070,12 +5070,12 @@
               },
               "2025Q3": {
                 "status": "value",
-                "value": 0.2575157826856348,
+                "value": 0.25751578268563485,
                 "source": "formula"
               },
               "2025Q4": {
                 "status": "value",
-                "value": 0.30139908384637826,
+                "value": 0.30139908384637837,
                 "source": "formula"
               }
             },
@@ -5117,7 +5117,7 @@
               },
               "2025Q4": {
                 "status": "value",
-                "value": 0.6624999999999999,
+                "value": 0.6625,
                 "source": "formula"
               }
             },
@@ -7785,7 +7785,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "12213201.825",
+                  "amount": "12213201.82499999835",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -7793,7 +7793,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "12726156.301649999",
+                  "amount": "12726156.30164999835",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -7851,7 +7851,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "74944647.5625",
+                  "amount": "74944647.562499989875",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -7859,7 +7859,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "78092322.760125",
+                  "amount": "78092322.760124989875",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -7917,7 +7917,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "147113567.43749997",
+                  "amount": "147113567.437499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -7925,7 +7925,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "153292337.269875",
+                  "amount": "153292337.269874980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -7983,7 +7983,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "57183495.037499964",
+                  "amount": "57183495.037499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -7991,7 +7991,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "70574656.67635497",
+                  "amount": "70574656.676354960125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -8030,12 +8030,12 @@
               },
               "2025Q3": {
                 "status": "value",
-                "value": 6.408909502661806,
+                "value": 6.408909502661808,
                 "source": "formula"
               },
               "2025Q4": {
                 "status": "value",
-                "value": 7.815576597602988,
+                "value": 7.815576597602986,
                 "source": "formula"
               }
             },
@@ -8190,7 +8190,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "44643974.637499966",
+                  "amount": "44643974.637499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -8198,7 +8198,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "57809424.909154974",
+                  "amount": "57809424.909154960125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -8256,7 +8256,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "34478959.17268747",
+                  "amount": "34478959.172687486445625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -8264,7 +8264,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "44263285.52105355",
+                  "amount": "44263285.521053546145625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -8322,7 +8322,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "35721474.637499966",
+                  "amount": "35721474.637499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -8330,7 +8330,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "48779424.909154974",
+                  "amount": "48779424.909154960125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -8388,7 +8388,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "8394546.539812492",
+                  "amount": "8394546.539812495329375",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -8396,7 +8396,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "11463164.853651417",
+                  "amount": "11463164.853651415629375",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -8454,7 +8454,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "36575746.67268747",
+                  "amount": "36575746.672687486445625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -8462,7 +8462,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "46385335.52105355",
+                  "amount": "46385335.521053546145625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -8520,7 +8520,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "27326928.097687475",
+                  "amount": "27326928.097687484795625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -8528,7 +8528,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "37316260.055503555",
+                  "amount": "37316260.055503544495625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -8567,12 +8567,12 @@
               },
               "2025Q3": {
                 "status": "value",
-                "value": 0.2575157826856348,
+                "value": 0.25751578268563485,
                 "source": "formula"
               },
               "2025Q4": {
                 "status": "value",
-                "value": 0.30501009300791454,
+                "value": 0.3050100930079145,
                 "source": "formula"
               }
             },
@@ -11282,7 +11282,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "12213201.825",
+                  "amount": "12213201.82499999835",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -11290,7 +11290,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "12726156.301649999",
+                  "amount": "12726156.30164999835",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -11348,7 +11348,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "74944647.5625",
+                  "amount": "74944647.562499989875",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -11356,7 +11356,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "78092322.760125",
+                  "amount": "78092322.760124989875",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -11414,7 +11414,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "147113567.43749997",
+                  "amount": "147113567.437499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -11422,7 +11422,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "153292337.269875",
+                  "amount": "153292337.269874980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -11480,7 +11480,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "57183495.037499964",
+                  "amount": "57183495.037499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -11488,7 +11488,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "52192949.877794966",
+                  "amount": "52192949.877794960125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -11527,12 +11527,12 @@
               },
               "2025Q3": {
                 "status": "value",
-                "value": 6.408909502661806,
+                "value": 6.408909502661808,
                 "source": "formula"
               },
               "2025Q4": {
                 "status": "value",
-                "value": 5.7799501525797305,
+                "value": 5.77995015257973,
                 "source": "formula"
               }
             },
@@ -11687,7 +11687,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "44643974.637499966",
+                  "amount": "44643974.637499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -11695,7 +11695,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "39427718.110594966",
+                  "amount": "39427718.110594960125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -11753,7 +11753,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "34478959.17268747",
+                  "amount": "34478959.172687486445625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -11761,7 +11761,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "30201279.820155147",
+                  "amount": "30201279.820155146145625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -11819,7 +11819,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "35721474.637499966",
+                  "amount": "35721474.637499980125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -11827,7 +11827,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "30397718.110594966",
+                  "amount": "30397718.110594960125",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -11885,7 +11885,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "8394546.539812492",
+                  "amount": "8394546.539812495329375",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -11893,7 +11893,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "7143463.755989816",
+                  "amount": "7143463.755989815629375",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -11951,7 +11951,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "36575746.67268747",
+                  "amount": "36575746.672687486445625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -11959,7 +11959,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "32323329.820155147",
+                  "amount": "32323329.820155146145625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -12017,7 +12017,7 @@
               "2025Q3": {
                 "status": "value",
                 "value": {
-                  "amount": "27326928.097687475",
+                  "amount": "27326928.097687484795625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -12025,7 +12025,7 @@
               "2025Q4": {
                 "status": "value",
                 "value": {
-                  "amount": "23254254.35460515",
+                  "amount": "23254254.354605144495625",
                   "currency": "USD"
                 },
                 "source": "formula"
@@ -12064,12 +12064,12 @@
               },
               "2025Q3": {
                 "status": "value",
-                "value": 0.2575157826856348,
+                "value": 0.25751578268563485,
                 "source": "formula"
               },
               "2025Q4": {
                 "status": "value",
-                "value": 0.22556789145411774,
+                "value": 0.2255678914541177,
                 "source": "formula"
               }
             },
@@ -14776,7 +14776,7 @@
           "2025Q3": {
             "status": "value",
             "value": {
-              "amount": "12213201.825",
+              "amount": "12213201.82499999835",
               "currency": "USD"
             },
             "source": "formula"
@@ -14784,7 +14784,7 @@
           "2025Q4": {
             "status": "value",
             "value": {
-              "amount": "12726156.301649999",
+              "amount": "12726156.30164999835",
               "currency": "USD"
             },
             "source": "formula"
@@ -14842,7 +14842,7 @@
           "2025Q3": {
             "status": "value",
             "value": {
-              "amount": "74944647.5625",
+              "amount": "74944647.562499989875",
               "currency": "USD"
             },
             "source": "formula"
@@ -14850,7 +14850,7 @@
           "2025Q4": {
             "status": "value",
             "value": {
-              "amount": "78092322.760125",
+              "amount": "78092322.760124989875",
               "currency": "USD"
             },
             "source": "formula"
@@ -14908,7 +14908,7 @@
           "2025Q3": {
             "status": "value",
             "value": {
-              "amount": "147113567.43749997",
+              "amount": "147113567.437499980125",
               "currency": "USD"
             },
             "source": "formula"
@@ -14916,7 +14916,7 @@
           "2025Q4": {
             "status": "value",
             "value": {
-              "amount": "153292337.269875",
+              "amount": "153292337.269874980125",
               "currency": "USD"
             },
             "source": "formula"
@@ -14974,7 +14974,7 @@
           "2025Q3": {
             "status": "value",
             "value": {
-              "amount": "57183495.037499964",
+              "amount": "57183495.037499980125",
               "currency": "USD"
             },
             "source": "formula"
@@ -14982,7 +14982,7 @@
           "2025Q4": {
             "status": "value",
             "value": {
-              "amount": "61383803.27707498",
+              "amount": "61383803.277074970125",
               "currency": "USD"
             },
             "source": "formula"
@@ -15021,12 +15021,12 @@
           },
           "2025Q3": {
             "status": "value",
-            "value": 6.408909502661806,
+            "value": 6.408909502661808,
             "source": "formula"
           },
           "2025Q4": {
             "status": "value",
-            "value": 6.7977633750913595,
+            "value": 6.797763375091359,
             "source": "formula"
           }
         },
@@ -15181,7 +15181,7 @@
           "2025Q3": {
             "status": "value",
             "value": {
-              "amount": "44643974.637499966",
+              "amount": "44643974.637499980125",
               "currency": "USD"
             },
             "source": "formula"
@@ -15189,7 +15189,7 @@
           "2025Q4": {
             "status": "value",
             "value": {
-              "amount": "48618571.50987498",
+              "amount": "48618571.509874970125",
               "currency": "USD"
             },
             "source": "formula"
@@ -15247,7 +15247,7 @@
           "2025Q3": {
             "status": "value",
             "value": {
-              "amount": "34478959.17268747",
+              "amount": "34478959.172687486445625",
               "currency": "USD"
             },
             "source": "formula"
@@ -15255,7 +15255,7 @@
           "2025Q4": {
             "status": "value",
             "value": {
-              "amount": "37232282.67060436",
+              "amount": "37232282.670604353795625",
               "currency": "USD"
             },
             "source": "formula"
@@ -15313,7 +15313,7 @@
           "2025Q3": {
             "status": "value",
             "value": {
-              "amount": "35721474.637499966",
+              "amount": "35721474.637499980125",
               "currency": "USD"
             },
             "source": "formula"
@@ -15321,7 +15321,7 @@
           "2025Q4": {
             "status": "value",
             "value": {
-              "amount": "39588571.50987498",
+              "amount": "39588571.509874970125",
               "currency": "USD"
             },
             "source": "formula"
@@ -15379,7 +15379,7 @@
           "2025Q3": {
             "status": "value",
             "value": {
-              "amount": "8394546.539812492",
+              "amount": "8394546.539812495329375",
               "currency": "USD"
             },
             "source": "formula"
@@ -15387,7 +15387,7 @@
           "2025Q4": {
             "status": "value",
             "value": {
-              "amount": "9303314.30482062",
+              "amount": "9303314.304820617979375",
               "currency": "USD"
             },
             "source": "formula"
@@ -15445,7 +15445,7 @@
           "2025Q3": {
             "status": "value",
             "value": {
-              "amount": "36575746.67268747",
+              "amount": "36575746.672687486445625",
               "currency": "USD"
             },
             "source": "formula"
@@ -15453,7 +15453,7 @@
           "2025Q4": {
             "status": "value",
             "value": {
-              "amount": "39354332.67060436",
+              "amount": "39354332.670604353795625",
               "currency": "USD"
             },
             "source": "formula"
@@ -15511,7 +15511,7 @@
           "2025Q3": {
             "status": "value",
             "value": {
-              "amount": "27326928.097687475",
+              "amount": "27326928.097687484795625",
               "currency": "USD"
             },
             "source": "formula"
@@ -15519,7 +15519,7 @@
           "2025Q4": {
             "status": "value",
             "value": {
-              "amount": "30285257.205054358",
+              "amount": "30285257.205054352145625",
               "currency": "USD"
             },
             "source": "formula"
@@ -15558,7 +15558,7 @@
           },
           "2025Q3": {
             "status": "value",
-            "value": 0.2575157826856348,
+            "value": 0.25751578268563485,
             "source": "formula"
           },
           "2025Q4": {
@@ -17504,12 +17504,12 @@
   "tornado": [
     {
       "parameter_id": "revenue@2025Q4",
-      "downside": -15329233.72698751,
-      "upside": 15329233.726987481
+      "downside": -15329233.726987496,
+      "upside": 15329233.726987518
     },
     {
       "parameter_id": "opex@2025Q4",
-      "downside": 9190853.399279997,
+      "downside": 9190853.39927999,
       "upside": -9190853.399280012
     }
   ]

@@ -87,10 +87,10 @@ test('monetary quantile preserves USD through the published facade', () => {
   assert.equal(result.node_value_types.lower.currency, 'USD');
 });
 
-test('coalesce skips infinite values and ranks honor direction', () => {
+test('coalesce skips unavailable values and ranks honor direction', () => {
   const input = model({
     observation: values('observation', [20, 30, 10]),
-    fallback: formula('fallback', 'coalesce(exp(1000), -exp(1000), 7)'),
+    fallback: formula('fallback', 'coalesce(lag(observation, 9), 7)'),
     ascending: formula('ascending', 'rank(observation, 1)'),
     descending: formula('descending', 'rank(observation, 0)'),
   });

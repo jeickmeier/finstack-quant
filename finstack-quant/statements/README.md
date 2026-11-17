@@ -244,9 +244,9 @@ Built-ins: `BalanceSheetArticulation`, `RetainedEarningsReconciliation`,
 `SignConventionCheck`. `FormulaCheckSpec` evaluates an arbitrary DSL predicate per
 period. Findings carry `Severity`, `CheckCategory`, `PeriodScope`, and a
 `Materiality` tolerance. A formula-check period whose same-period input is
-missing or non-finite, or whose formula consumes a non-finite value (a `lag`
-before the first period), reports insufficient data as a warning instead of
-failing; a division by zero over finite inputs still fails.
+missing, or whose formula result is unavailable (a `lag` before the first
+period), reports insufficient data as a warning instead of failing; a division
+by zero or other invalid arithmetic is an execution error.
 
 Identity checks treat a missing operand and a non-finite operand the same way —
 both skip with a warning rather than passing, because `NaN > tolerance` is

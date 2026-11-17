@@ -1722,45 +1722,6 @@
             "capital_structure"
           ],
           "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "One or more non-finite inputs were skipped by a skip-NaN aggregate\n(`sum`, `mean`, ...).\n\nThe aggregate's skip-NaN policy is intentional, but silently dropping a\nbroken line item can mask upstream problems (e.g. a division by zero in\none argument), so the drop is surfaced here.",
-          "properties": {
-            "non_finite_skipped": {
-              "properties": {
-                "count": {
-                  "description": "Number of non-finite inputs dropped.",
-                  "format": "uint",
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "function": {
-                  "description": "Name of the aggregate function that dropped values.",
-                  "type": "string"
-                },
-                "node_id": {
-                  "description": "Identifier of the node whose aggregate dropped inputs.",
-                  "type": "string"
-                },
-                "period": {
-                  "description": "Period in which the drop occurred.",
-                  "type": "string"
-                }
-              },
-              "required": [
-                "node_id",
-                "period",
-                "function",
-                "count"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "non_finite_skipped"
-          ],
-          "type": "object"
         }
       ]
     },

@@ -761,37 +761,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning"
   },
   {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3",
-    "description": "One or more non-finite inputs were skipped by a skip-NaN aggregate\n(`sum`, `mean`, ...).\n\nThe aggregate's skip-NaN policy is intentional, but silently dropping a\nbroken line item can mask upstream problems (e.g. a division by zero in\none argument), so the drop is surfaced here."
-  },
-  {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/non_finite_skipped",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped"
-  },
-  {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/non_finite_skipped/properties/count",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped/properties/count",
-    "description": "Number of non-finite inputs dropped.",
-    "format": "uint",
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/non_finite_skipped/properties/function",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped/properties/function",
-    "description": "Name of the aggregate function that dropped values."
-  },
-  {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/non_finite_skipped/properties/node_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped/properties/node_id",
-    "description": "Identifier of the node whose aggregate dropped inputs."
-  },
-  {
-    "path": "#/$defs/d_76adf23abc095fd56514/oneOf/3/properties/non_finite_skipped/properties/period",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/EvalWarning/oneOf/3/properties/non_finite_skipped/properties/period",
-    "description": "Period in which the drop occurred."
-  },
-  {
     "path": "#/$defs/d_7ed5d95d5da0aa4f3cb9",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodId",
     "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`."

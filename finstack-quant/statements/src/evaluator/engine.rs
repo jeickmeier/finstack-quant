@@ -5,12 +5,13 @@ use crate::evaluator::cell::{Cell, UnavailableReason};
 use crate::evaluator::context::EvaluationContext;
 use crate::evaluator::dag::{DependencyGraph, evaluate_order};
 use crate::evaluator::forecast_eval;
-use crate::evaluator::formula::evaluate_formula;
+use crate::evaluator::formula::evaluate_value;
 use crate::evaluator::monte_carlo::{
     MonteCarloAccumulator, MonteCarloConfig, MonteCarloResults, PathResult,
 };
 use crate::evaluator::precedence::{NodeValueSource, resolve_node_value};
 use crate::evaluator::results::{CellSource, EvalStats, EvalWarning, StatementResult};
+use crate::evaluator::value::{self, At};
 use crate::evaluator::{
     PeriodHistory, capital_structure_runtime, capital_structure_runtime::dependent_closure,
 };
@@ -987,20 +988,15 @@ impl Evaluator {
             if node_spec.where_text.is_some() {
                 let where_key = NodeId::new(format!("__where__{}", node_id));
                 if let Some(where_expr) = self.compiled_cache.get(&where_key) {
-                    // A comparison or logical operator that read a value-less
-                    // operand reports it through this flag; such a mask has no
-                    // value.
-                    let read_before = std::mem::replace(&mut context.non_finite_operand, false);
-                    let where_result =
-                        evaluate_formula(where_expr, context, Some(node_id.as_str()))?;
-                    let read_no_value =
-                        std::mem::replace(&mut context.non_finite_operand, read_before);
-                    let masked = if where_result.is_nan() || read_no_value {
-                        Some(Cell::Unavailable(UnavailableReason::MissingMask))
-                    } else if where_result == 0.0 {
-                        Some(Cell::Masked)
-                    } else {
-                        None
+                    let at = At {
+                        node_id: Some(node_id.as_str()),
+                        period: *period_id,
+                    };
+                    let mask = evaluate_value(where_expr, context, Some(node_id.as_str()))?;
+                    let masked = match value::control(mask, "where clause", at)? {
+                        Some(true) => None,
+                        Some(false) => Some(Cell::Masked),
+                        None => Some(Cell::Unavailable(UnavailableReason::MissingMask)),
                     };
                     if let Some(cell) = masked {
                         context.set_cell(node_id.as_str(), cell)?;
@@ -1046,8 +1042,12 @@ impl Evaluator {
                         let expr = self.compiled_cache.get(node_id).ok_or_else(|| {
                             Error::eval(format!("No compiled formula for node '{}'", node_id))
                         })?;
-                        evaluate_formula(expr, context, Some(node_id.as_str()))
-                            .and_then(|value| computed_cell(value, value_type, node_id, period_id))
+                        let at = At {
+                            node_id: Some(node_id.as_str()),
+                            period: *period_id,
+                        };
+                        evaluate_value(expr, context, Some(node_id.as_str()))
+                            .and_then(|result| value::into_cell(result, value_type, at))
                     }
                 }
             }
@@ -1320,7 +1320,7 @@ mod tests {
                 .with_formula("123"),
         );
         let mut masked = NodeSpec::new("masked", NodeType::Calculated).with_formula("42");
-        masked.where_text = Some("0".to_string());
+        masked.where_text = Some("1 == 0".to_string());
         model.add_node(masked);
 
         let results = Evaluator::new().evaluate(&model).expect("evaluation");

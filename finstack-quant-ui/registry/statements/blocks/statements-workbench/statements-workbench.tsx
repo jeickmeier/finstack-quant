@@ -97,20 +97,6 @@ function warningEntry(warning: EvalWarning): WarningEntry {
       detail: String(value),
     };
   }
-  if ("non_finite_skipped" in warning) {
-    const {
-      node_id,
-      period,
-      count,
-      function: name,
-    } = warning.non_finite_skipped;
-    return {
-      nodeId: node_id,
-      period,
-      kind: "non_finite_skipped",
-      detail: `${count} dropped by ${name}`,
-    };
-  }
   const { period, warning: cause } = warning.capital_structure;
   const { kind, node_id, ...fields } = cause;
   return {

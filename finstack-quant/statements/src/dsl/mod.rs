@@ -20,21 +20,33 @@
 //! - `not expr` binds outside a comparison: `not a > b` is `not (a > b)`
 //! - A comparison does not chain; write `(a > b) == (c > d)` with parentheses
 //!
+//! ### Values and Errors
+//!
+//! A formula evaluates to a finite scalar, an exact amount of money, a
+//! Boolean or an unavailable value. Arithmetic is checked: division or
+//! remainder by zero, an undefined domain, an overflow and mixed units or
+//! currencies are evaluation errors naming the node and period. An
+//! unavailable operand makes the result unavailable. `==` and `!=` compare
+//! the represented values with no tolerance; same-currency money compares as
+//! exact decimals. `and`, `or` and `not` need Boolean operands and `and` /
+//! `or` evaluate their right operand only when the left does not decide the
+//! result. A node whose formula is Boolean is published as `1` or `0`.
+//!
 //! ### Function Reference
 //!
 //! | Function | Arity | Behavior |
 //! | --- | --- | --- |
-//! | `if(condition, then_expr, else_expr)` | 3 | Conditional expression; finite non-zero values are truthy. |
-//! | `min(a, b, ...)`, `max(a, b, ...)` | 1+ | Min/max over arguments from left to right. A leading NaN yields to a finite peer; a trailing NaN propagates. |
-//! | `abs(expr)`, `sign(expr)` | 1 | Absolute value and sign indicator (`-1`, `0`, `1`, or NaN). |
-//! | `pow(base, exp)` | 2 | Exponentiation with IEEE 754 semantics (`pow(-1, 0.5)` is NaN, `pow(0, -1)` is +inf). |
-//! | `round(expr[, digits])` | 1-2 | Round to `digits` decimal places (default 0), ties half away from zero (Excel convention). Negative `digits` rounds to tens/hundreds. Non-finite values pass through. |
+//! | `if(condition, then_expr, else_expr)` | 3 | Conditional expression. `condition` must be Boolean (a comparison, a logical operator or `is_missing`); only the selected branch is evaluated, and an unavailable condition makes the result unavailable. |
+//! | `min(a, b, ...)`, `max(a, b, ...)` | 1+ | Smallest or largest argument. Every argument must be available and in the same units; an unavailable argument makes the result unavailable. |
+//! | `abs(expr)`, `sign(expr)` | 1 | Absolute value (exact for money) and sign indicator (`-1`, `0` or `1`). |
+//! | `pow(base, exp)` | 2 | Exponentiation of unitless numbers. An undefined or overflowing result (`pow(-1, 0.5)`, `pow(0, -1)`) is an error. |
+//! | `round(expr[, digits])` | 1-2 | Round to `digits` decimal places (default 0 for a scalar), midpoint ties away from zero. Negative `digits` rounds a scalar to tens/hundreds. Money needs `digits` stated and non-negative. |
 //! | `floor(expr)`, `ceil(expr)` | 1 | Largest/smallest integer at or below/above the value. |
-//! | `ln(expr)`, `exp(expr)`, `log10(expr)`, `sqrt(expr)` | 1 | Natural log, exponential, base-10 log, and square root with IEEE 754 semantics (`ln(0)` is -inf; `ln`/`sqrt` of negatives are NaN). |
-//! | `clamp(expr, lo, hi)` | 3 | Clamp to the inclusive range `[lo, hi]`. NaN in any argument or `lo > hi` returns NaN. |
-//! | `is_missing(expr)` | 1 | `1` when the value is non-finite (NaN or ±inf), `0` otherwise — the same "finite" convention as `coalesce`. |
-//! | `sum(...)`, `mean(...)` | 1+ | Aggregate finite argument values; non-finite values are skipped. |
-//! | `coalesce(expr, default, ...)` | 2+ | First finite argument, or NaN when every argument is non-finite. |
+//! | `ln(expr)`, `exp(expr)`, `log10(expr)`, `sqrt(expr)` | 1 | Natural log, exponential, base-10 log and square root of a unitless number. A value outside the domain (`ln(0)`, `sqrt(-1)`) or an overflow is an error. |
+//! | `clamp(expr, lo, hi)` | 3 | Clamp to the inclusive range `[lo, hi]` in the same units. `lo > hi` is an error; an unavailable argument makes the result unavailable. |
+//! | `is_missing(expr)` | 1 | Boolean: true when the value is missing, masked or unavailable. An error in `expr` still propagates. |
+//! | `sum(...)`, `mean(...)` | 1+ | Sum or mean of the arguments, exact for money. Every argument must be available and in the same units; an unavailable argument makes the result unavailable. |
+//! | `coalesce(expr, default, ...)` | 2+ | First available argument, including zero; later arguments are not evaluated. Unavailable when no argument is available. An error is not recovered. |
 //! | `lag(expr, n)`, `shift(expr, n)` | 2 | Historical expression lookup by calendar-period offset, preserving missing slots. `lag` requires a non-negative offset; negative `shift` returns NaN to prohibit forward-looking reads. Fiscal daily and weekly model timelines are supported, including leap days and shortened fiscal weeks. |
 //! | `diff(expr[, n])`, `pct_change(expr[, n])` | 1-2 | Difference or percentage change versus `n` periods ago, defaulting to 1. Missing or near-zero denominators return NaN. |
 //! | `growth_rate(expr, periods)` | 2 | Compound annual growth rate in decimal units, `(current / prior)^(1 / years) - 1`, over a required positive integer calendar-period offset (no default lookback). Missing observations or a non-positive prior value return NaN. Monthly/quarterly/semiannual/annual years equal the offset divided by the periods in a year (12, 4, 2, 1); daily/weekly years use Actual/Actual ISDA between the final included dates of the two periods. |
@@ -50,7 +62,7 @@
 //! | `qtd(expr)` | 1 | Quarter-to-date finite sum for monthly models. |
 //! | `fiscal_ytd(expr, start_month)` | 2 | Fiscal year-to-date finite sum using a 1-12 fiscal start month. |
 //! | `annualize(expr, annualization_factor)` | 2 | Scale a period value to an annual amount by a required positive annualization factor; none is inferred from the period frequency. |
-//! | `annualize_rate(rate, periods_per_year, compounding)` | 3 | Annualize a periodic decimal rate using the supplied positive periods per year. `compounding = 0` multiplies the rate by periods per year; any non-zero flag computes `(1 + rate)^periods_per_year - 1`. |
+//! | `annualize_rate(rate, periods_per_year, compounding)` | 3 | Annualize a periodic decimal rate using the supplied positive finite periods per year. `compounding = 0` computes `rate × periods_per_year`; `compounding = 1` computes `(1 + rate)^periods_per_year - 1` and rejects a rate below -100%. Any other value is an error. |
 //!
 //! `lead(...)` is intentionally not available because forward-looking formulas
 //! can leak future values into historical periods.

@@ -1,33 +1,18 @@
 //! Evaluate compiled formulas against an evaluation context.
 //!
-//! Arithmetic operators are handled locally for performance and separation of
-//! concerns, while statistical/time-series functions delegate to the shared
-//! `finstack-quant-core` helpers.
-//!
-//! # Numerical Behavior
-//!
-//! ## NaN Handling
-//! - Division by zero → NaN (with log warning)
-//! - Missing historical values in lag/shift → NaN
-//! - Insufficient data for variance (< 2 values) → NaN
-//! - pct_change with near-zero denominator → NaN (with log warning)
-//!
-//! ## Overflow Protection
-//! - Compound growth (`growth_pct`) errors on overflow
-//! - Growth rates > 100% produce warnings
-//!
-//! ## Precision
-//! - Equality comparisons use [`finstack_quant_core::math::ZERO_TOLERANCE`]
-//! - Suitable for rate comparisons (0.01 bp precision)
-//! - Monetary comparisons should use the `Money` type for currency safety
+//! [`evaluate_value`] is the typed evaluator: checked scalar arithmetic,
+//! exact money, Boolean controls and unavailable values (see
+//! [`crate::evaluator::value`]). History kernels (`lag`, rolling windows,
+//! cumulative and exponentially weighted statistics) still read the float
+//! view of their operands through [`evaluate_formula`], where an unavailable
+//! value is `NaN`.
 
 use crate::error::{Error, Result};
 use crate::evaluator::context::EvaluationContext;
 use crate::evaluator::formula_helpers::{
     collect_cs_values_sorted, collect_historical_values_sorted, collect_rolling_window_values,
-    is_truthy,
 };
-use crate::evaluator::results::EvalWarning;
+use crate::evaluator::value::{self, At, Value};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::expr::{Expr, ExprNode, Function};
 use finstack_quant_core::math::ZERO_TOLERANCE;
@@ -59,12 +44,6 @@ where
     E: Into<Error>,
 {
     res.map_err(|err| annotate_error(err.into(), node_id))
-}
-
-/// Convert boolean to f64 (1.0 for true, 0.0 for false).
-#[inline]
-fn bool_to_f64(b: bool) -> f64 {
-    if b { 1.0 } else { 0.0 }
 }
 
 /// Validate that a function has exactly the expected number of arguments.
@@ -376,13 +355,12 @@ pub(crate) fn collect_expression_window_values(
     Ok(sorted.values().skip(skip_count).copied().collect())
 }
 
-/// Evaluate a compiled expression.
+/// Evaluate a compiled expression to its float view.
 ///
-/// Handles both basic arithmetic operations (evaluated directly) and
-/// advanced financial/statistical functions (delegated to specialized handlers).
-/// Evaluation reads the current period and historical values from `context`;
-/// `node_id`, when supplied, is incorporated into diagnostics so formula
-/// failures can be traced back to the owning statement node.
+/// The float view is the typed result of the formula with an unavailable
+/// value as `NaN`, a Boolean as `1.0` or `0.0` and money as its nearest
+/// float. History kernels and callers that have not moved to typed values
+/// read it; the evaluator itself publishes typed cells.
 ///
 /// # Arguments
 ///
@@ -395,165 +373,112 @@ pub(crate) fn collect_expression_window_values(
 ///
 /// # Errors
 ///
-/// Returns an evaluation error when an expression needs a missing node or
-/// capital-structure value, a function receives invalid arguments (for
-/// example, a non-integral lag window), a historical lookup is unavailable, or
-/// a delegated function cannot evaluate. IEEE non-finite arithmetic may still
-/// return `NaN` with a warning rather than an error where the DSL defines that
-/// as a propagating numerical result.
+/// Returns an evaluation error naming the node and period when an expression
+/// needs an unknown node or capital-structure value, a function receives
+/// invalid arguments, a control is not Boolean, units or currencies are
+/// mixed, a value is outside a function's domain, a division or remainder is
+/// by zero, or a result overflows.
 pub fn evaluate_formula(
     expr: &Expr,
     context: &mut EvaluationContext,
     node_id: Option<&str>,
 ) -> Result<f64> {
+    evaluate_value(expr, context, node_id).map(Value::float)
+}
+
+/// Evaluate a compiled expression to a typed value.
+///
+/// `if`, `and` and `or` evaluate only the operands they need. An unavailable
+/// control or operand makes the result unavailable.
+pub(crate) fn evaluate_value(
+    expr: &Expr,
+    context: &mut EvaluationContext,
+    node_id: Option<&str>,
+) -> Result<Value> {
     use finstack_quant_core::expr::{BinOp, ExprNode, UnaryOp};
 
+    let at = At {
+        node_id,
+        period: context.period_id,
+    };
     match &expr.node {
-        ExprNode::Literal(val) => Ok(*val),
+        ExprNode::Literal(val) => Ok(Value::Scalar(*val)),
         ExprNode::CsRef {
             component,
             instrument_or_total,
         } => map_err_with_node(
             context.get_cs_value(component, instrument_or_total),
             node_id,
-        ),
-        ExprNode::Column(name) => map_err_with_node(context.get_value(name), node_id),
+        )
+        .map(Value::from_float),
+        ExprNode::Column(name) => map_err_with_node(context.get_operand(name), node_id),
         ExprNode::Call(func, args) => {
             crate::evaluator::formula_dispatch::evaluate_function(func, args, context, node_id)
         }
-        ExprNode::BinOp { op, left, right } => {
-            let left_val = evaluate_formula(left, context, node_id)?;
-
-            // Short-circuit logical operators before touching the right-hand
-            // side. DSL boolean semantics (`is_truthy`) treat non-finite and
-            // zero as false, so an AND whose left is false cannot become true
-            // and an OR whose left is true cannot become false. Skipping the
-            // right side avoids triggering its side effects (division-by-zero
-            // warnings, lookup errors, etc.) whenever the result is already
-            // determined.
-            let is_boolean_op = matches!(
-                op,
-                BinOp::Eq
-                    | BinOp::Ne
-                    | BinOp::Lt
-                    | BinOp::Le
-                    | BinOp::Gt
-                    | BinOp::Ge
-                    | BinOp::And
-                    | BinOp::Or
-            );
-            if is_boolean_op && !left_val.is_finite() {
-                context.non_finite_operand = true;
-            }
-            if matches!(op, BinOp::And) && !is_truthy(left_val) {
-                return Ok(bool_to_f64(false));
-            }
-            if matches!(op, BinOp::Or) && is_truthy(left_val) {
-                return Ok(bool_to_f64(true));
-            }
-
-            let right_val = evaluate_formula(right, context, node_id)?;
-            if is_boolean_op && !right_val.is_finite() {
-                context.non_finite_operand = true;
-            }
-
-            let result = match op {
-                BinOp::Add => left_val + right_val,
-                BinOp::Sub => left_val - right_val,
-                BinOp::Mul => left_val * right_val,
-                BinOp::Div => {
-                    // Division by zero yields NaN rather than an error so a
-                    // single bad cell does not abort the whole evaluation.
-                    // NaN then propagates through every downstream formula
-                    // (NaN + x = NaN, comparisons are false). Callers that
-                    // need to surface this must run `NonFiniteCheck` — it is
-                    // included in the standard `three_statement_checks` and
-                    // `credit_underwriting_checks` suites — or inspect the
-                    // `DivisionByZero` warning pushed below.
-                    if right_val == 0.0 {
-                        tracing::warn!(
-                            "Division by zero in formula evaluation (period: {:?})",
-                            context.period_id
-                        );
-                        if let Some(id) = node_id {
-                            context.warnings.push(EvalWarning::DivisionByZero {
-                                node_id: id.to_string(),
-                                period: context.period_id,
-                            });
-                        }
-                        f64::NAN
-                    } else {
-                        left_val / right_val
-                    }
+        ExprNode::BinOp { op, left, right } => match op {
+            BinOp::And | BinOp::Or => {
+                let what = if *op == BinOp::And { "and" } else { "or" };
+                let left_val = evaluate_value(left, context, node_id)?;
+                let Some(left_flag) = value::control(left_val, what, at)? else {
+                    return Ok(left_val);
+                };
+                // `and` is decided by a false left operand, `or` by a true one.
+                if left_flag != (*op == BinOp::And) {
+                    return Ok(Value::Bool(left_flag));
                 }
-                BinOp::Mod => {
-                    if right_val == 0.0 {
-                        tracing::warn!(
-                            "Modulo by zero in formula evaluation (period: {:?})",
-                            context.period_id
-                        );
-                        if let Some(id) = node_id {
-                            context.warnings.push(EvalWarning::DivisionByZero {
-                                node_id: id.to_string(),
-                                period: context.period_id,
-                            });
-                        }
-                        f64::NAN
-                    } else {
-                        left_val % right_val
-                    }
-                }
-
-                // Comparison operations (use approximate equality for == and !=)
-                BinOp::Eq => bool_to_f64((left_val - right_val).abs() <= ZERO_TOLERANCE),
-                BinOp::Ne => bool_to_f64((left_val - right_val).abs() > ZERO_TOLERANCE),
-                BinOp::Lt => bool_to_f64(left_val < right_val),
-                BinOp::Le => bool_to_f64(left_val <= right_val),
-                BinOp::Gt => bool_to_f64(left_val > right_val),
-                BinOp::Ge => bool_to_f64(left_val >= right_val),
-
-                // Logical operations
-                BinOp::And => bool_to_f64(is_truthy(left_val) && is_truthy(right_val)),
-                BinOp::Or => bool_to_f64(is_truthy(left_val) || is_truthy(right_val)),
-            };
-            Ok(result)
-        }
+                let right_val = evaluate_value(right, context, node_id)?;
+                Ok(match value::control(right_val, what, at)? {
+                    Some(flag) => Value::Bool(flag),
+                    None => right_val,
+                })
+            }
+            BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => {
+                let left_val = evaluate_value(left, context, node_id)?;
+                let right_val = evaluate_value(right, context, node_id)?;
+                value::compare(*op, left_val, right_val, at)
+            }
+            BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div | BinOp::Mod => {
+                let left_val = evaluate_value(left, context, node_id)?;
+                let right_val = evaluate_value(right, context, node_id)?;
+                value::arithmetic(*op, left_val, right_val, at)
+            }
+        },
         ExprNode::UnaryOp { op, operand } => {
-            let val = evaluate_formula(operand, context, node_id)?;
-            let result = match op {
-                UnaryOp::Neg => -val,
-                UnaryOp::Not => {
-                    if !val.is_finite() {
-                        context.non_finite_operand = true;
-                    }
-                    bool_to_f64(!is_truthy(val))
-                }
-            };
-            Ok(result)
+            let val = evaluate_value(operand, context, node_id)?;
+            match op {
+                UnaryOp::Neg => value::negate(val, at),
+                UnaryOp::Not => Ok(match value::control(val, "not", at)? {
+                    Some(flag) => Value::Bool(!flag),
+                    None => val,
+                }),
+            }
         }
         ExprNode::IfThenElse {
             condition,
             then_expr,
             else_expr,
         } => {
-            let cond_val = evaluate_formula(condition, context, node_id)?;
-            if !cond_val.is_finite() {
-                context.non_finite_operand = true;
-            }
-            if is_truthy(cond_val) {
-                evaluate_formula(then_expr, context, node_id)
-            } else {
-                evaluate_formula(else_expr, context, node_id)
+            let cond_val = evaluate_value(condition, context, node_id)?;
+            match value::control(cond_val, "if condition", at)? {
+                Some(true) => evaluate_value(then_expr, context, node_id),
+                Some(false) => evaluate_value(else_expr, context, node_id),
+                None => Ok(cond_val),
             }
         }
     }
 }
 
-// `evaluate_function` lives in [`crate::evaluator::formula_dispatch`].
-// Local tests below use the dispatch module's re-export to keep call sites
-// concise while still exercising the same code path used by `evaluate_formula`.
+/// Float view of one function call, for the kernel tests below.
 #[cfg(test)]
-use crate::evaluator::formula_dispatch::evaluate_function;
+fn evaluate_function(
+    func: &finstack_quant_core::expr::Function,
+    args: &[Expr],
+    context: &mut EvaluationContext,
+    node_id: Option<&str>,
+) -> Result<f64> {
+    crate::evaluator::formula_dispatch::evaluate_function(func, args, context, node_id)
+        .map(Value::float)
+}
 
 #[cfg(test)]
 mod tests {
@@ -901,12 +826,14 @@ mod tests {
             &mut context,
         );
         assert!((v - 6.25).abs() < 1e-12);
-        let v = eval(
+        let fails = |func: Function, args: &[Expr], context: &mut EvaluationContext| {
+            evaluate_function(&func, args, context, Some("elementwise")).is_err()
+        };
+        assert!(fails(
             Function::Pow,
             &[Expr::literal(-1.0), Expr::literal(0.5)],
             &mut context,
-        );
-        assert!(v.is_nan());
+        ));
 
         // round: ties away from zero, optional digits (negative allowed)
         let v = eval(Function::Round, &[Expr::column("x")], &mut context);
@@ -950,9 +877,9 @@ mod tests {
             2.0
         );
 
-        // ln / exp / log10 / sqrt (IEEE semantics)
+        // ln / exp / log10 / sqrt: a value outside the domain is an error
         assert_eq!(eval(Function::Ln, &[Expr::literal(1.0)], &mut context), 0.0);
-        assert!(eval(Function::Ln, &[Expr::literal(-1.0)], &mut context).is_nan());
+        assert!(fails(Function::Ln, &[Expr::literal(-1.0)], &mut context));
         let v = eval(Function::Exp, &[Expr::literal(1.0)], &mut context);
         assert!((v - std::f64::consts::E).abs() < 1e-12);
         let v = eval(Function::Log10, &[Expr::literal(100.0)], &mut context);
@@ -961,9 +888,9 @@ mod tests {
             eval(Function::Sqrt, &[Expr::literal(4.0)], &mut context),
             2.0
         );
-        assert!(eval(Function::Sqrt, &[Expr::literal(-4.0)], &mut context).is_nan());
+        assert!(fails(Function::Sqrt, &[Expr::literal(-4.0)], &mut context));
 
-        // clamp: inclusive bounds, NaN-safe, inverted range → NaN (no panic)
+        // clamp: inclusive bounds; an inverted range is an error
         let clamp_args =
             |x: f64, lo: f64, hi: f64| [Expr::literal(x), Expr::literal(lo), Expr::literal(hi)];
         assert_eq!(
@@ -978,19 +905,22 @@ mod tests {
             eval(Function::Clamp, &clamp_args(15.0, 0.0, 10.0), &mut context),
             10.0
         );
-        assert!(eval(Function::Clamp, &clamp_args(5.0, 10.0, 0.0), &mut context).is_nan());
+        assert!(fails(
+            Function::Clamp,
+            &clamp_args(5.0, 10.0, 0.0),
+            &mut context
+        ));
 
-        // is_missing: non-finite (NaN or ±inf) → 1, finite → 0
+        // is_missing: true only for an unavailable operand
         assert_eq!(
             eval(Function::IsMissing, &[Expr::literal(1.0)], &mut context),
             0.0
         );
-        let div_by_zero = Expr::bin_op(
-            finstack_quant_core::expr::BinOp::Div,
-            Expr::literal(1.0),
-            Expr::literal(0.0),
+        let before_history = Expr::call(Function::Lag, vec![Expr::column("x"), Expr::literal(5.0)]);
+        assert_eq!(
+            eval(Function::IsMissing, &[before_history], &mut context),
+            1.0
         );
-        assert_eq!(eval(Function::IsMissing, &[div_by_zero], &mut context), 1.0);
     }
 
     #[test]
@@ -1323,45 +1253,6 @@ mod tests {
         )
         .expect("sign zero");
         assert_eq!(sign_zero, 0.0);
-
-        let sign_nan = evaluate_function(
-            &Function::Sign,
-            &[Expr::literal(f64::NAN)],
-            &mut context,
-            Some("sign"),
-        )
-        .expect("sign nan");
-        assert!(sign_nan.is_nan());
-    }
-
-    #[test]
-    fn nan_conditions_are_falsey_in_formula_logic() {
-        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let mut context = EvaluationContext::new(
-            period,
-            &finstack_quant_core::dates::PeriodPlan::try_new(
-                finstack_quant_core::dates::PeriodCalendar::Gregorian,
-                Vec::new(),
-            )
-            .expect("empty plan"),
-            std::sync::Arc::new(IndexMap::new()),
-            std::sync::Arc::new(IndexMap::new()),
-        );
-
-        let if_expr = crate::dsl::parse_and_compile("if(0 / 0, 1, 2)").expect("compile if expr");
-        let if_value =
-            evaluate_formula(&if_expr, &mut context, Some("if_nan")).expect("evaluate if expr");
-        assert_eq!(if_value, 2.0);
-
-        let and_expr = crate::dsl::parse_and_compile("(0 / 0) and 1").expect("compile and expr");
-        let and_value =
-            evaluate_formula(&and_expr, &mut context, Some("and_nan")).expect("evaluate and expr");
-        assert_eq!(and_value, 0.0);
-
-        let not_expr = crate::dsl::parse_and_compile("not (0 / 0)").expect("compile not expr");
-        let not_value =
-            evaluate_formula(&not_expr, &mut context, Some("not_nan")).expect("evaluate not expr");
-        assert_eq!(not_value, 1.0);
     }
 
     #[test]

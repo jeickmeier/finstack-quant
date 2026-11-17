@@ -778,11 +778,7 @@ fn two_metric_model() -> (
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
                     AmountOrScalar::scalar(100.0),
                 ),
-                // EBITDA collapses to zero → debt/ebitda = inf (non-finite).
-                (
-                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
-                    AmountOrScalar::scalar(0.0),
-                ),
+                // No Q2 EBITDA observation: debt / ebitda is unavailable.
             ],
         );
         model_builder.value(
@@ -843,7 +839,7 @@ fn leverage_coverage_config() -> ScorecardConfig {
 fn test_scorecard_non_finite_metric_excluded_and_weights_renormalized() {
     let (model, results) = two_metric_model();
 
-    // Default period = last (Q2, no actuals): leverage = 150/0 = inf → NM.
+    // Default period = last (Q2): leverage has no EBITDA and is not meaningful.
     let extension =
         CreditScorecardExtension::new(leverage_coverage_config(), &agency_style_registry())
             .expect("valid scorecard");

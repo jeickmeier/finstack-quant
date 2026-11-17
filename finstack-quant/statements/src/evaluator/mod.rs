@@ -48,6 +48,7 @@ mod period_history;
 mod precedence;
 mod results;
 mod rollup;
+pub(crate) mod value;
 
 pub use cashflow_export::{
     DatedCell, FlowSign, PeriodDateConvention, PricingFlowSelection, node_to_dated_schedule,

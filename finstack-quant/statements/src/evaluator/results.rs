@@ -916,23 +916,6 @@ pub enum EvalWarning {
         /// Typed reason and associated diagnostic values.
         warning: CapitalStructureWarning,
     },
-    /// One or more non-finite inputs were skipped by a skip-NaN aggregate
-    /// (`sum`, `mean`, ...).
-    ///
-    /// The aggregate's skip-NaN policy is intentional, but silently dropping a
-    /// broken line item can mask upstream problems (e.g. a division by zero in
-    /// one argument), so the drop is surfaced here.
-    NonFiniteSkipped {
-        /// Identifier of the node whose aggregate dropped inputs.
-        node_id: String,
-        /// Period in which the drop occurred.
-        #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
-        period: PeriodId,
-        /// Name of the aggregate function that dropped values.
-        function: String,
-        /// Number of non-finite inputs dropped.
-        count: usize,
-    },
 }
 
 // The non-finite number form carried by evaluation warnings.

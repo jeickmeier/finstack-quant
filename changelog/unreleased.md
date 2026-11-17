@@ -957,3 +957,33 @@ and anchor; any required period without an amount is an error.
 
 Each result carries `provenance`: model id and content hash, source snapshot,
 observation cutoff, valuation date and run id.
+
+### Statements: formulas are checked; division by zero and invalid math fail the run
+
+STATEMENTS-EVALUATION-002. Formulas evaluate on typed values: a finite scalar,
+exact money, a Boolean or an unavailable value.
+
+- **Errors, not `NaN`.** Division or remainder by zero, `ln` or `log10` of a
+  non-positive number, `sqrt` of a negative number, an overflow, mixed units
+  and mixed currencies are evaluation errors naming the node and period. They
+  used to give `NaN` and a warning. Guard a denominator that can be zero, for
+  example `if(sign(ebitda) > 0, debt / ebitda, 0)`.
+- **Unavailable propagates.** A missing, masked or unavailable operand makes
+  the result unavailable. `sum`, `mean`, `min` and `max` no longer skip it,
+  and the `non_finite_skipped` warning is removed. `coalesce` returns the
+  first available value, including zero, and does not recover an error.
+  `is_missing` is true only for an unavailable value.
+- **Boolean controls.** `if`, `and`, `or`, `not` and `where` need a Boolean:
+  a comparison, a logical operator or `is_missing`. A number is rejected when
+  the model is built (`if(flag, a, b)` becomes `if(flag == 1, a, b)`; a
+  `where` clause of `0` becomes `1 == 0`). A Boolean is not a number:
+  `(a > b) * x` becomes `if(a > b, x, 0)`. A node whose formula is Boolean
+  is published as `1` or `0`.
+- **Exact comparisons.** `==` and `!=` compare the represented values; the
+  `1e-10` tolerance is gone. Same-currency money compares, adds, subtracts,
+  sums and averages as exact decimals.
+- **Rounding and clamp.** `round` of money needs its decimal places stated.
+  `clamp` with a lower bound above its upper bound is an error.
+- **Annualization.** `annualize_rate` takes method `0` (simple) or `1`
+  (compound); any other value is an error, as is compounding a rate below
+  -100%. An annualization factor must be positive and finite.

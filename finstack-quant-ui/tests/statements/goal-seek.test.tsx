@@ -211,7 +211,7 @@ it("presents the returned solution and hides Apply without a handler", () => {
     [...solution.querySelectorAll("dd")].map((node) => node.textContent),
   ).toEqual([
     "244,390,239.98913205",
-    "-0.000000014901161193847656",
+    "-0.000000029802322387695312",
     "0.07",
     "7",
     "Yes",

@@ -695,13 +695,13 @@ impl FinancialModelSpec {
                 let ast = parse_cached(&mut parsed, where_text).map_err(|e| {
                     Error::build(format!("Invalid where clause on node '{}': {}", node_id, e))
                 })?;
-                let where_type =
-                    crate::dsl::compiler::infer_value_type(ast, units).map_err(|error| {
-                        Error::build(format!("Invalid where clause on node '{node_id}': {error}"))
-                    })?;
-                if where_type != Some(crate::types::NodeValueType::Scalar) {
+                let boolean = crate::dsl::compiler::is_boolean(ast, units).map_err(|error| {
+                    Error::build(format!("Invalid where clause on node '{node_id}': {error}"))
+                })?;
+                if !boolean {
                     return Err(Error::build(format!(
-                        "Where clause on node '{node_id}' must return a scalar condition"
+                        "Where clause on node '{node_id}' must be a Boolean condition (a \
+                         comparison, a logical operator or is_missing)"
                     )));
                 }
                 let expression = crate::dsl::compile(ast).map_err(|e| {

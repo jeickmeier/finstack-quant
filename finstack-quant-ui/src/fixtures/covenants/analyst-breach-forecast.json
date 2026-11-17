@@ -141,9 +141,9 @@
       "covenant_id": "min_interest_coverage",
       "covenant_description": "Interest Coverage >= 5.50x",
       "breach_date": "2025-09-30",
-      "projected_value": 6.408909502661806,
+      "projected_value": 6.408909502661808,
       "threshold": 5.5,
-      "headroom": 0.16525627321123745,
+      "headroom": 0.16525627321123776,
       "breach_probability": 0.3755
     },
     {
@@ -159,9 +159,9 @@
       "covenant_id": "min_interest_coverage",
       "covenant_description": "Interest Coverage >= 5.50x",
       "breach_date": "2025-12-31",
-      "projected_value": 6.7977633750913595,
+      "projected_value": 6.797763375091359,
       "threshold": 5.5,
-      "headroom": 0.2359569772893381,
+      "headroom": 0.23595697728933793,
       "breach_probability": 0.3275
     }
   ]

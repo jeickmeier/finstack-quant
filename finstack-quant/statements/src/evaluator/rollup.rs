@@ -23,9 +23,9 @@ use crate::error::{Error, Result};
 use crate::evaluator::Evaluator;
 use crate::evaluator::PeriodHistory;
 use crate::evaluator::context::EvaluationContext;
-use crate::evaluator::formula::evaluate_formula;
-use crate::evaluator::formula_helpers::is_truthy;
+use crate::evaluator::formula::{evaluate_formula, evaluate_value};
 use crate::evaluator::results::{EvalStats, NumericMode, StatementResult};
+use crate::evaluator::value::{self, At};
 use crate::types::{FinancialModelSpec, NodeId, NodeValueType, RollupMethod};
 use finstack_quant_core::dates::{Period, PeriodId, PeriodKind, PeriodPlan};
 use indexmap::IndexMap;
@@ -265,7 +265,12 @@ impl StatementResult {
                         let where_key = NodeId::new(format!("__where__{node}"));
                         let masked = match prepared.compiled_cache.get(&where_key) {
                             Some(condition) => {
-                                !is_truthy(evaluate_formula(condition, &mut context, Some(node))?)
+                                let at = At {
+                                    node_id: Some(node),
+                                    period: context.period_id,
+                                };
+                                let mask = evaluate_value(condition, &mut context, Some(node))?;
+                                value::control(mask, "where clause", at)? != Some(true)
                             }
                             None => false,
                         };

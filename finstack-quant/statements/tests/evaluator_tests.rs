@@ -1470,7 +1470,7 @@ fn test_forecast_error_all_actual_periods() {
 // Division by Zero and NaN Handling
 
 #[test]
-fn test_division_by_zero_produces_nan() {
+fn test_division_by_zero_is_an_error() {
     let model = {
         let mut model_builder = ModelBuilder::new("test");
         model_builder.periods("2025Q1..2025Q1", None).unwrap();
@@ -1494,14 +1494,15 @@ fn test_division_by_zero_produces_nan() {
         model_builder.build().unwrap()
     };
 
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-
-    let result = results.get(
-        "result",
-        &PeriodId::quarter(2025, 1).expect("valid period fixture"),
+    let error = Evaluator::new()
+        .evaluate(&model)
+        .expect_err("a division by zero fails the run");
+    let message = error.to_string();
+    assert!(message.contains("division by zero"), "{message}");
+    assert!(
+        message.contains("result") && message.contains("2025Q1"),
+        "{message}"
     );
-    assert!(result.is_none());
 }
 
 #[test]
@@ -1961,7 +1962,8 @@ fn test_pct_change_zero_periods_propagates_nan() {
     let model = {
         let mut model_builder = ModelBuilder::new("pct-zero");
         model_builder.periods("2025Q1..Q1", None).unwrap();
-        model_builder.compute("x", "0 / 0").unwrap();
+        model_builder.value_scalar("seed", &[]);
+        model_builder.compute("x", "lag(seed, 1)").unwrap();
         model_builder.compute("y", "pct_change(x, 0)").unwrap();
         model_builder.build().unwrap()
     };

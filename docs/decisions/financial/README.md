@@ -393,7 +393,7 @@ published run provenance and finalization checks remain pending.
 The Statements scalar formulas and unavailable-value contract was accepted on
 2026-11-15. It covers checked arithmetic, exact comparisons, lazy Boolean
 controls, complete aggregates, rounding and explicit annualization.
-Implementation and independent qualification remain pending.
+It is implemented and qualified across Rust, Python and WASM.
 [STATEMENTS-EVALUATION-002](statements-evaluation/02-scalar-formulas-and-undefined-values.md#accepted-decision-for-scalar-formulas-and-unavailable-values).
 
 The Statements historical offsets, growth and reporting-window contract was

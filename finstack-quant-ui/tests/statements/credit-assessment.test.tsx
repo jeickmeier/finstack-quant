@@ -160,9 +160,9 @@ it("presents the returned assessment, lists the periods Rust left without a valu
   const tile = (name: string) =>
     within(report).getByRole("region", { name }).querySelector("p")!
       .textContent;
-  expect(tile("Leverage ratio")).toBe("1.9188563760404616");
-  expect(tile("Interest coverage")).toBe("6.194873653258923");
-  expect(tile("Free cash flow (USD)")).toBe("39,354,332.67060436");
+  expect(tile("Leverage ratio")).toBe("1.9188563760404618");
+  expect(tile("Interest coverage")).toBe("6.194873653258922");
+  expect(tile("Free cash flow (USD)")).toBe("39,354,332.670604356");
   expect(
     within(report).getByRole("img", {
       name: "Leverage ratio and interest coverage by period",
@@ -190,9 +190,9 @@ it("presents the returned assessment, lists the periods Rust left without a valu
       .map((cell) => cell.textContent),
   ).toEqual([
     "2025Q4",
-    "1.9188563760404616",
-    "6.194873653258923",
-    "39,354,332.67060436",
+    "1.9188563760404618",
+    "6.194873653258922",
+    "39,354,332.670604356",
   ]);
   const pl = within(report).getByRole("region", { name: "P&L summary" });
   expect(within(pl).getAllByRole("row").length).toBe(envelope.row_count + 1);
@@ -220,6 +220,6 @@ it("shows native errors as returned and an injected format without computing", (
   expect(
     screen.getByRole("region", { name: "Free cash flow" }).querySelector("p")!
       .textContent,
-  ).toBe("free_cash_flow=39354332.67060436");
+  ).toBe("free_cash_flow=39354332.670604356");
   expect(screen.queryByRole("region", { name: "P&L summary" })).toBeNull();
 });

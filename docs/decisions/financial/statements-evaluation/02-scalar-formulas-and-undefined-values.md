@@ -1,6 +1,6 @@
 # STATEMENTS-EVALUATION-002 — Scalar formulas, boolean control flow and undefined values
 
-Decision status: **Accepted for the full scalar formulas and unavailable-value contract (2026-11-15)**. Implementation status: **Reconciliation pending**. Validation status: **Existing evidence mapped. Independent qualification pending**. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
+Decision status: **Accepted for the full scalar formulas and unavailable-value contract (2026-11-15)**. Implementation status: **Reconciled (2026-11-17)**: formulas evaluate to typed values (`evaluator::value`): a finite scalar, exact `Money`, a Boolean or an unavailable value with its reason. Arithmetic is checked, with an undefined domain, division or remainder by zero, overflow and mixed units as errors naming the node and period; same-currency money adds, subtracts, compares, sums and averages as exact decimals; comparisons use the represented values with no tolerance; `if`, `and`, `or` and `not` require Boolean operands at model build and at evaluation and evaluate lazily, and an unavailable control makes the result unavailable; `is_missing` is true only for an unavailable value and `coalesce` returns the first available value including zero; `sum`, `mean`, `min` and `max` need every operand; scalar `round` defaults to zero places with ties away from zero and monetary `round` needs an explicit scale; `clamp` includes both endpoints and rejects reversed bounds; `annualize` needs a positive finite factor and `annualize_rate` an explicit method (`0` simple, `1` compound) with the compound domain from −100%. Monetary `round` applies the function's ties-away-from-zero mode; the DSL has no other rounding mode. Validation status: **Qualified** by a truth table over available, unavailable and error operands for each control, `coalesce` returning an available zero, `1/0`, `ln(-5)` and overflow as errors, and compound annualization at −100% and below. Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` ([slice audit](README.md)).
 
 ## Accepted decision for scalar formulas and unavailable values
 
@@ -11,6 +11,8 @@ Decision status: **Accepted for the full scalar formulas and unavailable-value c
 5. Require an explicit positive finite annualization factor. Annualize flows by multiplication. Annualize decimal rates using an explicit simple or compound method. Simple annualization uses `rate × factor`, and compound annualization uses `(1 + rate)^factor − 1`. The compound domain includes −100% and rejects rates below it.
 
 ## Audited input domain and conventions
+
+The sections below describe the implementation audited on 2026-11-05, before reconciliation.
 
 The DSL evaluates floating-point expressions with operation-specific undefined handling. Arithmetic values preserve the declared node units established by semantic analysis; decimal rates remain decimal, and no implicit sign or currency conversion occurs in these kernels. The implementation rationale is direct compositional expression evaluation. Adoption is pending for individual numerical tolerances and missing-data operations, subject to accepted [ADR 0009](../conventions/0009-missing-and-invalid-data.md).
 

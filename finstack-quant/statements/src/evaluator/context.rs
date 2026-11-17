@@ -61,15 +61,6 @@ pub struct EvaluationContext {
     /// Warnings collected while evaluating this period
     pub warnings: Vec<EvalWarning>,
 
-    /// Set when a comparison, logical operator or `if` condition consumed a
-    /// non-finite operand during this period's evaluation.
-    ///
-    /// DSL comparisons read `NaN` as false, so a formula check fed a missing
-    /// lag (`lag(x, 1)` in the first period) or a non-finite input would
-    /// otherwise look like a failed test. Formula checks read this flag to
-    /// report insufficient data instead.
-    pub(crate) non_finite_operand: bool,
-
     /// Per-context memoization of sorted historical lookups.
     ///
     /// Within a single period's evaluation many formulas (rolling, expanding,
@@ -156,7 +147,6 @@ impl EvaluationContext {
             current_sources: vec![None; num_nodes],
             capital_structure_cashflows: None,
             warnings: Vec::new(),
-            non_finite_operand: false,
             sorted_history_cache: RefCell::new(IndexMap::new()),
         }
     }
@@ -230,6 +220,7 @@ impl EvaluationContext {
         }
 
         self.current_values[*idx] = Some(value);
+        self.current_cells[*idx] = None;
         // Drop any cached sorted-history entry whose "current" view depended on
         // the previous value — repeat sets on the same node within a period are
         // rare but they happen (e.g., normalization rewrites), and a stale
@@ -266,6 +257,22 @@ impl EvaluationContext {
                  This usually indicates a circular dependency or missing value.",
                 node_id, self.period_id
             ))),
+        }
+    }
+
+    /// The typed value a formula reads for a node in the current period.
+    ///
+    /// A cell stored by the evaluator keeps its type and state. A value stored
+    /// as a float (a history row, a check or rollup context) is an untyped
+    /// number, or unavailable when it is not finite.
+    pub(crate) fn get_operand(&self, node_id: &str) -> Result<super::value::Value> {
+        let idx = *self
+            .node_to_column
+            .get(node_id)
+            .ok_or_else(|| Error::node_not_found(node_id))?;
+        match self.current_cells[idx] {
+            Some(cell) => Ok(super::value::Value::from_cell(cell)),
+            None => self.get_value(node_id).map(super::value::Value::from_float),
         }
     }
 

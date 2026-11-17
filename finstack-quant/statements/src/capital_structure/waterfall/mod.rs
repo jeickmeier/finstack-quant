@@ -1018,7 +1018,7 @@ mod tests {
                 PaymentPriority::Amortization,
                 PaymentPriority::Equity,
             ],
-            available_cash_node: "cash / 0".into(),
+            available_cash_node: "lag(cash, 1)".into(),
             ecf_sweep: None,
             pik_toggle: None,
             ..Default::default()
@@ -1028,7 +1028,7 @@ mod tests {
             .expect_err("non-finite available cash must error rather than coerce to zero");
         let msg = err.to_string();
         assert!(
-            msg.contains("non-finite") && msg.contains("cash / 0"),
+            msg.contains("non-finite") && msg.contains("lag(cash, 1)"),
             "error must name the offending expression: {msg}"
         );
     }
@@ -1166,7 +1166,7 @@ mod tests {
     /// (with its warnings) was dropped. A guarded expression returns a finite
     /// value, so the bad arithmetic inside it left no trace at all.
     #[test]
-    fn inline_expression_warnings_are_not_dropped() {
+    fn a_guarded_division_by_zero_still_fails() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(period, &[("cash", 500.0)]);
 
@@ -1187,25 +1187,19 @@ mod tests {
                 PaymentPriority::Amortization,
                 PaymentPriority::Equity,
             ],
-            // Guarded: the division by zero is swallowed by `coalesce`, so the
-            // node evaluates to a perfectly finite 500 and the finiteness check
-            // cannot catch it. Only the warning reveals the broken arithmetic.
+            // `coalesce` recovers an unavailable value, not invalid arithmetic.
             available_cash_node: "coalesce(cash / 0, cash)".into(),
             ecf_sweep: None,
             pik_toggle: None,
             ..Default::default()
         };
 
-        let result = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
-            .expect("a guarded expression still evaluates");
-
+        let err = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
+            .expect_err("a division by zero is an error even inside coalesce");
+        let msg = err.to_string();
         assert!(
-            result
-                .warnings
-                .iter()
-                .any(|w| matches!(w, EvalWarning::DivisionByZero { .. })),
-            "the division inside the inline expression must be surfaced: {:?}",
-            result.warnings
+            msg.contains("division by zero") && msg.contains("coalesce(cash / 0, cash)"),
+            "error must name the cause and the expression: {msg}"
         );
     }
 
@@ -1297,10 +1291,10 @@ mod tests {
         };
 
         let err = execute_waterfall(&context, &waterfall, &mut state, &contractual_flows)
-            .expect_err("non-finite PIK metric must error rather than read as 'not triggered'");
+            .expect_err("an invalid PIK metric must error rather than read as 'not triggered'");
         assert!(
-            err.to_string().contains("non-finite"),
-            "error must flag the non-finite metric: {err}"
+            err.to_string().contains("division by zero"),
+            "error must flag the invalid metric: {err}"
         );
     }
 

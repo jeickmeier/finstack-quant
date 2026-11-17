@@ -855,7 +855,10 @@ mod tests {
             model_builder_1
                 .periods("2025Q1..Q1", None)
                 .expect("periods");
-            model_builder_1.compute("ufcf", "0 / 0").expect("formula");
+            model_builder_1.value_scalar("seed", &[]);
+            model_builder_1
+                .compute("ufcf", "lag(seed, 1)")
+                .expect("formula");
             model_builder_1.with_meta("currency", serde_json::json!("USD"));
             model_builder_1.build().expect("model")
         };

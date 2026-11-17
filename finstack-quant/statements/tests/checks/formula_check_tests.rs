@@ -480,7 +480,7 @@ fn canonical_time_series_function_uses_evaluated_history() {
         name: "Canonical lag".into(),
         category: CheckCategory::InternalConsistency,
         severity: Severity::Error,
-        formula: "if(revenue == 100, 1, lag(revenue, 1) == 100)".into(),
+        formula: "revenue == 100 or lag(revenue, 1) == 100".into(),
         message_template: "Lag failed in {period}".into(),
         tolerance: None,
     };
@@ -640,7 +640,7 @@ fn lag_before_first_period_reports_insufficient_data() {
 }
 
 #[test]
-fn division_by_zero_over_finite_inputs_still_fails() {
+fn division_by_zero_over_finite_inputs_is_an_execution_error() {
     let model = {
         let mut model_builder = ModelBuilder::new("test");
         model_builder.periods("2025Q1..Q1", None).unwrap();
@@ -650,11 +650,9 @@ fn division_by_zero_over_finite_inputs_still_fails() {
     };
     let results = Evaluator::new().evaluate(&model).unwrap();
 
-    let result = predicate_check("debt / ebitda < 6", None)
+    let error = predicate_check("debt / ebitda < 6", None)
         .execute(&CheckContext::new(&model, &results))
-        .unwrap();
+        .expect_err("a division by zero is not a finding");
 
-    assert!(!result.passed);
-    assert!(insufficient_periods(&result).is_empty());
-    assert_eq!(result.findings[0].severity, Severity::Error);
+    assert!(error.to_string().contains("division by zero"), "{error}");
 }

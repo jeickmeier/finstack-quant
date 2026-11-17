@@ -1938,27 +1938,6 @@ export type EvalWarning =
         warning: CapitalStructureWarning;
         [k: string]: unknown;
       };
-    }
-  | {
-      non_finite_skipped: {
-        /**
-         * Number of non-finite inputs dropped.
-         */
-        count: number;
-        /**
-         * Name of the aggregate function that dropped values.
-         */
-        function: string;
-        /**
-         * Identifier of the node whose aggregate dropped inputs.
-         */
-        node_id: string;
-        /**
-         * Period in which the drop occurred.
-         */
-        period: string;
-        [k: string]: unknown;
-      };
     };
 export type ResultNumber = number | ("nan" | "inf" | "-inf");
 /**

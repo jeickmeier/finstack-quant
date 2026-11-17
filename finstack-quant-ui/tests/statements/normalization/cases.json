@@ -323,7 +323,7 @@
         "currency": "USD"
       },
       "period": "2025Q3",
-      "base_value": 57183495.037499964,
+      "base_value": 57183495.03749998,
       "adjustments": [
         {
           "adjustment_id": "restructuring",
@@ -331,7 +331,7 @@
           "raw_amount": 0,
           "capped_amount": 0,
           "is_capped": false,
-          "adjusted_value": 57183495.037499964
+          "adjusted_value": 57183495.03749998
         },
         {
           "adjustment_id": "run_rate_synergies",
@@ -339,7 +339,7 @@
           "raw_amount": 5551455.375,
           "capped_amount": 5551455.375,
           "is_capped": false,
-          "adjusted_value": 62734950.412499964
+          "adjusted_value": 62734950.41249998
         },
         {
           "adjustment_id": "management_fees",
@@ -347,7 +347,7 @@
           "raw_amount": 0,
           "capped_amount": 0,
           "is_capped": false,
-          "adjusted_value": 62734950.412499964
+          "adjusted_value": 62734950.41249998
         },
         {
           "adjustment_id": "one_time_gain",
@@ -355,10 +355,10 @@
           "raw_amount": 0,
           "capped_amount": 0,
           "is_capped": false,
-          "adjusted_value": 62734950.412499964
+          "adjusted_value": 62734950.41249998
         }
       ],
-      "final_value": 62734950.412499964
+      "final_value": 62734950.41249998
     },
     {
       "value_type": {
@@ -366,7 +366,7 @@
         "currency": "USD"
       },
       "period": "2025Q4",
-      "base_value": 61383803.27707498,
+      "base_value": 61383803.27707497,
       "adjustments": [
         {
           "adjustment_id": "restructuring",
@@ -374,7 +374,7 @@
           "raw_amount": 0,
           "capped_amount": 0,
           "is_capped": false,
-          "adjusted_value": 61383803.27707498
+          "adjusted_value": 61383803.27707497
         },
         {
           "adjustment_id": "run_rate_synergies",
@@ -382,7 +382,7 @@
           "raw_amount": 5784616.50075,
           "capped_amount": 5784616.50075,
           "is_capped": false,
-          "adjusted_value": 67168419.77782498
+          "adjusted_value": 67168419.77782497
         },
         {
           "adjustment_id": "management_fees",
@@ -390,7 +390,7 @@
           "raw_amount": 0,
           "capped_amount": 0,
           "is_capped": false,
-          "adjusted_value": 67168419.77782498
+          "adjusted_value": 67168419.77782497
         },
         {
           "adjustment_id": "one_time_gain",
@@ -398,10 +398,10 @@
           "raw_amount": 0,
           "capped_amount": 0,
           "is_capped": false,
-          "adjusted_value": 67168419.77782498
+          "adjusted_value": 67168419.77782497
         }
       ],
-      "final_value": 67168419.77782498
+      "final_value": 67168419.77782497
     }
   ],
   "errors": {

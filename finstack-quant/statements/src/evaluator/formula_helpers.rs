@@ -11,14 +11,6 @@ use finstack_quant_core::dates::PeriodId;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-/// Coerce a numeric value into DSL boolean semantics.
-///
-/// Non-zero finite values are truthy; zero and non-finite values are falsey.
-#[inline]
-pub(crate) fn is_truthy(value: f64) -> bool {
-    value.is_finite() && value != 0.0
-}
-
 /// Collect historical values sorted chronologically.
 ///
 /// Returns an `Rc<BTreeMap<PeriodId, f64>>` containing all historical periods
