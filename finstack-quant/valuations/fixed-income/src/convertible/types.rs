@@ -770,6 +770,17 @@ impl finstack_quant_valuations_core::instruments::Instrument for ConvertibleBond
         crate::FIXED_INCOME
     );
 
+    fn contractual_accrual_config(
+        &self,
+    ) -> Option<finstack_quant_cashflows::accrual::AccrualConfig> {
+        Some(finstack_quant_cashflows::accrual::AccrualConfig {
+            method: finstack_quant_cashflows::accrual::AccrualMethod::Linear,
+            ex_coupon: None,
+            include_pik: false,
+            frequency: Some(self.cashflow_spec.frequency()),
+        })
+    }
+
     fn default_model(&self) -> finstack_quant_valuations_core::pricer::ModelKey {
         finstack_quant_valuations_core::pricer::ModelKey::Tree
     }

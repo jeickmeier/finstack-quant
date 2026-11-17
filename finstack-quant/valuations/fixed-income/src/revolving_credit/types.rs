@@ -1218,6 +1218,17 @@ impl finstack_quant_valuations_core::instruments::Instrument for RevolvingCredit
         crate::FIXED_INCOME
     );
 
+    fn contractual_accrual_config(
+        &self,
+    ) -> Option<finstack_quant_cashflows::accrual::AccrualConfig> {
+        Some(finstack_quant_cashflows::accrual::AccrualConfig {
+            method: finstack_quant_cashflows::accrual::AccrualMethod::Linear,
+            ex_coupon: None,
+            include_pik: false,
+            frequency: Some(self.frequency),
+        })
+    }
+
     fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
         self.validate()
     }

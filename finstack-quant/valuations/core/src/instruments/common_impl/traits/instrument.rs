@@ -935,6 +935,20 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         )
     }
 
+    /// Contractual earning terms for cash-interest accrual on a balance
+    /// sheet: the accrual method and coupon frequency the instrument's own
+    /// coupons earn on, with no settlement ex-coupon window and no PIK.
+    ///
+    /// This is the earning basis of the contract, not the settlement quote
+    /// basis: a bond quoted with an ex-coupon window still earns its coupon
+    /// to the period close. `None` (the default) means the instrument has no
+    /// coupon accrual contract of its own.
+    fn contractual_accrual_config(
+        &self,
+    ) -> Option<finstack_quant_cashflows::accrual::AccrualConfig> {
+        None
+    }
+
     /// Rebuild the instrument for a rate scenario when its projected
     /// cashflows respond to rates.
     ///
