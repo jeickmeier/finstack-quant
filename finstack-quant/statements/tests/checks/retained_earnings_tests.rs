@@ -58,7 +58,7 @@ fn reconciliation_passes() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }
 
@@ -107,7 +107,7 @@ fn reconciliation_fails() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(!result.passed);
+    assert!(!result.passed());
     assert_eq!(result.findings.len(), 1);
     assert_eq!(result.findings[0].period, Some(q(2)));
 
@@ -210,7 +210,7 @@ fn with_other_adjustments() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }
 

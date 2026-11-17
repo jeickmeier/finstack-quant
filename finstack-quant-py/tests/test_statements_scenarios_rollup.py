@@ -158,7 +158,9 @@ def test_formula_check_reports_insufficient_data_instead_of_failing() -> None:
     )
     report = Evaluator().with_checks(suite).evaluate(model).check_report
 
-    assert report.passed
+    # The period could not be judged: the report is incomplete, not passed.
+    assert report.outcome == "incomplete"
+    assert not report.passed
     assert report.total_findings == 1
     (finding,) = report.findings_by_severity("warning")
     assert finding.period == "2025Q1"

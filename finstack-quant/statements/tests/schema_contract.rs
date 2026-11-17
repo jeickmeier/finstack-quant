@@ -11,7 +11,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_statements::adjustments::CapBaseMode;
 use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};
 use finstack_quant_statements::checks::{
-    CheckCategory, CheckFinding, CheckReport, CheckResult, CheckSummary, Materiality, Severity,
+    CheckCategory, CheckFinding, CheckOutcome, CheckReport, CheckResult, CheckSummary, Materiality,
+    Severity,
 };
 use finstack_quant_statements::evaluator::{
     CapitalStructureWarning, EvalStats, EvalWarning, StatementResult,
@@ -199,11 +200,13 @@ fn representative_statement_result() -> StatementResult {
     result.cs_cashflows = Some(cashflows);
 
     result.check_report = Some(CheckReport {
+        outcome: CheckOutcome::Fail,
         results: vec![CheckResult {
             check_id: "balance-sheet".to_string(),
             check_name: "Balance sheet balances".to_string(),
             category: CheckCategory::AccountingIdentity,
-            passed: false,
+            outcome: CheckOutcome::Fail,
+            evaluated: 1,
             findings: vec![CheckFinding {
                 check_id: "balance-sheet".to_string(),
                 severity: Severity::Warning,
@@ -217,6 +220,7 @@ fn representative_statement_result() -> StatementResult {
                 }),
                 nodes: vec!["total_assets".into(), "total_liabilities".into()],
                 comparison: None,
+                coverage: false,
             }],
             comparisons: Vec::new(),
         }],
@@ -224,6 +228,8 @@ fn representative_statement_result() -> StatementResult {
             total_checks: 1,
             passed: 0,
             failed: 1,
+            incomplete: 0,
+            unevaluated: 0,
             errors: 0,
             warnings: 1,
             infos: 0,

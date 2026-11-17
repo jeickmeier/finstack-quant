@@ -52,7 +52,7 @@ fn depreciation_reconciles_passes() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }
 
@@ -246,7 +246,7 @@ fn capex_reconciles_passes() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }
 
@@ -304,7 +304,13 @@ fn capex_no_components_passes_trivially() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    // With no component nodes there is nothing to reconcile: the check is
+    // unevaluated, which is not a pass.
+    assert_eq!(
+        result.outcome,
+        finstack_quant_statements::checks::CheckOutcome::Unevaluated
+    );
+    assert!(result.findings.is_empty());
 }
 
 // DividendReconciliation
@@ -332,7 +338,7 @@ fn dividends_reconcile_passes() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }
 

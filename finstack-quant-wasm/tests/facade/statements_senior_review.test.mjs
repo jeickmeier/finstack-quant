@@ -329,7 +329,7 @@ test('accounting overflow fails without publishing invalid numbers', () => {
   const report = statements_analytics.runChecks(input, suite);
   assert.equal(report.summary.failed, 1);
   const result = report.results[0];
-  assert.equal(result.passed, false);
+  assert.equal(result.outcome, 'fail');
   assert.equal(result.comparisons.length, 2);
   assert.equal(result.findings[0].severity, 'error');
   assert.equal(result.findings[0].comparison ?? null, null);

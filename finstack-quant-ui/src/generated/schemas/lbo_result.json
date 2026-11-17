@@ -117,6 +117,31 @@
         }
       ]
     },
+    "d_3644af53ded616741924": {
+      "description": "Verdict of a check, or of a whole report, decided from every outcome\nbefore any reporting filter is applied.",
+      "oneOf": [
+        {
+          "const": "pass",
+          "description": "Work was evaluated, required coverage was complete and nothing failed.",
+          "type": "string"
+        },
+        {
+          "const": "fail",
+          "description": "At least one error-severity finding.",
+          "type": "string"
+        },
+        {
+          "const": "incomplete",
+          "description": "Nothing failed, but required data was missing or unavailable for at\nleast one period or cell.",
+          "type": "string"
+        },
+        {
+          "const": "unevaluated",
+          "description": "Nothing was evaluated: an empty suite, or a check with no applicable\nperiod or cell.",
+          "type": "string"
+        }
+      ]
+    },
     "d_5df3315c25302264a1a6": {
       "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
       "pattern": "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$",
@@ -156,8 +181,12 @@
     "d_69ed1d0fd3aee296bce5": {
       "description": "Full report aggregating all [`CheckResult`]s from a check run.",
       "properties": {
+        "outcome": {
+          "$ref": "#/$defs/d_3644af53ded616741924",
+          "description": "Verdict of the suite from the unfiltered check outcomes: `fail` when\nany check failed, else `incomplete` when any check is incomplete,\nelse `pass` when at least one check passed, else `unevaluated` (an\nempty suite, or one with no applicable check)."
+        },
         "results": {
-          "description": "Individual results for each check.",
+          "description": "Individual results for each check, in declared order.",
           "items": {
             "$ref": "#/$defs/d_a64e478bd80b60331435"
           },
@@ -169,6 +198,7 @@
         }
       },
       "required": [
+        "outcome",
         "results",
         "summary"
       ],
@@ -994,7 +1024,13 @@
           "type": "integer"
         },
         "failed": {
-          "description": "Number of checks that failed (at least one error-severity finding).",
+          "description": "Number of checks whose outcome is `fail` (an error-severity finding).",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "incomplete": {
+          "description": "Number of checks whose outcome is `incomplete` (a coverage finding).",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
@@ -1006,13 +1042,19 @@
           "type": "integer"
         },
         "passed": {
-          "description": "Number of checks that passed.",
+          "description": "Number of checks whose outcome is `pass`.",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
         },
         "total_checks": {
           "description": "Total number of checks executed.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unevaluated": {
+          "description": "Number of checks whose outcome is `unevaluated` (nothing examined).",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
@@ -1028,6 +1070,8 @@
         "total_checks",
         "passed",
         "failed",
+        "incomplete",
+        "unevaluated",
         "errors",
         "warnings",
         "infos"
@@ -1056,23 +1100,30 @@
           },
           "type": "array"
         },
+        "evaluated": {
+          "description": "Number of periods or cells the check examined.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
         "findings": {
-          "description": "Individual findings produced by the check.",
+          "description": "Findings produced by the check. The suite's `min_severity` and\n`materiality_threshold` filters remove advisory findings only: an\nerror-severity or coverage finding is always retained.",
           "items": {
             "$ref": "#/$defs/d_ab7ac1a2678059460e09"
           },
           "type": "array"
         },
-        "passed": {
-          "description": "Whether the check passed (no error-severity findings).",
-          "type": "boolean"
+        "outcome": {
+          "$ref": "#/$defs/d_3644af53ded616741924",
+          "description": "Verdict of the check, decided from all of its findings before the\nsuite's reporting filters: `fail` on an error-severity finding, else\n`incomplete` on a coverage finding, else `unevaluated` when\n`evaluated` is zero, else `pass`."
         }
       },
       "required": [
         "check_id",
         "check_name",
         "category",
-        "passed",
+        "outcome",
+        "evaluated",
         "findings"
       ],
       "type": "object"
@@ -1094,6 +1145,10 @@
             }
           ],
           "description": "The failed numeric comparison behind this finding (actual, expected and\ntolerance). `None` for findings that do not compare two numbers:\nskipped periods, missing or non-finite inputs, sign-convention\nwarnings, and formula checks without a tolerance (a formula check\nwith a tolerance compares its value against zero)."
+        },
+        "coverage": {
+          "description": "True for a coverage finding: required data was missing or unavailable,\nso the check could not evaluate the period or cell it names. A\ncoverage finding makes its check incomplete and is never removed by\nthe reporting filters.",
+          "type": "boolean"
         },
         "materiality": {
           "anyOf": [

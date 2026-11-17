@@ -107,7 +107,7 @@ fn formula_checks_recover_missing_type_metadata_from_the_model() {
             formula_check(formula, tolerance)
                 .execute(&CheckContext::new(&model, &results))
                 .unwrap()
-                .passed
+                .passed()
         );
     }
 }
@@ -127,7 +127,7 @@ fn formula_checks_validate_capital_structure_reporting_units() {
         formula_check("cs.interest_expense.total == usd", None)
             .execute(&CheckContext::new(&model, &results))
             .unwrap()
-            .passed
+            .passed()
     );
     assert!(
         formula_check("cs.interest_expense.total == eur", None)
@@ -192,7 +192,7 @@ fn formula_checks_keep_native_instrument_units_distinct_from_reporting_totals() 
                 formula_check(formula, None)
                     .execute(&CheckContext::new(check_model, &results))
                     .unwrap()
-                    .passed
+                    .passed()
             );
         }
         let error = formula_check(
@@ -238,7 +238,8 @@ fn checked_balance_sheet() -> (FinancialModelSpec, StatementResult, CheckSuite) 
             equity_nodes: vec![NodeId::new("equity")],
             tolerance: None,
         })
-        .build();
+        .build()
+        .expect("unique check ids");
     let mut results = Evaluator::new().evaluate(&model).unwrap();
     results.check_report = Some(suite.run(&model, &results).unwrap());
     (model, results, suite)
@@ -289,7 +290,7 @@ fn failed_and_empty_normalization_merges_preserve_the_original_report_and_values
 }
 
 fn assert_arithmetic_failure(result: &finstack_quant_statements::checks::CheckResult) {
-    assert!(!result.passed);
+    assert!(!result.passed());
     assert!(result.findings.iter().any(|finding| {
         finding.severity == Severity::Error
             && finding.message.contains("Arithmetic overflow")
@@ -341,7 +342,8 @@ fn balance_sheet_arithmetic_overflow_fails_without_publishing_nonfinite_numbers(
         let suite = CheckSuite::builder("overflow")
             .config(context.config.clone())
             .add_check(check)
-            .build();
+            .build()
+            .expect("unique check ids");
         let report = suite.run(&model, &results).unwrap();
         assert!(report.has_errors());
         assert_eq!(report.summary.failed, 1);

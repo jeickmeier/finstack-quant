@@ -48,7 +48,7 @@ fn revenue_positive_passes() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }
 
@@ -79,7 +79,7 @@ fn failing_formula_produces_finding() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(!result.passed);
+    assert!(!result.passed());
     assert_eq!(result.findings.len(), 1);
     assert_eq!(result.findings[0].severity, Severity::Error);
     assert!(result.findings[0].message.contains("non-positive"));
@@ -113,7 +113,7 @@ fn warning_severity_does_not_fail() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed); // warning-only, still passes
+    assert!(result.passed()); // warning-only, still passes
     assert_eq!(result.findings.len(), 1);
     assert_eq!(result.findings[0].severity, Severity::Warning);
 }
@@ -147,7 +147,7 @@ fn arithmetic_formula_evaluates() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }
 
@@ -232,7 +232,7 @@ fn nested_expression_gross_margin() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }
 
@@ -263,7 +263,7 @@ fn nested_expression_gross_margin_fails() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(!result.passed);
+    assert!(!result.passed());
     assert_eq!(result.findings.len(), 1);
 }
 
@@ -297,7 +297,7 @@ fn abs_function_in_formula() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
 }
 
 #[test]
@@ -328,7 +328,7 @@ fn abs_function_detects_imbalance() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(!result.passed);
+    assert!(!result.passed());
     assert_eq!(result.findings.len(), 1);
 }
 
@@ -363,7 +363,7 @@ fn multi_operator_addition() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
 }
 
 // max() / min() functions
@@ -394,7 +394,7 @@ fn max_min_functions() {
 
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
-    assert!(result.passed);
+    assert!(result.passed());
 
     // min(5, 10) == 5 → pass
     let check_min = FormulaCheckSpec {
@@ -408,7 +408,7 @@ fn max_min_functions() {
     };
 
     let result_min = check_min.execute(&ctx).unwrap();
-    assert!(result_min.passed);
+    assert!(result_min.passed());
 }
 
 // if() conditional
@@ -438,7 +438,7 @@ fn if_conditional_formula() {
 
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
-    assert!(result.passed);
+    assert!(result.passed());
 }
 
 #[test]
@@ -463,7 +463,7 @@ fn canonical_variadic_function_is_supported() {
 
     let result = check.execute(&CheckContext::new(&model, &results)).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
 }
 
 #[test]
@@ -487,7 +487,7 @@ fn canonical_time_series_function_uses_evaluated_history() {
 
     let result = check.execute(&CheckContext::new(&model, &results)).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
 }
 
 #[test]
@@ -521,7 +521,7 @@ fn capital_structure_reference_uses_result_cashflows() {
 
     let result = check.execute(&CheckContext::new(&model, &results)).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
 }
 
 fn predicate_check(formula: &str, tolerance: Option<f64>) -> FormulaCheckSpec {
@@ -574,8 +574,15 @@ fn non_finite_input_reports_insufficient_data() {
             .execute(&CheckContext::new(&model, &results))
             .unwrap();
 
-        assert!(result.passed, "{formula}: {:?}", result.findings);
+        // A period that could not be judged makes the check incomplete.
+        assert_eq!(
+            result.outcome,
+            finstack_quant_statements::checks::CheckOutcome::Incomplete,
+            "{formula}: {:?}",
+            result.findings
+        );
         assert_eq!(result.findings.len(), 1, "{formula}: {:?}", result.findings);
+        assert!(result.findings[0].coverage);
         let finding = &result.findings[0];
         assert_eq!(finding.severity, Severity::Warning);
         assert_eq!(finding.period, Some(q(2)));
@@ -606,7 +613,10 @@ fn missing_input_cell_reports_insufficient_data() {
         .execute(&CheckContext::new(&model, &results))
         .unwrap();
 
-    assert!(result.passed);
+    assert_eq!(
+        result.outcome,
+        finstack_quant_statements::checks::CheckOutcome::Incomplete
+    );
     assert_eq!(insufficient_periods(&result), vec![q(2)]);
 }
 
@@ -628,7 +638,7 @@ fn lag_before_first_period_reports_insufficient_data() {
         .unwrap();
 
     // Q1 has no prior quarter, Q2 grows 10% and passes, Q3 grows 355% and fails.
-    assert!(!result.passed);
+    assert!(!result.passed());
     assert_eq!(insufficient_periods(&result), vec![q(1)]);
     let failures: Vec<_> = result
         .findings

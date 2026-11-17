@@ -691,7 +691,11 @@ pub fn run_checks(
     let suite = spec.resolve().map_err(to_js_err)?;
     let results = parse_optional_results(results_json)?;
     let report = suite
-        .run_model(&model, results.as_ref())
+        .run_model(
+            &model,
+            &finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+            results.as_ref(),
+        )
         .map_err(to_js_err)?;
     to_js_value(&report)
 }
@@ -729,10 +733,15 @@ pub fn run_three_statement_checks(
     let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
     let mapping: finstack_quant_statements_analytics::analysis::ThreeStatementMapping =
         serde_json::from_str(mapping_json).map_err(to_js_err)?;
-    let suite = finstack_quant_statements_analytics::analysis::three_statement_checks(mapping);
+    let suite = finstack_quant_statements_analytics::analysis::three_statement_checks(mapping)
+        .map_err(to_js_err)?;
     let results = parse_optional_results(results_json)?;
     let report = suite
-        .run_model(&model, results.as_ref())
+        .run_model(
+            &model,
+            &finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+            results.as_ref(),
+        )
         .map_err(to_js_err)?;
     to_js_value(&report)
 }
@@ -767,10 +776,15 @@ pub fn run_credit_underwriting_checks(
     let model = FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
     let mapping: finstack_quant_statements_analytics::analysis::CreditMapping =
         serde_json::from_str(mapping_json).map_err(to_js_err)?;
-    let suite = finstack_quant_statements_analytics::analysis::credit_underwriting_checks(mapping);
+    let suite = finstack_quant_statements_analytics::analysis::credit_underwriting_checks(mapping)
+        .map_err(to_js_err)?;
     let results = parse_optional_results(results_json)?;
     let report = suite
-        .run_model(&model, results.as_ref())
+        .run_model(
+            &model,
+            &finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+            results.as_ref(),
+        )
         .map_err(to_js_err)?;
     to_js_value(&report)
 }

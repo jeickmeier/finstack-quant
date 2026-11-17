@@ -8,7 +8,10 @@ use finstack_quant_statements::checks::builtins::{
     BalanceSheetArticulation, CashReconciliation, MissingValueCheck, NonFiniteCheck,
     RetainedEarningsReconciliation,
 };
-use finstack_quant_statements::checks::{CheckSuite, PeriodScope, Severity, SignConventionPolicy};
+use finstack_quant_statements::checks::{
+    Check, CheckCategory, CheckContext, CheckResult, CheckSuite, PeriodScope, Severity,
+    SignConventionPolicy,
+};
 
 use super::consistency::{EffectiveTaxRateCheck, GrowthRateConsistency, WorkingCapitalConsistency};
 use super::credit::{
@@ -68,7 +71,10 @@ const RUNWAY_ERROR_MONTHS: f64 = 6.0;
 ///
 /// * `mapping` - Three-statement node mapping that identifies balance-sheet,
 ///   cash-flow, and optional depreciation-reconciliation source nodes.
-pub fn three_statement_checks(mapping: ThreeStatementMapping) -> CheckSuite {
+pub fn three_statement_checks(
+    mapping: ThreeStatementMapping,
+) -> finstack_quant_statements::Result<CheckSuite> {
+    let config = mapping.config.clone();
     let mut builder = CheckSuite::builder("Three-Statement Checks")
         .description("Structural and data-quality checks for a three-statement model");
 
@@ -202,15 +208,55 @@ pub fn three_statement_checks(mapping: ThreeStatementMapping) -> CheckSuite {
         scope: PeriodScope::AllPeriods,
     });
 
-    builder.build()
+    builder.config(config).build()
 }
 
 // Credit underwriting suite
 
+/// The non-finite data-quality check scoped to the credit ratio inputs.
+///
+/// It has its own identifier so the credit suite can be merged with a suite
+/// that runs the general `non_finite` check over other nodes: a check
+/// identifier names exactly one check of a suite.
+struct CreditInputsFinite(NonFiniteCheck);
+
+impl Check for CreditInputsFinite {
+    fn id(&self) -> &str {
+        "credit_inputs_non_finite"
+    }
+
+    fn name(&self) -> &str {
+        "Credit Inputs Non-Finite"
+    }
+
+    fn category(&self) -> CheckCategory {
+        CheckCategory::DataQuality
+    }
+
+    fn execute(&self, context: &CheckContext) -> finstack_quant_statements::Result<CheckResult> {
+        let inner = self.0.execute(context)?;
+        let findings = inner
+            .findings
+            .into_iter()
+            .map(|mut finding| {
+                finding.check_id = self.id().to_string();
+                finding
+            })
+            .collect();
+        Ok(CheckResult::new(
+            self,
+            inner.evaluated,
+            findings,
+            inner.comparisons,
+        ))
+    }
+}
+
 /// Build a check suite for credit underwriting analysis.
 ///
 /// Includes:
-/// - **NonFiniteCheck** over the credit ratio inputs (always)
+/// - **NonFiniteCheck** over the credit ratio inputs, under the identifier
+///   `credit_inputs_non_finite` (always)
 /// - **LeverageRangeCheck** (always)
 /// - **CoverageFloorCheck** (always)
 /// - **FcfSignCheck** (if `fcf_node` is provided)
@@ -223,10 +269,13 @@ pub fn three_statement_checks(mapping: ThreeStatementMapping) -> CheckSuite {
 ///
 /// * `mapping` - Credit-analysis node mapping that identifies debt, EBITDA,
 ///   interest, and optional free-cash-flow inputs plus warning thresholds.
-pub fn credit_underwriting_checks(mapping: CreditMapping) -> CheckSuite {
+pub fn credit_underwriting_checks(
+    mapping: CreditMapping,
+) -> finstack_quant_statements::Result<CheckSuite> {
     let warn = mapping.leverage_warn.unwrap_or((0.0, 6.0));
     let cov_warn = mapping.coverage_min_warn.unwrap_or(1.5);
 
+    let config = mapping.config.clone();
     let mut builder = CheckSuite::builder("Credit Underwriting Checks")
         .description("Leverage, coverage, cash-flow, and trend checks for credit analysis");
 
@@ -241,9 +290,9 @@ pub fn credit_underwriting_checks(mapping: CreditMapping) -> CheckSuite {
     if let Some(ref fcf_node) = mapping.fcf_node {
         credit_nodes.push(fcf_node.clone());
     }
-    builder = builder.add_check(NonFiniteCheck {
+    builder = builder.add_check(CreditInputsFinite(NonFiniteCheck {
         nodes: credit_nodes,
-    });
+    }));
 
     builder = builder.add_check(LeverageRangeCheck {
         debt_node: mapping.debt_node.clone(),
@@ -280,6 +329,7 @@ pub fn credit_underwriting_checks(mapping: CreditMapping) -> CheckSuite {
     // Trend checks — use EBITDA as a proxy for coverage direction and
     // debt/EBITDA leverage direction.
     builder = builder.add_check(TrendCheck {
+        id: format!("trend_{}", mapping.ebitda_node),
         node: mapping.ebitda_node.clone(),
         direction: TrendDirection::IncreasingIsGood,
         lookback_periods: 3,
@@ -287,13 +337,14 @@ pub fn credit_underwriting_checks(mapping: CreditMapping) -> CheckSuite {
     });
 
     builder = builder.add_check(TrendCheck {
+        id: format!("trend_{}", mapping.debt_node),
         node: mapping.debt_node,
         direction: TrendDirection::DecreasingIsGood,
         lookback_periods: 3,
         severity: Severity::Warning,
     });
 
-    builder.build()
+    builder.config(config).build()
 }
 
 // LBO suite
@@ -309,15 +360,19 @@ pub fn credit_underwriting_checks(mapping: CreditMapping) -> CheckSuite {
 /// * `mapping` - Three-statement node mapping used to construct structural and
 ///   data-quality checks.
 /// * `credit` - Credit-underwriting node mapping; its leverage warning range
-///   is replaced with the LBO-specific range.
-pub fn lbo_model_checks(mapping: ThreeStatementMapping, credit: CreditMapping) -> CheckSuite {
-    let ts_suite = three_statement_checks(mapping);
+///   is replaced with the LBO-specific range. Its `config` must equal
+///   `mapping.config`: the two suites merge only under one policy.
+pub fn lbo_model_checks(
+    mapping: ThreeStatementMapping,
+    credit: CreditMapping,
+) -> finstack_quant_statements::Result<CheckSuite> {
+    let ts_suite = three_statement_checks(mapping)?;
 
     let credit_override = CreditMapping {
         leverage_warn: Some((0.0, 8.0)),
         ..credit
     };
-    let credit_suite = credit_underwriting_checks(credit_override);
+    let credit_suite = credit_underwriting_checks(credit_override)?;
 
     ts_suite.merge(credit_suite)
 }

@@ -162,22 +162,13 @@ impl Check for FormulaCheckSpec {
                     materiality: None,
                     nodes: vec![],
                     comparison,
+                    coverage: false,
                 });
             }
         }
 
-        let passed = !findings
-            .iter()
-            .any(|finding| finding.severity >= Severity::Error);
-
-        Ok(CheckResult {
-            check_id: self.id.clone(),
-            check_name: self.name.clone(),
-            category: self.category,
-            passed,
-            findings,
-            comparisons,
-        })
+        let evaluated = context.model.periods.len();
+        Ok(CheckResult::new(self, evaluated, findings, comparisons))
     }
 }
 
@@ -199,6 +190,7 @@ impl FormulaCheckSpec {
             materiality: None,
             nodes,
             comparison: None,
+            coverage: true,
         }
     }
 }

@@ -371,7 +371,9 @@ remain pending.
 The Statements numerical comparison and check-suite contract was accepted on
 2026-11-15. It covers typed tolerances, unfiltered coverage verdicts, advisory
 filters, ordered suites and supplied-result provenance.
-Implementation and independent qualification remain pending.
+The tolerance rule, four-state verdicts, advisory-only filters, unique ordered
+identifiers, compatible merges and verified result provenance are implemented
+and qualified; typed comparison values remain.
 [STATEMENTS-CONTRACTS-014](statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
 
 The Statements formula-check contract was accepted on 2026-11-15.
@@ -389,8 +391,8 @@ independent qualification remain pending.
 The Statements dependency graph, cell precedence and prepared evaluation
 contract was accepted on 2026-11-15. It covers closed dependencies, distinct
 mask states, explicit snapshots, forecast eligibility and checked plan reuse.
-Cell states, dependency edges and plan reuse are implemented and qualified;
-published run provenance and finalization checks remain pending.
+Cell states, dependency edges, plan reuse, published run provenance and the
+check suite at finalization are implemented and qualified.
 [STATEMENTS-EVALUATION-001](statements-evaluation/01-graph-precedence-and-prepared-plans.md#accepted-decision-for-dependency-graphs-cell-precedence-and-prepared-evaluation).
 
 The Statements scalar formulas and unavailable-value contract was accepted on

@@ -25,6 +25,9 @@ pub enum TrendDirection {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct TrendCheck {
+    /// Identifier of this check, unique within its suite (a suite may watch
+    /// several nodes, one trend check each).
+    pub id: String,
     /// Node to monitor.
     pub node: NodeId,
     /// Which direction is "good".
@@ -37,7 +40,7 @@ pub struct TrendCheck {
 
 impl Check for TrendCheck {
     fn id(&self) -> &str {
-        "trend"
+        &self.id
     }
 
     fn name(&self) -> &str {
@@ -83,6 +86,7 @@ impl Check for TrendCheck {
                         materiality: None,
                         nodes: vec![self.node.clone()],
                         comparison: None,
+                        coverage: false,
                     });
                 }
                 consecutive_bad = 0;
@@ -113,19 +117,12 @@ impl Check for TrendCheck {
                     materiality: None,
                     nodes: vec![self.node.clone()],
                     comparison: None,
+                    coverage: false,
                 });
             }
         }
 
-        let passed = !findings.iter().any(|f| f.severity >= Severity::Error);
-
-        Ok(CheckResult {
-            check_id: self.id().to_string(),
-            check_name: self.name().to_string(),
-            category: self.category(),
-            passed,
-            findings,
-            comparisons: Vec::new(),
-        })
+        let evaluated = context.model.periods.len();
+        Ok(CheckResult::new(self, evaluated, findings, Vec::new()))
     }
 }

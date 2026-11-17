@@ -47,6 +47,7 @@ fn ts_mapping() -> ThreeStatementMapping {
         wc_change_cf_node: None,
         current_assets_nodes: vec![],
         current_liabilities_nodes: vec![],
+        config: Default::default(),
     }
 }
 
@@ -60,6 +61,7 @@ fn credit_mapping() -> CreditMapping {
         cash_burn_node: None,
         leverage_warn: None,
         coverage_min_warn: None,
+        config: Default::default(),
     }
 }
 
@@ -185,7 +187,10 @@ fn integration_imbalanced_model_catches_errors_and_warnings() {
 
     let mapping = ts_mapping();
     let cm = credit_mapping();
-    let suite = three_statement_checks(mapping).merge(credit_underwriting_checks(cm));
+    let suite = three_statement_checks(mapping)
+        .expect("valid suite")
+        .merge(credit_underwriting_checks(cm).expect("valid suite"))
+        .expect("compatible suites");
     let report = suite.run(&model, &results).unwrap();
 
     // --- Errors ---
@@ -369,7 +374,10 @@ fn integration_balanced_model_passes_all_checks() {
 
     let mapping = ts_mapping();
     let cm = credit_mapping();
-    let suite = three_statement_checks(mapping).merge(credit_underwriting_checks(cm));
+    let suite = three_statement_checks(mapping)
+        .expect("valid suite")
+        .merge(credit_underwriting_checks(cm).expect("valid suite"))
+        .expect("compatible suites");
     let report = suite.run(&model, &results).unwrap();
 
     assert!(

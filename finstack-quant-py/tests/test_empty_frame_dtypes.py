@@ -118,11 +118,14 @@ class TestOtherSchemaFrames:
     def test_check_report_frames_are_typed_when_empty(self) -> None:
         report = CheckReport.from_json(
             json.dumps({
+                "outcome": "unevaluated",
                 "results": [],
                 "summary": {
                     "total_checks": 0,
                     "passed": 0,
                     "failed": 0,
+                    "incomplete": 0,
+                    "unevaluated": 0,
                     "errors": 0,
                     "warnings": 0,
                     "infos": 0,
@@ -131,7 +134,7 @@ class TestOtherSchemaFrames:
         )
         checks = report.to_dataframe()
         findings = report.to_findings_dataframe()
-        assert str(checks.dtypes["passed"]) == "bool"
+        assert str(checks.dtypes["outcome"]) == "str"
         assert str(checks.dtypes["finding_count"]) == "int64"
         assert str(findings.dtypes["materiality_absolute"]) == "float64"
 

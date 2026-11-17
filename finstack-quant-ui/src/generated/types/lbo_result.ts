@@ -87,7 +87,14 @@ export interface LboResultWire {
  */
 export interface D_69Ed1D0Fd3Aee296Bce5 {
   /**
-   * Individual results for each check.
+   * Verdict of the suite from the unfiltered check outcomes: `fail` when
+   * any check failed, else `incomplete` when any check is incomplete,
+   * else `pass` when at least one check passed, else `unevaluated` (an
+   * empty suite, or one with no applicable check).
+   */
+  outcome: "pass" | "fail" | "incomplete" | "unevaluated";
+  /**
+   * Individual results for each check, in declared order.
    */
   results: DA64E478Bd80B60331435[];
   summary: D_8Cf6A34771F30E7523Cf;
@@ -125,13 +132,22 @@ export interface DA64E478Bd80B60331435 {
    */
   comparisons?: DE423Eb660D927A5Db922[];
   /**
-   * Individual findings produced by the check.
+   * Number of periods or cells the check examined.
+   */
+  evaluated: number;
+  /**
+   * Findings produced by the check. The suite's `min_severity` and
+   * `materiality_threshold` filters remove advisory findings only: an
+   * error-severity or coverage finding is always retained.
    */
   findings: DAb7Ac1A2678059460E09[];
   /**
-   * Whether the check passed (no error-severity findings).
+   * Verdict of the check, decided from all of its findings before the
+   * suite's reporting filters: `fail` on an error-severity finding, else
+   * `incomplete` on a coverage finding, else `unevaluated` when
+   * `evaluated` is zero, else `pass`.
    */
-  passed: boolean;
+  outcome: "pass" | "fail" | "incomplete" | "unevaluated";
   [k: string]: unknown;
 }
 /**
@@ -191,6 +207,13 @@ export interface DAb7Ac1A2678059460E09 {
    */
   comparison?: DE423Eb660D927A5Db922 | null;
   /**
+   * True for a coverage finding: required data was missing or unavailable,
+   * so the check could not evaluate the period or cell it names. A
+   * coverage finding makes its check incomplete and is never removed by
+   * the reporting filters.
+   */
+  coverage?: boolean;
+  /**
    * Materiality context, if applicable.
    */
   materiality?: D_60E7F94Bf13Dea34E179 | null;
@@ -244,21 +267,29 @@ export interface D_8Cf6A34771F30E7523Cf {
    */
   errors: number;
   /**
-   * Number of checks that failed (at least one error-severity finding).
+   * Number of checks whose outcome is `fail` (an error-severity finding).
    */
   failed: number;
+  /**
+   * Number of checks whose outcome is `incomplete` (a coverage finding).
+   */
+  incomplete: number;
   /**
    * Total number of info-severity findings across all checks.
    */
   infos: number;
   /**
-   * Number of checks that passed.
+   * Number of checks whose outcome is `pass`.
    */
   passed: number;
   /**
    * Total number of checks executed.
    */
   total_checks: number;
+  /**
+   * Number of checks whose outcome is `unevaluated` (nothing examined).
+   */
+  unevaluated: number;
   /**
    * Total number of warning-severity findings across all checks.
    */

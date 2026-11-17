@@ -94,21 +94,14 @@ impl Check for GrowthRateConsistency {
                         }),
                         nodes: vec![node.clone()],
                         comparison: None,
+                        coverage: false,
                     });
                 }
             }
         }
 
-        let passed = !findings.iter().any(|f| f.severity >= Severity::Error);
-
-        Ok(CheckResult {
-            check_id: self.id().to_string(),
-            check_name: self.name().to_string(),
-            category: self.category(),
-            passed,
-            findings,
-            comparisons: Vec::new(),
-        })
+        let evaluated = context.model.periods.len();
+        Ok(CheckResult::new(self, evaluated, findings, Vec::new()))
     }
 }
 

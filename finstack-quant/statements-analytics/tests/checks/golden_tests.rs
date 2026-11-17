@@ -47,6 +47,7 @@ fn ts_mapping() -> ThreeStatementMapping {
         wc_change_cf_node: None,
         current_assets_nodes: vec![],
         current_liabilities_nodes: vec![],
+        config: Default::default(),
     }
 }
 
@@ -60,6 +61,7 @@ fn credit_mapping() -> CreditMapping {
         cash_burn_node: None,
         leverage_warn: None,
         coverage_min_warn: None,
+        config: Default::default(),
     }
 }
 
@@ -174,8 +176,10 @@ fn build_and_check_model() -> finstack_quant_statements::checks::CheckReport {
     let mut ev = Evaluator::new();
     let results = ev.evaluate(&model).unwrap();
 
-    let suite =
-        three_statement_checks(ts_mapping()).merge(credit_underwriting_checks(credit_mapping()));
+    let suite = three_statement_checks(ts_mapping())
+        .expect("valid suite")
+        .merge(credit_underwriting_checks(credit_mapping()).expect("valid suite"))
+        .expect("compatible suites");
     suite.run(&model, &results).unwrap()
 }
 

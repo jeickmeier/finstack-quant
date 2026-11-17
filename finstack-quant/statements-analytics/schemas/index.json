@@ -83,7 +83,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corporate_analysis_options.schema.json",
-      "bytes": 27661,
+      "bytes": 27376,
       "kind": "input",
       "path": "schemas/statements_analytics/1/corporate_analysis_options.schema.json",
       "summary": "Optional DCF, coverage, check-suite, valuation-date and LTV settings of the corporate analysis pipeline.",
@@ -254,7 +254,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json",
-      "bytes": 15474,
+      "bytes": 18967,
       "kind": "input",
       "path": "schemas/statements_analytics/1/lbo_config.schema.json",
       "summary": "Transaction assumptions for an LBO evaluation.",
@@ -263,7 +263,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json",
-      "bytes": 35575,
+      "bytes": 38212,
       "kind": "output",
       "path": "schemas/statements_analytics/1/lbo_result.schema.json",
       "summary": "Outputs of an LBO evaluation.",
@@ -461,7 +461,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/trend_check.schema.json",
-      "bytes": 3394,
+      "bytes": 3578,
       "kind": "component",
       "path": "schemas/statements_analytics/1/trend_check.schema.json",
       "summary": "Flags a metric that has been deteriorating for `lookback_periods` consecutive periods.",

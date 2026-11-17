@@ -25,6 +25,6 @@ pub use suite::{
 };
 pub use traits::{Check, CheckContext};
 pub use types::{
-    CheckCategory, CheckComparison, CheckConfig, CheckFinding, CheckReport, CheckResult,
-    CheckSummary, Materiality, PeriodScope, Severity, SignConventionPolicy,
+    CheckCategory, CheckComparison, CheckConfig, CheckFinding, CheckOutcome, CheckReport,
+    CheckResult, CheckSummary, Materiality, PeriodScope, Severity, SignConventionPolicy,
 };

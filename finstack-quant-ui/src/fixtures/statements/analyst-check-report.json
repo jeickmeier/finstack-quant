@@ -1,10 +1,12 @@
 {
+  "outcome": "fail",
   "results": [
     {
       "check_id": "non_finite",
       "check_name": "Non-Finite Value",
       "category": "data_quality",
-      "passed": false,
+      "outcome": "fail",
+      "evaluated": 208,
       "findings": [
         {
           "check_id": "non_finite",
@@ -61,28 +63,32 @@
       "check_id": "leverage_covenant",
       "check_name": "Gross leverage <= 3.50x",
       "category": "credit_reasonableness",
-      "passed": true,
+      "outcome": "incomplete",
+      "evaluated": 8,
       "findings": [
         {
           "check_id": "leverage_covenant",
           "severity": "warning",
           "message": "Gross leverage <= 3.50x: insufficient data for 2024Q1: missing or non-finite inputs [leverage]",
           "period": "2024Q1",
-          "nodes": ["leverage"]
+          "nodes": ["leverage"],
+          "coverage": true
         },
         {
           "check_id": "leverage_covenant",
           "severity": "warning",
           "message": "Gross leverage <= 3.50x: insufficient data for 2024Q2: missing or non-finite inputs [leverage]",
           "period": "2024Q2",
-          "nodes": ["leverage"]
+          "nodes": ["leverage"],
+          "coverage": true
         },
         {
           "check_id": "leverage_covenant",
           "severity": "warning",
           "message": "Gross leverage <= 3.50x: insufficient data for 2024Q3: missing or non-finite inputs [leverage]",
           "period": "2024Q3",
-          "nodes": ["leverage"]
+          "nodes": ["leverage"],
+          "coverage": true
         }
       ]
     },
@@ -90,28 +96,32 @@
       "check_id": "coverage_floor",
       "check_name": "Interest coverage >= 3.00x",
       "category": "credit_reasonableness",
-      "passed": true,
+      "outcome": "pass",
+      "evaluated": 8,
       "findings": []
     },
     {
       "check_id": "gross_margin_band",
       "check_name": "Gross margin between 55% and 75%",
       "category": "internal_consistency",
-      "passed": true,
+      "outcome": "pass",
+      "evaluated": 8,
       "findings": []
     },
     {
       "check_id": "fcf_positive",
       "check_name": "Free cash flow positive",
       "category": "credit_reasonableness",
-      "passed": true,
+      "outcome": "pass",
+      "evaluated": 8,
       "findings": []
     },
     {
       "check_id": "debt_corkscrew_ties",
       "check_name": "Opening + draws - repayments = closing",
       "category": "accounting_identity",
-      "passed": true,
+      "outcome": "pass",
+      "evaluated": 8,
       "findings": [],
       "comparisons": [
         {
@@ -175,8 +185,10 @@
   ],
   "summary": {
     "total_checks": 6,
-    "passed": 5,
+    "passed": 4,
     "failed": 1,
+    "incomplete": 1,
+    "unevaluated": 0,
     "errors": 7,
     "warnings": 3,
     "infos": 0

@@ -401,7 +401,7 @@ def test_check_specs_have_no_python_only_defaults_or_grammar() -> None:
     assert report.total_findings == 0
     with pytest.raises(ValueError, match="missing field `assets_nodes`"):
         ThreeStatementMapping(cash_node="cash", retained_earnings_node="re", net_income_node="ni")  # type: ignore[call-arg]
-    assert json.loads(CheckConfig().to_json()) == json.loads(CheckConfig(0.01, 1e-9, 0.0, "info").to_json())
+    assert json.loads(CheckConfig().to_json()) == json.loads(CheckConfig(0.0, 0.0, 0.0, "info").to_json())
 
 
 def test_dependency_tree_is_the_rust_tree_and_text_is_named() -> None:

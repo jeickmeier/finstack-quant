@@ -111,6 +111,7 @@ export interface D_5884433B163D26991C12 {
    * Cash / liquidity node.
    */
   cash_node?: DC9E3046F969A3Cea691D | null;
+  config?: D_94D87Fc0115F13E52Ce3;
   /**
    * Minimum coverage ratio that triggers a warning; defaults to `1.5`.
    */
@@ -251,6 +252,35 @@ export interface D_5884433B163D26991C12 {
   leverage_warn?: [number, number] | null;
 }
 /**
+ * Comparison and reporting policy of the suite. Identities are compared
+ * exactly unless a tolerance is stated here.
+ */
+export interface D_94D87Fc0115F13E52Ce3 {
+  /**
+   * **Relative** tolerance as a fraction of the identity's reference
+   * value (1e-9 allows 10 on a reference of 1e10). Zero, the default,
+   * disables the relative term.
+   */
+  default_relative_tolerance?: number;
+  /**
+   * **Absolute** tolerance for equality comparisons, in the units of the
+   * compared values (0.01 is one cent when nodes are in whole dollars).
+   * Zero, the default, requires exact equality.
+   */
+  default_tolerance?: number;
+  /**
+   * Advisory findings whose absolute materiality is below this threshold
+   * are left out of the report. Error-severity and coverage findings are
+   * always reported.
+   */
+  materiality_threshold?: number;
+  /**
+   * Minimum severity an advisory finding must have to appear in the
+   * report. Coverage findings are always reported.
+   */
+  min_severity?: "info" | "warning" | "error";
+}
+/**
  * Three-statement node mapping (balance sheet, income statement, cash flow).
  */
 export interface D_78D0Da8611Ea67085Bf9 {
@@ -315,6 +345,7 @@ export interface D_78D0Da8611Ea67085Bf9 {
    * Cash from operations node (cash flow statement).
    */
   cfo_node?: DC9E3046F969A3Cea691D | null;
+  config?: D_94D87Fc0115F13E52Ce31;
   /**
    * Capital-structure interest node; when present the interest
    * reconciliation compares against it directly instead of testing an
@@ -471,6 +502,35 @@ export interface D_78D0Da8611Ea67085Bf9 {
    * Change-in-working-capital node (cash flow statement, operating).
    */
   wc_change_cf_node?: DC9E3046F969A3Cea691D | null;
+}
+/**
+ * Comparison and reporting policy of the suite. Identities are compared
+ * exactly unless a tolerance is stated here.
+ */
+export interface D_94D87Fc0115F13E52Ce31 {
+  /**
+   * **Relative** tolerance as a fraction of the identity's reference
+   * value (1e-9 allows 10 on a reference of 1e10). Zero, the default,
+   * disables the relative term.
+   */
+  default_relative_tolerance?: number;
+  /**
+   * **Absolute** tolerance for equality comparisons, in the units of the
+   * compared values (0.01 is one cent when nodes are in whole dollars).
+   * Zero, the default, requires exact equality.
+   */
+  default_tolerance?: number;
+  /**
+   * Advisory findings whose absolute materiality is below this threshold
+   * are left out of the report. Error-severity and coverage findings are
+   * always reported.
+   */
+  materiality_threshold?: number;
+  /**
+   * Minimum severity an advisory finding must have to appear in the
+   * report. Coverage findings are always reported.
+   */
+  min_severity?: "info" | "warning" | "error";
 }
 /**
  * One funded debt tranche in the day-one capital structure.

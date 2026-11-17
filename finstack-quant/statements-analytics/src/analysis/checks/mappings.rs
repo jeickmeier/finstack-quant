@@ -83,6 +83,10 @@ pub struct ThreeStatementMapping {
     /// Current-liability nodes summed into net working capital.
     #[serde(default)]
     pub current_liabilities_nodes: Vec<NodeId>,
+    /// Comparison and reporting policy of the suite. Identities are compared
+    /// exactly unless a tolerance is stated here.
+    #[serde(default)]
+    pub config: finstack_quant_statements::checks::CheckConfig,
 }
 
 impl ThreeStatementMapping {
@@ -153,6 +157,10 @@ pub struct CreditMapping {
     pub leverage_warn: Option<(f64, f64)>,
     /// Minimum coverage ratio that triggers a warning; defaults to `1.5`.
     pub coverage_min_warn: Option<f64>,
+    /// Comparison and reporting policy of the suite. Identities are compared
+    /// exactly unless a tolerance is stated here.
+    #[serde(default)]
+    pub config: finstack_quant_statements::checks::CheckConfig,
 }
 
 #[cfg(test)]

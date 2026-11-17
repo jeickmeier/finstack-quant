@@ -336,6 +336,11 @@ export type CheckCategory =
  */
 export type CheckSeverity = "info" | "warning" | "error";
 /**
+ * Verdict of a check, or of a whole report, decided from every outcome
+ * before any reporting filter is applied.
+ */
+export type CheckOutcome = "pass" | "fail" | "incomplete" | "unevaluated";
+/**
  * Opaque company identifier within a peer set.
  */
 export type CompanyId = string;
@@ -1426,43 +1431,39 @@ export interface CheckComparison {
 /**
  * Configuration parameters that govern check execution.
  *
- * Identity checks trigger a finding when
- * `|diff| > max(default_tolerance, default_relative_tolerance * |reference|)`,
- * so an analyst can set an absolute floor (currency units) that catches
- * micro-errors on small balances plus a relative ceiling that scales with
- * larger balance sheets. A per-check tolerance override bypasses both
- * defaults and is applied verbatim.
+ * The identity tolerance is zero unless one is stated: an identity then
+ * holds only when its two sides are equal. An explicit tolerance allows
+ * `|difference| <= max(default_tolerance, default_relative_tolerance *
+ * |reference|)`, where the reference is the identity owner's (total assets
+ * for the balance sheet, for example); a difference equal to the allowance
+ * is within tolerance. A per-check absolute override replaces both terms.
  *
- * All four fields are part of the public configuration surface and are
- * intended to be tuned per-deployment via JSON / serde overrides — e.g.,
- * raising `default_relative_tolerance` to `1e-4` (1 bp) when a downstream
- * process is known to round to the nearest hundred. The defaults
- * (`default_tolerance = 0.01`, `default_relative_tolerance = 1e-9`,
- * `materiality_threshold = 0.0`, `min_severity = Info`) are conservative:
- * the absolute cent floor catches micro-errors on small balances while the
- * relative component absorbs f64 accumulation noise on large ones.
+ * `materiality_threshold` and `min_severity` are reporting filters for
+ * advisory findings. They never change a verdict, and they never remove an
+ * error-severity finding, a coverage finding or a recorded comparison.
  */
 export interface CheckConfig {
   /**
-   * Default **relative** tolerance as a fraction of the reference
-   * denominator (e.g. 1e-6 ≈ "one basis point of a basis point"). Zero
-   * disables relative tolerance.
+   * **Relative** tolerance as a fraction of the identity's reference
+   * value (1e-9 allows 10 on a reference of 1e10). Zero, the default,
+   * disables the relative term.
    */
   default_relative_tolerance?: number;
   /**
-   * Default **absolute** tolerance for equality comparisons, expressed in
-   * the same currency units as the node values being compared (e.g. 0.01
-   * means one cent when nodes are in whole dollars).
+   * **Absolute** tolerance for equality comparisons, in the units of the
+   * compared values (0.01 is one cent when nodes are in whole dollars).
+   * Zero, the default, requires exact equality.
    */
   default_tolerance?: number;
   /**
-   * Findings below this absolute materiality threshold are excluded from
-   * reports. Error-severity findings are exempt: materiality filters
-   * advisory noise, it never changes a check's pass/fail verdict.
+   * Advisory findings whose absolute materiality is below this threshold
+   * are left out of the report. Error-severity and coverage findings are
+   * always reported.
    */
   materiality_threshold?: number;
   /**
-   * Minimum severity a finding must have to appear in the report.
+   * Minimum severity an advisory finding must have to appear in the
+   * report. Coverage findings are always reported.
    */
   min_severity?: CheckSeverity;
 }
@@ -1482,6 +1483,13 @@ export interface CheckFinding {
    * with a tolerance compares its value against zero).
    */
   comparison?: CheckComparison | null;
+  /**
+   * True for a coverage finding: required data was missing or unavailable,
+   * so the check could not evaluate the period or cell it names. A
+   * coverage finding makes its check incomplete and is never removed by
+   * the reporting filters.
+   */
+  coverage?: boolean;
   /**
    * Materiality context, if applicable.
    */
@@ -1532,7 +1540,14 @@ export interface Materiality {
  */
 export interface CheckReport {
   /**
-   * Individual results for each check.
+   * Verdict of the suite from the unfiltered check outcomes: `fail` when
+   * any check failed, else `incomplete` when any check is incomplete,
+   * else `pass` when at least one check passed, else `unevaluated` (an
+   * empty suite, or one with no applicable check).
+   */
+  outcome: CheckOutcome;
+  /**
+   * Individual results for each check, in declared order.
    */
   results: CheckResult[];
   /**
@@ -1568,13 +1583,22 @@ export interface CheckResult {
    */
   comparisons?: CheckComparison[];
   /**
-   * Individual findings produced by the check.
+   * Number of periods or cells the check examined.
+   */
+  evaluated: number;
+  /**
+   * Findings produced by the check. The suite's `min_severity` and
+   * `materiality_threshold` filters remove advisory findings only: an
+   * error-severity or coverage finding is always retained.
    */
   findings: CheckFinding[];
   /**
-   * Whether the check passed (no error-severity findings).
+   * Verdict of the check, decided from all of its findings before the
+   * suite's reporting filters: `fail` on an error-severity finding, else
+   * `incomplete` on a coverage finding, else `unevaluated` when
+   * `evaluated` is zero, else `pass`.
    */
-  passed: boolean;
+  outcome: CheckOutcome;
   [k: string]: unknown;
 }
 /**
@@ -1586,21 +1610,29 @@ export interface CheckSummary {
    */
   errors: number;
   /**
-   * Number of checks that failed (at least one error-severity finding).
+   * Number of checks whose outcome is `fail` (an error-severity finding).
    */
   failed: number;
+  /**
+   * Number of checks whose outcome is `incomplete` (a coverage finding).
+   */
+  incomplete: number;
   /**
    * Total number of info-severity findings across all checks.
    */
   infos: number;
   /**
-   * Number of checks that passed.
+   * Number of checks whose outcome is `pass`.
    */
   passed: number;
   /**
    * Total number of checks executed.
    */
   total_checks: number;
+  /**
+   * Number of checks whose outcome is `unevaluated` (nothing examined).
+   */
+  unevaluated: number;
   /**
    * Total number of warning-severity findings across all checks.
    */
@@ -2284,6 +2316,11 @@ export interface CreditMapping {
    * Cash / liquidity node.
    */
   cash_node?: Id | null;
+  /**
+   * Comparison and reporting policy of the suite. Identities are compared
+   * exactly unless a tolerance is stated here.
+   */
+  config?: CheckConfig;
   /**
    * Minimum coverage ratio that triggers a warning; defaults to `1.5`.
    */
@@ -3656,6 +3693,11 @@ export interface ThreeStatementMapping {
    */
   cfo_node?: Id | null;
   /**
+   * Comparison and reporting policy of the suite. Identities are compared
+   * exactly unless a tolerance is stated here.
+   */
+  config?: CheckConfig;
+  /**
    * Capital-structure interest node; when present the interest
    * reconciliation compares against it directly instead of testing an
    * implied rate.
@@ -4886,6 +4928,11 @@ export interface TrendCheck {
    * Which direction is "good".
    */
   direction: TrendDirection;
+  /**
+   * Identifier of this check, unique within its suite (a suite may watch
+   * several nodes, one trend check each).
+   */
+  id: string;
   /**
    * Number of consecutive deteriorating periods before flagging.
    */

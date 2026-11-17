@@ -84,6 +84,7 @@ impl SignConventionPolicy {
                         materiality: None,
                         nodes: Vec::new(),
                         comparison: None,
+                        coverage: false,
                     })
                 } else {
                     None
@@ -232,6 +233,43 @@ pub struct CheckFinding {
     /// with a tolerance compares its value against zero).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub comparison: Option<CheckComparison>,
+    /// True for a coverage finding: required data was missing or unavailable,
+    /// so the check could not evaluate the period or cell it names. A
+    /// coverage finding makes its check incomplete and is never removed by
+    /// the reporting filters.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub coverage: bool,
+}
+
+/// Verdict of a check, or of a whole report, decided from every outcome
+/// before any reporting filter is applied.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum CheckOutcome {
+    /// Work was evaluated, required coverage was complete and nothing failed.
+    Pass,
+    /// At least one error-severity finding.
+    Fail,
+    /// Nothing failed, but required data was missing or unavailable for at
+    /// least one period or cell.
+    Incomplete,
+    /// Nothing was evaluated: an empty suite, or a check with no applicable
+    /// period or cell.
+    Unevaluated,
+}
+
+impl CheckOutcome {
+    /// Stable snake_case label, identical to the serde wire form.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Pass => "pass",
+            Self::Fail => "fail",
+            Self::Incomplete => "incomplete",
+            Self::Unevaluated => "unevaluated",
+        }
+    }
 }
 
 /// Outcome of a single check execution.
@@ -244,9 +282,16 @@ pub struct CheckResult {
     pub check_name: String,
     /// Category this check belongs to.
     pub category: CheckCategory,
-    /// Whether the check passed (no error-severity findings).
-    pub passed: bool,
-    /// Individual findings produced by the check.
+    /// Verdict of the check, decided from all of its findings before the
+    /// suite's reporting filters: `fail` on an error-severity finding, else
+    /// `incomplete` on a coverage finding, else `unevaluated` when
+    /// `evaluated` is zero, else `pass`.
+    pub outcome: CheckOutcome,
+    /// Number of periods or cells the check examined.
+    pub evaluated: usize,
+    /// Findings produced by the check. The suite's `min_severity` and
+    /// `materiality_threshold` filters remove advisory findings only: an
+    /// error-severity or coverage finding is always retained.
     pub findings: Vec<CheckFinding>,
     /// Every numeric comparison the check evaluated, passing and failing
     /// alike, in evaluation order. A passing check therefore still reports
@@ -259,70 +304,86 @@ pub struct CheckResult {
     pub comparisons: Vec<CheckComparison>,
 }
 
-fn default_check_tolerance() -> f64 {
-    0.01
-}
+impl CheckResult {
+    /// Assemble a check's result and decide its outcome.
+    ///
+    /// # Arguments
+    ///
+    /// * `check` - The check that ran; supplies the identifier, display name
+    ///   and category.
+    /// * `evaluated` - Number of periods or cells the check examined; zero
+    ///   makes a check without findings unevaluated.
+    /// * `findings` - Every finding the check produced, unfiltered.
+    /// * `comparisons` - Every numeric comparison the check evaluated.
+    #[must_use]
+    pub fn new(
+        check: &dyn super::Check,
+        evaluated: usize,
+        findings: Vec<CheckFinding>,
+        comparisons: Vec<CheckComparison>,
+    ) -> Self {
+        let outcome = if findings.iter().any(|f| f.severity == Severity::Error) {
+            CheckOutcome::Fail
+        } else if findings.iter().any(|f| f.coverage) {
+            CheckOutcome::Incomplete
+        } else if evaluated == 0 {
+            CheckOutcome::Unevaluated
+        } else {
+            CheckOutcome::Pass
+        };
+        Self {
+            check_id: check.id().to_string(),
+            check_name: check.name().to_string(),
+            category: check.category(),
+            outcome,
+            evaluated,
+            findings,
+            comparisons,
+        }
+    }
 
-fn default_relative_tolerance() -> f64 {
-    // Statement evaluation runs in f64 (see `NumericMode::Float64`), so
-    // identity checks accumulate rounding proportional to the magnitudes
-    // involved. A flat absolute default alone (one cent) false-positives on
-    // large balance sheets; 1e-9 relative keeps the effective tolerance at
-    // f64-noise scale (e.g. $10 on a $10B sheet) without loosening small ones,
-    // where the absolute floor still dominates.
-    1e-9
+    /// True when the outcome is [`CheckOutcome::Pass`].
+    #[must_use]
+    pub fn passed(&self) -> bool {
+        self.outcome == CheckOutcome::Pass
+    }
 }
 
 /// Configuration parameters that govern check execution.
 ///
-/// Identity checks trigger a finding when
-/// `|diff| > max(default_tolerance, default_relative_tolerance * |reference|)`,
-/// so an analyst can set an absolute floor (currency units) that catches
-/// micro-errors on small balances plus a relative ceiling that scales with
-/// larger balance sheets. A per-check tolerance override bypasses both
-/// defaults and is applied verbatim.
+/// The identity tolerance is zero unless one is stated: an identity then
+/// holds only when its two sides are equal. An explicit tolerance allows
+/// `|difference| <= max(default_tolerance, default_relative_tolerance *
+/// |reference|)`, where the reference is the identity owner's (total assets
+/// for the balance sheet, for example); a difference equal to the allowance
+/// is within tolerance. A per-check absolute override replaces both terms.
 ///
-/// All four fields are part of the public configuration surface and are
-/// intended to be tuned per-deployment via JSON / serde overrides — e.g.,
-/// raising `default_relative_tolerance` to `1e-4` (1 bp) when a downstream
-/// process is known to round to the nearest hundred. The defaults
-/// (`default_tolerance = 0.01`, `default_relative_tolerance = 1e-9`,
-/// `materiality_threshold = 0.0`, `min_severity = Info`) are conservative:
-/// the absolute cent floor catches micro-errors on small balances while the
-/// relative component absorbs f64 accumulation noise on large ones.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// `materiality_threshold` and `min_severity` are reporting filters for
+/// advisory findings. They never change a verdict, and they never remove an
+/// error-severity finding, a coverage finding or a recorded comparison.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CheckConfig {
-    /// Default **absolute** tolerance for equality comparisons, expressed in
-    /// the same currency units as the node values being compared (e.g. 0.01
-    /// means one cent when nodes are in whole dollars).
-    #[serde(default = "default_check_tolerance")]
+    /// **Absolute** tolerance for equality comparisons, in the units of the
+    /// compared values (0.01 is one cent when nodes are in whole dollars).
+    /// Zero, the default, requires exact equality.
+    #[serde(default)]
     pub default_tolerance: f64,
-    /// Default **relative** tolerance as a fraction of the reference
-    /// denominator (e.g. 1e-6 ≈ "one basis point of a basis point"). Zero
-    /// disables relative tolerance.
-    #[serde(default = "default_relative_tolerance")]
+    /// **Relative** tolerance as a fraction of the identity's reference
+    /// value (1e-9 allows 10 on a reference of 1e10). Zero, the default,
+    /// disables the relative term.
+    #[serde(default)]
     pub default_relative_tolerance: f64,
-    /// Findings below this absolute materiality threshold are excluded from
-    /// reports. Error-severity findings are exempt: materiality filters
-    /// advisory noise, it never changes a check's pass/fail verdict.
+    /// Advisory findings whose absolute materiality is below this threshold
+    /// are left out of the report. Error-severity and coverage findings are
+    /// always reported.
     #[serde(default)]
     pub materiality_threshold: f64,
-    /// Minimum severity a finding must have to appear in the report.
+    /// Minimum severity an advisory finding must have to appear in the
+    /// report. Coverage findings are always reported.
     #[serde(default)]
     pub min_severity: Severity,
-}
-
-impl Default for CheckConfig {
-    fn default() -> Self {
-        Self {
-            default_tolerance: 0.01,
-            default_relative_tolerance: default_relative_tolerance(),
-            materiality_threshold: 0.0,
-            min_severity: Severity::Info,
-        }
-    }
 }
 
 impl CheckConfig {
@@ -394,10 +455,14 @@ pub(crate) fn effective_tolerance(
 pub struct CheckSummary {
     /// Total number of checks executed.
     pub total_checks: usize,
-    /// Number of checks that passed.
+    /// Number of checks whose outcome is `pass`.
     pub passed: usize,
-    /// Number of checks that failed (at least one error-severity finding).
+    /// Number of checks whose outcome is `fail` (an error-severity finding).
     pub failed: usize,
+    /// Number of checks whose outcome is `incomplete` (a coverage finding).
+    pub incomplete: usize,
+    /// Number of checks whose outcome is `unevaluated` (nothing examined).
+    pub unevaluated: usize,
     /// Total number of error-severity findings across all checks.
     pub errors: usize,
     /// Total number of warning-severity findings across all checks.
@@ -410,7 +475,12 @@ pub struct CheckSummary {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CheckReport {
-    /// Individual results for each check.
+    /// Verdict of the suite from the unfiltered check outcomes: `fail` when
+    /// any check failed, else `incomplete` when any check is incomplete,
+    /// else `pass` when at least one check passed, else `unevaluated` (an
+    /// empty suite, or one with no applicable check).
+    pub outcome: CheckOutcome,
+    /// Individual results for each check, in declared order.
     pub results: Vec<CheckResult>,
     /// Aggregate summary.
     pub summary: CheckSummary,

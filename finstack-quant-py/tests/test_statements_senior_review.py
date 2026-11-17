@@ -248,7 +248,7 @@ def test_accounting_overflow_is_an_error_without_invalid_numbers() -> None:
     report = json.loads(run_checks(model, suite).to_json())
     assert report["summary"]["failed"] == 1
     result = report["results"][0]
-    assert not result["passed"]
+    assert result["outcome"] == "fail"
     assert len(result["comparisons"]) == 1
     assert result["comparisons"][0]["period"] == "2025Q2"
     finding = result["findings"][0]

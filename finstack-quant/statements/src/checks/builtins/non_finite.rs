@@ -34,10 +34,12 @@ impl Check for NonFiniteCheck {
 
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
         let mut findings = Vec::new();
+        let mut evaluated = 0_usize;
 
         let mut inspect_node = |node_id: &str| {
             if let Some(period_map) = context.results.float_series(node_id) {
                 for (period_id, &value) in &period_map {
+                    evaluated += 1;
                     if !value.is_finite() {
                         findings.push(CheckFinding {
                             check_id: self.id().to_string(),
@@ -50,6 +52,7 @@ impl Check for NonFiniteCheck {
                             materiality: None,
                             nodes: vec![NodeId::new(node_id)],
                             comparison: None,
+                            coverage: false,
                         });
                     }
                 }
@@ -65,15 +68,6 @@ impl Check for NonFiniteCheck {
             }
         }
 
-        let passed = !findings.iter().any(|f| f.severity == Severity::Error);
-
-        Ok(CheckResult {
-            check_id: self.id().to_string(),
-            check_name: self.name().to_string(),
-            category: self.category(),
-            passed,
-            findings,
-            comparisons: Vec::new(),
-        })
+        Ok(CheckResult::new(self, evaluated, findings, Vec::new()))
     }
 }

@@ -413,25 +413,26 @@ export interface D_2Bc9B0F4Efb33830F0A7 {
  */
 export interface D_5De9F28B928C01E49782 {
   /**
-   * Default **relative** tolerance as a fraction of the reference
-   * denominator (e.g. 1e-6 ≈ "one basis point of a basis point"). Zero
-   * disables relative tolerance.
+   * **Relative** tolerance as a fraction of the identity's reference
+   * value (1e-9 allows 10 on a reference of 1e10). Zero, the default,
+   * disables the relative term.
    */
   default_relative_tolerance?: number;
   /**
-   * Default **absolute** tolerance for equality comparisons, expressed in
-   * the same currency units as the node values being compared (e.g. 0.01
-   * means one cent when nodes are in whole dollars).
+   * **Absolute** tolerance for equality comparisons, in the units of the
+   * compared values (0.01 is one cent when nodes are in whole dollars).
+   * Zero, the default, requires exact equality.
    */
   default_tolerance?: number;
   /**
-   * Findings below this absolute materiality threshold are excluded from
-   * reports. Error-severity findings are exempt: materiality filters
-   * advisory noise, it never changes a check's pass/fail verdict.
+   * Advisory findings whose absolute materiality is below this threshold
+   * are left out of the report. Error-severity and coverage findings are
+   * always reported.
    */
   materiality_threshold?: number;
   /**
-   * Minimum severity a finding must have to appear in the report.
+   * Minimum severity an advisory finding must have to appear in the
+   * report. Coverage findings are always reported.
    */
   min_severity?: "info" | "warning" | "error";
 }

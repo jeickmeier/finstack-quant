@@ -159,19 +159,12 @@ impl Check for DepreciationReconciliation {
                     }),
                     nodes,
                     comparison: Some(comparison),
+                    coverage: false,
                 });
             }
         }
 
-        let passed = !findings.iter().any(|f| f.severity >= Severity::Error);
-
-        Ok(CheckResult {
-            check_id: self.id().to_string(),
-            check_name: self.name().to_string(),
-            category: self.category(),
-            passed,
-            findings,
-            comparisons,
-        })
+        let evaluated = context.model.periods.len();
+        Ok(CheckResult::new(self, evaluated, findings, comparisons))
     }
 }

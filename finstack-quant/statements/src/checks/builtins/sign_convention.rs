@@ -37,6 +37,7 @@ impl Check for SignConventionCheck {
 
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
         let mut findings = Vec::new();
+        let mut evaluated = 0_usize;
 
         for period in &context.model.periods {
             let pid = &period.id;
@@ -46,6 +47,7 @@ impl Check for SignConventionCheck {
                     let Some(cell) = context.results.get_cell(node.as_str(), pid) else {
                         continue;
                     };
+                    evaluated += 1;
                     // A cell without a value cannot have its sign verified.
                     let val = cell.numeric().unwrap_or(f64::NAN);
                     let message = if !val.is_finite() {
@@ -71,20 +73,12 @@ impl Check for SignConventionCheck {
                         materiality: None,
                         nodes: vec![node.clone()],
                         comparison: None,
+                        coverage: false,
                     });
                 }
             }
         }
 
-        let passed = !findings.iter().any(|f| f.severity == Severity::Error);
-
-        Ok(CheckResult {
-            check_id: self.id().to_string(),
-            check_name: self.name().to_string(),
-            category: self.category(),
-            passed,
-            findings,
-            comparisons: Vec::new(),
-        })
+        Ok(CheckResult::new(self, evaluated, findings, Vec::new()))
     }
 }

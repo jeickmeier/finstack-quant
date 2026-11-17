@@ -7,6 +7,29 @@ export default [
     "title": "LboConfig"
   },
   {
+    "path": "#/$defs/d_11e029f4aea8705053a0",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/CheckSeverity",
+    "description": "Severity level for a check finding, ordered from least to most severe."
+  },
+  {
+    "path": "#/$defs/d_11e029f4aea8705053a0/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/CheckSeverity/oneOf/0",
+    "const": "info",
+    "description": "Informational finding — no action required."
+  },
+  {
+    "path": "#/$defs/d_11e029f4aea8705053a0/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/CheckSeverity/oneOf/1",
+    "const": "warning",
+    "description": "Warning — review recommended."
+  },
+  {
+    "path": "#/$defs/d_11e029f4aea8705053a0/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/CheckSeverity/oneOf/2",
+    "const": "error",
+    "description": "Error — indicates a likely problem that should be addressed."
+  },
+  {
     "path": "#/$defs/d_5884433b163d26991c12",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/CreditMapping",
     "description": "Maps node IDs for credit underwriting analysis.\n\nUsed by [`super::suites::credit_underwriting_checks`] to build leverage,\ncoverage, cash-flow, and trend checks. Unknown JSON keys are rejected, so\na misspelled optional key fails instead of silently disabling its check."
@@ -40,6 +63,19 @@ export default [
   {
     "path": "#/$defs/d_5884433b163d26991c12/properties/cash_node/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/CreditMapping/properties/cash_node/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_5884433b163d26991c12/properties/config",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/CreditMapping/properties/config",
+    "default": {
+      "default_relative_tolerance": 0,
+      "default_tolerance": 0,
+      "materiality_threshold": 0,
+      "min_severity": "info"
+    },
+    "description": "Comparison and reporting policy of the suite. Identities are compared\nexactly unless a tolerance is stated here.",
+    "ref": "#/$defs/CheckConfig",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/CheckConfig"
   },
   {
     "path": "#/$defs/d_5884433b163d26991c12/properties/coverage_min_warn",
@@ -180,6 +216,19 @@ export default [
   {
     "path": "#/$defs/d_78d0da8611ea67085bf9/properties/cfo_node/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/ThreeStatementMapping/properties/cfo_node/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_78d0da8611ea67085bf9/properties/config",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/ThreeStatementMapping/properties/config",
+    "default": {
+      "default_relative_tolerance": 0,
+      "default_tolerance": 0,
+      "materiality_threshold": 0,
+      "min_severity": "info"
+    },
+    "description": "Comparison and reporting policy of the suite. Identities are compared\nexactly unless a tolerance is stated here.",
+    "ref": "#/$defs/CheckConfig",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/CheckConfig"
   },
   {
     "path": "#/$defs/d_78d0da8611ea67085bf9/properties/cs_interest_node",
@@ -455,6 +504,40 @@ export default [
   {
     "path": "#/$defs/d_78d0da8611ea67085bf9/properties/wc_change_cf_node/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/ThreeStatementMapping/properties/wc_change_cf_node/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_94d87fc0115f13e52ce3",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/CheckConfig",
+    "description": "Configuration parameters that govern check execution.\n\nThe identity tolerance is zero unless one is stated: an identity then\nholds only when its two sides are equal. An explicit tolerance allows\n`|difference| <= max(default_tolerance, default_relative_tolerance *\n|reference|)`, where the reference is the identity owner's (total assets\nfor the balance sheet, for example); a difference equal to the allowance\nis within tolerance. A per-check absolute override replaces both terms.\n\n`materiality_threshold` and `min_severity` are reporting filters for\nadvisory findings. They never change a verdict, and they never remove an\nerror-severity finding, a coverage finding or a recorded comparison."
+  },
+  {
+    "path": "#/$defs/d_94d87fc0115f13e52ce3/properties/default_relative_tolerance",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/CheckConfig/properties/default_relative_tolerance",
+    "default": 0,
+    "description": "**Relative** tolerance as a fraction of the identity's reference\nvalue (1e-9 allows 10 on a reference of 1e10). Zero, the default,\ndisables the relative term.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_94d87fc0115f13e52ce3/properties/default_tolerance",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/CheckConfig/properties/default_tolerance",
+    "default": 0,
+    "description": "**Absolute** tolerance for equality comparisons, in the units of the\ncompared values (0.01 is one cent when nodes are in whole dollars).\nZero, the default, requires exact equality.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_94d87fc0115f13e52ce3/properties/materiality_threshold",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/CheckConfig/properties/materiality_threshold",
+    "default": 0,
+    "description": "Advisory findings whose absolute materiality is below this threshold\nare left out of the report. Error-severity and coverage findings are\nalways reported.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_94d87fc0115f13e52ce3/properties/min_severity",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/CheckConfig/properties/min_severity",
+    "default": "info",
+    "description": "Minimum severity an advisory finding must have to appear in the\nreport. Coverage findings are always reported.",
+    "ref": "#/$defs/CheckSeverity",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_config.schema.json#/$defs/CheckSeverity"
   },
   {
     "path": "#/$defs/d_ad3709dd7e1a54218861",

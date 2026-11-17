@@ -202,7 +202,8 @@ fn precomputed_identity_checks_reject_units_that_disagree_with_the_model() {
             equity_nodes: vec![NodeId::new("c")],
             tolerance: None,
         })
-        .build();
+        .build()
+        .expect("unique check ids");
     // The numeric balance sheet articulates in both periods. Stale scalar
     // metadata must not hide that the operands use different currencies.
     for declarations_present in [true, false] {
@@ -211,8 +212,18 @@ fn precomputed_identity_checks_reject_units_that_disagree_with_the_model() {
                 node.value_type = None;
             }
         }
-        let error = suite.run_model(&model, Some(&results)).unwrap_err();
-        assert!(error.to_string().contains("result units"));
+        let error = suite
+            .run_model(
+                &model,
+                &finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+                Some(&results),
+            )
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("result units")
+                || error.to_string().contains("not a verified run"),
+            "{error}"
+        );
         for check in identities(None) {
             assert!(
                 check
@@ -240,10 +251,17 @@ fn precomputed_checks_reject_explicit_currency_changes_with_stale_declarations()
             equity_nodes: vec![NodeId::new("c")],
             tolerance: None,
         })
-        .build();
-    let error = suite.run_model(&model, Some(&results)).unwrap_err();
-    assert!(error.to_string().contains("Node 'b' declares"));
-    assert!(error.to_string().contains("EUR"));
+        .build()
+        .expect("unique check ids");
+    let error = suite
+        .run_model(
+            &model,
+            &finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+            Some(&results),
+        )
+        .unwrap_err();
+    // The model changed after the run, so the results are not its run.
+    assert!(error.to_string().contains("not a verified run"), "{error}");
 }
 
 #[test]
@@ -270,12 +288,39 @@ fn precomputed_inferred_money_units_keep_valid_results_and_missing_node_warnings
             equity_nodes: vec![NodeId::new("c")],
             tolerance: None,
         })
-        .build();
-    assert!(suite.run_model(&model, Some(&results)).unwrap().results[0].passed);
+        .build()
+        .expect("unique check ids");
+    assert!(
+        suite
+            .run_model(
+                &model,
+                &finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+                Some(&results)
+            )
+            .unwrap()
+            .results[0]
+            .passed()
+    );
     results.node_value_types.clear();
-    assert!(suite.run_model(&model, Some(&results)).unwrap().results[0].passed);
+    assert!(
+        suite
+            .run_model(
+                &model,
+                &finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+                Some(&results)
+            )
+            .unwrap()
+            .results[0]
+            .passed()
+    );
     results.cells.shift_remove("b");
-    let report = suite.run_model(&model, Some(&results)).unwrap();
+    let report = suite
+        .run_model(
+            &model,
+            &finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+            Some(&results),
+        )
+        .unwrap();
     let findings = &report.results[0].findings;
     assert_eq!(findings.len(), 2);
     assert!(findings.iter().all(|finding| {
@@ -331,7 +376,10 @@ fn check_configs_reject_invalid_numeric_policies_even_for_empty_suites() {
                 .resolve()
                 .is_err()
             );
-            let suite = CheckSuite::builder("empty").config(config).build();
+            let suite = CheckSuite::builder("empty")
+                .config(config)
+                .build()
+                .expect("unique check ids");
             assert!(suite.run(&model, &results).is_err());
         }
     }
@@ -377,7 +425,7 @@ fn shared_formula_check_history_preserves_temporal_results_and_visibility() {
         tolerance: Some(1e-10),
     };
     let result = check.execute(&CheckContext::new(&model, &results)).unwrap();
-    assert!(result.passed, "{:?}", result.findings);
+    assert!(result.passed(), "{:?}", result.findings);
     assert_eq!(results.get("expected", &q(1)), Some(10.0));
     assert_eq!(results.get("expected", &q(4)), Some(65.0));
 }

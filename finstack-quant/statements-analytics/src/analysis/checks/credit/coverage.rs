@@ -81,6 +81,7 @@ impl Check for CoverageFloorCheck {
                     }),
                     nodes: vec![self.numerator_node.clone(), self.denominator_node.clone()],
                     comparison: None,
+                    coverage: false,
                 });
                 continue;
             }
@@ -126,19 +127,12 @@ impl Check for CoverageFloorCheck {
                     }),
                     nodes: vec![self.numerator_node.clone(), self.denominator_node.clone()],
                     comparison: None,
+                    coverage: false,
                 });
             }
         }
 
-        let passed = !findings.iter().any(|f| f.severity >= Severity::Error);
-
-        Ok(CheckResult {
-            check_id: self.id().to_string(),
-            check_name: self.name().to_string(),
-            category: self.category(),
-            passed,
-            findings,
-            comparisons: Vec::new(),
-        })
+        let evaluated = context.model.periods.len();
+        Ok(CheckResult::new(self, evaluated, findings, Vec::new()))
     }
 }

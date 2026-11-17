@@ -62,14 +62,8 @@ impl Check for CapexReconciliation {
         let has_components =
             self.ppe_additions_node.is_some() || self.intangible_additions_node.is_some();
         if !has_components {
-            return Ok(CheckResult {
-                check_id: self.id().to_string(),
-                check_name: self.name().to_string(),
-                category: self.category(),
-                passed: true,
-                findings,
-                comparisons: Vec::new(),
-            });
+            // Without component nodes there is nothing to reconcile.
+            return Ok(CheckResult::new(self, 0, findings, Vec::new()));
         }
 
         for period_spec in &context.model.periods {
@@ -164,19 +158,12 @@ impl Check for CapexReconciliation {
                     }),
                     nodes,
                     comparison: Some(comparison),
+                    coverage: false,
                 });
             }
         }
 
-        let passed = !findings.iter().any(|f| f.severity >= Severity::Error);
-
-        Ok(CheckResult {
-            check_id: self.id().to_string(),
-            check_name: self.name().to_string(),
-            category: self.category(),
-            passed,
-            findings,
-            comparisons,
-        })
+        let evaluated = context.model.periods.len();
+        Ok(CheckResult::new(self, evaluated, findings, comparisons))
     }
 }

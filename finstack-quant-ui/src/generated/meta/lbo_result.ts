@@ -47,6 +47,35 @@ export default [
     "description": "Missing values, NaN/Inf, sign conventions"
   },
   {
+    "path": "#/$defs/d_3644af53ded616741924",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckOutcome",
+    "description": "Verdict of a check, or of a whole report, decided from every outcome\nbefore any reporting filter is applied."
+  },
+  {
+    "path": "#/$defs/d_3644af53ded616741924/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckOutcome/oneOf/0",
+    "const": "pass",
+    "description": "Work was evaluated, required coverage was complete and nothing failed."
+  },
+  {
+    "path": "#/$defs/d_3644af53ded616741924/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckOutcome/oneOf/1",
+    "const": "fail",
+    "description": "At least one error-severity finding."
+  },
+  {
+    "path": "#/$defs/d_3644af53ded616741924/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckOutcome/oneOf/2",
+    "const": "incomplete",
+    "description": "Nothing failed, but required data was missing or unavailable for at\nleast one period or cell."
+  },
+  {
+    "path": "#/$defs/d_3644af53ded616741924/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckOutcome/oneOf/3",
+    "const": "unevaluated",
+    "description": "Nothing was evaluated: an empty suite, or a check with no applicable\nperiod or cell."
+  },
+  {
     "path": "#/$defs/d_5df3315c25302264a1a6",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/DecimalWire",
     "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
@@ -86,9 +115,16 @@ export default [
     "description": "Full report aggregating all [`CheckResult`]s from a check run."
   },
   {
+    "path": "#/$defs/d_69ed1d0fd3aee296bce5/properties/outcome",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckReport/properties/outcome",
+    "description": "Verdict of the suite from the unfiltered check outcomes: `fail` when\nany check failed, else `incomplete` when any check is incomplete,\nelse `pass` when at least one check passed, else `unevaluated` (an\nempty suite, or one with no applicable check).",
+    "ref": "#/$defs/CheckOutcome",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckOutcome"
+  },
+  {
     "path": "#/$defs/d_69ed1d0fd3aee296bce5/properties/results",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckReport/properties/results",
-    "description": "Individual results for each check."
+    "description": "Individual results for each check, in declared order."
   },
   {
     "path": "#/$defs/d_69ed1d0fd3aee296bce5/properties/results/items",
@@ -1089,7 +1125,14 @@ export default [
   {
     "path": "#/$defs/d_8cf6a34771f30e7523cf/properties/failed",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckSummary/properties/failed",
-    "description": "Number of checks that failed (at least one error-severity finding).",
+    "description": "Number of checks whose outcome is `fail` (an error-severity finding).",
+    "format": "uint",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_8cf6a34771f30e7523cf/properties/incomplete",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckSummary/properties/incomplete",
+    "description": "Number of checks whose outcome is `incomplete` (a coverage finding).",
     "format": "uint",
     "minimum": 0
   },
@@ -1103,7 +1146,7 @@ export default [
   {
     "path": "#/$defs/d_8cf6a34771f30e7523cf/properties/passed",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckSummary/properties/passed",
-    "description": "Number of checks that passed.",
+    "description": "Number of checks whose outcome is `pass`.",
     "format": "uint",
     "minimum": 0
   },
@@ -1111,6 +1154,13 @@ export default [
     "path": "#/$defs/d_8cf6a34771f30e7523cf/properties/total_checks",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckSummary/properties/total_checks",
     "description": "Total number of checks executed.",
+    "format": "uint",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_8cf6a34771f30e7523cf/properties/unevaluated",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckSummary/properties/unevaluated",
+    "description": "Number of checks whose outcome is `unevaluated` (nothing examined).",
     "format": "uint",
     "minimum": 0
   },
@@ -1155,9 +1205,16 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckComparison"
   },
   {
+    "path": "#/$defs/d_a64e478bd80b60331435/properties/evaluated",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckResult/properties/evaluated",
+    "description": "Number of periods or cells the check examined.",
+    "format": "uint",
+    "minimum": 0
+  },
+  {
     "path": "#/$defs/d_a64e478bd80b60331435/properties/findings",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckResult/properties/findings",
-    "description": "Individual findings produced by the check."
+    "description": "Findings produced by the check. The suite's `min_severity` and\n`materiality_threshold` filters remove advisory findings only: an\nerror-severity or coverage finding is always retained."
   },
   {
     "path": "#/$defs/d_a64e478bd80b60331435/properties/findings/items",
@@ -1166,9 +1223,11 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckFinding"
   },
   {
-    "path": "#/$defs/d_a64e478bd80b60331435/properties/passed",
-    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckResult/properties/passed",
-    "description": "Whether the check passed (no error-severity findings)."
+    "path": "#/$defs/d_a64e478bd80b60331435/properties/outcome",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckResult/properties/outcome",
+    "description": "Verdict of the check, decided from all of its findings before the\nsuite's reporting filters: `fail` on an error-severity finding, else\n`incomplete` on a coverage finding, else `unevaluated` when\n`evaluated` is zero, else `pass`.",
+    "ref": "#/$defs/CheckOutcome",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckOutcome"
   },
   {
     "path": "#/$defs/d_ab7ac1a2678059460e09",
@@ -1194,6 +1253,11 @@ export default [
   {
     "path": "#/$defs/d_ab7ac1a2678059460e09/properties/comparison/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckFinding/properties/comparison/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_ab7ac1a2678059460e09/properties/coverage",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/lbo_result.schema.json#/$defs/CheckFinding/properties/coverage",
+    "description": "True for a coverage finding: required data was missing or unavailable,\nso the check could not evaluate the period or cell it names. A\ncoverage finding makes its check incomplete and is never removed by\nthe reporting filters."
   },
   {
     "path": "#/$defs/d_ab7ac1a2678059460e09/properties/materiality",

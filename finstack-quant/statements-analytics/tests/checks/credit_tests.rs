@@ -50,7 +50,7 @@ fn leverage_within_range_passes() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }
 
@@ -78,7 +78,7 @@ fn leverage_above_warn_flags_warning() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed); // warnings don't cause failure
+    assert!(result.passed()); // warnings don't cause failure
     assert_eq!(result.findings.len(), 1);
     assert_eq!(result.findings[0].severity, Severity::Warning);
 }
@@ -107,7 +107,7 @@ fn leverage_above_error_flags_error() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(!result.passed);
+    assert!(!result.passed());
     assert_eq!(result.findings[0].severity, Severity::Error);
 }
 
@@ -136,7 +136,7 @@ fn leverage_flags_non_positive_ebitda_as_error() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(!result.passed);
+    assert!(!result.passed());
     assert_eq!(result.findings.len(), 1);
     assert_eq!(result.findings[0].severity, Severity::Error);
     assert!(result.findings[0].message.contains("undefined"));
@@ -167,7 +167,7 @@ fn leverage_skips_incomplete_quarterly_ttm() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }
 
@@ -211,7 +211,7 @@ fn leverage_uses_four_quarter_ttm() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert_eq!(result.findings.len(), 1);
     assert_eq!(result.findings[0].severity, Severity::Warning);
     assert_eq!(result.findings[0].period, Some(q(4)));
@@ -243,7 +243,7 @@ fn coverage_above_floor_passes() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }
 
@@ -271,7 +271,7 @@ fn coverage_below_warning_flags() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert_eq!(result.findings.len(), 1);
     assert_eq!(result.findings[0].severity, Severity::Warning);
 }
@@ -300,7 +300,7 @@ fn coverage_below_error_flags() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(!result.passed);
+    assert!(!result.passed());
     assert_eq!(result.findings[0].severity, Severity::Error);
 }
 
@@ -329,7 +329,7 @@ fn coverage_negative_denominator_is_error() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(!result.passed);
+    assert!(!result.passed());
     assert_eq!(result.findings.len(), 1);
     assert_eq!(result.findings[0].severity, Severity::Error);
     assert!(result.findings[0].message.contains("undefined"));
@@ -359,7 +359,7 @@ fn coverage_zero_denominator_is_skipped() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }
 
@@ -394,7 +394,7 @@ fn fcf_positive_passes() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }
 
@@ -427,7 +427,7 @@ fn fcf_consecutive_negative_warning() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     let warnings: Vec<_> = result
         .findings
         .iter()
@@ -466,7 +466,7 @@ fn fcf_consecutive_negative_error() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(!result.passed);
+    assert!(!result.passed());
     let errors: Vec<_> = result
         .findings
         .iter()
@@ -498,6 +498,7 @@ fn trend_improving_passes() {
     let results = ev.evaluate(&model).unwrap();
 
     let check = TrendCheck {
+        id: "trend".into(),
         node: NodeId::new("coverage"),
         direction: TrendDirection::IncreasingIsGood,
         lookback_periods: 3,
@@ -532,6 +533,7 @@ fn trend_deteriorating_flags() {
     let results = ev.evaluate(&model).unwrap();
 
     let check = TrendCheck {
+        id: "trend".into(),
         node: NodeId::new("coverage"),
         direction: TrendDirection::IncreasingIsGood,
         lookback_periods: 3,
@@ -567,6 +569,7 @@ fn trend_decreasing_is_good_deterioration() {
     let results = ev.evaluate(&model).unwrap();
 
     let check = TrendCheck {
+        id: "trend".into(),
         node: NodeId::new("leverage"),
         direction: TrendDirection::DecreasingIsGood,
         lookback_periods: 2,
@@ -606,7 +609,7 @@ fn liquidity_runway_adequate_passes() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }
 
@@ -635,7 +638,7 @@ fn liquidity_runway_below_warning() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert_eq!(result.findings.len(), 1);
     assert_eq!(result.findings[0].severity, Severity::Warning);
 }
@@ -665,7 +668,7 @@ fn liquidity_runway_below_error() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(!result.passed);
+    assert!(!result.passed());
     assert_eq!(result.findings[0].severity, Severity::Error);
 }
 
@@ -696,7 +699,7 @@ fn liquidity_runway_converts_periods_to_months() {
     let result = check.execute(&ctx).unwrap();
 
     assert!(
-        result.passed,
+        result.passed(),
         "6 months runway must not breach a 3-month error floor"
     );
     assert!(
@@ -762,6 +765,7 @@ fn trend_nan_period_warns_and_resets() {
     );
 
     let check = TrendCheck {
+        id: "trend".into(),
         node: NodeId::new("coverage"),
         direction: TrendDirection::IncreasingIsGood,
         lookback_periods: 3,

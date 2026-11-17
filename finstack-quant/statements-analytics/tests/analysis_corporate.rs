@@ -19,6 +19,7 @@ fn non_finite_suite() -> CheckSuite {
     CheckSuite::builder("corporate-test")
         .add_check(NonFiniteCheck { nodes: vec![] })
         .build()
+        .expect("unique check ids")
 }
 
 #[test]

@@ -626,6 +626,10 @@
           ],
           "description": "The failed numeric comparison behind this finding (actual, expected and\ntolerance). `None` for findings that do not compare two numbers:\nskipped periods, missing or non-finite inputs, sign-convention\nwarnings, and formula checks without a tolerance (a formula check\nwith a tolerance compares its value against zero)."
         },
+        "coverage": {
+          "description": "True for a coverage finding: required data was missing or unavailable,\nso the check could not evaluate the period or cell it names. A\ncoverage finding makes its check incomplete and is never removed by\nthe reporting filters.",
+          "type": "boolean"
+        },
         "materiality": {
           "anyOf": [
             {
@@ -667,11 +671,40 @@
       ],
       "type": "object"
     },
+    "CheckOutcome": {
+      "description": "Verdict of a check, or of a whole report, decided from every outcome\nbefore any reporting filter is applied.",
+      "oneOf": [
+        {
+          "const": "pass",
+          "description": "Work was evaluated, required coverage was complete and nothing failed.",
+          "type": "string"
+        },
+        {
+          "const": "fail",
+          "description": "At least one error-severity finding.",
+          "type": "string"
+        },
+        {
+          "const": "incomplete",
+          "description": "Nothing failed, but required data was missing or unavailable for at\nleast one period or cell.",
+          "type": "string"
+        },
+        {
+          "const": "unevaluated",
+          "description": "Nothing was evaluated: an empty suite, or a check with no applicable\nperiod or cell.",
+          "type": "string"
+        }
+      ]
+    },
     "CheckReport": {
       "description": "Full report aggregating all [`CheckResult`]s from a check run.",
       "properties": {
+        "outcome": {
+          "$ref": "#/$defs/CheckOutcome",
+          "description": "Verdict of the suite from the unfiltered check outcomes: `fail` when\nany check failed, else `incomplete` when any check is incomplete,\nelse `pass` when at least one check passed, else `unevaluated` (an\nempty suite, or one with no applicable check)."
+        },
         "results": {
-          "description": "Individual results for each check.",
+          "description": "Individual results for each check, in declared order.",
           "items": {
             "$ref": "#/$defs/CheckResult"
           },
@@ -683,6 +716,7 @@
         }
       },
       "required": [
+        "outcome",
         "results",
         "summary"
       ],
@@ -710,23 +744,30 @@
           },
           "type": "array"
         },
+        "evaluated": {
+          "description": "Number of periods or cells the check examined.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
         "findings": {
-          "description": "Individual findings produced by the check.",
+          "description": "Findings produced by the check. The suite's `min_severity` and\n`materiality_threshold` filters remove advisory findings only: an\nerror-severity or coverage finding is always retained.",
           "items": {
             "$ref": "#/$defs/CheckFinding"
           },
           "type": "array"
         },
-        "passed": {
-          "description": "Whether the check passed (no error-severity findings).",
-          "type": "boolean"
+        "outcome": {
+          "$ref": "#/$defs/CheckOutcome",
+          "description": "Verdict of the check, decided from all of its findings before the\nsuite's reporting filters: `fail` on an error-severity finding, else\n`incomplete` on a coverage finding, else `unevaluated` when\n`evaluated` is zero, else `pass`."
         }
       },
       "required": [
         "check_id",
         "check_name",
         "category",
-        "passed",
+        "outcome",
+        "evaluated",
         "findings"
       ],
       "type": "object"
@@ -761,7 +802,13 @@
           "type": "integer"
         },
         "failed": {
-          "description": "Number of checks that failed (at least one error-severity finding).",
+          "description": "Number of checks whose outcome is `fail` (an error-severity finding).",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "incomplete": {
+          "description": "Number of checks whose outcome is `incomplete` (a coverage finding).",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
@@ -773,13 +820,19 @@
           "type": "integer"
         },
         "passed": {
-          "description": "Number of checks that passed.",
+          "description": "Number of checks whose outcome is `pass`.",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
         },
         "total_checks": {
           "description": "Total number of checks executed.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unevaluated": {
+          "description": "Number of checks whose outcome is `unevaluated` (nothing examined).",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
@@ -795,6 +848,8 @@
         "total_checks",
         "passed",
         "failed",
+        "incomplete",
+        "unevaluated",
         "errors",
         "warnings",
         "infos"

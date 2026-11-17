@@ -548,6 +548,31 @@ impl Evaluator {
         Ok((results, all_warnings))
     }
 
+    /// Evaluate the model without a market under an observation cutoff.
+    ///
+    /// The contractual capital structure is read as in [`Self::evaluate`];
+    /// a cutoff date hides observations published after it.
+    pub(crate) fn evaluate_under_cutoff(
+        &mut self,
+        model: &FinancialModelSpec,
+        cutoff: &ObservationCutoff,
+    ) -> Result<StatementResult> {
+        let visibility_cutoff = match cutoff {
+            ObservationCutoff::FullSnapshot => None,
+            ObservationCutoff::Through(date) => {
+                model.validate_point_in_time()?;
+                Some(*date)
+            }
+        };
+        let empty_market = finstack_quant_core::market_data::context::MarketContext::new();
+        self.evaluate_inner(
+            model,
+            contractual_capital_structure(model, &empty_market),
+            visibility_cutoff,
+            None,
+        )
+    }
+
     /// Evaluate a financial model over all periods without market context.
     ///
     /// Every explicit value is visible: there is no as-of cutoff.

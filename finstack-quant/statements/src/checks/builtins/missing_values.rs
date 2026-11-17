@@ -36,6 +36,7 @@ impl Check for MissingValueCheck {
 
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
         let mut findings = Vec::new();
+        let mut evaluated = 0_usize;
 
         for period in &context.model.periods {
             let in_scope = match self.scope {
@@ -54,6 +55,7 @@ impl Check for MissingValueCheck {
             };
 
             for node in &self.required_nodes {
+                evaluated += 1;
                 if context.results.get(node.as_str(), &period.id).is_none() {
                     findings.push(CheckFinding {
                         check_id: self.id().to_string(),
@@ -67,20 +69,12 @@ impl Check for MissingValueCheck {
                         materiality: None,
                         nodes: vec![node.clone()],
                         comparison: None,
+                        coverage: false,
                     });
                 }
             }
         }
 
-        let passed = !findings.iter().any(|f| f.severity == Severity::Error);
-
-        Ok(CheckResult {
-            check_id: self.id().to_string(),
-            check_name: self.name().to_string(),
-            category: self.category(),
-            passed,
-            findings,
-            comparisons: Vec::new(),
-        })
+        Ok(CheckResult::new(self, evaluated, findings, Vec::new()))
     }
 }

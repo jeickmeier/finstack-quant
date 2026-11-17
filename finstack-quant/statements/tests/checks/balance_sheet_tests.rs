@@ -55,7 +55,7 @@ fn balanced_passes() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 
     // A passing check still reports what it compared in every period.
@@ -65,8 +65,8 @@ fn balanced_passes() {
     assert_eq!(q1.period, Some(q(1)));
     assert_eq!(q1.actual, 1000.0);
     assert_eq!(q1.expected, 1000.0);
-    // Default tolerance: max(0.01 absolute, 1e-9 * |assets|).
-    assert_eq!(q1.tolerance, 0.01);
+    // No tolerance is stated, so the identity must hold exactly.
+    assert_eq!(q1.tolerance, 0.0);
     assert!(result.comparisons.iter().all(|c| c.within_tolerance()));
 }
 
@@ -112,7 +112,7 @@ fn imbalanced_fails_with_materiality() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(!result.passed);
+    assert!(!result.passed());
 
     let q1_findings: Vec<_> = result
         .findings
@@ -133,7 +133,7 @@ fn imbalanced_fails_with_materiality() {
     assert_eq!(comparison.period, Some(q(1)));
     assert_eq!(comparison.actual, 1000.0);
     assert_eq!(comparison.expected, 900.0);
-    assert_eq!(comparison.tolerance, 0.01);
+    assert_eq!(comparison.tolerance, 0.0);
     assert_eq!(comparison.difference().abs(), mat.absolute);
     assert!(!comparison.within_tolerance());
 
@@ -200,7 +200,7 @@ fn within_tolerance_passes() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }
 
@@ -355,12 +355,18 @@ fn large_balance_sheet_within_relative_tolerance_passes() {
         tolerance: None,
     };
 
-    let ctx = CheckContext::new(&model, &results);
+    // Without a stated tolerance the 0.05 imbalance fails.
+    let exact = check.execute(&CheckContext::new(&model, &results)).unwrap();
+    assert!(!exact.passed());
+
+    // An explicit relative tolerance of 1e-9 allows 10 on a $10B sheet.
+    let mut ctx = CheckContext::new(&model, &results);
+    ctx.config.default_relative_tolerance = 1e-9;
     let result = check.execute(&ctx).unwrap();
 
     assert!(
-        result.passed,
-        "a 5e-12 relative imbalance on a $10B sheet is f64 noise, not an accounting error: {:?}",
+        result.passed(),
+        "a 5e-12 relative imbalance is inside a stated 1e-9 relative tolerance: {:?}",
         result.findings
     );
 }

@@ -85,6 +85,9 @@ fn opt_node_str(value: &Option<NodeId>) -> Option<&str> {
 ///     Current-asset nodes for the working-capital check.
 /// current_liabilities_nodes : list[str]
 ///     Current-liability nodes for the working-capital check.
+/// config : CheckConfig | dict | None
+///     Comparison and reporting policy of the suite. ``None`` compares
+///     identities exactly; state a tolerance for floating-point models.
 ///
 /// Examples
 /// --------
@@ -114,7 +117,7 @@ impl PyThreeStatementMapping {
     #[new]
     #[pyo3(
         signature = (**fields),
-        text_signature = "(*, cash_node, retained_earnings_node, net_income_node, assets_nodes, liabilities_nodes, equity_nodes, ppe_node=None, depreciation_node=None, interest_expense_node=None, tax_expense_node=None, pretax_income_node=None, cfo_node=None, cfi_node=None, cff_node=None, total_cf_node=None, capex_node=None, dividends_node=None, ppe_additions_node=None, intangible_additions_node=None, dividends_equity_node=None, debt_balance_nodes=[], cs_interest_node=None, wc_change_cf_node=None, current_assets_nodes=[], current_liabilities_nodes=[])"
+        text_signature = "(*, cash_node, retained_earnings_node, net_income_node, assets_nodes, liabilities_nodes, equity_nodes, ppe_node=None, depreciation_node=None, interest_expense_node=None, tax_expense_node=None, pretax_income_node=None, cfo_node=None, cfi_node=None, cff_node=None, total_cf_node=None, capex_node=None, dividends_node=None, ppe_additions_node=None, intangible_additions_node=None, dividends_equity_node=None, debt_balance_nodes=[], cs_interest_node=None, wc_change_cf_node=None, current_assets_nodes=[], current_liabilities_nodes=[], config=None)"
     )]
     fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
         let inner: ThreeStatementMapping =
@@ -276,6 +279,12 @@ impl PyThreeStatementMapping {
         node_strings(&self.inner.current_liabilities_nodes)
     }
 
+    /// Comparison and reporting policy of the suite.
+    #[getter]
+    fn config(&self) -> crate::bindings::statements::checks::PyCheckConfig {
+        crate::bindings::statements::checks::PyCheckConfig::from_inner(self.inner.config.clone())
+    }
+
     /// Every node id referenced by the mapping.
     #[getter]
     fn all_nodes(&self) -> Vec<String> {
@@ -318,6 +327,9 @@ wire_methods!(
 ///     Rust default ``(0.0, 6.0)``.
 /// coverage_min_warn : float | None
 ///     Minimum EBITDA/interest coverage in turns before a warning.
+/// config : CheckConfig | dict | None
+///     Comparison and reporting policy of the suite. ``None`` compares
+///     identities exactly; state a tolerance for floating-point models.
 ///
 /// Examples
 /// --------
@@ -344,7 +356,7 @@ impl PyCreditMapping {
     #[new]
     #[pyo3(
         signature = (**fields),
-        text_signature = "(*, debt_node, ebitda_node, interest_expense_node, fcf_node=None, cash_node=None, cash_burn_node=None, leverage_warn=None, coverage_min_warn=None)"
+        text_signature = "(*, debt_node, ebitda_node, interest_expense_node, fcf_node=None, cash_node=None, cash_burn_node=None, leverage_warn=None, coverage_min_warn=None, config=None)"
     )]
     fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
         let inner: CreditMapping =
@@ -398,6 +410,12 @@ impl PyCreditMapping {
     #[getter]
     fn coverage_min_warn(&self) -> Option<f64> {
         self.inner.coverage_min_warn
+    }
+
+    /// Comparison and reporting policy of the suite.
+    #[getter]
+    fn config(&self) -> crate::bindings::statements::checks::PyCheckConfig {
+        crate::bindings::statements::checks::PyCheckConfig::from_inner(self.inner.config.clone())
     }
 
     fn __repr__(&self) -> String {
@@ -460,7 +478,11 @@ fn run_check_suite(
 ) -> PyResult<PyCheckReport> {
     py.detach(move || {
         suite
-            .run_model(&model, results.as_ref())
+            .run_model(
+                &model,
+                &finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
+                results.as_ref(),
+            )
             .map(PyCheckReport::from_inner)
             .map_err(statements_to_py)
     })
@@ -592,7 +614,8 @@ fn run_three_statement_checks(
 ) -> PyResult<PyCheckReport> {
     let model = extract_model_ref(model)?.into_owned();
     let mapping = extract_three_statement_mapping(py, mapping)?;
-    let suite = finstack_quant_statements_analytics::analysis::three_statement_checks(mapping);
+    let suite = finstack_quant_statements_analytics::analysis::three_statement_checks(mapping)
+        .map_err(statements_to_py)?;
     let results = optional_results(results)?;
     run_check_suite(py, model, suite, results)
 }
@@ -647,7 +670,8 @@ fn run_credit_underwriting_checks(
 ) -> PyResult<PyCheckReport> {
     let model = extract_model_ref(model)?.into_owned();
     let mapping = extract_credit_mapping(py, mapping)?;
-    let suite = finstack_quant_statements_analytics::analysis::credit_underwriting_checks(mapping);
+    let suite = finstack_quant_statements_analytics::analysis::credit_underwriting_checks(mapping)
+        .map_err(statements_to_py)?;
     let results = optional_results(results)?;
     run_check_suite(py, model, suite, results)
 }

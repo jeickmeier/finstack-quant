@@ -183,5 +183,6 @@ pub(crate) fn arithmetic_failure(
         materiality: None,
         nodes,
         comparison: None,
+        coverage: false,
     }
 }

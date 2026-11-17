@@ -881,8 +881,8 @@ class Evaluator:
         >>> _ = builder.periods("2025Q1..Q1")
         >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
         >>> evaluator = Evaluator().with_checks(spec)
-        >>> evaluator.evaluate(builder.build()).check_report.passed
-        True
+        >>> evaluator.evaluate(builder.build()).check_report.outcome
+        'unevaluated'
         """
         ...
 

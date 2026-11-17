@@ -1,5 +1,55 @@
 {
   "$defs": {
+    "CheckConfig": {
+      "additionalProperties": false,
+      "description": "Configuration parameters that govern check execution.\n\nThe identity tolerance is zero unless one is stated: an identity then\nholds only when its two sides are equal. An explicit tolerance allows\n`|difference| <= max(default_tolerance, default_relative_tolerance *\n|reference|)`, where the reference is the identity owner's (total assets\nfor the balance sheet, for example); a difference equal to the allowance\nis within tolerance. A per-check absolute override replaces both terms.\n\n`materiality_threshold` and `min_severity` are reporting filters for\nadvisory findings. They never change a verdict, and they never remove an\nerror-severity finding, a coverage finding or a recorded comparison.",
+      "properties": {
+        "default_relative_tolerance": {
+          "default": 0.0,
+          "description": "**Relative** tolerance as a fraction of the identity's reference\nvalue (1e-9 allows 10 on a reference of 1e10). Zero, the default,\ndisables the relative term.",
+          "format": "double",
+          "type": "number"
+        },
+        "default_tolerance": {
+          "default": 0.0,
+          "description": "**Absolute** tolerance for equality comparisons, in the units of the\ncompared values (0.01 is one cent when nodes are in whole dollars).\nZero, the default, requires exact equality.",
+          "format": "double",
+          "type": "number"
+        },
+        "materiality_threshold": {
+          "default": 0.0,
+          "description": "Advisory findings whose absolute materiality is below this threshold\nare left out of the report. Error-severity and coverage findings are\nalways reported.",
+          "format": "double",
+          "type": "number"
+        },
+        "min_severity": {
+          "$ref": "#/$defs/CheckSeverity",
+          "default": "info",
+          "description": "Minimum severity an advisory finding must have to appear in the\nreport. Coverage findings are always reported."
+        }
+      },
+      "type": "object"
+    },
+    "CheckSeverity": {
+      "description": "Severity level for a check finding, ordered from least to most severe.",
+      "oneOf": [
+        {
+          "const": "info",
+          "description": "Informational finding — no action required.",
+          "type": "string"
+        },
+        {
+          "const": "warning",
+          "description": "Warning — review recommended.",
+          "type": "string"
+        },
+        {
+          "const": "error",
+          "description": "Error — indicates a likely problem that should be addressed.",
+          "type": "string"
+        }
+      ]
+    },
     "CreditMapping": {
       "additionalProperties": false,
       "description": "Maps node IDs for credit underwriting analysis.\n\nUsed by [`super::suites::credit_underwriting_checks`] to build leverage,\ncoverage, cash-flow, and trend checks. Unknown JSON keys are rejected, so\na misspelled optional key fails instead of silently disabling its check.",
@@ -25,6 +75,16 @@
             }
           ],
           "description": "Cash / liquidity node."
+        },
+        "config": {
+          "$ref": "#/$defs/CheckConfig",
+          "default": {
+            "default_relative_tolerance": 0.0,
+            "default_tolerance": 0.0,
+            "materiality_threshold": 0.0,
+            "min_severity": "info"
+          },
+          "description": "Comparison and reporting policy of the suite. Identities are compared\nexactly unless a tolerance is stated here."
         },
         "coverage_min_warn": {
           "description": "Minimum coverage ratio that triggers a warning; defaults to `1.5`.",
@@ -189,6 +249,16 @@
             }
           ],
           "description": "Cash from operations node (cash flow statement)."
+        },
+        "config": {
+          "$ref": "#/$defs/CheckConfig",
+          "default": {
+            "default_relative_tolerance": 0.0,
+            "default_tolerance": 0.0,
+            "materiality_threshold": 0.0,
+            "min_severity": "info"
+          },
+          "description": "Comparison and reporting policy of the suite. Identities are compared\nexactly unless a tolerance is stated here."
         },
         "cs_interest_node": {
           "anyOf": [

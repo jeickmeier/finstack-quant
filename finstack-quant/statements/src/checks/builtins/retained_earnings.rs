@@ -109,6 +109,7 @@ impl Check for RetainedEarningsReconciliation {
                         self.net_income_node.clone(),
                     ],
                     comparison: None,
+                    coverage: false,
                 });
                 continue;
             }
@@ -151,6 +152,7 @@ impl Check for RetainedEarningsReconciliation {
                             self.net_income_node.clone(),
                         ],
                         comparison: None,
+                        coverage: true,
                     });
                     continue;
                 }
@@ -190,6 +192,7 @@ impl Check for RetainedEarningsReconciliation {
                         self.net_income_node.clone(),
                     ],
                     comparison: None,
+                    coverage: true,
                 });
                 continue;
             }
@@ -285,19 +288,12 @@ impl Check for RetainedEarningsReconciliation {
                     }),
                     nodes,
                     comparison: Some(comparison),
+                    coverage: false,
                 });
             }
         }
 
-        let passed = !findings.iter().any(|f| f.severity == Severity::Error);
-
-        Ok(CheckResult {
-            check_id: self.id().to_string(),
-            check_name: self.name().to_string(),
-            category: self.category(),
-            passed,
-            findings,
-            comparisons,
-        })
+        let evaluated = periods.len().saturating_sub(1);
+        Ok(CheckResult::new(self, evaluated, findings, comparisons))
     }
 }

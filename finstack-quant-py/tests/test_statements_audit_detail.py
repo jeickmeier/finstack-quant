@@ -140,7 +140,7 @@ def test_failed_finding_reports_actual_expected_and_tolerance() -> None:
         "period": Q1,
         "actual": 1000.0,
         "expected": 900.0,
-        "tolerance": 0.01,
+        "tolerance": 0.0,
     }
     # The numbers reconcile with the reported materiality and the verdict.
     difference = abs(comparison["actual"] - comparison["expected"])
@@ -150,7 +150,7 @@ def test_failed_finding_reports_actual_expected_and_tolerance() -> None:
     row = report.to_findings_dataframe().iloc[0]
     assert row["comparison_actual"] == 1000.0
     assert row["comparison_expected"] == 900.0
-    assert row["comparison_tolerance"] == 0.01
+    assert row["comparison_tolerance"] == 0.0
 
 
 def test_comparisons_dataframe_lists_passing_periods_too() -> None:
@@ -180,8 +180,18 @@ def test_comparisons_dataframe_lists_passing_periods_too() -> None:
 def test_report_without_comparisons_yields_typed_empty_frame() -> None:
     report = CheckReport.from_json(
         json.dumps({
+            "outcome": "unevaluated",
             "results": [],
-            "summary": {"total_checks": 0, "passed": 0, "failed": 0, "errors": 0, "warnings": 0, "infos": 0},
+            "summary": {
+                "total_checks": 0,
+                "passed": 0,
+                "failed": 0,
+                "incomplete": 0,
+                "unevaluated": 0,
+                "errors": 0,
+                "warnings": 0,
+                "infos": 0,
+            },
         })
     )
     frame = report.to_comparisons_dataframe()

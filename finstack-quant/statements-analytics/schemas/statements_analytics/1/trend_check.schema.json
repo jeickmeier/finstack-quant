@@ -48,6 +48,10 @@
       "$ref": "#/$defs/TrendDirection",
       "description": "Which direction is \"good\"."
     },
+    "id": {
+      "description": "Identifier of this check, unique within its suite (a suite may watch\nseveral nodes, one trend check each).",
+      "type": "string"
+    },
     "lookback_periods": {
       "description": "Number of consecutive deteriorating periods before flagging.",
       "format": "uint",
@@ -64,6 +68,7 @@
     }
   },
   "required": [
+    "id",
     "node",
     "direction",
     "lookback_periods",

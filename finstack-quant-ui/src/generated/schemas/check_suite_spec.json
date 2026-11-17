@@ -19,8 +19,8 @@
         }
       ],
       "config": {
-        "default_relative_tolerance": 1e-9,
-        "default_tolerance": 0.01,
+        "default_relative_tolerance": 0,
+        "default_tolerance": 0,
         "materiality_threshold": 0,
         "min_severity": "info"
       },
@@ -50,8 +50,8 @@
     "config": {
       "$ref": "#/$defs/d_5de9f28b928c01e49782",
       "default": {
-        "default_relative_tolerance": 1e-9,
-        "default_tolerance": 0.01,
+        "default_relative_tolerance": 0,
+        "default_tolerance": 0,
         "materiality_threshold": 0,
         "min_severity": "info"
       },
@@ -298,30 +298,30 @@
     },
     "d_5de9f28b928c01e49782": {
       "additionalProperties": false,
-      "description": "Configuration parameters that govern check execution.\n\nIdentity checks trigger a finding when\n`|diff| > max(default_tolerance, default_relative_tolerance * |reference|)`,\nso an analyst can set an absolute floor (currency units) that catches\nmicro-errors on small balances plus a relative ceiling that scales with\nlarger balance sheets. A per-check tolerance override bypasses both\ndefaults and is applied verbatim.\n\nAll four fields are part of the public configuration surface and are\nintended to be tuned per-deployment via JSON / serde overrides — e.g.,\nraising `default_relative_tolerance` to `1e-4` (1 bp) when a downstream\nprocess is known to round to the nearest hundred. The defaults\n(`default_tolerance = 0.01`, `default_relative_tolerance = 1e-9`,\n`materiality_threshold = 0.0`, `min_severity = Info`) are conservative:\nthe absolute cent floor catches micro-errors on small balances while the\nrelative component absorbs f64 accumulation noise on large ones.",
+      "description": "Configuration parameters that govern check execution.\n\nThe identity tolerance is zero unless one is stated: an identity then\nholds only when its two sides are equal. An explicit tolerance allows\n`|difference| <= max(default_tolerance, default_relative_tolerance *\n|reference|)`, where the reference is the identity owner's (total assets\nfor the balance sheet, for example); a difference equal to the allowance\nis within tolerance. A per-check absolute override replaces both terms.\n\n`materiality_threshold` and `min_severity` are reporting filters for\nadvisory findings. They never change a verdict, and they never remove an\nerror-severity finding, a coverage finding or a recorded comparison.",
       "properties": {
         "default_relative_tolerance": {
-          "default": 1e-9,
-          "description": "Default **relative** tolerance as a fraction of the reference\ndenominator (e.g. 1e-6 ≈ \"one basis point of a basis point\"). Zero\ndisables relative tolerance.",
+          "default": 0,
+          "description": "**Relative** tolerance as a fraction of the identity's reference\nvalue (1e-9 allows 10 on a reference of 1e10). Zero, the default,\ndisables the relative term.",
           "format": "double",
           "type": "number"
         },
         "default_tolerance": {
-          "default": 0.01,
-          "description": "Default **absolute** tolerance for equality comparisons, expressed in\nthe same currency units as the node values being compared (e.g. 0.01\nmeans one cent when nodes are in whole dollars).",
+          "default": 0,
+          "description": "**Absolute** tolerance for equality comparisons, in the units of the\ncompared values (0.01 is one cent when nodes are in whole dollars).\nZero, the default, requires exact equality.",
           "format": "double",
           "type": "number"
         },
         "materiality_threshold": {
           "default": 0,
-          "description": "Findings below this absolute materiality threshold are excluded from\nreports. Error-severity findings are exempt: materiality filters\nadvisory noise, it never changes a check's pass/fail verdict.",
+          "description": "Advisory findings whose absolute materiality is below this threshold\nare left out of the report. Error-severity and coverage findings are\nalways reported.",
           "format": "double",
           "type": "number"
         },
         "min_severity": {
           "$ref": "#/$defs/d_06907e07480e89ff7314",
           "default": "info",
-          "description": "Minimum severity a finding must have to appear in the report."
+          "description": "Minimum severity an advisory finding must have to appear in the\nreport. Coverage findings are always reported."
         }
       },
       "type": "object"

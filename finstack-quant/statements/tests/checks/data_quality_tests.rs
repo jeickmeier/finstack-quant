@@ -52,7 +52,7 @@ fn missing_value_actual_is_error() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(!result.passed); // Q2 missing in actuals → Error
+    assert!(!result.passed()); // Q2 missing in actuals → Error
 
     // Q2 is actual → Error
     let q2_findings: Vec<_> = result
@@ -151,7 +151,7 @@ fn missing_value_forecast_only_scope() {
     assert_eq!(result.findings.len(), 1);
     assert_eq!(result.findings[0].period, Some(q(4)));
     assert_eq!(result.findings[0].severity, Severity::Warning);
-    assert!(result.passed); // warnings only → passed
+    assert!(result.passed()); // warnings only → passed
 }
 
 // SignConventionCheck
@@ -182,7 +182,7 @@ fn sign_convention_positive_violation() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed); // warnings only → passed
+    assert!(result.passed()); // warnings only → passed
     assert_eq!(result.findings.len(), 1);
     assert_eq!(result.findings[0].severity, Severity::Warning);
     assert_eq!(result.findings[0].period, Some(q(1)));
@@ -214,7 +214,7 @@ fn sign_convention_negative_violation() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed); // warnings only → passed
+    assert!(result.passed()); // warnings only → passed
     assert_eq!(result.findings.len(), 1);
     assert_eq!(result.findings[0].severity, Severity::Warning);
     assert_eq!(result.findings[0].period, Some(q(2)));
@@ -253,7 +253,7 @@ fn sign_convention_clean() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }
 
@@ -294,7 +294,7 @@ fn sign_convention_nan_is_surfaced_not_silently_passed() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed); // advisory: warnings only
+    assert!(result.passed()); // advisory: warnings only
     assert_eq!(result.findings.len(), 2);
     for finding in &result.findings {
         assert_eq!(finding.severity, Severity::Warning);
@@ -340,7 +340,7 @@ fn non_finite_nan_detected() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(!result.passed);
+    assert!(!result.passed());
 
     let nan_findings: Vec<_> = result
         .findings
@@ -385,7 +385,7 @@ fn non_finite_inf_detected() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(!result.passed);
+    assert!(!result.passed());
     assert_eq!(result.findings.len(), 1);
     assert_eq!(result.findings[0].severity, Severity::Error);
 }
@@ -415,6 +415,6 @@ fn non_finite_all_finite_passes() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }

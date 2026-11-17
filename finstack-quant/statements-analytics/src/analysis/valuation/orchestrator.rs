@@ -74,7 +74,7 @@ struct DcfSpec {
 ///
 /// let checks = CheckSuite::builder("corporate")
 ///     .add_check(NonFiniteCheck { nodes: vec![] })
-///     .build();
+///     .build().expect("unique check ids");
 ///
 /// let _result = CorporateAnalysisBuilder::new(model)
 ///     .dcf(0.10, TerminalValueSpec::GordonGrowth { stable_growth_rate: 0.02 })
@@ -690,6 +690,7 @@ mod tests {
         CheckSuite::builder("corporate-test")
             .add_check(NonFiniteCheck { nodes: vec![] })
             .build()
+            .expect("unique check ids")
     }
 
     #[test]

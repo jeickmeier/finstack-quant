@@ -48,7 +48,7 @@ proptest! {
 
         let ctx = CheckContext::new(&model, &results);
         let result = check.execute(&ctx).unwrap();
-        prop_assert!(result.passed, "Expected pass for A={a}, L={l}, E={e}");
+        prop_assert!(result.passed(), "Expected pass for A={a}, L={l}, E={e}");
     }
 
     #[test]
@@ -80,7 +80,7 @@ proptest! {
 
         let ctx = CheckContext::new(&model, &results);
         let result = check.execute(&ctx).unwrap();
-        prop_assert!(!result.passed, "Expected fail for gap={gap}");
+        prop_assert!(!result.passed(), "Expected fail for gap={gap}");
     }
 }
 
@@ -116,7 +116,7 @@ proptest! {
         let check = NonFiniteCheck { nodes: vec![] };
         let ctx = CheckContext::new(&model, &results);
         let result = check.execute(&ctx).unwrap();
-        prop_assert!(!result.passed, "NonFiniteCheck should catch NaN");
+        prop_assert!(!result.passed(), "NonFiniteCheck should catch NaN");
     }
 
     #[test]
@@ -148,7 +148,7 @@ proptest! {
         let check = NonFiniteCheck { nodes: vec![] };
         let ctx = CheckContext::new(&model, &results);
         let result = check.execute(&ctx).unwrap();
-        prop_assert!(!result.passed, "NonFiniteCheck should catch Inf");
+        prop_assert!(!result.passed(), "NonFiniteCheck should catch Inf");
     }
 
     #[test]
@@ -180,7 +180,7 @@ proptest! {
         let check = NonFiniteCheck { nodes: vec![] };
         let ctx = CheckContext::new(&model, &results);
         let result = check.execute(&ctx).unwrap();
-        prop_assert!(!result.passed, "NonFiniteCheck should catch -Inf");
+        prop_assert!(!result.passed(), "NonFiniteCheck should catch -Inf");
     }
 }
 
@@ -210,7 +210,7 @@ proptest! {
 
         let ctx = CheckContext::new(&model, &results);
         let result = check.execute(&ctx).unwrap();
-        prop_assert!(result.passed, "Expected pass for v1={v1}, v2={v2}");
+        prop_assert!(result.passed(), "Expected pass for v1={v1}, v2={v2}");
         prop_assert!(result.findings.is_empty(), "Expected no findings");
     }
 

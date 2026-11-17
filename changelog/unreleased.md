@@ -1266,3 +1266,31 @@ STATEMENTS-CAPITAL-002.
 - **Rust.** `calculate_period_flows` takes a supplied schedule as
   `SuppliedSchedule { schedule, perspective }`
   (`SuppliedSchedule::holder(&schedule)` for the canonical form).
+
+### Statements checks: exact by default, four outcomes, verified results
+
+STATEMENTS-CONTRACTS-014. **Breaking.**
+
+- **Tolerance.** `CheckConfig` defaults are `default_tolerance = 0` and
+  `default_relative_tolerance = 0` (they were `0.01` and `1e-9`): an identity
+  must hold exactly unless a tolerance is stated. State one where floating
+  point noise matters, for example
+  `CheckConfig(default_tolerance=0.01, default_relative_tolerance=1e-9)`.
+- **Outcomes.** `CheckResult.passed` is replaced by `outcome` (`pass`,
+  `fail`, `incomplete`, `unevaluated`) and `evaluated`; `CheckReport` gains
+  `outcome`, and its summary `incomplete` and `unevaluated`. A check that
+  lacked required data is incomplete, and an empty suite or a check with
+  nothing to examine is unevaluated; neither is a pass. Python
+  `CheckReport.passed` is true only for the outcome `pass`, and
+  `to_dataframe()` has `outcome` and `evaluated` in place of `passed`.
+- **Filters.** `min_severity` and `materiality_threshold` hide advisory
+  findings only. Error-severity findings, coverage findings (new
+  `CheckFinding.coverage`) and comparisons are always reported.
+- **Identifiers.** A suite with two checks of one identifier is rejected.
+  `CheckSuiteBuilder::build`, `CheckSuite::merge` and the analytics suite
+  factories return `Result`; a merge needs equal configurations.
+  `TrendCheck` has a required `id`, and the credit suite's non-finite check
+  is `credit_inputs_non_finite`.
+- **Supplied results.** Results passed to a check run must be an evaluated
+  run of the same model; hand-built or stale results are rejected. Rust
+  `CheckSuite::run_model` takes the requested observation cutoff.

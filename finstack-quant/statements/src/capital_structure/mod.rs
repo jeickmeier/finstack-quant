@@ -35,11 +35,13 @@
 //! ```
 //! use finstack_quant_core::market_data::{context::MarketContext, term_structures::DiscountCurve};
 //! use finstack_quant_core::currency::Currency;
-//! use finstack_quant_core::dates::PeriodId;
+//! use finstack_quant_core::dates::{PeriodId, StubKind};
 //! use finstack_quant_core::money::Money;
+//! use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
 //! use finstack_quant_statements::builder::ModelBuilder;
 //! use finstack_quant_statements::evaluator::Evaluator;
-//! use finstack_quant_statements::types::AmountOrScalar;
+//! use finstack_quant_statements::types::{AmountOrScalar, FinancialStatementInstrument};
+//! use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 //!
 //! use time::macros::date;
 //!
@@ -60,15 +62,17 @@
 //!         "revenue",
 //!         &[(PeriodId::quarter(2025, 1).expect("valid period fixture"), issue_date)],
 //!     )?;
-//!     // Add debt instruments
-//!     model_builder.add_bond(
-//!         "BOND-001",
+//!     // Build the instrument through its Valuations API and attach it.
+//!     let bond = Bond::fixed(
+//!         InstrumentId::new("BOND-001"),
 //!         Money::from((10_000_000_i64, Currency::USD)),
-//!         0.05, // 5% coupon
+//!         Rate::from_decimal(0.05)?, // 5% coupon
 //!         issue_date,
 //!         maturity_date,
-//!         "USD-OIS",
+//!         StubKind::ShortFront,
+//!         CurveId::new("USD-OIS"),
 //!     )?;
+//!     model_builder.add_debt("BOND-001", FinancialStatementInstrument::Bond(bond));
 //!     // Reference in formulas
 //!     model_builder.compute("interest_expense", "cs.interest_expense.BOND-001")?;
 //!     model_builder.compute(
@@ -81,7 +85,10 @@
 //! let market_ctx = MarketContext::new().insert(
 //!     DiscountCurve::builder("USD-OIS")
 //!         .base_date(issue_date)
+//!         .day_count(finstack_quant_core::dates::DayCount::Act365F)
 //!         .knots([(0.0, 1.0), (5.0, 0.90)])
+//!         .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+//!         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
 //!         .build()?,
 //! );
 //!

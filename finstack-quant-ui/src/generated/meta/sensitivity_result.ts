@@ -21,7 +21,14 @@ export default [
   {
     "path": "#/$defs/d_033184211bfcc772ee94/properties/failed",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckSummary/properties/failed",
-    "description": "Number of checks that failed (at least one error-severity finding).",
+    "description": "Number of checks whose outcome is `fail` (an error-severity finding).",
+    "format": "uint",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_033184211bfcc772ee94/properties/incomplete",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckSummary/properties/incomplete",
+    "description": "Number of checks whose outcome is `incomplete` (a coverage finding).",
     "format": "uint",
     "minimum": 0
   },
@@ -35,7 +42,7 @@ export default [
   {
     "path": "#/$defs/d_033184211bfcc772ee94/properties/passed",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckSummary/properties/passed",
-    "description": "Number of checks that passed.",
+    "description": "Number of checks whose outcome is `pass`.",
     "format": "uint",
     "minimum": 0
   },
@@ -43,6 +50,13 @@ export default [
     "path": "#/$defs/d_033184211bfcc772ee94/properties/total_checks",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckSummary/properties/total_checks",
     "description": "Total number of checks executed.",
+    "format": "uint",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_033184211bfcc772ee94/properties/unevaluated",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckSummary/properties/unevaluated",
+    "description": "Number of checks whose outcome is `unevaluated` (nothing examined).",
     "format": "uint",
     "minimum": 0
   },
@@ -365,9 +379,16 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckComparison"
   },
   {
+    "path": "#/$defs/d_4f32370227b1985d85e9/properties/evaluated",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckResult/properties/evaluated",
+    "description": "Number of periods or cells the check examined.",
+    "format": "uint",
+    "minimum": 0
+  },
+  {
     "path": "#/$defs/d_4f32370227b1985d85e9/properties/findings",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckResult/properties/findings",
-    "description": "Individual findings produced by the check."
+    "description": "Findings produced by the check. The suite's `min_severity` and\n`materiality_threshold` filters remove advisory findings only: an\nerror-severity or coverage finding is always retained."
   },
   {
     "path": "#/$defs/d_4f32370227b1985d85e9/properties/findings/items",
@@ -376,9 +397,11 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckFinding"
   },
   {
-    "path": "#/$defs/d_4f32370227b1985d85e9/properties/passed",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckResult/properties/passed",
-    "description": "Whether the check passed (no error-severity findings)."
+    "path": "#/$defs/d_4f32370227b1985d85e9/properties/outcome",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckResult/properties/outcome",
+    "description": "Verdict of the check, decided from all of its findings before the\nsuite's reporting filters: `fail` on an error-severity finding, else\n`incomplete` on a coverage finding, else `unevaluated` when\n`evaluated` is zero, else `pass`.",
+    "ref": "#/$defs/CheckOutcome",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckOutcome"
   },
   {
     "path": "#/$defs/d_583d7ac2c659b0d958a8",
@@ -919,6 +942,11 @@ export default [
   {
     "path": "#/$defs/d_82a7f3795866afe7c96c/properties/comparison/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckFinding/properties/comparison/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_82a7f3795866afe7c96c/properties/coverage",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckFinding/properties/coverage",
+    "description": "True for a coverage finding: required data was missing or unavailable,\nso the check could not evaluate the period or cell it names. A\ncoverage finding makes its check incomplete and is never removed by\nthe reporting filters."
   },
   {
     "path": "#/$defs/d_82a7f3795866afe7c96c/properties/materiality",
@@ -2619,9 +2647,16 @@ export default [
     "description": "Full report aggregating all [`CheckResult`]s from a check run."
   },
   {
+    "path": "#/$defs/d_f0893f1d89ca5934871f/properties/outcome",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckReport/properties/outcome",
+    "description": "Verdict of the suite from the unfiltered check outcomes: `fail` when\nany check failed, else `incomplete` when any check is incomplete,\nelse `pass` when at least one check passed, else `unevaluated` (an\nempty suite, or one with no applicable check).",
+    "ref": "#/$defs/CheckOutcome",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckOutcome"
+  },
+  {
     "path": "#/$defs/d_f0893f1d89ca5934871f/properties/results",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckReport/properties/results",
-    "description": "Individual results for each check."
+    "description": "Individual results for each check, in declared order."
   },
   {
     "path": "#/$defs/d_f0893f1d89ca5934871f/properties/results/items",
@@ -2635,6 +2670,35 @@ export default [
     "description": "Aggregate summary.",
     "ref": "#/$defs/CheckSummary",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckSummary"
+  },
+  {
+    "path": "#/$defs/d_f1c764667142e4944f0b",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckOutcome",
+    "description": "Verdict of a check, or of a whole report, decided from every outcome\nbefore any reporting filter is applied."
+  },
+  {
+    "path": "#/$defs/d_f1c764667142e4944f0b/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckOutcome/oneOf/0",
+    "const": "pass",
+    "description": "Work was evaluated, required coverage was complete and nothing failed."
+  },
+  {
+    "path": "#/$defs/d_f1c764667142e4944f0b/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckOutcome/oneOf/1",
+    "const": "fail",
+    "description": "At least one error-severity finding."
+  },
+  {
+    "path": "#/$defs/d_f1c764667142e4944f0b/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckOutcome/oneOf/2",
+    "const": "incomplete",
+    "description": "Nothing failed, but required data was missing or unavailable for at\nleast one period or cell."
+  },
+  {
+    "path": "#/$defs/d_f1c764667142e4944f0b/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CheckOutcome/oneOf/3",
+    "const": "unevaluated",
+    "description": "Nothing was evaluated: an empty suite, or a check with no applicable\nperiod or cell."
   },
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7",

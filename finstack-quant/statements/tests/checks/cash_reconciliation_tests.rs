@@ -51,7 +51,7 @@ fn cash_reconciliation_passes() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }
 
@@ -93,7 +93,7 @@ fn cash_reconciliation_fails() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(!result.passed);
+    assert!(!result.passed());
     assert_eq!(result.findings.len(), 1);
 
     let mat = result.findings[0].materiality.as_ref().unwrap();
@@ -160,7 +160,7 @@ fn component_check_passes() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(result.passed);
+    assert!(result.passed());
     assert!(result.findings.is_empty());
 }
 
@@ -223,7 +223,7 @@ fn component_check_fails() {
     let ctx = CheckContext::new(&model, &results);
     let result = check.execute(&ctx).unwrap();
 
-    assert!(!result.passed);
+    assert!(!result.passed());
     // Should have the component mismatch finding
     let component_findings: Vec<_> = result
         .findings

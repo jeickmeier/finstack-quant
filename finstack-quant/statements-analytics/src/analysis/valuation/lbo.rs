@@ -310,7 +310,8 @@ pub fn evaluate_lbo(model: &FinancialModelSpec, config: &LboConfig) -> Result<Lb
 
     let checks = match &config.check_mappings {
         Some(mappings) => {
-            let suite = lbo_model_checks(mappings.three_statement.clone(), mappings.credit.clone());
+            let suite =
+                lbo_model_checks(mappings.three_statement.clone(), mappings.credit.clone())?;
             Some(suite.run(model, &results)?)
         }
         None => None,

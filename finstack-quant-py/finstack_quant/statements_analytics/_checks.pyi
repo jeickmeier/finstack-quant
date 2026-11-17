@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
-from finstack_quant.statements import CheckReport
+from finstack_quant.statements import CheckConfig, CheckReport
 
 class CreditMapping:
     """
@@ -40,6 +40,9 @@ class CreditMapping:
         Rust default ``(0.0, 6.0)``.
     coverage_min_warn : float | None
         Minimum EBITDA/interest coverage in turns before a warning.
+    config : CheckConfig | dict | None
+        Comparison and reporting policy of the suite. ``None`` compares
+        identities exactly; state a tolerance for floating-point models.
 
     Examples
     --------
@@ -63,6 +66,7 @@ class CreditMapping:
         cash_burn_node: str | None = None,
         leverage_warn: tuple[float, float] | None = None,
         coverage_min_warn: float | None = None,
+        config: CheckConfig | dict[str, Any] | None = None,
     ) -> None: ...
     @property
     def debt_node(self) -> str:
@@ -147,6 +151,19 @@ class CreditMapping:
         -------
         tuple[float, float] | None
             ``(min, max)`` leverage warning band in turns, or ``None``.
+        """
+    @property
+    def config(self) -> CheckConfig:
+        """
+        Comparison and reporting policy of the suite.
+
+        This property does not raise.
+
+        Returns
+        -------
+        CheckConfig
+            The policy the suite built from this mapping runs under.
+            Identities are compared exactly unless it states a tolerance.
         """
     @property
     def coverage_min_warn(self) -> float | None:
@@ -277,6 +294,9 @@ class ThreeStatementMapping:
         Current-asset nodes for the working-capital check. Default ``[]``.
     current_liabilities_nodes : list[str]
         Current-liability nodes for the working-capital check. Default ``[]``.
+    config : CheckConfig | dict | None
+        Comparison and reporting policy of the suite. ``None`` compares
+        identities exactly; state a tolerance for floating-point models.
 
     Examples
     --------
@@ -320,6 +340,7 @@ class ThreeStatementMapping:
         wc_change_cf_node: str | None = None,
         current_assets_nodes: list[str] = ...,
         current_liabilities_nodes: list[str] = ...,
+        config: CheckConfig | dict[str, Any] | None = None,
     ) -> None: ...
     @property
     def cash_node(self) -> str:
@@ -608,6 +629,19 @@ class ThreeStatementMapping:
         -------
         list[str]
             Current-asset nodes.
+        """
+    @property
+    def config(self) -> CheckConfig:
+        """
+        Comparison and reporting policy of the suite.
+
+        This property does not raise.
+
+        Returns
+        -------
+        CheckConfig
+            The policy the suite built from this mapping runs under.
+            Identities are compared exactly unless it states a tolerance.
         """
     @property
     def current_liabilities_nodes(self) -> list[str]:

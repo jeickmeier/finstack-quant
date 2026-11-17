@@ -49,7 +49,8 @@ fn evaluator_with_checks_attaches_report() {
             equity_nodes: vec![NodeId::new("total_equity")],
             tolerance: None,
         })
-        .build();
+        .build()
+        .expect("unique check ids");
 
     let mut evaluator = Evaluator::new().with_checks(suite);
     let result = evaluator.evaluate(&model).unwrap();
@@ -118,7 +119,8 @@ fn evaluator_with_checks_balanced_passes() {
             equity_nodes: vec![NodeId::new("total_equity")],
             tolerance: None,
         })
-        .build();
+        .build()
+        .expect("unique check ids");
 
     let mut evaluator = Evaluator::new().with_checks(suite);
     let result = evaluator.evaluate(&model).unwrap();

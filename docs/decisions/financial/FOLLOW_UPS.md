@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **643 review items across 33 source scopes with open items**
+This backlog consolidates **642 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -26,7 +26,7 @@ The labels distinguish the work required:
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (496): implementation and verification work against an
+- **Reconciliation** (495): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (38): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -69,7 +69,7 @@ product consequences remain in their product scope.
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
 | [Statements: capital structure](#statements-capital-structure) | 13 |
 | [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 12 |
-| [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 7 |
+| [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 6 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
 | [Statements analytics: credit checks and impairment](#statements-analytics-credit-checks-and-impairment) | 18 |
 | [Scenarios](#scenarios) | 16 |
@@ -1064,7 +1064,7 @@ product consequences remain in their product scope.
 
 - **Reconciliation — Statements data-quality coverage and validity.** Enforce explicit required scope, incomplete required observations, valid typed zero, reasoned unavailability and invalid-input errors on present optional cells. Qualify identifiers, off-plan cells, compatible units, empty coverage and advisory finite sign groups. [Accepted STATEMENTS-CONTRACTS-013](statements-contracts/13-data-quality-checks.md#accepted-decision-for-data-quality-coverage-and-validity).
 
-- **Reconciliation — Numerical comparison and check-suite outcomes.** Implement typed comparisons with zero default identity tolerance, unfiltered coverage verdicts and advisory-only filters. Enforce check order, identity, merge compatibility and verified supplied-result provenance. Independently qualify compared precision, residual scales, absolute and relative tolerance, empty coverage, filtering and requested-context evaluation. [Accepted STATEMENTS-CONTRACTS-014](statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
+- **Reconciliation — Typed comparison values and coverage in analytics checks.** Record a comparison's actual, expected, difference and tolerance as typed values (exact `Money` or scalar) at the compared precision; today they are floats in the compared nodes' units, with compatible units checked for identity inputs. Define, with their owning records, when a statements-analytics check that lacks an input is incomplete rather than not applicable; today those checks report the periods they examined and never a coverage finding. Zero default tolerance with the inclusive `max(absolute, relative × reference)` allowance and absolute override, pass, fail, incomplete and unevaluated verdicts from unfiltered outcomes, advisory-only filters, declared order with unique identifiers, compatible merges, and supplied results accepted only as a verified run under the requested cutoff are reconciled. [Accepted STATEMENTS-CONTRACTS-014](statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
 
 - **Reconciliation — Explicit formula-check modes, eligibility and lazy evaluation.** Enforce Boolean predicates and typed residuals, actual/forecast scope, complete AST validation and lazy observation consumption on a verified run. Independently qualify untaken branches and explicit fallback, eligibility, typed tolerance, missing coverage and execution errors even for advisory checks. [Accepted STATEMENTS-CONTRACTS-015](statements-contracts/15-formula-checks.md#accepted-decision-for-formula-checks-and-coverage).
 
@@ -1080,8 +1080,6 @@ product consequences remain in their product scope.
 
 - **Reconciliation — Complete Monte Carlo paths, typed samples and exact quantiles.** Implement the path-ID and resource limits, fresh complete paths with deterministic failure order, explicit metric coverage and typed sample validation. Qualify R-7, exact percentile keys, sample count and units, complete path restoration and finite typed strict-upper breach probability. Establish independent moment, quantile and sampling-error evidence. Record the run seed and the forecast stream version on the Monte Carlo result, so a path replays from the result alone as a single run does from its provenance. Qualify a correlated follower whose peer forecast is unavailable on a path: it is unavailable with reason `missing_peer_shock`, which the aggregation cannot report until samples are typed (today any valueless sample fails the run). [Accepted STATEMENTS-EVALUATION-011](statements-evaluation/11-monte-carlo-evaluation.md#accepted-decision-for-monte-carlo-paths-quantiles-and-breach-probabilities).
 
-- **Reconciliation — The check suite at single-run finalization.** Apply the configured check suite at single-run finalization under the accepted comparison and suite policy, and qualify configured single-run checks. Cell states, mask handling, the lag and shift dependency rule, source precedence under a cutoff, checked plan reuse and published run provenance with each cell's status, reason and source are reconciled. [Accepted STATEMENTS-EVALUATION-001](statements-evaluation/01-graph-precedence-and-prepared-plans.md#accepted-decision-for-dependency-graphs-cell-precedence-and-prepared-evaluation) · [Check-suite policy](statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
-
 - **Reconciliation — Float views of typed values inside Statements.** Typed cells and typed formula values are authoritative, but these internal consumers still read a float view in which a value that is missing, masked or unavailable is `NaN`: capital-structure references, whose values enter formulas as an untyped number that takes the units static analysis fixed; formula checks, period rollup and inline waterfall expressions (`evaluate_formula`); normalization bridges and the non-finite data-quality check (`StatementResult::float_series`); and Monte Carlo path collection (`StatementResult::path_values`). Move each to typed values and delete its view when its owning contract is reconciled. [Formula checks](statements-contracts/15-formula-checks.md) · [Period rollup](statements-evaluation/14-period-rollup.md) · [Waterfall allocation](statements-capital/06-priority-allocation.md) · [Normalization bridges](statements-evaluation/15-normalization-adjustments.md) · [Data-quality checks](statements-contracts/13-data-quality-checks.md) · [Monte Carlo paths](statements-evaluation/11-monte-carlo-evaluation.md) · [Capital reporting](statements-capital/09-reporting-and-fx.md).
 
 - **Reconciliation — Monetary rounding mode in Statements formulas.** `round(money, digits)` states its scale and rounds midpoint ties away from zero, the one mode the function has; `floor`, `ceil` and one-argument `round` reject money when the model is built. The accepted contract requires monetary rounding to state its rounding mode as well as its scale. Add the mode to the formula grammar, or accept the single documented mode. [Accepted STATEMENTS-EVALUATION-002](statements-evaluation/02-scalar-formulas-and-undefined-values.md#accepted-decision-for-scalar-formulas-and-unavailable-values) · [Monetary rounding](core-conventions/012-money-decimal-precision.md#accepted-decision-monetary-precision-rounding-and-currency-identity).
@@ -1090,7 +1088,7 @@ product consequences remain in their product scope.
 
 [Scope inventory](statements-analytics-valuation/README.md).
 
-- **Reconciliation — Statements analytics evaluations read the full snapshot.** Corporate valuation, the valuation orchestrator and scenario-set evaluation pass `ObservationCutoff::FullSnapshot` to the Statements evaluator, so `as_of` dates pricing and no longer hides unpublished observations. Expose the observation cutoff on these entry points and their hosts, and qualify a dated replay against an identified snapshot. [Accepted STATEMENTS-CONTRACTS-002](statements-contracts/02-authoring-and-availability.md#accepted-decision-for-authoring-imports-and-observation-availability).
+- **Reconciliation — Statements analytics evaluations read the full snapshot.** Corporate valuation, the valuation orchestrator and scenario-set evaluation pass `ObservationCutoff::FullSnapshot` to the Statements evaluator, so `as_of` dates pricing and no longer hides unpublished observations. Expose the observation cutoff on these entry points and their hosts, including the host check runners (`run_checks`, `run_three_statement_checks`, `run_credit_underwriting_checks`), which request the full snapshot while Rust `CheckSuite::run_model` takes the cutoff, and qualify a dated replay against an identified snapshot. [Accepted STATEMENTS-CONTRACTS-002](statements-contracts/02-authoring-and-availability.md#accepted-decision-for-authoring-imports-and-observation-availability).
 
 - **Reconciliation — Statements analytics reads typed cells through a float view.** Analytics reads every statement cell through one crate-private float view (`cell_float`) in which a missing, masked or unavailable cell is `NaN` and money is its nearest float, which preserves the behaviour it had before typed results. Read status, reason and exact amounts from the typed cell at each analytics boundary and delete the view. [Typed results](statements-evaluation/13-result-units-and-exports.md#accepted-decision-for-typed-results-and-exports).
 

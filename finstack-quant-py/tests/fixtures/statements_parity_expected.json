@@ -875,6 +875,7 @@
     "lbo": {
       "checked": {
         "checks": {
+          "outcome": "fail",
           "results": [
             {
               "category": "accounting_identity",
@@ -886,37 +887,38 @@
                   "expected": 400.0,
                   "identity": "balance_sheet_articulation",
                   "period": "2025Q1",
-                  "tolerance": 0.01
+                  "tolerance": 0.0
                 },
                 {
                   "actual": 100.0,
                   "expected": 400.0,
                   "identity": "balance_sheet_articulation",
                   "period": "2025Q2",
-                  "tolerance": 0.01
+                  "tolerance": 0.0
                 },
                 {
                   "actual": 100.0,
                   "expected": 400.0,
                   "identity": "balance_sheet_articulation",
                   "period": "2025Q3",
-                  "tolerance": 0.01
+                  "tolerance": 0.0
                 },
                 {
                   "actual": 100.0,
                   "expected": 400.0,
                   "identity": "balance_sheet_articulation",
                   "period": "2025Q4",
-                  "tolerance": 0.01
+                  "tolerance": 0.0
                 },
                 {
                   "actual": 120.0,
                   "expected": 320.0,
                   "identity": "balance_sheet_articulation",
                   "period": "2026Q1",
-                  "tolerance": 0.01
+                  "tolerance": 0.0
                 }
               ],
+              "evaluated": 5,
               "findings": [
                 {
                   "check_id": "balance_sheet_articulation",
@@ -925,7 +927,7 @@
                     "expected": 400.0,
                     "identity": "balance_sheet_articulation",
                     "period": "2025Q1",
-                    "tolerance": 0.01
+                    "tolerance": 0.0
                   },
                   "materiality": {
                     "absolute": 300.0,
@@ -949,7 +951,7 @@
                     "expected": 400.0,
                     "identity": "balance_sheet_articulation",
                     "period": "2025Q2",
-                    "tolerance": 0.01
+                    "tolerance": 0.0
                   },
                   "materiality": {
                     "absolute": 300.0,
@@ -973,7 +975,7 @@
                     "expected": 400.0,
                     "identity": "balance_sheet_articulation",
                     "period": "2025Q3",
-                    "tolerance": 0.01
+                    "tolerance": 0.0
                   },
                   "materiality": {
                     "absolute": 300.0,
@@ -997,7 +999,7 @@
                     "expected": 400.0,
                     "identity": "balance_sheet_articulation",
                     "period": "2025Q4",
-                    "tolerance": 0.01
+                    "tolerance": 0.0
                   },
                   "materiality": {
                     "absolute": 300.0,
@@ -1021,7 +1023,7 @@
                     "expected": 320.0,
                     "identity": "balance_sheet_articulation",
                     "period": "2026Q1",
-                    "tolerance": 0.01
+                    "tolerance": 0.0
                   },
                   "materiality": {
                     "absolute": 200.0,
@@ -1039,7 +1041,7 @@
                   "severity": "error"
                 }
               ],
-              "passed": false
+              "outcome": "fail"
             },
             {
               "category": "accounting_identity",
@@ -1051,30 +1053,31 @@
                   "expected": 200.0,
                   "identity": "retained_earnings_roll_forward",
                   "period": "2025Q2",
-                  "tolerance": 0.01
+                  "tolerance": 0.0
                 },
                 {
                   "actual": 100.0,
                   "expected": 200.0,
                   "identity": "retained_earnings_roll_forward",
                   "period": "2025Q3",
-                  "tolerance": 0.01
+                  "tolerance": 0.0
                 },
                 {
                   "actual": 100.0,
                   "expected": 200.0,
                   "identity": "retained_earnings_roll_forward",
                   "period": "2025Q4",
-                  "tolerance": 0.01
+                  "tolerance": 0.0
                 },
                 {
                   "actual": 120.0,
                   "expected": 220.0,
                   "identity": "retained_earnings_roll_forward",
                   "period": "2026Q1",
-                  "tolerance": 0.01
+                  "tolerance": 0.0
                 }
               ],
+              "evaluated": 4,
               "findings": [
                 {
                   "check_id": "retained_earnings_reconciliation",
@@ -1083,7 +1086,7 @@
                     "expected": 200.0,
                     "identity": "retained_earnings_roll_forward",
                     "period": "2025Q2",
-                    "tolerance": 0.01
+                    "tolerance": 0.0
                   },
                   "materiality": {
                     "absolute": 100.0,
@@ -1106,7 +1109,7 @@
                     "expected": 200.0,
                     "identity": "retained_earnings_roll_forward",
                     "period": "2025Q3",
-                    "tolerance": 0.01
+                    "tolerance": 0.0
                   },
                   "materiality": {
                     "absolute": 100.0,
@@ -1129,7 +1132,7 @@
                     "expected": 200.0,
                     "identity": "retained_earnings_roll_forward",
                     "period": "2025Q4",
-                    "tolerance": 0.01
+                    "tolerance": 0.0
                   },
                   "materiality": {
                     "absolute": 100.0,
@@ -1152,7 +1155,7 @@
                     "expected": 220.0,
                     "identity": "retained_earnings_roll_forward",
                     "period": "2026Q1",
-                    "tolerance": 0.01
+                    "tolerance": 0.0
                   },
                   "materiality": {
                     "absolute": 100.0,
@@ -1169,47 +1172,53 @@
                   "severity": "error"
                 }
               ],
-              "passed": false
+              "outcome": "fail"
             },
             {
               "category": "internal_consistency",
               "check_id": "growth_rate_consistency",
               "check_name": "Growth Rate Consistency",
+              "evaluated": 5,
               "findings": [],
-              "passed": true
+              "outcome": "pass"
             },
             {
               "category": "data_quality",
               "check_id": "non_finite",
               "check_name": "Non-Finite Value",
+              "evaluated": 30,
               "findings": [],
-              "passed": true
+              "outcome": "pass"
             },
             {
               "category": "data_quality",
               "check_id": "missing_value",
               "check_name": "Missing Value",
+              "evaluated": 15,
               "findings": [],
-              "passed": true
+              "outcome": "pass"
             },
             {
               "category": "data_quality",
-              "check_id": "non_finite",
-              "check_name": "Non-Finite Value",
+              "check_id": "credit_inputs_non_finite",
+              "check_name": "Credit Inputs Non-Finite",
+              "evaluated": 15,
               "findings": [],
-              "passed": true
+              "outcome": "pass"
             },
             {
               "category": "credit_reasonableness",
               "check_id": "leverage_range",
               "check_name": "Leverage Range",
+              "evaluated": 5,
               "findings": [],
-              "passed": true
+              "outcome": "pass"
             },
             {
               "category": "credit_reasonableness",
               "check_id": "coverage_floor",
               "check_name": "Coverage Floor",
+              "evaluated": 5,
               "findings": [
                 {
                   "check_id": "coverage_floor",
@@ -1292,29 +1301,33 @@
                   "severity": "warning"
                 }
               ],
-              "passed": true
+              "outcome": "pass"
             },
             {
               "category": "credit_reasonableness",
-              "check_id": "trend",
+              "check_id": "trend_ebitda",
               "check_name": "Trend",
+              "evaluated": 5,
               "findings": [],
-              "passed": true
+              "outcome": "pass"
             },
             {
               "category": "credit_reasonableness",
-              "check_id": "trend",
+              "check_id": "trend_net_debt",
               "check_name": "Trend",
+              "evaluated": 5,
               "findings": [],
-              "passed": true
+              "outcome": "pass"
             }
           ],
           "summary": {
             "errors": 9,
             "failed": 2,
+            "incomplete": 0,
             "infos": 0,
             "passed": 8,
             "total_checks": 10,
+            "unevaluated": 0,
             "warnings": 5
           }
         },

@@ -12,11 +12,12 @@ use finstack_quant_statements::checks::{
 use pyo3::prelude::*;
 
 /// Columns emitted by [`PyCheckReport::to_dataframe`].
-const CHECK_RESULT_COLUMNS: [ColumnSchema<'static>; 5] = [
+const CHECK_RESULT_COLUMNS: [ColumnSchema<'static>; 6] = [
     ("check_id", "str"),
     ("check_name", "str"),
     ("category", "str"),
-    ("passed", "bool"),
+    ("outcome", "str"),
+    ("evaluated", "int64"),
     ("finding_count", "int64"),
 ];
 
@@ -90,6 +91,13 @@ pub struct PyCheckConfig {
     pub(super) inner: CheckConfig,
 }
 
+impl PyCheckConfig {
+    /// Wrap a Rust check configuration.
+    pub(crate) fn from_inner(inner: CheckConfig) -> Self {
+        Self { inner }
+    }
+}
+
 #[pymethods]
 impl PyCheckConfig {
     /// Build a check configuration.
@@ -101,11 +109,11 @@ impl PyCheckConfig {
     /// ----------
     /// default_tolerance : float | None
     ///     Absolute equality tolerance in the compared nodes' own units
-    ///     (Rust default ``0.01``, one cent when nodes are in whole dollars);
+    ///     (default ``0.0``: identities must hold exactly);
     ///     finite and non-negative.
     /// default_relative_tolerance : float | None
     ///     Relative tolerance as a decimal fraction of the reference
-    ///     magnitude (Rust default ``1e-9``); finite and non-negative, with
+    ///     magnitude (default ``0.0``: no relative term); finite and non-negative, with
     ///     zero disabling the relative component.
     /// materiality_threshold : float | None
     ///     Advisory (info/warning) findings whose absolute materiality is
@@ -693,16 +701,16 @@ wire_methods!(
 
 #[pymethods]
 impl PyCheckReport {
-    /// Whether the whole report passed: no error-severity finding was
-    /// retained by any check.
-    ///
-    /// Warnings and info findings do not fail a report. A suite's
-    /// materiality threshold never suppresses error findings, so it cannot
-    /// flip this to ``True``. Delegates to the canonical Rust
-    /// ``CheckReport::has_errors``.
+    #[doc = pydoc!("finstack_quant.statements._checks", "CheckReport.outcome")]
+    #[getter]
+    fn outcome(&self) -> &'static str {
+        self.inner.outcome.as_str()
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._checks", "CheckReport.passed")]
     #[getter]
     fn passed(&self) -> bool {
-        !self.inner.has_errors()
+        self.inner.outcome == finstack_quant_statements::checks::CheckOutcome::Pass
     }
 
     /// Number of checks that ran, one per row of :meth:`to_dataframe`.
@@ -806,7 +814,8 @@ impl PyCheckReport {
                     "check_id": result.check_id,
                     "check_name": result.check_name,
                     "category": result.category,
-                    "passed": result.passed,
+                    "outcome": result.outcome.as_str(),
+                    "evaluated": result.evaluated,
                     "finding_count": result.findings.len(),
                 })
             })

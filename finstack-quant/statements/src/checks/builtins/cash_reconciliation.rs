@@ -90,6 +90,7 @@ impl Check for CashReconciliation {
                     .filter_map(|node| (*node).clone())
                     .collect(),
                 comparison: None,
+                coverage: false,
             });
         }
 
@@ -121,6 +122,7 @@ impl Check for CashReconciliation {
                         self.total_cash_flow_node.clone(),
                     ],
                     comparison: None,
+                    coverage: false,
                 });
                 continue;
             }
@@ -164,6 +166,7 @@ impl Check for CashReconciliation {
                             self.total_cash_flow_node.clone(),
                         ],
                         comparison: None,
+                        coverage: true,
                     });
                     continue;
                 }
@@ -218,6 +221,7 @@ impl Check for CashReconciliation {
                         self.total_cash_flow_node.clone(),
                     ],
                     comparison: Some(comparison),
+                    coverage: false,
                 });
             }
         }
@@ -263,6 +267,7 @@ impl Check for CashReconciliation {
                         materiality: None,
                         nodes: vec![cfo_node.clone(), cfi_node.clone(), cff_node.clone()],
                         comparison: None,
+                        coverage: true,
                     });
                 }
 
@@ -330,21 +335,14 @@ impl Check for CashReconciliation {
                                 cff_node.clone(),
                             ],
                             comparison: Some(comparison),
+                            coverage: false,
                         });
                     }
                 }
             }
         }
 
-        let passed = !findings.iter().any(|f| f.severity == Severity::Error);
-
-        Ok(CheckResult {
-            check_id: self.id().to_string(),
-            check_name: self.name().to_string(),
-            category: self.category(),
-            passed,
-            findings,
-            comparisons,
-        })
+        let evaluated = periods.len().saturating_sub(1);
+        Ok(CheckResult::new(self, evaluated, findings, comparisons))
     }
 }

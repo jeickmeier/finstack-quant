@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 import pandas as pd
 
 class CheckSuiteSpec:
@@ -276,10 +276,10 @@ class CheckReport:
     --------
     >>> from finstack_quant.statements import CheckReport
     >>> report = CheckReport.from_json(
-    ...     '{"results":[],"summary":{"total_checks":0,"passed":0,"failed":0,"errors":0,"warnings":0,"infos":0}}'
+    ...     '{"outcome":"unevaluated","results":[],"summary":{"total_checks":0,"passed":0,"failed":0,"incomplete":0,"unevaluated":0,"errors":0,"warnings":0,"infos":0}}'
     ... )
-    >>> (report.passed, report.total_findings)
-    (True, 0)
+    >>> (report.outcome, report.passed, report.total_findings)
+    ('unevaluated', False, 0)
 
     """
 
@@ -306,9 +306,7 @@ class CheckReport:
         Examples
         --------
         >>> from finstack_quant.statements import CheckReport
-        >>> payload = (
-        ...     '{"results":[],"summary":{"total_checks":0,"passed":0,"failed":0,"errors":0,"warnings":0,"infos":0}}'
-        ... )
+        >>> payload = '{"outcome":"unevaluated","results":[],"summary":{"total_checks":0,"passed":0,"failed":0,"incomplete":0,"unevaluated":0,"errors":0,"warnings":0,"infos":0}}'
         >>> CheckReport.from_json(payload).total_checks
         0
 
@@ -333,19 +331,39 @@ class CheckReport:
         ...
 
     @property
+    def outcome(self) -> Literal["pass", "fail", "incomplete", "unevaluated"]:
+        """
+        Verdict of the suite, decided from every check before any reporting filter.
+
+        Returns
+        -------
+        str
+            ``"fail"`` when any check has an error-severity finding, else
+            ``"incomplete"`` when any check lacked required data, else
+            ``"pass"`` when at least one check passed, else ``"unevaluated"``
+            (an empty suite, or one in which no check had anything to
+            examine).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
     def passed(self) -> bool:
         """
-        Whether the whole report passed: no error-severity finding was retained
-        by any check.
+        Whether the report's outcome is ``"pass"``.
 
-        Warnings and info findings do not fail a report. A suite's materiality
-        threshold never suppresses error findings, so it cannot flip this to
-        ``True``.
+        A pass requires evaluated work and complete required coverage: an
+        empty suite and an incomplete report are not passes. Warnings and
+        info findings do not fail a report, and no reporting filter can
+        change the outcome.
 
         Returns
         -------
         bool
-            ``True`` when zero error-severity findings were retained.
+            ``True`` when :attr:`outcome` is ``"pass"``.
 
         Notes
         -----
@@ -390,8 +408,8 @@ class CheckReport:
         --------
         >>> from finstack_quant.statements import CheckReport
         >>> report = CheckReport.from_json(
-        ...     '{"results": [], "summary": {"total_checks": 0, "passed": 0,'
-        ...     ' "failed": 0, "errors": 0, "warnings": 0, "infos": 0}}'
+        ...     '{"outcome": "unevaluated", "results": [], "summary": {"total_checks": 0, "passed": 0,'
+        ...     ' "failed": 0, "incomplete": 0, "unevaluated": 0, "errors": 0, "warnings": 0, "infos": 0}}'
         ... )
         >>> report.has_errors()
         False
@@ -417,8 +435,8 @@ class CheckReport:
         --------
         >>> from finstack_quant.statements import CheckReport
         >>> report = CheckReport.from_json(
-        ...     '{"results": [], "summary": {"total_checks": 0, "passed": 0,'
-        ...     ' "failed": 0, "errors": 0, "warnings": 0, "infos": 0}}'
+        ...     '{"outcome": "unevaluated", "results": [], "summary": {"total_checks": 0, "passed": 0,'
+        ...     ' "failed": 0, "incomplete": 0, "unevaluated": 0, "errors": 0, "warnings": 0, "infos": 0}}'
         ... )
         >>> report.has_warnings()
         False
@@ -451,8 +469,8 @@ class CheckReport:
         --------
         >>> from finstack_quant.statements import CheckReport
         >>> report = CheckReport.from_json(
-        ...     '{"results": [], "summary": {"total_checks": 0, "passed": 0,'
-        ...     ' "failed": 0, "errors": 0, "warnings": 0, "infos": 0}}'
+        ...     '{"outcome": "unevaluated", "results": [], "summary": {"total_checks": 0, "passed": 0,'
+        ...     ' "failed": 0, "incomplete": 0, "unevaluated": 0, "errors": 0, "warnings": 0, "infos": 0}}'
         ... )
         >>> report.findings_by_severity("error")
         []
@@ -521,9 +539,11 @@ class CheckReport:
         (human-readable name), ``category`` (snake_case group, one of
         ``accounting_identity``, ``cross_statement_reconciliation``,
         ``internal_consistency``, ``credit_reasonableness``, ``data_quality``),
-        ``passed`` (``True`` when the check retained no error-severity
-        finding), ``finding_count`` (retained findings for this check, after
-        the suite's reporting filters).
+        ``outcome`` (``"pass"``, ``"fail"``, ``"incomplete"`` or
+        ``"unevaluated"``, decided before the reporting filters),
+        ``evaluated`` (periods or cells the check examined),
+        ``finding_count`` (retained findings for this check, after the
+        suite's reporting filters).
 
         One row per check result, so the row count equals
         :attr:`total_checks`. A report with no checks still yields the
@@ -667,11 +687,11 @@ class CheckConfig:
         ----------
         default_tolerance : float | None
             Finite, non-negative absolute tolerance in the checked node's units
-            (Rust default ``0.01``).
+            (default ``0.0``: identities must hold exactly).
         default_relative_tolerance : float | None
             Finite, non-negative relative tolerance as a decimal fraction of
             the reference magnitude; zero disables relative tolerance (Rust
-            default ``1e-9``).
+            default ``0.0``: no relative term).
         materiality_threshold : float | None
             Finite, non-negative absolute magnitude below which advisory
             findings are suppressed; error findings are retained (Rust default

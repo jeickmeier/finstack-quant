@@ -4,7 +4,8 @@
 
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::checks::{
-    CheckCategory, CheckFinding, CheckReport, CheckResult, CheckSummary, Materiality, Severity,
+    CheckCategory, CheckFinding, CheckOutcome, CheckReport, CheckResult, CheckSummary, Materiality,
+    Severity,
 };
 use finstack_quant_statements::types::NodeId;
 use finstack_quant_statements_analytics::analysis::{
@@ -16,7 +17,8 @@ fn sample_report() -> CheckReport {
         check_id: "balance_sheet_articulation".into(),
         check_name: "Balance Sheet Articulation".into(),
         category: CheckCategory::AccountingIdentity,
-        passed: false,
+        outcome: CheckOutcome::Fail,
+        evaluated: 1,
         findings: vec![CheckFinding {
             check_id: "balance_sheet_articulation".into(),
             severity: Severity::Error,
@@ -33,6 +35,7 @@ fn sample_report() -> CheckReport {
                 NodeId::new("total_liabilities"),
             ],
             comparison: None,
+            coverage: false,
         }],
         comparisons: Vec::new(),
     };
@@ -41,7 +44,8 @@ fn sample_report() -> CheckReport {
         check_id: "leverage_range".into(),
         check_name: "Leverage Range".into(),
         category: CheckCategory::CreditReasonableness,
-        passed: true,
+        outcome: CheckOutcome::Pass,
+        evaluated: 1,
         findings: vec![CheckFinding {
             check_id: "leverage_range".into(),
             severity: Severity::Warning,
@@ -50,6 +54,7 @@ fn sample_report() -> CheckReport {
             materiality: None,
             nodes: vec![NodeId::new("debt"), NodeId::new("ebitda")],
             comparison: None,
+            coverage: false,
         }],
         comparisons: Vec::new(),
     };
@@ -58,17 +63,21 @@ fn sample_report() -> CheckReport {
         check_id: "non_finite".into(),
         check_name: "Non-Finite Value".into(),
         category: CheckCategory::DataQuality,
-        passed: true,
+        outcome: CheckOutcome::Pass,
+        evaluated: 1,
         findings: vec![],
         comparisons: Vec::new(),
     };
 
     CheckReport {
+        outcome: CheckOutcome::Fail,
         results: vec![error_result, warning_result, passing_result],
         summary: CheckSummary {
             total_checks: 3,
             passed: 2,
             failed: 1,
+            incomplete: 0,
+            unevaluated: 0,
             errors: 1,
             warnings: 1,
             infos: 0,

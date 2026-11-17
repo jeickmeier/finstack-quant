@@ -180,7 +180,7 @@ pub fn standard_check_suite() -> CheckSuite {
             positive_nodes: vec![NodeId::new("assets"), NodeId::new("cash")],
             negative_nodes: vec![],
         })
-        .build()
+        .build().expect("unique check ids")
 }
 
 /// `n_bonds` fixed-coupon bonds plus `cs.*` interest/principal/balance formulas.
