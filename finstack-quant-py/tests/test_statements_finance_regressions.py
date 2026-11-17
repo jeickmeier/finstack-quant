@@ -56,7 +56,7 @@ def test_dataframe_import_needs_a_timeline_and_never_infers_one() -> None:
     with pytest.raises(ValueError, match="Set the model timeline"):
         builder.from_dataframe(frame)
     builder.periods("2025Q3..Q4", "2025Q3")
-    builder.value("revenue", [])
+    builder.value_scalar("revenue", [])
     assert builder.build().periods == ["2025Q3", "2025Q4"]
 
 
@@ -66,7 +66,7 @@ def test_dataframe_invalid_cell_leaves_the_builder_unchanged() -> None:
     frame = pd.DataFrame([[100.0, "invalid"]], index=["revenue"], columns=["2025Q1", "2025Q2"])
     with pytest.raises(ValueError, match="is not numeric"):
         builder.from_dataframe(frame)
-    builder.value("revenue", [])
+    builder.value_scalar("revenue", [])
     assert builder.build().get_node("revenue").values == {}
 
 

@@ -29,10 +29,12 @@ fn empty_model_json() -> String {
         )
         .expect("valid period plan"),
     );
-    model.add_node(finstack_quant_statements::types::NodeSpec::new(
+    let mut placeholder = finstack_quant_statements::types::NodeSpec::new(
         "placeholder",
         finstack_quant_statements::types::NodeType::Value,
-    ));
+    );
+    placeholder.value_type = Some(finstack_quant_statements::types::NodeValueType::Scalar);
+    model.add_node(placeholder);
     serde_json::to_string(&model).unwrap()
 }
 

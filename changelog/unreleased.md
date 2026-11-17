@@ -891,3 +891,16 @@ identity and an availability date on every observation in an actual period;
 the default of "visible at the period's end" is removed. Statements analytics
 entry points (`evaluate_dcf`, the orchestrator, scenario sets) read the full
 snapshot.
+
+### Statements: every unit resolves before a model runs
+
+STATEMENTS-CONTRACTS-005. A model builds only when every node and formula
+resolves to `Scalar` or `Monetary(currency)`. A node with no observations and
+no declared `value_type` is rejected (declare it, for example with
+`value_scalar(id, [])`); so is a formula whose units nothing anchors. A
+declared unit must agree with inference. A corkscrew such as
+`lag(balance, 1) + flow` resolves from its flow. The variance of a monetary
+series (`var`, `rolling_var`, `ewm_var`) is rejected, where it used to leave
+the node's units unknown; use the standard deviation or a same-currency ratio.
+A formula that reads a `cs` reference with no resolved currency is the one
+case that may still carry unresolved units.

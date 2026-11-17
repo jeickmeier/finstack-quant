@@ -212,7 +212,7 @@ mod tests {
     fn calendar() -> finstack_quant_core::dates::PeriodPlan {
         let mut model_builder = finstack_quant_statements::builder::ModelBuilder::new("calendar");
         model_builder.periods("2025Q1..Q2", None).unwrap();
-        model_builder.value("placeholder", &[]);
+        model_builder.value_scalar("placeholder", &[]);
         model_builder.build().unwrap().periods
     }
 

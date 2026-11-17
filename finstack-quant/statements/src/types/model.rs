@@ -554,6 +554,23 @@ impl FinancialModelSpec {
             }
         }
 
+        // References and cycles first: an unknown node or a cycle would
+        // otherwise surface as an unresolved unit.
+        for (node_id, node) in &self.nodes {
+            for (label, source) in [
+                ("formula", &node.formula_text),
+                ("where clause", &node.where_text),
+            ] {
+                if let Some(source) = source {
+                    parse_cached(&mut parsed, source).map_err(|error| {
+                        Error::build(format!("Invalid {label} on node '{node_id}': {error}"))
+                    })?;
+                }
+            }
+        }
+        let graph = crate::evaluator::DependencyGraph::from_parsed(self, &parsed)?;
+        graph.detect_cycles()?;
+
         let capital_structure_currency = self.capital_structure_currency()?;
         let instrument_currencies = self.capital_structure_instrument_currencies()?;
         let mut node_value_types: IndexMap<NodeId, crate::types::NodeValueType> = self
@@ -586,10 +603,16 @@ impl FinancialModelSpec {
                     })?;
                     crate::dsl::compiler::infer_value_type(
                         ast,
-                        &node_value_types,
-                        capital_structure_currency,
-                        &instrument_currencies,
-                    )?
+                        crate::dsl::compiler::UnitContext {
+                            node_types: &node_value_types,
+                            capital_structure_currency,
+                            instrument_currencies: &instrument_currencies,
+                            provisional: true,
+                        },
+                    )
+                    .map_err(|error| {
+                        Error::build(format!("Invalid formula on node '{node_id}': {error}"))
+                    })?
                 };
                 if let Some(value_type) = inferred {
                     self.nodes
@@ -618,26 +641,49 @@ impl FinancialModelSpec {
             unresolved = next;
         }
 
+        // Every unit is now resolved or provably unresolvable. Check each
+        // formula against the resolved node types, with no provisional
+        // unification.
+        let units = crate::dsl::compiler::UnitContext {
+            node_types: &node_value_types,
+            capital_structure_currency,
+            instrument_currencies: &instrument_currencies,
+            provisional: false,
+        };
         for (node_id, node) in &self.nodes {
+            if node.formula_text.is_none() && node.value_type.is_none() {
+                return Err(Error::build(format!(
+                    "Cannot resolve the units of node '{node_id}': it has no observations; \
+                     declare its value type (for example with value_scalar or value_money)"
+                )));
+            }
             if let Some(formula) = &node.formula_text {
                 let ast = parse_cached(&mut parsed, formula).map_err(|e| {
                     Error::build(format!("Invalid formula on node '{}': {}", node_id, e))
                 })?;
-                if let Some(inferred) = crate::dsl::compiler::infer_value_type(
-                    ast,
-                    &node_value_types,
-                    capital_structure_currency,
-                    &instrument_currencies,
-                )
-                .map_err(|error| {
-                    Error::build(format!("Invalid formula on node '{node_id}': {error}"))
-                })? && node.value_type != Some(inferred)
-                {
-                    return Err(Error::build(format!(
-                        "Formula node '{node_id}' declares {:?} but its expression returns \
+                let inferred =
+                    crate::dsl::compiler::infer_value_type(ast, units).map_err(|error| {
+                        Error::build(format!("Invalid formula on node '{node_id}': {error}"))
+                    })?;
+                match inferred {
+                    Some(inferred) if node.value_type != Some(inferred) => {
+                        return Err(Error::build(format!(
+                            "Formula node '{node_id}' declares {:?} but its expression returns \
                              {:?}",
-                        node.value_type, inferred
-                    )));
+                            node.value_type, inferred
+                        )));
+                    }
+                    Some(_) => {}
+                    // A capital reference without a resolved currency is the
+                    // one unresolved unit a runnable model may still carry;
+                    // the capital reporting scopes close it.
+                    None if crate::dsl::compiler::has_unresolved_cs_reference(ast, units) => {}
+                    None => {
+                        return Err(Error::build(format!(
+                            "Cannot resolve the units of formula node '{node_id}' ('{formula}'): \
+                             declare the value type of the node, or of the inputs it reads"
+                        )));
+                    }
                 }
                 let expression = crate::dsl::compile(ast).map_err(|e| {
                     Error::build(format!("Invalid formula on node '{}': {}", node_id, e))
@@ -649,15 +695,10 @@ impl FinancialModelSpec {
                 let ast = parse_cached(&mut parsed, where_text).map_err(|e| {
                     Error::build(format!("Invalid where clause on node '{}': {}", node_id, e))
                 })?;
-                let where_type = crate::dsl::compiler::infer_value_type(
-                    ast,
-                    &node_value_types,
-                    capital_structure_currency,
-                    &instrument_currencies,
-                )
-                .map_err(|error| {
-                    Error::build(format!("Invalid where clause on node '{node_id}': {error}"))
-                })?;
+                let where_type =
+                    crate::dsl::compiler::infer_value_type(ast, units).map_err(|error| {
+                        Error::build(format!("Invalid where clause on node '{node_id}': {error}"))
+                    })?;
                 if where_type != Some(crate::types::NodeValueType::Scalar) {
                     return Err(Error::build(format!(
                         "Where clause on node '{node_id}' must return a scalar condition"
@@ -673,9 +714,6 @@ impl FinancialModelSpec {
         if let Some(cs) = &self.capital_structure {
             cs.validate()?;
         }
-
-        let graph = crate::evaluator::DependencyGraph::from_parsed(self, &parsed)?;
-        graph.detect_cycles()?;
 
         Ok(SemanticAnalysis { compiled, graph })
     }

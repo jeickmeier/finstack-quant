@@ -1124,7 +1124,7 @@ class FinancialModelSpec:
         >>> payload = (
         ...     '{"id":"demo","periods":{"calendar": "gregorian", "periods": [{"id":"2025Q1","start":"2025-01-01",'
         ...     '"end":"2025-04-01","is_actual":false}]},'
-        ...     '"nodes":{"revenue":{"node_id":"revenue","node_type":"value"}},"schema_version":1}'
+        ...     '"nodes":{"revenue":{"node_id":"revenue","node_type":"value","value_type":{"type":"scalar"}}},"schema_version":1}'
         ... )
         >>> (FinancialModelSpec.from_json(payload).id, FinancialModelSpec.from_json(payload).node_count)
         ('demo', 1)

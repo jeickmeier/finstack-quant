@@ -194,10 +194,12 @@ fn validate_financial_model_json_accepts_valid_model() {
         )
         .expect("valid period plan"),
     );
-    model.add_node(finstack_quant_statements::types::NodeSpec::new(
+    let mut placeholder = finstack_quant_statements::types::NodeSpec::new(
         "placeholder",
         finstack_quant_statements::types::NodeType::Value,
-    ));
+    );
+    placeholder.value_type = Some(finstack_quant_statements::types::NodeValueType::Scalar);
+    model.add_node(placeholder);
     let json = serde_json::to_string(&model).expect("model should serialize to JSON");
     let out = validate_financial_model_json(JsValue::from(&json))
         .expect("validate_financial_model_json should accept valid model");

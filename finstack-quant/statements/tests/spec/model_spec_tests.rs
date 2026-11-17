@@ -227,7 +227,7 @@ fn test_model_spec_with_metadata() {
         model_builder.with_meta("author", serde_json::json!("Test Author"));
         model_builder.with_meta("version", serde_json::json!("1.0.0"));
         model_builder.with_meta("created_at", serde_json::json!("2025-01-01"));
-        model_builder.value("placeholder", &[]);
+        model_builder.value_scalar("placeholder", &[]);
         model_builder.build().unwrap()
     };
 

@@ -2,9 +2,9 @@
 
 **Decision status:** Accepted for the full Statements formula units and currency contract (2026-11-15).
 
-**Implementation status:** Reconciliation pending. The audited path can retain unresolved units and infer a capital reporting currency from model metadata or candidate currencies.
+**Implementation status:** Partly reconciled (2026-11-16). Every node and formula resolves to `Scalar` or `Monetary(currency)` before a model can run: an undeclared empty series and an unanchored formula are rejected, a declared unit must agree with inference, and a corkscrew such as `lag(balance, 1) + flow` resolves from its flow and is then checked against the resolved units. The variance of a monetary series is rejected. Every function has a unit rule. Remaining: the capital reporting scopes of clause 4 (a formula may still carry an unresolved unit when a `cs` reference has no resolved currency) and the exact monetary arithmetic and forecast-boundary conversion of clause 3. The audited sections below describe revision `7e82fd03ad`.
 
-**Validation status:** Existing source and regression evidence mapped. Independent qualification of units, numerical boundaries and reporting scopes remains pending.
+**Validation status:** One case per unit rule, declared-unit agreement and unit resolution are qualified in the [dimension regressions](../../../../finstack-quant/statements/tests/finance_dimension_regressions.rs). Capital-scope and monetary-precision qualification remain pending.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. [Scope inventory](README.md).
 

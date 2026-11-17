@@ -128,7 +128,7 @@ class TestModelBuilderChaining:
         """`build()` consumes the builder; a later call must say so clearly."""
         builder = ModelBuilder("terminal")
         builder.periods("2025Q1..Q1")
-        builder.value("placeholder", [])
+        builder.value_scalar("placeholder", [])
         builder.build()
         with pytest.raises(ValueError, match="no longer usable"):
             builder.value("revenue", [("2025Q1", 1.0)])

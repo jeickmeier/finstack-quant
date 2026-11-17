@@ -243,7 +243,7 @@ def test_binding_requires_values_without_a_rust_default() -> None:
 
     builder = ModelBuilder("re")
     builder.periods("2025Q1..Q2", None)
-    builder.value("placeholder", [])
+    builder.value_scalar("placeholder", [])
     model = builder.build()
     lease = LeaseSpec(node_id="lease_a", start="2025Q1", base_rent=100.0)
     with pytest.raises(TypeError):

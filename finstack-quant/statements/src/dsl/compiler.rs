@@ -73,113 +73,224 @@ fn lower(ast: &StmtExpr) -> Result<Expr> {
     }
 }
 
-/// Infer a formula's output type from known node types and capital-structure
-/// currencies. Totals use the reporting currency; named instruments retain
-/// their native currencies, matching cashflow evaluation.
-pub(crate) fn infer_value_type(
-    ast: &StmtExpr,
-    node_types: &IndexMap<NodeId, NodeValueType>,
-    capital_structure_currency: Option<Currency>,
-    instrument_currencies: &IndexMap<String, Currency>,
-) -> Result<Option<NodeValueType>> {
-    Ok(
-        match infer_dimension(
-            ast,
-            node_types,
-            capital_structure_currency,
-            instrument_currencies,
-        )? {
-            Dimension::Unknown => None,
-            Dimension::Scalar => Some(NodeValueType::Scalar),
-            Dimension::Monetary(currency) => Some(NodeValueType::Monetary { currency }),
-        },
-    )
+/// Inputs to unit inference for one model.
+#[derive(Clone, Copy)]
+pub(crate) struct UnitContext<'a> {
+    /// Resolved units of the model's nodes.
+    pub(crate) node_types: &'a IndexMap<NodeId, NodeValueType>,
+    /// Reporting currency of capital-structure totals, when resolved.
+    pub(crate) capital_structure_currency: Option<Currency>,
+    /// Native currency of each named instrument.
+    pub(crate) instrument_currencies: &'a IndexMap<String, Currency>,
+    /// Let an unresolved operand take its partner's units in addition,
+    /// subtraction, comparison and selection. Used only while the model's
+    /// node types are still being resolved, so a corkscrew such as
+    /// `lag(balance, 1) + flow` resolves from `flow`; the final pass checks
+    /// every formula with this off.
+    pub(crate) provisional: bool,
 }
 
-fn infer_dimension(
+/// Infer a formula's units: `Scalar`, `Monetary(currency)`, or `None` when an
+/// operand is unresolved.
+///
+/// Totals use the reporting currency; named instruments keep their native
+/// currencies. No operation converts currency.
+///
+/// # Errors
+///
+/// Returns a build error for an operation the unit rules reject, such as
+/// adding two currencies, multiplying money by money, or the variance of a
+/// monetary series.
+pub(crate) fn infer_value_type(
     ast: &StmtExpr,
-    node_types: &IndexMap<NodeId, NodeValueType>,
-    capital_structure_currency: Option<Currency>,
-    instrument_currencies: &IndexMap<String, Currency>,
-) -> Result<Dimension> {
+    context: UnitContext<'_>,
+) -> Result<Option<NodeValueType>> {
+    Ok(match context.infer(ast)? {
+        Dimension::Unknown => None,
+        Dimension::Scalar => Some(NodeValueType::Scalar),
+        Dimension::Monetary(currency) => Some(NodeValueType::Monetary { currency }),
+    })
+}
+
+/// Whether `ast` reads a capital-structure reference whose currency is not
+/// resolved: a total without a reporting currency, or an unknown instrument.
+pub(crate) fn has_unresolved_cs_reference(ast: &StmtExpr, context: UnitContext<'_>) -> bool {
     match ast {
-        StmtExpr::Literal(_) => Ok(Dimension::Scalar),
-        StmtExpr::NodeRef(name) => Ok(node_types
-            .get(name)
-            .map(node_value_type_to_dimension)
-            .unwrap_or(Dimension::Unknown)),
-        StmtExpr::CsRef {
-            instrument_or_total,
-            ..
-        } => {
-            let currency = if instrument_or_total == "total" {
-                capital_structure_currency
-            } else {
-                instrument_currencies.get(instrument_or_total).copied()
-            };
-            Ok(currency
-                .map(Dimension::Monetary)
-                .unwrap_or(Dimension::Unknown))
+        StmtExpr::CsRef { .. } => matches!(context.infer(ast), Ok(Dimension::Unknown)),
+        StmtExpr::Literal(_) | StmtExpr::NodeRef(_) => false,
+        StmtExpr::UnaryOp { operand, .. } => has_unresolved_cs_reference(operand, context),
+        StmtExpr::BinOp { left, right, .. } => {
+            has_unresolved_cs_reference(left, context)
+                || has_unresolved_cs_reference(right, context)
         }
-        StmtExpr::UnaryOp { op, operand } => {
-            let dim = infer_dimension(
-                operand,
-                node_types,
-                capital_structure_currency,
-                instrument_currencies,
-            )?;
-            match op {
-                UnaryOp::Neg => Ok(dim),
-                UnaryOp::Not => require_scalar_arguments("logical negation", &[dim]),
-            }
-        }
-        StmtExpr::BinOp { op, left, right } => {
-            let left_dim = infer_dimension(
-                left,
-                node_types,
-                capital_structure_currency,
-                instrument_currencies,
-            )?;
-            let right_dim = infer_dimension(
-                right,
-                node_types,
-                capital_structure_currency,
-                instrument_currencies,
-            )?;
-            infer_bin_op_dimension(*op, left_dim, right_dim)
-        }
-        StmtExpr::Call { func, args } => infer_call_dimension(
-            func,
-            args,
-            node_types,
-            capital_structure_currency,
-            instrument_currencies,
-        ),
+        StmtExpr::Call { args, .. } => args
+            .iter()
+            .any(|arg| has_unresolved_cs_reference(arg, context)),
         StmtExpr::IfThenElse {
             condition,
             then_expr,
             else_expr,
-        } => {
-            let condition_dim = infer_dimension(
+        } => [condition, then_expr, else_expr]
+            .into_iter()
+            .any(|branch| has_unresolved_cs_reference(branch, context)),
+    }
+}
+
+impl UnitContext<'_> {
+    fn infer(self, ast: &StmtExpr) -> Result<Dimension> {
+        match ast {
+            StmtExpr::Literal(_) => Ok(Dimension::Scalar),
+            StmtExpr::NodeRef(name) => Ok(self
+                .node_types
+                .get(name)
+                .map(node_value_type_to_dimension)
+                .unwrap_or(Dimension::Unknown)),
+            StmtExpr::CsRef {
+                instrument_or_total,
+                ..
+            } => {
+                let currency = if instrument_or_total == "total" {
+                    self.capital_structure_currency
+                } else {
+                    self.instrument_currencies.get(instrument_or_total).copied()
+                };
+                Ok(currency
+                    .map(Dimension::Monetary)
+                    .unwrap_or(Dimension::Unknown))
+            }
+            StmtExpr::UnaryOp { op, operand } => {
+                let dim = self.infer(operand)?;
+                match op {
+                    UnaryOp::Neg => Ok(dim),
+                    UnaryOp::Not => require_scalar_arguments("logical negation", &[dim]),
+                }
+            }
+            StmtExpr::BinOp { op, left, right } => {
+                let left = self.infer(left)?;
+                let right = self.infer(right)?;
+                self.bin_op(*op, left, right)
+            }
+            StmtExpr::Call { func, args } => self.call(func, args),
+            StmtExpr::IfThenElse {
                 condition,
-                node_types,
-                capital_structure_currency,
-                instrument_currencies,
-            )?;
-            require_scalar_arguments("if condition", &[condition_dim])?;
-            let then_dim = infer_dimension(
                 then_expr,
-                node_types,
-                capital_structure_currency,
-                instrument_currencies,
-            )?;
-            let else_dim = infer_dimension(
                 else_expr,
-                node_types,
-                capital_structure_currency,
-                instrument_currencies,
-            )?;
-            compatible_dimensions("if branches", then_dim, else_dim)
+            } => {
+                let condition = self.infer(condition)?;
+                require_scalar_arguments("if condition", &[condition])?;
+                let then_dim = self.infer(then_expr)?;
+                let else_dim = self.infer(else_expr)?;
+                self.compatible("if branches", then_dim, else_dim)
+            }
+        }
+    }
+
+    fn bin_op(self, op: BinOp, left: Dimension, right: Dimension) -> Result<Dimension> {
+        match op {
+            BinOp::Add | BinOp::Sub => self.compatible("arithmetic operands", left, right),
+            BinOp::Mul => multiply_dimensions(left, right),
+            BinOp::Div => divide_dimensions(left, right),
+            BinOp::Mod => require_scalar_arguments("modulo", &[left, right]),
+            BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => {
+                self.compatible("comparison operands", left, right)?;
+                Ok(Dimension::Scalar)
+            }
+            BinOp::And | BinOp::Or => require_scalar_arguments("logical operands", &[left, right]),
+        }
+    }
+
+    /// Units of operands that must match: addition, subtraction, comparison,
+    /// selection and same-unit aggregates.
+    fn compatible(self, context: &str, left: Dimension, right: Dimension) -> Result<Dimension> {
+        match (left, right) {
+            (Dimension::Unknown, known) | (known, Dimension::Unknown) => Ok(if self.provisional {
+                known
+            } else {
+                Dimension::Unknown
+            }),
+            (Dimension::Scalar, Dimension::Scalar) => Ok(Dimension::Scalar),
+            (Dimension::Monetary(lhs), Dimension::Monetary(rhs)) if lhs == rhs => {
+                Ok(Dimension::Monetary(lhs))
+            }
+            (Dimension::Monetary(lhs), Dimension::Monetary(rhs)) => {
+                Err(crate::error::Error::build(format!(
+                    "Dimensional mismatch in {context}: cannot combine {lhs} and {rhs}"
+                )))
+            }
+            (Dimension::Scalar, Dimension::Monetary(ccy))
+            | (Dimension::Monetary(ccy), Dimension::Scalar) => Err(crate::error::Error::build(
+                format!("Dimensional mismatch in {context}: cannot combine scalar and {ccy}"),
+            )),
+        }
+    }
+
+    fn call(self, func: &str, args: &[StmtExpr]) -> Result<Dimension> {
+        let arg_dims: Vec<_> = args
+            .iter()
+            .map(|arg| self.infer(arg))
+            .collect::<Result<Vec<_>>>()?;
+        let auxiliary_dims = arg_dims.get(1..).unwrap_or_default();
+        match func {
+            // Value-variadic: every argument is a value carried in the same
+            // units, so a mismatch between them is a modelling error.
+            // `mean`/`sum`/`min`/`max` aggregate across all of their
+            // arguments, `coalesce` picks between interchangeable
+            // alternatives, and `clamp`'s bounds are compared against its
+            // value.
+            "mean" | "sum" | "min" | "max" | "coalesce" | "clamp" => {
+                let mut dims = arg_dims.into_iter();
+                let Some(first) = dims.next() else {
+                    return Ok(Dimension::Unknown);
+                };
+                dims.try_fold(first, |acc, dim| self.compatible(func, acc, dim))
+            }
+            "quantile" => {
+                require_scalar_arguments("quantile level", auxiliary_dims)?;
+                Ok(first_arg_dimension(&arg_dims))
+            }
+            "rank" => {
+                require_scalar_arguments("rank ascending flag", auxiliary_dims)?;
+                Ok(Dimension::Scalar)
+            }
+            // Level transforms and same-unit aggregates carry the units of
+            // their first (series or value) argument, including a monetary
+            // standard deviation. An argument that is a count, window size,
+            // period offset, smoothing factor, digit count or month number
+            // must be dimensionless and never unifies with the first.
+            "abs" | "lag" | "shift" | "cumsum" | "cummin" | "cummax" | "diff" | "rolling_mean"
+            | "rolling_sum" | "rolling_min" | "rolling_max" | "rolling_median" | "rolling_std"
+            | "ewm_mean" | "ewm_std" | "median" | "std" | "ttm" | "ytd" | "qtd" | "fiscal_ytd"
+            | "annualize" | "round" | "floor" | "ceil" => {
+                require_scalar_arguments(func, auxiliary_dims)?;
+                Ok(first_arg_dimension(&arg_dims))
+            }
+            // Ratios, counts, signs and predicates remove the leading
+            // argument's units. Their offsets, windows and flags are scalar.
+            "sign" | "pct_change" | "rolling_count" | "growth_rate" | "is_missing" => {
+                require_scalar_arguments(func, auxiliary_dims)?;
+                Ok(Dimension::Scalar)
+            }
+            // Products, rate compounding and nonlinear math cannot turn money
+            // into a dimensionless output by dropping its currency tag.
+            "cumprod" | "annualize_rate" | "pow" | "ln" | "exp" | "log10" | "sqrt" => {
+                require_scalar_arguments(func, &arg_dims)
+            }
+            // Variance has squared units. Squared currency is not a supported
+            // dimension, so the variance of money is rejected, not erased.
+            "var" | "rolling_var" | "ewm_var" => {
+                require_scalar_arguments(func, auxiliary_dims)?;
+                match first_arg_dimension(&arg_dims) {
+                    Dimension::Monetary(currency) => Err(crate::error::Error::build(format!(
+                        "Unsupported units in {func}: the variance of a {currency} series has \
+                         squared-currency units; use the standard deviation, or divide by a \
+                         same-currency base first"
+                    ))),
+                    resolved => Ok(resolved),
+                }
+            }
+            _ => Err(crate::error::Error::build(format!(
+                "Function '{func}' has no unit rule"
+            ))),
         }
     }
 }
@@ -191,68 +302,38 @@ fn node_value_type_to_dimension(value_type: &NodeValueType) -> Dimension {
     }
 }
 
-fn infer_bin_op_dimension(op: BinOp, left: Dimension, right: Dimension) -> Result<Dimension> {
-    match op {
-        BinOp::Add | BinOp::Sub => compatible_dimensions("arithmetic operands", left, right),
-        BinOp::Mul => multiply_dimensions(left, right),
-        BinOp::Div => divide_dimensions(left, right),
-        BinOp::Mod => require_scalar_arguments("modulo", &[left, right]),
-        BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => {
-            compatible_dimensions("comparison operands", left, right)?;
-            Ok(Dimension::Scalar)
-        }
-        BinOp::And | BinOp::Or => require_scalar_arguments("logical operands", &[left, right]),
-    }
-}
-
-fn compatible_dimensions(context: &str, left: Dimension, right: Dimension) -> Result<Dimension> {
-    match (left, right) {
-        (Dimension::Unknown, _) | (_, Dimension::Unknown) => Ok(Dimension::Unknown),
-        (Dimension::Scalar, Dimension::Scalar) => Ok(Dimension::Scalar),
-        (Dimension::Monetary(lhs), Dimension::Monetary(rhs)) if lhs == rhs => {
-            Ok(Dimension::Monetary(lhs))
-        }
-        (Dimension::Monetary(lhs), Dimension::Monetary(rhs)) => Err(crate::error::Error::build(
-            format!("Dimensional mismatch in {context}: cannot combine {lhs} and {rhs}"),
-        )),
-        (Dimension::Scalar, Dimension::Monetary(ccy))
-        | (Dimension::Monetary(ccy), Dimension::Scalar) => Err(crate::error::Error::build(
-            format!("Dimensional mismatch in {context}: cannot combine scalar and {ccy}"),
-        )),
-    }
-}
-
 fn multiply_dimensions(left: Dimension, right: Dimension) -> Result<Dimension> {
     match (left, right) {
+        (Dimension::Monetary(lhs), Dimension::Monetary(rhs)) => Err(crate::error::Error::build(
+            format!("Dimensional mismatch in multiplication: cannot multiply {lhs} by {rhs}"),
+        )),
         (Dimension::Unknown, _) | (_, Dimension::Unknown) => Ok(Dimension::Unknown),
         (Dimension::Scalar, Dimension::Scalar) => Ok(Dimension::Scalar),
         (Dimension::Scalar, Dimension::Monetary(ccy))
         | (Dimension::Monetary(ccy), Dimension::Scalar) => Ok(Dimension::Monetary(ccy)),
-        (Dimension::Monetary(lhs), Dimension::Monetary(rhs)) => Err(crate::error::Error::build(
-            format!("Dimensional mismatch in multiplication: cannot multiply {lhs} by {rhs}"),
-        )),
     }
 }
 
 fn divide_dimensions(left: Dimension, right: Dimension) -> Result<Dimension> {
     match (left, right) {
-        (Dimension::Unknown, _) | (_, Dimension::Unknown) => Ok(Dimension::Unknown),
-        (Dimension::Scalar, Dimension::Scalar) => Ok(Dimension::Scalar),
-        (Dimension::Monetary(ccy), Dimension::Scalar) => Ok(Dimension::Monetary(ccy)),
-        (Dimension::Monetary(lhs), Dimension::Monetary(rhs)) if lhs == rhs => Ok(Dimension::Scalar),
-        (Dimension::Monetary(lhs), Dimension::Monetary(rhs)) => Err(crate::error::Error::build(
-            format!("Dimensional mismatch in division: cannot divide {lhs} by {rhs}"),
-        )),
         (Dimension::Scalar, Dimension::Monetary(ccy)) => Err(crate::error::Error::build(format!(
             "Dimensional mismatch in division: cannot divide scalar by {ccy}"
         ))),
+        (Dimension::Monetary(lhs), Dimension::Monetary(rhs)) if lhs != rhs => {
+            Err(crate::error::Error::build(format!(
+                "Dimensional mismatch in division: cannot divide {lhs} by {rhs}"
+            )))
+        }
+        (Dimension::Unknown, _) | (_, Dimension::Unknown) => Ok(Dimension::Unknown),
+        (Dimension::Scalar, Dimension::Scalar)
+        | (Dimension::Monetary(_), Dimension::Monetary(_)) => Ok(Dimension::Scalar),
+        (Dimension::Monetary(ccy), Dimension::Scalar) => Ok(Dimension::Monetary(ccy)),
     }
 }
 
 fn require_scalar_arguments(context: &str, dimensions: &[Dimension]) -> Result<Dimension> {
     // An unresolved argument cannot excuse a known monetary argument, nor can
-    // it prove that the resulting expression is dimensionless. In particular,
-    // monetary variance has unrepresented squared units and stays Unknown.
+    // it prove that the resulting expression is dimensionless.
     if dimensions
         .iter()
         .any(|dimension| matches!(dimension, Dimension::Monetary(_)))
@@ -268,115 +349,47 @@ fn require_scalar_arguments(context: &str, dimensions: &[Dimension]) -> Result<D
     })
 }
 
-fn infer_call_dimension(
-    func: &str,
-    args: &[StmtExpr],
-    node_types: &IndexMap<NodeId, NodeValueType>,
-    capital_structure_currency: Option<Currency>,
-    instrument_currencies: &IndexMap<String, Currency>,
-) -> Result<Dimension> {
-    let arg_dims: Vec<_> = args
-        .iter()
-        .map(|arg| {
-            infer_dimension(
-                arg,
-                node_types,
-                capital_structure_currency,
-                instrument_currencies,
-            )
-        })
-        .collect::<Result<Vec<_>>>()?;
-    let auxiliary_dims = arg_dims.get(1..).unwrap_or_default();
-    match func {
-        // Value-variadic: every argument is a value carried in the same units,
-        // so a mismatch between them is a genuine modelling error worth
-        // rejecting. `mean`/`sum`/`min`/`max` aggregate across all of their
-        // arguments, `coalesce` picks between interchangeable alternatives,
-        // and `clamp`'s bounds are compared against its value.
-        "mean" | "sum" | "min" | "max" | "coalesce" | "clamp" => {
-            combine_arg_dimensions(func, arg_dims)
-        }
-        "quantile" => {
-            require_scalar_arguments("quantile level", auxiliary_dims)?;
-            Ok(first_arg_dimension(&arg_dims))
-        }
-        "rank" => {
-            require_scalar_arguments("rank ascending flag", auxiliary_dims)?;
-            Ok(Dimension::Scalar)
-        }
-        // Dimension-preserving in the *first* (series or value) argument only:
-        // the result carries that argument's units. This covers same-unit
-        // transforms such as `diff` (difference of amounts),
-        // `std`/`rolling_std`/`ewm_std` (dispersion in the series' own units)
-        // and the period aggregates.
-        //
-        // The rule, stated once: an argument that is a count, window size,
-        // period offset, smoothing factor, digit count or month number is
-        // required to be dimensionless and never participates in dimension
-        // unification with the first argument.
-        // Folding such an argument in with `combine_arg_dimensions` would
-        // wrongly reject `lag(usd_balance, 1)`, `rolling_sum(usd_flow, 4)` or
-        // `round(usd_amount, 2)` as a monetary/scalar mix. Functions here that
-        // take no trailing argument at all (`abs`, `cumsum`, `ytd`, ...)
-        // behave identically under this rule.
-        "abs" | "lag" | "shift" | "cumsum" | "cummin" | "cummax" | "diff" | "rolling_mean"
-        | "rolling_sum" | "rolling_min" | "rolling_max" | "rolling_median" | "rolling_std"
-        | "ewm_mean" | "ewm_std" | "median" | "std" | "ttm" | "ytd" | "qtd" | "fiscal_ytd"
-        | "annualize" | "round" | "floor" | "ceil" => {
-            require_scalar_arguments(func, auxiliary_dims)?;
-            Ok(first_arg_dimension(&arg_dims))
-        }
-        // Ratios, counts, signs and predicates genuinely remove the leading
-        // argument's units. Their offsets/windows/flags must still be scalar.
-        "sign" | "pct_change" | "rolling_count" | "growth_rate" | "is_missing" => {
-            require_scalar_arguments(func, auxiliary_dims)?;
-            Ok(Dimension::Scalar)
-        }
-        // Products, rate compounding and nonlinear math cannot turn money
-        // into a dimensionless output merely by dropping its currency tag.
-        "cumprod" | "annualize_rate" | "pow" | "ln" | "exp" | "log10" | "sqrt" => {
-            require_scalar_arguments(func, &arg_dims)
-        }
-        "var" | "rolling_var" | "ewm_var" => {
-            require_scalar_arguments(func, auxiliary_dims)?;
-            // Scalar variance stays scalar; monetary variance has squared
-            // units that NodeValueType cannot represent. Do not erase those
-            // units by asserting that all variance results are scalar.
-            Ok(match first_arg_dimension(&arg_dims) {
-                Dimension::Scalar => Dimension::Scalar,
-                Dimension::Unknown | Dimension::Monetary(_) => Dimension::Unknown,
-            })
-        }
-        _ => Ok(Dimension::Unknown),
-    }
-}
-
 /// Dimension of a call whose units come from its leading argument alone.
-///
-/// Used for functions whose trailing arguments are dimensionless counts,
-/// windows, offsets, smoothing factors or digit counts (see the rule stated in
-/// [`infer_call_dimension`]). A call with no arguments is dimension-unknown;
-/// arity itself is validated separately by the preflight.
 fn first_arg_dimension(arg_dims: &[Dimension]) -> Dimension {
     arg_dims.first().copied().unwrap_or(Dimension::Unknown)
-}
-
-fn combine_arg_dimensions(context: &str, arg_dims: Vec<Dimension>) -> Result<Dimension> {
-    // Seed the fold with the FIRST argument's dimension rather than
-    // `Dimension::Unknown`. `Unknown` is absorbing in `compatible_dimensions`
-    // (`(Unknown, _) => Unknown`), so seeding with it would make the fold
-    // permanently `Unknown` and silently accept e.g. `min(usd, eur)`.
-    let mut iter = arg_dims.into_iter();
-    let Some(first) = iter.next() else {
-        return Ok(Dimension::Unknown);
-    };
-    iter.try_fold(first, |acc, dim| compatible_dimensions(context, acc, dim))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::dsl::parse_formula;
+
+    fn infer_dimension(
+        ast: &StmtExpr,
+        node_types: &IndexMap<NodeId, NodeValueType>,
+        capital_structure_currency: Option<Currency>,
+        instrument_currencies: &IndexMap<String, Currency>,
+    ) -> Result<Dimension> {
+        UnitContext {
+            node_types,
+            capital_structure_currency,
+            instrument_currencies,
+            provisional: false,
+        }
+        .infer(ast)
+    }
+
+    fn value_type(
+        ast: &StmtExpr,
+        node_types: &IndexMap<NodeId, NodeValueType>,
+        capital_structure_currency: Option<Currency>,
+        instrument_currencies: &IndexMap<String, Currency>,
+    ) -> Result<Option<NodeValueType>> {
+        infer_value_type(
+            ast,
+            UnitContext {
+                node_types,
+                capital_structure_currency,
+                instrument_currencies,
+                provisional: false,
+            },
+        )
+    }
 
     fn validate_dimensions(
         ast: &StmtExpr,
@@ -647,7 +660,7 @@ mod tests {
                 let ast = parse_formula(&format!("lag(cs.{component}.{reference}, 1)"))
                     .expect("valid capital-structure reference");
                 assert_eq!(
-                    infer_value_type(
+                    value_type(
                         &ast,
                         &node_types,
                         Some(Currency::USD),
@@ -665,7 +678,7 @@ mod tests {
         ] {
             let ast = parse_formula(formula).expect("valid formula");
             assert!(
-                infer_value_type(
+                value_type(
                     &ast,
                     &node_types,
                     Some(Currency::USD),
@@ -677,7 +690,7 @@ mod tests {
         }
         let ast = parse_formula("cs.debt_balance.unknown").expect("valid reference");
         assert_eq!(
-            infer_value_type(
+            value_type(
                 &ast,
                 &node_types,
                 Some(Currency::USD),
@@ -705,6 +718,26 @@ mod tests {
                 assert_eq!(call_args.len(), 40, "all 40 args preserved on one node");
             }
             other => panic!("expected a single Function::Min call node, got {other:?}"),
+        }
+    }
+
+    /// Every function in the signature table has a unit rule, so no call can
+    /// leave a formula's units unresolved.
+    #[test]
+    fn every_function_has_a_unit_rule() {
+        use crate::dsl::signatures::FUNCTION_SIGNATURES;
+
+        let node_types = IndexMap::from([(NodeId::new("x"), NodeValueType::Scalar)]);
+        for signature in FUNCTION_SIGNATURES {
+            let args = vec![StmtExpr::node_ref("x"); signature.min_args];
+            let dimension = infer_dimension(
+                &StmtExpr::call(signature.name, args),
+                &node_types,
+                None,
+                &IndexMap::new(),
+            )
+            .unwrap_or_else(|error| panic!("{}: {error}", signature.name));
+            assert_eq!(dimension, Dimension::Scalar, "{}", signature.name);
         }
     }
 }

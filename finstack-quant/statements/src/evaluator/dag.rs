@@ -566,7 +566,7 @@ mod tests {
         let model = {
             let mut model_builder_1 = ModelBuilder::new("test");
             model_builder_1.periods("2025Q1..Q2", None).unwrap();
-            model_builder_1.value("revenue", &[]);
+            model_builder_1.value_scalar("revenue", &[]);
             let mut model_builder_1 = model_builder_1.mixed("margin");
             model_builder_1.formula("1.0").unwrap();
             let mut model_builder_1 = model_builder_1.build().unwrap();

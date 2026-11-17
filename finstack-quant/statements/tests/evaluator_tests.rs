@@ -1142,7 +1142,7 @@ fn test_shift_zero_periods() {
 fn test_shift_negative_literal_is_rejected_at_build() {
     let mut model_builder = ModelBuilder::new("test");
     model_builder.periods("2025Q1..2025Q2", None).unwrap();
-    model_builder.value("revenue", &[]);
+    model_builder.value_scalar("revenue", &[]);
     let error = model_builder
         .compute("future_shifted", "shift(revenue, -1)")
         .expect_err("a negative literal shift reads a future period");
@@ -1396,7 +1396,7 @@ fn test_forecast_error_no_actual_periods() {
         model_builder
             .periods("2025Q1..2025Q2", None) // No actuals_until
             .unwrap();
-        model_builder.value(
+        model_builder.value_scalar(
             "revenue",
             &[], // No values provided
         );
@@ -1613,7 +1613,7 @@ fn test_rolling_functions_edge_cases() {
 fn test_lag_negative_periods_error() {
     let mut model_builder = ModelBuilder::new("test");
     model_builder.periods("2025Q1..2025Q1", None).unwrap();
-    model_builder.value("revenue", &[]);
+    model_builder.value_scalar("revenue", &[]);
     let error = model_builder
         .compute("bad_lag", "lag(revenue, -1)")
         .expect_err("a negative literal lag reads a future period");

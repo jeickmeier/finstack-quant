@@ -53,9 +53,12 @@ impl Check for FormulaCheckSpec {
             super::helpers::validated_capital_structure_currencies(self.id(), context)?;
         let _ = crate::dsl::compiler::infer_value_type(
             &ast,
-            &value_types,
-            reporting_currency,
-            &instrument_currencies,
+            crate::dsl::compiler::UnitContext {
+                node_types: &value_types,
+                capital_structure_currency: reporting_currency,
+                instrument_currencies: &instrument_currencies,
+                provisional: false,
+            },
         )?;
         let expression = crate::dsl::compiler::compile(&ast)?;
         let history = Arc::new(period_history(context.results, context.model));

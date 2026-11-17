@@ -313,7 +313,8 @@ These are implemented and qualified; the typed `cs` selectors remain pending.
 The Statements formula units and currency contract was accepted on
 2026-11-15. It covers resolved dimensions, monetary and scalar operations,
 decimal scales, the forecast boundary and capital reporting currencies.
-Implementation and independent qualification remain pending.
+Unit resolution and the unit rules are implemented and qualified; capital
+reporting scopes and exact monetary results remain pending.
 [STATEMENTS-CONTRACTS-005](statements-contracts/05-currency-dimensions.md#accepted-decision-for-formula-units-and-currency).
 
 The Statements metric registry and model import contract was accepted on

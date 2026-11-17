@@ -116,7 +116,7 @@ fn test_recompile_on_reuse() {
         model_builder
             .periods("2025Q1..Q1", None)
             .expect("valid periods");
-        model_builder.value("placeholder", &[]);
+        model_builder.value_scalar("placeholder", &[]);
         model_builder.build().expect("build should succeed")
     }
     .periods;

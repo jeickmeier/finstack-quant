@@ -120,7 +120,6 @@ fn observation_import_is_plan_validated_sparse_and_atomic() {
             &[
                 row("revenue", vec![scalar(300.0), scalar(100.0), None]),
                 row("cash", vec![usd(0), usd(50), None]),
-                row("empty", vec![None, None, None]),
             ],
         )
         .unwrap();
@@ -141,7 +140,21 @@ fn observation_import_is_plan_validated_sparse_and_atomic() {
             currency: Currency::USD
         })
     );
-    assert!(values("empty").is_empty());
+
+    // A row with no observation has no units; the model needs them declared.
+    let mut unresolved = base();
+    unresolved
+        .import_observations(&["2025Q1"], &[row("empty", vec![None])])
+        .unwrap();
+    let error = unresolved
+        .build()
+        .expect_err("an empty undeclared series has no units");
+    assert!(
+        error
+            .to_string()
+            .contains("Cannot resolve the units of node 'empty'"),
+        "{error}"
+    );
     assert!(
         model.periods[0].is_actual,
         "the plan keeps its actuals flags"
@@ -395,7 +408,7 @@ fn runnable_model_keeps_missing_cells_and_rejects_plan_gaps_and_open_references(
 
     let mut misspelled = ModelBuilder::new("admission");
     misspelled.periods("2025Q1..Q3", None).unwrap();
-    misspelled.value("sales", &[]);
+    misspelled.value_scalar("sales", &[]);
     misspelled.compute("double", "slaes * 2").unwrap();
     let error = misspelled
         .build()
@@ -490,12 +503,36 @@ fn observations_are_finite_and_a_runnable_model_is_not_empty() {
     }
     assert!(Money::new(f64::NAN, Currency::USD).is_err());
 
-    let mut typed_empty = ModelBuilder::new("typed-empty");
-    typed_empty.periods("2025Q1..Q2", None).unwrap();
-    typed_empty.value_money("cash", &[]);
-    typed_empty
-        .build()
-        .expect("an empty series is a valid node");
+    // A declared type resolves an empty series; an undeclared one does not.
+    let empty_node = |declared: Option<NodeValueType>| {
+        let mut node = finstack_quant_statements::types::NodeSpec::new(
+            "cash",
+            finstack_quant_statements::types::NodeType::Value,
+        );
+        node.values = Some(Default::default());
+        node.value_type = declared;
+        let mut builder = ModelBuilder::new("typed-empty");
+        builder.periods("2025Q1..Q2", None).unwrap();
+        builder.insert_node(node);
+        builder.build()
+    };
+    let typed = empty_node(Some(NodeValueType::Monetary {
+        currency: Currency::USD,
+    }))
+    .expect("a declared type resolves an empty series");
+    assert_eq!(
+        typed.nodes["cash"].value_type,
+        Some(NodeValueType::Monetary {
+            currency: Currency::USD
+        })
+    );
+    let error = empty_node(None).expect_err("an undeclared empty series is unresolved");
+    assert!(
+        error
+            .to_string()
+            .contains("Cannot resolve the units of node 'cash'"),
+        "{error}"
+    );
 
     let mut empty = ModelBuilder::new("empty");
     empty.periods("2025Q1..Q2", None).unwrap();

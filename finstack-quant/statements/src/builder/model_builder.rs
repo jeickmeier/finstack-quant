@@ -991,8 +991,8 @@ impl ModelBuilder {
     /// let model = {
     ///     let mut model_builder = ModelBuilder::new("test");
     ///     model_builder.periods("2025Q1..Q2", None)?;
-    ///     model_builder.value("revenue", &[]);
-    ///     model_builder.value("cogs", &[]);
+    ///     model_builder.value_scalar("revenue", &[]);
+    ///     model_builder.value_scalar("cogs", &[]);
     ///     model_builder.with_builtin_metrics()?;
     ///     model_builder
     /// };
@@ -1059,8 +1059,8 @@ impl ModelBuilder {
     /// let model = {
     ///     let mut model_builder = ModelBuilder::new("test");
     ///     model_builder.periods("2025Q1..Q2", None)?;
-    ///     model_builder.value("revenue", &[]);
-    ///     model_builder.value("cogs", &[]);
+    ///     model_builder.value_scalar("revenue", &[]);
+    ///     model_builder.value_scalar("cogs", &[]);
     ///     model_builder.add_metric_from_registry("fin.gross_profit", &registry)?;
     ///     model_builder.add_metric_from_registry("fin.gross_margin", &registry)?;
     ///     model_builder.build()?
@@ -1469,7 +1469,7 @@ mod tests {
         };
 
         let mut builder = base();
-        builder.value("revenue", &[]);
+        builder.value_scalar("revenue", &[]);
         rejected(builder, "defined more than once");
         let mut builder = base();
         builder.value_scalar("revenue", &[]);

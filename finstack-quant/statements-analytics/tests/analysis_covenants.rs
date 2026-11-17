@@ -23,7 +23,7 @@ fn quarters() -> [PeriodId; 4] {
 fn model() -> FinancialModelSpec {
     let mut builder = ModelBuilder::new("borrower");
     builder.periods("2024Q1..Q4", None).unwrap();
-    builder.value("placeholder", &[]);
+    builder.value_scalar("placeholder", &[]);
     builder.build().unwrap()
 }
 

@@ -97,8 +97,8 @@ impl RollupSpec {
     /// let mut model = {
     ///     let mut model_builder = ModelBuilder::new("declared");
     ///     model_builder.periods("2025Q1..Q4", None)?;
-    ///     model_builder.value("revenue", &[]);
-    ///     model_builder.value("cash", &[]);
+    ///     model_builder.value_scalar("revenue", &[]);
+    ///     model_builder.value_scalar("cash", &[]);
     ///     model_builder.compute("margin", "revenue / revenue")?;
     ///     model_builder.build()?
     /// };
