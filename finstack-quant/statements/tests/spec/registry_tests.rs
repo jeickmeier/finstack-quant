@@ -72,35 +72,158 @@ fn builtin_earnings_and_margins_follow_the_reported_cost_table() {
     );
 }
 
-/// The return ratios read the same reported-cost lines: D&A sits inside
-/// `cogs` and `opex` and is not subtracted again.
-#[test]
-fn builtin_return_metrics_do_not_subtract_da_twice() {
-    let registry = Registry::with_builtins().unwrap();
-    for (id, formula) in [
+/// A year of quarters with the bundled metrics and the inputs the return
+/// ratios read. Quarterly net income is 10 (EBIT 40, interest 10, tax 20)
+/// unless `revenue` moves it.
+fn returns_model(
+    revenue: [f64; 4],
+    configure: impl Fn(&mut finstack_quant_statements::builder::ModelBuilder),
+) -> finstack_quant_statements::types::FinancialModelSpec {
+    use finstack_quant_core::dates::PeriodId;
+    use finstack_quant_statements::builder::ModelBuilder;
+    use finstack_quant_statements::types::RollupMethod;
+
+    let series = |values: [f64; 4]| -> Vec<(PeriodId, f64)> {
+        (1..=4_u8)
+            .zip(values)
+            .map(|(quarter, value)| (PeriodId::quarter(2025, quarter).expect("quarter"), value))
+            .collect()
+    };
+    let mut builder = ModelBuilder::new("returns");
+    builder.periods("2025Q1..Q4", None).expect("periods");
+    for (node, values, rollup) in [
+        ("revenue", revenue, RollupMethod::Sum),
+        ("cogs", [40.0; 4], RollupMethod::Sum),
+        ("opex", [20.0; 4], RollupMethod::Sum),
+        ("interest_expense", [10.0; 4], RollupMethod::Sum),
+        ("tax_expense", [20.0; 4], RollupMethod::Sum),
+        ("depreciation", [0.0; 4], RollupMethod::Sum),
+        ("amortization", [0.0; 4], RollupMethod::Sum),
+        ("principal_payment", [0.0; 4], RollupMethod::Sum),
+        ("operating_tax", [8.0, 8.0, -4.0, 8.0], RollupMethod::Sum),
         (
-            "fin.roe",
-            "(revenue - cogs - opex - interest_expense - taxes) / total_equity",
+            "total_equity",
+            [100.0, 300.0, 500.0, 700.0],
+            RollupMethod::PeriodEnd,
         ),
         (
-            "fin.roa",
-            "(revenue - cogs - opex - interest_expense - taxes) / total_assets",
+            "total_assets",
+            [900.0, 1100.0, 1300.0, 1500.0],
+            RollupMethod::PeriodEnd,
         ),
-        // ROIC uses NOPAT (EBIT less taxes), not pre-tax EBIT.
+        ("current_liabilities", [100.0; 4], RollupMethod::PeriodEnd),
+        ("total_debt", [400.0; 4], RollupMethod::PeriodEnd),
         (
-            "fin.roic",
-            "(revenue - cogs - opex - taxes) / (total_debt + total_equity)",
-        ),
-        (
-            "fin.roce",
-            "(revenue - cogs - opex) / (total_assets - current_liabilities)",
+            "operating_invested_capital",
+            [300.0, 340.0, 380.0, -400.0],
+            RollupMethod::PeriodEnd,
         ),
     ] {
-        assert_eq!(
-            registry.get(id).unwrap().definition.formula,
-            formula,
-            "{id}"
+        builder.value_scalar(node, &series(values));
+        builder.rollup(node, rollup).expect("known node");
+    }
+    configure(&mut builder);
+    builder.with_builtin_metrics().expect("bundled metrics");
+    builder.build().expect("valid model")
+}
+
+/// The bundled returns divide same-period earnings by the average of the
+/// opening and closing balance (STATEMENTS-CONTRACTS-009).
+#[test]
+fn bundled_returns_use_average_balances_and_explicit_operating_inputs() {
+    use finstack_quant_core::dates::PeriodId;
+    use finstack_quant_statements::evaluator::{CellStatus, UnavailableReason};
+
+    let model = returns_model([100.0, 100.0, 100.0, 50.0], |_| {});
+    let results = Evaluator::new().evaluate(&model).expect("evaluation");
+    let q = |quarter: u8| PeriodId::quarter(2025, quarter).expect("quarter");
+    let close = |node: &str, quarter: u8, expected: f64| {
+        let actual = results.get(node, &q(quarter)).expect("value");
+        assert!(
+            (actual - expected).abs() < 1e-12,
+            "{node} Q{quarter}: {actual}"
         );
+    };
+
+    // Q1 has no opening balance: every return is unavailable, not a
+    // period-end approximation.
+    for metric in ["fin.roe", "fin.roa", "fin.roce", "fin.roic"] {
+        let cell = results.get_cell(metric, &q(1)).expect("cell");
+        assert_eq!(cell.status, CellStatus::Unavailable, "{metric}");
+    }
+    // Q2: net income 10, EBIT 40, operating tax 8.
+    close("fin.roe", 2, 10.0 / 200.0);
+    close("fin.roa", 2, 10.0 / 1000.0);
+    close("fin.roce", 2, 40.0 / 900.0);
+    close("fin.roic", 2, 32.0 / 320.0);
+    // Q3: an operating tax credit of 4 raises the ROIC numerator to 44.
+    close("fin.roic", 3, 44.0 / 360.0);
+    // Q4: revenue of 50 is a loss of 40 after interest and tax; it stays signed.
+    close("fin.roe", 4, -40.0 / 600.0);
+    close("fin.roa", 4, -40.0 / 1400.0);
+    // Q4 average invested capital is (380 - 400) / 2 = -10: no return.
+    let roic = results.get_cell("fin.roic", &q(4)).expect("cell");
+    assert_eq!(roic.status, CellStatus::Unavailable);
+    assert_eq!(roic.reason, Some(UnavailableReason::UndefinedBase));
+    // Statement tax and operating tax are separate inputs.
+    assert_eq!(results.get("tax_expense", &q(3)), Some(20.0));
+}
+
+/// A coarser period recomputes each return from its own earnings and its
+/// own opening and closing balances.
+#[test]
+fn bundled_returns_roll_up_on_the_coarser_period_balances() {
+    use finstack_quant_core::dates::{PeriodId, PeriodKind};
+    use finstack_quant_statements::evaluator::{CellStatus, RollupSpec};
+
+    let model = returns_model([100.0; 4], |_| {});
+    let results = Evaluator::new().evaluate(&model).expect("evaluation");
+    let halves = results
+        .rollup(
+            &model,
+            &RollupSpec {
+                frequency: PeriodKind::SemiAnnual,
+                methods: indexmap::IndexMap::new(),
+            },
+        )
+        .expect("half-year rollup");
+    let h = |half: &str| -> PeriodId { half.parse().expect("half-year id") };
+
+    // H1 has no opening balance in the model.
+    assert_eq!(
+        halves
+            .get_cell("fin.roe", &h("2025H1"))
+            .expect("cell")
+            .status,
+        CellStatus::Unavailable
+    );
+    // H2: net income 20 over the average of the H1 close (300) and the H2
+    // close (700), not an average of the quarterly returns.
+    let roe = halves.get("fin.roe", &h("2025H2")).expect("value");
+    assert!((roe - 20.0 / 500.0).abs() < 1e-12, "{roe}");
+    let roce = halves.get("fin.roce", &h("2025H2")).expect("value");
+    assert!((roce - 80.0 / 1200.0).abs() < 1e-12, "{roce}");
+}
+
+/// The returns read the shared reported-cost earnings, so D&A inside `cogs`
+/// and `opex` is not subtracted again, and no return reads `taxes`.
+#[test]
+fn builtin_return_metrics_read_the_shared_earnings() {
+    let registry = Registry::with_builtins().unwrap();
+    for (id, earnings) in [
+        ("fin.roe", "fin.net_income"),
+        ("fin.roa", "fin.net_income"),
+        ("fin.roic", "fin.ebit"),
+        ("fin.roce", "fin.ebit"),
+    ] {
+        let dependencies = registry.get_dependencies(id).unwrap();
+        assert!(
+            dependencies.contains(&earnings.to_string()),
+            "{id}: {dependencies:?}"
+        );
+        let formula = &registry.get(id).unwrap().definition.formula;
+        assert!(formula.starts_with("ratio("), "{id}: {formula}");
+        assert!(!formula.contains("taxes"), "{id}: {formula}");
     }
 }
 
@@ -1013,7 +1136,8 @@ fn parity_add_metric_matches_with_builtin_metrics_for_same_nodes() {
         model_builder.value("total_assets", &zero_periods(2.0));
         model_builder.value("total_debt", &zero_periods(0.0));
         model_builder.value("total_equity", &zero_periods(1.0));
-        model_builder.value("taxes", &zero_periods(0.0));
+        model_builder.value("operating_tax", &zero_periods(0.0));
+        model_builder.value("operating_invested_capital", &zero_periods(1.0));
         model_builder.value("current_liabilities", &zero_periods(1.0));
         model_builder
     };
@@ -1280,7 +1404,7 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
             ],
         );
         model_builder.value(
-            "taxes",
+            "operating_tax",
             &[
                 (
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
@@ -1289,6 +1413,19 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
                 (
                     PeriodId::quarter(2025, 2).expect("valid period fixture"),
                     AmountOrScalar::scalar(0.0),
+                ),
+            ],
+        );
+        model_builder.value(
+            "operating_invested_capital",
+            &[
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(1.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(1.0),
                 ),
             ],
         );

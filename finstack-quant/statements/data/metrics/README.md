@@ -137,11 +137,23 @@ Principal repayment is not tax-deductible, so debt-service coverage measured on
 pre-tax EBITDA overstates capacity. Consider EBIAT (`EBIT × (1 - tax_rate)`) as a
 conservative numerator.
 
-### Tax node naming
+### Returns on capital
 
-`fin_basic.json` deducts a node named `tax_expense`; `fin_returns.json` deducts a
-node named `taxes`. A model that loads both files needs both nodes, or one
-aliased to the other.
+`fin_returns.json` reports same-period, unannualized decimal returns over the
+average of the opening balance (the prior period's close) and the closing
+balance: `ratio(earnings, (lag(balance, 1) + balance) / 2)`. The first period
+of a model has no opening balance and is unavailable, as is a period whose
+average balance is zero or negative; a loss stays negative. ROE and ROA read
+`fin.net_income` (after statement `tax_expense`) and ROCE and ROIC read
+`fin.ebit`, so no return carries its own earnings expression.
+
+ROIC needs two inputs of its own. `operating_tax` is the operating tax expense
+before financing effects, separate from statement `tax_expense`; a credit is
+negative. `operating_invested_capital` is the period-end operating assets less
+non-interest-bearing operating liabilities, including required operating cash
+and excluding excess cash and nonoperating assets. Rolling up recomputes each
+return from the coarser period's earnings and its own opening and closing
+balances, so declare `period_end` on the balances.
 
 More generally, `with_builtin_metrics()` inserts every `fin.*` metric as a
 `Calculated` node without creating placeholder nodes for the line items they

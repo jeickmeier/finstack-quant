@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **636 review items across 33 source scopes with open items**
+This backlog consolidates **635 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -26,7 +26,7 @@ The labels distinguish the work required:
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (489): implementation and verification work against an
+- **Reconciliation** (488): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (38): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -68,7 +68,7 @@ product consequences remain in their product scope.
 | [Calibration: Hull–White and LMM](#calibration-hullwhite-and-lmm) | 18 |
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
 | [Statements: capital structure](#statements-capital-structure) | 13 |
-| [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 7 |
+| [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 6 |
 | [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 5 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
 | [Statements analytics: credit checks and impairment](#statements-analytics-credit-checks-and-impairment) | 18 |
@@ -1053,8 +1053,6 @@ product consequences remain in their product scope.
 - **Reconciliation — Bounded Statements wire admission, schemas and errors.** Implement one loading path with exact version and numeric admission, shared limits and runnable validation before canonical content hashing. Retain separate evaluation provenance, validate canonical instrument eligibility and reconcile structured errors across hosts. Correct the empty schema fixture and ordering description, and independently qualify Rust, Python and WASM parity, boundaries and replay. [Accepted STATEMENTS-CONTRACTS-016](statements-contracts/16-wire-schema-and-errors.md#accepted-decision-for-statements-wire-admission-schemas-and-errors).
 
 - **Reconciliation — Bundled leverage and coverage definitions.** Use period-end gross debt and reported-cost EBITDA, complete TTM and positive denominators, statement interest including recognized PIK for interest coverage, and contractual due-date scheduled cash service for debt-service coverage. Qualify scope, currency, denominators and due-date service independently across formulas, examples, bindings and fixtures. Remove generic thresholds and require agreement-specific covenant terms. Until then these bundled ratios still divide with `/`, so a denominator that is exactly zero fails the run with a division-by-zero error; move them to `ratio`, which is unavailable for a non-positive base. [Accepted STATEMENTS-CONTRACTS-008](statements-contracts/08-leverage-and-coverage.md#accepted-decision-for-bundled-leverage-and-coverage).
-
-- **Reconciliation — Bundled period returns on comparable average capital.** Use shared reported-cost earnings, comparable opening and closing balances, explicit operating tax and invested capital for ROIC, and reasoned availability with positive denominators. Reconcile the separate audited `taxes` lookup to shared statement `tax_expense` for net income and explicit operating tax for ROIC. Independently qualify reporting scope, operating capital, tax credits, signed losses and coarser-period recomputation across formulas, examples, bindings and fixtures. Until then these bundled ratios still divide with `/`, so a denominator that is exactly zero fails the run with a division-by-zero error; move them to `ratio`, which is unavailable for a non-positive base. Its numerators already read reported-cost `cogs` and `opex` without a second D&A deduction. [Accepted STATEMENTS-CONTRACTS-009](statements-contracts/09-returns-on-capital.md#accepted-decision-for-bundled-period-returns-on-capital).
 
 - **Reconciliation — Typed comparison values and coverage in analytics checks.** Record a comparison's actual, expected, difference and tolerance as typed values (exact `Money` or scalar) at the compared precision; today they are floats in the compared nodes' units, with compatible units checked for identity inputs, and a [formula check's](statements-contracts/15-formula-checks.md#accepted-decision-for-formula-checks-and-coverage) residual and its tolerance are floats in the residual's units. The accounting identities already sum exactly (money) or with compensation (scalars) and compare one exact residual; the recorded values are its float views, and a relative residual that is undefined (a zero reference) is recorded as zero. Define, with their owning records, when a statements-analytics check that lacks an input is incomplete rather than not applicable; today those checks report the periods they examined and never a coverage finding. Zero default tolerance with the inclusive `max(absolute, relative × reference)` allowance and absolute override, pass, fail, incomplete and unevaluated verdicts from unfiltered outcomes, advisory-only filters, declared order with unique identifiers, compatible merges, and supplied results accepted only as a verified run under the requested cutoff are reconciled. [Accepted STATEMENTS-CONTRACTS-014](statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
 

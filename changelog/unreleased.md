@@ -1317,6 +1317,25 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements metrics: bundled returns use average balances and explicit ROIC inputs
+
+STATEMENTS-CONTRACTS-009. **Breaking.**
+
+- **Average balances.** `fin.roe`, `fin.roa`, `fin.roce` and `fin.roic`
+  divide same-period earnings by the average of the opening balance (the
+  prior period's close) and the closing balance. They used the period-end
+  balance. The first period of a model is unavailable.
+- **Shared earnings.** ROE and ROA read `fin.net_income` (after
+  `tax_expense`); ROCE and ROIC read `fin.ebit`. The `taxes` input is no
+  longer read.
+- **ROIC inputs.** `fin.roic` is `(ebit - operating_tax) / average
+  operating_invested_capital`. A model that loads it supplies
+  `operating_tax` (signed; a credit is negative) and
+  `operating_invested_capital`; it no longer reads `total_debt +
+  total_equity`.
+- **Unavailable, not an error.** A zero or negative average balance or a
+  missing input leaves the return unavailable; a loss stays negative.
+
 ### Statements normalization: an ordered bridge to a new adjusted node
 
 STATEMENTS-EVALUATION-015. **Breaking.**

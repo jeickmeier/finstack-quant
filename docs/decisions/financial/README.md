@@ -341,7 +341,8 @@ Implementation and independent qualification remain pending.
 The Statements bundled period returns contract was accepted on 2026-11-15.
 It covers same-period earnings, average comparable capital, explicit
 operating tax and invested capital, and coarser-period recomputation.
-Implementation and independent qualification remain pending.
+It is implemented and qualified; ROIC reads the explicit `operating_tax` and
+`operating_invested_capital` inputs.
 [STATEMENTS-CONTRACTS-009](statements-contracts/09-returns-on-capital.md#accepted-decision-for-bundled-period-returns-on-capital).
 
 The Statements balance-sheet articulation contract was accepted on
