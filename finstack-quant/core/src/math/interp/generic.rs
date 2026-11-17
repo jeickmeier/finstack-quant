@@ -26,7 +26,7 @@ use crate::InputError;
 /// - **Shared state**: `knots`, `values`, `extrapolation` are common to all interpolators.
 /// - **Strategy-specific state**: Stored in the generic `strategy: S` field.
 /// - **Validation**: Centralized in the constructor; positive-only strategies add
-///   strictly positive value validation in [`InterpolationStrategy::from_raw`].
+///   strictly positive value validation in `from_raw`.
 /// - **Serialization**: Stores canonical knots, values, and extrapolation policy.
 ///   Deserialization validates these inputs and rebuilds strategy caches.
 ///

@@ -111,6 +111,21 @@ beforeEach(() => {
           deal.free();
         }
       }
+      case "trancheMetrics": {
+        const deal = native.StructuredCredit.fromJson(request.instrumentJson);
+        try {
+          return native.trancheMetrics(
+            deal,
+            request.trancheId,
+            request.marketJson,
+            request.asOf,
+            request.marketPricePct,
+            request.metrics,
+          );
+        } finally {
+          deal.free();
+        }
+      }
       case "trancheSchedule": {
         const deal = native.StructuredCredit.fromJson(request.instrumentJson);
         try {

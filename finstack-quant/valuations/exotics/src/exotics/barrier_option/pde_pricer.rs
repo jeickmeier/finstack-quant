@@ -743,6 +743,15 @@ mod tests {
         0x40275548b49fed20, 0x4025674b21ed1b07, 0x3fe51c02da16cfe8, 0x3fc5fabdb96b3b00,
     ];
 
+    // Ubuntu 24.04.5, runner image 20261111.127.1, Rust 1.97.1.
+    #[rustfmt::skip]
+    const UBUNTU_24_04_5_BARRIER_PDE_PIN: &[u64] = &[
+        0x40223cefad505ebe, 0x4026ccb20dcfa68c, 0x3fb5b3baf9065e4e, 0x3fd7c45b2139740e,
+        0x4009e4687b5f3e38, 0x3feea3021fe08220, 0x401d85c5917095fd, 0x401c610bed6e62ae,
+        0x3fe60bef814818ea, 0x3ffa7352f64660c5, 0x401b39112278152a, 0x401d2bd07148442f,
+        0x40275548b49fed20, 0x4025674b21ed1b07, 0x3fe51c02da16cfe8, 0x3fc5fabdb96b3b00,
+    ];
+
     fn barrier_pde_pin_values() -> Vec<u64> {
         let as_of = date(2024, 1, 1);
         let expiry = date(2025, 1, 1);
@@ -788,7 +797,12 @@ mod tests {
     fn barrier_pde_stepper_bit_pin() {
         let values = barrier_pde_pin_values();
         assert!(
-            values.as_slice() == BARRIER_PDE_PIN || values.as_slice() == LINUX_BARRIER_PDE_PIN,
+            [
+                BARRIER_PDE_PIN,
+                LINUX_BARRIER_PDE_PIN,
+                UBUNTU_24_04_5_BARRIER_PDE_PIN
+            ]
+            .contains(&values.as_slice()),
             "barrier PDE prices moved off the macOS and Linux libm pins:\n{values:#x?}"
         );
     }

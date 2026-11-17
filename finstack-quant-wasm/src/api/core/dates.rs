@@ -339,9 +339,9 @@ impl JsVolatilityClock {
         context: Option<JsValue>,
     ) -> Result<JsVolatilityClock, JsValue> {
         let reference = js_epoch_days(&reference_epoch_days, "referenceEpochDays")?;
-        let dc = js_day_count_arg(&day_count, "dayCount")?;
+        let convention = js_day_count_arg(&day_count, "dayCount")?;
         let ctx = js_opt_day_count_context_state(context.as_ref(), "context")?;
-        VolatilityClock::try_new(reference, dc, ctx)
+        VolatilityClock::try_new(reference, convention, ctx)
             .map(|inner| JsVolatilityClock { inner })
             .map_err(to_js_err)
     }

@@ -373,9 +373,9 @@ impl PyVolatilityClock {
         context: Option<PyRef<'_, PyDayCountContext>>,
     ) -> PyResult<Self> {
         let reference = py_to_date(reference_date)?;
-        let dc = extract_day_count(day_count)?;
+        let convention = extract_day_count(day_count)?;
         let ctx = context.map(|c| c.inner.clone()).unwrap_or_default();
-        let inner = VolatilityClock::try_new(reference, dc, ctx).map_err(core_to_py)?;
+        let inner = VolatilityClock::try_new(reference, convention, ctx).map_err(core_to_py)?;
         Ok(Self { inner })
     }
 

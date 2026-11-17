@@ -32,7 +32,7 @@
   },
   "regression_fixture": {
     "path": "finstack-quant/valuations/credit/tests/fixtures/valuation_b4_tranche_reference.json",
-    "canonical_sha256": "857af80ac00dc5c4db646dcfb7dbc6c0cf3313e550afb103fccc00bc8023c6f1",
+    "canonical_sha256": "902be200503b66847a36b66fd74f63547afbd8e591ebf9730d0b866beaedac2b",
     "canonical_encoding": "UTF-8 json.dumps(value, sort_keys=True, separators=(',', ':'), allow_nan=False), without a trailing newline",
     "removed_report_fields": [
       "baseline_errors_with_uncertainty",
