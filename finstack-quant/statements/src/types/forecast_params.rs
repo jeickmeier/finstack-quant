@@ -591,7 +591,21 @@ impl ForecastSpec {
                 if p.season_length == 0 {
                     return fail("'season_length' must be at least 1".to_string());
                 }
-                p.growth.map_or(Ok(()), |growth| finite("growth", growth))
+                let cycles = p.historical.len() as u64 / p.season_length;
+                if cycles < 2 {
+                    return fail(format!(
+                        "'historical' needs at least two complete seasons of {} observations",
+                        p.season_length
+                    ));
+                }
+                let Some(growth) = p.growth else {
+                    return Ok(());
+                };
+                finite("growth", growth)?;
+                if p.mode == SeasonalMode::Multiplicative && growth <= -1.0 {
+                    return fail("'growth' must be above -1 in multiplicative mode".to_string());
+                }
+                Ok(())
             }
             Self::MeanReverting(p) => {
                 finite("long_run_mean", p.long_run_mean)?;

@@ -197,7 +197,7 @@ pub(crate) fn apply_forecast(
             timeseries_forecast(forecast_periods, p).map(|values| (values, None))
         }
         ForecastSpec::Seasonal(p) => {
-            seasonal_forecast(base_value, forecast_periods, p).map(|values| (values, None))
+            seasonal_forecast(forecast_periods, p).map(|values| (values, None))
         }
         ForecastSpec::FadeToTarget(p) => {
             fade_to_target(base_value, forecast_periods, p).map(|values| (values, None))

@@ -32,7 +32,6 @@
 use crate::error::{Error, Result};
 use crate::types::{ForecastTrendMethod, SeasonalMode, SeasonalParams, TimeSeriesParams};
 use finstack_quant_core::dates::PeriodId;
-use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_core::math::summation::neumaier_sum;
 use indexmap::IndexMap;
 
@@ -338,56 +337,32 @@ fn double_exponential_smoothing(data: &[f64], alpha: f64, beta: f64, phi: f64) -
 
 /// Apply a seasonal forecast with decomposition.
 ///
-/// Uses seasonal decomposition of historical data to extract trend and
-/// seasonal components, then projects forward. Seasonal factors are keyed by
-/// data position.
+/// The supplied history is decomposed into a centered moving-average trend
+/// and one effect per phase; the forecast grows the final trend and applies
+/// the effect of each slot's phase. Phase is keyed by position in the
+/// history and continues across every forecast slot.
 ///
 /// # Arguments
 ///
-/// * `base_value` - The node's last actual value; the level comes from
-///   `historical`, so this only drives a warning when the two disagree
 /// * `forecast_periods` - Periods that require projected values
 /// * `params` - Finite `historical` observations (oldest first, at least two
-///   full seasons), positive `season_length`, decomposition `mode`, and
-///   optional **per-period** compound trend `growth` (default 0.0): forecast
-///   period `i` uses `last_trend * (1 + growth)^(i + 1)`. This rate
-///   **replaces** the historical trend slope rather than adding to it—the
-///   decomposition already captures the historical trajectory in the trend
-///   component.
+///   full seasons of consecutive slots ending at the forecast opening),
+///   positive `season_length`, decomposition `mode`, and optional
+///   **per-slot** compound trend `growth` (default 0.0): forecast step `h`
+///   uses `last_trend * (1 + growth)^h`. Multiplicative mode requires
+///   `growth > -1`.
 pub(super) fn seasonal_forecast(
-    base_value: f64,
     forecast_periods: &[PeriodId],
     params: &SeasonalParams,
 ) -> Result<IndexMap<PeriodId, f64>> {
-    // The user-supplied `historical` array provides the level, with no
-    // cross-check against the model's own actuals, so if its last entry has
-    // drifted away from the node's last actual the forecast opens with a
-    // discontinuity at the actual/forecast seam. Surface the drift.
-    if let Some(&last_hist) = params.historical.last() {
-        let scale = base_value.abs().max(last_hist.abs()).max(1.0);
-        if base_value.is_finite() && (base_value - last_hist).abs() > 1e-6 * scale {
-            tracing::warn!(
-                base_value,
-                last_historical = last_hist,
-                "Seasonal forecast level comes from the 'historical' parameter, whose last \
-                 entry differs from the node's last actual value - the forecast will not \
-                 connect to the actuals at the seam. Update 'historical' to match the \
-                 model's actuals if this is unintentional."
-            );
-        }
-    }
-
     let hist_data = params.historical.as_slice();
     finite_history(hist_data, "Seasonal forecast")?;
 
-    // No default: season length must match the data's cycle (4 quarterly, 12 monthly).
     let season_length = usize::try_from(params.season_length)
         .map_err(|_| Error::forecast("season_length exceeds the supported platform size"))?;
-
     if season_length == 0 {
         return Err(Error::forecast("season_length must be greater than 0"));
     }
-
     let minimum_history = season_length.checked_mul(2).ok_or_else(|| {
         Error::forecast("season_length is too large to represent two full seasons")
     })?;
@@ -403,218 +378,154 @@ pub(super) fn seasonal_forecast(
     }
 
     let mode = params.mode;
-    let (trend, seasonal) = decompose_series_with_mode(hist_data, season_length, mode)?;
-
     let growth = params.growth.unwrap_or(0.0);
+    if !growth.is_finite() || (mode == SeasonalMode::Multiplicative && growth <= -1.0) {
+        return Err(Error::forecast(format!(
+            "Seasonal 'growth' must be finite, and above -1 in multiplicative mode; got {growth}"
+        )));
+    }
+
+    let trend = centered_trend(hist_data, season_length)?;
+    let effects = match mode {
+        SeasonalMode::Additive => additive_effects(hist_data, season_length, &trend)?,
+        SeasonalMode::Multiplicative => multiplicative_factors(hist_data, season_length, &trend)?,
+    };
+    let last_trend = trend[trend.len() - 1];
 
     let mut results = IndexMap::new();
-    let last_trend = trend
-        .last()
-        .copied()
-        .unwrap_or_else(|| hist_data.last().copied().unwrap_or(0.0));
-
+    let mut growth_factor = 1.0;
     for (i, period_id) in forecast_periods.iter().enumerate() {
-        let trend_value = if growth == 0.0 {
-            last_trend
-        } else {
-            last_trend * (1.0 + growth).powi(i as i32 + 1)
-        };
-
-        // Seasonal factors are keyed by data position; adding season_start here
-        // would double-shift the cycle (e.g. apply the Q4 uplift to Q1).
-        let season_idx = (hist_data.len() + i) % season_length;
-        let seasonal_value = seasonal[season_idx];
-
+        growth_factor *= 1.0 + growth;
+        let trend_value = last_trend * growth_factor;
+        // Phase continues from the history, one step per slot.
+        let effect = effects[(hist_data.len() + i) % season_length];
         let value = match mode {
-            SeasonalMode::Additive => trend_value + seasonal_value,
-            SeasonalMode::Multiplicative => trend_value * seasonal_value,
+            SeasonalMode::Additive => trend_value + effect,
+            SeasonalMode::Multiplicative => trend_value * effect,
         };
-
         if !value.is_finite() {
             return Err(Error::forecast(format!(
                 "Seasonal forecast produced a non-finite value at period {:?}",
                 period_id
             )));
         }
-
-        // Allow negative values for financial metrics (losses, declines, etc.)
         results.insert(*period_id, value);
     }
 
     Ok(results)
 }
 
-/// Decompose a time series into trend and seasonal components using a simple
-/// moving-average trend. The caller validates a positive season length and
-/// at least two complete seasons before entering the decomposition helpers.
-fn decompose_series_with_mode(
-    data: &[f64],
-    season_length: usize,
-    mode: SeasonalMode,
-) -> Result<(Vec<f64>, Vec<f64>)> {
-    let trend = calculate_trend_component(data, season_length);
-
-    match mode {
-        SeasonalMode::Additive => Ok(decompose_additive(data, season_length, trend)),
-        SeasonalMode::Multiplicative => decompose_multiplicative(data, season_length, trend),
-    }
-}
-
-fn calculate_trend_component(data: &[f64], season_length: usize) -> Vec<f64> {
-    debug_assert!(season_length > 0, "season_length must be > 0");
-    debug_assert!(!data.is_empty(), "data must not be empty");
-    debug_assert!(data.len() / season_length >= 2);
+/// Centered moving-average trend of at least two complete seasons.
+///
+/// For an odd season length `m` the `m` observations around a slot have
+/// equal weight. For an even `m` the `m + 1` observations around it are
+/// used with half weight at each endpoint, and the weighted sum is divided
+/// by `m`. Each edge is extended linearly with the slope between its two
+/// nearest centered points; the slope is used as computed.
+fn centered_trend(data: &[f64], season_length: usize) -> Result<Vec<f64>> {
+    debug_assert!(season_length > 0 && data.len() >= 2 * season_length);
     let n = data.len();
+    let half = season_length / 2;
+    let scale = magnitude_scale(data);
     let mut trend = vec![0.0; n];
-    let half_season = season_length / 2;
-    let is_even = season_length.is_multiple_of(2);
 
-    // Use centered moving average for middle values.
-    // For even-period seasonality, apply 2×MA weighting (half-weight endpoints).
-    for (i, trend_val) in trend
-        .iter_mut()
-        .enumerate()
-        .take(n.saturating_sub(half_season))
-        .skip(half_season)
-    {
-        let window_start = i.saturating_sub(half_season);
-        let window_end = (i + half_season + 1).min(n);
-
-        if is_even && window_end - window_start == season_length + 1 {
-            let sum: f64 = data[window_start + 1..window_end - 1].iter().sum();
-            let endpoint_sum = 0.5 * (data[window_start] + data[window_end - 1]);
-            *trend_val = (sum + endpoint_sum) / season_length as f64;
+    for (center, value) in trend.iter_mut().enumerate().take(n - half).skip(half) {
+        let window = &data[center - half..=center + half];
+        let weighted = if season_length.is_multiple_of(2) {
+            // m + 1 observations, half weight at both ends.
+            let last = window.len() - 1;
+            neumaier_sum(window.iter().enumerate().map(|(k, y)| {
+                let weight = if k == 0 || k == last { 0.5 } else { 1.0 };
+                weight * (y / scale)
+            }))?
         } else {
-            let sum: f64 = data[window_start..window_end].iter().sum();
-            *trend_val = sum / (window_end - window_start) as f64;
-        }
-    }
-
-    // Extrapolate trend to edges using linear extrapolation from the first /
-    // last two centered-MA points. Guard indices and require finite, non-equal
-    // values before computing the slope.
-    // Front extrapolation: slope from the first two centered trend points.
-    let slope_front = if half_season + 1 < n
-        && trend[half_season].is_finite()
-        && trend[half_season + 1].is_finite()
-    {
-        let diff = trend[half_season + 1] - trend[half_season];
-        if diff.abs() > ZERO_TOLERANCE {
-            diff
-        } else {
-            0.0
-        }
-    } else {
-        0.0
-    };
-    for i in 0..half_season {
-        trend[i] = trend[half_season] - slope_front * (half_season - i) as f64;
-    }
-
-    // Back extrapolation: slope from the last two centered trend points.
-    let last_valid = n.saturating_sub(half_season + 1);
-    let slope_back =
-        if last_valid > 0 && trend[last_valid].is_finite() && trend[last_valid - 1].is_finite() {
-            let diff = trend[last_valid] - trend[last_valid - 1];
-            if diff.abs() > ZERO_TOLERANCE {
-                diff
-            } else {
-                0.0
-            }
-        } else {
-            0.0
+            neumaier_sum(window.iter().map(|y| y / scale))?
         };
-    for i in (n.saturating_sub(half_season))..n {
-        let steps = i - (n - half_season - 1);
-        trend[i] = trend[n - half_season - 1] + slope_back * steps as f64;
+        *value = scale * (weighted / season_length as f64);
     }
 
-    trend
-}
-
-fn decompose_additive(data: &[f64], season_length: usize, trend: Vec<f64>) -> (Vec<f64>, Vec<f64>) {
-    debug_assert!(season_length > 0, "season_length must be > 0");
-    let n = data.len();
-
-    let detrended: Vec<f64> = data.iter().zip(&trend).map(|(d, t)| d - t).collect();
-
-    let mut seasonal = vec![0.0; season_length];
-    for (season, seasonal_val) in seasonal.iter_mut().enumerate().take(season_length) {
-        let mut sum = 0.0;
-        let mut count = 0;
-
-        let mut idx = season;
-        while idx < n {
-            sum += detrended[idx];
-            count += 1;
-            idx += season_length;
+    // Two complete seasons give at least two centered points, except for a
+    // season length of one, where every slot is its own centered point.
+    if half > 0 {
+        let (first, last) = (half, n - half - 1);
+        let slope_front = trend[first + 1] - trend[first];
+        let slope_back = trend[last] - trend[last - 1];
+        for i in 0..half {
+            trend[i] = trend[first] - slope_front * (first - i) as f64;
+            trend[last + 1 + i] = trend[last] + slope_back * (i + 1) as f64;
         }
-
-        *seasonal_val = sum / count as f64;
     }
-
-    // Normalize seasonal component (sum to zero for additive)
-    let seasonal_mean: f64 = seasonal.iter().sum::<f64>() / season_length as f64;
-    for s in &mut seasonal {
-        *s -= seasonal_mean;
-    }
-
-    (trend, seasonal)
-}
-
-fn decompose_multiplicative(
-    data: &[f64],
-    season_length: usize,
-    trend: Vec<f64>,
-) -> Result<(Vec<f64>, Vec<f64>)> {
-    debug_assert!(season_length > 0, "season_length must be > 0");
-    let n = data.len();
-
-    // A multiplicative decomposition divides by the trend, so it is undefined
-    // where the trend crosses or touches zero. Substituting an identity ratio
-    // there would silently bias every seasonal factor, so fail loudly instead.
-    if trend.iter().any(|t| !t.is_finite()) {
+    if trend.iter().any(|value| !value.is_finite()) {
         return Err(Error::forecast(
-            "Multiplicative seasonal decomposition produced a non-finite trend",
+            "Seasonal decomposition produced a non-finite trend",
         ));
     }
-    if trend.iter().any(|t| t.abs() < ZERO_TOLERANCE)
-        || trend
-            .windows(2)
-            .any(|pair| pair[0].is_sign_negative() != pair[1].is_sign_negative())
-    {
+    Ok(trend)
+}
+
+/// Mean of `values` at the slots of each phase: `values[phase]`,
+/// `values[phase + m]`, and so on.
+fn phase_means(values: &[f64], season_length: usize) -> Result<Vec<f64>> {
+    (0..season_length)
+        .map(|phase| {
+            let slots = values.iter().skip(phase).step_by(season_length);
+            let count = slots.clone().count();
+            Ok(neumaier_sum(slots.copied())? / count as f64)
+        })
+        .collect()
+}
+
+/// Additive phase effects: the mean observation-minus-trend residual of
+/// each phase, centered so the effects average zero across phases.
+fn additive_effects(data: &[f64], season_length: usize, trend: &[f64]) -> Result<Vec<f64>> {
+    let residuals: Vec<f64> = data.iter().zip(trend).map(|(y, t)| y - t).collect();
+    if residuals.iter().any(|residual| !residual.is_finite()) {
+        return Err(Error::forecast(
+            "Seasonal decomposition produced a non-finite residual",
+        ));
+    }
+    let mut effects = phase_means(&residuals, season_length)?;
+    let mean = neumaier_sum(effects.iter().copied())? / season_length as f64;
+    for effect in &mut effects {
+        *effect -= mean;
+    }
+    Ok(effects)
+}
+
+/// Multiplicative phase factors: the mean observation-to-trend ratio of
+/// each phase, normalized so the factors average one across phases.
+///
+/// The trend must be non-zero with one sign, and every observation must
+/// share that sign or be exactly zero, so every ratio is non-negative.
+fn multiplicative_factors(data: &[f64], season_length: usize, trend: &[f64]) -> Result<Vec<f64>> {
+    let negative = trend[0] < 0.0;
+    if trend.iter().any(|t| *t == 0.0 || (*t < 0.0) != negative) {
         return Err(Error::forecast(
             "Multiplicative seasonal decomposition is undefined for series whose trend \
              crosses or touches zero (the seasonal ratio divides by the trend). \
              Use mode 'additive' for series that change sign or hover near zero.",
         ));
     }
-
-    let detrended: Vec<f64> = data.iter().zip(&trend).map(|(d, t)| d / t).collect();
-
-    let mut seasonal = vec![1.0; season_length];
-    for (season, seasonal_val) in seasonal.iter_mut().enumerate().take(season_length) {
-        let mut sum = 0.0;
-        let mut count = 0;
-
-        let mut idx = season;
-        while idx < n {
-            sum += detrended[idx];
-            count += 1;
-            idx += season_length;
-        }
-
-        *seasonal_val = sum / count as f64;
+    if data.iter().any(|y| *y != 0.0 && (*y < 0.0) != negative) {
+        return Err(Error::forecast(
+            "Multiplicative seasonal decomposition requires every observation to share the \
+             sign of the trend or be exactly zero. Use mode 'additive' for series that \
+             change sign.",
+        ));
     }
-
-    let seasonal_mean = seasonal.iter().sum::<f64>() / season_length as f64;
-    if seasonal_mean.abs() >= ZERO_TOLERANCE {
-        for s in &mut seasonal {
-            *s /= seasonal_mean;
-        }
+    let ratios: Vec<f64> = data.iter().zip(trend).map(|(y, t)| y / t).collect();
+    let mut factors = phase_means(&ratios, season_length)?;
+    let mean = neumaier_sum(factors.iter().copied())? / season_length as f64;
+    if !(mean.is_finite() && mean > 0.0) || ratios.iter().any(|ratio| !ratio.is_finite()) {
+        return Err(Error::forecast(
+            "Multiplicative seasonal factors cannot be normalized: their average is not a \
+             positive finite number",
+        ));
     }
-
-    Ok((trend, seasonal))
+    for factor in &mut factors {
+        *factor /= mean;
+    }
+    Ok(factors)
 }
 
 #[cfg(test)]
@@ -689,7 +600,7 @@ mod tests {
         ];
 
         let result =
-            seasonal_forecast(100.0, &periods, &params).expect("seasonal_forecast should succeed");
+            seasonal_forecast(&periods, &params).expect("seasonal_forecast should succeed");
 
         assert!(result.len() == 4);
 
@@ -845,8 +756,8 @@ mod tests {
             110.0, 100.0, 120.0, 95.0, // Year 3
         ];
 
-        let (trend, seasonal) =
-            decompose_series_with_mode(&data, 4, SeasonalMode::Additive).expect("additive");
+        let trend = centered_trend(&data, 4).expect("trend");
+        let seasonal = additive_effects(&data, 4, &trend).expect("additive");
 
         assert_eq!(
             trend.len(),
@@ -935,7 +846,7 @@ mod tests {
         let params = seasonal(vec![100.0, 90.0, 110.0, 85.0], 0, SeasonalMode::Additive);
         let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
-        let result = seasonal_forecast(100.0, &periods, &params);
+        let result = seasonal_forecast(&periods, &params);
         assert!(result.is_err(), "zero season length must be rejected");
     }
 
@@ -975,7 +886,7 @@ mod tests {
         ];
 
         let result =
-            seasonal_forecast(100.0, &periods, &params).expect("seasonal_forecast should succeed");
+            seasonal_forecast(&periods, &params).expect("seasonal_forecast should succeed");
 
         let q1 = result[&PeriodId::quarter(2025, 1).expect("valid period fixture")];
         let q2 = result[&PeriodId::quarter(2025, 2).expect("valid period fixture")];
@@ -999,11 +910,123 @@ mod tests {
         );
         let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
 
-        let err = seasonal_forecast(10.0, &periods, &params)
+        let err = seasonal_forecast(&periods, &params)
             .expect_err("zero-crossing trend must be rejected in multiplicative mode");
         assert!(
             err.to_string().contains("additive"),
             "error should point the user at additive mode: {err}"
         );
+    }
+
+    fn quarters(count: u8) -> Vec<PeriodId> {
+        (1..=count)
+            .map(|q| PeriodId::quarter(2026, q).expect("valid period fixture"))
+            .collect()
+    }
+
+    /// Two exact cycles of a linear trend plus a zero-sum pattern decompose
+    /// exactly: the centered average of `2 t + s` is `2 t` in the interior,
+    /// the edges extend that line, and the effects are `s`. The forecast is
+    /// the final trend (16 at t = 8) plus the effect of each phase.
+    #[test]
+    fn two_exact_even_cycles_recover_trend_and_effects() {
+        let pattern = [3.0, -1.0, -4.0, 2.0];
+        let data: Vec<f64> = (0..8)
+            .map(|i| 2.0 * (i + 1) as f64 + pattern[i % 4])
+            .collect();
+        let trend = centered_trend(&data, 4).expect("trend");
+        for (i, value) in trend.iter().enumerate() {
+            assert!((value - 2.0 * (i + 1) as f64).abs() < 1e-12, "{i}: {value}");
+        }
+        let effects = additive_effects(&data, 4, &trend).expect("effects");
+        for (effect, expected) in effects.iter().zip(pattern) {
+            assert!((effect - expected).abs() < 1e-12);
+        }
+        let periods = quarters(4);
+        let forecast =
+            seasonal_forecast(&periods, &seasonal(data, 4, SeasonalMode::Additive)).unwrap();
+        for (period, expected) in periods.iter().zip(pattern) {
+            assert!((forecast[period] - (16.0 + expected)).abs() < 1e-12);
+        }
+    }
+
+    /// An odd season length weights its `m` observations equally:
+    /// `3 t + s` with `s = [-1, 0, 1]` over two cycles has trend `3 t`.
+    #[test]
+    fn two_exact_odd_cycles_recover_trend_and_effects() {
+        let pattern = [-1.0, 0.0, 1.0];
+        let data: Vec<f64> = (0..6)
+            .map(|i| 3.0 * (i + 1) as f64 + pattern[i % 3])
+            .collect();
+        let trend = centered_trend(&data, 3).expect("trend");
+        for (i, value) in trend.iter().enumerate() {
+            assert!((value - 3.0 * (i + 1) as f64).abs() < 1e-12, "{i}: {value}");
+        }
+        let periods = quarters(4);
+        let forecast =
+            seasonal_forecast(&periods, &seasonal(data, 3, SeasonalMode::Additive)).unwrap();
+        // Phase continues from the history: steps 1..4 are phases 0, 1, 2, 0.
+        for (period, expected) in periods.iter().zip([17.0, 18.0, 19.0, 17.0]) {
+            assert!((forecast[period] - expected).abs() < 1e-12);
+        }
+    }
+
+    /// A tiny edge slope is kept as computed, not snapped to zero.
+    #[test]
+    fn edge_slopes_are_not_snapped_to_zero() {
+        let data: Vec<f64> = (0..8).map(|i| 1e-12 * (i + 1) as f64).collect();
+        let trend = centered_trend(&data, 4).expect("trend");
+        assert!(trend[7] > trend[6] && trend[0] < trend[1], "{trend:?}");
+        assert!((trend[7] - 8e-12).abs() < 1e-24);
+    }
+
+    /// Multiplicative factors are non-negative ratios normalized to average
+    /// one. A zero observation is valid: the pattern [0, 20, 30, 50] around
+    /// a level of 25 has factors [0, 0.8, 1.2, 2.0].
+    #[test]
+    fn multiplicative_mode_accepts_a_zero_observation() {
+        let data = vec![0.0, 20.0, 30.0, 50.0, 0.0, 20.0, 30.0, 50.0];
+        let trend = centered_trend(&data, 4).expect("trend");
+        let factors = multiplicative_factors(&data, 4, &trend).expect("factors");
+        for (factor, expected) in factors.iter().zip([0.0, 0.8, 1.2, 2.0]) {
+            assert!((factor - expected).abs() < 1e-12);
+        }
+        let periods = quarters(4);
+        let grown = SeasonalParams {
+            growth: Some(0.1),
+            ..seasonal(data, 4, SeasonalMode::Multiplicative)
+        };
+        let forecast = seasonal_forecast(&periods, &grown).unwrap();
+        // The trend of 25 grows 10% per slot before the factor applies.
+        for (h, (period, factor)) in periods.iter().zip([0.0, 0.8, 1.2, 2.0]).enumerate() {
+            let expected = 25.0 * 1.1_f64.powi(h as i32 + 1) * factor;
+            assert!((forecast[period] - expected).abs() < 1e-9);
+        }
+    }
+
+    /// A negative trend with observations of that sign is a valid
+    /// multiplicative series; an observation of the other sign is not, and
+    /// neither is growth at or below -100%.
+    #[test]
+    fn multiplicative_mode_states_its_sign_domain() {
+        let periods = quarters(4);
+        let negative = vec![-10.0, -20.0, -30.0, -40.0, -10.0, -20.0, -30.0, -40.0];
+        let forecast = seasonal_forecast(
+            &periods,
+            &seasonal(negative, 4, SeasonalMode::Multiplicative),
+        )
+        .unwrap();
+        for (period, expected) in periods.iter().zip([-10.0, -20.0, -30.0, -40.0]) {
+            assert!((forecast[period] - expected).abs() < 1e-9);
+        }
+        let mixed = vec![-1.0, 20.0, 30.0, 51.0, -1.0, 20.0, 30.0, 51.0];
+        let error = seasonal_forecast(&periods, &seasonal(mixed, 4, SeasonalMode::Multiplicative))
+            .expect_err("an observation against the trend's sign");
+        assert!(error.to_string().contains("sign of the trend"), "{error}");
+        let collapsing = SeasonalParams {
+            growth: Some(-1.0),
+            ..seasonal(vec![1.0; 8], 4, SeasonalMode::Multiplicative)
+        };
+        assert!(seasonal_forecast(&periods, &collapsing).is_err());
     }
 }

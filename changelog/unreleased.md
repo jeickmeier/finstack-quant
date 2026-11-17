@@ -1207,3 +1207,18 @@ STATEMENTS-EVALUATION-009.
   coordinates with compensated sums, so a small slope at a large level is
   kept; moving-average windows of extreme finite levels no longer overflow.
   Ordinary results change only in the last digits.
+
+### Statements: seasonal forecasts state their multiplicative domain
+
+STATEMENTS-EVALUATION-010.
+
+- **Rejected at build.** A seasonal history shorter than two complete
+  seasons, and multiplicative `growth` at or below -1, fail when the model is
+  built.
+- **Multiplicative mode.** The trend must be non-zero with one sign and every
+  observation must share it or be exactly zero. A wholly negative series is
+  now accepted; an observation against the trend's sign is rejected, where
+  it used to produce a negative factor.
+- **Edges.** Edge trend slopes are used as computed; slopes below 1e-10 were
+  snapped to zero. The log advisory comparing the history with the node's
+  last actual is removed.

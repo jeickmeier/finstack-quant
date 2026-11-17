@@ -444,7 +444,7 @@ and centered moving-average forecasts. It is implemented and qualified.
 The Statements seasonal decomposition and projection contract was accepted
 on 2026-11-15. It covers aligned seasonal history, centered trend estimates,
 additive and multiplicative phase effects and per-slot projection.
-Implementation and independent qualification remain pending.
+It is implemented and qualified.
 [STATEMENTS-EVALUATION-010](statements-evaluation/10-seasonal-decomposition.md#accepted-decision-for-seasonal-decomposition-and-projection).
 
 The Statements Monte Carlo path, quantile and breach contract was accepted on

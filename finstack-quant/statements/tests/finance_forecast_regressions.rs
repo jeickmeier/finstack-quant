@@ -121,14 +121,17 @@ fn correlated_forecasts_reject_malformed_optional_parameters() {
 
 #[test]
 fn extreme_season_lengths_fail_before_allocation() {
+    // A season the history cannot cover twice is a static error, raised
+    // before anything is sized by the season length.
     for length in [u64::MAX, u64::from(u32::MAX) + 5] {
-        let mut forecast = ForecastSpec::seasonal(vec![100.0; 8], 4, SeasonalMode::Additive);
-        forecast = forecast
-            .clone()
+        let forecast = ForecastSpec::seasonal(vec![100.0; 8], 4, SeasonalMode::Additive)
             .with_param("season_length", json!(length))
             .unwrap();
-        let model = forecast_model(100.0, forecast);
-        assert!(Evaluator::new().evaluate(&model).is_err());
+        let error = forecast.validate().unwrap_err();
+        assert!(
+            error.to_string().contains("two complete seasons"),
+            "{error}"
+        );
     }
 }
 
@@ -1235,4 +1238,43 @@ fn trend_parameters_are_checked_statically() {
     };
     assert!(window(3).validate().is_ok());
     assert!(window(4).validate().is_err());
+}
+
+// --- C7: seasonal decomposition (STATEMENTS-EVALUATION-010) ---
+
+/// Through the evaluator: two exact cycles of `2 t + s` forecast the final
+/// trend plus each phase's effect, and a multiplicative series with a zero
+/// observation forecasts its pattern at the trend level.
+#[test]
+fn seasonal_forecasts_continue_trend_and_phase_from_the_history() {
+    let pattern = [3.0, -1.0, -4.0, 2.0];
+    let history: Vec<f64> = (0..8)
+        .map(|i| 2.0 * (i + 1) as f64 + pattern[i % 4])
+        .collect();
+    let additive = trend_values(ForecastSpec::seasonal(history, 4, SeasonalMode::Additive));
+    for (value, effect) in additive.iter().zip(pattern) {
+        assert!((value - (16.0 + effect)).abs() < 1e-12, "{value}");
+    }
+    let multiplicative = trend_values(ForecastSpec::seasonal(
+        vec![0.0, 20.0, 30.0, 50.0, 0.0, 20.0, 30.0, 50.0],
+        4,
+        SeasonalMode::Multiplicative,
+    ));
+    for (value, expected) in multiplicative.iter().zip([0.0, 20.0, 30.0]) {
+        assert!((value - expected).abs() < 1e-12, "{value}");
+    }
+    // Static requirements: two complete seasons, and growth above -1 in
+    // multiplicative mode.
+    assert!(
+        ForecastSpec::seasonal(vec![1.0; 7], 4, SeasonalMode::Additive)
+            .validate()
+            .is_err()
+    );
+    assert!(
+        ForecastSpec::seasonal(vec![1.0; 8], 4, SeasonalMode::Multiplicative)
+            .with_param("growth", json!(-1.0))
+            .unwrap()
+            .validate()
+            .is_err()
+    );
 }
