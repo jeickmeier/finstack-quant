@@ -693,7 +693,8 @@ fn execute_waterfall_inner(
     // (d) closing_balance = post_sweep_balance + toggle PIK.
     // (e) accrued_interest retains interest earned but not yet due. Paying
     // principal or toggling a coupon does not extinguish that separate claim.
-    // Any cash shortfall from Step 5 is added and carried into the next period.
+    // Any cash shortfall from Step 5 is interest already due: it is reported
+    // as interest_arrears, not accrued, and carried into the next period.
     for s in staged {
         let StagedInstrumentFlow {
             instrument_id,
@@ -734,10 +735,12 @@ fn execute_waterfall_inner(
         state.set_closing_balance(instrument_id.to_string(), closing_balance);
         breakdown.debt_balance = closing_balance;
 
-        // Unpaid interest from the available-cash cap accrues and is carried as
-        // a claim in the next period's interest category.
+        // Unpaid interest from the available-cash cap is overdue: it is
+        // reported as arrears and carried as a claim in the next period's
+        // interest category.
+        breakdown.interest_arrears = Some(Money::from((0_i64, currency)));
         if let Some(shortfall) = interest_shortfalls.get(instrument_id.as_str()) {
-            breakdown.accrued_interest = breakdown.accrued_interest.checked_add(*shortfall)?;
+            breakdown.interest_arrears = Some(*shortfall);
             state
                 .interest_shortfall
                 .insert(instrument_id.clone(), *shortfall);
@@ -1993,11 +1996,9 @@ mod tests {
 
         let tl = result_short.flows.get("TL-1").expect("TL-1");
         assert_eq!(tl.interest_expense_cash.amount(), 60.0);
-        assert_eq!(
-            tl.accrued_interest.amount(),
-            40.0,
-            "unpaid coupon must accrue"
-        );
+        // The unpaid coupon was due: it is arrears, not accrued interest.
+        assert_eq!(tl.interest_arrears.map(|a| a.amount()), Some(40.0));
+        assert_eq!(tl.accrued_interest.amount(), 0.0);
         assert_eq!(
             state
                 .interest_shortfall
@@ -2033,6 +2034,7 @@ mod tests {
             140.0,
             "carried claim is paid in the next period's interest category"
         );
+        assert_eq!(tl.interest_arrears.map(|a| a.amount()), Some(0.0));
         assert!(
             state.interest_shortfall.get("TL-1").is_none(),
             "shortfall cleared once paid"

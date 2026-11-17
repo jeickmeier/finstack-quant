@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **635 review items across 33 source scopes with open items**
+This backlog consolidates **632 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -21,12 +21,12 @@ The labels distinguish the work required:
 
 - **Observed** (53): a static implementation, contract, dispatch or
   documentation difference. Its financial impact is not necessarily reproduced.
-- **Investigate** (18): a source-derived numerical or economic concern
+- **Investigate** (17): a source-derived numerical or economic concern
   requiring targeted reproduction, an independent reference or convergence
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (488): implementation and verification work against an
+- **Reconciliation** (486): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (38): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -67,7 +67,7 @@ product consequences remain in their product scope.
 | [Calibration: quotes and curve/smile targets](#calibration-quotes-and-curvesmile-targets) | 18 |
 | [Calibration: Hull–White and LMM](#calibration-hullwhite-and-lmm) | 18 |
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
-| [Statements: capital structure](#statements-capital-structure) | 13 |
+| [Statements: capital structure](#statements-capital-structure) | 10 |
 | [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 6 |
 | [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 5 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
@@ -956,17 +956,11 @@ product consequences remain in their product scope.
 
 [Scope inventory](statements-capital/README.md).
 
-- **Reconciliation — Opening principal must match between the schedule and debt ledger.** Replace raw opening-balance scaling for carried debt with a hard mismatch error naming the instrument, period, currency and both opening amounts. Calculate debt service from the dated schedule after checking principal at the same economic boundary. Qualify dated issuance, redraw and retirement cases. [Accepted opening principal decision](statements-capital/03-funding-and-balances.md#accepted-decision-for-opening-principal-reconciliation).
-
-- **Investigate — New-funding closes mix economic and cash-period clocks.** A zero-opening/new-funding close combines economic-dated funding with cash-period PIK and repayments, whereas ordinary close uses economic outstanding. Reproduce newly issued or redrawn debt with early/late settlement and PIK dates to measure closing-balance and capacity differences. Records: [STATEMENTS-CAPITAL-003](statements-capital/03-funding-and-balances.md).
-
 - **Investigate — Class allocation can direct floating remainder to an ineligible final row.** Class vectors contain zeros for other rows, but pro-rata remainder goes to the final array entry, potentially zero/ineligible, before available cash becomes zero. Independently bound or reproduce the residual across scales and row orders before concluding a material cash loss; ordinary conservation fixtures do not cover every case. Records: [STATEMENTS-CAPITAL-006](statements-capital/06-priority-allocation.md).
 
 - **Evidence — Residual coupons need independent debt-ledger reconciliation.** Qualify arbitrary cash/PIK shares, zeroed-coupon reactivation, irregular day counts and multiple dated advances/arrears against an independent schedule. Existing residual regressions primarily establish internal ledger invariants. Include tolerance scaling while preserving the established period-close balance-change and FX/date policy. Records: [STATEMENTS-CAPITAL-005](statements-capital/05-residual-coupons.md).
 
 - **Reconciliation — Fee rebates, funding proceeds and ledger qualification of capital cash classification.** Report fee rebates and repayment refunds as company receipts (today a fee or repayment row that is a company receipt is rejected, not read as a claim), report signed funding proceeds separately from the principal they establish, accept a company-perspective borrowing schedule (today a supplied borrowing schedule must be in the holder perspective and is rejected otherwise), and classify net derivative settlement cash on a hedge once the cashflow contract supplies that kind. Independently qualify source conversion, custom and rebuilt schedules, signed fee and distress cash, explicit liability changes and boundary dates against borrower and hedge ledgers, and carry distress cash into reporting-currency totals with the capital reporting scopes. Period validation before every schedule read, the stated schedule perspective with one signed conversion, native currency at zero, exhaustive kind classification with unclassified effects rejected, signed PIK, period coupon netting with separate expense and income totals, the Interest claim, and dated distress cash outside scheduled debt service are reconciled. [Accepted STATEMENTS-CAPITAL-002](statements-capital/02-cashflow-classification.md#accepted-decision-for-period-admission-and-cashflow-classification).
-
-- **Reconciliation — Contractual accrued cash interest must stay separate from arrears.** Calculate future-due cash interest earned through period close from canonical earning terms, dated principal and the required accrual context. Replace generic accrual inputs and report overdue arrears separately. Qualify period-close earning and due-date boundaries. Issue-discount amortization and effective-interest accounting remain separate from contractual accrual and the funding face ledger. [Accepted contractual accrual decision](statements-capital/03-funding-and-balances.md#accepted-decision-for-contractual-accrued-cash-interest).
 
 - **Reconciliation — Dated principal claims, settlement arrears and advance reserves.** Require stable dated claims with separate cash and face, remove synthetic claims, and report economic principal, unsettled payments, arrears and paid advance reserves separately. Reconcile scheduled principal across seniority classes, eligible instrument claims and due dates. Qualify partial, early and late payments and exact native-currency balances with atomic state updates across periods. [Accepted STATEMENTS-CAPITAL-004](statements-capital/04-dated-principal.md#accepted-decision-for-dated-principal-claims).
 

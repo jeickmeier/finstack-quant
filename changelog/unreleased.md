@@ -1317,6 +1317,29 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements capital: the ledger must agree with its schedule; arrears are separate from accrued interest
+
+STATEMENTS-CAPITAL-003. **Breaking.**
+
+- **No rescaling.** `calculate_period_flows` fails when the opening balance
+  it is given disagrees with the principal the dated schedule carries into
+  the period, naming the instrument, period, currency and both amounts. It
+  used to scale the period's coupons, fees and capitalization by the ratio
+  and warn. `scheduled_opening_principal(schedule, period_start)` returns the
+  agreeing opening. The `residual_scale_mismatch` warning is removed from
+  `CapitalStructureWarning`.
+- **One balance clock.** Every debt balance closes on the dated schedule:
+  newly issued and redrawn debt moves on balance-effective dates, as carried
+  debt does. A schedule whose opening notional and funding row both hold the
+  same principal now reports their sum.
+- **Contractual accrual.** `accrued_interest` is calculated from the
+  instrument's own earning terms
+  (`Instrument::contractual_accrual_config`), so ACT/ACT ISMA debt accrues
+  instead of failing. An instrument that states no terms cannot be accrued.
+- **Arrears.** Cash interest due and unpaid is `interest_arrears`
+  (`cs.interest_arrears.<instrument or total>`, and a row of
+  `CashflowBreakdown::flows`). It is no longer added to `accrued_interest`.
+
 ### Statements metrics: bundled returns use average balances and explicit ROIC inputs
 
 STATEMENTS-CONTRACTS-009. **Breaking.**

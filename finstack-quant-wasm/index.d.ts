@@ -10019,7 +10019,8 @@ export interface StatementsNamespace {
    * * `cashflows_json` - Capital-structure cashflows object or its serialized JSON.
    * * `component` - One of `interest_expense` (cash plus PIK), `interest_expense_cash`,
    *   `interest_expense_pik`, `interest_income`, `principal_payment`, `debt_balance`,
-   *   `fees`, or `accrued_interest`. Flows are positive payment/receipt magnitudes;
+   *   `fees`, `accrued_interest` (cash interest earned and not yet due) or
+   *   `interest_arrears` (cash interest due and unpaid). Flows are positive payment/receipt magnitudes;
    *   debt balance is closing principal. Rate hedges have zero debt balance and
    *   debt accrued interest.
    * * `instrument_or_total` - Instrument identifier for native-currency amounts,
@@ -10034,7 +10035,7 @@ export interface StatementsNamespace {
    * kind `computation` for unknown components, missing instrument/period data,
    * unavailable multi-currency totals, or incompatible cash/PIK currencies.
    * @param cashflowsJson - Capital-structure cashflows object or its serialized JSON.
-   * @param component - One of `interest_expense` (cash plus PIK), `interest_expense_cash`, `interest_expense_pik`, `interest_income`, `principal_payment`, `debt_balance`, `fees`, or `accrued_interest`. Flows are positive payment/receipt magnitudes; debt balance is closing principal. Rate hedges have zero debt balance and debt accrued interest.
+   * @param component - One of `interest_expense` (cash plus PIK), `interest_expense_cash`, `interest_expense_pik`, `interest_income`, `principal_payment`, `debt_balance`, `fees`, `accrued_interest` (cash interest earned and not yet due) or `interest_arrears` (cash interest due and unpaid). Flows are positive payment/receipt magnitudes; debt balance is closing principal. Rate hedges have zero debt balance and debt accrued interest.
    * @param instrumentOrTotal - Instrument identifier for native-currency amounts, or `total` for reporting-currency aggregates. This lookup performs no FX.
    * @param periodId - Reporting-period label such as `2025Q1` present in the result.
    */

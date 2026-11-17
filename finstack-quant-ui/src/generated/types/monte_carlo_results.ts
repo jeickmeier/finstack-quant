@@ -66,14 +66,6 @@ export type DCf776B61125046D84B45 =
         warning:
           | {
               /**
-               * Actual ratio of stateful to scheduled opening applied to the cashflows.
-               */
-              applied_ratio: number;
-              kind: "residual_scale_mismatch";
-              [k: string]: unknown;
-            }
-          | {
-              /**
                * Negative claim amount in the waterfall currency.
                */
               amount: number;

@@ -233,8 +233,8 @@ impl EvaluationContext {
     /// Get a capital-structure component from one completed period.
     ///
     /// `component` accepts `interest_expense`, `interest_expense_cash`,
-    /// `interest_expense_pik`, `principal_payment`, `debt_balance`, `fees`, or
-    /// `accrued_interest`. Pass an instrument identifier in
+    /// `interest_expense_pik`, `principal_payment`, `debt_balance`, `fees`,
+    /// `accrued_interest` or `interest_arrears`. Pass an instrument identifier in
     /// `instrument_or_total` for its native-currency value, or `total` for the
     /// cashflow aggregate, which requires the reporting-currency invariant.
     ///
@@ -288,7 +288,8 @@ impl EvaluationContext {
     /// # }
     /// ```
     ///
-    /// The component names `fees` and `accrued_interest` are also supported.
+    /// The component names `fees`, `accrued_interest` and `interest_arrears`
+    /// are also supported.
     /// Per-instrument values use their native currencies; `total` values use
     /// the capital structure's reporting-currency aggregation convention.
     ///

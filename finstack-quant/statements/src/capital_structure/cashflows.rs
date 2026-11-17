@@ -47,6 +47,7 @@ use serde::{Deserialize, Serialize};
 ///         mandatory_prepayment: None,
 ///         sweep_prepayment: None,
 ///         voluntary_prepayment: None,
+///         interest_arrears: None,
 ///     });
 /// cs.totals.insert(period, CashflowBreakdown {
 ///     interest_expense_cash: Money::from((10_000_i64, Currency::USD)),
@@ -61,6 +62,7 @@ use serde::{Deserialize, Serialize};
 ///     mandatory_prepayment: None,
 ///     sweep_prepayment: None,
 ///     voluntary_prepayment: None,
+///     interest_arrears: None,
 /// });
 ///
 /// assert_eq!(cs.get_component("interest_expense", "total", &period).unwrap(), 12_500.0);
@@ -207,7 +209,9 @@ pub struct CashflowBreakdown {
     /// Outstanding debt balance at period end
     pub debt_balance: Money,
 
-    /// Debt coupon interest accrued but not yet paid (liability).
+    /// Contractual cash interest earned through the period close and due
+    /// after it (liability), from the instrument's own earning terms. Interest
+    /// already due and unpaid is `interest_arrears`, not part of this amount.
     /// Hedge-leg accrual valuation is outside the debt-service contract and is zero.
     pub accrued_interest: Money,
 
@@ -254,15 +258,25 @@ pub struct CashflowBreakdown {
     /// [`Self::scheduled_principal`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub voluntary_prepayment: Option<Money>,
+
+    /// Cash interest already due and still unpaid at the period close:
+    /// overdue arrears carried as a claim into the next period. It is separate
+    /// from `accrued_interest`, which is interest earned but not yet due.
+    /// Positive amount in the breakdown's currency. Always `Some` on
+    /// breakdowns produced by the evaluator or the waterfall; `None` on
+    /// hand-built breakdowns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interest_arrears: Option<Money>,
 }
 
 /// Field names of [`CashflowBreakdown::audit_detail`], in the same order.
-const AUDIT_DETAIL_LABELS: [&str; 5] = [
+const AUDIT_DETAIL_LABELS: [&str; 6] = [
     "opening_balance",
     "scheduled_principal",
     "mandatory_prepayment",
     "sweep_prepayment",
     "voluntary_prepayment",
+    "interest_arrears",
 ];
 
 impl CashflowBreakdown {
@@ -278,7 +292,8 @@ impl CashflowBreakdown {
     /// `opening_balance` and the four sources of `principal_payment`
     /// (`scheduled_principal`, `mandatory_prepayment`, `sweep_prepayment`,
     /// `voluntary_prepayment`), each only when recorded. Those four rows sum
-    /// to the `principal_payment` row, so do not add them to it.
+    /// to the `principal_payment` row, so do not add them to it. The last
+    /// row, `interest_arrears`, is cash interest due and unpaid at the close.
     #[must_use]
     pub fn flows(&self) -> Vec<(&'static str, Money)> {
         let mut flows = vec![("interest_expense_cash", self.interest_expense_cash)];
@@ -316,31 +331,35 @@ impl CashflowBreakdown {
             mandatory_prepayment: None,
             sweep_prepayment: None,
             voluntary_prepayment: None,
+            interest_arrears: None,
         }
     }
 
-    /// Opening balance and the four principal components, in the fixed order
-    /// `[opening_balance, scheduled_principal, mandatory_prepayment,
-    /// sweep_prepayment, voluntary_prepayment]`.
-    pub(crate) fn audit_detail(&self) -> [Option<Money>; 5] {
+    /// Opening balance, the four principal components and interest arrears,
+    /// in the fixed order `[opening_balance, scheduled_principal,
+    /// mandatory_prepayment, sweep_prepayment, voluntary_prepayment,
+    /// interest_arrears]`.
+    pub(crate) fn audit_detail(&self) -> [Option<Money>; 6] {
         [
             self.opening_balance,
             self.scheduled_principal,
             self.mandatory_prepayment,
             self.sweep_prepayment,
             self.voluntary_prepayment,
+            self.interest_arrears,
         ]
     }
 
     /// Mutable view of the fields returned by [`Self::audit_detail`], in the
     /// same order.
-    pub(crate) fn audit_detail_mut(&mut self) -> [&mut Option<Money>; 5] {
+    pub(crate) fn audit_detail_mut(&mut self) -> [&mut Option<Money>; 6] {
         [
             &mut self.opening_balance,
             &mut self.scheduled_principal,
             &mut self.mandatory_prepayment,
             &mut self.sweep_prepayment,
             &mut self.voluntary_prepayment,
+            &mut self.interest_arrears,
         ]
     }
 
@@ -353,6 +372,8 @@ impl CashflowBreakdown {
         self.mandatory_prepayment = Some(zero);
         self.sweep_prepayment = Some(zero);
         self.voluntary_prepayment = Some(zero);
+        // No cash cap has applied: nothing due is unpaid.
+        self.interest_arrears = Some(zero);
     }
 
     /// Net cash interest received this period, resolving `None` to a zero in
@@ -668,8 +689,10 @@ impl CapitalStructureCashflows {
     ///
     /// * `component` - `interest_expense` (cash plus PIK), `interest_expense_cash`,
     ///   `interest_expense_pik`, `interest_income`, `principal_payment`,
-    ///   `debt_balance`, `fees`, or `accrued_interest`. Flows use positive
-    ///   payment/receipt magnitudes; `debt_balance` is period-end principal.
+    ///   `debt_balance`, `fees`, `accrued_interest` (cash interest earned and
+    ///   not yet due) or `interest_arrears` (cash interest due and unpaid).
+    ///   Flows use positive payment/receipt magnitudes; `debt_balance` is
+    ///   period-end principal.
     /// * `instrument_or_total` - Instrument identifier for its native-currency
     ///   value, or `total` for the reporting-currency aggregate.
     /// * `period_id` - Reporting period whose component is returned, in major
@@ -695,11 +718,20 @@ impl CapitalStructureCashflows {
             "debt_balance" => |flow| Ok(flow.debt_balance.amount()),
             "fees" => |flow| Ok(flow.fees.amount()),
             "accrued_interest" => |flow| Ok(flow.accrued_interest.amount()),
+            "interest_arrears" => |flow| {
+                flow.interest_arrears
+                    .map(|arrears| arrears.amount())
+                    .ok_or_else(|| {
+                        crate::error::Error::capital_structure(
+                            "interest_arrears is not recorded on this cashflow breakdown",
+                        )
+                    })
+            },
             _ => {
                 return Err(crate::error::Error::capital_structure(format!(
                     "Unknown capital structure component: {component}. Expected: interest_expense, \
                  interest_expense_cash, interest_expense_pik, interest_income, principal_payment, \
-                 debt_balance, fees, or accrued_interest"
+                 debt_balance, fees, accrued_interest, or interest_arrears"
                 )));
             }
         };
@@ -855,6 +887,7 @@ mod tests {
             mandatory_prepayment: None,
             sweep_prepayment: None,
             voluntary_prepayment: None,
+            interest_arrears: None,
         };
 
         let mut period_map = IndexMap::new();

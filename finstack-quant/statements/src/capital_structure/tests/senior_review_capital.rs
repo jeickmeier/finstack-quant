@@ -1013,7 +1013,11 @@ fn schedule_without_funding_books_issuance_once_and_does_not_resurrect_paid_debt
                 assert_eq!(result.flows["TL"].debt_balance.amount(), 100.0);
             }
         }
-        let (_, closing, funding, _) = calculate_period_flows(
+        // A paid-off ledger cannot be read against the stale raw schedule,
+        // which still carries the principal: the mismatch is an error, not a
+        // resurrected or rescaled balance. The runtime rebuilds the residual
+        // schedule after every balance change, so it never meets this.
+        let error = calculate_period_flows(
             &instrument,
             &periods[1],
             zero,
@@ -1021,9 +1025,10 @@ fn schedule_without_funding_books_issuance_once_and_does_not_resurrect_paid_debt
             periods[0].start,
             None,
         )
-        .expect("paid-off debt stays zero after issuance period");
-        assert_eq!(closing.amount(), 0.0);
-        assert_eq!(funding.amount(), 0.0);
+        .expect_err("a paid-off ledger disagrees with the raw schedule")
+        .to_string();
+        assert!(error.contains("opens at 0 USD"), "{error}");
+        assert!(error.contains("carries 100 USD"), "{error}");
     }
 }
 
@@ -1430,10 +1435,11 @@ fn newly_funded_balance_capitalizes_pik_on_its_effective_date() {
             periods[0].start,
             None,
         )
-        .expect("period flows")
-        .1
-        .amount()
+        .map(|(_, closing, _, _)| closing.amount())
     };
-    assert_eq!(close(100), 105.0);
-    assert_eq!(close(0), 105.0);
+    // Funded on the period boundary: the ledger opens at zero and closes on
+    // the dated schedule, face plus the capitalized coupon.
+    assert_eq!(close(0).expect("newly funded"), 105.0);
+    // A ledger that already holds the face disagrees with that schedule.
+    assert!(close(100).is_err());
 }

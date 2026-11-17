@@ -228,7 +228,7 @@ test('statements.parseFormula returns the canonical text Python parse_formula re
   );
 });
 
-test('statements residual scale warning accepts the applied ratio and rejects obsolete clamping', () => {
+test('statements capital warnings are typed and the rescaling warnings are rejected', () => {
   const evaluator = new statements.Evaluator();
   try {
     const result = evaluator.evaluate(MODEL_JSON);
@@ -236,20 +236,22 @@ test('statements residual scale warning accepts the applied ratio and rejects ob
       {
         capital_structure: {
           period: '2025Q1',
-          warning: { kind: 'residual_scale_mismatch', applied_ratio: 10000000 },
+          warning: { kind: 'interest_shortfall', instrument_id: 'TL', amount: 12.5 },
         },
       },
     ];
     assert.equal(statements.statementResultGet(result, 'revenue', '2025Q1'), 100000);
-    result.meta.warnings[0].capital_structure.warning = {
-      kind: 'scale_clamped',
-      raw_ratio: 10000000,
-      clamped_ratio: 1,
-    };
-    assert.throws(
-      () => statements.statementResultGet(result, 'revenue', '2025Q1'),
-      /scale_clamped/
-    );
+    // An opening-balance mismatch is an error, so no result carries these.
+    for (const obsolete of [
+      { kind: 'residual_scale_mismatch', applied_ratio: 10000000 },
+      { kind: 'scale_clamped', raw_ratio: 10000000, clamped_ratio: 1 },
+    ]) {
+      result.meta.warnings[0].capital_structure.warning = obsolete;
+      assert.throws(
+        () => statements.statementResultGet(result, 'revenue', '2025Q1'),
+        new RegExp(obsolete.kind)
+      );
+    }
   } finally {
     evaluator.free();
   }

@@ -350,7 +350,6 @@ enum WarningKey<'a> {
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 enum CapitalStructureKey<'a> {
-    ResidualScaleMismatch(u64),
     NegativeClaimNeutralized(CapitalStructureClaimCategory, &'a str, u64),
     NegativeAvailableCashFloored(&'a str, u64),
     InterestShortfall(&'a str, u64),
@@ -392,9 +391,6 @@ impl<'a> WarningKey<'a> {
 impl<'a> CapitalStructureKey<'a> {
     fn of(warning: &'a CapitalStructureWarning) -> Self {
         match warning {
-            CapitalStructureWarning::ResidualScaleMismatch { applied_ratio } => {
-                Self::ResidualScaleMismatch(applied_ratio.to_bits())
-            }
             CapitalStructureWarning::NegativeClaimNeutralized {
                 category,
                 instrument_id,

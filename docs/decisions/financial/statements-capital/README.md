@@ -34,11 +34,12 @@ separate funding proceeds and ledger qualification remain.
 [Accepted cashflow classification contract](02-cashflow-classification.md#accepted-decision-for-period-admission-and-cashflow-classification).
 
 Opening principal reconciliation requires the dated schedule and stateful debt
-ledger to agree before calculating debt service for carried debt. Implementation
-is pending. [Accepted opening principal decision](03-funding-and-balances.md#accepted-decision-for-opening-principal-reconciliation).
+ledger to agree before calculating debt service for carried debt. It is
+implemented and qualified: a mismatch is an error and nothing is rescaled. [Accepted opening principal decision](03-funding-and-balances.md#accepted-decision-for-opening-principal-reconciliation).
 
 Contractual accrued interest covers cash interest earned through period close
-and due afterward. Separate arrears reporting remains pending.
+and due afterward. It is implemented and qualified on the instrument's own
+earning terms, with arrears reported separately as `interest_arrears`.
 [Accepted contractual accrual decision](03-funding-and-balances.md#accepted-decision-for-contractual-accrued-cash-interest).
 
 The dated principal contract covers claims, separate economic and settlement
@@ -79,8 +80,8 @@ Implementation and independent qualification remain pending.
 | Principal, PIK, fee and distress classification | Every kind named: repayments and fees the company pays are claims; signed PIK from its principal delta; write-downs move the balance only; recovery, accrual on default and protection payments are dated distress cash outside debt service; margin and unknown kinds rejected | Cashflow kind and company cash sign | [002](02-cashflow-classification.md) | Reconciled 2026-11-17; the record's write-down-with-settlement example, a rebate, a margin row and a PIK correction executed | Fee rebates and refunds are rejected until they are reported as receipts |
 | Reporting cash and balance clocks | Cash `[start,end)`; opening strictly before start; inclusive `end−1` balance/accrual | Actual supplied periods | [002](02-cashflow-classification.md) | Reconciled 2026-11-17 for period admission (an empty or reversed period fails before a schedule is read) and the March 31 / April 1 example; boundary fixtures | Same-period hedge netting and uniform invalid-period rejection |
 | Funding principal and OID separation | Positive explicit principal deltas; signed cash fallback; issue-period implicit funding only without any funding leg | Economic balance date; zero opening/new issuance gate | [003 — funding/balances](03-funding-and-balances.md) | Observed; issuance/OID/PIK fixtures | Face preservation is not EIR/OID amortization |
-| Stateful cash scaling | Piecewise zero/new-funding rules then raw opening/scheduled ratio with warning | Ratio outside `1±1e−6` warned, not clamped | [003](03-funding-and-balances.md) | Observed; stale clamp prose identified | [Follow-ups](../FOLLOW_UPS.md#statements-capital-structure) |
-| Closing debt and accrued interest | Economic schedule closing normally; zero-opening/new-funding cash-bucket reconstruction; shared accrued-interest kernel | Branch by debt kind, opening and current funding | [003](03-funding-and-balances.md) | Observed; ordinary issuance tests | [Follow-ups](../FOLLOW_UPS.md#statements-capital-structure) |
+| Opening principal reconciliation | The ledger must open on the principal the dated schedule carries in; a disagreement is an error and no amount is rescaled | Opening strictly before the period start, within half a minor unit | [003](03-funding-and-balances.md) | Reconciled 2026-11-17; half, zero, excess and paid-off ledgers against the schedule executed | The error names instrument, period, currency and both amounts |
+| Closing debt, accrued interest and arrears | Every debt balance closes on the dated schedule on balance-effective dates; accrued interest from the instrument's own earning terms; interest due and unpaid is `interest_arrears` | Debt kinds; an instrument without earning terms fails | [003](03-funding-and-balances.md) | Reconciled 2026-11-17; ISMA mid-coupon closes, an unpaid coupon at its due date and late or early settled funding executed | No issue-discount or effective-interest measure |
 | Dated principal allocation | Separate economic/settlement capacities, carried arrears, future-paid reserve and sequential claim caps | Exact current dated claims; aggregate fallback forbids advance state | [004 — dated principal](04-dated-principal.md) | Observed; early/late settlement and no-double-pay fixtures | [Follow-ups](../FOLLOW_UPS.md#statements-capital-structure) |
 | Residual coupon projection | Component-rate inference, segment accrual at principal changes, preserve earned interest and cash/PIK shares | Rebuild after closing delta above `1e−9` | [005 — residual coupons](05-residual-coupons.md) | Observed; split-coupon/paydown/rebuild cases | Custom accrual assumptions and irregular calendar qualification |
 | Future repayment/PIK reconstruction | Economic event ordering, reserve arrears/advances, cap repayments and final redemption, propagate PIK deltas | Future economic principal and future cash gates differ | [005](05-residual-coupons.md) | Observed; maturity/late-PIK cases | Independent multi-period contractual ledger evidence |

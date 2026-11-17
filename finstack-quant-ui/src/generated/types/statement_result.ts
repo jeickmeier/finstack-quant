@@ -283,14 +283,6 @@ export type D_76Adf23Abc095Fd56514 =
         warning:
           | {
               /**
-               * Actual ratio of stateful to scheduled opening applied to the cashflows.
-               */
-              applied_ratio: number;
-              kind: "residual_scale_mismatch";
-              [k: string]: unknown;
-            }
-          | {
-              /**
                * Negative claim amount in the waterfall currency.
                */
               amount: number;
@@ -1150,6 +1142,7 @@ export interface D_033184211Bfcc772Ee94 {
  *         mandatory_prepayment: None,
  *         sweep_prepayment: None,
  *         voluntary_prepayment: None,
+ *         interest_arrears: None,
  *     });
  * cs.totals.insert(period, CashflowBreakdown {
  *     interest_expense_cash: Money::from((10_000_i64, Currency::USD)),
@@ -1164,6 +1157,7 @@ export interface D_033184211Bfcc772Ee94 {
  *     mandatory_prepayment: None,
  *     sweep_prepayment: None,
  *     voluntary_prepayment: None,
+ *     interest_arrears: None,
  * });
  *
  * assert_eq!(cs.get_component("interest_expense", "total", &period).unwrap(), 12_500.0);
@@ -1449,6 +1443,15 @@ export interface D_677810Bf9653Cfb0A467 {
   accrued_interest: D_1B5716Dde9957A614F3C2;
   debt_balance: D_1B5716Dde9957A614F3C3;
   fees: D_1B5716Dde9957A614F3C4;
+  /**
+   * Cash interest already due and still unpaid at the period close:
+   * overdue arrears carried as a claim into the next period. It is separate
+   * from `accrued_interest`, which is interest earned but not yet due.
+   * Positive amount in the breakdown's currency. Always `Some` on
+   * breakdowns produced by the evaluator or the waterfall; `None` on
+   * hand-built breakdowns.
+   */
+  interest_arrears?: D_1B5716Dde9957A614F3C1 | null;
   interest_expense_cash: D_1B5716Dde9957A614F3C5;
   interest_expense_pik: D_1B5716Dde9957A614F3C6;
   /**

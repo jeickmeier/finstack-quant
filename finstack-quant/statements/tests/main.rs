@@ -11,6 +11,8 @@ mod audit_regressions;
 mod builder_all;
 #[path = "canonical_contract.rs"]
 mod canonical_contract;
+#[path = "capital_opening_and_accrual.rs"]
+mod capital_opening_and_accrual;
 #[path = "capital_structure_builder.rs"]
 mod capital_structure_builder;
 #[path = "capital_structure_integration.rs"]

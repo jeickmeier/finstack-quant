@@ -72,25 +72,26 @@ def test_ordinary_missing_results_survive_json_and_pickle() -> None:
         assert restored.get("lagged", "2025Q2") == 1.0
 
 
-def test_residual_scale_warning_reports_the_applied_ratio() -> None:
+def test_capital_structure_warnings_round_trip_and_rescaling_warnings_are_rejected() -> None:
     document = json.loads(s.Evaluator().evaluate(money_model()).to_json())
     warning = {
         "capital_structure": {
             "period": "2025Q1",
-            "warning": {"kind": "residual_scale_mismatch", "applied_ratio": 10_000_000.0},
+            "warning": {"kind": "interest_shortfall", "instrument_id": "TL", "amount": 12.5},
         }
     }
     document["meta"]["warnings"] = [warning]
     restored = s.StatementResult.from_json(json.dumps(document))
     assert restored.warnings == [warning]
     assert json.loads(restored.to_json())["meta"]["warnings"] == [warning]
-    document["meta"]["warnings"][0]["capital_structure"]["warning"] = {
-        "kind": "scale_clamped",
-        "raw_ratio": 10_000_000.0,
-        "clamped_ratio": 1.0,
-    }
-    with pytest.raises(ValueError, match="scale_clamped"):
-        s.StatementResult.from_json(json.dumps(document))
+    # An opening-balance mismatch is an error, so no result carries a rescaling warning.
+    for obsolete in (
+        {"kind": "residual_scale_mismatch", "applied_ratio": 10_000_000.0},
+        {"kind": "scale_clamped", "raw_ratio": 10_000_000.0, "clamped_ratio": 1.0},
+    ):
+        document["meta"]["warnings"][0]["capital_structure"]["warning"] = obsolete
+        with pytest.raises(ValueError, match=obsolete["kind"]):
+            s.StatementResult.from_json(json.dumps(document))
 
 
 @pytest.mark.parametrize("method", ["normal", "log_normal", "mean_reverting"])

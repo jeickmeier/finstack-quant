@@ -121,7 +121,9 @@ pub use cashflows::{
     CapitalStructureCashflows, CashflowBreakdown, DistressCashflow, TOTAL_ROW_LABEL,
 };
 pub use integration::build_instrument_from_spec;
-pub use period_flows::{SchedulePerspective, SuppliedSchedule, calculate_period_flows};
+pub use period_flows::{
+    SchedulePerspective, SuppliedSchedule, calculate_period_flows, scheduled_opening_principal,
+};
 pub(crate) use principal::PrincipalClaim;
 pub(crate) use state::CapitalStructureState;
 pub(crate) use waterfall_spec::reject_available_cash_debt_service;

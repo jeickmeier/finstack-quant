@@ -715,7 +715,7 @@ impl PyCapitalStructureCashflows {
     /// evaluator-produced cashflows — ``opening_balance`` and the four
     /// sources of ``principal_payment``: ``scheduled_principal``,
     /// ``mandatory_prepayment``, ``sweep_prepayment``,
-    /// ``voluntary_prepayment``), ``amount`` (float64, positive debt-service
+    /// ``voluntary_prepayment``, and ``interest_arrears``), ``amount`` (float64, positive debt-service
     /// magnitude) and ``currency`` (ISO code of that instrument). Rows follow
     /// instrument then period order.
     ///

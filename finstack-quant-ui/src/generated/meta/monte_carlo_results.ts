@@ -316,72 +316,77 @@ export default [
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/0",
-    "description": "The residual schedule opening differs from the stateful opening balance."
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/0/properties/applied_ratio",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/applied_ratio",
-    "description": "Actual ratio of stateful to scheduled opening applied to the cashflows.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/0/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/kind",
-    "const": "residual_scale_mismatch"
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1",
     "description": "A negative creditor claim was neutralized instead of reducing other claims."
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/amount",
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/0/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/amount",
     "description": "Negative claim amount in the waterfall currency.",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/category",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/category",
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/0/properties/category",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/category",
     "description": "Payment category containing the invalid negative claim.",
     "ref": "#/$defs/CapitalStructureClaimCategory",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureClaimCategory"
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/instrument_id",
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/0/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/instrument_id",
     "description": "Instrument whose claim was neutralized."
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/kind",
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/0/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/kind",
     "const": "negative_claim_neutralized"
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2",
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1",
     "description": "A negative available-cash pool was floored to zero before allocation."
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/amount",
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/amount",
     "description": "Negative amount that was floored, in the waterfall currency.",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/kind",
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/kind",
     "const": "negative_available_cash_floored"
   },
   {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2/properties/node_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/node_id",
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/1/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/node_id",
     "description": "Statement node supplying the available-cash amount."
+  },
+  {
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2",
+    "description": "Available cash was insufficient to pay a cash-interest claim."
+  },
+  {
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/amount",
+    "description": "Unpaid amount in the waterfall currency.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/instrument_id",
+    "description": "Instrument carrying the unpaid claim forward."
+  },
+  {
+    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/2/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/kind",
+    "const": "interest_shortfall"
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/3",
-    "description": "Available cash was insufficient to pay a cash-interest claim."
+    "description": "Available cash was insufficient to pay a fee claim."
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/3/properties/amount",
@@ -397,12 +402,12 @@ export default [
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/3/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/kind",
-    "const": "interest_shortfall"
+    "const": "fee_shortfall"
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/4",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/4",
-    "description": "Available cash was insufficient to pay a fee claim."
+    "description": "Available cash was insufficient to pay scheduled principal."
   },
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/4/properties/amount",
@@ -418,27 +423,6 @@ export default [
   {
     "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/4/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/4/properties/kind",
-    "const": "fee_shortfall"
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/5",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/5",
-    "description": "Available cash was insufficient to pay scheduled principal."
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/5/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/5/properties/amount",
-    "description": "Unpaid amount in the waterfall currency.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/5/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/5/properties/instrument_id",
-    "description": "Instrument carrying the unpaid claim forward."
-  },
-  {
-    "path": "#/$defs/d_797699a3f0493b0ba6f3/oneOf/5/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning/oneOf/5/properties/kind",
     "const": "principal_shortfall"
   },
   {

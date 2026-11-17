@@ -615,7 +615,7 @@ export default [
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/accrued_interest",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/accrued_interest",
-    "description": "Debt coupon interest accrued but not yet paid (liability).\nHedge-leg accrual valuation is outside the debt-service contract and is zero.",
+    "description": "Contractual cash interest earned through the period close and due\nafter it (liability), from the instrument's own earning terms. Interest\nalready due and unpaid is `interest_arrears`, not part of this amount.\nHedge-leg accrual valuation is outside the debt-service contract and is zero.",
     "ref": "#/$defs/Money",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
   },
@@ -632,6 +632,21 @@ export default [
     "description": "Fees (commitment fees, etc.)",
     "ref": "#/$defs/Money",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/interest_arrears",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/interest_arrears",
+    "description": "Cash interest already due and still unpaid at the period close:\noverdue arrears carried as a claim into the next period. It is separate\nfrom `accrued_interest`, which is interest earned but not yet due.\nPositive amount in the breakdown's currency. Always `Some` on\nbreakdowns produced by the evaluator or the waterfall; `None` on\nhand-built breakdowns."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/interest_arrears/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/interest_arrears/anyOf/0",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/interest_arrears/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/interest_arrears/anyOf/1"
   },
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/interest_expense_cash",
@@ -2545,72 +2560,77 @@ export default [
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0",
-    "description": "The residual schedule opening differs from the stateful opening balance."
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/applied_ratio",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/applied_ratio",
-    "description": "Actual ratio of stateful to scheduled opening applied to the cashflows.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/kind",
-    "const": "residual_scale_mismatch"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1",
     "description": "A negative creditor claim was neutralized instead of reducing other claims."
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/amount",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/amount",
     "description": "Negative claim amount in the waterfall currency.",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/category",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/category",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/category",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/category",
     "description": "Payment category containing the invalid negative claim.",
     "ref": "#/$defs/CapitalStructureClaimCategory",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureClaimCategory"
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/instrument_id",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/instrument_id",
     "description": "Instrument whose claim was neutralized."
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/kind",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/kind",
     "const": "negative_claim_neutralized"
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1",
     "description": "A negative available-cash pool was floored to zero before allocation."
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/amount",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/amount",
     "description": "Negative amount that was floored, in the waterfall currency.",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/kind",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/kind",
     "const": "negative_available_cash_floored"
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/node_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/node_id",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/node_id",
     "description": "Statement node supplying the available-cash amount."
+  },
+  {
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2",
+    "description": "Available cash was insufficient to pay a cash-interest claim."
+  },
+  {
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/amount",
+    "description": "Unpaid amount in the waterfall currency.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/instrument_id",
+    "description": "Instrument carrying the unpaid claim forward."
+  },
+  {
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/kind",
+    "const": "interest_shortfall"
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/3",
-    "description": "Available cash was insufficient to pay a cash-interest claim."
+    "description": "Available cash was insufficient to pay a fee claim."
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3/properties/amount",
@@ -2626,12 +2646,12 @@ export default [
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/kind",
-    "const": "interest_shortfall"
+    "const": "fee_shortfall"
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/4",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/4",
-    "description": "Available cash was insufficient to pay a fee claim."
+    "description": "Available cash was insufficient to pay scheduled principal."
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/4/properties/amount",
@@ -2647,27 +2667,6 @@ export default [
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/4/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/4/properties/kind",
-    "const": "fee_shortfall"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/5",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/5",
-    "description": "Available cash was insufficient to pay scheduled principal."
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/5/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/5/properties/amount",
-    "description": "Unpaid amount in the waterfall currency.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/5/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/5/properties/instrument_id",
-    "description": "Instrument carrying the unpaid claim forward."
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/5/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/5/properties/kind",
     "const": "principal_shortfall"
   },
   {
@@ -2794,7 +2793,7 @@ export default [
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows",
-    "description": "Aggregated cashflows from capital structure instruments by period.\n\nInstances of this type are produced by the evaluator and exposed to the DSL\nvia the `cs.*` namespace. It keeps both per-instrument details and totals so\nthat downstream consumers can drill down or report aggregates.\n\nMonetary fields are stored as [`Money`] to preserve currency identity. The\ncomponent accessor returns raw `f64` amounts in the instrument's native\ncurrency or the reporting currency for totals. Callers that need currency\nmetadata should inspect the underlying maps directly.\n\n# Example\n\n```rust\n# use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};\n# use finstack_quant_core::dates::PeriodId;\n# use finstack_quant_core::money::Money;\n# use finstack_quant_core::currency::Currency;\nlet mut cs = CapitalStructureCashflows::new();\nlet period = PeriodId::quarter(2025, 1).expect(\"valid period fixture\");\ncs.by_instrument\n    .entry(\"BOND-1\".into())\n    .or_default()\n    .insert(period, CashflowBreakdown {\n        interest_expense_cash: Money::from((10_000_i64, Currency::USD)),\n        interest_income_cash: None,\n        interest_expense_pik: Money::from((2_500_i64, Currency::USD)),\n        principal_payment: Money::from((100_000_i64, Currency::USD)),\n        fees: Money::from((0_i64, Currency::USD)),\n        debt_balance: Money::from((4_900_000_i64, Currency::USD)),\n        accrued_interest: Money::from((5_000_i64, Currency::USD)),\n        opening_balance: None,\n        scheduled_principal: None,\n        mandatory_prepayment: None,\n        sweep_prepayment: None,\n        voluntary_prepayment: None,\n    });\ncs.totals.insert(period, CashflowBreakdown {\n    interest_expense_cash: Money::from((10_000_i64, Currency::USD)),\n    interest_income_cash: None,\n    interest_expense_pik: Money::from((2_500_i64, Currency::USD)),\n    principal_payment: Money::from((100_000_i64, Currency::USD)),\n    fees: Money::from((0_i64, Currency::USD)),\n    debt_balance: Money::from((4_900_000_i64, Currency::USD)),\n    accrued_interest: Money::from((5_000_i64, Currency::USD)),\n    opening_balance: None,\n    scheduled_principal: None,\n    mandatory_prepayment: None,\n    sweep_prepayment: None,\n    voluntary_prepayment: None,\n});\n\nassert_eq!(cs.get_component(\"interest_expense\", \"total\", &period).unwrap(), 12_500.0);\n```"
+    "description": "Aggregated cashflows from capital structure instruments by period.\n\nInstances of this type are produced by the evaluator and exposed to the DSL\nvia the `cs.*` namespace. It keeps both per-instrument details and totals so\nthat downstream consumers can drill down or report aggregates.\n\nMonetary fields are stored as [`Money`] to preserve currency identity. The\ncomponent accessor returns raw `f64` amounts in the instrument's native\ncurrency or the reporting currency for totals. Callers that need currency\nmetadata should inspect the underlying maps directly.\n\n# Example\n\n```rust\n# use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};\n# use finstack_quant_core::dates::PeriodId;\n# use finstack_quant_core::money::Money;\n# use finstack_quant_core::currency::Currency;\nlet mut cs = CapitalStructureCashflows::new();\nlet period = PeriodId::quarter(2025, 1).expect(\"valid period fixture\");\ncs.by_instrument\n    .entry(\"BOND-1\".into())\n    .or_default()\n    .insert(period, CashflowBreakdown {\n        interest_expense_cash: Money::from((10_000_i64, Currency::USD)),\n        interest_income_cash: None,\n        interest_expense_pik: Money::from((2_500_i64, Currency::USD)),\n        principal_payment: Money::from((100_000_i64, Currency::USD)),\n        fees: Money::from((0_i64, Currency::USD)),\n        debt_balance: Money::from((4_900_000_i64, Currency::USD)),\n        accrued_interest: Money::from((5_000_i64, Currency::USD)),\n        opening_balance: None,\n        scheduled_principal: None,\n        mandatory_prepayment: None,\n        sweep_prepayment: None,\n        voluntary_prepayment: None,\n        interest_arrears: None,\n    });\ncs.totals.insert(period, CashflowBreakdown {\n    interest_expense_cash: Money::from((10_000_i64, Currency::USD)),\n    interest_income_cash: None,\n    interest_expense_pik: Money::from((2_500_i64, Currency::USD)),\n    principal_payment: Money::from((100_000_i64, Currency::USD)),\n    fees: Money::from((0_i64, Currency::USD)),\n    debt_balance: Money::from((4_900_000_i64, Currency::USD)),\n    accrued_interest: Money::from((5_000_i64, Currency::USD)),\n    opening_balance: None,\n    scheduled_principal: None,\n    mandatory_prepayment: None,\n    sweep_prepayment: None,\n    voluntary_prepayment: None,\n    interest_arrears: None,\n});\n\nassert_eq!(cs.get_component(\"interest_expense\", \"total\", &period).unwrap(), 12_500.0);\n```"
   },
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/available_cash",

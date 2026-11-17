@@ -187,6 +187,7 @@ fn representative_statement_result() -> StatementResult {
         mandatory_prepayment: None,
         sweep_prepayment: None,
         voluntary_prepayment: None,
+        interest_arrears: None,
     };
     let mut cashflows = CapitalStructureCashflows::new();
     cashflows.by_instrument.insert(
@@ -325,15 +326,26 @@ fn root_types_generate_typed_schemas() {
 fn capital_structure_warning_uses_typed_canonical_values() {
     let warning = EvalWarning::CapitalStructure {
         period: PeriodId::quarter(2025, 1).expect("valid period fixture"),
-        warning: CapitalStructureWarning::ResidualScaleMismatch { applied_ratio: 1.5 },
+        warning: CapitalStructureWarning::InterestShortfall {
+            instrument_id: "TL".into(),
+            amount: 1.5,
+        },
     };
 
     let json = serde_json::to_value(warning).expect("warning should serialize");
     assert_eq!(
         json["capital_structure"]["warning"]["kind"],
-        "residual_scale_mismatch"
+        "interest_shortfall"
     );
-    assert_eq!(json["capital_structure"]["warning"]["applied_ratio"], 1.5);
+    assert_eq!(json["capital_structure"]["warning"]["amount"], 1.5);
+    // The opening-balance rescaling warning is gone: a mismatch is an error.
+    assert!(
+        serde_json::from_value::<CapitalStructureWarning>(serde_json::json!({
+            "kind": "residual_scale_mismatch",
+            "applied_ratio": 1.5
+        }))
+        .is_err()
+    );
 }
 
 /// Distress cash keeps its instrument, kind, payment date and signed amount.

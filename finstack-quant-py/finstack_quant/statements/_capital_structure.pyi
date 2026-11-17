@@ -947,7 +947,9 @@ class CapitalStructureCashflows:
         component : str
             One of ``interest_expense`` (cash plus PIK), ``interest_expense_cash``,
             ``interest_expense_pik``, ``interest_income``, ``principal_payment``,
-            ``debt_balance``, ``fees``, or ``accrued_interest``. Flows are positive
+            ``debt_balance``, ``fees``, ``accrued_interest`` (cash interest earned
+            and not yet due) or ``interest_arrears`` (cash interest due and
+            unpaid). Flows are positive
             payment or receipt magnitudes; debt balance is closing principal.
             Rate hedges have zero debt balance and debt accrued interest.
         instrument_or_total : str
@@ -1011,7 +1013,8 @@ class CapitalStructureCashflows:
             ``scheduled_principal``, ``mandatory_prepayment``,
             ``sweep_prepayment`` and ``voluntary_prepayment``. The four
             source rows sum to the ``principal_payment`` row, so do not add
-            them together.
+            them together. ``interest_arrears`` (cash interest due and
+            unpaid at the close) is the last evaluator-produced row.
 
         Raises
         ------

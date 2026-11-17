@@ -86,6 +86,7 @@ fn test_capital_structure_cashflows_serialization() {
         mandatory_prepayment: None,
         sweep_prepayment: None,
         voluntary_prepayment: None,
+        interest_arrears: None,
     };
 
     let mut period_map = IndexMap::new();
@@ -513,6 +514,7 @@ fn test_capital_structure_json_roundtrip() {
         mandatory_prepayment: None,
         sweep_prepayment: None,
         voluntary_prepayment: None,
+        interest_arrears: None,
     };
 
     let json = serde_json::to_string(&breakdown).expect("Failed to serialize");

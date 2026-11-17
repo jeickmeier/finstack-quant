@@ -916,11 +916,6 @@ impl std::fmt::Display for CapitalStructureClaimCategory {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum CapitalStructureWarning {
-    /// The residual schedule opening differs from the stateful opening balance.
-    ResidualScaleMismatch {
-        /// Actual ratio of stateful to scheduled opening applied to the cashflows.
-        applied_ratio: f64,
-    },
     /// A negative creditor claim was neutralized instead of reducing other claims.
     NegativeClaimNeutralized {
         /// Payment category containing the invalid negative claim.

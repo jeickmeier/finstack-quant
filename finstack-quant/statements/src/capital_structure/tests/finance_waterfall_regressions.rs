@@ -343,8 +343,10 @@ fn shortfall_categories_cannot_collide_with_instrument_ids() {
         );
         assert_eq!(state.interest_shortfall["fees::A"].amount(), 20.0);
         assert_eq!(state.interest_shortfall["principal::A"].amount(), 40.0);
-        assert_eq!(result.flows["fees::A"].accrued_interest.amount(), 20.0);
-        assert_eq!(result.flows["principal::A"].accrued_interest.amount(), 40.0);
+        let arrears = |id: &str| result.flows[id].interest_arrears.map(|a| a.amount());
+        assert_eq!(arrears("fees::A"), Some(20.0));
+        assert_eq!(arrears("principal::A"), Some(40.0));
+        assert_eq!(result.flows["fees::A"].accrued_interest.amount(), 0.0);
     }
 }
 

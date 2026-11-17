@@ -19,25 +19,6 @@
       "description": "Typed reason for a capital-structure evaluation warning.",
       "oneOf": [
         {
-          "description": "The residual schedule opening differs from the stateful opening balance.",
-          "properties": {
-            "applied_ratio": {
-              "description": "Actual ratio of stateful to scheduled opening applied to the cashflows.",
-              "format": "double",
-              "type": "number"
-            },
-            "kind": {
-              "const": "residual_scale_mismatch",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "applied_ratio"
-          ],
-          "type": "object"
-        },
-        {
           "description": "A negative creditor claim was neutralized instead of reducing other claims.",
           "properties": {
             "amount": {

@@ -152,6 +152,7 @@ pub struct CreditNumeratorNodes<'a> {
 ///             mandatory_prepayment: None,
 ///             sweep_prepayment: None,
 ///             voluntary_prepayment: None,
+///             interest_arrears: None,
 ///         },
 ///     )]),
 /// );
@@ -480,6 +481,7 @@ mod tests {
                     mandatory_prepayment: None,
                     sweep_prepayment: None,
                     voluntary_prepayment: None,
+                    interest_arrears: None,
                 },
             );
         }

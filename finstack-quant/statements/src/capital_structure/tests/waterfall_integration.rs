@@ -673,7 +673,9 @@ mod period_flow_waterfall_integration {
                 .build()
                 .expect("valid cashflow"),
             ],
-            1_000_000.0,
+            // The dated draw establishes the principal; an opening notional
+            // that also held it would double the schedule's balance.
+            0.0,
             issue,
         )));
 

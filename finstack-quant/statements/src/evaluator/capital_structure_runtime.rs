@@ -210,49 +210,7 @@ pub(crate) fn resolve_opening_balance(
     period_start: Date,
 ) -> Result<Money> {
     let schedule = instrument.raw_cashflow_schedule(market_ctx, as_of)?;
-    let outstanding_path = schedule.outstanding_by_date()?;
-
-    // Same half-open rule as `calculate_period_flows`: a coupon/amort dated
-    // exactly on `period_start` belongs to this period, so opening is the
-    // balance strictly before that date.
-    if let Some((_, m)) = outstanding_path.iter().rfind(|(d, _)| *d < period_start) {
-        return Ok(m.abs());
-    }
-
-    // Initial funding dated on the first period boundary belongs to that
-    // period. Its opening is zero: `calculate_period_flows` records the funding
-    // and the waterfall adds it at close. Bonds without an initial funding leg
-    // still use face value below.
-    let funding_at_start = schedule.get_meta().issue_date == Some(period_start)
-        && schedule.get_flows().iter().any(|flow| {
-            flow.get_balance_date() == Some(period_start)
-                && crate::capital_structure::period_flows::funding_principal(flow)
-                    .is_some_and(|principal| principal.amount() > 0.0)
-        });
-    if funding_at_start {
-        return Ok(Money::from((
-            0_i64,
-            schedule.get_notional().initial.currency(),
-        )));
-    }
-
-    // A forward-dated instrument has no opening principal before issuance,
-    // including a schedule that omits the issuance cash leg entirely.
-    let pre_issuance = schedule
-        .get_meta()
-        .issue_date
-        .is_some_and(|issue| issue > period_start);
-    if pre_issuance {
-        return Ok(Money::from((
-            0_i64,
-            schedule.get_notional().initial.currency(),
-        )));
-    }
-
-    // Before the first event, principal is the schedule's initial notional.
-    // The first path row is an after-event balance, so using it here would
-    // apply boundary amortization or even a future redemption too early.
-    Ok(schedule.get_notional().initial.abs())
+    crate::capital_structure::period_flows::scheduled_opening_principal(&schedule, period_start)
 }
 
 /// One period's contractual capital-structure reading.

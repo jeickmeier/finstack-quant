@@ -1793,14 +1793,6 @@ export type PaymentPriority =
 export type CapitalStructureWarning =
   | {
       /**
-       * Actual ratio of stateful to scheduled opening applied to the cashflows.
-       */
-      applied_ratio: number;
-      kind: "residual_scale_mismatch";
-      [k: string]: unknown;
-    }
-  | {
-      /**
        * Negative claim amount in the waterfall currency.
        */
       amount: number;
@@ -4872,7 +4864,9 @@ export interface CapitalStructureCashflows {
  */
 export interface CashflowBreakdown {
   /**
-   * Debt coupon interest accrued but not yet paid (liability).
+   * Contractual cash interest earned through the period close and due
+   * after it (liability), from the instrument's own earning terms. Interest
+   * already due and unpaid is `interest_arrears`, not part of this amount.
    * Hedge-leg accrual valuation is outside the debt-service contract and is zero.
    */
   accrued_interest: Money;
@@ -4884,6 +4878,15 @@ export interface CashflowBreakdown {
    * Fees (commitment fees, etc.)
    */
   fees: Money;
+  /**
+   * Cash interest already due and still unpaid at the period close:
+   * overdue arrears carried as a claim into the next period. It is separate
+   * from `accrued_interest`, which is interest earned but not yet due.
+   * Positive amount in the breakdown's currency. Always `Some` on
+   * breakdowns produced by the evaluator or the waterfall; `None` on
+   * hand-built breakdowns.
+   */
+  interest_arrears?: Money | null;
   /**
    * Cash interest payments (coupons, floating resets)
    */

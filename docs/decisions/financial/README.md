@@ -245,12 +245,13 @@ remain.
 Statements opening principal reconciliation was accepted on 2026-11-15. The
 canonical debt schedule and stateful ledger must agree at the same economic
 boundary and currency before calculating debt service for carried debt.
-Implementation remains pending. [STATEMENTS-CAPITAL-003](statements-capital/03-funding-and-balances.md#accepted-decision-for-opening-principal-reconciliation).
+It is implemented and qualified: a mismatch is an error and nothing is rescaled. [STATEMENTS-CAPITAL-003](statements-capital/03-funding-and-balances.md#accepted-decision-for-opening-principal-reconciliation).
 
 Statements contractual accrued cash interest was accepted on 2026-11-15. It
 covers interest earned through period close and due afterward. Overdue arrears
 and issue-discount amortization are reported separately from this measure.
-Implementation remains pending. [STATEMENTS-CAPITAL-003](statements-capital/03-funding-and-balances.md#accepted-decision-for-contractual-accrued-cash-interest).
+It is implemented and qualified on the instrument's own earning terms, with
+arrears reported as `interest_arrears`. [STATEMENTS-CAPITAL-003](statements-capital/03-funding-and-balances.md#accepted-decision-for-contractual-accrued-cash-interest).
 
 The Statements dated principal contract was accepted on 2026-11-15. It covers
 stable dated claims, separate reporting of economic principal and unsettled

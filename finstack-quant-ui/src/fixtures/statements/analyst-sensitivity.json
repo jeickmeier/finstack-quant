@@ -1825,6 +1825,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -1873,6 +1877,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -1925,6 +1933,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -1973,6 +1985,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -2025,6 +2041,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -2073,6 +2093,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -2125,6 +2149,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -2173,6 +2201,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -2227,6 +2259,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -2275,6 +2311,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -2327,6 +2367,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -2375,6 +2419,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -2427,6 +2475,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -2475,6 +2527,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -2527,6 +2583,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -2575,6 +2635,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -2630,6 +2694,10 @@
                 "voluntary_prepayment": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "interest_arrears": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2024Q2": {
@@ -2678,6 +2746,10 @@
                   "currency": "USD"
                 },
                 "voluntary_prepayment": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "interest_arrears": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -2730,6 +2802,10 @@
                 "voluntary_prepayment": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "interest_arrears": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2024Q4": {
@@ -2778,6 +2854,10 @@
                   "currency": "USD"
                 },
                 "voluntary_prepayment": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "interest_arrears": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -2830,6 +2910,10 @@
                 "voluntary_prepayment": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "interest_arrears": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2025Q2": {
@@ -2878,6 +2962,10 @@
                   "currency": "USD"
                 },
                 "voluntary_prepayment": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "interest_arrears": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -2930,6 +3018,10 @@
                 "voluntary_prepayment": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "interest_arrears": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2025Q4": {
@@ -2978,6 +3070,10 @@
                   "currency": "USD"
                 },
                 "voluntary_prepayment": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "interest_arrears": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -3033,6 +3129,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -3081,6 +3181,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -3133,6 +3237,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -3181,6 +3289,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -3233,6 +3345,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -3281,6 +3397,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -3333,6 +3453,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -3381,6 +3505,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -5322,6 +5450,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -5370,6 +5502,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -5422,6 +5558,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -5470,6 +5610,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -5522,6 +5666,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -5570,6 +5718,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -5622,6 +5774,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -5670,6 +5826,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -5724,6 +5884,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -5772,6 +5936,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -5824,6 +5992,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -5872,6 +6044,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -5924,6 +6100,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -5972,6 +6152,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -6024,6 +6208,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -6072,6 +6260,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -6127,6 +6319,10 @@
                 "voluntary_prepayment": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "interest_arrears": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2024Q2": {
@@ -6175,6 +6371,10 @@
                   "currency": "USD"
                 },
                 "voluntary_prepayment": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "interest_arrears": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -6227,6 +6427,10 @@
                 "voluntary_prepayment": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "interest_arrears": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2024Q4": {
@@ -6275,6 +6479,10 @@
                   "currency": "USD"
                 },
                 "voluntary_prepayment": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "interest_arrears": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -6327,6 +6535,10 @@
                 "voluntary_prepayment": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "interest_arrears": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2025Q2": {
@@ -6375,6 +6587,10 @@
                   "currency": "USD"
                 },
                 "voluntary_prepayment": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "interest_arrears": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -6427,6 +6643,10 @@
                 "voluntary_prepayment": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "interest_arrears": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2025Q4": {
@@ -6475,6 +6695,10 @@
                   "currency": "USD"
                 },
                 "voluntary_prepayment": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "interest_arrears": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -6530,6 +6754,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -6578,6 +6806,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -6630,6 +6862,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -6678,6 +6914,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -6730,6 +6970,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -6778,6 +7022,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -6830,6 +7078,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -6878,6 +7130,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -8819,6 +9075,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -8867,6 +9127,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -8919,6 +9183,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -8967,6 +9235,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -9019,6 +9291,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -9067,6 +9343,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -9119,6 +9399,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -9167,6 +9451,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -9221,6 +9509,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -9269,6 +9561,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -9321,6 +9617,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -9369,6 +9669,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -9421,6 +9725,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -9469,6 +9777,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -9521,6 +9833,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -9569,6 +9885,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -9624,6 +9944,10 @@
                 "voluntary_prepayment": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "interest_arrears": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2024Q2": {
@@ -9672,6 +9996,10 @@
                   "currency": "USD"
                 },
                 "voluntary_prepayment": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "interest_arrears": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -9724,6 +10052,10 @@
                 "voluntary_prepayment": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "interest_arrears": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2024Q4": {
@@ -9772,6 +10104,10 @@
                   "currency": "USD"
                 },
                 "voluntary_prepayment": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "interest_arrears": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -9824,6 +10160,10 @@
                 "voluntary_prepayment": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "interest_arrears": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2025Q2": {
@@ -9872,6 +10212,10 @@
                   "currency": "USD"
                 },
                 "voluntary_prepayment": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "interest_arrears": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -9924,6 +10268,10 @@
                 "voluntary_prepayment": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "interest_arrears": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2025Q4": {
@@ -9972,6 +10320,10 @@
                   "currency": "USD"
                 },
                 "voluntary_prepayment": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "interest_arrears": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -10027,6 +10379,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -10075,6 +10431,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -10127,6 +10487,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -10175,6 +10539,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -10227,6 +10595,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -10275,6 +10647,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -10327,6 +10703,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -10375,6 +10755,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -12316,6 +12700,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -12364,6 +12752,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -12416,6 +12808,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -12464,6 +12860,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -12516,6 +12916,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -12564,6 +12968,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -12616,6 +13024,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -12664,6 +13076,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -12718,6 +13134,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -12766,6 +13186,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -12818,6 +13242,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -12866,6 +13294,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -12918,6 +13350,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -12966,6 +13402,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -13018,6 +13458,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -13066,6 +13510,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -13121,6 +13569,10 @@
                 "voluntary_prepayment": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "interest_arrears": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2024Q2": {
@@ -13169,6 +13621,10 @@
                   "currency": "USD"
                 },
                 "voluntary_prepayment": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "interest_arrears": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -13221,6 +13677,10 @@
                 "voluntary_prepayment": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "interest_arrears": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2024Q4": {
@@ -13269,6 +13729,10 @@
                   "currency": "USD"
                 },
                 "voluntary_prepayment": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "interest_arrears": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -13321,6 +13785,10 @@
                 "voluntary_prepayment": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "interest_arrears": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2025Q2": {
@@ -13369,6 +13837,10 @@
                   "currency": "USD"
                 },
                 "voluntary_prepayment": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "interest_arrears": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -13421,6 +13893,10 @@
                 "voluntary_prepayment": {
                   "amount": "0",
                   "currency": "USD"
+                },
+                "interest_arrears": {
+                  "amount": "0",
+                  "currency": "USD"
                 }
               },
               "2025Q4": {
@@ -13469,6 +13945,10 @@
                   "currency": "USD"
                 },
                 "voluntary_prepayment": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "interest_arrears": {
                   "amount": "0",
                   "currency": "USD"
                 }
@@ -13524,6 +14004,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q2": {
@@ -13572,6 +14056,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -13624,6 +14112,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2024Q4": {
@@ -13672,6 +14164,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -13724,6 +14220,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q2": {
@@ -13772,6 +14272,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -13824,6 +14328,10 @@
                   "voluntary_prepayment": {
                     "amount": "0",
                     "currency": "USD"
+                  },
+                  "interest_arrears": {
+                    "amount": "0",
+                    "currency": "USD"
                   }
                 },
                 "2025Q4": {
@@ -13872,6 +14380,10 @@
                     "currency": "USD"
                   },
                   "voluntary_prepayment": {
+                    "amount": "0",
+                    "currency": "USD"
+                  },
+                  "interest_arrears": {
                     "amount": "0",
                     "currency": "USD"
                   }
@@ -15810,6 +16322,10 @@
               "voluntary_prepayment": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "interest_arrears": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2024Q2": {
@@ -15858,6 +16374,10 @@
                 "currency": "USD"
               },
               "voluntary_prepayment": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "interest_arrears": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -15910,6 +16430,10 @@
               "voluntary_prepayment": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "interest_arrears": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2024Q4": {
@@ -15958,6 +16482,10 @@
                 "currency": "USD"
               },
               "voluntary_prepayment": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "interest_arrears": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -16010,6 +16538,10 @@
               "voluntary_prepayment": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "interest_arrears": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2025Q2": {
@@ -16058,6 +16590,10 @@
                 "currency": "USD"
               },
               "voluntary_prepayment": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "interest_arrears": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -16110,6 +16646,10 @@
               "voluntary_prepayment": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "interest_arrears": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2025Q4": {
@@ -16158,6 +16698,10 @@
                 "currency": "USD"
               },
               "voluntary_prepayment": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "interest_arrears": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -16212,6 +16756,10 @@
               "voluntary_prepayment": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "interest_arrears": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2024Q2": {
@@ -16260,6 +16808,10 @@
                 "currency": "USD"
               },
               "voluntary_prepayment": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "interest_arrears": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -16312,6 +16864,10 @@
               "voluntary_prepayment": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "interest_arrears": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2024Q4": {
@@ -16360,6 +16916,10 @@
                 "currency": "USD"
               },
               "voluntary_prepayment": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "interest_arrears": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -16412,6 +16972,10 @@
               "voluntary_prepayment": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "interest_arrears": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2025Q2": {
@@ -16460,6 +17024,10 @@
                 "currency": "USD"
               },
               "voluntary_prepayment": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "interest_arrears": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -16512,6 +17080,10 @@
               "voluntary_prepayment": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "interest_arrears": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2025Q4": {
@@ -16560,6 +17132,10 @@
                 "currency": "USD"
               },
               "voluntary_prepayment": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "interest_arrears": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -16615,6 +17191,10 @@
             "voluntary_prepayment": {
               "amount": "0",
               "currency": "USD"
+            },
+            "interest_arrears": {
+              "amount": "0",
+              "currency": "USD"
             }
           },
           "2024Q2": {
@@ -16663,6 +17243,10 @@
               "currency": "USD"
             },
             "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_arrears": {
               "amount": "0",
               "currency": "USD"
             }
@@ -16715,6 +17299,10 @@
             "voluntary_prepayment": {
               "amount": "0",
               "currency": "USD"
+            },
+            "interest_arrears": {
+              "amount": "0",
+              "currency": "USD"
             }
           },
           "2024Q4": {
@@ -16763,6 +17351,10 @@
               "currency": "USD"
             },
             "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_arrears": {
               "amount": "0",
               "currency": "USD"
             }
@@ -16815,6 +17407,10 @@
             "voluntary_prepayment": {
               "amount": "0",
               "currency": "USD"
+            },
+            "interest_arrears": {
+              "amount": "0",
+              "currency": "USD"
             }
           },
           "2025Q2": {
@@ -16863,6 +17459,10 @@
               "currency": "USD"
             },
             "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_arrears": {
               "amount": "0",
               "currency": "USD"
             }
@@ -16915,6 +17515,10 @@
             "voluntary_prepayment": {
               "amount": "0",
               "currency": "USD"
+            },
+            "interest_arrears": {
+              "amount": "0",
+              "currency": "USD"
             }
           },
           "2025Q4": {
@@ -16963,6 +17567,10 @@
               "currency": "USD"
             },
             "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "interest_arrears": {
               "amount": "0",
               "currency": "USD"
             }
@@ -17018,6 +17626,10 @@
               "voluntary_prepayment": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "interest_arrears": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2024Q2": {
@@ -17066,6 +17678,10 @@
                 "currency": "USD"
               },
               "voluntary_prepayment": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "interest_arrears": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -17118,6 +17734,10 @@
               "voluntary_prepayment": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "interest_arrears": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2024Q4": {
@@ -17166,6 +17786,10 @@
                 "currency": "USD"
               },
               "voluntary_prepayment": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "interest_arrears": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -17218,6 +17842,10 @@
               "voluntary_prepayment": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "interest_arrears": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2025Q2": {
@@ -17266,6 +17894,10 @@
                 "currency": "USD"
               },
               "voluntary_prepayment": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "interest_arrears": {
                 "amount": "0",
                 "currency": "USD"
               }
@@ -17318,6 +17950,10 @@
               "voluntary_prepayment": {
                 "amount": "0",
                 "currency": "USD"
+              },
+              "interest_arrears": {
+                "amount": "0",
+                "currency": "USD"
               }
             },
             "2025Q4": {
@@ -17366,6 +18002,10 @@
                 "currency": "USD"
               },
               "voluntary_prepayment": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "interest_arrears": {
                 "amount": "0",
                 "currency": "USD"
               }

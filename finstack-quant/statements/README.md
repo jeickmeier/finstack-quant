@@ -186,7 +186,8 @@ cs.<component>.total
 
 Valid components: `interest_expense` (cash + PIK), `interest_expense_cash`,
 `interest_expense_pik`, `interest_income`, `principal_payment`, `debt_balance`,
-`fees`, `accrued_interest`. Unknown components are rejected at compile time.
+`fees`, `accrued_interest`, `interest_arrears`. Unknown components are rejected
+at compile time.
 
 Cash interest follows the declared instrument kind: positive bond and loan
 coupons are issuer expenses, while negative debt coupons are income. Swaps use
@@ -194,7 +195,14 @@ the holder's signed cashflows, with receipts reported as `interest_income` and
 payments as `interest_expense_cash`; both pay-fixed and receive-fixed positions
 are supported, including negative rates and zero fixed coupons. Hedge trade
 notionals size cashflows and do not count as borrowing principal. `accrued_interest`
-reports debt coupon accrual; derivative accrual valuation is outside this contract.
+is contractual cash interest earned through the period close and due after it,
+calculated from the instrument's own earning terms (accrual method and coupon
+frequency); an instrument that states none cannot be accrued. Interest already
+due and unpaid is `interest_arrears`, never part of the accrual. Derivative
+accrual valuation is outside this contract. The debt ledger must open each
+period on the principal its dated schedule carries in: a disagreement is an
+error naming the instrument, period, currency and both amounts, and no amount
+is rescaled.
 Placeholder option schedules are rejected because their contingent payouts are
 not modeled.
 
