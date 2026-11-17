@@ -10,6 +10,7 @@
 //! the typed value of each canonical period slot.
 
 use crate::error::Result;
+use crate::evaluator::cell::UnavailableReason;
 use crate::evaluator::context::EvaluationContext;
 use crate::evaluator::formula::{eval_error, evaluate_value, require_args, require_min_args};
 use crate::evaluator::formula_aggregates::{
@@ -162,6 +163,21 @@ pub(crate) fn evaluate_function(
             require_args("is_missing", args, 1, node_id)?;
             let input = evaluate_value(&args[0], context, node_id)?;
             Ok(Value::Bool(input.is_unavailable()))
+        }
+
+        // The numerator over a strictly positive base in the same units. A
+        // zero or negative base has no defined ratio.
+        Function::Ratio => {
+            require_args("ratio", args, 2, node_id)?;
+            let numerator = evaluate_value(&args[0], context, node_id)?;
+            let base = evaluate_value(&args[1], context, node_id)?;
+            if let Some(unavailable) = value::first_unavailable(&[numerator, base]) {
+                return Ok(unavailable);
+            }
+            if value::sign(base, at)? != Value::Scalar(1.0) {
+                return Ok(Value::Unavailable(UnavailableReason::UndefinedBase));
+            }
+            value::arithmetic(BinOp::Div, numerator, base, at)
         }
 
         Function::Annualize => eval_annualize(args, context, node_id),

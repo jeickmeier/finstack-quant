@@ -651,8 +651,8 @@ export default [
   {
     "path": "#/$defs/d_6c08f5490eda9e343593/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason/oneOf/3",
-    "const": "undefined_change",
-    "description": "A percentage change or growth rate has no defined value for its base:\nan exactly zero base, or for a growth rate a non-positive base or a\nnegative ending value."
+    "const": "undefined_base",
+    "description": "A change, growth rate or ratio has no defined value for its base: an\nexactly zero base for a percentage change, a non-positive base or a\nnegative ending value for a growth rate, and a non-positive base for\n`ratio`."
   },
   {
     "path": "#/$defs/d_6f601764dacadc213e87",

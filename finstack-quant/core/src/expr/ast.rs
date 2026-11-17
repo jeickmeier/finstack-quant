@@ -424,6 +424,11 @@ for_all_functions! {
     /// First available argument, including zero (coalesce). Evaluated in the
     /// `statements` layer.
     Coalesce => ("coalesce", false),
+    /// Decimal ratio of a numerator to a strictly positive base
+    /// (`ratio(numerator, base)`). Evaluated in the `statements` layer, where
+    /// a zero or negative base makes the result unavailable instead of an
+    /// error.
+    Ratio => ("ratio", false),
     /// Minimum of two or more values.
     ///
     /// Evaluated in the `statements` layer as an n-ary reducer over operands

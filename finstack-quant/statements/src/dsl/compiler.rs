@@ -327,6 +327,17 @@ impl UnitContext<'_> {
                 Ok(Dimension::Scalar)
             }
             "is_missing" => Ok(Dimension::Boolean),
+            // A ratio divides like for like and is dimensionless.
+            "ratio" => {
+                let mut dims = arg_dims.into_iter();
+                let (Some(numerator), Some(base)) = (dims.next(), dims.next()) else {
+                    return Ok(Dimension::Unknown);
+                };
+                Ok(match self.compatible(func, numerator, base)? {
+                    Dimension::Unknown => Dimension::Unknown,
+                    _ => Dimension::Scalar,
+                })
+            }
             // Products, rate compounding and nonlinear math cannot turn money
             // into a dimensionless output by dropping its currency tag.
             "cumprod" | "annualize_rate" | "pow" | "ln" | "exp" | "log10" | "sqrt" => {

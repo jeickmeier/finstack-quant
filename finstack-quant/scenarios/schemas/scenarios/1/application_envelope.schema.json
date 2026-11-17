@@ -13007,6 +13007,11 @@
           "type": "string"
         },
         {
+          "const": "ratio",
+          "description": "Decimal ratio of a numerator to a strictly positive base\n(`ratio(numerator, base)`). Evaluated in the `statements` layer, where\na zero or negative base makes the result unavailable instead of an\nerror.",
+          "type": "string"
+        },
+        {
           "const": "min",
           "description": "Minimum of two or more values.\n\nEvaluated in the `statements` layer as an n-ary reducer over operands\nthat must all be available and in the same units.",
           "type": "string"

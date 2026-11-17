@@ -549,7 +549,7 @@ fn pct_change_is_signed_and_a_zero_base_is_unavailable() {
     // Q3 is measured from an exactly zero base.
     assert_eq!(
         reason(&result, "change", quarter(3)),
-        Some(UnavailableReason::UndefinedChange)
+        Some(UnavailableReason::UndefinedBase)
     );
     assert!(result.meta.warnings.iter().any(|warning| matches!(
         warning,
@@ -600,7 +600,7 @@ fn growth_rate_needs_a_positive_base_and_a_non_negative_ending_value() {
     for (node, period) in [("one", ids[1]), ("one", ids[2]), ("two", ids[2])] {
         assert_eq!(
             reason(&result, node, period),
-            Some(UnavailableReason::UndefinedChange),
+            Some(UnavailableReason::UndefinedBase),
             "{node} {period}"
         );
     }

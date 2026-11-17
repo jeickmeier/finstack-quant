@@ -301,28 +301,22 @@
       "count": 22,
       "definition": {
         "category": "income_statement",
-        "description": "Earnings after all expenses and taxes. CONVENTION: `opex` excludes depreciation and amortization.",
-        "formula": "revenue - cogs - opex - depreciation - amortization - interest_expense - tax_expense",
-        "id": "net_income",
-        "name": "Net Income",
+        "description": "Revenue minus cost of goods sold",
+        "formula": "revenue - cogs",
+        "id": "gross_profit",
+        "name": "Gross Profit",
         "requires": [
           "revenue",
-          "cogs",
-          "opex",
-          "depreciation",
-          "amortization",
-          "interest_expense",
-          "tax_expense"
+          "cogs"
         ],
         "tags": [
           "income_statement",
-          "profitability",
-          "bottom_line"
+          "profitability"
         ],
         "unit_type": "currency"
       },
       "dependencies": [],
-      "first": "fin.net_income",
+      "first": "fin.gross_profit",
       "has": [
         true,
         false

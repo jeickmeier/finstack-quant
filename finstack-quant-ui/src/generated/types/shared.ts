@@ -13558,6 +13558,7 @@ export type Function =
   | "qtd"
   | "fiscal_ytd"
   | "coalesce"
+  | "ratio"
   | "min"
   | "max"
   | "abs"

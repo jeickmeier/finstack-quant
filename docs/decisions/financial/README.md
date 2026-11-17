@@ -326,7 +326,7 @@ It is implemented and qualified across Rust, Python and WASM.
 The Statements bundled earnings and margin contract was accepted on
 2026-11-15. It covers reported costs, the included D&A add-back, signed
 expenses, revenue eligibility and recomputed ratios at coarser periods.
-Implementation and independent qualification remain pending.
+It is implemented and qualified across Rust, Python and WASM.
 [STATEMENTS-CONTRACTS-007](statements-contracts/07-earnings-and-margins.md#accepted-decision-for-reported-cost-earnings-and-margins).
 
 The Statements bundled leverage and coverage contract was accepted on

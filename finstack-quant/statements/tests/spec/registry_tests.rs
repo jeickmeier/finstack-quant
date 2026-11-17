@@ -19,163 +19,241 @@ fn test_load_builtins() {
     assert!(registry.all_metrics().any(|(id, _)| id.starts_with("fin.")));
 }
 
+/// STATEMENTS-CONTRACTS-007: the accepted six-row earnings table, four
+/// margins and two cost ratios.
 #[test]
-fn test_builtin_basic_metrics() {
-    let mut registry = Registry::new();
-    registry.load_builtins().unwrap();
-
-    // Test some basic metrics
-    assert!(registry.has("fin.gross_profit"));
-    assert!(registry.has("fin.operating_income"));
-    assert!(registry.has("fin.ebitda"));
-    assert!(registry.has("fin.net_income"));
-
-    let gross_profit = registry.get("fin.gross_profit").unwrap();
-    assert_eq!(gross_profit.definition.formula, "revenue - cogs");
-
-    let ebit = registry.get("fin.ebit").unwrap();
-    assert_eq!(
-        ebit.definition.formula,
-        "ebitda - depreciation - amortization"
-    );
-}
-
-#[test]
-fn test_builtin_margin_metrics() {
-    let mut registry = Registry::new();
-    registry.load_builtins().unwrap();
-
-    // Test margin metrics
-    assert!(registry.has("fin.gross_margin"));
-    assert!(registry.has("fin.operating_margin"));
-    assert!(registry.has("fin.ebitda_margin"));
-    assert!(registry.has("fin.net_margin"));
-
-    let gross_margin = registry.get("fin.gross_margin").unwrap();
-    assert_eq!(gross_margin.definition.formula, "gross_profit / revenue");
-    assert_eq!(
-        gross_margin.definition.unit_type,
-        Some(UnitType::Percentage)
-    );
-}
-
-#[test]
-fn test_builtin_return_metrics() {
-    let mut registry = Registry::new();
-    registry.load_builtins().unwrap();
-
-    // Test return metrics
-    assert!(registry.has("fin.roe"));
-    assert!(registry.has("fin.roa"));
-    assert!(registry.has("fin.roic"));
-
-    let roe = registry.get("fin.roe").unwrap();
-    assert_eq!(
-        roe.definition.formula,
-        "(revenue - cogs - opex - depreciation - amortization - interest_expense - taxes) / total_equity"
-    );
-
-    // ROIC uses NOPAT (EBIT less taxes), not pre-tax EBIT: pre-tax overstates
-    // the return by the tax rate.
-    let roic = registry.get("fin.roic").unwrap();
-    assert_eq!(
-        roic.definition.formula,
-        "(revenue - cogs - opex - depreciation - amortization - taxes) / (total_debt + total_equity)"
-    );
-}
-
-/// The built-in P&L metrics use the standard convention where `opex`
-/// EXCLUDES depreciation & amortization (D&A is supplied separately).
-///
-/// The previous formulas were only self-consistent if `opex` already
-/// included D&A — under the common convention (opex excluding D&A) they
-/// overstated EBITDA by D&A (double-counted add-back) and conflated
-/// operating income with EBITDA.
-#[test]
-fn builtin_pl_metrics_use_opex_excluding_da_convention() {
+fn builtin_earnings_and_margins_follow_the_reported_cost_table() {
     let registry = Registry::with_builtins().unwrap();
-
-    assert_eq!(
-        registry.get("fin.ebitda").unwrap().definition.formula,
-        "revenue - cogs - opex"
-    );
+    for (id, formula) in [
+        ("fin.gross_profit", "revenue - cogs"),
+        ("fin.operating_income", "gross_profit - opex"),
+        ("fin.ebit", "operating_income"),
+        ("fin.ebitda", "ebit + depreciation + amortization"),
+        ("fin.ebt", "ebit - interest_expense"),
+        ("fin.net_income", "ebt - tax_expense"),
+        ("fin.gross_margin", "ratio(gross_profit, revenue)"),
+        ("fin.operating_margin", "ratio(operating_income, revenue)"),
+        ("fin.ebitda_margin", "ratio(ebitda, revenue)"),
+        ("fin.net_margin", "ratio(net_income, revenue)"),
+        ("fin.cogs_as_pct_revenue", "ratio(cogs, revenue)"),
+        ("fin.opex_as_pct_revenue", "ratio(opex, revenue)"),
+    ] {
+        assert_eq!(
+            registry.get(id).unwrap().definition.formula,
+            formula,
+            "{id}"
+        );
+    }
     assert_eq!(
         registry
-            .get("fin.operating_income")
+            .get("fin.gross_margin")
             .unwrap()
             .definition
-            .formula,
-        "revenue - cogs - opex - depreciation - amortization"
+            .unit_type,
+        Some(UnitType::Percentage)
     );
+    // Each row references the row above it, so the closure walks the table.
     assert_eq!(
-        registry.get("fin.ebit").unwrap().definition.formula,
-        "ebitda - depreciation - amortization"
+        registry.get_dependencies("fin.net_margin").unwrap(),
+        [
+            "fin.gross_profit",
+            "fin.operating_income",
+            "fin.ebit",
+            "fin.ebt",
+            "fin.net_income"
+        ]
     );
-    assert_eq!(
-        registry.get("fin.net_income").unwrap().definition.formula,
-        "revenue - cogs - opex - depreciation - amortization - interest_expense - tax_expense"
+    // The leverage ratios read the bundled EBITDA, not a model input.
+    assert!(
+        registry
+            .get_dependencies("fin.debt_to_ebitda")
+            .unwrap()
+            .contains(&"fin.ebitda".to_string())
     );
 }
 
-/// Numeric articulation: with opex excluding D&A, EBITDA − D − A must equal
-/// operating income (= EBIT), and EBITDA must not double-count the add-back.
+/// The return ratios read the same reported-cost lines: D&A sits inside
+/// `cogs` and `opex` and is not subtracted again.
 #[test]
-fn builtin_pl_metrics_articulate_numerically() {
+fn builtin_return_metrics_do_not_subtract_da_twice() {
+    let registry = Registry::with_builtins().unwrap();
+    for (id, formula) in [
+        (
+            "fin.roe",
+            "(revenue - cogs - opex - interest_expense - taxes) / total_equity",
+        ),
+        (
+            "fin.roa",
+            "(revenue - cogs - opex - interest_expense - taxes) / total_assets",
+        ),
+        // ROIC uses NOPAT (EBIT less taxes), not pre-tax EBIT.
+        (
+            "fin.roic",
+            "(revenue - cogs - opex - taxes) / (total_debt + total_equity)",
+        ),
+        (
+            "fin.roce",
+            "(revenue - cogs - opex) / (total_assets - current_liabilities)",
+        ),
+    ] {
+        assert_eq!(
+            registry.get(id).unwrap().definition.formula,
+            formula,
+            "{id}"
+        );
+    }
+}
+
+/// One quarter of the bundled income statement with the named inputs.
+fn income_statement(
+    inputs: &[(&str, Option<f64>)],
+) -> finstack_quant_statements::evaluator::StatementResult {
     use finstack_quant_core::dates::PeriodId;
     use finstack_quant_statements::builder::ModelBuilder;
     use finstack_quant_statements::evaluator::Evaluator;
-    use finstack_quant_statements::types::AmountOrScalar;
 
     let registry = Registry::with_builtins().unwrap();
     let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let v = |x: f64| AmountOrScalar::scalar(x);
+    let mut builder = ModelBuilder::new("income-statement");
+    builder.periods("2025Q1..Q1", None).unwrap();
+    for (node, value) in inputs {
+        let observations: Vec<_> = value.iter().map(|value| (q1, *value)).collect();
+        builder.value_scalar(*node, &observations);
+    }
+    for metric in [
+        "fin.ebitda_margin",
+        "fin.net_margin",
+        "fin.gross_margin",
+        "fin.operating_margin",
+        "fin.cogs_as_pct_revenue",
+        "fin.opex_as_pct_revenue",
+    ] {
+        builder.add_metric_from_registry(metric, &registry).unwrap();
+    }
+    Evaluator::new()
+        .evaluate(&builder.build().unwrap())
+        .unwrap()
+}
 
-    let model = {
-        let mut model_builder = ModelBuilder::new("articulation");
-        model_builder.periods("2025Q1..Q1", None).unwrap();
-        model_builder.value("revenue", &[(q1, v(1000.0))]);
-        model_builder.value("cogs", &[(q1, v(400.0))]);
-        model_builder.value("opex", &[(q1, v(300.0))]);
-        model_builder // excludes D&A
-            .value("depreciation", &[(q1, v(50.0))]);
-        model_builder.value("amortization", &[(q1, v(30.0))]);
-        model_builder
-            .compute(
-                "ebitda",
-                registry
-                    .get("fin.ebitda")
-                    .unwrap()
-                    .definition
-                    .formula
-                    .clone(),
-            )
-            .unwrap();
-        model_builder
-            .compute(
-                "operating_income",
-                registry
-                    .get("fin.operating_income")
-                    .unwrap()
-                    .definition
-                    .formula
-                    .clone(),
-            )
-            .unwrap();
-        model_builder
-            .compute(
-                "ebit",
-                registry.get("fin.ebit").unwrap().definition.formula.clone(),
-            )
-            .unwrap();
-        model_builder.build().unwrap()
+/// An income statement worked by hand. Reported COGS of 400 includes 20 of
+/// depreciation; reported OPEX of 300 includes 30 of depreciation and 30 of
+/// amortization. The included D&A of 80 is added back once, in EBITDA.
+#[test]
+fn reported_costs_include_da_and_ebitda_adds_it_back_once() {
+    use finstack_quant_core::dates::PeriodId;
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let result = income_statement(&[
+        ("revenue", Some(1_000.0)),
+        ("cogs", Some(400.0)),
+        ("opex", Some(300.0)),
+        ("depreciation", Some(50.0)),
+        ("amortization", Some(30.0)),
+        ("interest_expense", Some(40.0)),
+        ("tax_expense", Some(65.0)),
+    ]);
+    for (node, expected) in [
+        ("fin.gross_profit", 600.0),
+        ("fin.operating_income", 300.0),
+        ("fin.ebit", 300.0),
+        ("fin.ebitda", 380.0),
+        ("fin.ebt", 260.0),
+        ("fin.net_income", 195.0),
+        ("fin.gross_margin", 0.6),
+        ("fin.operating_margin", 0.3),
+        ("fin.ebitda_margin", 0.38),
+        ("fin.net_margin", 0.195),
+        ("fin.cogs_as_pct_revenue", 0.4),
+        ("fin.opex_as_pct_revenue", 0.3),
+    ] {
+        assert_eq!(result.get(node, &q1), Some(expected), "{node}");
+    }
+}
+
+/// An expense credit keeps its negative sign, a known zero is a zero, and a
+/// loss keeps its sign in a margin on positive revenue.
+#[test]
+fn expense_credits_and_losses_keep_their_sign() {
+    use finstack_quant_core::dates::PeriodId;
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let result = income_statement(&[
+        ("revenue", Some(1_000.0)),
+        ("cogs", Some(1_200.0)),
+        // A reversal larger than the period's charges.
+        ("opex", Some(-50.0)),
+        ("depreciation", Some(0.0)),
+        ("amortization", Some(0.0)),
+        ("interest_expense", Some(0.0)),
+        ("tax_expense", Some(-30.0)),
+    ]);
+    for (node, expected) in [
+        ("fin.gross_profit", -200.0),
+        ("fin.operating_income", -150.0),
+        ("fin.ebitda", -150.0),
+        ("fin.net_income", -120.0),
+        ("fin.gross_margin", -0.2),
+        ("fin.net_margin", -0.12),
+        ("fin.opex_as_pct_revenue", -0.05),
+    ] {
+        assert_eq!(result.get(node, &q1), Some(expected), "{node}");
+    }
+}
+
+/// A margin is unavailable, with a reason, when revenue is missing, zero or
+/// negative; a missing dependency makes the affected earnings unavailable.
+#[test]
+fn margins_are_unavailable_without_positive_revenue() {
+    use finstack_quant_core::dates::PeriodId;
+    use finstack_quant_statements::evaluator::{CellStatus, UnavailableReason};
+    let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let statement = |revenue: Option<f64>, depreciation: Option<f64>| {
+        income_statement(&[
+            ("revenue", revenue),
+            ("cogs", Some(400.0)),
+            ("opex", Some(300.0)),
+            ("depreciation", depreciation),
+            ("amortization", Some(30.0)),
+            ("interest_expense", Some(40.0)),
+            ("tax_expense", Some(65.0)),
+        ])
     };
-
-    let mut evaluator = Evaluator::new();
-    let results = evaluator.evaluate(&model).unwrap();
-
-    assert_eq!(results.get("ebitda", &q1), Some(300.0));
-    assert_eq!(results.get("operating_income", &q1), Some(220.0));
-    assert_eq!(results.get("ebit", &q1), Some(220.0));
+    let reason = |result: &finstack_quant_statements::evaluator::StatementResult, node: &str| {
+        let cell = result.get_cell(node, &q1).expect("cell");
+        assert_eq!(cell.status, CellStatus::Unavailable, "{node}");
+        cell.reason
+    };
+    for (revenue, expected) in [
+        (Some(0.0), UnavailableReason::UndefinedBase),
+        (Some(-10.0), UnavailableReason::UndefinedBase),
+        (None, UnavailableReason::MissingInput),
+    ] {
+        let result = statement(revenue, Some(50.0));
+        for margin in [
+            "fin.gross_margin",
+            "fin.operating_margin",
+            "fin.ebitda_margin",
+            "fin.net_margin",
+            "fin.cogs_as_pct_revenue",
+            "fin.opex_as_pct_revenue",
+        ] {
+            assert_eq!(
+                reason(&result, margin),
+                Some(expected),
+                "{margin} at {revenue:?}"
+            );
+        }
+    }
+    // Zero revenue still gives the earnings lines themselves.
+    assert_eq!(
+        statement(Some(0.0), Some(50.0)).get("fin.operating_income", &q1),
+        Some(-700.0)
+    );
+    // A missing add-back leaves EBITDA and its margin unavailable, and
+    // nothing else.
+    let result = statement(Some(1_000.0), None);
+    for node in ["fin.ebitda", "fin.ebitda_margin"] {
+        assert_eq!(reason(&result, node), Some(UnavailableReason::MissingInput));
+    }
+    assert_eq!(result.get("fin.net_margin", &q1), Some(0.195));
 }
 
 #[test]
@@ -696,20 +774,21 @@ fn test_complete_pl_model_with_select_registry_metrics() {
     // operating income (EBIT) = EBITDA − 60k D&A = 140k.
     let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     assert_eq!(results.get("fin.gross_profit", &q1).unwrap(), 400_000.0);
-    assert_eq!(results.get("fin.operating_income", &q1).unwrap(), 140_000.0);
-    assert_eq!(results.get("fin.ebitda", &q1).unwrap(), 200_000.0);
+    // Reported OPEX of 200k includes the 60k of D&A, so operating income is
+    // 400k − 200k and EBITDA adds the 60k back once.
+    assert_eq!(results.get("fin.operating_income", &q1).unwrap(), 200_000.0);
+    assert_eq!(results.get("fin.ebitda", &q1).unwrap(), 260_000.0);
     assert!((results.get("fin.gross_margin", &q1).unwrap() - 0.4).abs() < 0.0001);
-    assert!((results.get("fin.operating_margin", &q1).unwrap() - 0.14).abs() < 0.0001);
+    assert!((results.get("fin.operating_margin", &q1).unwrap() - 0.2).abs() < 0.0001);
 
-    // Test Q2 calculations: EBITDA = 1,100k − 660k − 220k = 220k,
-    // operating income = 220k − 60k = 160k.
+    // Q2: operating income = 440k − 220k = 220k, EBITDA = 220k + 60k = 280k.
     let q2 = PeriodId::quarter(2025, 2).expect("valid period fixture");
     assert_eq!(results.get("fin.gross_profit", &q2).unwrap(), 440_000.0);
-    assert_eq!(results.get("fin.operating_income", &q2).unwrap(), 160_000.0);
-    assert_eq!(results.get("fin.ebitda", &q2).unwrap(), 220_000.0);
+    assert_eq!(results.get("fin.operating_income", &q2).unwrap(), 220_000.0);
+    assert_eq!(results.get("fin.ebitda", &q2).unwrap(), 280_000.0);
     assert!((results.get("fin.gross_margin", &q2).unwrap() - 0.4).abs() < 0.0001);
     assert!(
-        (results.get("fin.operating_margin", &q2).unwrap() - 160_000.0 / 1_100_000.0).abs()
+        (results.get("fin.operating_margin", &q2).unwrap() - 220_000.0 / 1_100_000.0).abs()
             < 0.0001
     );
 }

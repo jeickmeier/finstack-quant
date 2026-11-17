@@ -338,3 +338,50 @@ def test_swap_conventions_take_tenor_and_day_count_objects() -> None:
         return builder.add_swap_with_conventions(swap, conventions).build().to_json()
 
     assert build(typed) == build(wire)
+
+
+def test_bundled_earnings_use_reported_costs_and_add_da_back_once() -> None:
+    """Hand-worked statement: COGS 400 and OPEX 300 include 80 of D&A between them."""
+    registry = s.Registry.with_builtins()
+    builder = s.ModelBuilder("income")
+    builder.periods("2025Q1..Q1")
+    for node, value in [
+        ("revenue", 1000.0),
+        ("cogs", 400.0),
+        ("opex", 300.0),
+        ("depreciation", 50.0),
+        ("amortization", 30.0),
+        ("interest_expense", 40.0),
+        ("tax_expense", 65.0),
+    ]:
+        builder.value_scalar(node, [("2025Q1", value)])
+    for metric in ("fin.ebitda_margin", "fin.net_margin"):
+        builder.add_metric_from_registry(metric, registry)
+    result = s.Evaluator().evaluate(builder.build())
+
+    expected = {
+        "fin.operating_income": 300.0,
+        "fin.ebit": 300.0,
+        "fin.ebitda": 380.0,
+        "fin.net_income": 195.0,
+        "fin.ebitda_margin": 0.38,
+        "fin.net_margin": 0.195,
+    }
+    assert {node: result.get(node, "2025Q1") for node in expected} == expected
+
+
+def test_bundled_margin_is_unavailable_without_positive_revenue() -> None:
+    registry = s.Registry.with_builtins()
+    builder = s.ModelBuilder("no-revenue")
+    builder.periods("2025Q1..Q1")
+    builder.value_scalar("revenue", [("2025Q1", 0.0)])
+    builder.value_scalar("cogs", [("2025Q1", 40.0)])
+    builder.add_metric_from_registry("fin.gross_margin", registry)
+    result = s.Evaluator().evaluate(builder.build())
+
+    assert result.get("fin.gross_profit", "2025Q1") == -40.0
+    assert result.get_cell("fin.gross_margin", "2025Q1") == {
+        "status": "unavailable",
+        "reason": "undefined_base",
+        "source": "formula",
+    }

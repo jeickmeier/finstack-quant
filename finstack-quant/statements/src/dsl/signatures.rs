@@ -69,6 +69,7 @@ pub(crate) const FUNCTION_SIGNATURES: &[FunctionSignature] = &[
     exactly("log10", Function::Log10, 1),
     exactly("sqrt", Function::Sqrt, 1),
     exactly("is_missing", Function::IsMissing, 1),
+    exactly("ratio", Function::Ratio, 2),
     exactly("ttm", Function::Ttm, 1),
     exactly("ytd", Function::Ytd, 1),
     exactly("qtd", Function::Qtd, 1),

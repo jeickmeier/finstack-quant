@@ -8,7 +8,7 @@
  * continues. Invalid arithmetic, an invalid mask and unrepresentable money
  * are errors instead and fail the run.
  */
-export type D_6C08F5490Eda9E343593 = "missing_mask" | "hidden_by_cutoff" | "missing_input" | "undefined_change";
+export type D_6C08F5490Eda9E343593 = "missing_mask" | "hidden_by_cutoff" | "missing_input" | "undefined_base";
 /**
  * Which value source produced a statement cell (one node in one period).
  *

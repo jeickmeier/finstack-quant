@@ -2175,8 +2175,8 @@
           "type": "string"
         },
         {
-          "const": "undefined_change",
-          "description": "A percentage change or growth rate has no defined value for its base:\nan exactly zero base, or for a growth rate a non-positive base or a\nnegative ending value.",
+          "const": "undefined_base",
+          "description": "A change, growth rate or ratio has no defined value for its base: an\nexactly zero base for a percentage change, a non-positive base or a\nnegative ending value for a growth rate, and a non-positive base for\n`ratio`.",
           "type": "string"
         }
       ]

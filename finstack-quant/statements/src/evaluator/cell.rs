@@ -21,10 +21,11 @@ pub enum UnavailableReason {
     /// The formula or forecast that supplies the cell had no defined result,
     /// because an input it needs is missing, masked or itself unavailable.
     MissingInput,
-    /// A percentage change or growth rate has no defined value for its base:
-    /// an exactly zero base, or for a growth rate a non-positive base or a
-    /// negative ending value.
-    UndefinedChange,
+    /// A change, growth rate or ratio has no defined value for its base: an
+    /// exactly zero base for a percentage change, a non-positive base or a
+    /// negative ending value for a growth rate, and a non-positive base for
+    /// `ratio`.
+    UndefinedBase,
 }
 
 impl UnavailableReason {
@@ -35,7 +36,7 @@ impl UnavailableReason {
             Self::MissingMask => "missing_mask",
             Self::HiddenByCutoff => "hidden_by_cutoff",
             Self::MissingInput => "missing_input",
-            Self::UndefinedChange => "undefined_change",
+            Self::UndefinedBase => "undefined_base",
         }
     }
 }

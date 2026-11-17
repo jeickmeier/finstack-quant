@@ -18097,38 +18097,38 @@ export default [
   {
     "path": "#/$defs/Function/oneOf/34",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/34",
-    "const": "min",
-    "description": "Minimum of two or more values.\n\nEvaluated in the `statements` layer as an n-ary reducer over operands\nthat must all be available and in the same units."
+    "const": "ratio",
+    "description": "Decimal ratio of a numerator to a strictly positive base\n(`ratio(numerator, base)`). Evaluated in the `statements` layer, where\na zero or negative base makes the result unavailable instead of an\nerror."
   },
   {
     "path": "#/$defs/Function/oneOf/35",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/35",
-    "const": "max",
-    "description": "Maximum of two or more values.\n\nEvaluated in the `statements` layer as an n-ary reducer (see\n[`Function::Min`])."
+    "const": "min",
+    "description": "Minimum of two or more values.\n\nEvaluated in the `statements` layer as an n-ary reducer over operands\nthat must all be available and in the same units."
   },
   {
     "path": "#/$defs/Function/oneOf/36",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/36",
-    "const": "abs",
-    "description": "Absolute value helper (`abs(expr)`)."
+    "const": "max",
+    "description": "Maximum of two or more values.\n\nEvaluated in the `statements` layer as an n-ary reducer (see\n[`Function::Min`])."
   },
   {
     "path": "#/$defs/Function/oneOf/37",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/37",
-    "const": "sign",
-    "description": "Sign helper returning -1, 0, or 1 (`sign(expr)`)."
+    "const": "abs",
+    "description": "Absolute value helper (`abs(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/38",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/38",
-    "const": "growth_rate",
-    "description": "Compound annual growth rate between the current period and one a\nrequired number of periods back: `growth_rate(series, periods)`.\n\nEvaluated in the statements layer where period spacing is known."
+    "const": "sign",
+    "description": "Sign helper returning -1, 0, or 1 (`sign(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/39",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/39",
-    "const": "pow",
-    "description": "Exponentiation (`pow(base, exp)`), computed as `base^exp` with IEEE 754\nsemantics: `pow(-1, 0.5)` is NaN, `pow(0, -1)` is +inf, and overflow\nsaturates to ±inf."
+    "const": "growth_rate",
+    "description": "Compound annual growth rate between the current period and one a\nrequired number of periods back: `growth_rate(series, periods)`.\n\nEvaluated in the statements layer where period spacing is known."
   },
   {
     "path": "#/$defs/Function/oneOf/4",
@@ -18139,54 +18139,60 @@ export default [
   {
     "path": "#/$defs/Function/oneOf/40",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/40",
-    "const": "round",
-    "description": "Round to a number of decimal digits (`round(expr[, digits])`).\n\nTies round half away from zero (Excel convention): `round(2.5)` is 3,\n`round(-2.5)` is -3. `digits` defaults to 0 and may be negative to\nround to tens/hundreds (`round(1234, -2)` is 1200). Non-finite inputs\npass through unchanged."
+    "const": "pow",
+    "description": "Exponentiation (`pow(base, exp)`), computed as `base^exp` with IEEE 754\nsemantics: `pow(-1, 0.5)` is NaN, `pow(0, -1)` is +inf, and overflow\nsaturates to ±inf."
   },
   {
     "path": "#/$defs/Function/oneOf/41",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/41",
-    "const": "floor",
-    "description": "Largest integer less than or equal to the value (`floor(expr)`)."
+    "const": "round",
+    "description": "Round to a number of decimal digits (`round(expr[, digits])`).\n\nTies round half away from zero (Excel convention): `round(2.5)` is 3,\n`round(-2.5)` is -3. `digits` defaults to 0 and may be negative to\nround to tens/hundreds (`round(1234, -2)` is 1200). Non-finite inputs\npass through unchanged."
   },
   {
     "path": "#/$defs/Function/oneOf/42",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/42",
-    "const": "ceil",
-    "description": "Smallest integer greater than or equal to the value (`ceil(expr)`)."
+    "const": "floor",
+    "description": "Largest integer less than or equal to the value (`floor(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/43",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/43",
-    "const": "ln",
-    "description": "Natural logarithm (`ln(expr)`), IEEE semantics: `ln(0)` is -inf and\n`ln(x)` for `x < 0` is NaN."
+    "const": "ceil",
+    "description": "Smallest integer greater than or equal to the value (`ceil(expr)`)."
   },
   {
     "path": "#/$defs/Function/oneOf/44",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/44",
-    "const": "exp",
-    "description": "Natural exponential (`exp(expr)`); overflow saturates to +inf."
+    "const": "ln",
+    "description": "Natural logarithm (`ln(expr)`), IEEE semantics: `ln(0)` is -inf and\n`ln(x)` for `x < 0` is NaN."
   },
   {
     "path": "#/$defs/Function/oneOf/45",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/45",
-    "const": "log10",
-    "description": "Base-10 logarithm (`log10(expr)`), IEEE semantics: `log10(0)` is -inf\nand `log10(x)` for `x < 0` is NaN."
+    "const": "exp",
+    "description": "Natural exponential (`exp(expr)`); overflow saturates to +inf."
   },
   {
     "path": "#/$defs/Function/oneOf/46",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/46",
-    "const": "sqrt",
-    "description": "Square root (`sqrt(expr)`), IEEE semantics: `sqrt(x)` for `x < 0` is\nNaN."
+    "const": "log10",
+    "description": "Base-10 logarithm (`log10(expr)`), IEEE semantics: `log10(0)` is -inf\nand `log10(x)` for `x < 0` is NaN."
   },
   {
     "path": "#/$defs/Function/oneOf/47",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/47",
-    "const": "clamp",
-    "description": "Clamp a value to an inclusive range (`clamp(expr, lo, hi)`),\nequivalent to `min(max(expr, lo), hi)`. Returns NaN when any argument\nis NaN or when `lo > hi`; it never panics on an inverted range."
+    "const": "sqrt",
+    "description": "Square root (`sqrt(expr)`), IEEE semantics: `sqrt(x)` for `x < 0` is\nNaN."
   },
   {
     "path": "#/$defs/Function/oneOf/48",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/48",
+    "const": "clamp",
+    "description": "Clamp a value to an inclusive range (`clamp(expr, lo, hi)`),\nequivalent to `min(max(expr, lo), hi)`. Returns NaN when any argument\nis NaN or when `lo > hi`; it never panics on an inverted range."
+  },
+  {
+    "path": "#/$defs/Function/oneOf/49",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Function/oneOf/49",
     "const": "is_missing",
     "description": "Missing-value predicate (`is_missing(expr)`), returning 1 when the\nvalue is non-finite (NaN or ±inf) and 0 otherwise — the same\n\"finite\" convention used by `coalesce`."
   },

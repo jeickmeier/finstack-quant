@@ -419,6 +419,8 @@ fn dotted_namespaces_qualify_references_to_their_own_metrics() {
         ("revenue", 100.0),
         ("cogs", 40.0),
         ("opex", 30.0),
+        ("depreciation", 0.0),
+        ("amortization", 0.0),
         ("addbacks", 10.0),
     ];
 

@@ -31,8 +31,8 @@ Each file deserializes into `registry::MetricRegistry` with
     {
       "id": "ebitda_margin",
       "name": "EBITDA Margin",
-      "formula": "ebitda / revenue",
-      "description": "EBITDA as a percentage of revenue",
+      "formula": "ratio(ebitda, revenue)",
+      "description": "EBITDA over same-period revenue",
       "category": "margins",
       "unit_type": "percentage",
       "rollup": "formula",
@@ -58,11 +58,13 @@ inputs. The inputs follow their own declarations: declare `period_end` on
 balances such as `total_debt` so a rolled-up leverage ratio reads the closing
 balance.
 
-Identifiers inside a formula are written unqualified. When a metric is inserted
-into a model, references to other metrics **in the same namespace** are rewritten
-to their qualified form (so `ebitda / revenue` becomes `fin.ebitda / revenue`
-when `revenue` is a model node and `ebitda` is a sibling metric). Anything not
-matching a sibling metric id stays as written and must resolve to a model node.
+Identifiers inside a formula are written unqualified, or as an exact qualified
+id to reach another namespace. Bindings are pinned when the document is
+registered: a reference to a metric **in the same namespace** is stored in its
+qualified form (so `ratio(ebitda, revenue)` becomes
+`ratio(fin.ebitda, revenue)` when `ebitda` is a sibling metric). Anything that
+matches no metric stays as written and must resolve to a model node. A metric
+registered later does not change an earlier metric's bindings.
 
 ## Loading your own registries
 
@@ -84,20 +86,33 @@ individual metrics to a model with
 
 ## Conventions the bundled metrics assume
 
-### Operating expenses exclude D&A
+### Reported costs include D&A
 
-`opex` is treated as **excluding** depreciation and amortization; supply those as
-separate `depreciation` and `amortization` nodes. Consequently:
+`cogs` and `opex` are the reported costs, with their depreciation and
+amortization included. `depreciation` and `amortization` are the D&A included
+in those two lines, and EBITDA adds them back once:
 
 ```text
-fin.ebitda           = revenue - cogs - opex
-fin.ebit             = fin.ebitda - depreciation - amortization
-fin.operating_income = revenue - cogs - opex - depreciation - amortization
+fin.gross_profit     = revenue - cogs
+fin.operating_income = fin.gross_profit - opex
+fin.ebit             = fin.operating_income
+fin.ebitda           = fin.ebit + depreciation + amortization
+fin.ebt              = fin.ebit - interest_expense
+fin.net_income       = fin.ebt - tax_expense
 ```
 
-so `fin.ebit == fin.operating_income` by construction. If your chart of accounts
-embeds D&A inside `opex`, EBITDA will be understated — either restate the inputs
-or define your own metrics in a separate namespace.
+Expense charges are positive; a credit or reversal keeps its negative sign.
+Supply an explicit zero for a known zero: a missing input leaves the metrics
+that read it unavailable. If your chart of accounts reports OPEX before D&A,
+restate the inputs or define your own metrics in a separate namespace.
+
+### Margins need positive revenue
+
+The four margins and two cost ratios are `ratio(numerator, revenue)`: a decimal
+ratio that is unavailable (`undefined_base`) when revenue is zero or negative
+and unavailable (`missing_input`) when it is missing. A loss keeps its sign on
+positive revenue. For a coarser period the ratio is recomputed from the
+aggregated numerator and revenue (`"rollup": "formula"`).
 
 ### Trailing-twelve-month coverage
 

@@ -1003,10 +1003,10 @@ amount (`lag(cash, 1) + cash` is exact).
   future read (`shift` by a negative amount) are errors; a negative `shift`
   used to give no value. A slot before the first period is unavailable.
 - **`pct_change`** is unavailable for an exactly zero base (reason
-  `undefined_change`); a base within `1e-10` of zero used to qualify.
+  `undefined_base`); a base within `1e-10` of zero used to qualify.
 - **`growth_rate`** needs an exact positive lookback, a strictly positive
   base and a non-negative ending value; outside that domain it is
-  unavailable (`undefined_change`). A zero ending value is -100%. Daily and
+  unavailable (`undefined_base`). A zero ending value is -100%. Daily and
   weekly plans measure years as Actual/365 Fixed, where they used
   Actual/Actual.
 - **`ytd`, `qtd`, `fiscal_ytd`, `ttm`** sum only complete windows: a window
@@ -1058,3 +1058,31 @@ STATEMENTS-CONTRACTS-006.
   are qualified in the parsed formula, not in its text.
 - `StoredMetric` gains `qualified_formula`, `dependencies` and
   `requirements`.
+
+### Statements: bundled earnings use reported costs; margins need positive revenue
+
+STATEMENTS-CONTRACTS-007. **The bundled `fin.*` convention flips.** `cogs`
+and `opex` are now the reported costs, with their depreciation and
+amortization included; they used to exclude D&A. `depreciation` and
+`amortization` are the D&A included in those lines.
+
+| Metric | Was | Now |
+| --- | --- | --- |
+| `fin.operating_income` | `revenue - cogs - opex - depreciation - amortization` | `gross_profit - opex` |
+| `fin.ebit` | `ebitda - depreciation - amortization` | `operating_income` |
+| `fin.ebitda` | `revenue - cogs - opex` | `ebit + depreciation + amortization` |
+| `fin.ebt` | inlined chain | `ebit - interest_expense` |
+| `fin.net_income` | inlined chain | `ebt - tax_expense` |
+
+A model that feeds ex-D&A operating expenses must restate `opex` to include
+D&A, or define its own metrics in another namespace. `fin.roe`, `fin.roa`,
+`fin.roic` and `fin.roce` drop their separate D&A deductions for the same
+reason. `fin.ebitda` now needs `depreciation` and `amortization` inputs.
+
+The four margins and two cost ratios are `ratio(numerator, revenue)`: they are
+unavailable when revenue is zero or negative (`undefined_base`) or missing,
+where a zero revenue used to give no value or fail the run.
+
+New formula function `ratio(numerator, base)`: a decimal ratio over a strictly
+positive base in the same units, unavailable for a non-positive base. The
+reason `undefined_change` is renamed `undefined_base`.

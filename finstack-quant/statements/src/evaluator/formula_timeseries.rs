@@ -21,7 +21,7 @@ use finstack_quant_core::dates::{DayCount, DayCountContext, PeriodId, PeriodKind
 use finstack_quant_core::expr::{BinOp, Expr, ExprNode, Function};
 
 const MISSING: Value = Value::Unavailable(UnavailableReason::MissingInput);
-const UNDEFINED: Value = Value::Unavailable(UnavailableReason::UndefinedChange);
+const UNDEFINED: Value = Value::Unavailable(UnavailableReason::UndefinedBase);
 
 /// The period `offset` periods from the current one, stepped in the model
 /// plan's calendar (record CORE-CONVENTIONS-014 #7).

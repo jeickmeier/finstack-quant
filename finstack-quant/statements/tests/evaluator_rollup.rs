@@ -654,6 +654,9 @@ fn bundled_ratio_metrics_roll_up_as_ratios() {
         builder.value("revenue", &series([100.0, 110.0, 120.0, 130.0]));
         builder.value("cogs", &series([60.0, 66.0, 72.0, 78.0]));
         builder.value("opex", &series([20.0, 22.0, 24.0, 26.0]));
+        // D&A included in the reported costs above, added back in EBITDA.
+        builder.value("depreciation", &series([4.0; 4]));
+        builder.value("amortization", &series([1.0; 4]));
         builder.value("total_debt", &series([400.0, 410.0, 420.0, 460.0]));
         builder.value("total_equity", &series([200.0, 205.0, 210.0, 230.0]));
         for balance in ["total_debt", "total_equity"] {
@@ -679,11 +682,11 @@ fn bundled_ratio_metrics_roll_up_as_ratios() {
     let year = PeriodId::annual(2025).expect("valid annual period");
     // Flows still sum.
     close(annual.get("fin.gross_profit", &year), 184.0);
-    close(annual.get("fin.ebitda", &year), 92.0);
+    close(annual.get("fin.ebitda", &year), 112.0);
     // Ratios are recomputed on the annual inputs.
     close(annual.get("fin.gross_margin", &year), 184.0 / 460.0);
     close(annual.get("fin.debt_to_equity", &year), 2.0);
-    close(annual.get("fin.debt_to_ebitda", &year), 460.0 / 92.0);
+    close(annual.get("fin.debt_to_ebitda", &year), 460.0 / 112.0);
 }
 
 /// Every bundled metric that is not a currency flow declares how it rolls up.

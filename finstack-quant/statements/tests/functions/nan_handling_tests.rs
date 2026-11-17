@@ -265,6 +265,35 @@ fn test_ttm_with_nan() {
     );
 }
 
+/// `ratio(numerator, base)` divides over a strictly positive base. A zero or
+/// negative base has no defined ratio; it is unavailable, not an error.
+#[test]
+fn ratio_needs_a_strictly_positive_base() {
+    assert_eq!(value("ratio(seed, 4)"), Some(2.5));
+    assert_eq!(value("ratio(0 - seed, 4)"), Some(-2.5));
+    assert_eq!(value("ratio(0, seed)"), Some(0.0));
+    assert_eq!(value("ratio(gone, seed)"), None);
+    assert_eq!(value("ratio(seed, gone)"), None);
+    let results = evaluate(&[
+        ("zero", "ratio(seed, 0)"),
+        ("negative", "ratio(seed, 0 - 4)"),
+        ("recovered", "coalesce(ratio(seed, 0), 0)"),
+    ])
+    .unwrap();
+    for node in ["zero", "negative"] {
+        let cell = results.get_cell(node, &q1()).expect("cell");
+        assert_eq!(cell.status, CellStatus::Unavailable, "{node}");
+        assert_eq!(
+            cell.reason,
+            Some(UnavailableReason::UndefinedBase),
+            "{node}"
+        );
+    }
+    assert_eq!(results.get("recovered", &q1()), Some(0.0));
+    // An invalid numerator is still an error.
+    assert!(failure("ratio(1 / 0, seed)").contains("division by zero"));
+}
+
 #[test]
 fn an_unavailable_operand_propagates_through_nested_functions() {
     assert_eq!(value("mean(sum(seed, gone), coalesce(gone, 20))"), None);

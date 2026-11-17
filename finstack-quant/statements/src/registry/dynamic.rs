@@ -287,7 +287,8 @@ impl Registry {
     /// registry.load_builtins()?;
     ///
     /// let metric = registry.get("fin.gross_margin")?;
-    /// assert_eq!(metric.definition.formula, "gross_profit / revenue");
+    /// assert_eq!(metric.definition.formula, "ratio(gross_profit, revenue)");
+    /// assert_eq!(metric.qualified_formula, "ratio(fin.gross_profit, revenue)");
     /// # Ok(())
     /// # }
     /// ```

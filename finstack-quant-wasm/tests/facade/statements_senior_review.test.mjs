@@ -335,3 +335,58 @@ test('accounting overflow fails without publishing invalid numbers', () => {
   assert.equal(result.findings[0].comparison ?? null, null);
   assert.equal(result.findings[0].materiality ?? null, null);
 });
+
+test('bundled earnings use reported costs and add D&A back once', () => {
+  // Hand-worked statement: COGS 400 and OPEX 300 include 80 of D&A between them.
+  const registry = statements.Registry.withBuiltins();
+  const builder = new statements.ModelBuilder('income');
+  try {
+    builder.periods('2025Q1..Q1');
+    for (const [node, value] of [
+      ['revenue', 1000],
+      ['cogs', 400],
+      ['opex', 300],
+      ['depreciation', 50],
+      ['amortization', 30],
+      ['interest_expense', 40],
+      ['tax_expense', 65],
+    ]) {
+      builder.valueScalar(node, { '2025Q1': value });
+    }
+    builder.addMetricFromRegistry('fin.ebitda_margin', registry);
+    builder.addMetricFromRegistry('fin.net_margin', registry);
+    const result = evaluateModel(builder.build());
+    const expected = {
+      'fin.operating_income': 300,
+      'fin.ebit': 300,
+      'fin.ebitda': 380,
+      'fin.net_income': 195,
+      'fin.ebitda_margin': 0.38,
+      'fin.net_margin': 0.195,
+    };
+    for (const [node, value] of Object.entries(expected)) {
+      assert.equal(statements.statementResultGet(result, node, '2025Q1'), value, node);
+    }
+  } finally {
+    registry.free();
+  }
+});
+
+test('a bundled margin is unavailable without positive revenue', () => {
+  const registry = statements.Registry.withBuiltins();
+  const builder = new statements.ModelBuilder('no-revenue');
+  try {
+    builder.periods('2025Q1..Q1');
+    builder.valueScalar('revenue', { '2025Q1': 0 });
+    builder.valueScalar('cogs', { '2025Q1': 40 });
+    builder.addMetricFromRegistry('fin.gross_margin', registry);
+    const result = evaluateModel(builder.build());
+    assert.deepEqual(result.cells['fin.gross_margin']['2025Q1'], {
+      status: 'unavailable',
+      reason: 'undefined_base',
+      source: 'formula',
+    });
+  } finally {
+    registry.free();
+  }
+});

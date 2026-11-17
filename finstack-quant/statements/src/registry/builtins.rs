@@ -12,18 +12,21 @@
 //!   - `fin_returns.json` - Return metrics (ROE, ROA, ROIC, etc.)
 //!   - `fin_leverage.json` - Leverage ratios
 //!
-//! ## Operating-expense convention
+//! ## Reported-cost convention
 //!
-//! Bundled metrics treat `opex` as excluding depreciation and amortization;
-//! provide those amounts through the separate `depreciation` and `amortization` nodes.
-//! Consequently:
+//! Bundled metrics read `cogs` and `opex` as reported costs, with their
+//! depreciation and amortization included. `depreciation` and `amortization`
+//! are the D&A included in those lines, added back once in EBITDA:
 //!
-//! - `fin.ebitda = revenue - cogs - opex`
-//! - `fin.operating_income = revenue - cogs - opex - depreciation - amortization`
-//! - `fin.ebit = fin.ebitda - depreciation - amortization`
+//! - `fin.gross_profit = revenue - cogs`
+//! - `fin.operating_income = fin.gross_profit - opex`
+//! - `fin.ebit = fin.operating_income`
+//! - `fin.ebitda = fin.ebit + depreciation + amortization`
+//! - `fin.ebt = fin.ebit - interest_expense`
+//! - `fin.net_income = fin.ebt - tax_expense`
 //!
-//! Thus `fin.ebit == fin.operating_income`; bundled downstream earnings and return
-//! formulas deduct the separate D&A nodes under the same convention.
+//! The margins and cost ratios are `ratio(numerator, revenue)`, which is
+//! unavailable when revenue is missing, zero or negative.
 //!
 //! ## Usage
 //!
