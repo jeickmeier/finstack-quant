@@ -677,6 +677,12 @@ export default [
     "description": "A forecast has no base: no start level is selected and the slot\nimmediately before the forecast suffix has no value."
   },
   {
+    "path": "#/$defs/d_6c08f5490eda9e343593/oneOf/5",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason/oneOf/5",
+    "const": "missing_peer_shock",
+    "description": "A correlated forecast needs the shocks of a peer whose forecast was\nitself unavailable on the path."
+  },
+  {
     "path": "#/$defs/d_6df778c161860d725fb3",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json#/$defs/ParameterSpec",
     "description": "Parameter to vary in sensitivity analysis.\n\nThe wire form carries exactly one of `perturbations` (absolute values) or\n`pct_range` (percentage moves of `base_value`, converted on deserialization\nas by [`Self::with_percentages`]); it always serializes the absolute values."

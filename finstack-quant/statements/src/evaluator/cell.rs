@@ -29,6 +29,9 @@ pub enum UnavailableReason {
     /// A forecast has no base: no start level is selected and the slot
     /// immediately before the forecast suffix has no value.
     MissingForecastBase,
+    /// A correlated forecast needs the shocks of a peer whose forecast was
+    /// itself unavailable on the path.
+    MissingPeerShock,
 }
 
 impl UnavailableReason {
@@ -41,6 +44,7 @@ impl UnavailableReason {
             Self::MissingInput => "missing_input",
             Self::UndefinedBase => "undefined_base",
             Self::MissingForecastBase => "missing_forecast_base",
+            Self::MissingPeerShock => "missing_peer_shock",
         }
     }
 }

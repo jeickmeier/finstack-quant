@@ -1176,3 +1176,20 @@ Re-pin any stored stochastic numbers.
 - **Zero volatility.** A zero `std_dev` is the deterministic transition and
   consumes no draws.
 - **Mean reversion.** `reversion_speed` outside `(0, 1]` fails at build.
+
+### Statements: correlated forecasts need Monte Carlo and no longer depend on node order
+
+STATEMENTS-EVALUATION-008.
+
+- **Breaking: ordinary runs.** `Evaluator.evaluate` on a model with a non-zero
+  forecast `correlation` now fails with an error naming Monte Carlo; it used
+  to ignore the correlation. Use `evaluate_monte_carlo`, or set the
+  coefficient to zero.
+- **Order.** A correlated node no longer needs its peer declared or evaluated
+  first; the helper formula that forced the order (`peer * 0 + ...`) is not
+  needed.
+- **Build checks.** A non-zero correlation needs a positive `std_dev` on both
+  nodes, and peer cycles are rejected.
+- **Exact cases.** A zero coefficient is an uncorrelated node (same draws);
+  `1` copies and `-1` negates the peer shock exactly.
+- New unavailable reason `missing_peer_shock`.

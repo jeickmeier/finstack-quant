@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **647 review items across 33 source scopes with open items**
+This backlog consolidates **646 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -26,7 +26,7 @@ The labels distinguish the work required:
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (500): implementation and verification work against an
+- **Reconciliation** (499): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (38): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -69,7 +69,7 @@ product consequences remain in their product scope.
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
 | [Statements: capital structure](#statements-capital-structure) | 14 |
 | [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 12 |
-| [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 10 |
+| [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 9 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
 | [Statements analytics: credit checks and impairment](#statements-analytics-credit-checks-and-impairment) | 18 |
 | [Scenarios](#scenarios) | 16 |
@@ -1080,11 +1080,9 @@ product consequences remain in their product scope.
 
 - **Reconciliation — Aligned trend history, checked fitted levels and extrapolation.** Implement centered and scaled OLS over reporting slots, damped Holt and centered moving-average forecasts on eligible histories. Independently qualify history alignment, parameter boundaries, large levels, cancellation, representability and replay before bounds. [Accepted STATEMENTS-EVALUATION-009](statements-evaluation/09-trend-extrapolation.md#accepted-decision-for-trend-extrapolation).
 
-- **Reconciliation — Latent one-peer correlation, ordering and replay.** Enforce positive-volatility Monte Carlo peers, zero-coefficient independence, exact endpoints and a stable interior mix. Qualify deterministic peer ordering and cycles, canonical slot matching through masks and explicit values, chained shocks and replay. The live generator shares the independent seed mixer and still requires peer lookup at zero correlation. [Accepted STATEMENTS-EVALUATION-008](statements-evaluation/08-correlated-shocks.md#accepted-decision-for-latent-one-peer-correlation).
-
 - **Reconciliation — Ordered normalization bridges and separately named adjusted metrics.** Validate references, units and canonical period keys before calculation. Enforce signed adjustments, individual caps and checked arithmetic for every bridge row. Replace existing-node overwrite with collision-checked publication and source provenance. Independently qualify unavailable inputs, Reported and Progressive caps, intermediate overflow with a finite final total, D&A add-backs, and explicit adjusted references in ratios and covenant checks. [Accepted STATEMENTS-EVALUATION-015](statements-evaluation/15-normalization-adjustments.md#accepted-decision-for-normalization-bridges).
 
-- **Reconciliation — Complete Monte Carlo paths, typed samples and exact quantiles.** Implement the path-ID and resource limits, fresh complete paths with deterministic failure order, explicit metric coverage and typed sample validation. Qualify R-7, exact percentile keys, sample count and units, complete path restoration and finite typed strict-upper breach probability. Establish independent moment, quantile and sampling-error evidence. Record the run seed and the forecast stream version on the Monte Carlo result, so a path replays from the result alone as a single run does from its provenance. [Accepted STATEMENTS-EVALUATION-011](statements-evaluation/11-monte-carlo-evaluation.md#accepted-decision-for-monte-carlo-paths-quantiles-and-breach-probabilities).
+- **Reconciliation — Complete Monte Carlo paths, typed samples and exact quantiles.** Implement the path-ID and resource limits, fresh complete paths with deterministic failure order, explicit metric coverage and typed sample validation. Qualify R-7, exact percentile keys, sample count and units, complete path restoration and finite typed strict-upper breach probability. Establish independent moment, quantile and sampling-error evidence. Record the run seed and the forecast stream version on the Monte Carlo result, so a path replays from the result alone as a single run does from its provenance. Qualify a correlated follower whose peer forecast is unavailable on a path: it is unavailable with reason `missing_peer_shock`, which the aggregation cannot report until samples are typed (today any valueless sample fails the run). [Accepted STATEMENTS-EVALUATION-011](statements-evaluation/11-monte-carlo-evaluation.md#accepted-decision-for-monte-carlo-paths-quantiles-and-breach-probabilities).
 
 - **Reconciliation — Aligned seasonal decomposition and phase-preserving projection.** Implement checked centered averages and unsnapped edge slopes, zero-mean additive effects and normalized multiplicative factors. Qualify equal-period histories and phase, signed trends with zero observations, extreme factors and output bounds. [Accepted STATEMENTS-EVALUATION-010](statements-evaluation/10-seasonal-decomposition.md#accepted-decision-for-seasonal-decomposition-and-projection).
 

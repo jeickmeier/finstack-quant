@@ -2340,7 +2340,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/dated_cell.schema.json",
             "type_name": "DatedCell",
             "kind": "output",
-            "bytes": 27896
+            "bytes": 28114
           },
           {
             "path": "schemas/statements/1/financial_model_spec.schema.json",
@@ -2424,7 +2424,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 85630
+            "bytes": 85848
           },
           {
             "path": "schemas/statements/1/swap_conventions.schema.json",
@@ -5179,7 +5179,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/dated_cell.schema.json",
             "type_name": "DatedCell",
             "kind": "output",
-            "bytes": 27896
+            "bytes": 28114
           },
           {
             "domain": "statements",
@@ -5275,7 +5275,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 85630
+            "bytes": 85848
           },
           {
             "domain": "statements",

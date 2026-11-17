@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/dated_cell.schema.json",
-      "bytes": 27896,
+      "bytes": 28114,
       "kind": "output",
       "path": "schemas/statements/1/dated_cell.schema.json",
       "summary": "One period of a dated statement export: the anchor date, the period and its typed cell.",
@@ -128,7 +128,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
-      "bytes": 85630,
+      "bytes": 85848,
       "kind": "output",
       "path": "schemas/statements/1/statement_result.schema.json",
       "summary": "Evaluated node values per period, with policy stamps.",

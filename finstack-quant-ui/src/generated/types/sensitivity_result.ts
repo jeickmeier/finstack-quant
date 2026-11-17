@@ -9,7 +9,12 @@
  * are errors instead and fail the run.
  */
 export type D_6C08F5490Eda9E343593 =
-  "missing_mask" | "hidden_by_cutoff" | "missing_input" | "undefined_base" | "missing_forecast_base";
+  | "missing_mask"
+  | "hidden_by_cutoff"
+  | "missing_input"
+  | "undefined_base"
+  | "missing_forecast_base"
+  | "missing_peer_shock";
 /**
  * Which value source produced a statement cell (one node in one period).
  *

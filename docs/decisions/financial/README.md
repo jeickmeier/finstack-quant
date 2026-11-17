@@ -431,8 +431,9 @@ result is tracked with the Monte Carlo contract.
 
 The Statements latent one-peer correlation contract was accepted on
 2026-11-15. It covers active Monte Carlo eligibility, exact zero and endpoint
-behavior, deterministic peer ordering and latent-shock replay.
-Implementation and independent qualification remain pending.
+behavior, deterministic peer ordering and latent-shock replay. It is
+implemented and qualified; the reason on a follower whose peer is unavailable
+is qualified with typed Monte Carlo samples.
 [STATEMENTS-EVALUATION-008](statements-evaluation/08-correlated-shocks.md#accepted-decision-for-latent-one-peer-correlation).
 
 The Statements trend extrapolation contract was accepted on 2026-11-15.

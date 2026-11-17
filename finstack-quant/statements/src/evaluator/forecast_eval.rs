@@ -70,10 +70,15 @@ pub(crate) fn evaluate_forecast(
 ) -> Result<ForecastCell> {
     let model = eval.model;
     let period_id = &eval.period.id;
-    if !forecast_cache.contains_key(node_spec.node_id.as_str()) {
-        let run = generate_run(node_spec, model, period_id, context, path, mc_z_cache)?;
-        forecast_cache.insert(node_spec.node_id.clone(), run);
-    }
+    ensure_run(
+        node_spec,
+        model,
+        period_id,
+        context,
+        forecast_cache,
+        path,
+        mc_z_cache,
+    )?;
     match forecast_cache.get(node_spec.node_id.as_str()) {
         Some(ForecastRun::Unavailable(reason)) => Ok(ForecastCell::Unavailable(*reason)),
         Some(ForecastRun::Series { raw, published }) => {
@@ -106,6 +111,64 @@ pub(crate) fn evaluate_forecast(
             node_spec.node_id
         ))),
     }
+}
+
+/// Generate and cache the node's forecast run, after the run of its active
+/// correlation peer.
+///
+/// The peer's run is generated on demand, so the order in which nodes are
+/// declared or evaluated does not decide whether its shocks exist, and it is
+/// generated whether or not the peer publishes explicit values or is masked
+/// in the suffix. The model rejects peer cycles when it is built.
+fn ensure_run(
+    node_spec: &NodeSpec,
+    model: &FinancialModelSpec,
+    period_id: &PeriodId,
+    context: &EvaluationContext,
+    forecast_cache: &mut IndexMap<NodeId, ForecastRun>,
+    path: Option<PathId>,
+    mc_z_cache: &mut Option<&mut IndexMap<NodeId, IndexMap<PeriodId, f64>>>,
+) -> Result<()> {
+    if forecast_cache.contains_key(node_spec.node_id.as_str()) {
+        return Ok(());
+    }
+    let peer = match &node_spec.forecast {
+        Some(forecast) => forecast::statistical::active_correlation(forecast)?,
+        None => None,
+    };
+    let mut run = None;
+    if let Some((peer, _)) = peer {
+        if path.is_none() {
+            return Err(Error::forecast(format!(
+                "Node '{}' is correlated with '{peer}': a non-zero correlation needs Monte \
+                 Carlo evaluation. Use evaluate_monte_carlo, or set the correlation to zero.",
+                node_spec.node_id
+            )));
+        }
+        let peer_spec = model.get_node(peer).ok_or_else(|| {
+            Error::forecast(format!("correlation_with references unknown node '{peer}'"))
+        })?;
+        ensure_run(
+            peer_spec,
+            model,
+            period_id,
+            context,
+            forecast_cache,
+            path,
+            mc_z_cache,
+        )?;
+        if matches!(forecast_cache.get(peer), Some(ForecastRun::Unavailable(_))) {
+            run = Some(ForecastRun::Unavailable(
+                UnavailableReason::MissingPeerShock,
+            ));
+        }
+    }
+    let run = match run {
+        Some(run) => run,
+        None => generate_run(node_spec, model, period_id, context, path, mc_z_cache)?,
+    };
+    forecast_cache.insert(node_spec.node_id.clone(), run);
+    Ok(())
 }
 
 /// Generate the node's whole forecast suffix for this run.
@@ -167,18 +230,15 @@ fn generate_run(
 
     let parameters = forecast_spec;
     let raw = if let Some(path) = path {
+        // At exactly zero correlation the node takes the uncorrelated path
+        // and draws the same stream as a node without a peer.
         let correlation = if mc_z_cache.is_some() {
-            forecast::statistical::correlation(parameters)?
+            forecast::statistical::active_correlation(parameters)?
         } else {
             None
         };
         let (series, shocks) =
             if let (Some(cache), Some((peer, rho))) = (mc_z_cache.as_deref(), correlation) {
-                if model.get_node(peer).is_none() {
-                    return Err(Error::forecast(format!(
-                        "correlation_with references unknown node '{peer}'"
-                    )));
-                }
                 let (series, shocks) = monte_carlo_correlated_series(CorrelatedMonteCarloSeries {
                     parameters,
                     base_value,

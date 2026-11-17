@@ -1887,7 +1887,12 @@ export type CheckSeverity = "info" | "warning" | "error";
  * are errors instead and fail the run.
  */
 export type UnavailableReason =
-  "missing_mask" | "hidden_by_cutoff" | "missing_input" | "undefined_base" | "missing_forecast_base";
+  | "missing_mask"
+  | "hidden_by_cutoff"
+  | "missing_input"
+  | "undefined_base"
+  | "missing_forecast_base"
+  | "missing_peer_shock";
 /**
  * Identifier for a Gregorian period like `2025Q1` or a fiscal period like
  * `FY2025W53`.

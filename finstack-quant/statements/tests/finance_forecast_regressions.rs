@@ -927,3 +927,201 @@ fn bootstrap_modes_state_their_domains() {
         level = next;
     }
 }
+
+// --- C5: latent one-peer correlation (STATEMENTS-EVALUATION-008) ---
+
+fn correlated_with(forecast: ForecastSpec, peer: &str, rho: f64) -> ForecastSpec {
+    forecast
+        .with_param("correlation_with", json!(peer))
+        .unwrap()
+        .with_param("correlation", json!(rho))
+        .unwrap()
+}
+
+/// Scalar nodes at 100 in the one actual period, declared in the given order.
+fn peer_model_builder(nodes: &[(&str, ForecastSpec)]) -> ModelBuilder {
+    let mut builder = ModelBuilder::new("peers");
+    builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
+    for (node, forecast) in nodes {
+        builder.value_scalar(*node, &[(quarter(1), 100.0)]);
+        builder.forecast(*node, forecast.clone());
+    }
+    builder
+}
+
+fn peer_model(nodes: &[(&str, ForecastSpec)]) -> FinancialModelSpec {
+    peer_model_builder(nodes).build().unwrap()
+}
+
+/// First-period changes of a node across paths: with a unit-volatility
+/// driftless normal walk from 100 this is the node's standardized shock.
+fn first_shocks(model: &FinancialModelSpec, node: &str, paths: usize) -> Vec<f64> {
+    let config = MonteCarloConfig::new(paths, 5).with_path_data(true);
+    let results = Evaluator::new()
+        .evaluate_monte_carlo(model, &config)
+        .unwrap();
+    metric_paths(&results, node)
+        .chunks(3)
+        .map(|path| path[0] - 100.0)
+        .collect()
+}
+
+fn sample_correlation(x: &[f64], y: &[f64]) -> f64 {
+    let n = x.len() as f64;
+    let (mean_x, mean_y) = (x.iter().sum::<f64>() / n, y.iter().sum::<f64>() / n);
+    let covariance: f64 = x
+        .iter()
+        .zip(y)
+        .map(|(a, b)| (a - mean_x) * (b - mean_y))
+        .sum();
+    let variance =
+        |values: &[f64], mean: f64| -> f64 { values.iter().map(|v| (v - mean).powi(2)).sum() };
+    covariance / (variance(x, mean_x) * variance(y, mean_y)).sqrt()
+}
+
+/// A three-node chain gives the same paths whatever order its nodes are
+/// declared in, and each link has the configured correlation; the ends of
+/// the chain have the product of the two coefficients.
+#[test]
+fn a_three_node_chain_is_ordered_by_its_peers_not_its_declaration() {
+    let unit = |seed| ForecastSpec::normal(0.0, 1.0, seed);
+    let head = ("head", unit(1));
+    let middle = ("middle", correlated_with(unit(2), "head", 0.8));
+    let tail = ("tail", correlated_with(unit(3), "middle", -0.5));
+    let forward = peer_model(&[head.clone(), middle.clone(), tail.clone()]);
+    let reversed = peer_model(&[tail, middle, head]);
+
+    let paths = 20_000;
+    let shocks = |model: &FinancialModelSpec, node: &str| first_shocks(model, node, paths);
+    for node in ["head", "middle", "tail"] {
+        assert_eq!(shocks(&forward, node), shocks(&reversed, node), "{node}");
+    }
+    let (head, middle, tail) = (
+        shocks(&forward, "head"),
+        shocks(&forward, "middle"),
+        shocks(&forward, "tail"),
+    );
+    // The standard error of a sample correlation is about (1 - r^2) / sqrt(n),
+    // at most 0.0071 here; four standard errors is under 0.03.
+    assert!((sample_correlation(&head, &middle) - 0.8).abs() < 0.03);
+    assert!((sample_correlation(&middle, &tail) + 0.5).abs() < 0.03);
+    assert!((sample_correlation(&head, &tail) + 0.4).abs() < 0.03);
+    // Each mixed shock keeps unit variance.
+    for shocks in [&middle, &tail] {
+        let variance = shocks.iter().map(|z| z * z).sum::<f64>() / paths as f64;
+        assert!((variance - 1.0).abs() < 0.04, "{variance}");
+    }
+}
+
+/// At the endpoints the peer shock is copied or negated exactly.
+#[test]
+fn unit_correlation_copies_or_negates_the_peer_shock_exactly() {
+    for rho in [1.0, -1.0] {
+        let model = peer_model(&[
+            (
+                "follower",
+                correlated_with(ForecastSpec::normal(0.0, 1.0, 2), "peer", rho),
+            ),
+            ("peer", ForecastSpec::normal(0.0, 1.0, 1)),
+        ]);
+        let peer = first_shocks(&model, "peer", 64);
+        let follower = first_shocks(&model, "follower", 64);
+        for (peer, follower) in peer.iter().zip(&follower) {
+            assert_eq!(follower.to_bits(), (rho * peer).to_bits());
+        }
+    }
+}
+
+#[test]
+fn peer_cycles_and_volatility_free_peers_are_rejected_at_build() {
+    let unit = |seed| ForecastSpec::normal(0.0, 1.0, seed);
+    // A two-node and a three-node cycle.
+    let two = peer_model_builder(&[
+        ("a", correlated_with(unit(1), "b", 0.5)),
+        ("b", correlated_with(unit(2), "a", 0.5)),
+    ])
+    .build()
+    .unwrap_err();
+    assert!(two.to_string().contains("cycle"), "{two}");
+    let three = peer_model_builder(&[
+        ("a", correlated_with(unit(1), "b", 0.5)),
+        ("b", correlated_with(unit(2), "c", 0.5)),
+        ("c", correlated_with(unit(3), "a", 0.5)),
+    ])
+    .build()
+    .unwrap_err();
+    assert!(three.to_string().contains("cycle"), "{three}");
+    // A zero coefficient is not a dependency, so it closes no cycle.
+    peer_model(&[
+        ("a", correlated_with(unit(1), "b", 0.5)),
+        ("b", correlated_with(unit(2), "a", 0.0)),
+    ]);
+    // An active correlation needs positive volatility on both nodes.
+    let flat = ForecastSpec::normal(0.0, 0.0, 9);
+    for nodes in [
+        [
+            ("a", correlated_with(unit(1), "b", 0.5)),
+            ("b", flat.clone()),
+        ],
+        [("a", correlated_with(flat, "b", 0.5)), ("b", unit(2))],
+    ] {
+        let error = peer_model_builder(&nodes).build().unwrap_err();
+        assert!(error.to_string().contains("std_dev"), "{error}");
+    }
+    // The peer is a known, distinct stochastic node.
+    for peer in ["a", "missing"] {
+        assert!(
+            peer_model_builder(&[("a", correlated_with(unit(1), peer, 0.5))])
+                .build()
+                .is_err()
+        );
+    }
+}
+
+/// A non-zero correlation needs Monte Carlo; a zero one is an ordinary node.
+#[test]
+fn active_correlation_is_rejected_in_a_single_run() {
+    let unit = |seed| ForecastSpec::normal(0.0, 1.0, seed);
+    let model = |rho| peer_model(&[("a", correlated_with(unit(1), "b", rho)), ("b", unit(2))]);
+    let error = Evaluator::new().evaluate(&model(0.5)).unwrap_err();
+    assert!(error.to_string().contains("Monte Carlo"), "{error}");
+    let uncorrelated = Evaluator::new()
+        .evaluate(&peer_model(&[("a", unit(1)), ("b", unit(2))]))
+        .unwrap();
+    let zero = Evaluator::new().evaluate(&model(0.0)).unwrap();
+    assert_eq!(
+        zero.get("a", &quarter(4)),
+        uncorrelated.get("a", &quarter(4))
+    );
+}
+
+/// The peer's shocks are generated even when it publishes explicit values
+/// through the whole suffix, so the follower's paths do not change.
+#[test]
+fn peer_shocks_follow_the_peer_forecast_not_its_published_cells() {
+    let unit = |seed| ForecastSpec::normal(0.0, 1.0, seed);
+    let follower = ("follower", correlated_with(unit(2), "peer", 0.7));
+    let config = MonteCarloConfig::new(8, 5).with_path_data(true);
+
+    // The peer publishes explicit values in every forecast period.
+    let mut published = peer_model_builder(std::slice::from_ref(&follower));
+    published.value_scalar(
+        "peer",
+        &[
+            (quarter(1), 100.0),
+            (quarter(2), 1.0),
+            (quarter(3), 2.0),
+            (quarter(4), 3.0),
+        ],
+    );
+    published.forecast("peer", unit(1));
+    let published = published.build().unwrap();
+    let plain = peer_model(&[follower.clone(), ("peer", unit(1))]);
+    let run = |model: &FinancialModelSpec| {
+        let results = Evaluator::new()
+            .evaluate_monte_carlo(model, &config)
+            .unwrap();
+        metric_paths(&results, "follower")
+    };
+    assert_eq!(run(&published), run(&plain));
+}

@@ -704,6 +704,12 @@ export default [
     "description": "A forecast has no base: no start level is selected and the slot\nimmediately before the forecast suffix has no value."
   },
   {
+    "path": "#/$defs/d_6c08f5490eda9e343593/oneOf/5",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason/oneOf/5",
+    "const": "missing_peer_shock",
+    "description": "A correlated forecast needs the shocks of a peer whose forecast was\nitself unavailable on the path."
+  },
+  {
     "path": "#/$defs/d_6f601764dacadc213e87",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodPlan",
     "description": "Builder/plan for a contiguous sequence of periods and their actual/forecast split.\n\nPeriods are returned in ascending order and are intended to form a contiguous\nrun of model periods. Each [`Period`] uses the crate-wide `[start, end)`\ninterval convention, so the `end` of one period naturally aligns with the\n`start` of the next."

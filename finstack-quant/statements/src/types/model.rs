@@ -1006,14 +1006,61 @@ impl FinancialModelSpec {
                             | ForecastSpec::MeanReverting(_)
                     )
                 });
-        if stochastic_peer {
-            Ok(())
-        } else {
-            Err(Error::build(format!(
+        if !stochastic_peer {
+            return Err(Error::build(format!(
                 "Node '{node_id}': correlation peer '{peer}' is not another node with a normal, \
                  log_normal or mean_reverting forecast"
-            )))
+            )));
         }
+        // An active (non-zero) correlation mixes standardized shocks, so
+        // both nodes need positive volatility and the peer chain must end.
+        fn active(forecast: &ForecastSpec) -> Option<(&str, f64)> {
+            let (peer, rho, std_dev) = match forecast {
+                ForecastSpec::Normal(p) | ForecastSpec::LogNormal(p) => {
+                    (p.correlation_with.as_deref(), p.correlation, p.std_dev)
+                }
+                ForecastSpec::MeanReverting(p) => {
+                    (p.correlation_with.as_deref(), p.correlation, p.std_dev)
+                }
+                _ => return None,
+            };
+            peer.filter(|_| rho.is_some_and(|rho| rho != 0.0))
+                .map(|peer| (peer, std_dev))
+        }
+        let Some((mut next, std_dev)) = active(forecast) else {
+            return Ok(());
+        };
+        if std_dev == 0.0 {
+            return Err(Error::build(format!(
+                "Node '{node_id}': a non-zero correlation needs a positive 'std_dev'"
+            )));
+        }
+        for _ in 0..self.nodes.len() {
+            if next == node_id.as_str() {
+                return Err(Error::build(format!(
+                    "Node '{node_id}': its correlation peers form a cycle"
+                )));
+            }
+            let peer_forecast = self.get_node(next).and_then(|node| node.forecast.as_ref());
+            let std_dev = match peer_forecast {
+                Some(ForecastSpec::Normal(p) | ForecastSpec::LogNormal(p)) => p.std_dev,
+                Some(ForecastSpec::MeanReverting(p)) => p.std_dev,
+                _ => 0.0,
+            };
+            if std_dev == 0.0 {
+                return Err(Error::build(format!(
+                    "Node '{node_id}': correlation peer '{next}' needs a positive 'std_dev' to \
+                     supply shocks"
+                )));
+            }
+            match peer_forecast.and_then(active) {
+                Some((peer, _)) => next = peer,
+                None => return Ok(()),
+            }
+        }
+        // A chain longer than the node count has a cycle that does not pass
+        // through this node; the nodes on it report it.
+        Ok(())
     }
 }
 

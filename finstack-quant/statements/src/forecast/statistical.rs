@@ -49,6 +49,13 @@ pub(crate) fn correlation(parameters: &ForecastSpec) -> Result<Option<(&str, f64
     }
 }
 
+/// The correlation pair of `parameters` when it is active: a peer with a
+/// non-zero coefficient. At exactly zero a node is uncorrelated: it draws
+/// its own stream and has no dependency on the peer.
+pub(crate) fn active_correlation(parameters: &ForecastSpec) -> Result<Option<(&str, f64)>> {
+    Ok(correlation(parameters)?.filter(|(_, rho)| *rho != 0.0))
+}
+
 /// Check that a distribution's mean and standard deviation are usable.
 fn validate_distribution(p: &DistributionParams, method_name: &str) -> Result<()> {
     if p.std_dev < 0.0 {
@@ -463,7 +470,8 @@ pub(crate) struct CorrelatedMonteCarloSeries<'a> {
 
 /// Correlated Normal / LogNormal / MeanReverting series for Monte Carlo.
 ///
-/// The shock `z_t = ρ·z_peer + sqrt(1-ρ²)·z_indep` is applied in the **same
+/// The shock `z_t = ρ·z_peer + sqrt((1-ρ)(1+ρ))·z_indep` (the peer shock
+/// copied at ρ = 1 and negated at ρ = -1) is applied in the **same
 /// recurrence** as the independent forecast paths
 /// ([`normal_forecast_with_stream`], [`lognormal_forecast_with_stream`],
 /// [`mean_reverting_forecast_with_stream`]) so correlated and uncorrelated
@@ -577,8 +585,9 @@ pub(crate) fn monte_carlo_correlated_series(
     let mut prev = base_value;
     let mut log_level = base_value.ln();
 
-    // sqrt(1 - ρ²) with floor at zero in case of tiny numerical overshoot.
-    let indep_weight = (1.0 - rho * rho).max(0.0).sqrt();
+    // sqrt((1 - ρ)(1 + ρ)): exact at the endpoints and never negative on
+    // [-1, 1].
+    let indep_weight = ((1.0 - rho) * (1.0 + rho)).sqrt();
 
     for period_id in forecast_periods {
         let z_peer = peer_map.get(period_id).copied().ok_or_else(|| {
@@ -590,8 +599,14 @@ pub(crate) fn monte_carlo_correlated_series(
         })?;
 
         // A deterministic transition takes no shock and consumes no draw.
+        // At the endpoints the peer shock is copied or negated exactly,
+        // with no independent draw.
         let z = if sigma == 0.0 {
             0.0
+        } else if rho >= 1.0 {
+            z_peer
+        } else if rho <= -1.0 {
+            -z_peer
         } else {
             rho * z_peer + indep_weight * rng.normal(0.0, 1.0)
         };
