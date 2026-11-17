@@ -268,7 +268,7 @@ test('statements correlated paths retain sampled shocks when peer values round f
     };
     const params = {
       std_dev: tiny ? 1e-20 : 0.1,
-      seed: 42,
+      seed: '42',
       ...(method === 'mean_reverting'
         ? { long_run_mean: tiny ? 1e16 : 100, reversion_speed: 0.1 }
         : { mean: 0 }),
@@ -292,7 +292,7 @@ test('statements correlated paths retain sampled shocks when peer values round f
         values: { '2025Q1': 100 },
         forecast: {
           method: 'normal',
-          params: { mean: 0, std_dev: 1, seed, correlation_with: peer, correlation },
+          params: { mean: 0, std_dev: 1, seed: String(seed), correlation_with: peer, correlation },
         },
       };
     }

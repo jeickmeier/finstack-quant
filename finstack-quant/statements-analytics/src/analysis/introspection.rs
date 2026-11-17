@@ -749,10 +749,10 @@ impl Explanation {
             output.push_str(&format!("Source: {}\n", source.as_str()));
         }
         if let Some(forecast) = &self.forecast {
-            output.push_str(&format!("Forecast: {:?}", forecast.method));
-            if !forecast.params.is_empty() {
+            output.push_str(&format!("Forecast: {:?}", forecast.method()));
+            if !forecast.params().is_empty() {
                 let params: Vec<String> = forecast
-                    .params
+                    .params()
                     .iter()
                     .map(|(name, value)| format!("{name}={value}"))
                     .collect();
@@ -1188,8 +1188,8 @@ mod tests {
         assert!((forecast.final_value - 105.0).abs() < 1e-9);
         assert_eq!(forecast.source, Some(CellSource::Forecast));
         let spec = forecast.forecast.as_ref().expect("forecast spec");
-        assert_eq!(spec.method, ForecastMethod::GrowthPct);
-        assert_eq!(spec.params["rate"], serde_json::json!(0.05));
+        assert_eq!(spec.method(), ForecastMethod::GrowthPct);
+        assert_eq!(spec.params()["rate"], serde_json::json!(0.05));
         let text = forecast.to_text();
         assert!(text.contains("Source: forecast"), "{text}");
         assert!(

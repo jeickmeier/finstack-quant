@@ -106,8 +106,8 @@ fn formula_fingerprint(model: &FinancialModelSpec) -> u64 {
             date.hash(&mut hasher);
         }
         if let Some(forecast) = &spec.forecast {
-            forecast.method.hash(&mut hasher);
-            for (parameter, value) in &forecast.params {
+            forecast.method().hash(&mut hasher);
+            for (parameter, value) in &forecast.params() {
                 parameter.hash(&mut hasher);
                 value.hash(&mut hasher);
             }

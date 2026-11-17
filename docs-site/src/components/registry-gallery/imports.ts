@@ -1997,13 +1997,13 @@ export const importHarnesses = {
       name: "contract-financial-model-spec",
       modules: modules.length,
     })),
-  "contract-forecast-parameters": () =>
+  "contract-forecast-spec": () =>
     Promise.all([
-      import("@/lib/finstack/generated/schemas/forecast_parameters.json"),
-      import("@/lib/finstack/generated/types/forecast_parameters"),
-      import("@/lib/finstack/generated/meta/forecast_parameters"),
+      import("@/lib/finstack/generated/schemas/forecast_spec.json"),
+      import("@/lib/finstack/generated/types/forecast_spec"),
+      import("@/lib/finstack/generated/meta/forecast_spec"),
     ]).then((modules) => ({
-      name: "contract-forecast-parameters",
+      name: "contract-forecast-spec",
       modules: modules.length,
     })),
   "contract-monte-carlo-config": () =>

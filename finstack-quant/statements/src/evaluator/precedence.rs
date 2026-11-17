@@ -174,14 +174,11 @@ mod tests {
 
     #[test]
     fn test_forecast_in_forecast_period() {
-        use crate::types::{ForecastMethod, ForecastSpec};
+        use crate::types::ForecastSpec;
 
         let node = NodeSpec::new("revenue", NodeType::Mixed)
             .with_formula("lag(revenue, 1)")
-            .with_forecast(ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: IndexMap::new(),
-            });
+            .with_forecast(ForecastSpec::growth(0.05));
 
         // In forecast period, should prefer forecast over formula
         let source = resolve_node_value(
@@ -196,14 +193,11 @@ mod tests {
 
     #[test]
     fn test_formula_in_actual_period() {
-        use crate::types::{ForecastMethod, ForecastSpec};
+        use crate::types::ForecastSpec;
 
         let node = NodeSpec::new("revenue", NodeType::Mixed)
             .with_formula("lag(revenue, 1)")
-            .with_forecast(ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: IndexMap::new(),
-            });
+            .with_forecast(ForecastSpec::growth(0.05));
 
         // In actual period, should use formula (not forecast)
         let source = resolve_node_value(

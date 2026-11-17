@@ -10,7 +10,7 @@ use crate::evaluator::{
     StatementResult,
 };
 use crate::registry::MetricRegistry;
-use crate::types::{FinancialModelSpec, ForecastParameters, ModelEdit};
+use crate::types::{FinancialModelSpec, ForecastMethod, ForecastSpec, ModelEdit};
 
 /// Stable base URI for statements-owned schemas.
 pub const STATEMENTS_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/statements/1/";
@@ -135,10 +135,16 @@ fn statement_result_examples() -> finstack_quant_core::Result<Vec<Value>> {
     )
 }
 
-/// A suite with one built-in articulation check and one formula check.
+/// The method tag on its own.
+fn forecast_method_examples() -> finstack_quant_core::Result<Vec<Value>> {
+    finstack_quant_core::schema::example_from_json::<ForecastMethod>(serde_json::json!(
+        "growth_pct"
+    ))
+}
+
 /// Fade a line to a target level, the shape every parameterized method takes.
-fn forecast_parameters_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    finstack_quant_core::schema::example_from_json::<ForecastParameters>(serde_json::json!({
+fn forecast_spec_examples() -> finstack_quant_core::Result<Vec<Value>> {
+    finstack_quant_core::schema::example_from_json::<ForecastSpec>(serde_json::json!({
         "method": "fade_to_target",
         "params": { "target": 0.35, "shape": "linear" }
     }))
@@ -331,13 +337,21 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
     )
     .with_examples(check_suite_examples),
     finstack_quant_core::schema_artifact!(
-        ForecastParameters,
+        ForecastSpec,
         "statements",
-        "forecast_parameters",
+        "forecast_spec",
         Input,
         "One forecast method with its typed parameters, in the wire shape of ForecastSpec."
     )
-    .with_examples(forecast_parameters_examples),
+    .with_examples(forecast_spec_examples),
+    finstack_quant_core::schema_artifact!(
+        ForecastMethod,
+        "statements",
+        "forecast_method",
+        Component,
+        "The method tag of a forecast specification."
+    )
+    .with_examples(forecast_method_examples),
     finstack_quant_core::schema_artifact!(
         FinancialModelSpec,
         "statements",

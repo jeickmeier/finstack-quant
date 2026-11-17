@@ -8,8 +8,8 @@
 
 use crate::error::{Error, Result};
 use crate::types::{
-    BootstrapParams, DistributionParams, ForecastBootstrapMode, ForecastParameters,
-    MeanRevertingParams, NodeId,
+    BootstrapParams, DistributionParams, ForecastBootstrapMode, ForecastSpec, MeanRevertingParams,
+    NodeId,
 };
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
@@ -74,12 +74,12 @@ fn splitmix64_finalize(mut z: u64) -> u64 {
 /// correlated with the peer node's standard normal shocks (same forecast
 /// period). The peer node must be evaluated earlier in the dependency order so
 /// its Z-scores are available. Other methods carry no correlation.
-pub(crate) fn correlation(parameters: &ForecastParameters) -> Result<Option<(&str, f64)>> {
+pub(crate) fn correlation(parameters: &ForecastSpec) -> Result<Option<(&str, f64)>> {
     let (with, rho) = match parameters {
-        ForecastParameters::Normal(p) | ForecastParameters::LogNormal(p) => {
+        ForecastSpec::Normal(p) | ForecastSpec::LogNormal(p) => {
             (p.correlation_with.as_deref(), p.correlation)
         }
-        ForecastParameters::MeanReverting(p) => (p.correlation_with.as_deref(), p.correlation),
+        ForecastSpec::MeanReverting(p) => (p.correlation_with.as_deref(), p.correlation),
         _ => return Ok(None),
     };
 
@@ -501,7 +501,7 @@ pub(crate) fn bootstrap_forecast_with_stream(
 /// Inputs for [`monte_carlo_correlated_series`].
 pub(crate) struct CorrelatedMonteCarloSeries<'a> {
     /// Forecast parameters (Normal, LogNormal, or MeanReverting only).
-    pub parameters: &'a ForecastParameters,
+    pub parameters: &'a ForecastSpec,
     /// Starting level anchoring the path; must match the peer-path convention.
     pub base_value: f64,
     pub forecast_periods: &'a [PeriodId],
@@ -550,7 +550,7 @@ pub(crate) fn monte_carlo_correlated_series(
              got {base_value}"
         )));
     }
-    if matches!(parameters, ForecastParameters::LogNormal(_)) {
+    if matches!(parameters, ForecastSpec::LogNormal(_)) {
         // Apply the identical guard the independent path uses, so toggling
         // `correlation_with` on a node cannot change whether an invalid base is
         // caught or silently simulated in a different regime.
@@ -594,15 +594,15 @@ pub(crate) fn monte_carlo_correlated_series(
     }
 
     let (kernel, seed, sigma, method_name) = match parameters {
-        ForecastParameters::Normal(p) => {
+        ForecastSpec::Normal(p) => {
             validate_distribution(p, "Normal")?;
             (Kernel::Normal(p), p.seed, p.std_dev, "Normal")
         }
-        ForecastParameters::LogNormal(p) => {
+        ForecastSpec::LogNormal(p) => {
             validate_distribution(p, "LogNormal")?;
             (Kernel::LogNormal(p), p.seed, p.std_dev, "LogNormal")
         }
-        ForecastParameters::MeanReverting(p) => {
+        ForecastSpec::MeanReverting(p) => {
             validate_mean_reverting(p)?;
             (Kernel::MeanReverting(p), p.seed, p.std_dev, "MeanReverting")
         }
@@ -711,7 +711,7 @@ mod tests {
     }
 
     fn correlated(
-        parameters: &ForecastParameters,
+        parameters: &ForecastSpec,
         base_value: f64,
         periods: &[PeriodId],
         node_id: &str,
@@ -755,11 +755,9 @@ mod tests {
     /// would otherwise simulate at a quarter of the intended volatility.
     #[test]
     fn statistical_forecast_rejects_unknown_parameter_keys() {
-        let mut spec = crate::types::ForecastSpec::log_normal(0.02, 0.1, 7);
-        spec.params
-            .insert("sigma".to_string(), serde_json::json!(0.4));
+        let spec = crate::types::ForecastSpec::log_normal(0.02, 0.1, 7);
         let msg = spec
-            .parameters()
+            .with_param("sigma", serde_json::json!(0.4))
             .expect_err("an unknown parameter must be rejected")
             .to_string();
         assert!(
@@ -772,13 +770,15 @@ mod tests {
     #[test]
     fn correlation_keys_are_allowed_on_statistical_methods() {
         let mut spec = crate::types::ForecastSpec::log_normal(0.02, 0.1, 7);
-        spec.params
-            .insert("correlation_with".to_string(), serde_json::json!("peer"));
-        spec.params
-            .insert("correlation".to_string(), serde_json::json!(0.5));
-        let parameters = spec
-            .parameters()
-            .expect("correlation parameters are legal to configure");
+        spec = spec
+            .clone()
+            .with_param("correlation_with", serde_json::json!("peer"))
+            .unwrap();
+        spec = spec
+            .clone()
+            .with_param("correlation", serde_json::json!(0.5))
+            .unwrap();
+        let parameters = spec;
         assert_eq!(
             correlation(&parameters).expect("valid pair"),
             Some(("peer", 0.5))
@@ -789,12 +789,12 @@ mod tests {
     fn correlation_requires_both_keys_and_a_valid_rho() {
         let mut half = lognormal_params();
         half.correlation = Some(0.5);
-        assert!(correlation(&ForecastParameters::Normal(half)).is_err());
+        assert!(correlation(&ForecastSpec::Normal(half)).is_err());
 
         let mut out_of_range = lognormal_params();
         out_of_range.correlation_with = Some("peer".into());
         out_of_range.correlation = Some(1.5);
-        assert!(correlation(&ForecastParameters::Normal(out_of_range)).is_err());
+        assert!(correlation(&ForecastSpec::Normal(out_of_range)).is_err());
     }
 
     /// A non-finite base must fail the same strict-positive validation as zero
@@ -823,7 +823,7 @@ mod tests {
 
         let cache = peer_cache(&periods, 0.5);
         let correlated_err = correlated(
-            &ForecastParameters::LogNormal(params),
+            &ForecastSpec::LogNormal(params),
             -5.0,
             &periods,
             "node",
@@ -846,7 +846,7 @@ mod tests {
         let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         let cache = peer_cache(&periods, 0.5);
         let err = correlated(
-            &ForecastParameters::LogNormal(lognormal_params()),
+            &ForecastSpec::LogNormal(lognormal_params()),
             f64::NAN,
             &periods,
             "node",
@@ -938,10 +938,11 @@ mod tests {
     fn mean_reverting_rejects_missing_parameters_and_bad_base() {
         let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         for missing in ["long_run_mean", "reversion_speed", "std_dev", "seed"] {
-            let mut spec = crate::types::ForecastSpec::mean_reverting(0.05, 0.25, 0.01, 42);
-            spec.params.shift_remove(missing);
+            let spec = crate::types::ForecastSpec::mean_reverting(0.05, 0.25, 0.01, 42);
+            let mut params = spec.params();
+            params.shift_remove(missing);
             assert!(
-                spec.parameters().is_err(),
+                crate::types::ForecastSpec::from_params(spec.method(), params).is_err(),
                 "missing '{missing}' must be rejected"
             );
         }
@@ -980,7 +981,7 @@ mod tests {
         }
 
         for rho in [1.0, -1.0] {
-            let parameters = ForecastParameters::MeanReverting(MeanRevertingParams {
+            let parameters = ForecastSpec::MeanReverting(MeanRevertingParams {
                 correlation_with: Some("peer".into()),
                 correlation: Some(rho),
                 ..mean_reverting_params()
@@ -1115,15 +1116,24 @@ mod tests {
         };
         assert!(bootstrap_forecast(100.0, &periods, &params).is_err());
 
-        let mut spec = crate::types::ForecastSpec::bootstrap(vec![100.0, 105.0], 42);
-        spec.params
-            .insert("mode".to_string(), serde_json::json!("block"));
-        let err = spec.parameters().expect_err("bad mode");
+        let spec = crate::types::ForecastSpec::bootstrap(
+            vec![100.0, 105.0],
+            ForecastBootstrapMode::Growth,
+            42,
+        );
+        let err = spec
+            .with_param("mode", serde_json::json!("block"))
+            .expect_err("bad mode");
         assert!(err.to_string().contains("mode"), "{err}");
 
-        let mut spec = crate::types::ForecastSpec::bootstrap(vec![100.0, 105.0], 42);
-        spec.params.shift_remove("seed");
-        assert!(spec.parameters().is_err());
+        let spec = crate::types::ForecastSpec::bootstrap(
+            vec![100.0, 105.0],
+            ForecastBootstrapMode::Growth,
+            42,
+        );
+        let mut params = spec.params();
+        params.shift_remove("seed");
+        assert!(crate::types::ForecastSpec::from_params(spec.method(), params).is_err());
     }
 
     #[test]
@@ -1161,10 +1171,11 @@ mod tests {
         assert!(normal_forecast(0.0, &periods, &distribution(f64::NAN, 1.0, 42)).is_err());
 
         for missing in ["mean", "std_dev", "seed"] {
-            let mut spec = crate::types::ForecastSpec::normal(100_000.0, 15_000.0, 42);
-            spec.params.shift_remove(missing);
+            let spec = crate::types::ForecastSpec::normal(100_000.0, 15_000.0, 42);
+            let mut params = spec.params();
+            params.shift_remove(missing);
             assert!(
-                spec.parameters().is_err(),
+                crate::types::ForecastSpec::from_params(spec.method(), params).is_err(),
                 "missing '{missing}' must be rejected"
             );
         }
@@ -1305,7 +1316,7 @@ mod tests {
             PeriodId::quarter(2025, 2).unwrap(),
         ];
         let cache = peer_cache(&periods, 0.5);
-        let flat = ForecastParameters::Normal(DistributionParams {
+        let flat = ForecastSpec::Normal(DistributionParams {
             std_dev: 0.0,
             ..lognormal_params()
         });
@@ -1322,7 +1333,7 @@ mod tests {
         .expect("deterministic child");
         assert!(shocks.values().all(|z| *z == 0.0));
         let cache = [(NodeId::new("flat"), shocks)].into_iter().collect();
-        let child = ForecastParameters::Normal(DistributionParams {
+        let child = ForecastSpec::Normal(DistributionParams {
             std_dev: 1.0,
             ..lognormal_params()
         });

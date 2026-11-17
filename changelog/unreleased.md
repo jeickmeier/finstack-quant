@@ -1086,3 +1086,31 @@ where a zero revenue used to give no value or fail the run.
 New formula function `ratio(numerator, base)`: a decimal ratio over a strictly
 positive base in the same units, unavailable for a non-positive base. The
 reason `undefined_change` is renamed `undefined_base`.
+
+### Statements: one typed forecast specification; seeds are exact strings on the wire
+
+STATEMENTS-CONTRACTS-003. `ForecastSpec` is now a closed typed enum (a method
+with its typed parameters) and replaces the free-form parameter map.
+`ForecastParameters` is renamed `ForecastSpec`; `ForecastSpec::parameters()`
+and the public `method` / `params` fields are gone (`method()` and `params()`
+are accessors, `from_params` and `with_param` build checked specifications).
+The schema `forecast_parameters` is renamed `forecast_spec`.
+
+- **Rejected on read.** An unknown, duplicate, `null` or method-inapplicable
+  field fails when the document is read or the parameter is set, where it
+  used to fail when the forecast ran.
+- **No default choices.** `time_series` needs its `method`, `bootstrap` its
+  `mode`, and `fade_to_target` its `shape`. The constructors take them:
+  `ForecastSpec.time_series(history, "linear")`,
+  `ForecastSpec.bootstrap(history, "growth", seed)`,
+  `ForecastSpec.fade_to_target(target, "linear")`.
+- **Seeds are exact.** In JSON a seed is a canonical decimal string
+  (`"seed": "42"`); a JSON number is rejected, including an integer-valued
+  float. Rust and Python pass an integer. Only stochastic methods take one.
+- **Static checks at build and load**, even when observations cover every
+  forecast period: finite numbers, `min` not above `max`, non-negative
+  standard deviations, `half_life` only with the exponential fade, smoothing
+  factors only with the exponential trend, a moving-average `window`, a
+  growth curve with one rate per forecast period, override keys that are
+  periods of the model, and a correlation peer that is another stochastic
+  forecast node.

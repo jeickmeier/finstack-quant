@@ -827,9 +827,8 @@ impl ModelBuilder {
     ///
     /// ```rust
     /// # use finstack_quant_statements::builder::ModelBuilder;
-    /// # use finstack_quant_statements::types::{AmountOrScalar, ForecastSpec, ForecastMethod};
+    /// # use finstack_quant_statements::types::{AmountOrScalar, ForecastSpec};
     /// # use finstack_quant_core::dates::PeriodId;
-    /// # use indexmap::indexmap;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let model = {
     ///     let mut model_builder = ModelBuilder::new("test");
@@ -839,10 +838,7 @@ impl ModelBuilder {
     ///             (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0)),
     ///             (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(110_000.0)),
     ///         ]);
-    ///     model_builder.forecast(ForecastSpec {
-    ///             method: ForecastMethod::GrowthPct,
-    ///             params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-    ///         });
+    ///     model_builder.forecast(ForecastSpec::growth(0.05));
     ///     model_builder.formula("lag(revenue, 1) * 1.05")?;
     ///     let model_builder = model_builder.build()?;
     ///     model_builder.build()?
@@ -874,9 +870,8 @@ impl ModelBuilder {
     ///
     /// ```rust
     /// # use finstack_quant_statements::builder::ModelBuilder;
-    /// # use finstack_quant_statements::types::{AmountOrScalar, ForecastSpec, ForecastMethod};
+    /// # use finstack_quant_statements::types::{AmountOrScalar, ForecastSpec};
     /// # use finstack_quant_core::dates::PeriodId;
-    /// # use indexmap::indexmap;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let model = {
     ///     let mut model_builder = ModelBuilder::new("test");
@@ -885,10 +880,7 @@ impl ModelBuilder {
     ///         (PeriodId::quarter(2025, 1).expect("valid period fixture"), AmountOrScalar::scalar(100_000.0)),
     ///         (PeriodId::quarter(2025, 2).expect("valid period fixture"), AmountOrScalar::scalar(110_000.0)),
     ///     ]);
-    ///     model_builder.forecast("revenue", ForecastSpec {
-    ///         method: ForecastMethod::GrowthPct,
-    ///         params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-    ///     });
+    ///     model_builder.forecast("revenue", ForecastSpec::growth(0.05));
     ///     model_builder.build()?
     /// };
     /// # Ok(())

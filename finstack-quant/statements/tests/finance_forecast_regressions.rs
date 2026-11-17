@@ -6,6 +6,7 @@ use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::evaluator::MonteCarloConfig;
 use finstack_quant_statements::types::SeasonalMode;
 use finstack_quant_statements::types::{FinancialModelSpec, ForecastMethod, ForecastSpec};
+use finstack_quant_statements::types::{ForecastFadeShape, ForecastTrendMethod};
 use serde_json::json;
 
 fn quarter(index: u8) -> PeriodId {
@@ -28,12 +29,13 @@ fn override_period_aliases_apply_to_their_parsed_periods() {
     let february = PeriodId::month(2025, 2).unwrap();
     let march = PeriodId::month(2025, 3).unwrap();
     for spelling in ["2025M2", "2025m02", " 2025M02 "] {
-        let forecast = ForecastSpec {
-            method: ForecastMethod::Override,
-            params: [("overrides".into(), json!({spelling: 200.0}))]
+        let forecast = ForecastSpec::from_params(
+            ForecastMethod::Override,
+            [("overrides".into(), json!({spelling: 200.0}))]
                 .into_iter()
                 .collect(),
-        };
+        )
+        .unwrap();
         let model = {
             let mut model_builder = ModelBuilder::new("monthly-overrides");
             model_builder.periods("2025M1..M3", Some("2025M1")).unwrap();
@@ -49,15 +51,16 @@ fn override_period_aliases_apply_to_their_parsed_periods() {
 
 #[test]
 fn override_duplicate_period_aliases_are_rejected() {
-    let forecast = ForecastSpec {
-        method: ForecastMethod::Override,
-        params: [(
+    let forecast = ForecastSpec::from_params(
+        ForecastMethod::Override,
+        [(
             "overrides".into(),
             json!({"2025Q2": 200.0, "2025q2": 300.0}),
         )]
         .into_iter()
         .collect(),
-    };
+    )
+    .unwrap();
     let model = forecast_model(100.0, forecast);
     let error = Evaluator::new().evaluate(&model).unwrap_err();
     assert!(error.to_string().contains("Duplicate override"), "{error}");
@@ -90,7 +93,7 @@ fn forecast_bounds_preserve_missing_observations_and_warnings() {
     ] {
         let mut forecast = ForecastSpec::forward_fill();
         for (key, value) in bounds {
-            forecast.params.insert(key.into(), json!(value));
+            forecast = forecast.with_param(key, json!(value)).unwrap();
         }
         let mut model_builder = ModelBuilder::new("forecast-regression");
         model_builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
@@ -103,48 +106,33 @@ fn forecast_bounds_preserve_missing_observations_and_warnings() {
     }
 }
 
+/// A typed specification cannot be given a malformed optional parameter:
+/// the wrong JSON type is rejected when the parameter is set.
 #[test]
-fn malformed_optional_forecast_parameters_fail_in_both_evaluation_modes() {
-    let mut bad_growth = ForecastSpec::seasonal(vec![100.0; 8], 4, SeasonalMode::Additive);
-    bad_growth.params.insert("growth".into(), json!("0.1"));
-    let mut bad_method = ForecastSpec::time_series(vec![90.0, 100.0]);
-    bad_method.params.insert("method".into(), json!(true));
-    let mut bad_correlation = ForecastSpec::normal(0.0, 1.0, 42);
-    bad_correlation
-        .params
-        .insert("correlation_with".into(), json!(1));
-    bad_correlation
-        .params
-        .insert("correlation".into(), json!("0.5"));
-    for invalid in [bad_growth, bad_method, bad_correlation] {
-        assert!(invalid.validate().is_err());
-        // Mutate a valid model so this exercises runtime validation even when
-        // normal construction already validates the forecast specification.
-        let mut model = forecast_model(100.0, ForecastSpec::forward_fill());
-        model.nodes.get_mut("x").unwrap().forecast = Some(invalid);
-        assert!(Evaluator::new().evaluate(&model).is_err());
-        assert!(
-            Evaluator::new()
-                .evaluate_monte_carlo(&model, &MonteCarloConfig::new(2, 7))
-                .is_err()
-        );
+fn malformed_optional_forecast_parameters_cannot_be_constructed() {
+    let seasonal = ForecastSpec::seasonal(vec![100.0; 8], 4, SeasonalMode::Additive);
+    let trend = ForecastSpec::time_series(vec![90.0, 100.0], ForecastTrendMethod::Linear);
+    let normal = ForecastSpec::normal(0.0, 1.0, 42);
+    for (spec, key, value) in [
+        (seasonal, "growth", json!("0.1")),
+        (trend, "method", json!(true)),
+        (normal.clone(), "correlation_with", json!(1)),
+        (normal, "correlation", json!("0.5")),
+    ] {
+        let error = spec.with_param(key, value).expect_err(key);
+        assert!(error.to_string().contains(key), "{key}: {error}");
     }
 }
 
 #[test]
 fn correlated_forecasts_reject_malformed_optional_parameters() {
-    let mut model = forecast_model(100.0, ForecastSpec::normal(0.0, 1.0, 42));
-    let mut peer = model.nodes["x"].clone();
-    peer.node_id = "peer".into();
-    model.nodes.insert("peer".into(), peer);
-    let forecast = model.nodes.get_mut("x").unwrap().forecast.as_mut().unwrap();
-    forecast
-        .params
-        .insert("correlation_with".into(), json!("peer"));
-    forecast.params.insert("correlation".into(), json!(0.5));
-    forecast.params.insert("max".into(), json!("150"));
-    let error = Evaluator::new()
-        .evaluate_monte_carlo(&model, &MonteCarloConfig::new(2, 7))
+    // A typed specification cannot hold a malformed parameter at all.
+    let error = ForecastSpec::normal(0.0, 1.0, 42)
+        .with_param("correlation_with", json!("peer"))
+        .unwrap()
+        .with_param("correlation", json!(0.5))
+        .unwrap()
+        .with_param("max", json!("150"))
         .unwrap_err();
     assert!(error.to_string().contains("max"), "{error}");
 }
@@ -153,9 +141,10 @@ fn correlated_forecasts_reject_malformed_optional_parameters() {
 fn extreme_season_lengths_fail_before_allocation() {
     for length in [u64::MAX, u64::from(u32::MAX) + 5] {
         let mut forecast = ForecastSpec::seasonal(vec![100.0; 8], 4, SeasonalMode::Additive);
-        forecast
-            .params
-            .insert("season_length".into(), json!(length));
+        forecast = forecast
+            .clone()
+            .with_param("season_length", json!(length))
+            .unwrap();
         let model = forecast_model(100.0, forecast);
         assert!(Evaluator::new().evaluate(&model).is_err());
     }
@@ -163,12 +152,13 @@ fn extreme_season_lengths_fail_before_allocation() {
 
 #[test]
 fn bounded_constant_moving_average_rejects_overflow() {
-    let mut forecast = ForecastSpec::time_series(vec![1e308, 1e308]);
-    forecast
-        .params
-        .insert("method".into(), json!("moving_average"));
-    forecast.params.insert("window".into(), json!(2));
-    forecast.params.insert("max".into(), json!(100.0));
+    let mut forecast = ForecastSpec::time_series(vec![1e308, 1e308], ForecastTrendMethod::Linear);
+    forecast = forecast
+        .clone()
+        .with_param("method", json!("moving_average"))
+        .unwrap();
+    forecast = forecast.clone().with_param("window", json!(2)).unwrap();
+    forecast = forecast.clone().with_param("max", json!(100.0)).unwrap();
     let model = forecast_model(1e308, forecast);
     let error = Evaluator::new().evaluate(&model).unwrap_err();
     assert!(error.to_string().contains("non-finite historical average"));
@@ -177,10 +167,16 @@ fn bounded_constant_moving_average_rejects_overflow() {
 #[test]
 fn fades_between_finite_opposite_extremes_remain_finite() {
     for exponential in [false, true] {
-        let mut forecast = ForecastSpec::fade_to_target(-1e308);
+        let mut forecast = ForecastSpec::fade_to_target(-1e308, ForecastFadeShape::Linear);
         if exponential {
-            forecast.params.insert("shape".into(), json!("exponential"));
-            forecast.params.insert("half_life".into(), json!(1.0));
+            forecast = forecast
+                .clone()
+                .with_param("shape", json!("exponential"))
+                .unwrap();
+            forecast = forecast
+                .clone()
+                .with_param("half_life", json!(1.0))
+                .unwrap();
         }
         let model = forecast_model(1e308, forecast);
         let result = Evaluator::new().evaluate(&model).unwrap();
@@ -197,18 +193,27 @@ fn fades_between_finite_opposite_extremes_remain_finite() {
     }
 }
 
+/// A seed is an exact unsigned 64-bit integer. Neighbouring seeds above
+/// 2^53, which a float cannot tell apart, draw different paths.
 #[test]
-fn integer_valued_float_seeds_work_and_out_of_range_seeds_fail() {
-    let mut forecast = ForecastSpec::normal(0.0, 1.0, 42);
-    forecast.params.insert("seed".into(), json!(42.0));
-    forecast.validate().unwrap();
-    let model = forecast_model(100.0, forecast);
-    assert!(Evaluator::new().evaluate(&model).is_ok());
+fn seeds_are_exact_above_two_to_the_53() {
+    let path = |seed: u64| {
+        let model = forecast_model(100.0, ForecastSpec::normal(0.0, 1.0, seed));
+        let result = Evaluator::new().evaluate(&model).unwrap();
+        result.get("x", &quarter(4)).unwrap()
+    };
+    assert_ne!(path(9_007_199_254_740_992), path(9_007_199_254_740_993));
+    assert_eq!(path(u64::MAX), path(u64::MAX));
 
-    let mut invalid = ForecastSpec::normal(0.0, 1.0, 42);
-    // u64::MAX rounds up to 2^64 as f64 and must not saturate back to u64::MAX.
-    invalid.params.insert("seed".into(), json!(u64::MAX as f64));
-    assert!(invalid.validate().is_err());
+    let spec = ForecastSpec::normal(0.0, 1.0, 42);
+    // A float seed, and one beyond u64, are not seeds.
+    for bad in [
+        json!(42.0),
+        json!(u64::MAX as f64),
+        json!("18446744073709551616"),
+    ] {
+        assert!(spec.clone().with_param("seed", bad).is_err());
+    }
 }
 
 fn shock_chain_model(method: ForecastMethod, tiny: bool, rho: f64) -> FinancialModelSpec {
@@ -219,15 +224,20 @@ fn shock_chain_model(method: ForecastMethod, tiny: bool, rho: f64) -> FinancialM
         _ => ForecastSpec::mean_reverting(if tiny { 1e16 } else { 100.0 }, 0.1, sigma, 42),
     };
     let mut follower = ForecastSpec::normal(0.0, 1.0, 19);
-    follower
-        .params
-        .insert("correlation_with".into(), json!("peer"));
-    follower.params.insert("correlation".into(), json!(rho));
+    follower = follower
+        .clone()
+        .with_param("correlation_with", json!("peer"))
+        .unwrap();
+    follower = follower
+        .clone()
+        .with_param("correlation", json!(rho))
+        .unwrap();
     let mut child = ForecastSpec::normal(0.0, 1.0, 23);
-    child
-        .params
-        .insert("correlation_with".into(), json!("follower"));
-    child.params.insert("correlation".into(), json!(0.6));
+    child = child
+        .clone()
+        .with_param("correlation_with", json!("follower"))
+        .unwrap();
+    child = child.clone().with_param("correlation", json!(0.6)).unwrap();
     let mut builder = ModelBuilder::new("direct-shocks");
     builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();
     builder.value(
@@ -309,7 +319,7 @@ fn clipping_and_explicit_overrides_preserve_latent_correlated_paths() {
                 .unwrap()
                 .insert(quarter(3), 200.0.into());
         } else {
-            let params = &mut peer.forecast.as_mut().unwrap().params;
+            let params = &mut peer.forecast.as_mut().unwrap().params();
             params.insert("min".into(), json!(100.0));
             params.insert("max".into(), json!(100.0));
         }
@@ -433,8 +443,11 @@ fn zero_correlation_keeps_the_uncorrelated_draws() {
     let model = |correlated: bool| {
         let mut node = ForecastSpec::normal(0.0, 1.0, 19);
         if correlated {
-            node.params.insert("correlation_with".into(), json!("peer"));
-            node.params.insert("correlation".into(), json!(0.0));
+            node = node
+                .clone()
+                .with_param("correlation_with", json!("peer"))
+                .unwrap();
+            node = node.clone().with_param("correlation", json!(0.0)).unwrap();
         }
         let mut builder = ModelBuilder::new("zero-correlation");
         builder.periods("2025Q1..Q4", Some("2025Q1")).unwrap();

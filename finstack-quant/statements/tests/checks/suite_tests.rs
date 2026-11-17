@@ -257,10 +257,13 @@ fn run_model_evaluates_with_value_forecast_formula_precedence() {
         model_builder.periods("2025Q1..Q4", Some("2025Q2")).unwrap();
         let mut model_builder = model_builder.mixed("revenue");
         model_builder.values(&[(q(1), s(100.0)), (q(2), s(110.0))]);
-        model_builder.forecast(ForecastSpec {
-            method: ForecastMethod::GrowthPct,
-            params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-        });
+        model_builder.forecast(
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.05) },
+            )
+            .unwrap(),
+        );
         model_builder.formula("0").unwrap();
         let model_builder = model_builder.build().unwrap();
         model_builder.build().unwrap()

@@ -22,10 +22,13 @@ fn test_mixed_builder_basic() {
                 AmountOrScalar::scalar(110_000.0),
             ),
         ]);
-        model_builder.forecast(ForecastSpec {
-            method: ForecastMethod::GrowthPct,
-            params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-        });
+        model_builder.forecast(
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.05) },
+            )
+            .unwrap(),
+        );
         model_builder.formula("lag(revenue, 1) * 1.05").unwrap();
         let model_builder = model_builder.build().unwrap();
         model_builder.build().unwrap()
@@ -73,10 +76,13 @@ fn test_mixed_builder_evaluation() {
                 AmountOrScalar::scalar(110_000.0),
             ),
         ]);
-        model_builder.forecast(ForecastSpec {
-            method: ForecastMethod::GrowthPct,
-            params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-        });
+        model_builder.forecast(
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.05) },
+            )
+            .unwrap(),
+        );
         let model_builder = model_builder.build().unwrap();
         model_builder.build().unwrap()
     };

@@ -2,7 +2,7 @@
   "$defs": {
     "BootstrapParams": {
       "additionalProperties": false,
-      "description": "Parameters of [`ForecastParameters::Bootstrap`].",
+      "description": "Parameters of [`ForecastSpec::Bootstrap`].",
       "properties": {
         "historical": {
           "description": "At least 2 observations in the line's base units, oldest first.",
@@ -30,18 +30,16 @@
         },
         "mode": {
           "$ref": "#/$defs/ForecastBootstrapMode",
-          "default": "growth",
           "description": "What to resample; defaults to growth rates."
         },
         "seed": {
           "description": "Random seed; the same seed reproduces the same path.",
-          "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+          "type": "string"
         }
       },
       "required": [
         "historical",
+        "mode",
         "seed"
       ],
       "type": "object"
@@ -71,7 +69,7 @@
     },
     "CurvePctParams": {
       "additionalProperties": false,
-      "description": "Parameters of [`ForecastParameters::CurvePct`].",
+      "description": "Parameters of [`ForecastSpec::CurvePct`].",
       "properties": {
         "curve": {
           "description": "Growth rate per forecast period as decimals, one per period in order.",
@@ -105,7 +103,7 @@
     },
     "DistributionParams": {
       "additionalProperties": false,
-      "description": "Parameters of [`ForecastParameters::Normal`] and [`ForecastParameters::LogNormal`].",
+      "description": "Parameters of [`ForecastSpec::Normal`] and [`ForecastSpec::LogNormal`].",
       "properties": {
         "correlation": {
           "description": "Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.",
@@ -145,9 +143,7 @@
         },
         "seed": {
           "description": "Random seed; the same seed reproduces the same path.",
-          "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+          "type": "string"
         },
         "std_dev": {
           "description": "Standard deviation of the shock per period; non-negative.",
@@ -164,7 +160,7 @@
     },
     "FadeToTargetParams": {
       "additionalProperties": false,
-      "description": "Parameters of [`ForecastParameters::FadeToTarget`].",
+      "description": "Parameters of [`ForecastSpec::FadeToTarget`].",
       "properties": {
         "half_life": {
           "description": "Periods to close half the gap; required for, and legal only with, the exponential shape.",
@@ -192,7 +188,6 @@
         },
         "shape": {
           "$ref": "#/$defs/ForecastFadeShape",
-          "default": "linear",
           "description": "Path to the target; defaults to linear."
         },
         "target": {
@@ -202,7 +197,8 @@
         }
       },
       "required": [
-        "target"
+        "target",
+        "shape"
       ],
       "type": "object"
     },
@@ -263,7 +259,7 @@
     },
     "GrowthPctParams": {
       "additionalProperties": false,
-      "description": "Parameters of [`ForecastParameters::GrowthPct`].",
+      "description": "Parameters of [`ForecastSpec::GrowthPct`].",
       "properties": {
         "max": {
           "description": "Upper bound clamped onto generated values, in the line's base units.",
@@ -294,7 +290,7 @@
     },
     "MeanRevertingParams": {
       "additionalProperties": false,
-      "description": "Parameters of [`ForecastParameters::MeanReverting`].",
+      "description": "Parameters of [`ForecastSpec::MeanReverting`].",
       "properties": {
         "correlation": {
           "description": "Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.",
@@ -339,9 +335,7 @@
         },
         "seed": {
           "description": "Random seed; the same seed reproduces the same path.",
-          "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
+          "type": "string"
         },
         "std_dev": {
           "description": "Standard deviation of the shock per period; non-negative.",
@@ -359,7 +353,7 @@
     },
     "OverrideParams": {
       "additionalProperties": false,
-      "description": "Parameters of [`ForecastParameters::Override`].",
+      "description": "Parameters of [`ForecastSpec::Override`].",
       "properties": {
         "max": {
           "description": "Upper bound clamped onto generated values, in the line's base units.",
@@ -408,7 +402,7 @@
     },
     "SeasonalParams": {
       "additionalProperties": false,
-      "description": "Parameters of [`ForecastParameters::Seasonal`].",
+      "description": "Parameters of [`ForecastSpec::Seasonal`].",
       "properties": {
         "growth": {
           "description": "Trend growth per period as a decimal: 0.03 = 3%; defaults to none.",
@@ -462,7 +456,7 @@
     },
     "TimeSeriesParams": {
       "additionalProperties": false,
-      "description": "Parameters of [`ForecastParameters::TimeSeries`].",
+      "description": "Parameters of [`ForecastSpec::TimeSeries`].",
       "properties": {
         "alpha": {
           "description": "Level smoothing in (0, 1]; required for the exponential method.",
@@ -498,7 +492,6 @@
         },
         "method": {
           "$ref": "#/$defs/ForecastTrendMethod",
-          "default": "linear",
           "description": "Trend model; defaults to linear."
         },
         "min": {
@@ -528,12 +521,13 @@
         }
       },
       "required": [
-        "historical"
+        "historical",
+        "method"
       ],
       "type": "object"
     }
   },
-  "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_parameters.schema.json",
+  "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_spec.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "One forecast method with its typed parameters, in the wire shape of ForecastSpec.",
   "examples": [
@@ -547,7 +541,6 @@
   ],
   "oneOf": [
     {
-      "additionalProperties": false,
       "description": "Carry the last value forward.",
       "properties": {
         "method": {
@@ -559,13 +552,11 @@
         }
       },
       "required": [
-        "method",
-        "params"
+        "method"
       ],
       "type": "object"
     },
     {
-      "additionalProperties": false,
       "description": "Compound one growth rate per period.",
       "properties": {
         "method": {
@@ -583,7 +574,6 @@
       "type": "object"
     },
     {
-      "additionalProperties": false,
       "description": "Compound a different growth rate each period.",
       "properties": {
         "method": {
@@ -601,7 +591,6 @@
       "type": "object"
     },
     {
-      "additionalProperties": false,
       "description": "Sample an additive random walk.",
       "properties": {
         "method": {
@@ -619,7 +608,6 @@
       "type": "object"
     },
     {
-      "additionalProperties": false,
       "description": "Sample a multiplicative random walk for positive values.",
       "properties": {
         "method": {
@@ -637,7 +625,6 @@
       "type": "object"
     },
     {
-      "additionalProperties": false,
       "description": "Set exact values for chosen periods, carrying forward between them.",
       "properties": {
         "method": {
@@ -655,7 +642,6 @@
       "type": "object"
     },
     {
-      "additionalProperties": false,
       "description": "Project from a historical series.",
       "properties": {
         "method": {
@@ -673,7 +659,6 @@
       "type": "object"
     },
     {
-      "additionalProperties": false,
       "description": "Project a repeating pattern from a historical series.",
       "properties": {
         "method": {
@@ -691,7 +676,6 @@
       "type": "object"
     },
     {
-      "additionalProperties": false,
       "description": "Sample a mean-reverting AR(1) process.",
       "properties": {
         "method": {
@@ -709,7 +693,6 @@
       "type": "object"
     },
     {
-      "additionalProperties": false,
       "description": "Resample changes from a historical series.",
       "properties": {
         "method": {
@@ -727,7 +710,6 @@
       "type": "object"
     },
     {
-      "additionalProperties": false,
       "description": "Glide toward a target level over the forecast horizon.",
       "properties": {
         "method": {
@@ -745,5 +727,5 @@
       "type": "object"
     }
   ],
-  "title": "ForecastParameters"
+  "title": "ForecastSpec"
 }

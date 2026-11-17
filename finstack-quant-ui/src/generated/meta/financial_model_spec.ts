@@ -437,6 +437,23 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_12f170432b1b0cb25769",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SeasonalMode",
+    "description": "Seasonal decomposition mode."
+  },
+  {
+    "path": "#/$defs/d_12f170432b1b0cb25769/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SeasonalMode/oneOf/0",
+    "const": "additive",
+    "description": "Additive seasonality: Y = Trend + Seasonal + Error"
+  },
+  {
+    "path": "#/$defs/d_12f170432b1b0cb25769/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SeasonalMode/oneOf/1",
+    "const": "multiplicative",
+    "description": "Multiplicative seasonality: Y = Trend * Seasonal * Error"
+  },
+  {
     "path": "#/$defs/d_12fd8e2c005f5987500b",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RevolvingCreditFees",
     "description": "Fee structure for a revolving credit facility.\n\nContains the various fees charged on the facility:\n- Upfront: one-time fee at commitment\n- Commitment: annual fee on undrawn amount (can be tiered by utilization)\n- Usage: annual fee on drawn amount (can be tiered by utilization)\n- Facility: annual fee on total commitment\n\nFlat fees can be represented as single-tier vectors."
@@ -2885,6 +2902,42 @@ export default [
     "description": "Minimum credit rating requirement (e.g., \"A-\", \"BBB\")\n\nIf None, no rating constraint applies."
   },
   {
+    "path": "#/$defs/d_44123d832feea816e1b8",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FadeToTargetParams",
+    "description": "Parameters of [`ForecastSpec::FadeToTarget`]."
+  },
+  {
+    "path": "#/$defs/d_44123d832feea816e1b8/properties/half_life",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FadeToTargetParams/properties/half_life",
+    "description": "Periods to close half the gap; required for, and legal only with, the exponential shape.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_44123d832feea816e1b8/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FadeToTargetParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_44123d832feea816e1b8/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FadeToTargetParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_44123d832feea816e1b8/properties/shape",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FadeToTargetParams/properties/shape",
+    "description": "Path to the target; defaults to linear.",
+    "ref": "#/$defs/ForecastFadeShape",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastFadeShape"
+  },
+  {
+    "path": "#/$defs/d_44123d832feea816e1b8/properties/target",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FadeToTargetParams/properties/target",
+    "description": "Terminal level, in the line's base units.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_450829dac3a74a5c8761",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FloatLegSpec",
     "description": "Specification for floating rate legs in interest rate swaps"
@@ -3455,6 +3508,45 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_540ac8fb2e11ac940d17",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BootstrapParams",
+    "description": "Parameters of [`ForecastSpec::Bootstrap`]."
+  },
+  {
+    "path": "#/$defs/d_540ac8fb2e11ac940d17/properties/historical",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BootstrapParams/properties/historical",
+    "description": "At least 2 observations in the line's base units, oldest first."
+  },
+  {
+    "path": "#/$defs/d_540ac8fb2e11ac940d17/properties/historical/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BootstrapParams/properties/historical/items",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_540ac8fb2e11ac940d17/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BootstrapParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_540ac8fb2e11ac940d17/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BootstrapParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_540ac8fb2e11ac940d17/properties/mode",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BootstrapParams/properties/mode",
+    "description": "What to resample; defaults to growth rates.",
+    "ref": "#/$defs/ForecastBootstrapMode",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastBootstrapMode"
+  },
+  {
+    "path": "#/$defs/d_540ac8fb2e11ac940d17/properties/seed",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BootstrapParams/properties/seed",
+    "description": "Random seed; the same seed reproduces the same path."
+  },
+  {
     "path": "#/$defs/d_540b029baeeb4469863b",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MarginStep",
     "description": "Dated margin step (covenant penalty, scheduled change or pricing-grid move).\n\nShifts the interest margin by `delta_bp` from `date` onward (effective-from\ndate). Steps are cumulative. A negative `delta_bp` steps the margin down (a\nleverage-grid improvement); term loans accept only non-negative steps."
@@ -3959,6 +4051,29 @@ export default [
     "description": "Initial principal amount outstanding at leg inception.",
     "ref": "#/$defs/Money",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_668586b4a212813f115e",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastFadeShape",
+    "description": "Path of a fade to target."
+  },
+  {
+    "path": "#/$defs/d_668586b4a212813f115e/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastFadeShape/oneOf/0",
+    "const": "linear",
+    "description": "Equal steps, reaching the target at the final period."
+  },
+  {
+    "path": "#/$defs/d_668586b4a212813f115e/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastFadeShape/oneOf/1",
+    "const": "geometric",
+    "description": "Constant compound growth; base and target must be non-zero with the same sign."
+  },
+  {
+    "path": "#/$defs/d_668586b4a212813f115e/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastFadeShape/oneOf/2",
+    "const": "exponential",
+    "description": "Half-life decay toward the target; requires `half_life`."
   },
   {
     "path": "#/$defs/d_66cec9e6c4e451f96890",
@@ -5438,6 +5553,29 @@ export default [
     "description": "Formula or node for the `VoluntaryPrepayment` rung.\n\nRequired when `VoluntaryPrepayment` appears in `priority_of_payments`.\nWhen configured, that priority must be present so payment consumes cash.\nSized independently of the ECF sweep and mandatory prepay buckets."
   },
   {
+    "path": "#/$defs/d_7f4d9a4ecfa35776a8bf",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastTrendMethod",
+    "description": "Trend model of a time-series forecast."
+  },
+  {
+    "path": "#/$defs/d_7f4d9a4ecfa35776a8bf/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastTrendMethod/oneOf/0",
+    "const": "linear",
+    "description": "Least-squares linear trend."
+  },
+  {
+    "path": "#/$defs/d_7f4d9a4ecfa35776a8bf/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastTrendMethod/oneOf/1",
+    "const": "exponential",
+    "description": "Holt exponential smoothing; requires `alpha` and `beta`."
+  },
+  {
+    "path": "#/$defs/d_7f4d9a4ecfa35776a8bf/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastTrendMethod/oneOf/2",
+    "const": "moving_average",
+    "description": "Moving average; requires `window`."
+  },
+  {
     "path": "#/$defs/d_82d2bec48bc64b37bcef",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ClosedUnitIntervalF64Wire",
     "description": "Finite JSON number in the closed interval `[0, 1]`.",
@@ -6418,19 +6556,183 @@ export default [
   {
     "path": "#/$defs/d_9699cb3c9e4a8e981880",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec",
-    "description": "Forecast method specification.\n\nDefines how to forecast future values for a node."
+    "description": "A forecast method with its typed parameters.\n\nSerializes as `{ \"method\": ..., \"params\": { ... } }`. `params` may be\nomitted when the method needs none."
   },
   {
-    "path": "#/$defs/d_9699cb3c9e4a8e981880/properties/method",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/properties/method",
-    "description": "Forecast method",
-    "ref": "#/$defs/ForecastMethod",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastMethod"
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/0",
+    "description": "Carry the last value forward."
   },
   {
-    "path": "#/$defs/d_9699cb3c9e4a8e981880/properties/params",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/properties/params",
-    "description": "Method-specific parameters"
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/0/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/0/properties/method",
+    "const": "forward_fill"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/0/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/0/properties/params",
+    "ref": "#/$defs/BoundsParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BoundsParams"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/1",
+    "description": "Compound one growth rate per period."
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/1/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/1/properties/method",
+    "const": "growth_pct"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/1/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/1/properties/params",
+    "ref": "#/$defs/GrowthPctParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/GrowthPctParams"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/10",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/10",
+    "description": "Glide toward a target level over the forecast horizon."
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/10/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/10/properties/method",
+    "const": "fade_to_target"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/10/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/10/properties/params",
+    "ref": "#/$defs/FadeToTargetParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FadeToTargetParams"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/2",
+    "description": "Compound a different growth rate each period."
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/2/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/2/properties/method",
+    "const": "curve_pct"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/2/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/2/properties/params",
+    "ref": "#/$defs/CurvePctParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CurvePctParams"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/3",
+    "description": "Sample an additive random walk."
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/3/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/3/properties/method",
+    "const": "normal"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/3/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/3/properties/params",
+    "ref": "#/$defs/DistributionParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DistributionParams"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/4",
+    "description": "Sample a multiplicative random walk for positive values."
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/4/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/4/properties/method",
+    "const": "log_normal"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/4/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/4/properties/params",
+    "ref": "#/$defs/DistributionParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DistributionParams"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/5",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/5",
+    "description": "Set exact values for chosen periods, carrying forward between them."
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/5/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/5/properties/method",
+    "const": "override"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/5/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/5/properties/params",
+    "ref": "#/$defs/OverrideParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/OverrideParams"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/6",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/6",
+    "description": "Project from a historical series."
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/6/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/6/properties/method",
+    "const": "time_series"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/6/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/6/properties/params",
+    "ref": "#/$defs/TimeSeriesParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TimeSeriesParams"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/7",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/7",
+    "description": "Project a repeating pattern from a historical series."
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/7/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/7/properties/method",
+    "const": "seasonal"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/7/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/7/properties/params",
+    "ref": "#/$defs/SeasonalParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SeasonalParams"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/8",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/8",
+    "description": "Sample a mean-reverting AR(1) process."
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/8/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/8/properties/method",
+    "const": "mean_reverting"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/8/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/8/properties/params",
+    "ref": "#/$defs/MeanRevertingParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MeanRevertingParams"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/9",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/9",
+    "description": "Resample changes from a historical series."
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/9/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/9/properties/method",
+    "const": "bootstrap"
+  },
+  {
+    "path": "#/$defs/d_9699cb3c9e4a8e981880/oneOf/9/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/9/properties/params",
+    "ref": "#/$defs/BootstrapParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BootstrapParams"
   },
   {
     "path": "#/$defs/d_97ce4fbfee051bc20729",
@@ -6835,6 +7137,57 @@ export default [
     "description": "Apply index floors/caps once to the compounded period index rate.\n\nThis preserves the historical period-level behavior for contracts that\nexplicitly define floors/caps on the period index rate."
   },
   {
+    "path": "#/$defs/d_a9879b1ecf56bb1c1e5d",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MeanRevertingParams",
+    "description": "Parameters of [`ForecastSpec::MeanReverting`]."
+  },
+  {
+    "path": "#/$defs/d_a9879b1ecf56bb1c1e5d/properties/correlation",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MeanRevertingParams/properties/correlation",
+    "description": "Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_a9879b1ecf56bb1c1e5d/properties/correlation_with",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MeanRevertingParams/properties/correlation_with",
+    "description": "Node whose shocks this one correlates with; Monte Carlo evaluation only."
+  },
+  {
+    "path": "#/$defs/d_a9879b1ecf56bb1c1e5d/properties/long_run_mean",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MeanRevertingParams/properties/long_run_mean",
+    "description": "Long-run level the process reverts to, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_a9879b1ecf56bb1c1e5d/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MeanRevertingParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_a9879b1ecf56bb1c1e5d/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MeanRevertingParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_a9879b1ecf56bb1c1e5d/properties/reversion_speed",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MeanRevertingParams/properties/reversion_speed",
+    "description": "Fraction of the gap closed each period, a decimal in (0, 1].",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_a9879b1ecf56bb1c1e5d/properties/seed",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MeanRevertingParams/properties/seed",
+    "description": "Random seed; the same seed reproduces the same path."
+  },
+  {
+    "path": "#/$defs/d_a9879b1ecf56bb1c1e5d/properties/std_dev",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/MeanRevertingParams/properties/std_dev",
+    "description": "Standard deviation of the shock per period; non-negative.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_ac8cc8b1c0238b654c35",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BondRiskBasis",
     "description": "Basis used for bond duration, convexity, and DV01-style risk metrics."
@@ -6979,6 +7332,53 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConversionEvent/oneOf/2/properties/price_trigger",
     "ref": "#/$defs/PriceTrigger",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PriceTrigger"
+  },
+  {
+    "path": "#/$defs/d_b0df738903f9c16e9407",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SeasonalParams",
+    "description": "Parameters of [`ForecastSpec::Seasonal`]."
+  },
+  {
+    "path": "#/$defs/d_b0df738903f9c16e9407/properties/growth",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SeasonalParams/properties/growth",
+    "description": "Trend growth per period as a decimal: 0.03 = 3%; defaults to none.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_b0df738903f9c16e9407/properties/historical",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SeasonalParams/properties/historical",
+    "description": "Observations in the line's base units, oldest first; at least two full cycles."
+  },
+  {
+    "path": "#/$defs/d_b0df738903f9c16e9407/properties/historical/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SeasonalParams/properties/historical/items",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_b0df738903f9c16e9407/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SeasonalParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_b0df738903f9c16e9407/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SeasonalParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_b0df738903f9c16e9407/properties/mode",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SeasonalParams/properties/mode",
+    "description": "How the seasonal pattern combines with the trend.",
+    "ref": "#/$defs/SeasonalMode",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SeasonalMode"
+  },
+  {
+    "path": "#/$defs/d_b0df738903f9c16e9407/properties/season_length",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/SeasonalParams/properties/season_length",
+    "description": "Periods per seasonal cycle.",
+    "format": "uint64",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_b375e274438ab847f1fc",
@@ -7979,6 +8379,92 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikMode"
   },
   {
+    "path": "#/$defs/d_d161ae86daa94ad6c7ee",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CurvePctParams",
+    "description": "Parameters of [`ForecastSpec::CurvePct`]."
+  },
+  {
+    "path": "#/$defs/d_d161ae86daa94ad6c7ee/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CurvePctParams/properties/curve",
+    "description": "Growth rate per forecast period as decimals, one per period in order."
+  },
+  {
+    "path": "#/$defs/d_d161ae86daa94ad6c7ee/properties/curve/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CurvePctParams/properties/curve/items",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_d161ae86daa94ad6c7ee/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CurvePctParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_d161ae86daa94ad6c7ee/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CurvePctParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_d2a51b402e236fa27cc5",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TimeSeriesParams",
+    "description": "Parameters of [`ForecastSpec::TimeSeries`]."
+  },
+  {
+    "path": "#/$defs/d_d2a51b402e236fa27cc5/properties/alpha",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TimeSeriesParams/properties/alpha",
+    "description": "Level smoothing in (0, 1]; required for the exponential method.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_d2a51b402e236fa27cc5/properties/beta",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TimeSeriesParams/properties/beta",
+    "description": "Trend smoothing in (0, 1]; required for the exponential method.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_d2a51b402e236fa27cc5/properties/historical",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TimeSeriesParams/properties/historical",
+    "description": "Observations in the line's base units, oldest first."
+  },
+  {
+    "path": "#/$defs/d_d2a51b402e236fa27cc5/properties/historical/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TimeSeriesParams/properties/historical/items",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_d2a51b402e236fa27cc5/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TimeSeriesParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_d2a51b402e236fa27cc5/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TimeSeriesParams/properties/method",
+    "description": "Trend model; defaults to linear.",
+    "ref": "#/$defs/ForecastTrendMethod",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastTrendMethod"
+  },
+  {
+    "path": "#/$defs/d_d2a51b402e236fa27cc5/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TimeSeriesParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_d2a51b402e236fa27cc5/properties/phi",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TimeSeriesParams/properties/phi",
+    "description": "Trend damping in (0, 1]; legal only with the exponential method.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_d2a51b402e236fa27cc5/properties/window",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/TimeSeriesParams/properties/window",
+    "description": "Averaging window in periods; required for the moving-average method.",
+    "format": "uint64",
+    "minimum": 0
+  },
+  {
     "path": "#/$defs/d_d3213166ba249a2637ec",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/NodeType",
     "description": "Node computation type.\n\nDetermines how a node's value is computed:\n- **Value**: Only explicit values (actuals, assumptions)\n- **Calculated**: Only formula-derived\n- **Mixed**: Value OR Forecast OR Formula (precedence: Value > Forecast > Formula)"
@@ -8103,6 +8589,23 @@ export default [
     "format": "uint8",
     "maximum": 12,
     "minimum": 1
+  },
+  {
+    "path": "#/$defs/d_d96cd84373b443a9835e",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastBootstrapMode",
+    "description": "What a bootstrap resamples from its historical series."
+  },
+  {
+    "path": "#/$defs/d_d96cd84373b443a9835e/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastBootstrapMode/oneOf/0",
+    "const": "growth",
+    "description": "Period-over-period growth rates, compounded; needs a positive series."
+  },
+  {
+    "path": "#/$defs/d_d96cd84373b443a9835e/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastBootstrapMode/oneOf/1",
+    "const": "diff",
+    "description": "Additive level changes; works for a series crossing zero."
   },
   {
     "path": "#/$defs/d_d9b87615ca391901799a",
@@ -8255,6 +8758,23 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CalibrationParameter/oneOf/1",
     "const": "asset_vol",
     "description": "Calibrate the asset volatility sigma_V."
+  },
+  {
+    "path": "#/$defs/d_dfb113784288659a8f2c",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BoundsParams",
+    "description": "Parameters of a method with only the cross-cutting bounds."
+  },
+  {
+    "path": "#/$defs/d_dfb113784288659a8f2c/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BoundsParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_dfb113784288659a8f2c/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BoundsParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_e2eda29a60f5dc6bf382",
@@ -8496,6 +9016,33 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ProtectionWindow"
   },
   {
+    "path": "#/$defs/d_f1ea5e7398e0dcbf32b5",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/OverrideParams",
+    "description": "Parameters of [`ForecastSpec::Override`]."
+  },
+  {
+    "path": "#/$defs/d_f1ea5e7398e0dcbf32b5/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/OverrideParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_f1ea5e7398e0dcbf32b5/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/OverrideParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_f1ea5e7398e0dcbf32b5/properties/overrides",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/OverrideParams/properties/overrides",
+    "description": "Exact levels by period id, in the line's base units; other periods carry forward."
+  },
+  {
+    "path": "#/$defs/d_f1ea5e7398e0dcbf32b5/properties/overrides/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/OverrideParams/properties/overrides/additionalProperties",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_f6d62213f69ce1a51ff3",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ThresholdDirection",
     "description": "Direction for threshold comparison."
@@ -8604,77 +9151,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/StubKind"
   },
   {
-    "path": "#/$defs/d_fa7e9148fe6bb6b4aec7",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastMethod",
-    "description": "Available forecast methods."
-  },
-  {
-    "path": "#/$defs/d_fa7e9148fe6bb6b4aec7/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastMethod/oneOf/0",
-    "const": "forward_fill",
-    "description": "Carry last value forward"
-  },
-  {
-    "path": "#/$defs/d_fa7e9148fe6bb6b4aec7/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastMethod/oneOf/1",
-    "const": "growth_pct",
-    "description": "Compound growth: `v[t] = v[t-1] * (1 + rate)`"
-  },
-  {
-    "path": "#/$defs/d_fa7e9148fe6bb6b4aec7/oneOf/10",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastMethod/oneOf/10",
-    "const": "bootstrap",
-    "description": "Resample historical growth rates or level diffs (deterministic with seed)"
-  },
-  {
-    "path": "#/$defs/d_fa7e9148fe6bb6b4aec7/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastMethod/oneOf/2",
-    "const": "curve_pct",
-    "description": "Period-specific growth rates: `v[t] = v[t-1] * (1 + curve[t])`"
-  },
-  {
-    "path": "#/$defs/d_fa7e9148fe6bb6b4aec7/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastMethod/oneOf/3",
-    "const": "normal",
-    "description": "Sample from normal distribution (deterministic with seed)"
-  },
-  {
-    "path": "#/$defs/d_fa7e9148fe6bb6b4aec7/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastMethod/oneOf/4",
-    "const": "log_normal",
-    "description": "Sample from log-normal distribution (deterministic with seed)"
-  },
-  {
-    "path": "#/$defs/d_fa7e9148fe6bb6b4aec7/oneOf/5",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastMethod/oneOf/5",
-    "const": "override",
-    "description": "Explicit period overrides"
-  },
-  {
-    "path": "#/$defs/d_fa7e9148fe6bb6b4aec7/oneOf/6",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastMethod/oneOf/6",
-    "const": "time_series",
-    "description": "Reference external time series"
-  },
-  {
-    "path": "#/$defs/d_fa7e9148fe6bb6b4aec7/oneOf/7",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastMethod/oneOf/7",
-    "const": "seasonal",
-    "description": "Seasonal pattern (additive/multiplicative)"
-  },
-  {
-    "path": "#/$defs/d_fa7e9148fe6bb6b4aec7/oneOf/8",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastMethod/oneOf/8",
-    "const": "fade_to_target",
-    "description": "Glide from the base value to a target level: linear, geometric\n(CAGR-to-terminal), or exponential (half-life) shape"
-  },
-  {
-    "path": "#/$defs/d_fa7e9148fe6bb6b4aec7/oneOf/9",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastMethod/oneOf/9",
-    "const": "mean_reverting",
-    "description": "Mean-reverting AR(1) path:\n`v[t] = v[t-1] + reversion_speed * (long_run_mean - v[t-1]) + std_dev * z[t]`"
-  },
-  {
     "path": "#/$defs/d_fada56e3c212d0a9b805",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CollateralAssetClass",
     "description": "Collateral asset classes per BCBS-IOSCO standards.\n\nAsset classes determine baseline haircuts and eligibility criteria.\nThe BCBS-IOSCO framework specifies minimum haircuts by asset class.\n\n# Reference\n\nBCBS-IOSCO \"Margin requirements for non-centrally cleared derivatives\" (2020)\nAnnex A: Standardized haircut schedule `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`"
@@ -8755,6 +9231,51 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CallPut"
   },
   {
+    "path": "#/$defs/d_fb167be7e6dcd5c363b6",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DistributionParams",
+    "description": "Parameters of [`ForecastSpec::Normal`] and [`ForecastSpec::LogNormal`]."
+  },
+  {
+    "path": "#/$defs/d_fb167be7e6dcd5c363b6/properties/correlation",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DistributionParams/properties/correlation",
+    "description": "Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fb167be7e6dcd5c363b6/properties/correlation_with",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DistributionParams/properties/correlation_with",
+    "description": "Node whose shocks this one correlates with; Monte Carlo evaluation only."
+  },
+  {
+    "path": "#/$defs/d_fb167be7e6dcd5c363b6/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DistributionParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fb167be7e6dcd5c363b6/properties/mean",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DistributionParams/properties/mean",
+    "description": "Mean shock per period, as the method applies it.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fb167be7e6dcd5c363b6/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DistributionParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fb167be7e6dcd5c363b6/properties/seed",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DistributionParams/properties/seed",
+    "description": "Random seed; the same seed reproduces the same path."
+  },
+  {
+    "path": "#/$defs/d_fb167be7e6dcd5c363b6/properties/std_dev",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DistributionParams/properties/std_dev",
+    "description": "Standard deviation of the shock per period; non-negative.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_fc17544530079d46d05e",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RollupMethod",
     "description": "How one node's values combine over the source periods of a target period."
@@ -8776,6 +9297,29 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/RollupMethod/oneOf/2",
     "const": "formula",
     "description": "Re-evaluate the node's formula (and `where` clause) on the rolled-up\nvalues: ratios such as margins, leverage and coverage. Time-series\nfunctions then run at the target frequency, so `lag(x, 1)` is the\nprior target period."
+  },
+  {
+    "path": "#/$defs/d_fcbfa69172f239f37e64",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/GrowthPctParams",
+    "description": "Parameters of [`ForecastSpec::GrowthPct`]."
+  },
+  {
+    "path": "#/$defs/d_fcbfa69172f239f37e64/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/GrowthPctParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fcbfa69172f239f37e64/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/GrowthPctParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fcbfa69172f239f37e64/properties/rate",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/GrowthPctParams/properties/rate",
+    "description": "Growth per period as a decimal: 0.03 = 3%.",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_fedf13c6253774f430cb",

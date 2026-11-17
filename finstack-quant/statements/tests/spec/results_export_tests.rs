@@ -147,10 +147,11 @@ fn test_export_complete_pl_model() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => json!(0.05) },
-            },
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => json!(0.05) },
+            )
+            .unwrap(),
         );
         model_builder.compute("cogs", "revenue * 0.6").unwrap();
         model_builder.value(
@@ -162,10 +163,7 @@ fn test_export_complete_pl_model() {
         );
         model_builder.forecast(
             "opex",
-            ForecastSpec {
-                method: ForecastMethod::ForwardFill,
-                params: indexmap! {},
-            },
+            ForecastSpec::from_params(ForecastMethod::ForwardFill, indexmap! {}).unwrap(),
         );
         model_builder
             .compute("gross_profit", "revenue - cogs")

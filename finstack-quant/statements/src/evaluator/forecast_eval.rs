@@ -89,10 +89,10 @@ pub(crate) fn evaluate_forecast(
         visibility_cutoff,
     )?;
 
-    let parameters = forecast_spec.parameters()?;
+    let parameters = forecast_spec;
     let forecast_results = if let Some(offset) = seed_offset {
         let correlation = if mc_z_cache.is_some() {
-            forecast::statistical::correlation(&parameters)?
+            forecast::statistical::correlation(parameters)?
         } else {
             None
         };
@@ -104,7 +104,7 @@ pub(crate) fn evaluate_forecast(
                     )));
                 }
                 let (series, shocks) = monte_carlo_correlated_series(CorrelatedMonteCarloSeries {
-                    parameters: &parameters,
+                    parameters,
                     base_value,
                     forecast_periods: &forecast_periods,
                     seed_offset: offset,
@@ -116,7 +116,7 @@ pub(crate) fn evaluate_forecast(
                 (series, Some(shocks))
             } else {
                 forecast::apply_forecast(
-                    &parameters,
+                    parameters,
                     base_value,
                     &forecast_periods,
                     node_spec.node_id.as_str(),
@@ -131,11 +131,11 @@ pub(crate) fn evaluate_forecast(
         }
         // Cache sampled shocks before applying output bounds. Clipping the
         // reported levels does not change the latent correlation process.
-        forecast::apply_bounds(&parameters, &mut series)?;
+        forecast::apply_bounds(parameters, &mut series)?;
         series
     } else {
         forecast::apply_forecast_for_node(
-            &parameters,
+            parameters,
             base_value,
             &forecast_periods,
             node_spec.node_id.as_str(),

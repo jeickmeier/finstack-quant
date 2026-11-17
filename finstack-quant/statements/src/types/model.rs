@@ -1,11 +1,11 @@
 //! Financial model specification types.
 
 use crate::error::{Error, Result};
-use crate::types::{NodeId, NodeSpec, NodeType};
+use crate::types::{ForecastSpec, NodeId, NodeSpec, NodeType};
 use finstack_quant_core::contract::{
     ContractDescriptor, ContractError, LoadLimits, ValidationReport,
 };
-use finstack_quant_core::dates::PeriodPlan;
+use finstack_quant_core::dates::{PeriodId, PeriodPlan};
 use finstack_quant_core::wire::SchemaVersion;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond;
@@ -512,7 +512,7 @@ impl FinancialModelSpec {
                 )));
             }
             if let Some(forecast) = &node.forecast {
-                forecast.validate()?;
+                self.validate_forecast(node_id, forecast)?;
             }
             match node.node_type {
                 NodeType::Value => {
@@ -939,6 +939,82 @@ pub struct DebtInstrumentSpec {
     pub id: String,
     /// Tagged instrument payload: `{"type": "...", "spec": {...}}`.
     pub spec: FinancialStatementInstrument,
+}
+
+impl FinancialModelSpec {
+    /// Static checks of one node's forecast: the method's own requirements,
+    /// then the ones that need the model. They apply even when explicit
+    /// observations cover every forecast period.
+    fn validate_forecast(&self, node_id: &NodeId, forecast: &ForecastSpec) -> Result<()> {
+        use crate::types::{DistributionParams, MeanRevertingParams};
+
+        forecast
+            .validate()
+            .map_err(|error| Error::build(format!("Node '{node_id}': {error}")))?;
+        let peer = match forecast {
+            // A growth curve covers exactly the model's forecast periods.
+            ForecastSpec::CurvePct(params) => {
+                let horizon = self.periods.iter().filter(|p| !p.is_actual).count();
+                if params.curve.len() != horizon {
+                    return Err(Error::build(format!(
+                        "Node '{node_id}': the growth curve has {} rates but the model has \
+                         {horizon} forecast periods",
+                        params.curve.len()
+                    )));
+                }
+                None
+            }
+            // Override keys are periods of this model's plan.
+            ForecastSpec::Override(params) => {
+                for key in params.overrides.keys() {
+                    let in_plan = key
+                        .parse::<PeriodId>()
+                        .is_ok_and(|id| self.periods.iter().any(|period| period.id == id));
+                    if !in_plan {
+                        return Err(Error::build(format!(
+                            "Node '{node_id}': forecast override key '{key}' is not a period of \
+                             the model"
+                        )));
+                    }
+                }
+                None
+            }
+            ForecastSpec::Normal(DistributionParams {
+                correlation_with, ..
+            })
+            | ForecastSpec::LogNormal(DistributionParams {
+                correlation_with, ..
+            })
+            | ForecastSpec::MeanReverting(MeanRevertingParams {
+                correlation_with, ..
+            }) => correlation_with.as_deref(),
+            _ => None,
+        };
+        // A correlation peer is another stochastic forecast of the model.
+        let Some(peer) = peer else {
+            return Ok(());
+        };
+        let stochastic_peer = peer != node_id.as_str()
+            && self
+                .get_node(peer)
+                .and_then(|node| node.forecast.as_ref())
+                .is_some_and(|peer| {
+                    matches!(
+                        peer,
+                        ForecastSpec::Normal(_)
+                            | ForecastSpec::LogNormal(_)
+                            | ForecastSpec::MeanReverting(_)
+                    )
+                });
+        if stochastic_peer {
+            Ok(())
+        } else {
+            Err(Error::build(format!(
+                "Node '{node_id}': correlation peer '{peer}' is not another node with a normal, \
+                 log_normal or mean_reverting forecast"
+            )))
+        }
+    }
 }
 
 #[cfg(test)]

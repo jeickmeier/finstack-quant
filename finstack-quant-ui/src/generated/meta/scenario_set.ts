@@ -7,6 +7,53 @@ export default [
     "title": "ScenarioSet"
   },
   {
+    "path": "#/$defs/d_08ce974392238bd9f951",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/SeasonalParams",
+    "description": "Parameters of [`ForecastSpec::Seasonal`]."
+  },
+  {
+    "path": "#/$defs/d_08ce974392238bd9f951/properties/growth",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/SeasonalParams/properties/growth",
+    "description": "Trend growth per period as a decimal: 0.03 = 3%; defaults to none.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_08ce974392238bd9f951/properties/historical",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/SeasonalParams/properties/historical",
+    "description": "Observations in the line's base units, oldest first; at least two full cycles."
+  },
+  {
+    "path": "#/$defs/d_08ce974392238bd9f951/properties/historical/items",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/SeasonalParams/properties/historical/items",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_08ce974392238bd9f951/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/SeasonalParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_08ce974392238bd9f951/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/SeasonalParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_08ce974392238bd9f951/properties/mode",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/SeasonalParams/properties/mode",
+    "description": "How the seasonal pattern combines with the trend.",
+    "ref": "#/$defs/SeasonalMode",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/SeasonalMode"
+  },
+  {
+    "path": "#/$defs/d_08ce974392238bd9f951/properties/season_length",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/SeasonalParams/properties/season_length",
+    "description": "Periods per seasonal cycle.",
+    "format": "uint64",
+    "minimum": 0
+  },
+  {
     "path": "#/$defs/d_1aa28628f45df66f024e",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ScenarioDefinition",
     "description": "Definition for a single named scenario.\n\nScenarios are attached to a base [`FinancialModelSpec`] and specify an\noptional parent plus typed scalar or monetary value overrides and forecast\nspecification overrides for named nodes.\n\nThe JSON representation mirrors the design docs example:\n\n```json\n\"downside\": {\n  \"parent\": \"base\",\n  \"overrides\": { \"revenue_growth\": -0.05, \"margin\": -0.02 }\n}\n```"
@@ -54,6 +101,29 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/AmountOrScalar"
   },
   {
+    "path": "#/$defs/d_1b5f98440d110c152454",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/GrowthPctParams",
+    "description": "Parameters of [`ForecastSpec::GrowthPct`]."
+  },
+  {
+    "path": "#/$defs/d_1b5f98440d110c152454/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/GrowthPctParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_1b5f98440d110c152454/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/GrowthPctParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_1b5f98440d110c152454/properties/rate",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/GrowthPctParams/properties/rate",
+    "description": "Growth per period as a decimal: 0.03 = 3%.",
+    "format": "double"
+  },
+  {
     "path": "#/$defs/d_22985de49498160e6347",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/Money",
     "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues retain decimal precision independently of ISO 4217 display precision.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::from((1_000_000_i64, Currency::EUR));\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```"
@@ -73,6 +143,50 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/Currency"
   },
   {
+    "path": "#/$defs/d_23aac388db4697418a04",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/OverrideParams",
+    "description": "Parameters of [`ForecastSpec::Override`]."
+  },
+  {
+    "path": "#/$defs/d_23aac388db4697418a04/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/OverrideParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_23aac388db4697418a04/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/OverrideParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_23aac388db4697418a04/properties/overrides",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/OverrideParams/properties/overrides",
+    "description": "Exact levels by period id, in the line's base units; other periods carry forward."
+  },
+  {
+    "path": "#/$defs/d_23aac388db4697418a04/properties/overrides/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/OverrideParams/properties/overrides/additionalProperties",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_37bdaa203daeacc7cf76",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/SeasonalMode",
+    "description": "Seasonal decomposition mode."
+  },
+  {
+    "path": "#/$defs/d_37bdaa203daeacc7cf76/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/SeasonalMode/oneOf/0",
+    "const": "additive",
+    "description": "Additive seasonality: Y = Trend + Seasonal + Error"
+  },
+  {
+    "path": "#/$defs/d_37bdaa203daeacc7cf76/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/SeasonalMode/oneOf/1",
+    "const": "multiplicative",
+    "description": "Multiplicative seasonality: Y = Trend * Seasonal * Error"
+  },
+  {
     "path": "#/$defs/d_39fe593d8e226e27da6a",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/AmountOrScalar",
     "description": "Value that can be currency-aware or unitless.\n\nUsed for node values that can represent:\n- **Amount**: Currency-aware monetary values (e.g., USD 1,000,000)\n- **Scalar**: Unitless values (e.g., ratios, percentages, counts)"
@@ -89,6 +203,65 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/AmountOrScalar/anyOf/1",
     "description": "Unitless scalar (ratio, percentage, count, etc.)",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_64bfae777a8ae7e8ab2b",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/TimeSeriesParams",
+    "description": "Parameters of [`ForecastSpec::TimeSeries`]."
+  },
+  {
+    "path": "#/$defs/d_64bfae777a8ae7e8ab2b/properties/alpha",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/TimeSeriesParams/properties/alpha",
+    "description": "Level smoothing in (0, 1]; required for the exponential method.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_64bfae777a8ae7e8ab2b/properties/beta",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/TimeSeriesParams/properties/beta",
+    "description": "Trend smoothing in (0, 1]; required for the exponential method.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_64bfae777a8ae7e8ab2b/properties/historical",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/TimeSeriesParams/properties/historical",
+    "description": "Observations in the line's base units, oldest first."
+  },
+  {
+    "path": "#/$defs/d_64bfae777a8ae7e8ab2b/properties/historical/items",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/TimeSeriesParams/properties/historical/items",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_64bfae777a8ae7e8ab2b/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/TimeSeriesParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_64bfae777a8ae7e8ab2b/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/TimeSeriesParams/properties/method",
+    "description": "Trend model; defaults to linear.",
+    "ref": "#/$defs/ForecastTrendMethod",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastTrendMethod"
+  },
+  {
+    "path": "#/$defs/d_64bfae777a8ae7e8ab2b/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/TimeSeriesParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_64bfae777a8ae7e8ab2b/properties/phi",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/TimeSeriesParams/properties/phi",
+    "description": "Trend damping in (0, 1]; legal only with the exponential method.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_64bfae777a8ae7e8ab2b/properties/window",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/TimeSeriesParams/properties/window",
+    "description": "Averaging window in periods; required for the moving-average method.",
+    "format": "uint64",
+    "minimum": 0
   },
   {
     "path": "#/$defs/d_80f981bb0b9a5ed597d5",
@@ -1070,90 +1243,461 @@ export default [
   {
     "path": "#/$defs/d_8ed123e8acaef4d5eee1",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec",
-    "description": "Forecast method specification.\n\nDefines how to forecast future values for a node."
+    "description": "A forecast method with its typed parameters.\n\nSerializes as `{ \"method\": ..., \"params\": { ... } }`. `params` may be\nomitted when the method needs none."
   },
   {
-    "path": "#/$defs/d_8ed123e8acaef4d5eee1/properties/method",
-    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/properties/method",
-    "description": "Forecast method",
-    "ref": "#/$defs/ForecastMethod",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastMethod"
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/0",
+    "description": "Carry the last value forward."
   },
   {
-    "path": "#/$defs/d_8ed123e8acaef4d5eee1/properties/params",
-    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/properties/params",
-    "description": "Method-specific parameters"
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/0/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/0/properties/method",
+    "const": "forward_fill"
   },
   {
-    "path": "#/$defs/d_e4fb825338963b5b9812",
-    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastMethod",
-    "description": "Available forecast methods."
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/0/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/0/properties/params",
+    "ref": "#/$defs/BoundsParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/BoundsParams"
   },
   {
-    "path": "#/$defs/d_e4fb825338963b5b9812/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastMethod/oneOf/0",
-    "const": "forward_fill",
-    "description": "Carry last value forward"
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/1",
+    "description": "Compound one growth rate per period."
   },
   {
-    "path": "#/$defs/d_e4fb825338963b5b9812/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastMethod/oneOf/1",
-    "const": "growth_pct",
-    "description": "Compound growth: `v[t] = v[t-1] * (1 + rate)`"
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/1/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/1/properties/method",
+    "const": "growth_pct"
   },
   {
-    "path": "#/$defs/d_e4fb825338963b5b9812/oneOf/10",
-    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastMethod/oneOf/10",
-    "const": "bootstrap",
-    "description": "Resample historical growth rates or level diffs (deterministic with seed)"
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/1/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/1/properties/params",
+    "ref": "#/$defs/GrowthPctParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/GrowthPctParams"
   },
   {
-    "path": "#/$defs/d_e4fb825338963b5b9812/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastMethod/oneOf/2",
-    "const": "curve_pct",
-    "description": "Period-specific growth rates: `v[t] = v[t-1] * (1 + curve[t])`"
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/10",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/10",
+    "description": "Glide toward a target level over the forecast horizon."
   },
   {
-    "path": "#/$defs/d_e4fb825338963b5b9812/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastMethod/oneOf/3",
-    "const": "normal",
-    "description": "Sample from normal distribution (deterministic with seed)"
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/10/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/10/properties/method",
+    "const": "fade_to_target"
   },
   {
-    "path": "#/$defs/d_e4fb825338963b5b9812/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastMethod/oneOf/4",
-    "const": "log_normal",
-    "description": "Sample from log-normal distribution (deterministic with seed)"
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/10/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/10/properties/params",
+    "ref": "#/$defs/FadeToTargetParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/FadeToTargetParams"
   },
   {
-    "path": "#/$defs/d_e4fb825338963b5b9812/oneOf/5",
-    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastMethod/oneOf/5",
-    "const": "override",
-    "description": "Explicit period overrides"
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/2",
+    "description": "Compound a different growth rate each period."
   },
   {
-    "path": "#/$defs/d_e4fb825338963b5b9812/oneOf/6",
-    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastMethod/oneOf/6",
-    "const": "time_series",
-    "description": "Reference external time series"
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/2/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/2/properties/method",
+    "const": "curve_pct"
   },
   {
-    "path": "#/$defs/d_e4fb825338963b5b9812/oneOf/7",
-    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastMethod/oneOf/7",
-    "const": "seasonal",
-    "description": "Seasonal pattern (additive/multiplicative)"
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/2/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/2/properties/params",
+    "ref": "#/$defs/CurvePctParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/CurvePctParams"
   },
   {
-    "path": "#/$defs/d_e4fb825338963b5b9812/oneOf/8",
-    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastMethod/oneOf/8",
-    "const": "fade_to_target",
-    "description": "Glide from the base value to a target level: linear, geometric\n(CAGR-to-terminal), or exponential (half-life) shape"
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/3",
+    "description": "Sample an additive random walk."
   },
   {
-    "path": "#/$defs/d_e4fb825338963b5b9812/oneOf/9",
-    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastMethod/oneOf/9",
-    "const": "mean_reverting",
-    "description": "Mean-reverting AR(1) path:\n`v[t] = v[t-1] + reversion_speed * (long_run_mean - v[t-1]) + std_dev * z[t]`"
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/3/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/3/properties/method",
+    "const": "normal"
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/3/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/3/properties/params",
+    "ref": "#/$defs/DistributionParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/DistributionParams"
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/4",
+    "description": "Sample a multiplicative random walk for positive values."
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/4/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/4/properties/method",
+    "const": "log_normal"
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/4/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/4/properties/params",
+    "ref": "#/$defs/DistributionParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/DistributionParams"
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/5",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/5",
+    "description": "Set exact values for chosen periods, carrying forward between them."
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/5/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/5/properties/method",
+    "const": "override"
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/5/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/5/properties/params",
+    "ref": "#/$defs/OverrideParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/OverrideParams"
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/6",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/6",
+    "description": "Project from a historical series."
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/6/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/6/properties/method",
+    "const": "time_series"
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/6/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/6/properties/params",
+    "ref": "#/$defs/TimeSeriesParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/TimeSeriesParams"
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/7",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/7",
+    "description": "Project a repeating pattern from a historical series."
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/7/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/7/properties/method",
+    "const": "seasonal"
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/7/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/7/properties/params",
+    "ref": "#/$defs/SeasonalParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/SeasonalParams"
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/8",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/8",
+    "description": "Sample a mean-reverting AR(1) process."
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/8/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/8/properties/method",
+    "const": "mean_reverting"
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/8/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/8/properties/params",
+    "ref": "#/$defs/MeanRevertingParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/MeanRevertingParams"
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/9",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/9",
+    "description": "Resample changes from a historical series."
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/9/properties/method",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/9/properties/method",
+    "const": "bootstrap"
+  },
+  {
+    "path": "#/$defs/d_8ed123e8acaef4d5eee1/oneOf/9/properties/params",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastSpec/oneOf/9/properties/params",
+    "ref": "#/$defs/BootstrapParams",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/BootstrapParams"
+  },
+  {
+    "path": "#/$defs/d_93aff92b5684afb10a6d",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/CurvePctParams",
+    "description": "Parameters of [`ForecastSpec::CurvePct`]."
+  },
+  {
+    "path": "#/$defs/d_93aff92b5684afb10a6d/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/CurvePctParams/properties/curve",
+    "description": "Growth rate per forecast period as decimals, one per period in order."
+  },
+  {
+    "path": "#/$defs/d_93aff92b5684afb10a6d/properties/curve/items",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/CurvePctParams/properties/curve/items",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_93aff92b5684afb10a6d/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/CurvePctParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_93aff92b5684afb10a6d/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/CurvePctParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_94898fbe50f273d757c5",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/DistributionParams",
+    "description": "Parameters of [`ForecastSpec::Normal`] and [`ForecastSpec::LogNormal`]."
+  },
+  {
+    "path": "#/$defs/d_94898fbe50f273d757c5/properties/correlation",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/DistributionParams/properties/correlation",
+    "description": "Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_94898fbe50f273d757c5/properties/correlation_with",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/DistributionParams/properties/correlation_with",
+    "description": "Node whose shocks this one correlates with; Monte Carlo evaluation only."
+  },
+  {
+    "path": "#/$defs/d_94898fbe50f273d757c5/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/DistributionParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_94898fbe50f273d757c5/properties/mean",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/DistributionParams/properties/mean",
+    "description": "Mean shock per period, as the method applies it.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_94898fbe50f273d757c5/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/DistributionParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_94898fbe50f273d757c5/properties/seed",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/DistributionParams/properties/seed",
+    "description": "Random seed; the same seed reproduces the same path."
+  },
+  {
+    "path": "#/$defs/d_94898fbe50f273d757c5/properties/std_dev",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/DistributionParams/properties/std_dev",
+    "description": "Standard deviation of the shock per period; non-negative.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_978c4e1eab840443601f",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastFadeShape",
+    "description": "Path of a fade to target."
+  },
+  {
+    "path": "#/$defs/d_978c4e1eab840443601f/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastFadeShape/oneOf/0",
+    "const": "linear",
+    "description": "Equal steps, reaching the target at the final period."
+  },
+  {
+    "path": "#/$defs/d_978c4e1eab840443601f/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastFadeShape/oneOf/1",
+    "const": "geometric",
+    "description": "Constant compound growth; base and target must be non-zero with the same sign."
+  },
+  {
+    "path": "#/$defs/d_978c4e1eab840443601f/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastFadeShape/oneOf/2",
+    "const": "exponential",
+    "description": "Half-life decay toward the target; requires `half_life`."
+  },
+  {
+    "path": "#/$defs/d_aa6b6e2b1dab3c4d1d7e",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/BootstrapParams",
+    "description": "Parameters of [`ForecastSpec::Bootstrap`]."
+  },
+  {
+    "path": "#/$defs/d_aa6b6e2b1dab3c4d1d7e/properties/historical",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/BootstrapParams/properties/historical",
+    "description": "At least 2 observations in the line's base units, oldest first."
+  },
+  {
+    "path": "#/$defs/d_aa6b6e2b1dab3c4d1d7e/properties/historical/items",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/BootstrapParams/properties/historical/items",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_aa6b6e2b1dab3c4d1d7e/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/BootstrapParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_aa6b6e2b1dab3c4d1d7e/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/BootstrapParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_aa6b6e2b1dab3c4d1d7e/properties/mode",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/BootstrapParams/properties/mode",
+    "description": "What to resample; defaults to growth rates.",
+    "ref": "#/$defs/ForecastBootstrapMode",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastBootstrapMode"
+  },
+  {
+    "path": "#/$defs/d_aa6b6e2b1dab3c4d1d7e/properties/seed",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/BootstrapParams/properties/seed",
+    "description": "Random seed; the same seed reproduces the same path."
+  },
+  {
+    "path": "#/$defs/d_b358c7ce89d7a5feef27",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/BoundsParams",
+    "description": "Parameters of a method with only the cross-cutting bounds."
+  },
+  {
+    "path": "#/$defs/d_b358c7ce89d7a5feef27/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/BoundsParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_b358c7ce89d7a5feef27/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/BoundsParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_c42ab0f6dd72707c9df1",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastBootstrapMode",
+    "description": "What a bootstrap resamples from its historical series."
+  },
+  {
+    "path": "#/$defs/d_c42ab0f6dd72707c9df1/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastBootstrapMode/oneOf/0",
+    "const": "growth",
+    "description": "Period-over-period growth rates, compounded; needs a positive series."
+  },
+  {
+    "path": "#/$defs/d_c42ab0f6dd72707c9df1/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastBootstrapMode/oneOf/1",
+    "const": "diff",
+    "description": "Additive level changes; works for a series crossing zero."
+  },
+  {
+    "path": "#/$defs/d_f59b39c1dff118611478",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastTrendMethod",
+    "description": "Trend model of a time-series forecast."
+  },
+  {
+    "path": "#/$defs/d_f59b39c1dff118611478/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastTrendMethod/oneOf/0",
+    "const": "linear",
+    "description": "Least-squares linear trend."
+  },
+  {
+    "path": "#/$defs/d_f59b39c1dff118611478/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastTrendMethod/oneOf/1",
+    "const": "exponential",
+    "description": "Holt exponential smoothing; requires `alpha` and `beta`."
+  },
+  {
+    "path": "#/$defs/d_f59b39c1dff118611478/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastTrendMethod/oneOf/2",
+    "const": "moving_average",
+    "description": "Moving average; requires `window`."
+  },
+  {
+    "path": "#/$defs/d_fb6c2b90cbcd2299d868",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/MeanRevertingParams",
+    "description": "Parameters of [`ForecastSpec::MeanReverting`]."
+  },
+  {
+    "path": "#/$defs/d_fb6c2b90cbcd2299d868/properties/correlation",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/MeanRevertingParams/properties/correlation",
+    "description": "Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fb6c2b90cbcd2299d868/properties/correlation_with",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/MeanRevertingParams/properties/correlation_with",
+    "description": "Node whose shocks this one correlates with; Monte Carlo evaluation only."
+  },
+  {
+    "path": "#/$defs/d_fb6c2b90cbcd2299d868/properties/long_run_mean",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/MeanRevertingParams/properties/long_run_mean",
+    "description": "Long-run level the process reverts to, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fb6c2b90cbcd2299d868/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/MeanRevertingParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fb6c2b90cbcd2299d868/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/MeanRevertingParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fb6c2b90cbcd2299d868/properties/reversion_speed",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/MeanRevertingParams/properties/reversion_speed",
+    "description": "Fraction of the gap closed each period, a decimal in (0, 1].",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_fb6c2b90cbcd2299d868/properties/seed",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/MeanRevertingParams/properties/seed",
+    "description": "Random seed; the same seed reproduces the same path."
+  },
+  {
+    "path": "#/$defs/d_fb6c2b90cbcd2299d868/properties/std_dev",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/MeanRevertingParams/properties/std_dev",
+    "description": "Standard deviation of the shock per period; non-negative.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_ff81303313e8d987d8df",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/FadeToTargetParams",
+    "description": "Parameters of [`ForecastSpec::FadeToTarget`]."
+  },
+  {
+    "path": "#/$defs/d_ff81303313e8d987d8df/properties/half_life",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/FadeToTargetParams/properties/half_life",
+    "description": "Periods to close half the gap; required for, and legal only with, the exponential shape.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_ff81303313e8d987d8df/properties/max",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/FadeToTargetParams/properties/max",
+    "description": "Upper bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_ff81303313e8d987d8df/properties/min",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/FadeToTargetParams/properties/min",
+    "description": "Lower bound clamped onto generated values, in the line's base units.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_ff81303313e8d987d8df/properties/shape",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/FadeToTargetParams/properties/shape",
+    "description": "Path to the target; defaults to linear.",
+    "ref": "#/$defs/ForecastFadeShape",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastFadeShape"
+  },
+  {
+    "path": "#/$defs/d_ff81303313e8d987d8df/properties/target",
+    "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/FadeToTargetParams/properties/target",
+    "description": "Terminal level, in the line's base units.",
+    "format": "double"
   },
   {
     "path": "#/properties/scenarios",

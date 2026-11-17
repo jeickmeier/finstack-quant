@@ -9,8 +9,8 @@ mod value;
 pub use edit::ModelEdit;
 pub use forecast_params::{
     BootstrapParams, BoundsParams, CurvePctParams, DistributionParams, FadeToTargetParams,
-    ForecastBootstrapMode, ForecastFadeShape, ForecastParameters, ForecastTrendMethod,
-    GrowthPctParams, MeanRevertingParams, OverrideParams, SeasonalParams, TimeSeriesParams,
+    ForecastBootstrapMode, ForecastFadeShape, ForecastSpec, ForecastTrendMethod, GrowthPctParams,
+    MeanRevertingParams, OverrideParams, SeasonalParams, TimeSeriesParams,
 };
 pub(crate) use model::validated_explicit_value_type;
 pub use model::{
@@ -18,7 +18,6 @@ pub use model::{
     FinancialStatementInstrument,
 };
 pub use node::{
-    ForecastMethod, ForecastSpec, NodeId, NodeSpec, NodeType, NodeValueType, RollupMethod,
-    SeasonalMode,
+    ForecastMethod, NodeId, NodeSpec, NodeType, NodeValueType, RollupMethod, SeasonalMode,
 };
 pub use value::{AmountOrScalar, infer_series_value_type};

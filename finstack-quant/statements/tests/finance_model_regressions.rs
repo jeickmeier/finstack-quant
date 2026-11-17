@@ -7,7 +7,8 @@ use finstack_quant_core::money::Money;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::NodeValueType;
-use finstack_quant_statements::types::{FinancialModelSpec, ForecastSpec};
+use finstack_quant_statements::types::{FinancialModelSpec, ForecastFadeShape, ForecastSpec};
+use indexmap::IndexMap;
 use serde_json::json;
 use time::macros::date;
 
@@ -247,10 +248,52 @@ fn invalid_forecast_parameters_are_rejected_even_when_actual_values_win() {
         model_builder.value("revenue", &[(quarter(1), 100.0.into())]);
         model_builder.build().unwrap()
     };
-    let mut forecast = ForecastSpec::growth(0.1);
-    forecast.params.insert("raet".into(), json!(0.2));
-    model.nodes.get_mut("revenue").unwrap().forecast = Some(forecast);
-    assert!(model.validate_semantics().is_err());
+    // The only period is an actual with an observation, so none of these
+    // forecasts would ever run. Their static requirements still hold.
+    model.nodes.get_mut("revenue").unwrap().node_type =
+        finstack_quant_statements::types::NodeType::Mixed;
+    for (forecast, cause) in [
+        (
+            ForecastSpec::growth(0.1)
+                .with_param("min", json!(5.0))
+                .unwrap()
+                .with_param("max", json!(1.0))
+                .unwrap(),
+            "'min' (5) is above 'max' (1)",
+        ),
+        (
+            ForecastSpec::fade_to_target(1.0, ForecastFadeShape::Linear)
+                .with_param("half_life", json!(2.0))
+                .unwrap(),
+            "'half_life' applies only to the exponential shape",
+        ),
+        (
+            ForecastSpec::normal(0.0, -1.0, 7),
+            "'std_dev' must not be negative",
+        ),
+        (
+            ForecastSpec::growth(f64::INFINITY),
+            "'rate' must be a finite number",
+        ),
+        (
+            ForecastSpec::normal(0.0, 1.0, 7)
+                .with_param("correlation_with", json!("nobody"))
+                .unwrap()
+                .with_param("correlation", json!(0.5))
+                .unwrap(),
+            "correlation peer 'nobody'",
+        ),
+        (
+            ForecastSpec::overrides(IndexMap::from([(quarter(3), 1.0)])),
+            "override key '2025Q3' is not a period of the model",
+        ),
+    ] {
+        model.nodes.get_mut("revenue").unwrap().forecast = Some(forecast);
+        let error = model.validate_semantics().expect_err(cause);
+        assert!(error.to_string().contains(cause), "{cause}: {error}");
+    }
+    model.nodes.get_mut("revenue").unwrap().forecast = Some(ForecastSpec::growth(0.1));
+    model.validate_semantics().unwrap();
 }
 
 #[test]

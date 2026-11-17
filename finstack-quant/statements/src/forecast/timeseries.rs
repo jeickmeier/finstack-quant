@@ -826,13 +826,10 @@ mod tests {
 
     #[test]
     fn test_seasonal_forecast_rejects_unsupported_season_start() {
-        let spec: crate::types::ForecastSpec = serde_json::from_value(serde_json::json!({
+        let err = serde_json::from_value::<crate::types::ForecastSpec>(serde_json::json!({
             "method": "seasonal",
             "params": {"historical": [0.0, 10.0, 0.0, 10.0], "season_length": 2, "mode": "additive", "season_start": 1},
         }))
-        .expect("forecast spec");
-        let err = spec
-            .parameters()
             .expect_err("unknown parameter key must be rejected");
         assert!(err.to_string().contains("season_start"), "{err}");
     }
@@ -870,26 +867,20 @@ mod tests {
 
     #[test]
     fn test_timeseries_forecast_rejects_unknown_param_keys() {
-        let spec: crate::types::ForecastSpec = serde_json::from_value(serde_json::json!({
+        let err = serde_json::from_value::<crate::types::ForecastSpec>(serde_json::json!({
             "method": "time_series",
             "params": {"historical": [100.0, 110.0, 120.0], "method": "moving_average", "windoww": 2},
         }))
-        .expect("forecast spec");
-        let err = spec
-            .parameters()
             .expect_err("unknown parameter key must be rejected");
         assert!(err.to_string().contains("windoww"), "{err}");
     }
 
     #[test]
     fn test_seasonal_forecast_rejects_unknown_param_keys() {
-        let spec: crate::types::ForecastSpec = serde_json::from_value(serde_json::json!({
+        let err = serde_json::from_value::<crate::types::ForecastSpec>(serde_json::json!({
             "method": "seasonal",
             "params": {"historical": [100.0, 90.0, 110.0, 85.0], "season_length": 2, "mode": "additive", "seasonstart": 1},
         }))
-        .expect("forecast spec");
-        let err = spec
-            .parameters()
             .expect_err("unknown parameter key must be rejected");
         assert!(err.to_string().contains("seasonstart"), "{err}");
     }

@@ -1970,20 +1970,75 @@ export type ResultNumber = number | ("nan" | "inf" | "-inf");
  */
 export type ForecastFadeShape = "linear" | "geometric" | "exponential";
 /**
- * Available forecast methods.
+ * A forecast method with its typed parameters.
+ *
+ * Serializes as `{ "method": ..., "params": { ... } }`. `params` may be
+ * omitted when the method needs none.
  */
-export type ForecastMethod =
-  | "forward_fill"
-  | "growth_pct"
-  | "curve_pct"
-  | "normal"
-  | "log_normal"
-  | "override"
-  | "time_series"
-  | "seasonal"
-  | "fade_to_target"
-  | "mean_reverting"
-  | "bootstrap";
+export type ForecastSpec =
+  | {
+      method: "forward_fill";
+      params?: BoundsParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "growth_pct";
+      params: GrowthPctParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "curve_pct";
+      params: CurvePctParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "normal";
+      params: DistributionParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "log_normal";
+      params: DistributionParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "override";
+      params: OverrideParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "time_series";
+      params: TimeSeriesParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "seasonal";
+      params: SeasonalParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "mean_reverting";
+      params: MeanRevertingParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "bootstrap";
+      params: BootstrapParams;
+      [k: string]: unknown;
+    }
+  | {
+      method: "fade_to_target";
+      params: FadeToTargetParams;
+      [k: string]: unknown;
+    };
+/**
+ * Trend model of a time-series forecast.
+ */
+export type ForecastTrendMethod = "linear" | "exponential" | "moving_average";
+/**
+ * Seasonal decomposition mode.
+ */
+export type SeasonalMode = "additive" | "multiplicative";
 /**
  * Node computation type.
  *
@@ -2040,61 +2095,20 @@ export type SchemaVersion = number;
  */
 export type FlowSign = "inflow_positive" | "outflow_magnitude";
 /**
- * One forecast method with its typed parameters, in the wire shape of ForecastSpec.
+ * The method tag of a forecast specification.
  */
-export type ForecastParameters =
-  | {
-      method: "forward_fill";
-      params: BoundsParams;
-    }
-  | {
-      method: "growth_pct";
-      params: GrowthPctParams;
-    }
-  | {
-      method: "curve_pct";
-      params: CurvePctParams;
-    }
-  | {
-      method: "normal";
-      params: DistributionParams;
-    }
-  | {
-      method: "log_normal";
-      params: DistributionParams;
-    }
-  | {
-      method: "override";
-      params: OverrideParams;
-    }
-  | {
-      method: "time_series";
-      params: TimeSeriesParams;
-    }
-  | {
-      method: "seasonal";
-      params: SeasonalParams;
-    }
-  | {
-      method: "mean_reverting";
-      params: MeanRevertingParams;
-    }
-  | {
-      method: "bootstrap";
-      params: BootstrapParams;
-    }
-  | {
-      method: "fade_to_target";
-      params: FadeToTargetParams;
-    };
-/**
- * Trend model of a time-series forecast.
- */
-export type ForecastTrendMethod = "linear" | "exponential" | "moving_average";
-/**
- * Seasonal decomposition mode.
- */
-export type SeasonalMode = "additive" | "multiplicative";
+export type ForecastMethod =
+  | "forward_fill"
+  | "growth_pct"
+  | "curve_pct"
+  | "normal"
+  | "log_normal"
+  | "override"
+  | "time_series"
+  | "seasonal"
+  | "fade_to_target"
+  | "mean_reverting"
+  | "bootstrap";
 /**
  * Unit type for metric values.
  */
@@ -4322,7 +4336,7 @@ export interface BondConventionParams {
   notional: Money;
 }
 /**
- * Parameters of [`ForecastParameters::Bootstrap`].
+ * Parameters of [`ForecastSpec::Bootstrap`].
  */
 export interface BootstrapParams {
   /**
@@ -4340,11 +4354,11 @@ export interface BootstrapParams {
   /**
    * What to resample; defaults to growth rates.
    */
-  mode?: ForecastBootstrapMode;
+  mode: ForecastBootstrapMode;
   /**
    * Random seed; the same seed reproduces the same path.
    */
-  seed: number;
+  seed: string;
 }
 /**
  * Parameters of a method with only the cross-cutting bounds.
@@ -7224,7 +7238,7 @@ export interface FormulaCheckSpec {
   tolerance?: number | null;
 }
 /**
- * Parameters of [`ForecastParameters::CurvePct`].
+ * Parameters of [`ForecastSpec::CurvePct`].
  */
 export interface CurvePctParams {
   /**
@@ -7286,7 +7300,7 @@ export interface ResultCell {
   value?: AmountOrScalar | null;
 }
 /**
- * Parameters of [`ForecastParameters::Normal`] and [`ForecastParameters::LogNormal`].
+ * Parameters of [`ForecastSpec::Normal`] and [`ForecastSpec::LogNormal`].
  */
 export interface DistributionParams {
   /**
@@ -7312,14 +7326,14 @@ export interface DistributionParams {
   /**
    * Random seed; the same seed reproduces the same path.
    */
-  seed: number;
+  seed: string;
   /**
    * Standard deviation of the shock per period; non-negative.
    */
   std_dev: number;
 }
 /**
- * Parameters of [`ForecastParameters::FadeToTarget`].
+ * Parameters of [`ForecastSpec::FadeToTarget`].
  */
 export interface FadeToTargetParams {
   /**
@@ -7337,7 +7351,7 @@ export interface FadeToTargetParams {
   /**
    * Path to the target; defaults to linear.
    */
-  shape?: ForecastFadeShape;
+  shape: ForecastFadeShape;
   /**
    * Terminal level, in the line's base units.
    */
@@ -7463,21 +7477,143 @@ export interface NodeSpec {
   where_text?: string | null;
 }
 /**
- * Forecast method specification.
- *
- * Defines how to forecast future values for a node.
+ * Parameters of [`ForecastSpec::GrowthPct`].
  */
-export interface ForecastSpec {
+export interface GrowthPctParams {
   /**
-   * Forecast method
+   * Upper bound clamped onto generated values, in the line's base units.
    */
-  method: ForecastMethod;
+  max?: number | null;
   /**
-   * Method-specific parameters
+   * Lower bound clamped onto generated values, in the line's base units.
    */
-  params?: {
-    [k: string]: unknown;
+  min?: number | null;
+  /**
+   * Growth per period as a decimal: 0.03 = 3%.
+   */
+  rate: number;
+}
+/**
+ * Parameters of [`ForecastSpec::Override`].
+ */
+export interface OverrideParams {
+  /**
+   * Upper bound clamped onto generated values, in the line's base units.
+   */
+  max?: number | null;
+  /**
+   * Lower bound clamped onto generated values, in the line's base units.
+   */
+  min?: number | null;
+  /**
+   * Exact levels by period id, in the line's base units; other periods carry forward.
+   */
+  overrides: {
+    [k: string]: number;
   };
+}
+/**
+ * Parameters of [`ForecastSpec::TimeSeries`].
+ */
+export interface TimeSeriesParams {
+  /**
+   * Level smoothing in (0, 1]; required for the exponential method.
+   */
+  alpha?: number | null;
+  /**
+   * Trend smoothing in (0, 1]; required for the exponential method.
+   */
+  beta?: number | null;
+  /**
+   * Observations in the line's base units, oldest first.
+   */
+  historical: number[];
+  /**
+   * Upper bound clamped onto generated values, in the line's base units.
+   */
+  max?: number | null;
+  /**
+   * Trend model; defaults to linear.
+   */
+  method: ForecastTrendMethod;
+  /**
+   * Lower bound clamped onto generated values, in the line's base units.
+   */
+  min?: number | null;
+  /**
+   * Trend damping in (0, 1]; legal only with the exponential method.
+   */
+  phi?: number | null;
+  /**
+   * Averaging window in periods; required for the moving-average method.
+   */
+  window?: number | null;
+}
+/**
+ * Parameters of [`ForecastSpec::Seasonal`].
+ */
+export interface SeasonalParams {
+  /**
+   * Trend growth per period as a decimal: 0.03 = 3%; defaults to none.
+   */
+  growth?: number | null;
+  /**
+   * Observations in the line's base units, oldest first; at least two full cycles.
+   */
+  historical: number[];
+  /**
+   * Upper bound clamped onto generated values, in the line's base units.
+   */
+  max?: number | null;
+  /**
+   * Lower bound clamped onto generated values, in the line's base units.
+   */
+  min?: number | null;
+  /**
+   * How the seasonal pattern combines with the trend.
+   */
+  mode: SeasonalMode;
+  /**
+   * Periods per seasonal cycle.
+   */
+  season_length: number;
+}
+/**
+ * Parameters of [`ForecastSpec::MeanReverting`].
+ */
+export interface MeanRevertingParams {
+  /**
+   * Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.
+   */
+  correlation?: number | null;
+  /**
+   * Node whose shocks this one correlates with; Monte Carlo evaluation only.
+   */
+  correlation_with?: string | null;
+  /**
+   * Long-run level the process reverts to, in the line's base units.
+   */
+  long_run_mean: number;
+  /**
+   * Upper bound clamped onto generated values, in the line's base units.
+   */
+  max?: number | null;
+  /**
+   * Lower bound clamped onto generated values, in the line's base units.
+   */
+  min?: number | null;
+  /**
+   * Fraction of the gap closed each period, a decimal in (0, 1].
+   */
+  reversion_speed: number;
+  /**
+   * Random seed; the same seed reproduces the same path.
+   */
+  seed: string;
+  /**
+   * Standard deviation of the shock per period; non-negative.
+   */
+  std_dev: number;
 }
 /**
  * Builder/plan for a contiguous sequence of periods and their actual/forecast split.
@@ -7527,145 +7663,6 @@ export interface Period {
    * Inclusive start date.
    */
   start: string;
-}
-/**
- * Parameters of [`ForecastParameters::GrowthPct`].
- */
-export interface GrowthPctParams {
-  /**
-   * Upper bound clamped onto generated values, in the line's base units.
-   */
-  max?: number | null;
-  /**
-   * Lower bound clamped onto generated values, in the line's base units.
-   */
-  min?: number | null;
-  /**
-   * Growth per period as a decimal: 0.03 = 3%.
-   */
-  rate: number;
-}
-/**
- * Parameters of [`ForecastParameters::Override`].
- */
-export interface OverrideParams {
-  /**
-   * Upper bound clamped onto generated values, in the line's base units.
-   */
-  max?: number | null;
-  /**
-   * Lower bound clamped onto generated values, in the line's base units.
-   */
-  min?: number | null;
-  /**
-   * Exact levels by period id, in the line's base units; other periods carry forward.
-   */
-  overrides: {
-    [k: string]: number;
-  };
-}
-/**
- * Parameters of [`ForecastParameters::TimeSeries`].
- */
-export interface TimeSeriesParams {
-  /**
-   * Level smoothing in (0, 1]; required for the exponential method.
-   */
-  alpha?: number | null;
-  /**
-   * Trend smoothing in (0, 1]; required for the exponential method.
-   */
-  beta?: number | null;
-  /**
-   * Observations in the line's base units, oldest first.
-   */
-  historical: number[];
-  /**
-   * Upper bound clamped onto generated values, in the line's base units.
-   */
-  max?: number | null;
-  /**
-   * Trend model; defaults to linear.
-   */
-  method?: ForecastTrendMethod;
-  /**
-   * Lower bound clamped onto generated values, in the line's base units.
-   */
-  min?: number | null;
-  /**
-   * Trend damping in (0, 1]; legal only with the exponential method.
-   */
-  phi?: number | null;
-  /**
-   * Averaging window in periods; required for the moving-average method.
-   */
-  window?: number | null;
-}
-/**
- * Parameters of [`ForecastParameters::Seasonal`].
- */
-export interface SeasonalParams {
-  /**
-   * Trend growth per period as a decimal: 0.03 = 3%; defaults to none.
-   */
-  growth?: number | null;
-  /**
-   * Observations in the line's base units, oldest first; at least two full cycles.
-   */
-  historical: number[];
-  /**
-   * Upper bound clamped onto generated values, in the line's base units.
-   */
-  max?: number | null;
-  /**
-   * Lower bound clamped onto generated values, in the line's base units.
-   */
-  min?: number | null;
-  /**
-   * How the seasonal pattern combines with the trend.
-   */
-  mode: SeasonalMode;
-  /**
-   * Periods per seasonal cycle.
-   */
-  season_length: number;
-}
-/**
- * Parameters of [`ForecastParameters::MeanReverting`].
- */
-export interface MeanRevertingParams {
-  /**
-   * Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.
-   */
-  correlation?: number | null;
-  /**
-   * Node whose shocks this one correlates with; Monte Carlo evaluation only.
-   */
-  correlation_with?: string | null;
-  /**
-   * Long-run level the process reverts to, in the line's base units.
-   */
-  long_run_mean: number;
-  /**
-   * Upper bound clamped onto generated values, in the line's base units.
-   */
-  max?: number | null;
-  /**
-   * Lower bound clamped onto generated values, in the line's base units.
-   */
-  min?: number | null;
-  /**
-   * Fraction of the gap closed each period, a decimal in (0, 1].
-   */
-  reversion_speed: number;
-  /**
-   * Random seed; the same seed reproduces the same path.
-   */
-  seed: number;
-  /**
-   * Standard deviation of the shock per period; non-negative.
-   */
-  std_dev: number;
 }
 /**
  * Individual metric definition.

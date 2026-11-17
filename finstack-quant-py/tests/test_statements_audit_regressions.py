@@ -99,7 +99,7 @@ def test_correlated_paths_keep_shocks_when_peer_levels_round_flat(method: str, r
         builder = s.ModelBuilder("direct-shocks")
         builder.periods("2025Q1..Q4", "2025Q1")
         builder.value("peer", [("2025Q1", 1e16 if tiny else 100.0)])
-        params = {"std_dev": 1e-20 if tiny else 0.1, "seed": 42}
+        params = {"std_dev": 1e-20 if tiny else 0.1, "seed": "42"}
         if method == "mean_reverting":
             params.update({"long_run_mean": 1e16 if tiny else 100.0, "reversion_speed": 0.1})
         else:
@@ -116,7 +116,7 @@ def test_correlated_paths_keep_shocks_when_peer_levels_round_flat(method: str, r
                         "params": {
                             "mean": 0.0,
                             "std_dev": 1.0,
-                            "seed": seed,
+                            "seed": str(seed),
                             "correlation_with": peer,
                             "correlation": correlation,
                         },

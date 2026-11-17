@@ -26,10 +26,7 @@ fn test_forward_fill_forecast() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::ForwardFill,
-                params: indexmap! {},
-            },
+            ForecastSpec::from_params(ForecastMethod::ForwardFill, indexmap! {}).unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -84,10 +81,11 @@ fn test_growth_pct_forecast() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-            },
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.05) },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -143,10 +141,7 @@ fn test_growth_pct_negative() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => serde_json::json!(-0.1) }, // -10% decline
-            },
+            ForecastSpec::growth(-0.1), // -10% decline
         );
         model_builder.build().unwrap()
     };
@@ -185,12 +180,13 @@ fn test_curve_pct_forecast() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::CurvePct,
-                params: indexmap! {
+            ForecastSpec::from_params(
+                ForecastMethod::CurvePct,
+                indexmap! {
                     "curve".into() => serde_json::json!([0.05, 0.06, 0.05])
                 },
-            },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -246,15 +242,16 @@ fn test_override_forecast() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::Override,
-                params: indexmap! {
+            ForecastSpec::from_params(
+                ForecastMethod::Override,
+                indexmap! {
                     "overrides".into() => serde_json::json!({
                         "2025Q2": 120_000.0,
                         "2025Q4": 140_000.0,
                     })
                 },
-            },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -315,10 +312,11 @@ fn test_forecast_with_formula_fallback() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-            },
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.05) },
+            )
+            .unwrap(),
         );
         model_builder.compute("cogs", "revenue * 0.6").unwrap();
         model_builder.build().unwrap()
@@ -368,10 +366,11 @@ fn test_multiple_periods_with_forecast() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => serde_json::json!(0.03) },
-            },
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.03) },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -446,10 +445,11 @@ fn test_forecast_pl_model() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-            },
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.05) },
+            )
+            .unwrap(),
         );
         model_builder.compute("cogs", "revenue * 0.6").unwrap();
         model_builder.value(
@@ -467,10 +467,7 @@ fn test_forecast_pl_model() {
         );
         model_builder.forecast(
             "opex",
-            ForecastSpec {
-                method: ForecastMethod::ForwardFill,
-                params: indexmap! {},
-            },
+            ForecastSpec::from_params(ForecastMethod::ForwardFill, indexmap! {}).unwrap(),
         );
         model_builder
             .compute("gross_profit", "revenue - cogs")
@@ -537,14 +534,15 @@ fn test_normal_forecast_deterministic() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::Normal,
-                params: indexmap! {
+            ForecastSpec::from_params(
+                ForecastMethod::Normal,
+                indexmap! {
                     "mean".into() => serde_json::json!(100_000.0),
                     "std_dev".into() => serde_json::json!(15_000.0),
-                    "seed".into() => serde_json::json!(42),
+                    "seed".into() => serde_json::json!("42"),
                 },
-            },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -561,14 +559,15 @@ fn test_normal_forecast_deterministic() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::Normal,
-                params: indexmap! {
+            ForecastSpec::from_params(
+                ForecastMethod::Normal,
+                indexmap! {
                     "mean".into() => serde_json::json!(100_000.0),
                     "std_dev".into() => serde_json::json!(15_000.0),
-                    "seed".into() => serde_json::json!(42),
+                    "seed".into() => serde_json::json!("42"),
                 },
-            },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -616,14 +615,15 @@ fn test_lognormal_forecast_always_positive() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::LogNormal,
-                params: indexmap! {
+            ForecastSpec::from_params(
+                ForecastMethod::LogNormal,
+                indexmap! {
                     "mean".into() => serde_json::json!(11.5),
                     "std_dev".into() => serde_json::json!(0.15),
-                    "seed".into() => serde_json::json!(42),
+                    "seed".into() => serde_json::json!("42"),
                 },
-            },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -689,10 +689,11 @@ fn test_as_of_hidden_actuals_are_forecast_with_visible_base() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => serde_json::json!(0.10) },
-            },
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.10) },
+            )
+            .unwrap(),
         );
         // Each observation is published on its period's exclusive end.
         model_builder
@@ -785,10 +786,11 @@ fn test_explicit_availability_date_controls_actual_visibility() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => serde_json::json!(0.10) },
-            },
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.10) },
+            )
+            .unwrap(),
         );
         model_builder
             .availability_dates(
@@ -848,14 +850,15 @@ fn test_single_run_stochastic_nodes_with_shared_seed_diverge() {
         );
         model_builder.forecast(
             "a",
-            ForecastSpec {
-                method: ForecastMethod::Normal,
-                params: indexmap! {
+            ForecastSpec::from_params(
+                ForecastMethod::Normal,
+                indexmap! {
                     "mean".into() => serde_json::json!(0.0),
                     "std_dev".into() => serde_json::json!(1_000.0),
-                    "seed".into() => serde_json::json!(42),
+                    "seed".into() => serde_json::json!("42"),
                 },
-            },
+            )
+            .unwrap(),
         );
         model_builder.value(
             "b",
@@ -866,14 +869,15 @@ fn test_single_run_stochastic_nodes_with_shared_seed_diverge() {
         );
         model_builder.forecast(
             "b",
-            ForecastSpec {
-                method: ForecastMethod::Normal,
-                params: indexmap! {
+            ForecastSpec::from_params(
+                ForecastMethod::Normal,
+                indexmap! {
                     "mean".into() => serde_json::json!(0.0),
                     "std_dev".into() => serde_json::json!(1_000.0),
-                    "seed".into() => serde_json::json!(42),
+                    "seed".into() => serde_json::json!("42"),
                 },
-            },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };

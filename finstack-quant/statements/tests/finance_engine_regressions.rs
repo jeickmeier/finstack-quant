@@ -225,13 +225,10 @@ fn monte_carlo_reports_each_forecast_warning_once() {
         let mut params = indexmap::IndexMap::new();
         params.insert("mean".into(), serde_json::json!(120.0));
         params.insert("std_dev".into(), serde_json::json!(5.0));
-        params.insert("seed".into(), serde_json::json!(42));
+        params.insert("seed".into(), serde_json::json!("42"));
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::Normal,
-                params,
-            },
+            ForecastSpec::from_params(ForecastMethod::Normal, params).unwrap(),
         );
         model_builder.value(
             "denominator",

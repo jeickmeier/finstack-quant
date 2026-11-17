@@ -385,3 +385,24 @@ def test_bundled_margin_is_unavailable_without_positive_revenue() -> None:
         "reason": "undefined_base",
         "source": "formula",
     }
+
+
+def test_forecast_seeds_are_exact_and_choices_are_explicit() -> None:
+    """Seed 9007199254740993 is not representable as a float; it round-trips exactly."""
+    seed = 9007199254740993
+    spec = s.ForecastSpec.normal(0.0, 1.0, seed)
+    assert spec.params["seed"] == seed
+    document = json.loads(spec.to_json())
+    assert document["params"]["seed"] == str(seed)
+    assert s.ForecastSpec.from_json(spec.to_json()).params["seed"] == seed
+    assert s.ForecastSpec(s.ForecastMethod.normal(), {"mean": 0.0, "std_dev": 1.0, "seed": seed}).params == spec.params
+
+    with pytest.raises(ValueError, match="seed"):
+        s.ForecastSpec.from_json(json.dumps({"method": "normal", "params": {"mean": 0.0, "std_dev": 1.0, "seed": 42}}))
+    with pytest.raises(ValueError, match="shape"):
+        s.ForecastSpec(s.ForecastMethod.fade_to_target(), {"target": 1.0})
+    with pytest.raises(ValueError, match="half_life"):
+        s.ForecastSpec(s.ForecastMethod.fade_to_target(), {"target": 1.0, "shape": "linear", "half_life": 2.0})
+    with pytest.raises(ValueError, match="more than once"):
+        s.ForecastSpec.from_json('{"method": "growth_pct", "params": {"rate": 0.1, "rate": 0.2}}')
+    assert s.ForecastSpec.fade_to_target(1.0, "geometric").params["shape"] == "geometric"

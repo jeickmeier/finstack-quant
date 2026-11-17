@@ -607,7 +607,7 @@ test('monteCarloBreachProbability reads the serialized path table', () => {
         node_id: 'revenue',
         node_type: 'mixed',
         values: { '2025Q1': 100.0 },
-        forecast: { method: 'normal', params: { mean: 100.0, std_dev: 10.0, seed: 7 } },
+        forecast: { method: 'normal', params: { mean: 100.0, std_dev: 10.0, seed: '7' } },
         value_type: { type: 'scalar' },
       },
     },

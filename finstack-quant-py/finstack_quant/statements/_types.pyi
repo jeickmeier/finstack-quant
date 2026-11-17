@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from datetime import date
-from typing import Any
+from typing import Any, Literal
 import pandas as pd
 
 from finstack_quant.core.money import Money
@@ -389,15 +389,21 @@ class ForecastSpec:
             Rates are decimal fractions per period. Every method also accepts
             optional ``min`` / ``max`` bounds that clamp generated values to a
             band (in the node's own units). ``None`` means no parameters,
-            which is only valid for ``forward_fill``.
+            which is only valid for ``forward_fill``. ``seed`` is an exact
+            unsigned 64-bit ``int`` (a decimal string in a JSON object
+            string). The ``time_series`` ``method``, the ``bootstrap``
+            ``mode``, the ``seasonal`` ``mode`` and the ``fade_to_target``
+            ``shape`` have no default and must be given.
 
         Raises
         ------
         ValueError
             If ``params`` is not a JSON object / dict, names a parameter the
             method does not accept, omits a required one, sets one to
-            ``null``/``None``, or carries a value of the wrong type (a string
-            ``rate``, a non-list ``curve``).
+            ``null``/``None``, carries a value of the wrong type (a string
+            ``rate``, a non-list ``curve``), or fails a static requirement of
+            the method (a non-finite number, ``min`` above ``max``, a negative
+            ``std_dev``, a ``half_life`` on a non-exponential fade).
 
         """
         ...
@@ -562,36 +568,39 @@ class ForecastSpec:
         ...
 
     @staticmethod
-    def fade_to_target(target: float) -> ForecastSpec:
+    def fade_to_target(target: float, shape: Literal["linear", "geometric", "exponential"]) -> ForecastSpec:
         """
-        Linear fade-to-target spec:
-        ``v[t] = base + (target - base) * t / N``.
+        Fade-to-target spec with the chosen shape.
 
-        Values glide from the last observed value to ``target`` in equal
-        steps, reaching it exactly at the final forecast period. For the
-        ``"geometric"`` (CAGR-to-terminal) or ``"exponential"`` (half-life)
-        shapes, construct ``ForecastSpec(ForecastMethod.fade_to_target(),
-        params)`` with ``shape`` and, for exponential, ``half_life``.
+        Values glide from the last observed value to ``target``. The
+        ``"linear"`` shape moves in equal steps,
+        ``v[t] = base + (target - base) * t / N``, and reaches the target at
+        the final forecast period; ``"geometric"`` compounds toward it;
+        ``"exponential"`` closes the gap with a ``half_life`` set through
+        ``ForecastSpec(ForecastMethod.fade_to_target(), params)``.
 
         Parameters
         ----------
         target:
             Terminal level in the node's own units (a currency amount for
             monetary nodes, a decimal ratio for scalar nodes such as margins).
+        shape:
+            Path of the fade. There is no default.
 
         Returns
         -------
         ForecastSpec
-            A linear fade-to-target forecast specification.
+            A fade-to-target forecast specification.
 
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
+        Raises
+        ------
+        ValueError
+            If ``shape`` is not one of the three shapes.
 
         Examples
         --------
         >>> from finstack_quant.statements import ForecastSpec
-        >>> spec = ForecastSpec.fade_to_target(0.02)
+        >>> spec = ForecastSpec.fade_to_target(0.02, "linear")
         >>> ForecastSpec.from_json(spec.to_json()).to_json() == spec.to_json()
         True
         """
@@ -639,37 +648,39 @@ class ForecastSpec:
         ...
 
     @staticmethod
-    def bootstrap(historical: list[float], seed: int) -> ForecastSpec:
+    def bootstrap(historical: list[float], mode: Literal["growth", "diff"], seed: int) -> ForecastSpec:
         """
-        Growth-mode bootstrap spec: resample historical growth rates and
-        compound them from the base value.
+        Bootstrap spec: resample historical changes and apply them from the
+        base value.
 
-        The history must be strictly positive in growth mode. For additive
-        resampling of level changes (series that cross zero), construct
-        ``ForecastSpec(ForecastMethod.bootstrap(), params)`` with
-        ``mode = "diff"``.
+        ``"growth"`` resamples growth rates and compounds them, which needs a
+        strictly positive history; ``"diff"`` resamples level changes and
+        suits series that cross zero.
 
         Parameters
         ----------
         historical:
             At least 2 historical values in the node's own units, oldest
-            first; consecutive pairs define the resampled growth rates.
+            first; consecutive pairs define the resampled changes.
+        mode:
+            What is resampled. There is no default.
         seed:
-            Seed for the deterministic resampling draws.
+            Exact unsigned 64-bit seed for the resampling draws.
 
         Returns
         -------
         ForecastSpec
-            A growth-mode bootstrap forecast specification.
+            A bootstrap forecast specification.
 
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
+        Raises
+        ------
+        ValueError
+            If ``mode`` is not ``"growth"`` or ``"diff"``.
 
         Examples
         --------
         >>> from finstack_quant.statements import ForecastSpec
-        >>> spec = ForecastSpec.bootstrap([100.0, 105.0, 110.0], 7)
+        >>> spec = ForecastSpec.bootstrap([100.0, 105.0, 110.0], "growth", 7)
         >>> ForecastSpec.from_json(spec.to_json()).to_json() == spec.to_json()
         True
         """
@@ -751,7 +762,7 @@ class ForecastSpec:
         Returns
         -------
         dict[str, Any]
-            Parameter mapping in insertion order; rates are decimal fractions per model period and levels use the node's units.
+            Parameter mapping in insertion order; rates are decimal fractions per model period, levels use the node's units and ``seed`` is an exact ``int``.
 
         Notes
         -----
@@ -822,27 +833,36 @@ class ForecastSpec:
         ...
 
     @staticmethod
-    def time_series(historical: list[float]) -> ForecastSpec:
-        """Forecast an external historical series using its estimated linear trend.
+    def time_series(
+        historical: list[float], method: Literal["linear", "exponential", "moving_average"]
+    ) -> ForecastSpec:
+        """Forecast an external historical series with the chosen trend method.
+
+        Tuning parameters (``alpha``, ``beta``, ``phi`` for ``"exponential"``;
+        ``window`` for ``"moving_average"``) are set through
+        ``ForecastSpec(ForecastMethod.time_series(), params)``.
 
         Parameters
         ----------
         historical:
-            Oldest-first levels in the node's units; eventual evaluation requires at least two observations.
+            Oldest-first levels in the node's units; evaluation requires at least two observations.
+        method:
+            Trend method. There is no default.
 
         Returns
         -------
         ForecastSpec
-            Linear time-series forecast configuration.
+            Time-series forecast configuration.
 
-        Notes
-        -----
-        This accessor does not raise; it returns stored or derived model data.
+        Raises
+        ------
+        ValueError
+            If ``method`` is not one of the three trend methods.
 
         Examples
         --------
         >>> from finstack_quant.statements import ForecastSpec
-        >>> ForecastSpec.time_series([100.0, 105.0, 110.0]).method.kind
+        >>> ForecastSpec.time_series([100.0, 105.0, 110.0], "linear").method.kind
         'time_series'
         """
         ...

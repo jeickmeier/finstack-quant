@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
-      "bytes": 394406,
+      "bytes": 412116,
       "kind": "input",
       "path": "schemas/statements/1/financial_model_spec.schema.json",
       "summary": "Statement model graph: periods, nodes and the Value > Forecast > Formula precedence.",
@@ -37,13 +37,22 @@
       "type_name": "FinancialModelSpec"
     },
     {
-      "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_parameters.schema.json",
-      "bytes": 20392,
+      "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_method.schema.json",
+      "bytes": 1931,
+      "kind": "component",
+      "path": "schemas/statements/1/forecast_method.schema.json",
+      "summary": "The method tag of a forecast specification.",
+      "title": "ForecastMethod",
+      "type_name": "ForecastMethod"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_spec.schema.json",
+      "bytes": 19688,
       "kind": "input",
-      "path": "schemas/statements/1/forecast_parameters.schema.json",
+      "path": "schemas/statements/1/forecast_spec.schema.json",
       "summary": "One forecast method with its typed parameters, in the wire shape of ForecastSpec.",
-      "title": "ForecastParameters",
-      "type_name": "ForecastParameters"
+      "title": "ForecastSpec",
+      "type_name": "ForecastSpec"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/metric_registry.schema.json",
@@ -56,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/model_edit.schema.json",
-      "bytes": 38373,
+      "bytes": 56083,
       "kind": "input",
       "path": "schemas/statements/1/model_edit.schema.json",
       "summary": "One named change to a financial model, applied atomically with the others in its batch.",

@@ -4,56 +4,67 @@
 /**
  * One forecast method with its typed parameters, in the wire shape of ForecastSpec.
  */
-export type ForecastParametersWire =
+export type ForecastSpecWire =
   | {
       method: "forward_fill";
-      params: DA06F77C2C045E9Cec3Ea;
+      params?: DCdf57B2C9052D7E6A3F1;
+      [k: string]: unknown;
     }
   | {
       method: "growth_pct";
-      params: DD71F2766Db50Dd20F883;
+      params: DB5031E2Afd1019Fb5366;
+      [k: string]: unknown;
     }
   | {
       method: "curve_pct";
-      params: DEe7145843A9D665D4347;
+      params: D_9B3D81606Bb357B45C25;
+      [k: string]: unknown;
     }
   | {
       method: "normal";
-      params: D_35F294D671F725A240Ea;
+      params: DC17C93B81Aa1Aa394Bd9;
+      [k: string]: unknown;
     }
   | {
       method: "log_normal";
-      params: D_35F294D671F725A240Ea;
+      params: DC17C93B81Aa1Aa394Bd9;
+      [k: string]: unknown;
     }
   | {
       method: "override";
-      params: D_6242950457Fc4A9E0824;
+      params: DEea422B5De5A4E2B1C76;
+      [k: string]: unknown;
     }
   | {
       method: "time_series";
-      params: D_102Fe83E4D93Ec672667;
+      params: D_76Cf21224D1810F1Ccb2;
+      [k: string]: unknown;
     }
   | {
       method: "seasonal";
-      params: D_81B875191Ce1C7884B1D;
+      params: D_0Ead30Fb9985712F46F4;
+      [k: string]: unknown;
     }
   | {
       method: "mean_reverting";
-      params: D_9Ab95Cc65614Ecd1A398;
+      params: D_61Ab76E17B1A0D1860Ae;
+      [k: string]: unknown;
     }
   | {
       method: "bootstrap";
-      params: D_28618Af4D7A1Ca8Bf3F0;
+      params: D_789205379096953Ae54B;
+      [k: string]: unknown;
     }
   | {
       method: "fade_to_target";
-      params: D_70E42898A335B5Fbcb5E;
+      params: D_253D6Ee6E653433D50Cd;
+      [k: string]: unknown;
     };
 
 /**
  * Parameters of a method with only the cross-cutting bounds.
  */
-export interface DA06F77C2C045E9Cec3Ea {
+export interface DCdf57B2C9052D7E6A3F1 {
   /**
    * Upper bound clamped onto generated values, in the line's base units.
    */
@@ -64,9 +75,9 @@ export interface DA06F77C2C045E9Cec3Ea {
   min?: number | null;
 }
 /**
- * Parameters of [`ForecastParameters::GrowthPct`].
+ * Parameters of [`ForecastSpec::GrowthPct`].
  */
-export interface DD71F2766Db50Dd20F883 {
+export interface DB5031E2Afd1019Fb5366 {
   /**
    * Upper bound clamped onto generated values, in the line's base units.
    */
@@ -81,9 +92,9 @@ export interface DD71F2766Db50Dd20F883 {
   rate: number;
 }
 /**
- * Parameters of [`ForecastParameters::CurvePct`].
+ * Parameters of [`ForecastSpec::CurvePct`].
  */
-export interface DEe7145843A9D665D4347 {
+export interface D_9B3D81606Bb357B45C25 {
   /**
    * Growth rate per forecast period as decimals, one per period in order.
    */
@@ -98,9 +109,9 @@ export interface DEe7145843A9D665D4347 {
   min?: number | null;
 }
 /**
- * Parameters of [`ForecastParameters::Normal`] and [`ForecastParameters::LogNormal`].
+ * Parameters of [`ForecastSpec::Normal`] and [`ForecastSpec::LogNormal`].
  */
-export interface D_35F294D671F725A240Ea {
+export interface DC17C93B81Aa1Aa394Bd9 {
   /**
    * Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.
    */
@@ -124,16 +135,16 @@ export interface D_35F294D671F725A240Ea {
   /**
    * Random seed; the same seed reproduces the same path.
    */
-  seed: number;
+  seed: string;
   /**
    * Standard deviation of the shock per period; non-negative.
    */
   std_dev: number;
 }
 /**
- * Parameters of [`ForecastParameters::Override`].
+ * Parameters of [`ForecastSpec::Override`].
  */
-export interface D_6242950457Fc4A9E0824 {
+export interface DEea422B5De5A4E2B1C76 {
   /**
    * Upper bound clamped onto generated values, in the line's base units.
    */
@@ -150,9 +161,9 @@ export interface D_6242950457Fc4A9E0824 {
   };
 }
 /**
- * Parameters of [`ForecastParameters::TimeSeries`].
+ * Parameters of [`ForecastSpec::TimeSeries`].
  */
-export interface D_102Fe83E4D93Ec672667 {
+export interface D_76Cf21224D1810F1Ccb2 {
   /**
    * Level smoothing in (0, 1]; required for the exponential method.
    */
@@ -172,7 +183,7 @@ export interface D_102Fe83E4D93Ec672667 {
   /**
    * Trend model; defaults to linear.
    */
-  method?: "linear" | "exponential" | "moving_average";
+  method: "linear" | "exponential" | "moving_average";
   /**
    * Lower bound clamped onto generated values, in the line's base units.
    */
@@ -187,9 +198,9 @@ export interface D_102Fe83E4D93Ec672667 {
   window?: number | null;
 }
 /**
- * Parameters of [`ForecastParameters::Seasonal`].
+ * Parameters of [`ForecastSpec::Seasonal`].
  */
-export interface D_81B875191Ce1C7884B1D {
+export interface D_0Ead30Fb9985712F46F4 {
   /**
    * Trend growth per period as a decimal: 0.03 = 3%; defaults to none.
    */
@@ -216,9 +227,9 @@ export interface D_81B875191Ce1C7884B1D {
   season_length: number;
 }
 /**
- * Parameters of [`ForecastParameters::MeanReverting`].
+ * Parameters of [`ForecastSpec::MeanReverting`].
  */
-export interface D_9Ab95Cc65614Ecd1A398 {
+export interface D_61Ab76E17B1A0D1860Ae {
   /**
    * Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.
    */
@@ -246,16 +257,16 @@ export interface D_9Ab95Cc65614Ecd1A398 {
   /**
    * Random seed; the same seed reproduces the same path.
    */
-  seed: number;
+  seed: string;
   /**
    * Standard deviation of the shock per period; non-negative.
    */
   std_dev: number;
 }
 /**
- * Parameters of [`ForecastParameters::Bootstrap`].
+ * Parameters of [`ForecastSpec::Bootstrap`].
  */
-export interface D_28618Af4D7A1Ca8Bf3F0 {
+export interface D_789205379096953Ae54B {
   /**
    * At least 2 observations in the line's base units, oldest first.
    */
@@ -271,16 +282,16 @@ export interface D_28618Af4D7A1Ca8Bf3F0 {
   /**
    * What to resample; defaults to growth rates.
    */
-  mode?: "growth" | "diff";
+  mode: "growth" | "diff";
   /**
    * Random seed; the same seed reproduces the same path.
    */
-  seed: number;
+  seed: string;
 }
 /**
- * Parameters of [`ForecastParameters::FadeToTarget`].
+ * Parameters of [`ForecastSpec::FadeToTarget`].
  */
-export interface D_70E42898A335B5Fbcb5E {
+export interface D_253D6Ee6E653433D50Cd {
   /**
    * Periods to close half the gap; required for, and legal only with, the exponential shape.
    */
@@ -296,7 +307,7 @@ export interface D_70E42898A335B5Fbcb5E {
   /**
    * Path to the target; defaults to linear.
    */
-  shape?: "linear" | "geometric" | "exponential";
+  shape: "linear" | "geometric" | "exponential";
   /**
    * Terminal level, in the line's base units.
    */

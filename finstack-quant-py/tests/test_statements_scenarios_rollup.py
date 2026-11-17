@@ -83,11 +83,9 @@ def test_invalid_forecast_override_is_a_value_error() -> None:
     typo = ForecastSpec.from_json('{"method": "growth_pct", "params": {"rate": 0.05}}')
     spec_doc = json.loads(typo.to_json())
     spec_doc["params"]["rat"] = 0.1
-    scenarios = ScenarioSet.from_json(
-        json.dumps({"scenarios": {"typo": {"forecast_overrides": {"revenue": spec_doc}}}})
-    )
+    # A typed specification rejects the unknown parameter when it is read.
     with pytest.raises(ValueError, match="rat"):
-        evaluate_scenario_set(_forecast_model(), scenarios)
+        ScenarioSet.from_json(json.dumps({"scenarios": {"typo": {"forecast_overrides": {"revenue": spec_doc}}}}))
 
 
 def test_scenarios_carry_capital_structure_cashflows() -> None:

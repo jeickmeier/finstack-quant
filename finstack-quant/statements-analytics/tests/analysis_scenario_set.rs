@@ -591,19 +591,27 @@ fn value_overrides_win_over_forecast_overrides() {
 #[test]
 fn invalid_forecast_override_parameters_are_rejected_with_the_node() {
     let model = forecast_model();
-    let mut typo = ForecastSpec::growth(0.05);
-    typo.params
-        .insert("rat".to_string(), serde_json::json!(0.1));
+    // A typed specification cannot carry an unknown parameter, so the
+    // invalid override is one that fails the method's static requirements.
+    assert!(
+        ForecastSpec::growth(0.05)
+            .with_param("rat", serde_json::json!(0.1))
+            .is_err()
+    );
+    let invalid = ForecastSpec::growth(f64::NAN);
     let set = ScenarioSet {
-        scenarios: IndexMap::from([("typo".to_string(), scenario(None, &[("revenue", typo)]))]),
+        scenarios: IndexMap::from([(
+            "invalid".to_string(),
+            scenario(None, &[("revenue", invalid)]),
+        )]),
     };
 
     let err = set
         .evaluate_all(&model)
-        .expect_err("unknown forecast parameter");
+        .expect_err("invalid forecast parameter");
     let message = err.to_string();
     assert!(message.contains("'revenue'"), "{message}");
-    assert!(message.contains("rat"), "{message}");
+    assert!(message.contains("rate"), "{message}");
 
     let missing = ScenarioSet {
         scenarios: IndexMap::from([(
@@ -614,13 +622,13 @@ fn invalid_forecast_override_parameters_are_rejected_with_the_node() {
     let err = missing.evaluate_all(&model).expect_err("unknown node");
     assert!(err.to_string().contains("'nope'"));
 
-    // The new field round-trips through the strict wire format.
-    let json = serde_json::to_string(&set).expect("serialize");
+    // The field round-trips through the strict wire format.
+    let json = serde_json::to_string(&missing).expect("serialize");
     assert!(json.contains("forecast_overrides"));
     let restored: ScenarioSet = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(
-        restored.scenarios["typo"].forecast_overrides["revenue"],
-        set.scenarios["typo"].forecast_overrides["revenue"]
+        restored.scenarios["missing"].forecast_overrides["nope"],
+        missing.scenarios["missing"].forecast_overrides["nope"]
     );
 }
 

@@ -83,8 +83,7 @@ use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::Result;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::evaluator::{Evaluator, StatementResult};
-use finstack_quant_statements::types::{AmountOrScalar, ForecastMethod, ForecastSpec};
-use indexmap::indexmap;
+use finstack_quant_statements::types::{AmountOrScalar, ForecastSpec};
 
 fn build_and_evaluate() -> Result<StatementResult> {
     let mut builder = ModelBuilder::new("acme");
@@ -93,10 +92,7 @@ fn build_and_evaluate() -> Result<StatementResult> {
         (PeriodId::quarter(2025, 1)?, AmountOrScalar::scalar(10_000_000.0)),
         (PeriodId::quarter(2025, 2)?, AmountOrScalar::scalar(11_000_000.0)),
     ]);
-    builder.forecast("revenue", ForecastSpec {
-        method: ForecastMethod::GrowthPct,
-        params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-    });
+    builder.forecast("revenue", ForecastSpec::growth(0.05));
     builder.compute("cogs", "revenue * 0.6")?;
     builder.compute("gross_profit", "revenue - cogs")?;
     let model = builder.build()?;

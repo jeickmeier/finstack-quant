@@ -136,10 +136,10 @@ def statements_cases() -> dict[str, Any]:
                 st.ForecastSpec.log_normal(0.0, 0.2, 7),
                 st.ForecastSpec.overrides({Q2: 125.0}),
                 st.ForecastSpec.seasonal([1.0, 2.0, 3.0, 4.0], 4, "additive"),
-                st.ForecastSpec.time_series([1.0, 2.0, 3.0]),
-                st.ForecastSpec.fade_to_target(50.0),
+                st.ForecastSpec.time_series([1.0, 2.0, 3.0], "linear"),
+                st.ForecastSpec.fade_to_target(50.0, "linear"),
                 st.ForecastSpec.mean_reverting(100.0, 0.5, 5.0, 11),
-                st.ForecastSpec.bootstrap([1.0, 2.0, 3.0], 13),
+                st.ForecastSpec.bootstrap([1.0, 2.0, 3.0], "growth", 13),
             )
         ],
         "adjustments": [

@@ -74,7 +74,7 @@ use override_method::apply_override;
 use timeseries::{seasonal_forecast, timeseries_forecast};
 
 use crate::error::Result;
-use crate::types::ForecastParameters;
+use crate::types::ForecastSpec;
 use finstack_quant_core::dates::PeriodId;
 
 /// Per-period forecast levels or standard-normal shocks.
@@ -88,7 +88,7 @@ type ForecastSeries = indexmap::IndexMap<PeriodId, f64>;
 /// would receive identical shock paths within a single evaluation run.
 /// Deterministic methods are unaffected.
 pub(crate) fn apply_forecast_for_node(
-    parameters: &ForecastParameters,
+    parameters: &ForecastSpec,
     base_value: f64,
     forecast_periods: &[PeriodId],
     node_id: &str,
@@ -123,7 +123,7 @@ pub(crate) fn apply_forecast_for_node(
 /// for methods that do not draw Gaussian shocks. Zero-volatility forecasts
 /// retain zero shocks so they cannot serve as stochastic correlation peers.
 pub(crate) fn apply_forecast(
-    parameters: &ForecastParameters,
+    parameters: &ForecastSpec,
     base_value: f64,
     forecast_periods: &[PeriodId],
     node_id: &str,
@@ -138,41 +138,41 @@ pub(crate) fn apply_forecast(
         *seed = mix_node_seed(*seed, node_id);
     }
     match &seeded {
-        ForecastParameters::Normal(p) => {
+        ForecastSpec::Normal(p) => {
             normal_forecast_with_stream(base_value, forecast_periods, p, stream)
                 .map(|(values, shocks)| (values, Some(shocks)))
         }
-        ForecastParameters::LogNormal(p) => {
+        ForecastSpec::LogNormal(p) => {
             lognormal_forecast_with_stream(base_value, forecast_periods, p, stream)
                 .map(|(values, shocks)| (values, Some(shocks)))
         }
-        ForecastParameters::MeanReverting(p) => {
+        ForecastSpec::MeanReverting(p) => {
             mean_reverting_forecast_with_stream(base_value, forecast_periods, p, stream)
                 .map(|(values, shocks)| (values, Some(shocks)))
         }
-        ForecastParameters::Bootstrap(p) => {
+        ForecastSpec::Bootstrap(p) => {
             bootstrap_forecast_with_stream(base_value, forecast_periods, p, stream)
                 .map(|values| (values, None))
         }
-        ForecastParameters::ForwardFill(_) => {
+        ForecastSpec::ForwardFill(_) => {
             forward_fill(base_value, forecast_periods).map(|values| (values, None))
         }
-        ForecastParameters::GrowthPct(p) => {
+        ForecastSpec::GrowthPct(p) => {
             growth_pct(base_value, forecast_periods, p.rate).map(|values| (values, None))
         }
-        ForecastParameters::CurvePct(p) => {
+        ForecastSpec::CurvePct(p) => {
             curve_pct(base_value, forecast_periods, &p.curve).map(|values| (values, None))
         }
-        ForecastParameters::Override(p) => {
+        ForecastSpec::Override(p) => {
             apply_override(base_value, forecast_periods, &p.overrides).map(|values| (values, None))
         }
-        ForecastParameters::TimeSeries(p) => {
+        ForecastSpec::TimeSeries(p) => {
             timeseries_forecast(forecast_periods, p).map(|values| (values, None))
         }
-        ForecastParameters::Seasonal(p) => {
+        ForecastSpec::Seasonal(p) => {
             seasonal_forecast(base_value, forecast_periods, p).map(|values| (values, None))
         }
-        ForecastParameters::FadeToTarget(p) => {
+        ForecastSpec::FadeToTarget(p) => {
             fade_to_target(base_value, forecast_periods, p).map(|values| (values, None))
         }
     }
@@ -203,10 +203,7 @@ pub(crate) fn apply_forecast(
 ///
 /// Returns an error when `min` or `max` is present but not finite, or when
 /// both are present with `min > max`.
-pub(crate) fn apply_bounds(
-    parameters: &ForecastParameters,
-    results: &mut ForecastSeries,
-) -> Result<()> {
+pub(crate) fn apply_bounds(parameters: &ForecastSpec, results: &mut ForecastSeries) -> Result<()> {
     let (min, max) = parameters.bounds();
     for (key, bound) in [("min", min), ("max", max)] {
         if let Some(bound) = bound
@@ -256,7 +253,8 @@ fn mix_node_seed(seed: u64, node_id: &str) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{ForecastParameters, ForecastSpec};
+    use crate::types::ForecastSpec;
+    use crate::types::{ForecastBootstrapMode, ForecastFadeShape, ForecastTrendMethod};
     use finstack_quant_core::dates::PeriodId;
     use serde_json::json;
 
@@ -269,7 +267,7 @@ mod tests {
     }
 
     fn run(spec: &ForecastSpec, base_value: f64, periods: &[PeriodId]) -> Result<ForecastSeries> {
-        apply_forecast_for_node(&spec.parameters()?, base_value, periods, "node")
+        apply_forecast_for_node(&spec.clone(), base_value, periods, "node")
     }
 
     #[test]
@@ -279,20 +277,19 @@ mod tests {
             json!({"method": "growth_pct", "params": {"rate": 0.03}}),
             json!({"method": "curve_pct", "params": {"curve": [0.01, 0.02]}}),
             json!({"method": "override", "params": {"overrides": {"2025Q1": 1.0}}}),
-            json!({"method": "normal", "params": {"mean": 1.0, "std_dev": 0.1, "seed": 7, "correlation_with": "peer", "correlation": 0.5}}),
-            json!({"method": "log_normal", "params": {"mean": 0.0, "std_dev": 0.1, "seed": 7}}),
-            json!({"method": "mean_reverting", "params": {"long_run_mean": 1.0, "reversion_speed": 0.5, "std_dev": 0.1, "seed": 7}}),
-            json!({"method": "bootstrap", "params": {"historical": [1.0, 2.0], "mode": "diff", "seed": 7}}),
+            json!({"method": "normal", "params": {"mean": 1.0, "std_dev": 0.1, "seed": "7", "correlation_with": "peer", "correlation": 0.5}}),
+            json!({"method": "log_normal", "params": {"mean": 0.0, "std_dev": 0.1, "seed": "7"}}),
+            json!({"method": "mean_reverting", "params": {"long_run_mean": 1.0, "reversion_speed": 0.5, "std_dev": 0.1, "seed": "7"}}),
+            json!({"method": "bootstrap", "params": {"historical": [1.0, 2.0], "mode": "diff", "seed": "7"}}),
             json!({"method": "time_series", "params": {"historical": [1.0, 2.0], "method": "exponential", "alpha": 0.5, "beta": 0.5, "phi": 0.9}}),
             json!({"method": "seasonal", "params": {"historical": [1.0, 2.0], "season_length": 2, "mode": "additive", "growth": 0.01}}),
             json!({"method": "fade_to_target", "params": {"target": 1.0, "shape": "exponential", "half_life": 2.0}}),
         ];
         for document in documents {
             let spec: ForecastSpec = serde_json::from_value(document.clone()).expect("spec");
-            let typed = spec.parameters().expect("typed parameters");
+            let typed = spec.clone();
             assert_eq!(serde_json::to_value(&typed).expect("serialize"), document);
-            let direct: ForecastParameters =
-                serde_json::from_value(document).expect("tagged parameters");
+            let direct: ForecastSpec = serde_json::from_value(document).expect("tagged parameters");
             assert_eq!(direct, typed);
         }
     }
@@ -300,14 +297,14 @@ mod tests {
     #[test]
     fn typed_parameters_reject_a_key_outside_the_method() {
         let document = json!({"method": "growth_pct", "params": {"rate": 0.03, "sigma": 1.0}});
-        assert!(serde_json::from_value::<ForecastParameters>(document).is_err());
+        assert!(serde_json::from_value::<ForecastSpec>(document).is_err());
     }
 
     #[test]
     fn bounds_clamp_deterministic_forecast_output() {
         let periods = quarters(4);
         let mut spec = ForecastSpec::growth(0.10);
-        spec.params.insert("max".into(), json!(120.0));
+        spec = spec.clone().with_param("max", json!(120.0)).unwrap();
         let results = run(&spec, 100.0, &periods).expect("bounded growth");
         // Unbounded: 110, 121, 133.1, 146.41 — everything above 120 pins.
         assert!((results[&periods[0]] - 110.0).abs() < 1e-9);
@@ -320,8 +317,8 @@ mod tests {
     fn bounds_clamp_stochastic_forecast_output() {
         let periods = quarters(8);
         let mut spec = ForecastSpec::normal(0.0, 50.0, 42);
-        spec.params.insert("min".into(), json!(0.0));
-        spec.params.insert("max".into(), json!(150.0));
+        spec = spec.clone().with_param("min", json!(0.0)).unwrap();
+        spec = spec.clone().with_param("max", json!(150.0)).unwrap();
         let results = run(&spec, 100.0, &periods).expect("bounded normal");
         for (pid, value) in &results {
             assert!(
@@ -335,8 +332,8 @@ mod tests {
     fn bounds_reject_inverted_range() {
         let periods = quarters(1);
         let mut spec = ForecastSpec::forward_fill();
-        spec.params.insert("min".into(), json!(10.0));
-        spec.params.insert("max".into(), json!(-10.0));
+        spec = spec.clone().with_param("min", json!(10.0)).unwrap();
+        spec = spec.clone().with_param("max", json!(-10.0)).unwrap();
         let err = run(&spec, 100.0, &periods).expect_err("min > max");
         assert!(err.to_string().contains("min <= max"), "{err}");
     }
@@ -344,9 +341,8 @@ mod tests {
     #[test]
     fn bounds_reject_non_numeric_values() {
         for bad in [json!("high"), serde_json::Value::Null] {
-            let mut spec = ForecastSpec::forward_fill();
-            spec.params.insert("max".into(), bad);
-            let err = spec.parameters().expect_err("bad bound");
+            let spec = ForecastSpec::forward_fill();
+            let err = spec.clone().with_param("max", bad).expect_err("bad bound");
             assert!(err.to_string().contains("'max'"), "{err}");
         }
     }
@@ -360,21 +356,21 @@ mod tests {
             ForecastSpec::normal(0.0, 1.0, 1),
             ForecastSpec::log_normal(0.0, 1.0, 1),
             ForecastSpec::overrides(indexmap::IndexMap::new()),
-            ForecastSpec::time_series(vec![1.0, 2.0]),
+            ForecastSpec::time_series(vec![1.0, 2.0], ForecastTrendMethod::Linear),
             ForecastSpec::seasonal(vec![1.0; 8], 4, crate::types::SeasonalMode::Additive),
-            ForecastSpec::fade_to_target(1.0),
+            ForecastSpec::fade_to_target(1.0, ForecastFadeShape::Linear),
             ForecastSpec::mean_reverting(1.0, 0.5, 0.1, 1),
-            ForecastSpec::bootstrap(vec![1.0, 2.0], 1),
+            ForecastSpec::bootstrap(vec![1.0, 2.0], ForecastBootstrapMode::Growth, 1),
         ];
         for mut spec in specs {
-            spec.params.insert("min".into(), json!(-5.0));
-            spec.params.insert("max".into(), json!(5.0));
-            let parameters = spec.parameters().expect("bounds are legal");
+            spec = spec.clone().with_param("min", json!(-5.0)).unwrap();
+            spec = spec.clone().with_param("max", json!(5.0)).unwrap();
+            let parameters = spec.clone();
             assert_eq!(
                 parameters.bounds(),
                 (Some(-5.0), Some(5.0)),
                 "{:?}",
-                spec.method
+                spec.method()
             );
         }
     }
@@ -386,9 +382,9 @@ mod tests {
     fn seeded_mc_forecast_is_not_clamped_before_z_recording() {
         let periods = quarters(8);
         let mut spec = ForecastSpec::normal(0.0, 50.0, 42);
-        spec.params.insert("min".into(), json!(99.0));
-        spec.params.insert("max".into(), json!(101.0));
-        let parameters = spec.parameters().expect("parameters");
+        spec = spec.clone().with_param("min", json!(99.0)).unwrap();
+        spec = spec.clone().with_param("max", json!(101.0)).unwrap();
+        let parameters = spec.clone();
 
         let (seeded, _) =
             apply_forecast(&parameters, 100.0, &periods, "node", Some(3)).expect("seeded forecast");
@@ -410,40 +406,117 @@ mod tests {
     #[test]
     fn node_id_is_mixed_into_the_seed() {
         let periods = quarters(4);
-        let parameters = ForecastSpec::normal(0.0, 1.0, 42)
-            .parameters()
-            .expect("parameters");
+        let parameters = ForecastSpec::normal(0.0, 1.0, 42);
         let a = apply_forecast_for_node(&parameters, 0.0, &periods, "a").expect("a");
         let b = apply_forecast_for_node(&parameters, 0.0, &periods, "b").expect("b");
         assert_ne!(a, b);
     }
 
     #[test]
-    fn spec_validate_rejects_wrong_value_types() {
-        let mut spec = ForecastSpec::growth(0.05);
+    fn a_typed_spec_cannot_hold_a_wrong_type_or_an_unknown_key() {
+        let spec = ForecastSpec::growth(0.05);
         spec.validate().expect("well-typed growth spec");
-        spec.params.insert("rate".into(), json!("x"));
-        let err = spec.validate().expect_err("string rate must be rejected");
+        let err = spec
+            .with_param("rate", json!("x"))
+            .expect_err("string rate must be rejected");
         assert!(err.to_string().contains("'rate'"), "{err}");
 
-        let mut spec = ForecastSpec::forward_fill();
-        spec.params.insert("sigma".into(), json!(1.0));
-        let err = spec.validate().expect_err("unknown key must be rejected");
+        let err = ForecastSpec::forward_fill()
+            .with_param("sigma", json!(1.0))
+            .expect_err("unknown key must be rejected");
         assert!(err.to_string().contains("unknown field `sigma`"), "{err}");
     }
 
+    /// STATEMENTS-CONTRACTS-003 #1: a duplicate, unknown, `null` or
+    /// method-inapplicable field is rejected when the document is read, and
+    /// the method choices have no default.
     #[test]
-    fn integer_valued_float_seeds_are_accepted() {
-        let mut spec = ForecastSpec::normal(0.0, 1.0, 42);
-        spec.params.insert("seed".into(), json!(42.0));
-        let ForecastParameters::Normal(params) = spec.parameters().expect("float seed") else {
-            panic!("normal parameters");
-        };
-        assert_eq!(params.seed, 42);
-        for bad in [json!(1.5), json!(-1), json!(u64::MAX as f64)] {
-            spec.params.insert("seed".into(), bad);
-            assert!(spec.parameters().is_err());
+    fn the_wire_form_rejects_duplicate_unknown_null_and_inapplicable_fields() {
+        for (document, cause) in [
+            (
+                r#"{"method":"growth_pct","params":{"rate":0.1,"rate":0.2}}"#,
+                "appears more than once",
+            ),
+            (
+                r#"{"method":"growth_pct","params":{"rate":0.1,"min":null}}"#,
+                "'min' is null",
+            ),
+            (
+                r#"{"method":"growth_pct","params":{"rate":0.1},"extra":1}"#,
+                "unknown field `extra`",
+            ),
+            (
+                r#"{"method":"growth_pct","params":{"rate":0.1,"seed":"1"}}"#,
+                "unknown field `seed`",
+            ),
+            (
+                r#"{"method":"fade_to_target","params":{"target":1.0}}"#,
+                "missing field `shape`",
+            ),
+            (
+                r#"{"method":"time_series","params":{"historical":[1.0,2.0]}}"#,
+                "missing field `method`",
+            ),
+            (
+                r#"{"method":"bootstrap","params":{"historical":[1.0,2.0],"seed":"1"}}"#,
+                "missing field `mode`",
+            ),
+        ] {
+            let error = serde_json::from_str::<ForecastSpec>(document).expect_err(document);
+            assert!(error.to_string().contains(cause), "{document}: {error}");
         }
+        // A method without required parameters may omit the object.
+        let bare: ForecastSpec =
+            serde_json::from_str(r#"{"method":"forward_fill"}"#).expect("bare");
+        assert_eq!(bare, ForecastSpec::forward_fill());
+        assert_eq!(
+            serde_json::to_string(&bare).expect("serialize"),
+            r#"{"method":"forward_fill"}"#
+        );
+        // A linear fade with a half-life reads but fails static validation.
+        let fade: ForecastSpec = serde_json::from_str(
+            r#"{"method":"fade_to_target","params":{"target":1.0,"shape":"linear","half_life":2.0}}"#,
+        )
+        .expect("well-typed");
+        let error = fade.validate().expect_err("half_life on a linear fade");
+        assert!(error.to_string().contains("half_life"), "{error}");
+    }
+
+    /// STATEMENTS-CONTRACTS-003 #4: a seed is an exact `u64`, written as a
+    /// canonical decimal string so every host carries all 64 bits.
+    #[test]
+    fn seeds_are_exact_canonical_decimal_strings() {
+        let spec = ForecastSpec::normal(0.0, 1.0, 9_007_199_254_740_993);
+        let wire = serde_json::to_value(&spec).expect("serialize");
+        assert_eq!(wire["params"]["seed"], json!("9007199254740993"));
+        let back: ForecastSpec = serde_json::from_value(wire).expect("deserialize");
+        assert_eq!(back, spec);
+
+        for bad in [
+            json!(42),
+            json!(42.0),
+            json!("042"),
+            json!("+42"),
+            json!("-1"),
+            json!("1.5"),
+            json!(""),
+            json!("18446744073709551616"),
+        ] {
+            assert!(
+                spec.clone().with_param("seed", bad.clone()).is_err(),
+                "{bad}"
+            );
+        }
+        assert!(
+            spec.with_param("seed", json!("18446744073709551615"))
+                .is_ok()
+        );
+        // Only a stochastic method takes a seed.
+        assert!(
+            ForecastSpec::growth(0.05)
+                .with_param("seed", json!("1"))
+                .is_err()
+        );
     }
 
     #[test]
@@ -459,27 +532,32 @@ mod tests {
         ForecastSpec::seasonal(vec![1.0; 8], 4, crate::types::SeasonalMode::Additive)
             .validate()
             .expect("seasonal spec");
-        ForecastSpec::time_series(vec![1.0, 2.0, 3.0])
+        ForecastSpec::time_series(vec![1.0, 2.0, 3.0], ForecastTrendMethod::Linear)
             .validate()
             .expect("time-series spec");
     }
 
     #[test]
     fn unknown_keys_and_variants_rejected_for_fade_to_target() {
-        let mut spec = ForecastSpec::fade_to_target(50.0);
-        spec.params.insert("shpae".into(), json!("linear"));
-        let err = spec.parameters().expect_err("typo key");
+        let spec = ForecastSpec::fade_to_target(50.0, ForecastFadeShape::Linear);
+        let err = spec
+            .with_param("shpae", json!("linear"))
+            .expect_err("typo key");
         assert!(err.to_string().contains("shpae"), "{err}");
 
-        let mut spec = ForecastSpec::fade_to_target(50.0);
-        spec.params.insert("shape".into(), json!("sigmoid"));
-        let err = spec.parameters().expect_err("unknown shape");
+        let spec = ForecastSpec::fade_to_target(50.0, ForecastFadeShape::Linear);
+        let err = spec
+            .with_param("shape", json!("sigmoid"))
+            .expect_err("unknown shape");
         assert!(err.to_string().contains("sigmoid"), "{err}");
 
-        let spec = ForecastSpec {
-            method: crate::types::ForecastMethod::FadeToTarget,
-            params: indexmap::IndexMap::new(),
-        };
-        assert!(spec.parameters().is_err(), "target is required");
+        assert!(
+            ForecastSpec::from_params(
+                crate::types::ForecastMethod::FadeToTarget,
+                indexmap::IndexMap::new(),
+            )
+            .is_err(),
+            "target is required"
+        );
     }
 }

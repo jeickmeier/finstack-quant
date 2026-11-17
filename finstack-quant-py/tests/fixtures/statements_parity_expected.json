@@ -127,7 +127,7 @@
         "method": "normal",
         "params": {
           "mean": 100.0,
-          "seed": 7,
+          "seed": "7",
           "std_dev": 10.0
         }
       },
@@ -135,7 +135,7 @@
         "method": "log_normal",
         "params": {
           "mean": 0.0,
-          "seed": 7,
+          "seed": "7",
           "std_dev": 0.2
         }
       },
@@ -167,12 +167,14 @@
             1.0,
             2.0,
             3.0
-          ]
+          ],
+          "method": "linear"
         }
       },
       {
         "method": "fade_to_target",
         "params": {
+          "shape": "linear",
           "target": 50.0
         }
       },
@@ -181,7 +183,7 @@
         "params": {
           "long_run_mean": 100.0,
           "reversion_speed": 0.5,
-          "seed": 11,
+          "seed": "11",
           "std_dev": 5.0
         }
       },
@@ -193,7 +195,8 @@
             2.0,
             3.0
           ],
-          "seed": 13
+          "mode": "growth",
+          "seed": "13"
         }
       }
     ],

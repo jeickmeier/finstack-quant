@@ -272,10 +272,9 @@ impl PyForecastSpec {
         params: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
         let params = parse_params(py, params)?;
-        let inner = finstack_quant_statements::types::ForecastSpec {
-            method: method.inner,
-            params,
-        };
+        let inner =
+            finstack_quant_statements::types::ForecastSpec::from_params(method.inner, params)
+                .map_err(statements_to_py)?;
         inner.validate().map_err(statements_to_py)?;
         Ok(Self { inner })
     }
@@ -413,43 +412,53 @@ impl PyForecastSpec {
         ))
     }
 
-    /// Trend-detection time-series spec over an external history (linear
-    /// trend by default).
+    /// Time-series spec over an external history with the chosen trend
+    /// method.
     ///
-    /// For Holt / damped-Holt or moving-average projections construct
-    /// ``ForecastSpec(ForecastMethod.time_series(), {...})`` with ``method``
-    /// (``"linear"``, ``"exponential"``, ``"moving_average"``) and its
-    /// tuning parameters (``alpha``, ``beta``, ``phi``, ``window``).
+    /// Tuning parameters (``alpha``, ``beta``, ``phi`` for ``"exponential"``;
+    /// ``window`` for ``"moving_average"``) are set through
+    /// ``ForecastSpec(ForecastMethod.time_series(), {...})``.
     ///
     /// Parameters
     /// ----------
     /// historical : list[float]
     ///     At least 2 historical values in the node's own units, oldest
     ///     first, from which the trend is estimated.
+    /// method : {"linear", "exponential", "moving_average"}
+    ///     Trend method. There is no default.
     #[staticmethod]
-    fn time_series(historical: Vec<f64>) -> Self {
-        Self::wrap(finstack_quant_statements::types::ForecastSpec::time_series(
-            historical,
+    fn time_series(historical: Vec<f64>, method: &str) -> PyResult<Self> {
+        Ok(Self::wrap(
+            finstack_quant_statements::types::ForecastSpec::time_series(
+                historical,
+                choice(method, "method")?,
+            ),
         ))
     }
 
-    /// Linear fade-to-target spec:
-    /// ``v[t] = base + (target - base) * t / N``.
+    /// Fade-to-target spec with the chosen shape.
     ///
-    /// Values glide from the last observed value to ``target`` in equal
-    /// steps, reaching it exactly at the final forecast period. For the
-    /// ``"geometric"`` (CAGR-to-terminal) or ``"exponential"`` (half-life)
-    /// shapes, construct ``ForecastSpec(ForecastMethod.fade_to_target(),
-    /// {...})`` with ``shape`` and, for exponential, ``half_life``.
+    /// Values glide from the last observed value to ``target``. The
+    /// ``"linear"`` shape moves in equal steps and reaches the target at the
+    /// final forecast period; ``"geometric"`` compounds toward it;
+    /// ``"exponential"`` closes the gap with a ``half_life`` set through
+    /// ``ForecastSpec(ForecastMethod.fade_to_target(), {...})``.
     ///
     /// Parameters
     /// ----------
     /// target : float
     ///     Terminal level in the node's own units (a currency amount for
     ///     monetary nodes, a decimal ratio for scalar nodes such as margins).
+    /// shape : {"linear", "geometric", "exponential"}
+    ///     Path of the fade. There is no default.
     #[staticmethod]
-    fn fade_to_target(target: f64) -> Self {
-        Self::wrap(finstack_quant_statements::types::ForecastSpec::fade_to_target(target))
+    fn fade_to_target(target: f64, shape: &str) -> PyResult<Self> {
+        Ok(Self::wrap(
+            finstack_quant_statements::types::ForecastSpec::fade_to_target(
+                target,
+                choice(shape, "shape")?,
+            ),
+        ))
     }
 
     /// Mean-reverting AR(1) spec:
@@ -483,25 +492,30 @@ impl PyForecastSpec {
         )
     }
 
-    /// Growth-mode bootstrap spec: resample historical growth rates and
-    /// compound them from the base value.
+    /// Bootstrap spec: resample historical changes and apply them from the
+    /// base value.
     ///
-    /// The history must be strictly positive in growth mode. For additive
-    /// resampling of level changes (series that cross zero), construct
-    /// ``ForecastSpec(ForecastMethod.bootstrap(), {...})`` with
-    /// ``mode = "diff"``.
+    /// ``"growth"`` resamples growth rates and compounds them, which needs a
+    /// strictly positive history; ``"diff"`` resamples level changes and
+    /// suits series that cross zero.
     ///
     /// Parameters
     /// ----------
     /// historical : list[float]
     ///     At least 2 historical values in the node's own units, oldest
-    ///     first; consecutive pairs define the resampled growth rates.
+    ///     first; consecutive pairs define the resampled changes.
+    /// mode : {"growth", "diff"}
+    ///     What is resampled. There is no default.
     /// seed : int
-    ///     Seed for the deterministic resampling draws.
+    ///     Exact unsigned 64-bit seed for the resampling draws.
     #[staticmethod]
-    fn bootstrap(historical: Vec<f64>, seed: u64) -> Self {
-        Self::wrap(finstack_quant_statements::types::ForecastSpec::bootstrap(
-            historical, seed,
+    fn bootstrap(historical: Vec<f64>, mode: &str, seed: u64) -> PyResult<Self> {
+        Ok(Self::wrap(
+            finstack_quant_statements::types::ForecastSpec::bootstrap(
+                historical,
+                choice(mode, "mode")?,
+                seed,
+            ),
         ))
     }
 
@@ -509,7 +523,7 @@ impl PyForecastSpec {
     #[getter]
     fn method(&self) -> PyForecastMethod {
         PyForecastMethod {
-            inner: self.inner.method,
+            inner: self.inner.method(),
         }
     }
 
@@ -523,24 +537,40 @@ impl PyForecastSpec {
     ///     for ``overrides``.
     #[getter]
     fn params<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.params)
+        serde_to_py(py, &python_params(&self.inner))
     }
 
     /// Return ``ForecastSpec(method='growth_pct', params={'rate': 0.05})``.
     fn __repr__(&self) -> PyResult<String> {
-        let params = serde_json::Value::Object(
-            self.inner
-                .params
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect(),
-        );
+        let params = serde_json::Value::Object(python_params(&self.inner).into_iter().collect());
         Ok(format!(
             "ForecastSpec(method={:?}, params={})",
-            crate::bindings::extract::label(&self.inner.method)?,
+            crate::bindings::extract::label(&self.inner.method())?,
             super::python_literal(&params)
         ))
     }
+}
+
+/// A forecast's parameters as Python reads them: the wire object with the
+/// seed as an integer.
+fn python_params(
+    spec: &finstack_quant_statements::types::ForecastSpec,
+) -> IndexMap<String, serde_json::Value> {
+    let mut params = spec.params();
+    if let Some(seed) = params.get_mut("seed")
+        && let Some(exact) = seed.as_str().and_then(|text| text.parse::<u64>().ok())
+    {
+        *seed = serde_json::Value::from(exact);
+    }
+    params
+}
+
+/// Parse one of a forecast method's named choices (a trend method, fade
+/// shape or bootstrap mode) from its wire label.
+fn choice<T: serde::de::DeserializeOwned>(label: &str, parameter: &str) -> PyResult<T> {
+    serde_json::from_value(serde_json::Value::String(label.to_string())).map_err(|error| {
+        crate::errors::value_error(format!("invalid forecast {parameter} '{label}': {error}"))
+    })
 }
 
 /// Parse the ``params`` argument of ``ForecastSpec`` from a dict, a JSON
@@ -554,7 +584,17 @@ fn parse_params(
     };
     let value = crate::bindings::module_utils::py_to_json_value(py, params, "forecast params")?;
     match value {
-        serde_json::Value::Object(map) => Ok(map.into_iter().collect()),
+        serde_json::Value::Object(map) => Ok(map
+            .into_iter()
+            .map(|(key, value)| {
+                // A Python seed is an int; the wire form is its decimal text.
+                let value = match (key.as_str(), value.as_u64()) {
+                    ("seed", Some(seed)) => serde_json::Value::String(seed.to_string()),
+                    _ => value,
+                };
+                (key, value)
+            })
+            .collect()),
         other => Err(crate::errors::value_error(format!(
             "forecast params must be a dict or JSON object, got {other}"
         ))),
@@ -1150,7 +1190,7 @@ impl PyFinancialModelSpec {
                     "node_type": crate::bindings::extract::label(&node.node_type)?,
                     "name": node.name,
                     "formula_text": node.formula_text,
-                    "forecast_method": node.forecast.as_ref().map(|f| crate::bindings::extract::label(&f.method)).transpose()?,
+                    "forecast_method": node.forecast.as_ref().map(|f| crate::bindings::extract::label(&f.method())).transpose()?,
                     "value_type": value_type,
                     "currency": currency,
                     "where_text": node.where_text,

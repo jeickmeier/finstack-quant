@@ -1,0 +1,66 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_method.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The method tag of a forecast specification.",
+  "examples": [
+    "growth_pct"
+  ],
+  "oneOf": [
+    {
+      "const": "forward_fill",
+      "description": "Carry last value forward",
+      "type": "string"
+    },
+    {
+      "const": "growth_pct",
+      "description": "Compound growth: `v[t] = v[t-1] * (1 + rate)`",
+      "type": "string"
+    },
+    {
+      "const": "curve_pct",
+      "description": "Period-specific growth rates: `v[t] = v[t-1] * (1 + curve[t])`",
+      "type": "string"
+    },
+    {
+      "const": "normal",
+      "description": "Sample from normal distribution (deterministic with seed)",
+      "type": "string"
+    },
+    {
+      "const": "log_normal",
+      "description": "Sample from log-normal distribution (deterministic with seed)",
+      "type": "string"
+    },
+    {
+      "const": "override",
+      "description": "Explicit period overrides",
+      "type": "string"
+    },
+    {
+      "const": "time_series",
+      "description": "Reference external time series",
+      "type": "string"
+    },
+    {
+      "const": "seasonal",
+      "description": "Seasonal pattern (additive/multiplicative)",
+      "type": "string"
+    },
+    {
+      "const": "fade_to_target",
+      "description": "Glide from the base value to a target level: linear, geometric\n(CAGR-to-terminal), or exponential (half-life) shape",
+      "type": "string"
+    },
+    {
+      "const": "mean_reverting",
+      "description": "Mean-reverting AR(1) path:\n`v[t] = v[t-1] + reversion_speed * (long_run_mean - v[t-1]) + std_dev * z[t]`",
+      "type": "string"
+    },
+    {
+      "const": "bootstrap",
+      "description": "Resample historical growth rates or level diffs (deterministic with seed)",
+      "type": "string"
+    }
+  ],
+  "title": "ForecastMethod"
+}

@@ -301,7 +301,8 @@ implemented and qualified.
 The Statements typed forecast and validation staging contract was accepted
 on 2026-11-15. It covers explicit method parameters, shared static checks,
 runtime history and horizon checks, and exact stochastic seeds.
-Implementation and independent qualification remain pending.
+The typed specification, static checks and exact seeds are implemented and
+qualified; JavaScript `bigint` seeds and the runtime horizon checks remain.
 [STATEMENTS-CONTRACTS-003](statements-contracts/03-forecast-parameter-contract.md#accepted-decision-for-typed-forecasts-and-validation-staging).
 
 The Statements formula grammar and dispatch contract was accepted on

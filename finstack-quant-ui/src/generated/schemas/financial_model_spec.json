@@ -446,6 +446,21 @@
       ],
       "type": "object"
     },
+    "d_12f170432b1b0cb25769": {
+      "description": "Seasonal decomposition mode.",
+      "oneOf": [
+        {
+          "const": "additive",
+          "description": "Additive seasonality: Y = Trend + Seasonal + Error",
+          "type": "string"
+        },
+        {
+          "const": "multiplicative",
+          "description": "Multiplicative seasonality: Y = Trend * Seasonal * Error",
+          "type": "string"
+        }
+      ]
+    },
     "d_12fd8e2c005f5987500b": {
       "additionalProperties": false,
       "description": "Fee structure for a revolving credit facility.\n\nContains the various fees charged on the facility:\n- Upfront: one-time fee at commitment\n- Commitment: annual fee on undrawn amount (can be tiered by utilization)\n- Usage: annual fee on drawn amount (can be tiered by utilization)\n- Facility: annual fee on total commitment\n\nFlat fees can be represented as single-tier vectors.",
@@ -2654,6 +2669,50 @@
       ],
       "type": "object"
     },
+    "d_44123d832feea816e1b8": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::FadeToTarget`].",
+      "properties": {
+        "half_life": {
+          "description": "Periods to close half the gap; required for, and legal only with, the exponential shape.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "shape": {
+          "$ref": "#/$defs/d_668586b4a212813f115e",
+          "description": "Path to the target; defaults to linear."
+        },
+        "target": {
+          "description": "Terminal level, in the line's base units.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "target",
+        "shape"
+      ],
+      "type": "object"
+    },
     "d_450829dac3a74a5c8761": {
       "additionalProperties": false,
       "description": "Specification for floating rate legs in interest rate swaps",
@@ -3234,6 +3293,50 @@
       ],
       "type": "object"
     },
+    "d_540ac8fb2e11ac940d17": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::Bootstrap`].",
+      "properties": {
+        "historical": {
+          "description": "At least 2 observations in the line's base units, oldest first.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mode": {
+          "$ref": "#/$defs/d_d96cd84373b443a9835e",
+          "description": "What to resample; defaults to growth rates."
+        },
+        "seed": {
+          "description": "Random seed; the same seed reproduces the same path.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "historical",
+        "mode",
+        "seed"
+      ],
+      "type": "object"
+    },
     "d_540b029baeeb4469863b": {
       "additionalProperties": false,
       "description": "Dated margin step (covenant penalty, scheduled change or pricing-grid move).\n\nShifts the interest margin by `delta_bp` from `date` onward (effective-from\ndate). Steps are cumulative. A negative `delta_bp` steps the margin down (a\nleverage-grid improvement); term loans accept only non-negative steps.",
@@ -3770,6 +3873,26 @@
         "amort"
       ],
       "type": "object"
+    },
+    "d_668586b4a212813f115e": {
+      "description": "Path of a fade to target.",
+      "oneOf": [
+        {
+          "const": "linear",
+          "description": "Equal steps, reaching the target at the final period.",
+          "type": "string"
+        },
+        {
+          "const": "geometric",
+          "description": "Constant compound growth; base and target must be non-zero with the same sign.",
+          "type": "string"
+        },
+        {
+          "const": "exponential",
+          "description": "Half-life decay toward the target; requires `half_life`.",
+          "type": "string"
+        }
+      ]
     },
     "d_66cec9e6c4e451f96890": {
       "description": "Roll-date rule applied when generating schedule anchors.\n\nSelects the core `ScheduleBuilder` date-generation mode.\n\n# Variants\n\n- **`None`**: plain tenor stepping from the schedule boundaries (default).\n- **`Imm`**: the IMM roll convention (FpML `IMM`). Regular periods roll on\n  the third Wednesday of Mar/Jun/Sep/Dec at the schedule `frequency`, which\n  must be a whole number of quarters; the `stub` rule picks forward or\n  backward generation and short or long stubs, as in\n  `ScheduleBuilder::imm`. The contractual start and maturity are always\n  kept, so an off-cycle date becomes a stub period, and a schedule with no\n  IMM date strictly inside it is a single period.\n\nThere is no generic CDS grid: a CDS product selects its own named date\nregime (record CALIBRATION-FRAMEWORK-007, O7).\n\nAn IMM roll grid cannot be combined with `end_of_month`. Third-Wednesday\nIMM with ACT/ACT ICMA is rejected because the available ICMA reference\ncalculation requires nominal month-grid coupons.\n\n# Examples\n\n```rust\nuse finstack_quant_cashflows::builder::RollRule;\n\nlet rule = RollRule::default();\nassert_eq!(rule, RollRule::None);\n```\n\n# References\n\n- `docs/REFERENCES.md#isda-cds-standard-model`\n- CME IMM date rules (third Wednesday of the contract month)",
@@ -5087,6 +5210,26 @@
       ],
       "type": "object"
     },
+    "d_7f4d9a4ecfa35776a8bf": {
+      "description": "Trend model of a time-series forecast.",
+      "oneOf": [
+        {
+          "const": "linear",
+          "description": "Least-squares linear trend.",
+          "type": "string"
+        },
+        {
+          "const": "exponential",
+          "description": "Holt exponential smoothing; requires `alpha` and `beta`.",
+          "type": "string"
+        },
+        {
+          "const": "moving_average",
+          "description": "Moving average; requires `window`.",
+          "type": "string"
+        }
+      ]
+    },
     "d_82d2bec48bc64b37bcef": {
       "description": "Finite JSON number in the closed interval `[0, 1]`.",
       "format": "double",
@@ -6047,23 +6190,195 @@
       "type": "object"
     },
     "d_9699cb3c9e4a8e981880": {
-      "additionalProperties": false,
-      "description": "Forecast method specification.\n\nDefines how to forecast future values for a node.",
-      "properties": {
-        "method": {
-          "$ref": "#/$defs/d_fa7e9148fe6bb6b4aec7",
-          "description": "Forecast method"
+      "description": "A forecast method with its typed parameters.\n\nSerializes as `{ \"method\": ..., \"params\": { ... } }`. `params` may be\nomitted when the method needs none.",
+      "oneOf": [
+        {
+          "description": "Carry the last value forward.",
+          "properties": {
+            "method": {
+              "const": "forward_fill",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_dfb113784288659a8f2c"
+            }
+          },
+          "required": [
+            "method"
+          ],
+          "type": "object"
         },
-        "params": {
-          "additionalProperties": true,
-          "description": "Method-specific parameters",
+        {
+          "description": "Compound one growth rate per period.",
+          "properties": {
+            "method": {
+              "const": "growth_pct",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_fcbfa69172f239f37e64"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Compound a different growth rate each period.",
+          "properties": {
+            "method": {
+              "const": "curve_pct",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_d161ae86daa94ad6c7ee"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Sample an additive random walk.",
+          "properties": {
+            "method": {
+              "const": "normal",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_fb167be7e6dcd5c363b6"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Sample a multiplicative random walk for positive values.",
+          "properties": {
+            "method": {
+              "const": "log_normal",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_fb167be7e6dcd5c363b6"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Set exact values for chosen periods, carrying forward between them.",
+          "properties": {
+            "method": {
+              "const": "override",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_f1ea5e7398e0dcbf32b5"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Project from a historical series.",
+          "properties": {
+            "method": {
+              "const": "time_series",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_d2a51b402e236fa27cc5"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Project a repeating pattern from a historical series.",
+          "properties": {
+            "method": {
+              "const": "seasonal",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_b0df738903f9c16e9407"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Sample a mean-reverting AR(1) process.",
+          "properties": {
+            "method": {
+              "const": "mean_reverting",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_a9879b1ecf56bb1c1e5d"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Resample changes from a historical series.",
+          "properties": {
+            "method": {
+              "const": "bootstrap",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_540ac8fb2e11ac940d17"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Glide toward a target level over the forecast horizon.",
+          "properties": {
+            "method": {
+              "const": "fade_to_target",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/$defs/d_44123d832feea816e1b8"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
           "type": "object"
         }
-      },
-      "required": [
-        "method"
-      ],
-      "type": "object"
+      ]
     },
     "d_97ce4fbfee051bc20729": {
       "description": "Provider-selection purpose of a point-date FX query (record\nCORE-CONVENTIONS-013 #1/#2).\n\nThe policy tells a provider which source purpose the rate serves; it does\nnot calculate dates or choose spot versus forward. There is no default:\nevery query names its policy. Period averages are not point queries; an\nowner that needs one computes the oriented aggregate itself.",
@@ -6460,6 +6775,69 @@
         }
       ]
     },
+    "d_a9879b1ecf56bb1c1e5d": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::MeanReverting`].",
+      "properties": {
+        "correlation": {
+          "description": "Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "correlation_with": {
+          "description": "Node whose shocks this one correlates with; Monte Carlo evaluation only.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "long_run_mean": {
+          "description": "Long-run level the process reverts to, in the line's base units.",
+          "format": "double",
+          "type": "number"
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "reversion_speed": {
+          "description": "Fraction of the gap closed each period, a decimal in (0, 1].",
+          "format": "double",
+          "type": "number"
+        },
+        "seed": {
+          "description": "Random seed; the same seed reproduces the same path.",
+          "type": "string"
+        },
+        "std_dev": {
+          "description": "Standard deviation of the shock per period; non-negative.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "long_run_mean",
+        "reversion_speed",
+        "std_dev",
+        "seed"
+      ],
+      "type": "object"
+    },
     "d_ac8cc8b1c0238b654c35": {
       "description": "Basis used for bond duration, convexity, and DV01-style risk metrics.",
       "oneOf": [
@@ -6629,6 +7007,60 @@
           "type": "object"
         }
       ]
+    },
+    "d_b0df738903f9c16e9407": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::Seasonal`].",
+      "properties": {
+        "growth": {
+          "description": "Trend growth per period as a decimal: 0.03 = 3%; defaults to none.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "historical": {
+          "description": "Observations in the line's base units, oldest first; at least two full cycles.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mode": {
+          "$ref": "#/$defs/d_12f170432b1b0cb25769",
+          "description": "How the seasonal pattern combines with the trend."
+        },
+        "season_length": {
+          "description": "Periods per seasonal cycle.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "historical",
+        "season_length",
+        "mode"
+      ],
+      "type": "object"
     },
     "d_b375e274438ab847f1fc": {
       "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",
@@ -7474,6 +7906,112 @@
         }
       ]
     },
+    "d_d161ae86daa94ad6c7ee": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::CurvePct`].",
+      "properties": {
+        "curve": {
+          "description": "Growth rate per forecast period as decimals, one per period in order.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "curve"
+      ],
+      "type": "object"
+    },
+    "d_d2a51b402e236fa27cc5": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::TimeSeries`].",
+      "properties": {
+        "alpha": {
+          "description": "Level smoothing in (0, 1]; required for the exponential method.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "beta": {
+          "description": "Trend smoothing in (0, 1]; required for the exponential method.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "historical": {
+          "description": "Observations in the line's base units, oldest first.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "method": {
+          "$ref": "#/$defs/d_7f4d9a4ecfa35776a8bf",
+          "description": "Trend model; defaults to linear."
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "phi": {
+          "description": "Trend damping in (0, 1]; legal only with the exponential method.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "window": {
+          "description": "Averaging window in periods; required for the moving-average method.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "historical",
+        "method"
+      ],
+      "type": "object"
+    },
     "d_d3213166ba249a2637ec": {
       "description": "Node computation type.\n\nDetermines how a node's value is computed:\n- **Value**: Only explicit values (actuals, assumptions)\n- **Calculated**: Only formula-derived\n- **Mixed**: Value OR Forecast OR Formula (precedence: Value > Forecast > Formula)",
       "oneOf": [
@@ -7597,6 +8135,21 @@
       ],
       "type": "object"
     },
+    "d_d96cd84373b443a9835e": {
+      "description": "What a bootstrap resamples from its historical series.",
+      "oneOf": [
+        {
+          "const": "growth",
+          "description": "Period-over-period growth rates, compounded; needs a positive series.",
+          "type": "string"
+        },
+        {
+          "const": "diff",
+          "description": "Additive level changes; works for a series crossing zero.",
+          "type": "string"
+        }
+      ]
+    },
     "d_d9b87615ca391901799a": {
       "description": "Whether a contractual spread is included in overnight daily compounding.\n\nISDA-standard RFR coupons normally compound only the overnight index and add\nany spread as simple interest after compounding. `Include` represents the\nless common contract where the spread enters every daily compound factor.",
       "oneOf": [
@@ -7713,6 +8266,29 @@
           "type": "string"
         }
       ]
+    },
+    "d_dfb113784288659a8f2c": {
+      "additionalProperties": false,
+      "description": "Parameters of a method with only the cross-cutting bounds.",
+      "properties": {
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
     },
     "d_e2eda29a60f5dc6bf382": {
       "description": "VaR calculation method.",
@@ -7951,6 +8527,40 @@
       ],
       "type": "object"
     },
+    "d_f1ea5e7398e0dcbf32b5": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::Override`].",
+      "properties": {
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "overrides": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Exact levels by period id, in the line's base units; other periods carry forward.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "overrides"
+      ],
+      "type": "object"
+    },
     "d_f6d62213f69ce1a51ff3": {
       "description": "Direction for threshold comparison.",
       "oneOf": [
@@ -8037,66 +8647,6 @@
       ],
       "type": "object"
     },
-    "d_fa7e9148fe6bb6b4aec7": {
-      "description": "Available forecast methods.",
-      "oneOf": [
-        {
-          "const": "forward_fill",
-          "description": "Carry last value forward",
-          "type": "string"
-        },
-        {
-          "const": "growth_pct",
-          "description": "Compound growth: `v[t] = v[t-1] * (1 + rate)`",
-          "type": "string"
-        },
-        {
-          "const": "curve_pct",
-          "description": "Period-specific growth rates: `v[t] = v[t-1] * (1 + curve[t])`",
-          "type": "string"
-        },
-        {
-          "const": "normal",
-          "description": "Sample from normal distribution (deterministic with seed)",
-          "type": "string"
-        },
-        {
-          "const": "log_normal",
-          "description": "Sample from log-normal distribution (deterministic with seed)",
-          "type": "string"
-        },
-        {
-          "const": "override",
-          "description": "Explicit period overrides",
-          "type": "string"
-        },
-        {
-          "const": "time_series",
-          "description": "Reference external time series",
-          "type": "string"
-        },
-        {
-          "const": "seasonal",
-          "description": "Seasonal pattern (additive/multiplicative)",
-          "type": "string"
-        },
-        {
-          "const": "fade_to_target",
-          "description": "Glide from the base value to a target level: linear, geometric\n(CAGR-to-terminal), or exponential (half-life) shape",
-          "type": "string"
-        },
-        {
-          "const": "mean_reverting",
-          "description": "Mean-reverting AR(1) path:\n`v[t] = v[t-1] + reversion_speed * (long_run_mean - v[t-1]) + std_dev * z[t]`",
-          "type": "string"
-        },
-        {
-          "const": "bootstrap",
-          "description": "Resample historical growth rates or level diffs (deterministic with seed)",
-          "type": "string"
-        }
-      ]
-    },
     "d_fada56e3c212d0a9b805": {
       "description": "Collateral asset classes per BCBS-IOSCO standards.\n\nAsset classes determine baseline haircuts and eligibility criteria.\nThe BCBS-IOSCO framework specifies minimum haircuts by asset class.\n\n# Reference\n\nBCBS-IOSCO \"Margin requirements for non-centrally cleared derivatives\" (2020)\nAnnex A: Standardized haircut schedule `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`",
       "oneOf": [
@@ -8167,6 +8717,63 @@
       ],
       "type": "object"
     },
+    "d_fb167be7e6dcd5c363b6": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::Normal`] and [`ForecastSpec::LogNormal`].",
+      "properties": {
+        "correlation": {
+          "description": "Correlation with `correlation_with`, in [-1, 1]; Monte Carlo evaluation only.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "correlation_with": {
+          "description": "Node whose shocks this one correlates with; Monte Carlo evaluation only.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mean": {
+          "description": "Mean shock per period, as the method applies it.",
+          "format": "double",
+          "type": "number"
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "seed": {
+          "description": "Random seed; the same seed reproduces the same path.",
+          "type": "string"
+        },
+        "std_dev": {
+          "description": "Standard deviation of the shock per period; non-negative.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "mean",
+        "std_dev",
+        "seed"
+      ],
+      "type": "object"
+    },
     "d_fc17544530079d46d05e": {
       "description": "How one node's values combine over the source periods of a target period.",
       "oneOf": [
@@ -8186,6 +8793,37 @@
           "type": "string"
         }
       ]
+    },
+    "d_fcbfa69172f239f37e64": {
+      "additionalProperties": false,
+      "description": "Parameters of [`ForecastSpec::GrowthPct`].",
+      "properties": {
+        "max": {
+          "description": "Upper bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min": {
+          "description": "Lower bound clamped onto generated values, in the line's base units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "rate": {
+          "description": "Growth per period as a decimal: 0.03 = 3%.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "rate"
+      ],
+      "type": "object"
     },
     "d_fedf13c6253774f430cb": {
       "additionalProperties": false,

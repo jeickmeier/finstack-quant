@@ -4141,9 +4141,9 @@
         },
         "provenance": {
           "model_id": "ACME-SOFTWARE-3STMT",
-          "model_content_hash": "sha256:0cd672ec26d3646ebcfd9dd3be59fb3e1dd8b1d9567f327aa0c231c9b3cc7cff",
+          "model_content_hash": "sha256:f81c5170afe8077200cde71205f5c011e6de668eabfb401d984ccbe9f71b825a",
           "observation_cutoff": "full_snapshot",
-          "run_id": "sha256:065180acd0480cbf27ea215556f5f7790acc5ed9462e9984b7c3c90a01404c59"
+          "run_id": "sha256:4f864bce01edf7a39e97587b085883694696f0c838bfa91181af1e07a16212a8"
         },
         "meta": {
           "num_nodes": 26,

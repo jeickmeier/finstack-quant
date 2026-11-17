@@ -1399,10 +1399,11 @@ fn test_forecast_error_no_actual_periods() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-            },
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.05) },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };
@@ -1437,10 +1438,11 @@ fn test_forecast_error_all_actual_periods() {
         );
         model_builder.forecast(
             "revenue",
-            ForecastSpec {
-                method: ForecastMethod::GrowthPct,
-                params: indexmap! { "rate".into() => serde_json::json!(0.05) },
-            },
+            ForecastSpec::from_params(
+                ForecastMethod::GrowthPct,
+                indexmap! { "rate".into() => serde_json::json!(0.05) },
+            )
+            .unwrap(),
         );
         model_builder.build().unwrap()
     };

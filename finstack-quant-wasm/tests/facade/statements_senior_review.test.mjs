@@ -390,3 +390,38 @@ test('a bundled margin is unavailable without positive revenue', () => {
     registry.free();
   }
 });
+
+test('forecast seeds are exact decimal text and method choices are explicit', () => {
+  const model = (forecast) =>
+    JSON.stringify({
+      id: 'seeded',
+      schema_version: 1,
+      periods: {
+        calendar: 'gregorian',
+        periods: [
+          { id: '2025Q1', start: '2025-01-01', end: '2025-04-01', is_actual: true },
+          { id: '2025Q2', start: '2025-04-01', end: '2025-07-01', is_actual: false },
+        ],
+      },
+      nodes: {
+        x: { node_id: 'x', node_type: 'mixed', values: { '2025Q1': 100 }, forecast },
+      },
+    });
+  const normal = (seed) => ({ method: 'normal', params: { mean: 0, std_dev: 1, seed } });
+  // 9007199254740993 is not a JavaScript number; as text it is exact.
+  const path = (seed) => evaluateModel(model(normal(seed))).cells.x['2025Q2'].value;
+  assert.notEqual(path('9007199254740992'), path('9007199254740993'));
+  assert.equal(path('9007199254740993'), path('9007199254740993'));
+
+  for (const forecast of [
+    normal(42),
+    { method: 'fade_to_target', params: { target: 1 } },
+    { method: 'fade_to_target', params: { target: 1, shape: 'linear', half_life: 2 } },
+    { method: 'growth_pct', params: { rate: 0.1, seed: '1' } },
+  ]) {
+    assert.throws(
+      () => evaluateModel(model(forecast)),
+      (e) => e.kind === 'validation'
+    );
+  }
+});
