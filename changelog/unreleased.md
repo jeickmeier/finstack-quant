@@ -1193,3 +1193,17 @@ STATEMENTS-EVALUATION-008.
 - **Exact cases.** A zero coefficient is an uncorrelated node (same draws);
   `1` copies and `-1` negates the peer shock exactly.
 - New unavailable reason `missing_peer_shock`.
+
+### Statements: trend forecasts check their parameters at build
+
+STATEMENTS-EVALUATION-009.
+
+- **Rejected at build.** An exponential trend without `alpha` and `beta`, a
+  smoothing factor of exactly 1 (the range is the open interval), a history
+  of fewer than two observations and a moving-average `window` longer than
+  the history now fail when the model is built; they used to fail when the
+  forecast ran, and a smoothing factor of 1 passed the build.
+- **Numerics.** The linear trend is fitted on centered and scaled
+  coordinates with compensated sums, so a small slope at a large level is
+  kept; moving-average windows of extreme finite levels no longer overflow.
+  Ordinary results change only in the last digits.

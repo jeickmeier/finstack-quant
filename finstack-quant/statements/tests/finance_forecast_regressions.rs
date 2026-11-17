@@ -133,7 +133,7 @@ fn extreme_season_lengths_fail_before_allocation() {
 }
 
 #[test]
-fn bounded_constant_moving_average_rejects_overflow() {
+fn a_moving_average_of_extreme_finite_levels_is_representable() {
     let mut forecast = ForecastSpec::time_series(vec![1e308, 1e308], ForecastTrendMethod::Linear);
     forecast = forecast
         .clone()
@@ -142,8 +142,11 @@ fn bounded_constant_moving_average_rejects_overflow() {
     forecast = forecast.clone().with_param("window", json!(2)).unwrap();
     forecast = forecast.clone().with_param("max", json!(100.0)).unwrap();
     let model = forecast_model(1e308, forecast);
-    let error = Evaluator::new().evaluate(&model).unwrap_err();
-    assert!(error.to_string().contains("non-finite historical average"));
+    // The mean of two levels of 1e308 is 1e308: the window is accumulated
+    // on scaled values, so its partial sum does not overflow. The bound then
+    // clips the published level.
+    let result = Evaluator::new().evaluate(&model).unwrap();
+    assert_eq!(result.get("x", &quarter(2)), Some(100.0));
 }
 
 #[test]
@@ -1124,4 +1127,112 @@ fn peer_shocks_follow_the_peer_forecast_not_its_published_cells() {
         metric_paths(&results, "follower")
     };
     assert_eq!(run(&published), run(&plain));
+}
+
+// --- C6: trend extrapolation (STATEMENTS-EVALUATION-009) ---
+
+fn trend_values(forecast: ForecastSpec) -> [f64; 3] {
+    let result = Evaluator::new()
+        .evaluate(&growth_model(forecast, Some(100.0), &[]))
+        .unwrap();
+    [2, 3, 4].map(|index| result.get("x", &quarter(index)).unwrap())
+}
+
+/// Damped Holt against a recursion worked by hand for [10, 12, 15] with
+/// alpha = beta = 0.5 and phi = 0.9: the initial trend is (15 - 10) / 2 =
+/// 2.5; the updates give L = 12.125, B = 2.1875 and then L = 14.546875,
+/// B = 2.1953125; the forecasts add B times 0.9, 1.71 and 2.439.
+#[test]
+fn damped_holt_matches_a_hand_recursion() {
+    let holt = ForecastSpec::time_series(vec![10.0, 12.0, 15.0], ForecastTrendMethod::Exponential)
+        .with_param("alpha", json!(0.5))
+        .unwrap()
+        .with_param("beta", json!(0.5))
+        .unwrap()
+        .with_param("phi", json!(0.9))
+        .unwrap();
+    let expected = [
+        14.546875 + 2.1953125 * 0.9,
+        14.546875 + 2.1953125 * 1.71,
+        14.546875 + 2.1953125 * 2.439,
+    ];
+    for (value, expected) in trend_values(holt).iter().zip(expected) {
+        assert!((value - expected).abs() < 1e-12, "{value} vs {expected}");
+    }
+}
+
+/// The moving-average rule: with the window equal to the history the
+/// forecast is the constant mean; with one more observation the trend is
+/// the difference of the two trailing means, centred by (W - 1) / 2.
+#[test]
+fn moving_average_is_constant_when_the_window_is_the_history() {
+    let moving = |history: Vec<f64>| {
+        ForecastSpec::time_series(history, ForecastTrendMethod::MovingAverage)
+            .with_param("window", json!(3))
+            .unwrap()
+    };
+    assert_eq!(trend_values(moving(vec![10.0, 20.0, 60.0])), [30.0; 3]);
+    // Means 30 and 20, trend 10: 30 + 10 (1 + h) continues the line.
+    assert_eq!(
+        trend_values(moving(vec![10.0, 20.0, 30.0, 40.0])),
+        [50.0, 60.0, 70.0]
+    );
+}
+
+/// The linear trend keeps a small slope at a large level.
+#[test]
+fn linear_trend_keeps_a_small_slope_at_a_large_level() {
+    let history: Vec<f64> = (1..=6).map(|t| 1e15 + 3.0 * f64::from(t)).collect();
+    let values = trend_values(ForecastSpec::time_series(
+        history,
+        ForecastTrendMethod::Linear,
+    ));
+    for (step, value) in values.iter().enumerate() {
+        let expected = 1e15 + 3.0 * (7 + step) as f64;
+        assert!((value - expected).abs() <= 0.5, "{value} vs {expected}");
+    }
+}
+
+/// Trend parameters are checked when the specification is validated, with
+/// no forecast period needed.
+#[test]
+fn trend_parameters_are_checked_statically() {
+    let exponential = |alpha: f64, beta: f64| {
+        ForecastSpec::time_series(vec![1.0, 2.0, 3.0], ForecastTrendMethod::Exponential)
+            .with_param("alpha", json!(alpha))
+            .unwrap()
+            .with_param("beta", json!(beta))
+            .unwrap()
+    };
+    assert!(exponential(0.5, 0.5).validate().is_ok());
+    for (alpha, beta) in [(1.0, 0.5), (0.5, 1.0), (0.0, 0.5), (0.5, 0.0)] {
+        assert!(
+            exponential(alpha, beta).validate().is_err(),
+            "{alpha}, {beta}"
+        );
+    }
+    // The damping factor may be exactly one, and not above it.
+    for (phi, valid) in [(1.0, true), (0.5, true), (1.5, false), (0.0, false)] {
+        let spec = exponential(0.5, 0.5).with_param("phi", json!(phi)).unwrap();
+        assert_eq!(spec.validate().is_ok(), valid, "{phi}");
+    }
+    // The exponential method needs both smoothing factors.
+    assert!(
+        ForecastSpec::time_series(vec![1.0, 2.0, 3.0], ForecastTrendMethod::Exponential)
+            .validate()
+            .is_err()
+    );
+    // At least two observations, and a window no longer than the history.
+    assert!(
+        ForecastSpec::time_series(vec![1.0], ForecastTrendMethod::Linear)
+            .validate()
+            .is_err()
+    );
+    let window = |window: u64| {
+        ForecastSpec::time_series(vec![1.0, 2.0, 3.0], ForecastTrendMethod::MovingAverage)
+            .with_param("window", json!(window))
+            .unwrap()
+    };
+    assert!(window(3).validate().is_ok());
+    assert!(window(4).validate().is_err());
 }

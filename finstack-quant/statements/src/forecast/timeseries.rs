@@ -33,6 +33,7 @@ use crate::error::{Error, Result};
 use crate::types::{ForecastTrendMethod, SeasonalMode, SeasonalParams, TimeSeriesParams};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::ZERO_TOLERANCE;
+use finstack_quant_core::math::summation::neumaier_sum;
 use indexmap::IndexMap;
 
 fn finite_history(historical: &[f64], context: &str) -> Result<()> {
@@ -89,12 +90,9 @@ pub(super) fn timeseries_forecast(
 
     match method {
         ForecastTrendMethod::Linear => {
-            let (slope, intercept) = calculate_linear_trend(hist_data);
-            let n_hist = hist_data.len() as f64;
-
+            let fit = LinearFit::of(hist_data)?;
             for (i, period_id) in forecast_periods.iter().enumerate() {
-                let t = n_hist + i as f64 + 1.0;
-                let value = slope * t + intercept;
+                let value = fit.at_step(i + 1);
                 if !value.is_finite() {
                     return Err(Error::forecast(format!(
                         "Linear forecast produced a non-finite value at period {:?}",
@@ -130,7 +128,7 @@ pub(super) fn timeseries_forecast(
             // beta=0 freezes the trend at the initial value.
             // alpha=1 or beta=1 degenerates to naïve methods.
             // See Hyndman & Athanasopoulos, "Forecasting: Principles and Practice", §8.1.
-            if alpha <= 0.0 || alpha >= 1.0 {
+            if !(alpha > 0.0 && alpha < 1.0) {
                 return Err(Error::forecast(format!(
                     "alpha must be in the open interval (0, 1), got {}. \
                      alpha=0 means the level never updates; alpha=1 uses only the latest observation. \
@@ -138,7 +136,7 @@ pub(super) fn timeseries_forecast(
                     alpha
                 )));
             }
-            if beta <= 0.0 || beta >= 1.0 {
+            if !(beta > 0.0 && beta < 1.0) {
                 return Err(Error::forecast(format!(
                     "beta must be in the open interval (0, 1), got {}. \
                      beta=0 freezes the trend at its initial value; beta=1 uses only the latest trend. \
@@ -161,6 +159,11 @@ pub(super) fn timeseries_forecast(
             }
 
             let (level, trend) = double_exponential_smoothing(hist_data, alpha, beta, phi);
+            if !level.is_finite() || !trend.is_finite() {
+                return Err(Error::forecast(
+                    "Exponential smoothing produced a non-finite level or trend",
+                ));
+            }
 
             // Damped forecast function: ŷ_{t+h} = ℓ + (φ + φ² + … + φ^h)·b.
             // With φ = 1 the damped sum accumulates exactly 1.0 per step, so
@@ -204,20 +207,12 @@ pub(super) fn timeseries_forecast(
                 )));
             }
 
-            let ma: f64 = hist_data.iter().rev().take(window).sum::<f64>() / window as f64;
-            if !ma.is_finite() {
-                return Err(Error::forecast(
-                    "Moving average forecast produced a non-finite historical average",
-                ));
-            }
+            let n = hist_data.len();
+            let ma = scaled_mean(&hist_data[n - window..])?;
 
-            if hist_data.len() > window {
-                let prev_ma: f64 = hist_data[..hist_data.len() - 1]
-                    .iter()
-                    .rev()
-                    .take(window)
-                    .sum::<f64>()
-                    / window as f64;
+            if n > window {
+                // The preceding same-length window, shifted back one slot.
+                let prev_ma = scaled_mean(&hist_data[n - window - 1..n - 1])?;
                 let trend = ma - prev_ma;
 
                 // A trailing moving average is centered (window-1)/2 periods
@@ -249,49 +244,72 @@ pub(super) fn timeseries_forecast(
     Ok(result)
 }
 
-/// Calculate linear trend using numerically stable least squares regression.
-///
-/// # Numerical Stability
-///
-/// Uses the mean-centered formulation to avoid catastrophic cancellation:
-///
-/// ```text
-/// slope = Σ((x_i - x̄)(y_i - ȳ)) / Σ((x_i - x̄)²)
-/// intercept = ȳ - slope × x̄
-/// ```
-///
-/// This is equivalent to the standard formula but avoids subtracting two large
-/// nearly-equal numbers, which causes precision loss for large `n` or correlated
-/// data. See Welford's algorithm / Knuth TAOCP Vol. 2, Section 4.2.2.
-///
-/// # Returns
-///
-/// A tuple `(slope, intercept)` where `y = slope * x + intercept`.
-/// The caller must provide at least two observations, validated by
-/// [`timeseries_forecast`].
-fn calculate_linear_trend(data: &[f64]) -> (f64, f64) {
-    debug_assert!(data.len() >= 2);
-    let n = data.len() as f64;
+/// The largest magnitude of a finite series, or 1 when it is all zeros:
+/// dividing by it keeps every sum of the series representable.
+fn magnitude_scale(data: &[f64]) -> f64 {
+    let largest = data.iter().fold(0.0_f64, |largest, y| largest.max(y.abs()));
+    if largest > 0.0 { largest } else { 1.0 }
+}
 
-    // Mean of x values (1-indexed: 1, 2, ..., n)
-    let x_bar = (n + 1.0) / 2.0;
-    let y_bar = data.iter().sum::<f64>() / n;
+/// Mean of a non-empty finite window, accumulated on scaled values with
+/// compensated summation so a finite window cannot overflow its partial sums.
+fn scaled_mean(window: &[f64]) -> Result<f64> {
+    let scale = magnitude_scale(window);
+    let total = neumaier_sum(window.iter().map(|y| y / scale))?;
+    Ok(scale * (total / window.len() as f64))
+}
 
-    // Compute slope using mean-centered formula (numerically stable)
-    let mut num = 0.0; // Σ (x_i - x̄)(y_i - ȳ)
-    let mut den = 0.0; // Σ (x_i - x̄)²
+/// Equal-weight ordinary least squares over reporting-slot indices.
+///
+/// The slot indices `1..=n` are centered on their mean and scaled to
+/// `[-1, 1]`, and the observations are divided by their largest magnitude,
+/// so the normal sums are well conditioned and cannot overflow at large
+/// levels. Sums use compensated accumulation.
+struct LinearFit {
+    /// Largest observation magnitude; fitted values are restored by it.
+    scale: f64,
+    /// Mean of the scaled observations: the fitted value at the centre.
+    mean: f64,
+    /// Slope per unit of the scaled coordinate.
+    slope: f64,
+    /// Number of observations.
+    n: usize,
+}
 
-    for (i, &y) in data.iter().enumerate() {
-        let dx = (i + 1) as f64 - x_bar;
-        let dy = y - y_bar;
-        num += dx * dy;
-        den += dx * dx;
+impl LinearFit {
+    /// Fit at least two finite observations in slot order.
+    fn of(data: &[f64]) -> Result<Self> {
+        debug_assert!(data.len() >= 2);
+        let n = data.len();
+        let scale = magnitude_scale(data);
+        let mean = neumaier_sum(data.iter().map(|y| y / scale))? / n as f64;
+        let cross = neumaier_sum(
+            data.iter()
+                .enumerate()
+                .map(|(i, y)| Self::coordinate(n, i as f64) * (y / scale - mean)),
+        )?;
+        let spread = neumaier_sum((0..n).map(|i| Self::coordinate(n, i as f64).powi(2)))?;
+        Ok(Self {
+            scale,
+            mean,
+            slope: cross / spread,
+            n,
+        })
     }
 
-    let slope = num / den;
-    let intercept = y_bar - slope * x_bar;
+    /// Centered and scaled coordinate of zero-based slot `index`: the first
+    /// observation is -1 and the last is 1.
+    fn coordinate(n: usize, index: f64) -> f64 {
+        let half = (n as f64 - 1.0) / 2.0;
+        (index - half) / half
+    }
 
-    (slope, intercept)
+    /// The fitted line at forecast step `step` (1 is the slot after the
+    /// last observation).
+    fn at_step(&self, step: usize) -> f64 {
+        let coordinate = Self::coordinate(self.n, (self.n - 1 + step) as f64);
+        self.scale * (self.mean + self.slope * coordinate)
+    }
 }
 
 /// Double exponential smoothing (Holt's method), optionally damped.
@@ -683,12 +701,39 @@ mod tests {
 
     #[test]
     fn test_linear_trend() {
-        let data = vec![10.0, 20.0, 30.0, 40.0];
-        let (slope, intercept) = calculate_linear_trend(&data);
+        // A perfect line y = 10 t is extended exactly.
+        let fit = LinearFit::of(&[10.0, 20.0, 30.0, 40.0]).unwrap();
+        assert!((fit.at_step(1) - 50.0).abs() < 1e-12);
+        assert!((fit.at_step(3) - 70.0).abs() < 1e-12);
+    }
 
-        // Perfect linear trend: y = 10x + 0
-        assert_eq!(slope, 10.0);
-        assert_eq!(intercept, 0.0);
+    /// At large levels the fit keeps the small trend: 1e15 + 3 t fitted on
+    /// centered and scaled coordinates predicts 1e15 + 3 (n + h) to the
+    /// spacing of doubles at 1e15 (0.125). A fit through raw sums of t y
+    /// (about 1e16) would lose it.
+    #[test]
+    fn linear_fit_keeps_a_small_trend_at_a_large_level() {
+        let data: Vec<f64> = (1..=8).map(|t| 1e15 + 3.0 * f64::from(t)).collect();
+        let fit = LinearFit::of(&data).unwrap();
+        for step in 1..=4_usize {
+            let expected = 1e15 + 3.0 * (8 + step) as f64;
+            assert!((fit.at_step(step) - expected).abs() <= 0.5, "{step}");
+        }
+        // Finite observations near the top of the range do not overflow the
+        // normal sums: the mean of [1.5e308, 1.7e308] is 1.6e308.
+        let extreme = LinearFit::of(&[1.5e308, 1.7e308, 1.5e308, 1.7e308]).unwrap();
+        assert!(extreme.at_step(1).is_finite());
+        assert!((scaled_mean(&[1.5e308, 1.7e308]).unwrap() / 1.6e308 - 1.0).abs() < 1e-12);
+    }
+
+    /// An independent fit with noisy data: the closed-form slope and
+    /// intercept for t = 1..5, y = [2, 4, 5, 4, 5] are 0.6 and 2.2
+    /// (Sxy = 6, Sxx = 10, means 3 and 4), so step 1 is 5.8 and step 2 is 6.4.
+    #[test]
+    fn linear_fit_matches_an_independent_closed_form() {
+        let fit = LinearFit::of(&[2.0, 4.0, 5.0, 4.0, 5.0]).unwrap();
+        assert!((fit.at_step(1) - 5.8).abs() < 1e-12);
+        assert!((fit.at_step(2) - 6.4).abs() < 1e-12);
     }
 
     #[test]

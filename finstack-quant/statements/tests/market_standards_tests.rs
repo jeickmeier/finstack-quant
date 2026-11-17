@@ -696,15 +696,8 @@ fn test_exponential_smoothing_requires_alpha() {
         model_builder.build()
     };
 
-    assert!(result.is_ok()); // Model builds fine
-
-    let model = result.unwrap();
-    let mut evaluator = Evaluator::new();
-    let eval_result = evaluator.evaluate(&model);
-
-    // Should error during evaluation when alpha is missing
-    assert!(eval_result.is_err());
-    let err = eval_result.unwrap_err();
+    // The missing factor is a static requirement: the model does not build.
+    let err = result.unwrap_err();
     assert!(
         err.to_string().contains("alpha"),
         "Error should mention missing alpha parameter: {}",
@@ -715,7 +708,7 @@ fn test_exponential_smoothing_requires_alpha() {
 #[test]
 fn test_exponential_smoothing_requires_beta() {
     // Should error if beta not provided
-    let model = {
+    let result = {
         let mut model_builder = ModelBuilder::new("test");
         model_builder
             .periods("2025Q1..2025Q4", Some("2025Q1"))
@@ -740,13 +733,10 @@ fn test_exponential_smoothing_requires_beta() {
             )
             .unwrap(),
         );
-        model_builder.build().unwrap()
+        model_builder.build()
     };
 
-    let mut evaluator = Evaluator::new();
-    let result = evaluator.evaluate(&model);
-
-    assert!(result.is_err());
+    // The missing factor is a static requirement: the model does not build.
     assert!(result.unwrap_err().to_string().contains("beta"));
 }
 

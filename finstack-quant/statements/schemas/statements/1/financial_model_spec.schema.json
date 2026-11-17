@@ -8714,7 +8714,7 @@
       "description": "Parameters of [`ForecastSpec::TimeSeries`].",
       "properties": {
         "alpha": {
-          "description": "Level smoothing in (0, 1]; required for the exponential method.",
+          "description": "Level smoothing in (0, 1); required for the exponential method.",
           "format": "double",
           "type": [
             "number",
@@ -8722,7 +8722,7 @@
           ]
         },
         "beta": {
-          "description": "Trend smoothing in (0, 1]; required for the exponential method.",
+          "description": "Trend smoothing in (0, 1); required for the exponential method.",
           "format": "double",
           "type": [
             "number",
@@ -8730,7 +8730,7 @@
           ]
         },
         "historical": {
-          "description": "Observations in the line's base units, oldest first.",
+          "description": "At least two observations in the line's base units, oldest first,\nfrom consecutive reporting slots of the model's frequency; the last\none is the slot that ends where the forecast opens.",
           "items": {
             "format": "double",
             "type": "number"
@@ -8747,7 +8747,7 @@
         },
         "method": {
           "$ref": "#/$defs/ForecastTrendMethod",
-          "description": "Trend model; defaults to linear."
+          "description": "Trend model; required."
         },
         "min": {
           "description": "Lower bound clamped onto generated values, in the line's base units.",

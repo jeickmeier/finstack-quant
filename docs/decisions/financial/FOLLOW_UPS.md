@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **646 review items across 33 source scopes with open items**
+This backlog consolidates **645 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -26,7 +26,7 @@ The labels distinguish the work required:
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (499): implementation and verification work against an
+- **Reconciliation** (498): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (38): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -69,7 +69,7 @@ product consequences remain in their product scope.
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
 | [Statements: capital structure](#statements-capital-structure) | 14 |
 | [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 12 |
-| [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 9 |
+| [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 8 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
 | [Statements analytics: credit checks and impairment](#statements-analytics-credit-checks-and-impairment) | 18 |
 | [Scenarios](#scenarios) | 16 |
@@ -1077,8 +1077,6 @@ product consequences remain in their product scope.
 - **Reconciliation — Capital-state orchestration, dependency validation and atomic period snapshots.** Establish dated obligations, enforce transitive input independence and allocate once per period. Finalize reporting with explicit period-close FX, then evaluate downstream formulas using the same forecast shocks and commit period data together. Independently qualify multi-period cash and debt bridges, issuance boundaries, downstream evaluation and replay. [Accepted STATEMENTS-EVALUATION-012](statements-evaluation/12-capital-state-orchestration.md#accepted-decision-for-capital-state-orchestration-and-period-snapshots).
 
 - **Reconciliation — Explicit period rollup, typed accumulation and provenance.** Require an explicit method for each rolled node and required input, complete canonical coarser periods, checked Money or compensated scalar sums, final-cell status for PeriodEnd, target-cadence formulas and traceable source runs. Reconcile the audited automatic Sum and ordinary floating-point accumulation. Independently qualify coverage, cancellation across scales, flow, balance and ratio examples, cadence and unavailable inputs. [Accepted STATEMENTS-EVALUATION-014](statements-evaluation/14-period-rollup.md#accepted-decision-for-period-rollup).
-
-- **Reconciliation — Aligned trend history, checked fitted levels and extrapolation.** Implement centered and scaled OLS over reporting slots, damped Holt and centered moving-average forecasts on eligible histories. Independently qualify history alignment, parameter boundaries, large levels, cancellation, representability and replay before bounds. [Accepted STATEMENTS-EVALUATION-009](statements-evaluation/09-trend-extrapolation.md#accepted-decision-for-trend-extrapolation).
 
 - **Reconciliation — Ordered normalization bridges and separately named adjusted metrics.** Validate references, units and canonical period keys before calculation. Enforce signed adjustments, individual caps and checked arithmetic for every bridge row. Replace existing-node overwrite with collision-checked publication and source provenance. Independently qualify unavailable inputs, Reported and Progressive caps, intermediate overflow with a finite final total, D&A add-backs, and explicit adjusted references in ratios and covenant checks. [Accepted STATEMENTS-EVALUATION-015](statements-evaluation/15-normalization-adjustments.md#accepted-decision-for-normalization-bridges).
 

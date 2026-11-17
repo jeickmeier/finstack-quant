@@ -182,7 +182,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/explanation.schema.json",
-      "bytes": 29184,
+      "bytes": 29309,
       "kind": "component",
       "path": "schemas/statements_analytics/1/explanation.schema.json",
       "summary": "Detailed explanation of a node's calculation.",
@@ -407,7 +407,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json",
-      "bytes": 47682,
+      "bytes": 47807,
       "kind": "component",
       "path": "schemas/statements_analytics/1/scenario_set.schema.json",
       "summary": "Registry of named scenarios built on top of a base model.",

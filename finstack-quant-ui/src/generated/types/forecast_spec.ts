@@ -189,15 +189,17 @@ export interface DEea422B5De5A4E2B1C76 {
  */
 export interface D_76Cf21224D1810F1Ccb2 {
   /**
-   * Level smoothing in (0, 1]; required for the exponential method.
+   * Level smoothing in (0, 1); required for the exponential method.
    */
   alpha?: number | null;
   /**
-   * Trend smoothing in (0, 1]; required for the exponential method.
+   * Trend smoothing in (0, 1); required for the exponential method.
    */
   beta?: number | null;
   /**
-   * Observations in the line's base units, oldest first.
+   * At least two observations in the line's base units, oldest first,
+   * from consecutive reporting slots of the model's frequency; the last
+   * one is the slot that ends where the forecast opens.
    */
   historical: number[];
   /**
@@ -205,7 +207,7 @@ export interface D_76Cf21224D1810F1Ccb2 {
    */
   max?: number | null;
   /**
-   * Trend model; defaults to linear.
+   * Trend model; required.
    */
   method: "linear" | "exponential" | "moving_average";
   /**

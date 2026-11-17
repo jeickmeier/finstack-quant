@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
-      "bytes": 414307,
+      "bytes": 414432,
       "kind": "input",
       "path": "schemas/statements/1/financial_model_spec.schema.json",
       "summary": "Statement model graph: periods, nodes and the Value > Forecast > Formula precedence.",
@@ -47,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/forecast_spec.schema.json",
-      "bytes": 21879,
+      "bytes": 22004,
       "kind": "input",
       "path": "schemas/statements/1/forecast_spec.schema.json",
       "summary": "One forecast method with its typed parameters, in the wire shape of ForecastSpec.",
@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/model_edit.schema.json",
-      "bytes": 58274,
+      "bytes": 58399,
       "kind": "input",
       "path": "schemas/statements/1/model_edit.schema.json",
       "summary": "One named change to a financial model, applied atomically with the others in its batch.",

@@ -218,19 +218,19 @@ export default [
   {
     "path": "#/$defs/d_64bfae777a8ae7e8ab2b/properties/alpha",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/TimeSeriesParams/properties/alpha",
-    "description": "Level smoothing in (0, 1]; required for the exponential method.",
+    "description": "Level smoothing in (0, 1); required for the exponential method.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_64bfae777a8ae7e8ab2b/properties/beta",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/TimeSeriesParams/properties/beta",
-    "description": "Trend smoothing in (0, 1]; required for the exponential method.",
+    "description": "Trend smoothing in (0, 1); required for the exponential method.",
     "format": "double"
   },
   {
     "path": "#/$defs/d_64bfae777a8ae7e8ab2b/properties/historical",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/TimeSeriesParams/properties/historical",
-    "description": "Observations in the line's base units, oldest first."
+    "description": "At least two observations in the line's base units, oldest first,\nfrom consecutive reporting slots of the model's frequency; the last\none is the slot that ends where the forecast opens."
   },
   {
     "path": "#/$defs/d_64bfae777a8ae7e8ab2b/properties/historical/items",
@@ -246,7 +246,7 @@ export default [
   {
     "path": "#/$defs/d_64bfae777a8ae7e8ab2b/properties/method",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/TimeSeriesParams/properties/method",
-    "description": "Trend model; defaults to linear.",
+    "description": "Trend model; required.",
     "ref": "#/$defs/ForecastTrendMethod",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements_analytics/1/scenario_set.schema.json#/$defs/ForecastTrendMethod"
   },

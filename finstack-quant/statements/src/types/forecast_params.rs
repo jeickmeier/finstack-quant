@@ -544,14 +544,34 @@ impl ForecastSpec {
             }),
             Self::TimeSeries(p) => {
                 series("historical", &p.historical)?;
+                if p.historical.len() < 2 {
+                    return fail("'historical' needs at least two observations".to_string());
+                }
                 for (name, value) in [("alpha", p.alpha), ("beta", p.beta), ("phi", p.phi)] {
                     let Some(value) = value else { continue };
                     if p.method != ForecastTrendMethod::Exponential {
                         return fail(format!("'{name}' applies only to the exponential method"));
                     }
-                    if !(value > 0.0 && value <= 1.0) {
-                        return fail(format!("'{name}' must be in (0, 1]"));
+                    // The smoothing factors are strictly inside (0, 1); the
+                    // damping factor may be exactly 1 (undamped).
+                    let in_range = value > 0.0 && (value < 1.0 || (name == "phi" && value <= 1.0));
+                    if !in_range {
+                        let upper = if name == "phi" { "1]" } else { "1)" };
+                        return fail(format!("'{name}' must be in (0, {upper}"));
                     }
+                }
+                if p.method == ForecastTrendMethod::Exponential
+                    && (p.alpha.is_none() || p.beta.is_none())
+                {
+                    return fail("the exponential method needs 'alpha' and 'beta'".to_string());
+                }
+                if p.window
+                    .is_some_and(|window| window > p.historical.len() as u64)
+                {
+                    return fail(format!(
+                        "'window' must not exceed the {} historical observations",
+                        p.historical.len()
+                    ));
                 }
                 match (p.method, p.window) {
                     (ForecastTrendMethod::MovingAverage, None) => {
@@ -892,14 +912,16 @@ pub enum ForecastTrendMethod {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct TimeSeriesParams {
-    /// Observations in the line's base units, oldest first.
+    /// At least two observations in the line's base units, oldest first,
+    /// from consecutive reporting slots of the model's frequency; the last
+    /// one is the slot that ends where the forecast opens.
     pub historical: Vec<f64>,
-    /// Trend model; defaults to linear.
+    /// Trend model; required.
     pub method: ForecastTrendMethod,
-    /// Level smoothing in (0, 1]; required for the exponential method.
+    /// Level smoothing in (0, 1); required for the exponential method.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alpha: Option<f64>,
-    /// Trend smoothing in (0, 1]; required for the exponential method.
+    /// Trend smoothing in (0, 1); required for the exponential method.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub beta: Option<f64>,
     /// Trend damping in (0, 1]; legal only with the exponential method.

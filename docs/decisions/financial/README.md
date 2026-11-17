@@ -438,8 +438,7 @@ is qualified with typed Monte Carlo samples.
 
 The Statements trend extrapolation contract was accepted on 2026-11-15.
 It covers aligned supplied history, centered linear trend, damped Holt
-and centered moving-average forecasts. Implementation and independent
-qualification remain pending.
+and centered moving-average forecasts. It is implemented and qualified.
 [STATEMENTS-EVALUATION-009](statements-evaluation/09-trend-extrapolation.md#accepted-decision-for-trend-extrapolation).
 
 The Statements seasonal decomposition and projection contract was accepted
