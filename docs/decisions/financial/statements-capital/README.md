@@ -14,8 +14,8 @@ contains only fees, interest, scheduled principal and equity. Each prepayment
 requires an explicit priority and sizing input. [Accepted prepayment decision](01-instrument-construction.md#accepted-decision-for-opt-in-waterfall-prepayments).
 
 The accepted instrument construction path attaches canonical Valuations bonds
-and swaps through `add_debt` or `addDebt`. Removal of the Statements helpers
-is pending. [Accepted instrument construction decision](01-instrument-construction.md#accepted-decision-for-explicit-bond-and-swap-construction).
+and swaps through `add_debt` or `addDebt`. The Statements helpers are removed
+and their callers reconciled. [Accepted instrument construction decision](01-instrument-construction.md#accepted-decision-for-explicit-bond-and-swap-construction).
 
 Coupon settlements net within each instrument and reporting period. The
 evaluator aggregates the resulting expense and income separately.
@@ -71,7 +71,7 @@ Implementation and independent qualification remain pending.
 
 | Calculation / supported instruments | Implemented method / material variants | Actual selection | Decision record | Implementation / validation | Scope limits and tracking |
 |---|---|---|---|---|---|
-| Convenience bond/swap construction | US-corporate semiannual 30/360 bond; regional bond preset; pay-fixed simple zero-spread swap with explicit leg conventions | Constructor succeeds before append; typed add-debt defers enclosing validation | [001 — construction](01-instrument-construction.md) | Observed; construction and supported-kind evidence located | Preset suitability; default Sweep rejects bond/derivative capital structures |
+| Bond and swap construction | Canonical Valuations instrument, with authored terms or a selected dated convention, attached through `add_debt` / `addDebt` | No Statements construction helper | [001 — construction](01-instrument-construction.md) | Reconciled 2026-11-17; attachment and wire replay of terms, convention and schedule executed in Rust, Python and WASM | Independent schedule qualification is tracked with the capital evidence entry |
 | Runtime instrument/schedule domain | Typed registry, declared borrowing versus hedge categories, placeholder rejection | Raw full schedule unless residual schedule supplied | [001](01-instrument-construction.md) | Observed; placeholder and PIK-target fixtures | Admitted option kind does not imply modeled contingent payouts |
 | Cash debt service and hedge income | Period-net Fixed/Stub/FloatReset; debt positive expense, hedge opposite sign; separate positive income | Declared instrument kind, not coupon sign heuristic | [002 — classification](02-cashflow-classification.md) | Observed; signed-rate/hedge fixtures | Gross timing lost by period netting; custom sign conventions |
 | Principal/PIK/fees/credit-event buckets | Absolute repayments and PIK; commitment/facility/LC/fronting unscaled; usage/generic fees scaled; unsupported/credit cash warned and ignored | CFKind and positive Notional redemption | [002](02-cashflow-classification.md) | Observed; classification/boundary evidence | Distressed cash is not modeled debt service; invalid interval helper behavior |

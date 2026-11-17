@@ -220,8 +220,8 @@ of term loans and revolvers. [STATEMENTS-CAPITAL-001](statements-capital/01-inst
 Explicit bond and swap construction was accepted on 2026-11-15. Callers
 construct instruments through canonical Valuations with authored terms or a
 deliberately selected qualified dated convention, then attach them through
-`add_debt` or `addDebt`. Removal of the four Statements helpers remains
-pending. [STATEMENTS-CAPITAL-001](statements-capital/01-instrument-construction.md#accepted-decision-for-explicit-bond-and-swap-construction).
+`add_debt` or `addDebt`. The four Statements helpers are removed and their
+callers reconciled; attachment and replay are qualified. [STATEMENTS-CAPITAL-001](statements-capital/01-instrument-construction.md#accepted-decision-for-explicit-bond-and-swap-construction).
 
 Statements per-instrument coupon netting was accepted on 2026-11-15.
 Signed coupon settlements net within each instrument and reporting period.

@@ -200,15 +200,7 @@ pub fn bond_cs_model(n_bonds: usize, n_quarters: usize) -> FinancialModelSpec {
     for i in 0..n_bonds {
         let id = format!("BOND-{i:03}");
         builder
-            .add_bond(
-                &id,
-                Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-                0.05,
-                issue,
-                maturity,
-                "USD-OIS",
-            )
-            .unwrap()
+            .add_debt(&id, fixed_bond(&id, Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"), 0.05, issue, maturity, "USD-OIS"))
             .compute(format!("int_{i}"), format!("cs.interest_expense.{id}"))
             .unwrap()
             .compute(format!("prin_{i}"), format!("cs.principal_payment.{id}"))
@@ -407,4 +399,29 @@ pub fn formula_family_model() -> FinancialModelSpec {
         model_builder.compute("lagged_roll", "lag(rolling_mean(revenue, 12), 1)").unwrap();
         model_builder.build().unwrap()
     }
+}
+
+/// A fixed-rate bond from the canonical Valuations constructor (US corporate
+/// conventions: semi-annual 30/360), ready to attach with `add_debt`.
+fn fixed_bond(
+    id: &str,
+    notional: finstack_quant_core::money::Money,
+    coupon_rate: f64,
+    issue: finstack_quant_core::dates::Date,
+    maturity: finstack_quant_core::dates::Date,
+    curve: &str,
+) -> finstack_quant_statements::types::FinancialStatementInstrument {
+    use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
+    finstack_quant_statements::types::FinancialStatementInstrument::Bond(
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
+            InstrumentId::new(id),
+            notional,
+            Rate::from_decimal(coupon_rate).expect("valid coupon"),
+            issue,
+            maturity,
+            finstack_quant_core::dates::StubKind::ShortFront,
+            CurveId::new(curve),
+        )
+        .expect("valid bond"),
+    )
 }

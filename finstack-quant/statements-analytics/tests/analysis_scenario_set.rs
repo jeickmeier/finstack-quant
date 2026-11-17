@@ -651,16 +651,17 @@ fn scenarios_evaluate_the_capital_structure() {
                 .map(|quarter| (q(quarter), AmountOrScalar::scalar(1_000.0)))
                 .collect::<Vec<_>>(),
         );
-        model_builder
-            .add_bond(
+        model_builder.add_debt(
+            "BOND",
+            fixed_bond(
                 "BOND",
                 Money::new(10_000.0, Currency::USD).expect("valid money fixture"),
                 0.05,
                 issue,
                 Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
                 "USD-OIS",
-            )
-            .expect("valid bond");
+            ),
+        );
         model_builder
             .compute("interest", "cs.interest_expense.total")
             .expect("valid formula");
@@ -716,4 +717,29 @@ fn scenarios_evaluate_the_capital_structure() {
         plain.scenarios["base"].get("interest", &q(3)),
         priced.scenarios["base"].get("interest", &q(3))
     );
+}
+
+/// A fixed-rate bond from the canonical Valuations constructor (US corporate
+/// conventions: semi-annual 30/360), ready to attach with `add_debt`.
+fn fixed_bond(
+    id: &str,
+    notional: finstack_quant_core::money::Money,
+    coupon_rate: f64,
+    issue: finstack_quant_core::dates::Date,
+    maturity: finstack_quant_core::dates::Date,
+    curve: &str,
+) -> finstack_quant_statements::types::FinancialStatementInstrument {
+    use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
+    finstack_quant_statements::types::FinancialStatementInstrument::Bond(
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
+            InstrumentId::new(id),
+            notional,
+            Rate::from_decimal(coupon_rate).expect("valid coupon"),
+            issue,
+            maturity,
+            finstack_quant_core::dates::StubKind::ShortFront,
+            CurveId::new(curve),
+        )
+        .expect("valid bond"),
+    )
 }

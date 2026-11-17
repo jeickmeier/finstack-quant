@@ -1222,3 +1222,24 @@ STATEMENTS-EVALUATION-010.
 - **Edges.** Edge trend slopes are used as computed; slopes below 1e-10 were
   snapped to zero. The log advisory comparing the history with the node's
   last actual is removed.
+
+### Statements: bond and swap construction helpers removed
+
+STATEMENTS-CAPITAL-001. **Breaking.** `ModelBuilder.add_bond`,
+`add_bond_with_convention`, `add_swap` and `add_swap_with_conventions`
+(`addBond`, `addBondWithConvention`, `addSwap`, `addSwapWithConventions` in
+WASM) are removed, with the `BondConventionParams`, `SwapParams` and
+`SwapConventions` types and their schemas. Build the instrument through its
+own Valuations API and attach it:
+
+```python
+bond = Bond.fixed("SENIOR", Money(1_000_000.0, usd), 0.05, issue, maturity, "short_front", "USD-OIS")
+builder.add_debt("SENIOR", bond)
+swap = InterestRateSwap.from_conventions({...})
+builder.add_debt("IRS", swap)
+```
+
+`Bond.fixed` uses the same US corporate conventions `add_bond` did.
+`InterestRateSwap.from_conventions` takes its conventions from the named
+index, which may differ from the fixed semi-annual 30/360 against quarterly
+ACT/360 legs `add_swap` used; author the legs explicitly where they matter.

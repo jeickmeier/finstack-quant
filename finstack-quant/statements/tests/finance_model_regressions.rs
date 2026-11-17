@@ -319,16 +319,17 @@ fn named_capital_structure_formulas_keep_native_instrument_currency() {
     let model = {
         let mut model_builder = ModelBuilder::new("native-versus-reporting");
         model_builder.periods("2025Q1..Q1", None).unwrap();
-        model_builder
-            .add_bond(
+        model_builder.add_debt(
+            "euro",
+            fixed_bond(
                 "euro",
                 Money::from((1_000_i64, Currency::EUR)),
                 0.05,
                 date!(2025 - 01 - 01),
                 date!(2030 - 01 - 01),
                 "EUR-OIS",
-            )
-            .unwrap();
+            ),
+        );
         model_builder.reporting_currency(Currency::USD);
         model_builder.value_money(
             "expected_usd",
@@ -838,4 +839,29 @@ fn point_in_time_evaluation_replays_identified_snapshots() {
     let round_trip =
         FinancialModelSpec::from_json(&serde_json::to_string(&revised).unwrap()).unwrap();
     assert_eq!(round_trip.source_snapshot.as_deref(), Some("revised"));
+}
+
+/// A fixed-rate bond from the canonical Valuations constructor (US corporate
+/// conventions: semi-annual 30/360), ready to attach with `add_debt`.
+fn fixed_bond(
+    id: &str,
+    notional: finstack_quant_core::money::Money,
+    coupon_rate: f64,
+    issue: finstack_quant_core::dates::Date,
+    maturity: finstack_quant_core::dates::Date,
+    curve: &str,
+) -> finstack_quant_statements::types::FinancialStatementInstrument {
+    use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
+    finstack_quant_statements::types::FinancialStatementInstrument::Bond(
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
+            InstrumentId::new(id),
+            notional,
+            Rate::from_decimal(coupon_rate).expect("valid coupon"),
+            issue,
+            maturity,
+            finstack_quant_core::dates::StubKind::ShortFront,
+            CurveId::new(curve),
+        )
+        .expect("valid bond"),
+    )
 }

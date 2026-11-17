@@ -2322,13 +2322,6 @@
         "schema_index_version": 1,
         "artifacts": [
           {
-            "path": "schemas/statements/1/bond_convention_params.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/statements/1/bond_convention_params.schema.json",
-            "type_name": "BondConventionParams",
-            "kind": "input",
-            "bytes": 26097
-          },
-          {
             "path": "schemas/statements/1/check_suite_spec.schema.json",
             "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
             "type_name": "CheckSuiteSpec",
@@ -2425,20 +2418,6 @@
             "type_name": "StatementResult",
             "kind": "output",
             "bytes": 85848
-          },
-          {
-            "path": "schemas/statements/1/swap_conventions.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/statements/1/swap_conventions.schema.json",
-            "type_name": "SwapConventions",
-            "kind": "input",
-            "bytes": 22717
-          },
-          {
-            "path": "schemas/statements/1/swap_params.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/statements/1/swap_params.schema.json",
-            "type_name": "SwapParams",
-            "kind": "input",
-            "bytes": 23357
           }
         ]
       },
@@ -5159,14 +5138,6 @@
           },
           {
             "domain": "statements",
-            "path": "schemas/statements/1/bond_convention_params.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/statements/1/bond_convention_params.schema.json",
-            "type_name": "BondConventionParams",
-            "kind": "input",
-            "bytes": 26097
-          },
-          {
-            "domain": "statements",
             "path": "schemas/statements/1/check_suite_spec.schema.json",
             "$id": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json",
             "type_name": "CheckSuiteSpec",
@@ -5276,22 +5247,6 @@
             "type_name": "StatementResult",
             "kind": "output",
             "bytes": 85848
-          },
-          {
-            "domain": "statements",
-            "path": "schemas/statements/1/swap_conventions.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/statements/1/swap_conventions.schema.json",
-            "type_name": "SwapConventions",
-            "kind": "input",
-            "bytes": 22717
-          },
-          {
-            "domain": "statements",
-            "path": "schemas/statements/1/swap_params.schema.json",
-            "$id": "https://finstack_quant.dev/schemas/statements/1/swap_params.schema.json",
-            "type_name": "SwapParams",
-            "kind": "input",
-            "bytes": 23357
           },
           {
             "domain": "valuations",

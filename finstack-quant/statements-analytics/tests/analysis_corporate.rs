@@ -130,16 +130,17 @@ fn test_cs_cashflows_populated_on_statement_result() {
                 ),
             ],
         );
-        model_builder
-            .add_bond(
+        model_builder.add_debt(
+            "BOND-001",
+            fixed_bond(
                 "BOND-001",
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 0.05,
                 issue,
                 maturity,
                 "USD-OIS",
-            )
-            .expect("valid bond");
+            ),
+        );
         model_builder.build().expect("model should build")
     };
 
@@ -894,16 +895,17 @@ fn evaluate_dcf_uses_curve_for_cs_interest() {
                 )],
             )
             .expect("availability");
-        model_builder
-            .add_bond(
+        model_builder.add_debt(
+            "BOND-001",
+            fixed_bond(
                 "BOND-001",
                 Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
                 0.05,
                 as_of,
                 Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
                 "USD-OIS",
-            )
-            .expect("bond");
+            ),
+        );
         model_builder
             .compute("ufcf", "revenue - cs.interest_expense.total")
             .expect("formula");
@@ -1036,4 +1038,29 @@ fn dcf_as_of_reads_the_full_snapshot_and_explains_the_valuation_date() {
         message.contains("in forecast periods ending after the valuation date 2026-01-01"),
         "{message}"
     );
+}
+
+/// A fixed-rate bond from the canonical Valuations constructor (US corporate
+/// conventions: semi-annual 30/360), ready to attach with `add_debt`.
+fn fixed_bond(
+    id: &str,
+    notional: finstack_quant_core::money::Money,
+    coupon_rate: f64,
+    issue: finstack_quant_core::dates::Date,
+    maturity: finstack_quant_core::dates::Date,
+    curve: &str,
+) -> finstack_quant_statements::types::FinancialStatementInstrument {
+    use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
+    finstack_quant_statements::types::FinancialStatementInstrument::Bond(
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
+            InstrumentId::new(id),
+            notional,
+            Rate::from_decimal(coupon_rate).expect("valid coupon"),
+            issue,
+            maturity,
+            finstack_quant_core::dates::StubKind::ShortFront,
+            CurveId::new(curve),
+        )
+        .expect("valid bond"),
+    )
 }

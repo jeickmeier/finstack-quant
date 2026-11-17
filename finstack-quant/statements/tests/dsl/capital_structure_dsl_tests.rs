@@ -326,16 +326,17 @@ fn test_model_with_bond_builder() {
                 AmountOrScalar::scalar(1_000_000.0),
             )],
         );
-        model_builder
-            .add_bond(
+        model_builder.add_debt(
+            "BOND-001",
+            fixed_bond(
                 "BOND-001",
                 Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
                 0.05,
                 issue_date,
                 maturity_date,
                 "USD-OIS",
-            )
-            .unwrap();
+            ),
+        );
         model_builder.build()
     };
 
@@ -644,4 +645,29 @@ fn test_capital_structure_cashflows_accessors() {
         cs.get_component("debt_balance", "NONEXISTENT", &period)
             .is_err()
     );
+}
+
+/// A fixed-rate bond from the canonical Valuations constructor (US corporate
+/// conventions: semi-annual 30/360), ready to attach with `add_debt`.
+fn fixed_bond(
+    id: &str,
+    notional: finstack_quant_core::money::Money,
+    coupon_rate: f64,
+    issue: finstack_quant_core::dates::Date,
+    maturity: finstack_quant_core::dates::Date,
+    curve: &str,
+) -> finstack_quant_statements::types::FinancialStatementInstrument {
+    use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
+    finstack_quant_statements::types::FinancialStatementInstrument::Bond(
+        finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
+            InstrumentId::new(id),
+            notional,
+            Rate::from_decimal(coupon_rate).expect("valid coupon"),
+            issue,
+            maturity,
+            finstack_quant_core::dates::StubKind::ShortFront,
+            CurveId::new(curve),
+        )
+        .expect("valid bond"),
+    )
 }

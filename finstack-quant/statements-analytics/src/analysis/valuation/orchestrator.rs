@@ -628,6 +628,31 @@ fn ltv_reference_path(
 
 #[cfg(test)]
 mod tests {
+    /// A fixed-rate bond from the canonical Valuations constructor (US corporate
+    /// conventions: semi-annual 30/360), ready to attach with `add_debt`.
+    fn fixed_bond(
+        id: &str,
+        notional: finstack_quant_core::money::Money,
+        coupon_rate: f64,
+        issue: finstack_quant_core::dates::Date,
+        maturity: finstack_quant_core::dates::Date,
+        curve: &str,
+    ) -> finstack_quant_statements::types::FinancialStatementInstrument {
+        use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
+        finstack_quant_statements::types::FinancialStatementInstrument::Bond(
+            finstack_quant_valuations::instruments::fixed_income::bond::Bond::fixed(
+                InstrumentId::new(id),
+                notional,
+                Rate::from_decimal(coupon_rate).expect("valid coupon"),
+                issue,
+                maturity,
+                finstack_quant_core::dates::StubKind::ShortFront,
+                CurveId::new(curve),
+            )
+            .expect("valid bond"),
+        )
+    }
+
     use super::*;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::PeriodId;
@@ -949,16 +974,17 @@ mod tests {
                     )],
                 )
                 .expect("availability");
-            model_builder_1
-                .add_bond(
+            model_builder_1.add_debt(
+                "BOND-001",
+                fixed_bond(
                     "BOND-001",
                     Money::from((1_000_000_i64, finstack_quant_core::currency::Currency::USD)),
                     0.05,
                     date!(2025 - 01 - 01),
                     date!(2026 - 01 - 01),
                     "USD-OIS",
-                )
-                .expect("bond");
+                ),
+            );
             model_builder_1
                 .compute("ufcf", "revenue - cs.interest_expense.total")
                 .expect("formula");
@@ -1190,16 +1216,17 @@ mod tests {
             model_builder_1
                 .availability_dates("ebitda", &[(q1, as_of)])
                 .expect("availability");
-            model_builder_1
-                .add_bond(
+            model_builder_1.add_debt(
+                "BOND-001",
+                fixed_bond(
                     "BOND-001",
                     Money::from((4_000_000_i64, finstack_quant_core::currency::Currency::USD)),
                     0.05,
                     date!(2025 - 01 - 01),
                     date!(2026 - 01 - 01),
                     "USD-OIS",
-                )
-                .expect("bond");
+                ),
+            );
             model_builder_1.with_meta("currency", serde_json::json!("USD"));
             model_builder_1.build().expect("model")
         };

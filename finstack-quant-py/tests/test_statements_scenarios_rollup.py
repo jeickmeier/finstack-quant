@@ -24,6 +24,7 @@ from finstack_quant.statements_analytics import (
     evaluate_scenario_set,
     evaluate_scenario_set_with_market,
 )
+from finstack_quant.valuations.instruments import Bond
 
 QUARTERS = [f"2025Q{q}" for q in range(1, 5)]
 
@@ -39,13 +40,11 @@ def _forecast_model() -> object:
 
 def _bond_model() -> object:
     builder = ModelBuilder("bond-scenarios")
-    builder.add_bond(
-        id="BOND",
-        notional=Money(10_000.0, Currency("USD")),
-        coupon_rate=0.05,
-        issue_date=date(2025, 1, 1),
-        maturity_date=date(2030, 1, 1),
-        discount_curve_id="USD-OIS",
+    builder.add_debt(
+        "BOND",
+        Bond.fixed(
+            "BOND", Money(10_000.0, Currency("USD")), 0.05, date(2025, 1, 1), date(2030, 1, 1), "short_front", "USD-OIS"
+        ),
     )
     builder.periods("2025Q1..Q4", None)
     builder.value("revenue", [(q, 1_000.0) for q in QUARTERS])

@@ -4004,12 +4004,8 @@
     "constructor": true,
     "statics": ["fromSpec"],
     "methods": [
-      "addBond",
-      "addBondWithConvention",
       "addDebt",
       "addMetricFromRegistry",
-      "addSwap",
-      "addSwapWithConventions",
       "availabilityDates",
       "build",
       "compute",

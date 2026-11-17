@@ -108,8 +108,7 @@ mod state;
 pub(crate) mod waterfall;
 mod waterfall_spec;
 
-// Curated public facade for capital-structure types and builder inputs.
-pub use builder::{BondConventionParams, SwapConventions, SwapParams};
+// Curated public facade for capital-structure types.
 pub(crate) use cashflows::add_optional_money;
 pub use cashflows::{CapitalStructureCashflows, CashflowBreakdown, TOTAL_ROW_LABEL};
 pub use integration::build_instrument_from_spec;

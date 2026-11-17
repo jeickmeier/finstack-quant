@@ -3,7 +3,6 @@
 use serde_json::Value;
 
 use crate::adjustments::{NormalizationConfig, NormalizationResult};
-use crate::capital_structure::{BondConventionParams, SwapConventions, SwapParams};
 use crate::checks::CheckSuiteSpec;
 use crate::evaluator::{
     DatedCell, MonteCarloConfig, MonteCarloResults, PricingFlowSelection, RollupSpec,
@@ -265,43 +264,6 @@ fn rollup_spec_examples() -> finstack_quant_core::Result<Vec<Value>> {
     )
 }
 
-/// A five-year US Treasury-convention bond.
-fn bond_convention_params_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    finstack_quant_core::schema::example_from_json::<BondConventionParams>(serde_json::json!({
-        "id": "UST-5Y",
-        "notional": {"amount": "1000000", "currency": "USD"},
-        "coupon_rate": 0.03,
-        "issue_date": "2025-01-15",
-        "maturity_date": "2030-01-15",
-        "convention": "us_treasury",
-        "discount_curve_id": "USD-OIS"
-    }))
-}
-
-/// A five-year pay-fixed swap against a three-month SOFR forward curve.
-fn swap_params_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    finstack_quant_core::schema::example_from_json::<SwapParams>(serde_json::json!({
-        "id": "SWAP-5Y",
-        "notional": {"amount": "1000000", "currency": "USD"},
-        "fixed_rate": 0.04,
-        "start_date": "2025-01-15",
-        "maturity_date": "2030-01-15",
-        "discount_curve_id": "USD-OIS",
-        "forward_curve_id": "USD-SOFR-3M"
-    }))
-}
-
-/// Annual ACT/360 fixed coupons against quarterly ACT/360 floating coupons.
-fn swap_conventions_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    finstack_quant_core::schema::example_from_json::<SwapConventions>(serde_json::json!({
-        "fixed_frequency": {"count": 1, "unit": "years"},
-        "fixed_day_count": "act_360",
-        "float_frequency": {"count": 3, "unit": "months"},
-        "float_day_count": "act_360",
-        "business_day_convention": "modified_following"
-    }))
-}
-
 /// One quarter of EBITDA with a single restructuring add-back.
 fn normalization_result_examples() -> finstack_quant_core::Result<Vec<Value>> {
     finstack_quant_core::schema::example_from_json::<crate::adjustments::NormalizationResult>(
@@ -422,22 +384,6 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
     )
     .with_examples(rollup_spec_examples),
     finstack_quant_core::schema_artifact!(
-        BondConventionParams,
-        "statements",
-        "bond_convention_params",
-        Input,
-        "Identity, notional, decimal coupon, dates, regional convention and discount curve of a capital-structure bond."
-    )
-    .with_examples(bond_convention_params_examples),
-    finstack_quant_core::schema_artifact!(
-        SwapParams,
-        "statements",
-        "swap_params",
-        Input,
-        "Identity, notional, decimal fixed rate, dates and curves of a capital-structure pay-fixed swap."
-    )
-    .with_examples(swap_params_examples),
-    finstack_quant_core::schema_artifact!(
         PricingFlowSelection,
         "statements",
         "pricing_flow_selection",
@@ -461,12 +407,4 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "One named change to a financial model, applied atomically with the others in its batch."
     )
     .with_examples(model_edit_examples),
-    finstack_quant_core::schema_artifact!(
-        SwapConventions,
-        "statements",
-        "swap_conventions",
-        Input,
-        "Fixed and floating leg frequencies and day counts plus the business-day convention of a capital-structure swap."
-    )
-    .with_examples(swap_conventions_examples),
 ];

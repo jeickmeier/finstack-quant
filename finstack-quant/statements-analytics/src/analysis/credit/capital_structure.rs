@@ -296,12 +296,15 @@ struct StackEntry<'a> {
 ///
 /// ```rust
 /// use finstack_quant_core::currency::Currency;
-/// use finstack_quant_core::dates::PeriodId;
+/// use finstack_quant_core::dates::{PeriodId, StubKind};
 /// use finstack_quant_core::money::Money;
+/// use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
 /// use finstack_quant_statements::builder::ModelBuilder;
 /// use finstack_quant_statements::capital_structure::{
 ///     CapitalStructureCashflows, CashflowBreakdown,
 /// };
+/// use finstack_quant_statements::types::FinancialStatementInstrument;
+/// use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 /// use finstack_quant_statements::evaluator::StatementResult;
 /// use finstack_quant_statements_analytics::analysis::{
 ///     capital_structure_summary, CapitalStructureSummaryConfig,
@@ -312,14 +315,16 @@ struct StackEntry<'a> {
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let mut builder = ModelBuilder::new("borrower");
 /// builder.periods("2025Q1..2025Q4", None)?;
-/// builder.add_bond(
-///     "SENIOR",
+/// let bond = Bond::fixed(
+///     InstrumentId::new("SENIOR"),
 ///     Money::new(1_000.0, Currency::USD)?,
-///     0.05,
+///     Rate::from_decimal(0.05)?,
 ///     date!(2025 - 01 - 01),
 ///     date!(2030 - 01 - 01),
-///     "USD-OIS",
+///     StubKind::ShortFront,
+///     CurveId::new("USD-OIS"),
 /// )?;
+/// builder.add_debt("SENIOR", FinancialStatementInstrument::Bond(bond));
 /// let model = builder.build()?;
 ///
 /// let quarters = (1..=4)

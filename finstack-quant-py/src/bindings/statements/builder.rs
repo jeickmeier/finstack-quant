@@ -10,17 +10,12 @@ use super::types::{PyFinancialModelSpec, PyForecastSpec, PyNodeSpec};
 use super::{PERIOD_GRAMMAR, extract_money_series, extract_scalar_series, extract_value_series};
 use crate::bindings::core::currency::PyCurrency;
 use crate::bindings::core::dates::periods::PyPeriodPlan;
-use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::py_to_date;
-use crate::bindings::module_utils::spec_from_py;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, statements_to_py, value_error};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::money::fx::FxConversionPolicy;
 use finstack_quant_statements::builder::{MixedNodeBuilder, ModelBuilder};
-use finstack_quant_statements::capital_structure::{
-    BondConventionParams, SwapConventions, SwapParams,
-};
 use finstack_quant_statements::types::{
     AmountOrScalar, FinancialStatementInstrument, NodeId, RollupMethod,
 };
@@ -413,78 +408,6 @@ impl PyModelBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         slf.builder_mut()?
             .add_metric_from_registry(qualified_id, &registry.inner)
-            .map_err(statements_to_py)?;
-        Ok(slf)
-    }
-
-    #[pyo3(
-        text_signature = "($self, id, notional, coupon_rate, issue_date, maturity_date, discount_curve_id)"
-    )]
-    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.add_bond")]
-    fn add_bond<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        id: &str,
-        notional: PyRef<'_, PyMoney>,
-        coupon_rate: f64,
-        issue_date: &Bound<'_, PyAny>,
-        maturity_date: &Bound<'_, PyAny>,
-        discount_curve_id: &str,
-    ) -> PyResult<PyRefMut<'py, Self>> {
-        let notional = notional.inner;
-        let issue = py_to_date(issue_date)?;
-        let maturity = py_to_date(maturity_date)?;
-        slf.builder_mut()?
-            .add_bond(
-                id,
-                notional,
-                coupon_rate,
-                issue,
-                maturity,
-                discount_curve_id,
-            )
-            .map_err(statements_to_py)?;
-        Ok(slf)
-    }
-
-    #[pyo3(text_signature = "($self, params)")]
-    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.add_swap")]
-    fn add_swap<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        params: &Bound<'_, PyAny>,
-    ) -> PyResult<PyRefMut<'py, Self>> {
-        let params: SwapParams = spec_from_py(params.py(), params, "SwapParams")?;
-        slf.builder_mut()?
-            .add_swap(params)
-            .map_err(statements_to_py)?;
-        Ok(slf)
-    }
-
-    #[pyo3(text_signature = "($self, params)")]
-    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.add_bond_with_convention")]
-    fn add_bond_with_convention<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        params: &Bound<'_, PyAny>,
-    ) -> PyResult<PyRefMut<'py, Self>> {
-        let params: BondConventionParams =
-            spec_from_py(params.py(), params, "BondConventionParams")?;
-        slf.builder_mut()?
-            .add_bond_with_convention(params)
-            .map_err(statements_to_py)?;
-        Ok(slf)
-    }
-
-    #[pyo3(text_signature = "($self, params, conventions)")]
-    #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.add_swap_with_conventions")]
-    fn add_swap_with_conventions<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        params: &Bound<'_, PyAny>,
-        conventions: &Bound<'_, PyAny>,
-    ) -> PyResult<PyRefMut<'py, Self>> {
-        let params: SwapParams = spec_from_py(params.py(), params, "SwapParams")?;
-        let conventions: SwapConventions =
-            spec_from_py(conventions.py(), conventions, "SwapConventions")?;
-        slf.builder_mut()?
-            .add_swap_with_conventions(params, conventions)
             .map_err(statements_to_py)?;
         Ok(slf)
     }

@@ -1,347 +1,195 @@
 //! Capital structure builder integration tests.
+//!
+//! Instruments are built through their canonical Valuations APIs and attached
+//! with `add_debt`; Statements has no bond or swap construction helpers.
 #![allow(clippy::expect_used, clippy::panic)]
 
+use finstack_quant_cashflows::CashflowScheduleSource;
+use finstack_quant_cashflows::builder::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
 use finstack_quant_statements::builder::ModelBuilder;
-use finstack_quant_statements::types::FinancialStatementInstrument;
+use finstack_quant_statements::types::{FinancialModelSpec, FinancialStatementInstrument};
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCredit;
-use time::Month;
+use finstack_quant_valuations::instruments::rates::irs::InterestRateSwap;
+use finstack_quant_valuations::instruments::{
+    BondConvention, FixedLegSpec, FloatLegSpec, PayReceive,
+};
+use rust_decimal::Decimal;
+use time::macros::date;
+
+fn usd(amount: f64) -> Money {
+    Money::new(amount, Currency::USD).expect("valid money fixture")
+}
+
+/// A bond on a deliberately selected dated convention.
+fn treasury_bond(id: &str) -> Bond {
+    Bond::with_convention(
+        InstrumentId::new(id),
+        usd(1_000_000.0),
+        Rate::from_decimal(0.03).expect("valid coupon"),
+        date!(2025 - 01 - 15),
+        date!(2030 - 01 - 15),
+        BondConvention::UsTreasury,
+        CurveId::new("USD-OIS"),
+    )
+    .expect("valid bond")
+}
+
+/// A pay-fixed swap with every leg term authored.
+fn authored_swap(id: &str) -> InterestRateSwap {
+    let (start, end) = (date!(2025 - 01 - 01), date!(2030 - 01 - 01));
+    let fixed = FixedLegSpec {
+        discount_curve_id: CurveId::new("USD-OIS"),
+        rate: Decimal::new(4, 2),
+        frequency: Tenor::annual(),
+        day_count: DayCount::Act360,
+        business_day_convention: BusinessDayConvention::ModifiedFollowing,
+        calendar_id: Some("usny".into()),
+        stub: StubKind::None,
+        start,
+        end,
+        payment_lag_days: 0,
+        end_of_month: false,
+    };
+    let float = FloatLegSpec {
+        discount_curve_id: CurveId::new("USD-OIS"),
+        forward_curve_id: CurveId::new("USD-SOFR-3M"),
+        spread_bp: Decimal::ZERO,
+        frequency: Tenor::quarterly(),
+        day_count: DayCount::Act360,
+        business_day_convention: BusinessDayConvention::ModifiedFollowing,
+        calendar_id: Some("usny".into()),
+        stub: StubKind::None,
+        reset_lag_days: 0,
+        fixing_calendar_id: None,
+        start,
+        end,
+        compounding: FloatingLegCompounding::Simple,
+        payment_lag_days: 0,
+        end_of_month: false,
+    };
+    InterestRateSwap::builder()
+        .id(InstrumentId::new(id))
+        .notional(usd(5_000_000.0))
+        .side(PayReceive::Pay)
+        .fixed_leg(fixed)
+        .float_leg(float)
+        .build()
+        .expect("valid swap")
+}
+
+fn model_with(instruments: Vec<(&str, FinancialStatementInstrument)>) -> FinancialModelSpec {
+    let mut builder = ModelBuilder::new("test");
+    builder
+        .periods("2025Q1..2025Q2", None)
+        .expect("valid period range");
+    for (id, instrument) in instruments {
+        builder.add_debt(id, instrument);
+    }
+    builder.build().expect("valid model")
+}
 
 #[test]
-fn test_add_bond() {
-    let issue = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-    let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("valid date");
-
-    let builder = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder
-            .periods("2025Q1..2025Q2", None)
-            .expect("valid period range");
-        model_builder
-            .add_bond(
-                "BOND-001",
-                Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-                0.05,
-                issue,
-                maturity,
-                "USD-OIS",
-            )
-            .expect("valid bond");
-        model_builder
-    };
-    let model = builder.build().expect("valid model");
-
-    let cs = model
+fn add_debt_attaches_canonical_instruments_in_order() {
+    let model = model_with(vec![
+        (
+            "BOND-001",
+            FinancialStatementInstrument::Bond(treasury_bond("BOND-001")),
+        ),
+        (
+            "SWAP-001",
+            FinancialStatementInstrument::InterestRateSwap(authored_swap("SWAP-001")),
+        ),
+        (
+            "RCF-A",
+            FinancialStatementInstrument::RevolvingCredit(
+                RevolvingCredit::example().expect("valid revolving credit example"),
+            ),
+        ),
+    ]);
+    let debt = model
         .capital_structure
-        .as_ref()
-        .expect("capital_structure should exist");
-    assert_eq!(cs.debt_instruments.len(), 1);
-
-    assert_eq!(cs.debt_instruments[0].id, "BOND-001");
+        .expect("capital structure")
+        .debt_instruments;
+    let ids: Vec<&str> = debt.iter().map(|entry| entry.id.as_str()).collect();
+    assert_eq!(ids, ["BOND-001", "SWAP-001", "RCF-A"]);
     assert!(matches!(
-        cs.debt_instruments[0].spec,
+        debt[0].spec,
         FinancialStatementInstrument::Bond(_)
+    ));
+    assert!(matches!(
+        debt[1].spec,
+        FinancialStatementInstrument::InterestRateSwap(_)
     ));
 }
 
-fn swap_in(currency: Currency) -> finstack_quant_statements::Result<ModelBuilder> {
-    {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder
-            .periods("2025Q1..2025Q2", None)
-            .expect("valid period range");
-        match model_builder.add_swap(finstack_quant_statements::capital_structure::SwapParams {
-            id: ("SWAP-001").into(),
-            notional: Money::new(5_000_000.0, currency).expect("valid money fixture"),
-            fixed_rate: 0.04,
-            start_date: Date::from_calendar_date(2025, Month::January, 1).expect("valid date"),
-            maturity_date: Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
-            discount_curve_id: ("OIS").into(),
-            forward_curve_id: ("FWD-3M").into(),
-        }) {
-            Ok(_) => Ok(model_builder),
-            Err(error) => Err(error),
+/// The instrument the model holds is the canonical instrument, unchanged:
+/// its resolved terms, elected convention and contractual schedule survive
+/// attachment and a replay through the model's wire form.
+#[test]
+fn resolved_terms_and_schedule_survive_attachment_and_replay() {
+    let bond = treasury_bond("BOND-001");
+    let swap = authored_swap("SWAP-001");
+    let model = model_with(vec![
+        ("BOND-001", FinancialStatementInstrument::Bond(bond.clone())),
+        (
+            "SWAP-001",
+            FinancialStatementInstrument::InterestRateSwap(swap.clone()),
+        ),
+    ]);
+    let wire = serde_json::to_string(&model).expect("serialize model");
+    let replayed: FinancialModelSpec = serde_json::from_str(&wire).expect("replay model");
+
+    let terms = |instrument: &FinancialStatementInstrument| {
+        serde_json::to_value(instrument).expect("serialize instrument")
+    };
+    let expected = [
+        terms(&FinancialStatementInstrument::Bond(bond.clone())),
+        terms(&FinancialStatementInstrument::InterestRateSwap(swap)),
+    ];
+    for candidate in [&model, &replayed] {
+        let debt = &candidate
+            .capital_structure
+            .as_ref()
+            .expect("capital structure")
+            .debt_instruments;
+        for (entry, expected) in debt.iter().zip(&expected) {
+            assert_eq!(&terms(&entry.spec), expected, "{}", entry.id);
         }
     }
-}
+    assert_eq!(
+        replayed.content_hash().unwrap(),
+        model.content_hash().unwrap()
+    );
 
-#[test]
-fn add_swap_rolls_on_the_currency_rates_calendar() {
-    for (currency, calendar) in [
-        (Currency::USD, "usny"),
-        (Currency::EUR, "target2"),
-        (Currency::AUD, "auce"),
-        (Currency::CAD, "cato"),
-        (Currency::CHF, "chzh"),
-    ] {
-        let model = swap_in(currency)
-            .expect("mapped currency")
-            .build()
-            .expect("valid model");
-        let cs = model.capital_structure.expect("capital structure");
-        let FinancialStatementInstrument::InterestRateSwap(swap) = &cs.debt_instruments[0].spec
-        else {
-            panic!("expected a swap");
+    // The contractual schedule is the canonical bond's own, before and after
+    // the replay: the same dated flows.
+    let schedule = |instrument: &FinancialStatementInstrument| {
+        let FinancialStatementInstrument::Bond(bond) = instrument else {
+            panic!("expected a bond");
         };
-        assert_eq!(swap.fixed_leg.calendar_id.as_deref(), Some(calendar));
-        assert_eq!(swap.float_leg.calendar_id.as_deref(), Some(calendar));
-    }
-}
-
-#[test]
-fn add_swap_rejects_a_currency_without_a_standard_calendar() {
-    let error = swap_in(Currency::SEK).expect_err("SEK has no standard rates calendar");
-    assert!(
-        error.to_string().contains("no standard rates calendar"),
-        "unexpected error: {error}"
+        let schedule = bond
+            .raw_cashflow_schedule(&MarketContext::new(), date!(2025 - 01 - 15))
+            .expect("schedule");
+        assert!(
+            schedule.get_flows().len() >= 11,
+            "ten coupons and the redemption"
+        );
+        format!("{:?}", schedule.get_flows())
+    };
+    let replayed_bond = &replayed
+        .capital_structure
+        .as_ref()
+        .expect("capital structure")
+        .debt_instruments[0]
+        .spec;
+    assert_eq!(
+        schedule(replayed_bond),
+        schedule(&FinancialStatementInstrument::Bond(bond))
     );
-}
-
-#[test]
-fn test_add_swap() {
-    let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-    let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
-
-    let builder = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder
-            .periods("2025Q1..2025Q2", None)
-            .expect("valid period range");
-        model_builder
-            .add_swap(finstack_quant_statements::capital_structure::SwapParams {
-                id: ("SWAP-001").into(),
-                notional: Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
-                fixed_rate: 0.04,
-                start_date: start,
-                maturity_date: maturity,
-                discount_curve_id: ("USD-OIS").into(),
-                forward_curve_id: ("USD-SOFR-3M").into(),
-            })
-            .expect("valid swap");
-        model_builder
-    };
-    let model = builder.build().expect("valid model");
-
-    let cs = model
-        .capital_structure
-        .as_ref()
-        .expect("capital_structure should exist");
-    assert_eq!(cs.debt_instruments.len(), 1);
-
-    assert_eq!(cs.debt_instruments[0].id, "SWAP-001");
-    assert!(matches!(
-        cs.debt_instruments[0].spec,
-        FinancialStatementInstrument::InterestRateSwap(_)
-    ));
-}
-
-#[test]
-fn test_add_multiple_instruments() {
-    let issue = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-    let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("valid date");
-
-    let builder = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder
-            .periods("2025Q1..2025Q2", None)
-            .expect("valid period range");
-        model_builder
-            .add_bond(
-                "BOND-001",
-                Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-                0.05,
-                issue,
-                maturity,
-                "USD-OIS",
-            )
-            .expect("valid bond");
-        model_builder
-            .add_bond(
-                "BOND-002",
-                Money::new(2_000_000.0, Currency::USD).expect("valid money fixture"),
-                0.06,
-                issue,
-                maturity,
-                "USD-OIS",
-            )
-            .expect("valid bond");
-        model_builder
-    };
-    let model = builder.build().expect("valid model");
-
-    let cs = model
-        .capital_structure
-        .as_ref()
-        .expect("capital_structure should exist");
-    assert_eq!(cs.debt_instruments.len(), 2);
-}
-
-#[test]
-fn test_add_debt() {
-    let instrument = FinancialStatementInstrument::RevolvingCredit(
-        RevolvingCredit::example().expect("valid revolving credit example"),
-    );
-    let builder = {
-        let mut model_builder = ModelBuilder::new("test");
-        model_builder
-            .periods("2025Q1..2025Q2", None)
-            .expect("valid period range");
-        model_builder.add_debt("RCF-A", instrument);
-        model_builder
-    };
-    let model = builder.build().expect("valid model");
-
-    let cs = model
-        .capital_structure
-        .as_ref()
-        .expect("capital_structure should exist");
-    assert_eq!(cs.debt_instruments.len(), 1);
-
-    assert_eq!(cs.debt_instruments[0].id, "RCF-A");
-}
-
-// --- Parity: add_bond vs add_bond_with_convention (USD defaults) ---
-
-#[test]
-fn parity_add_bond_and_add_bond_with_convention_same_id() {
-    use finstack_quant_core::types::Rate;
-    use finstack_quant_valuations::instruments::BondConvention;
-
-    let issue = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-    let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("valid date");
-
-    let model_simple = {
-        let mut model_builder = ModelBuilder::new("simple");
-        model_builder
-            .periods("2025Q1..2025Q2", None)
-            .expect("valid period range");
-        model_builder
-            .add_bond(
-                "BOND-SIMPLE",
-                Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-                0.05,
-                issue,
-                maturity,
-                "USD-OIS",
-            )
-            .expect("valid bond");
-        model_builder.build().expect("valid model")
-    };
-
-    let model_conv = {
-        let mut model_builder = ModelBuilder::new("convention");
-        model_builder
-            .periods("2025Q1..2025Q2", None)
-            .expect("valid period range");
-        model_builder
-            .add_bond_with_convention(
-                finstack_quant_statements::capital_structure::BondConventionParams {
-                    id: ("BOND-CONV").into(),
-                    notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-                    coupon_rate: Rate::from_decimal(0.05).expect("valid rate fixture"),
-                    issue_date: issue,
-                    maturity_date: maturity,
-                    convention: BondConvention::UsCorporate,
-                    discount_curve_id: ("USD-OIS").into(),
-                },
-            )
-            .expect("valid bond with convention");
-        model_builder.build().expect("valid model")
-    };
-
-    let cs_simple = model_simple
-        .capital_structure
-        .as_ref()
-        .expect("capital_structure present");
-    let cs_conv = model_conv
-        .capital_structure
-        .as_ref()
-        .expect("capital_structure present");
-
-    // Both produce a bond-tagged payload
-    assert!(matches!(
-        cs_simple.debt_instruments[0].spec,
-        FinancialStatementInstrument::Bond(_)
-    ));
-    assert!(matches!(
-        cs_conv.debt_instruments[0].spec,
-        FinancialStatementInstrument::Bond(_)
-    ));
-}
-
-// --- Parity: add_swap vs add_swap_with_conventions (USD defaults) ---
-
-#[test]
-fn parity_add_swap_and_add_swap_with_conventions_produce_swap_variant() {
-    use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
-
-    let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-    let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");
-
-    let model_simple = {
-        let mut model_builder = ModelBuilder::new("simple");
-        model_builder
-            .periods("2025Q1..2025Q2", None)
-            .expect("valid period range");
-        model_builder
-            .add_swap(finstack_quant_statements::capital_structure::SwapParams {
-                id: ("SWAP-SIMPLE").into(),
-                notional: Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
-                fixed_rate: 0.04,
-                start_date: start,
-                maturity_date: maturity,
-                discount_curve_id: ("USD-OIS").into(),
-                forward_curve_id: ("USD-SOFR-3M").into(),
-            })
-            .expect("valid swap");
-        model_builder.build().expect("valid model")
-    };
-
-    let model_conv = {
-        let mut model_builder = ModelBuilder::new("convention");
-        model_builder
-            .periods("2025Q1..2025Q2", None)
-            .expect("valid period range");
-        model_builder
-            .add_swap_with_conventions(
-                finstack_quant_statements::capital_structure::SwapParams {
-                    id: ("SWAP-CONV").into(),
-                    notional: Money::new(5_000_000.0, Currency::USD).expect("valid money fixture"),
-                    fixed_rate: 0.04,
-                    start_date: start,
-                    maturity_date: maturity,
-                    discount_curve_id: ("USD-OIS").into(),
-                    forward_curve_id: ("USD-SOFR-3M").into(),
-                },
-                finstack_quant_statements::capital_structure::SwapConventions {
-                    fixed_frequency: Tenor::semi_annual(),
-                    fixed_day_count: DayCount::Thirty360,
-                    float_frequency: Tenor::quarterly(),
-                    float_day_count: DayCount::Act360,
-                    business_day_convention: BusinessDayConvention::ModifiedFollowing,
-                },
-            )
-            .expect("valid swap with conventions");
-        model_builder.build().expect("valid model")
-    };
-
-    let cs_simple = model_simple
-        .capital_structure
-        .as_ref()
-        .expect("capital_structure present");
-    let cs_conv = model_conv
-        .capital_structure
-        .as_ref()
-        .expect("capital_structure present");
-
-    assert!(matches!(
-        cs_simple.debt_instruments[0].spec,
-        FinancialStatementInstrument::InterestRateSwap(_)
-    ));
-    assert!(matches!(
-        cs_conv.debt_instruments[0].spec,
-        FinancialStatementInstrument::InterestRateSwap(_)
-    ));
 }

@@ -11,6 +11,7 @@ from finstack_quant.core.dates import PeriodPlan
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.statements_analytics import run_checks
+from finstack_quant.valuations.instruments import InterestRateSwap
 from tests.tests_typed_helpers import projection_curve
 
 
@@ -24,65 +25,6 @@ def test_canonical_forecast_and_registry_names() -> None:
     with pytest.raises(ValueError, match="Function 'ltm' is not supported"):
         s.parse_and_compile("ltm(revenue)")
     assert s.parse_and_compile("ttm(revenue)") is None
-
-
-@pytest.mark.parametrize("ready", [False, True])
-@pytest.mark.parametrize(
-    "method",
-    ["add_bond", "add_bond_with_convention", "add_swap", "add_swap_with_conventions"],
-)
-def test_rejected_instrument_keeps_builder_usable(method: str, ready: bool) -> None:
-    builder = s.ModelBuilder("retained")
-    builder.add_bond("existing", Money(100, Currency("USD")), 0.05, "2025-01-01", "2030-01-01", "USD-OIS")
-    if ready:
-        builder.periods("2025Q1..Q2", "2025Q1").value_scalar("revenue", {"2025Q1": 123.0})
-    notional = Money(100, Currency("USD"))
-
-    def arguments(maturity: str) -> list[object]:
-        if method == "add_bond":
-            return ["retry", notional, 0.05, "2025-01-01", maturity, "USD-OIS"]
-        if method == "add_bond_with_convention":
-            return [
-                {
-                    "id": "retry",
-                    "notional": notional,
-                    "coupon_rate": 0.05,
-                    "issue_date": "2025-01-01",
-                    "maturity_date": maturity,
-                    "convention": "us_corporate",
-                    "discount_curve_id": "USD-OIS",
-                }
-            ]
-        swap = {
-            "id": "retry",
-            "notional": notional,
-            "fixed_rate": 0.05,
-            "start_date": "2025-01-01",
-            "maturity_date": maturity,
-            "discount_curve_id": "USD-OIS",
-            "forward_curve_id": "USD-SOFR-3M",
-        }
-        if method == "add_swap":
-            return [swap]
-        conventions = {
-            "fixed_frequency": {"count": 6, "unit": "months"},
-            "fixed_day_count": "30_360",
-            "float_frequency": {"count": 3, "unit": "months"},
-            "float_day_count": "act_360",
-            "business_day_convention": "modified_following",
-        }
-        return [swap, conventions]
-
-    with pytest.raises(ValueError, match=r"before|maturity|start"):
-        getattr(builder, method)(*arguments("2024-01-01"))
-    if not ready:
-        builder.periods("2025Q1..Q2", "2025Q1").value_scalar("revenue", {"2025Q1": 123.0})
-    assert getattr(builder, method)(*arguments("2030-01-01")) is builder
-    model = builder.build()
-    assert model.id == "retained"
-    assert model.actual_periods == ["2025Q1"]
-    assert model.get_node("revenue").values == {"2025Q1": 123.0}
-    assert [instrument["id"] for instrument in model.capital_structure["debt_instruments"]] == ["existing", "retry"]
 
 
 @pytest.mark.parametrize("field", ["default_tolerance", "default_relative_tolerance", "materiality_threshold"])
@@ -146,15 +88,21 @@ def test_swap_with_two_receiving_legs_reports_interest_income(
     side: str, fixed_rate: float, forward_rate: float
 ) -> None:
     builder = s.ModelBuilder("negative-rate-receiver")
-    builder.add_swap({
-        "id": "IRS",
-        "notional": Money(100.0, Currency("USD")),
-        "fixed_rate": fixed_rate,
-        "start_date": "2025-01-01",
-        "maturity_date": "2026-01-01",
-        "discount_curve_id": "USD-OIS",
-        "forward_curve_id": "USD-SOFR-3M",
-    })
+    # The swap starts after the valuation date so its first reset is not a past fixing.
+    builder.add_debt(
+        "IRS",
+        InterestRateSwap.from_conventions({
+            "id": "IRS",
+            "notional": Money(100.0, Currency("USD")),
+            "side": "pay",
+            "fixed_rate": fixed_rate,
+            "start_date": "2025-01-06",
+            "maturity": "2026-01-06",
+            "index_id": "USD-SOFR-3M",
+            "discount_curve_id": "USD-OIS",
+            "forward_curve_id": "USD-SOFR-3M",
+        }),
+    )
     builder.periods("2025..2025", None).value_scalar("cash", {"2025": 10.0})
     builder.compute("income", "cs.interest_income.IRS")
     model_payload = json.loads(builder.build().to_json())
@@ -214,15 +162,20 @@ def test_merge_into_results_writes_normalized_node() -> None:
 
 def test_model_rejects_rate_hedge_as_pik_target() -> None:
     builder = s.ModelBuilder("hedge-pik")
-    builder.add_swap({
-        "id": "IRS",
-        "notional": Money(100.0, Currency("USD")),
-        "fixed_rate": 0.01,
-        "start_date": "2025-01-01",
-        "maturity_date": "2026-01-01",
-        "discount_curve_id": "USD-OIS",
-        "forward_curve_id": "USD-SOFR-3M",
-    })
+    builder.add_debt(
+        "IRS",
+        InterestRateSwap.from_conventions({
+            "id": "IRS",
+            "notional": Money(100.0, Currency("USD")),
+            "side": "pay",
+            "fixed_rate": 0.01,
+            "start_date": "2025-01-01",
+            "maturity": "2026-01-01",
+            "index_id": "USD-SOFR-3M",
+            "discount_curve_id": "USD-OIS",
+            "forward_curve_id": "USD-SOFR-3M",
+        }),
+    )
     builder.periods("2025..2025", None).value_scalar("cash", {"2025": 10.0})
     builder.waterfall(s.WaterfallSpec(pik_toggle=s.PikToggleSpec("cash", 20.0, ["IRS"])))
     with pytest.raises(ValueError, match="only borrowing debt coupons can capitalize into principal"):
@@ -302,42 +255,6 @@ def test_accounting_overflow_is_an_error_without_invalid_numbers() -> None:
     assert finding["severity"] == "error"
     assert finding.get("comparison") is None
     assert finding.get("materiality") is None
-
-
-def test_swap_conventions_take_tenor_and_day_count_objects() -> None:
-    """``Tenor`` and ``DayCount`` objects in a params dict serialize to their wire form."""
-    from finstack_quant.core.dates import DayCount, Tenor
-
-    swap = {
-        "id": "swap",
-        "notional": Money(100, Currency("USD")),
-        "fixed_rate": 0.05,
-        "start_date": "2025-01-01",
-        "maturity_date": "2030-01-01",
-        "discount_curve_id": "USD-OIS",
-        "forward_curve_id": "USD-SOFR-3M",
-    }
-    wire = {
-        "fixed_frequency": {"count": 6, "unit": "months"},
-        "fixed_day_count": "30_360",
-        "float_frequency": {"count": 3, "unit": "months"},
-        "float_day_count": "act_360",
-        "business_day_convention": "modified_following",
-    }
-    typed = {
-        "fixed_frequency": Tenor.semi_annual(),
-        "fixed_day_count": DayCount.THIRTY_360,
-        "float_frequency": Tenor.quarterly(),
-        "float_day_count": DayCount.ACT_360,
-        "business_day_convention": "modified_following",
-    }
-
-    def build(conventions: dict[str, object]) -> str:
-        builder = s.ModelBuilder("m").periods("2025Q1..Q2", "2025Q1")
-        builder.value_scalar("revenue", {"2025Q1": 1.0})
-        return builder.add_swap_with_conventions(swap, conventions).build().to_json()
-
-    assert build(typed) == build(wire)
 
 
 def test_bundled_earnings_use_reported_costs_and_add_da_back_once() -> None:

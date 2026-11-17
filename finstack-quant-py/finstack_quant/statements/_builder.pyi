@@ -455,40 +455,28 @@ class ModelBuilder:
         """
         ...
 
-    def add_bond(
-        self,
-        id: str,
-        notional: Money,
-        coupon_rate: float,
-        issue_date: date | str,
-        maturity_date: date | str,
-        discount_curve_id: str,
-    ) -> ModelBuilder:
+    def add_debt(self, id: str, instrument: Any | str) -> ModelBuilder:
         """
+        Attach a canonical debt or hedge instrument to the capital structure.
 
-        Add a fixed-rate bond to the capital structure (US 30/360 semi-annual).
-
-        Rejected inputs leave this builder usable with its accumulated model intact.
-
-        For non-USD conventions, use :meth:`add_debt` with a pre-built
-        ``Bond`` JSON specification.
+        This is the one way an instrument enters a model. Build the
+        instrument through its own Valuations API (``Bond.fixed``,
+        ``Bond.with_convention``, ``InterestRateSwap.from_conventions``,
+        ``TermLoan`` ...) with fully authored terms or a deliberately selected
+        convention; the model keeps its resolved terms and schedule unchanged.
+        Supported instrument types are bonds, convertible bonds, revolving
+        credit facilities, term loans, interest-rate swaps, caps/floors and
+        swaptions.
 
         Parameters
         ----------
         id:
-            Bond identifier.
-        notional:
-            Face value as a :class:`Money` amount.
-        coupon_rate:
-            Annual coupon rate as a decimal (e.g. ``0.05`` for 5%).
-        issue_date:
-            Contractual issue and accrual start as datetime.date or ISO YYYY-MM-DD;
-            must precede maturity.
-        maturity_date:
-            Final contractual repayment as datetime.date or ISO YYYY-MM-DD;
-            must follow the issue date.
-        discount_curve_id:
-            Curve ID for discounting (e.g. ``"USD-OIS"``).
+            Capital-structure identifier of the instrument, used by
+            ``cs.<component>.<id>`` references and waterfall classes.
+            Market-aware evaluation rejects duplicate identifiers.
+        instrument:
+            A typed instrument object, or its canonical
+            ``finstack_quant.instrument/1`` envelope as a dict or JSON text.
 
         Returns
         -------
@@ -498,115 +486,8 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If the bond constructor rejects its rate, notional, curve configuration,
-            or dates, or the builder has already been consumed.
-
-        """
-        ...
-
-    def add_swap(self, params: dict[str, Any] | str) -> ModelBuilder:
-        """
-
-        Add a pay-fixed interest rate swap to the capital structure (US conventions).
-
-        Uses semi-annual 30/360 fixed coupons, quarterly ACT/360 floating coupons,
-        Modified Following and simple floating compounding. Rejected inputs leave
-        this builder usable with its accumulated model intact.
-
-        Parameters
-        ----------
-        params:
-            The Rust ``SwapParams`` serde form, as a dict or JSON text. Every key
-            is required and an unknown key raises ``ValueError``:
-
-            * ``id`` (str): swap identifier; market-aware evaluation rejects
-              duplicates.
-            * ``notional`` (Money | dict): notional as a :class:`Money` value or
-              its wire form ``{"amount": "1000000", "currency": "USD"}``.
-            * ``fixed_rate`` (float): fixed leg rate as a decimal (``0.04`` for 4%).
-            * ``start_date`` (datetime.date | str): contractual accrual start for
-              both legs, as a date or ISO ``YYYY-MM-DD``; must precede maturity.
-            * ``maturity_date`` (datetime.date | str): final contractual accrual
-              end, as a date or ISO ``YYYY-MM-DD``.
-            * ``discount_curve_id`` (str): curve ID for discounting.
-            * ``forward_curve_id`` (str): curve ID for floating-leg forward rates.
-
-        Returns
-        -------
-        ModelBuilder
-            This builder, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If ``params`` is malformed, misses a key or carries an unknown one,
-            the swap constructor rejects its rate, notional, curve configuration,
-            or dates, or the builder has already been consumed.
-
-        Examples
-        --------
-        >>> from datetime import date
-        >>> from finstack_quant.core.money import Money
-        >>> from finstack_quant.statements import ModelBuilder
-        >>> builder = ModelBuilder("cs-model")
-        >>> _ = builder.add_swap({
-        ...     "id": "SWAP-1",
-        ...     "notional": Money(1_000_000.0, "USD"),
-        ...     "fixed_rate": 0.04,
-        ...     "start_date": date(2025, 1, 15),
-        ...     "maturity_date": date(2030, 1, 15),
-        ...     "discount_curve_id": "USD-OIS",
-        ...     "forward_curve_id": "USD-SOFR-3M",
-        ... })
-        """
-        ...
-
-    def add_bond_with_convention(self, params: dict[str, Any] | str) -> ModelBuilder:
-        """
-
-        Add a fixed-rate bond with a market convention preset.
-
-        Rejected inputs leave this builder usable with its accumulated model intact.
-
-        Applies regional day-count, coupon-frequency, and calendar
-        conventions automatically; :meth:`add_bond` uses US corporate
-        conventions instead.
-
-        Parameters
-        ----------
-        params:
-            The Rust ``BondConventionParams`` serde form, as a dict or JSON text.
-            Every key is required and an unknown key raises ``ValueError``:
-
-            * ``id`` (str): bond identifier; market-aware evaluation rejects
-              duplicates.
-            * ``notional`` (Money | dict): face value as a :class:`Money` value
-              or its wire form ``{"amount": "10000000", "currency": "EUR"}``.
-            * ``coupon_rate`` (float): finite annual coupon rate as a decimal
-              (``0.03`` for 3%).
-            * ``issue_date`` (datetime.date | str): contractual issue and accrual
-              start, as a date or ISO ``YYYY-MM-DD``; must precede maturity.
-            * ``maturity_date`` (datetime.date | str): final contractual
-              repayment, as a date or ISO ``YYYY-MM-DD``.
-            * ``convention`` (str): regional preset as the canonical snake_case
-              identifier: ``"us_treasury"``, ``"us_agency"``, ``"german_bund"``,
-              ``"uk_gilt"``, ``"french_oat"``, ``"jgb"``, ``"us_corporate"``, or
-              ``"eur_corporate"``.
-            * ``discount_curve_id`` (str): curve ID for discounting (e.g.
-              ``"EUR-OIS"``).
-
-        Returns
-        -------
-        ModelBuilder
-            This builder, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If ``params`` is malformed, misses a key or carries an unknown one,
-            the convention is unknown, the coupon is not finite, the bond
-            constructor rejects its notional, curve configuration, or dates, or
-            the builder was consumed.
+            If the envelope is invalid or its instrument type is not supported
+            by financial statement capital structures.
 
         Examples
         --------
@@ -614,125 +495,21 @@ class ModelBuilder:
         >>> from finstack_quant.core.currency import Currency
         >>> from finstack_quant.core.money import Money
         >>> from finstack_quant.statements import ModelBuilder
-        >>> builder = ModelBuilder("cs-model")
-        >>> _ = builder.add_bond_with_convention({
-        ...     "id": "BUND-001",
-        ...     "notional": Money(10_000_000.0, Currency("EUR")),
-        ...     "coupon_rate": 0.03,
-        ...     "issue_date": date(2025, 1, 15),
-        ...     "maturity_date": date(2030, 1, 15),
-        ...     "convention": "german_bund",
-        ...     "discount_curve_id": "EUR-OIS",
-        ... })
-        """
-        ...
-
-    def add_swap_with_conventions(
-        self,
-        params: dict[str, Any] | str,
-        conventions: dict[str, Any] | str,
-    ) -> ModelBuilder:
-        """
-
-        Add a pay-fixed interest rate swap with custom leg conventions.
-
-        Rejected inputs leave this builder usable with its accumulated model intact.
-
-        Exposes day-count, frequency, and business-day-convention parameters
-        for non-USD swaps (e.g. EUR annual ACT/360 fixed legs);
-        :meth:`add_swap` uses US conventions instead. Floating compounding stays
-        simple.
-
-        Parameters
-        ----------
-        params:
-            The Rust ``SwapParams`` serde form (dict or JSON text) with the keys
-            ``id``, ``notional``, ``fixed_rate``, ``start_date``,
-            ``maturity_date``, ``discount_curve_id`` and ``forward_curve_id``,
-            exactly as for :meth:`add_swap`.
-        conventions:
-            The Rust ``SwapConventions`` serde form, as a dict or JSON text; an
-            unknown key raises ``ValueError``:
-
-            * ``fixed_frequency`` (dict): fixed-leg payment cadence as a tenor
-              wire object, e.g. ``{"count": 1, "unit": "years"}``; ``unit`` is
-              ``"days"``, ``"weeks"``, ``"months"`` or ``"years"``.
-            * ``fixed_day_count`` (str): fixed-leg day count label, e.g.
-              ``"act_360"``, ``"30_360"`` or ``"act_365f"``.
-            * ``float_frequency`` (dict): floating-leg payment and fixing cadence,
-              e.g. ``{"count": 3, "unit": "months"}``.
-            * ``float_day_count`` (str): floating-leg day count label.
-            * ``business_day_convention`` (str): schedule-date rolling rule,
-              e.g. ``"modified_following"`` or ``"following"``. Required:
-              there is no default convention.
-
-        Returns
-        -------
-        ModelBuilder
-            This builder, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If either object is malformed, misses a required key or carries an
-            unknown one, a tenor, day count, convention, rate, notional, curve
-            configuration, or date is rejected, or the builder has already been
-            consumed.
-
-        Examples
-        --------
-        >>> from datetime import date
-        >>> from finstack_quant.core.currency import Currency
-        >>> from finstack_quant.core.money import Money
-        >>> from finstack_quant.statements import ModelBuilder
-        >>> builder = ModelBuilder("cs-model")
-        >>> _ = builder.add_swap_with_conventions(
-        ...     {
-        ...         "id": "SWAP-EUR",
-        ...         "notional": Money(5_000_000.0, Currency("EUR")),
-        ...         "fixed_rate": 0.03,
-        ...         "start_date": date(2025, 1, 15),
-        ...         "maturity_date": date(2030, 1, 15),
-        ...         "discount_curve_id": "EUR-OIS",
-        ...         "forward_curve_id": "EUR-EURIBOR-6M",
-        ...     },
-        ...     {
-        ...         "fixed_frequency": {"count": 1, "unit": "years"},
-        ...         "fixed_day_count": "act_360",
-        ...         "float_frequency": {"count": 6, "unit": "months"},
-        ...         "float_day_count": "act_360",
-        ...         "business_day_convention": "modified_following",
-        ...     },
+        >>> from finstack_quant.valuations.instruments import Bond
+        >>> bond = Bond.with_convention(
+        ...     "UST-5Y",
+        ...     Money(1_000_000.0, Currency("USD")),
+        ...     0.03,
+        ...     date(2025, 1, 15),
+        ...     date(2030, 1, 15),
+        ...     "us_treasury",
+        ...     "USD-OIS",
         ... )
-        """
-        ...
-
-    def add_debt(self, id: str, instrument: Any | str) -> ModelBuilder:
-        """
-        Add a debt instrument via its canonical v1 instrument envelope.
-
-        Supported instrument types are bonds, convertible bonds, revolving
-        credit facilities, term loans, interest-rate swaps, caps/floors, and
-        swaptions.
-
-                Parameters
-                ----------
-                id:
-                    Instrument identifier.
-                instrument:
-                    ``finstack_quant.instrument/1`` envelope containing the debt instrument.
-
-                Returns
-        -------
-        ModelBuilder
-            This builder, for chaining.
-
-        Raises
-                ------
-                ValueError
-                    If the envelope is invalid or its instrument type is not supported by
-                    financial statement capital structures.
-
+        >>> builder = ModelBuilder("deal")
+        >>> _ = builder.add_debt("UST-5Y", bond)
+        >>> _ = builder.periods("2025Q1..Q2", None).value_scalar("revenue", {"2025Q1": 1.0})
+        >>> [entry["id"] for entry in builder.build().capital_structure["debt_instruments"]]
+        ['UST-5Y']
         """
         ...
 

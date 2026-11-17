@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **644 review items across 33 source scopes with open items**
+This backlog consolidates **643 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -26,7 +26,7 @@ The labels distinguish the work required:
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (497): implementation and verification work against an
+- **Reconciliation** (496): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (38): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -67,7 +67,7 @@ product consequences remain in their product scope.
 | [Calibration: quotes and curve/smile targets](#calibration-quotes-and-curvesmile-targets) | 18 |
 | [Calibration: Hull–White and LMM](#calibration-hullwhite-and-lmm) | 18 |
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
-| [Statements: capital structure](#statements-capital-structure) | 14 |
+| [Statements: capital structure](#statements-capital-structure) | 13 |
 | [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 12 |
 | [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 7 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
@@ -963,8 +963,6 @@ product consequences remain in their product scope.
 - **Investigate — Class allocation can direct floating remainder to an ineligible final row.** Class vectors contain zeros for other rows, but pro-rata remainder goes to the final array entry, potentially zero/ineligible, before available cash becomes zero. Independently bound or reproduce the residual across scales and row orders before concluding a material cash loss; ordinary conservation fixtures do not cover every case. Records: [STATEMENTS-CAPITAL-006](statements-capital/06-priority-allocation.md).
 
 - **Evidence — Residual coupons need independent debt-ledger reconciliation.** Qualify arbitrary cash/PIK shares, zeroed-coupon reactivation, irregular day counts and multiple dated advances/arrears against an independent schedule. Existing residual regressions primarily establish internal ledger invariants. Include tolerance scaling while preserving the established period-close balance-change and FX/date policy. Records: [STATEMENTS-CAPITAL-005](statements-capital/05-residual-coupons.md).
-
-- **Reconciliation — Explicit bond and swap construction.** Remove the four Statements construction helpers across Rust, Python and WASM and reconcile callers to the canonical Valuations instrument and the existing `add_debt` or `addDebt` route. Verify that resolved contractual terms, source and schedule survive model attachment and replay. Independently qualify the supported instrument schedules. [Accepted construction decision](statements-capital/01-instrument-construction.md#accepted-decision-for-explicit-bond-and-swap-construction).
 
 - **Reconciliation — Debt and hedge cashflow classification and period admission.** Validate periods before reading schedules, enforce source perspective and native currency, and classify dated cash, principal and PIK effects, fees and hedge settlements under the accepted contract. Keep signed distress cash visible outside scheduled debt service. Period coupon netting, separate expense and income totals and the Interest claim are implemented. Independently qualify source conversion, custom and rebuilt schedules, signed fee and distress cash, explicit liability changes and boundary dates against borrower and hedge ledgers. [Accepted STATEMENTS-CAPITAL-002](statements-capital/02-cashflow-classification.md#accepted-decision-for-period-admission-and-cashflow-classification).
 

@@ -330,44 +330,47 @@ test('ModelBuilder capital-structure and registry steps build a valid model', ()
   builder.periods('2025Q1..Q4');
   builder.valueScalar('revenue', { [Q1]: 100.0 });
   builder.addMetricFromRegistry('custom.half', registry);
-  builder.addBond(
-    'BOND-1',
-    { amount: '1000000', currency: 'USD' },
-    0.05,
-    '2025-01-15',
-    '2030-01-15',
-    'USD-OIS'
-  );
-  builder.addBondWithConvention({
-    id: 'BOND-2',
+  // Instruments come from the Valuations API; Statements has no bond or swap
+  // construction helpers.
+  const { core, valuations } = facade;
+  const usd = new core.Currency('USD');
+  const bond = (id, convention, coupon) =>
+    valuations.instruments.Bond.withConvention(
+      id,
+      new core.Money(1_000_000, usd),
+      new core.Rate(coupon),
+      '2025-01-15',
+      '2030-01-15',
+      convention,
+      'USD-OIS'
+    );
+  const swap = valuations.instruments.InterestRateSwap.fromConventions({
+    id: 'SWAP-1',
     notional: { amount: '1000000', currency: 'USD' },
-    coupon_rate: 0.03,
-    issue_date: '2025-01-15',
-    maturity_date: '2030-01-15',
-    convention: 'us_treasury',
-    discount_curve_id: 'USD-OIS',
-  });
-  const swap = (id) => ({
-    id,
-    notional: { amount: '1000000', currency: 'USD' },
+    side: 'pay',
     fixed_rate: 0.04,
     start_date: '2025-01-15',
-    maturity_date: '2030-01-15',
+    maturity: '2030-01-15',
+    index_id: 'USD-SOFR-3M',
     discount_curve_id: 'USD-OIS',
     forward_curve_id: 'USD-SOFR-3M',
   });
-  builder.addSwap(swap('SWAP-1'));
-  builder.addSwapWithConventions(swap('SWAP-2'), {
-    fixed_frequency: { count: 1, unit: 'years' },
-    fixed_day_count: 'act_360',
-    float_frequency: { count: 3, unit: 'months' },
-    float_day_count: 'act_360',
-    business_day_convention: 'modified_following',
-  });
+  const treasury = bond('BOND-2', 'us_treasury', 0.03);
+  builder.addDebt('BOND-1', bond('BOND-1', 'us_corporate', 0.05).toJson());
+  builder.addDebt('BOND-2', treasury.toJson());
+  builder.addDebt('SWAP-1', swap.toJson());
+  for (const helper of ['addBond', 'addBondWithConvention', 'addSwap', 'addSwapWithConventions'])
+    assert.equal(builder[helper], undefined);
   const model = builder.build();
   registry.free();
   const ids = model.capital_structure.debt_instruments.map((instrument) => instrument.id);
-  assert.deepEqual(ids, ['BOND-1', 'BOND-2', 'SWAP-1', 'SWAP-2']);
+  assert.deepEqual(ids, ['BOND-1', 'BOND-2', 'SWAP-1']);
+  // The model holds the canonical instrument unchanged: resolved terms and
+  // the elected convention survive attachment.
+  assert.deepEqual(
+    model.capital_structure.debt_instruments[1].spec,
+    JSON.parse(treasury.toJson()).instrument
+  );
   assert.equal(model.capital_structure.reporting_currency, 'USD');
   assert.equal(model.capital_structure.fx_policy, 'period_end');
   assert.ok(statements.modelNodeIds(model).includes('custom.half'));
@@ -398,33 +401,11 @@ test('ModelBuilder capital-structure and registry steps build a valid model', ()
     () => bad.fxPolicy('sometimes'),
     (e) => e.kind === 'validation'
   );
-  assert.throws(
-    () =>
-      bad.addBondWithConvention({
-        id: 'B',
-        notional: { amount: '1', currency: 'USD' },
-        coupon_rate: 0.01,
-        issue_date: '2025-01-15',
-        maturity_date: '2030-01-15',
-        convention: 'martian',
-        discount_curve_id: 'USD-OIS',
-      }),
-    (e) => e.kind === 'validation'
-  );
-
   // A capital-structure call rejected by Rust leaves the builder usable.
   assert.throws(
     () =>
-      bad.addSwap({
-        id: 'SEK-SWAP',
-        notional: { amount: '1000000', currency: 'SEK' },
-        fixed_rate: 0.03,
-        start_date: '2025-01-15',
-        maturity_date: '2030-01-15',
-        discount_curve_id: 'SEK-OIS',
-        forward_curve_id: 'SEK-STIBOR-3M',
-      }),
-    (e) => /no standard rates calendar/.test(e.message)
+      bad.addDebt('B', { schema: 'finstack_quant.instrument/1', instrument: { type: 'martian' } }),
+    (e) => e.kind === 'validation'
   );
   bad.periods('2025Q1..Q2');
   bad.valueScalar('revenue', { [Q1]: 1.0 });

@@ -8,14 +8,12 @@
 
 use super::handles::JsRegistry;
 use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string, json_text};
-use crate::utils::wire::{js_date, js_wire};
+use crate::utils::wire::js_wire;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::builder::{MixedNodeBuilder, ModelBuilder};
-use finstack_quant_statements::capital_structure::{
-    BondConventionParams, SwapConventions, SwapParams, WaterfallSpec,
-};
+use finstack_quant_statements::capital_structure::WaterfallSpec;
 use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::{
     AmountOrScalar, FinancialStatementInstrument, ForecastSpec, NodeSpec, RollupMethod,
@@ -521,117 +519,15 @@ impl JsModelBuilder {
         Ok(())
     }
 
-    /// Add a fixed-rate bond to the capital structure (US conventions: 30/360, semi-annual).
-    ///
-    /// Twin of Python `ModelBuilder.add_bond` (Rust `ModelBuilder::add_bond`).
-    /// A failed call leaves the builder usable.
-    ///
-    /// @param id - Unique instrument identifier.
-    /// @param notional - Principal as a `Money` wire object (`{amount, currency}`).
-    /// @param couponRate - Annual coupon rate as a decimal (`0.05` = 5%).
-    /// @param issueDate - ISO 8601 issue date.
-    /// @param maturityDate - ISO 8601 maturity date.
-    /// @param discountCurveId - Identifier of the discount curve used for pricing.
-    /// @throws Error with kind `validation` if an argument is malformed, the bond cannot be constructed, or the builder was consumed.
-    #[wasm_bindgen(js_name = addBond)]
-    pub fn add_bond(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "string")] id: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "generated.statements.Money | string")]
-        notional: JsValue,
-        #[wasm_bindgen(js_name = "couponRate", unchecked_param_type = "number")]
-        coupon_rate: JsValue,
-        #[wasm_bindgen(js_name = "issueDate", unchecked_param_type = "string")] issue_date: JsValue,
-        #[wasm_bindgen(js_name = "maturityDate", unchecked_param_type = "string")]
-        maturity_date: JsValue,
-        #[wasm_bindgen(js_name = "discountCurveId", unchecked_param_type = "string")]
-        discount_curve_id: JsValue,
-    ) -> Result<(), JsValue> {
-        let id = js_string(&id, "id")?;
-        let notional: Money = from_js_json(&notional, "notional")?;
-        let coupon_rate = js_f64(&coupon_rate, "couponRate")?;
-        let issue = js_date(&issue_date, "issueDate")?;
-        let maturity = js_date(&maturity_date, "maturityDate")?;
-        let curve = js_string(&discount_curve_id, "discountCurveId")?;
-        self.builder_mut()?
-            .add_bond(id, notional, coupon_rate, issue, maturity, curve)
-            .map_err(to_js_err)?;
-        Ok(())
-    }
-
-    /// Add a fixed-rate bond with a market convention preset.
-    ///
-    /// Twin of Python `ModelBuilder.add_bond_with_convention` (Rust
-    /// `ModelBuilder::add_bond_with_convention`). A failed call leaves
-    /// the builder usable.
-    ///
-    /// @param params - Rust `BondConventionParams` (object or JSON); every key is required and an unknown key is rejected: `id` (unique instrument identifier), `notional` (principal as a `Money` wire object `{amount, currency}`), `coupon_rate` (finite annual coupon as a decimal, `0.03` = 3%), `issue_date` and `maturity_date` (ISO 8601 dates, issue before maturity), `convention` (regional preset `"us_treasury"`, `"us_agency"`, `"german_bund"`, `"uk_gilt"`, `"french_oat"`, `"jgb"`, `"us_corporate"` or `"eur_corporate"`; sets day count, coupon frequency and calendar) and `discount_curve_id` (discount curve used for pricing).
-    /// @throws Error with kind `validation` if `params` is malformed, misses a key or carries an unknown one, `convention` is unknown, the bond cannot be constructed, or the builder was consumed.
-    #[wasm_bindgen(js_name = addBondWithConvention)]
-    pub fn add_bond_with_convention(
-        &mut self,
-        #[wasm_bindgen(
-            unchecked_param_type = "generated.statements.BondConventionParams | string"
-        )]
-        params: JsValue,
-    ) -> Result<(), JsValue> {
-        let params: BondConventionParams = from_js_json(&params, "params")?;
-        self.builder_mut()?
-            .add_bond_with_convention(params)
-            .map_err(to_js_err)?;
-        Ok(())
-    }
-
-    /// Add a pay-fixed interest rate swap to the capital structure (US conventions).
-    ///
-    /// Twin of Python `ModelBuilder.add_swap` (Rust `ModelBuilder::add_swap`):
-    /// semi-annual 30/360 fixed coupons, quarterly ACT/360 floating coupons,
-    /// Modified Following. A failed call leaves the builder usable.
-    ///
-    /// @param params - Rust `SwapParams` (object or JSON); every key is required and an unknown key is rejected: `id` (unique instrument identifier), `notional` (swap notional as a `Money` wire object `{amount, currency}`), `fixed_rate` (fixed leg rate as a decimal, `0.04` = 4%), `start_date` and `maturity_date` (ISO 8601 dates, start before maturity), `discount_curve_id` (discount curve) and `forward_curve_id` (floating-leg forward curve).
-    /// @throws Error with kind `validation` if `params` is malformed, misses a key or carries an unknown one, the swap cannot be constructed, or the builder was consumed.
-    #[wasm_bindgen(js_name = addSwap)]
-    pub fn add_swap(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "generated.statements.SwapParams | string")]
-        params: JsValue,
-    ) -> Result<(), JsValue> {
-        let params: SwapParams = from_js_json(&params, "params")?;
-        self.builder_mut()?.add_swap(params).map_err(to_js_err)?;
-        Ok(())
-    }
-
-    /// Add a pay-fixed interest rate swap with explicit leg conventions.
-    ///
-    /// Twin of Python `ModelBuilder.add_swap_with_conventions` (Rust
-    /// `ModelBuilder::add_swap_with_conventions`). A failed call leaves
-    /// the builder usable.
-    ///
-    /// @param params - Rust `SwapParams` (object or JSON) with the keys `id`, `notional`, `fixed_rate`, `start_date`, `maturity_date`, `discount_curve_id` and `forward_curve_id`, as for `addSwap`.
-    /// @param conventions - Rust `SwapConventions` (object or JSON); an unknown key is rejected: `fixed_frequency` and `float_frequency` (tenor wire objects such as `{ count: 1, unit: "years" }`; `unit` is `"days"`, `"weeks"`, `"months"` or `"years"`), `fixed_day_count` and `float_day_count` (day-count labels such as `"act_360"` or `"30_360"`) and the required `business_day_convention` (schedule roll, e.g. `"modified_following"`; there is no default convention).
-    /// @throws Error with kind `validation` if either object is malformed, misses a required key or carries an unknown one, a tenor, day count or roll convention is unknown, the swap cannot be constructed, or the builder was consumed.
-    #[wasm_bindgen(js_name = addSwapWithConventions)]
-    pub fn add_swap_with_conventions(
-        &mut self,
-        #[wasm_bindgen(unchecked_param_type = "generated.statements.SwapParams | string")]
-        params: JsValue,
-        #[wasm_bindgen(unchecked_param_type = "generated.statements.SwapConventions | string")]
-        conventions: JsValue,
-    ) -> Result<(), JsValue> {
-        let params: SwapParams = from_js_json(&params, "params")?;
-        let conventions: SwapConventions = from_js_json(&conventions, "conventions")?;
-        self.builder_mut()?
-            .add_swap_with_conventions(params, conventions)
-            .map_err(to_js_err)?;
-        Ok(())
-    }
-
-    /// Add a debt instrument to the capital structure.
+    /// Attach a canonical debt or hedge instrument to the capital structure.
     ///
     /// Twin of Python `ModelBuilder.add_debt` (Rust `ModelBuilder::add_debt`).
-    /// Supported instruments are bonds, convertible bonds, term loans,
-    /// revolving credit facilities, interest-rate swaps, caps/floors and
-    /// swaptions.
+    /// This is the one way an instrument enters a model: build it through
+    /// its own Valuations API (for example `Bond.withConvention` or
+    /// `InterestRateSwap.fromConventions`) and pass its `toJson()` envelope;
+    /// the model keeps its resolved terms and schedule unchanged. Supported
+    /// instruments are bonds, convertible bonds, term loans, revolving credit
+    /// facilities, interest-rate swaps, caps/floors and swaptions.
     ///
     /// @param id - Unique instrument identifier.
     /// @param instrument - The instrument's `finstack_quant.instrument/1` envelope (object or JSON); bare payloads without the envelope are rejected.

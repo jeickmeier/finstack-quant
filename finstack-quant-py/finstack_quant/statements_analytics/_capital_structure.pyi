@@ -455,7 +455,11 @@ class CapitalStructureSummary:
     >>> _ = builder.value("ebitda", [(quarter, 50_000.0) for quarter in quarters])
     >>> _ = builder.value("cash", [(quarter, 100_000.0) for quarter in quarters])
     >>> usd = Currency("USD")
-    >>> _ = builder.add_bond("SENIOR", Money(1_000_000.0, usd), 0.05, date(2024, 1, 1), date(2029, 6, 1), "USD-OIS")
+    >>> from finstack_quant.valuations.instruments import Bond
+    >>> senior = Bond.fixed(
+    ...     "SENIOR", Money(1_000_000.0, usd), 0.05, date(2024, 1, 1), date(2029, 6, 1), "short_front", "USD-OIS"
+    ... )
+    >>> _ = builder.add_debt("SENIOR", senior)
     >>> model = builder.build()
     >>> summary = capital_structure_summary(
     ...     Evaluator().evaluate(model), model, {"period": "2025Q4", "ebitda_node": "ebitda", "cash_node": "cash"}
@@ -848,7 +852,11 @@ def capital_structure_summary(
     >>> _ = builder.value("ebitda", [(quarter, 50_000.0) for quarter in quarters])
     >>> _ = builder.value("cash", [(quarter, 100_000.0) for quarter in quarters])
     >>> usd = Currency("USD")
-    >>> _ = builder.add_bond("SENIOR", Money(1_000_000.0, usd), 0.05, date(2024, 1, 1), date(2029, 6, 1), "USD-OIS")
+    >>> from finstack_quant.valuations.instruments import Bond
+    >>> senior = Bond.fixed(
+    ...     "SENIOR", Money(1_000_000.0, usd), 0.05, date(2024, 1, 1), date(2029, 6, 1), "short_front", "USD-OIS"
+    ... )
+    >>> _ = builder.add_debt("SENIOR", senior)
     >>> model = builder.build()
     >>> results = Evaluator().evaluate(model)
     >>> summary = capital_structure_summary(results, model, {"period": "2025Q4", "ebitda_node": "ebitda"})

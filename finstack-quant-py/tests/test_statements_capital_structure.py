@@ -8,6 +8,7 @@ to a FinancialModelSpec.
 from __future__ import annotations
 
 from datetime import date
+import json
 
 import pytest
 
@@ -16,7 +17,7 @@ from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import StubKind
 from finstack_quant.core.money import Money
 from finstack_quant.core.types import Rate
-from finstack_quant.valuations.instruments import Bond, TermLoan
+from finstack_quant.valuations.instruments import Bond, InterestRateSwap, TermLoan
 
 SWEEP_PRIORITIES = ["fees", "interest", "amortization", "sweep", "equity"]
 
@@ -161,15 +162,19 @@ class TestModelBuilderCapitalStructure:
     def usd(self) -> Currency:
         return Currency("USD")
 
-    def test_add_bond_with_default_waterfall_appears_in_model_json(self, usd: Currency) -> None:
+    def test_bond_with_default_waterfall_appears_in_model_json(self, usd: Currency) -> None:
         b = statements.ModelBuilder("deal")
-        b.add_bond(
-            id="BOND-001",
-            notional=Money(10_000_000.0, usd),
-            coupon_rate=0.05,
-            issue_date=date(2025, 1, 15),
-            maturity_date=date(2030, 1, 15),
-            discount_curve_id="USD-OIS",
+        b.add_debt(
+            "BOND-001",
+            Bond.fixed(
+                "BOND-001",
+                Money(10_000_000.0, usd),
+                0.05,
+                date(2025, 1, 15),
+                date(2030, 1, 15),
+                "short_front",
+                "USD-OIS",
+            ),
         )
         b.periods("2025Q1..Q4", None)
         b.value("cash", [("2025Q1", 1.0)])
@@ -180,21 +185,31 @@ class TestModelBuilderCapitalStructure:
         assert '"waterfall"' in js
         assert '"BOND-001"' in js
 
-    def test_add_swap_appears_in_model_json(self, usd: Currency) -> None:
-        b = statements.ModelBuilder("deal")
-        b.add_swap({
+    def test_canonical_swap_appears_in_model_json(self, usd: Currency) -> None:
+        swap = InterestRateSwap.from_conventions({
             "id": "SWAP-001",
             "notional": Money(5_000_000.0, usd),
+            "side": "pay",
             "fixed_rate": 0.04,
             "start_date": date(2025, 1, 15),
-            "maturity_date": date(2030, 1, 15),
+            "maturity": date(2030, 1, 15),
+            "index_id": "USD-SOFR-3M",
             "discount_curve_id": "USD-OIS",
             "forward_curve_id": "USD-SOFR-3M",
         })
+        b = statements.ModelBuilder("deal")
+        b.add_debt("SWAP-001", swap)
         b.periods("2025Q1..Q4", None)
         b.value("x", [("2025Q1", 1.0)])
         model = b.build()
         assert '"SWAP-001"' in model.to_json()
+        # The model holds the canonical instrument unchanged.
+        attached = model.capital_structure["debt_instruments"][0]["spec"]
+        assert attached == json.loads(swap.to_json())["instrument"]
+
+    def test_statements_has_no_bond_or_swap_construction_helpers(self) -> None:
+        for helper in ["add_bond", "add_bond_with_convention", "add_swap", "add_swap_with_conventions"]:
+            assert not hasattr(statements.ModelBuilder, helper)
 
     def test_add_debt_passes_through_canonical_envelope(self) -> None:
         b = statements.ModelBuilder("deal")
@@ -247,13 +262,11 @@ class TestModelBuilderCapitalStructure:
         """Capital-structure methods must be state-agnostic (both NeedPeriods and Ready)."""
         b = statements.ModelBuilder("deal")
         # Attach capital structure BEFORE periods
-        b.add_bond(
-            id="B1",
-            notional=Money(1_000_000.0, usd),
-            coupon_rate=0.05,
-            issue_date=date(2025, 1, 15),
-            maturity_date=date(2030, 1, 15),
-            discount_curve_id="USD-OIS",
+        b.add_debt(
+            "B1",
+            Bond.fixed(
+                "B1", Money(1_000_000.0, usd), 0.05, date(2025, 1, 15), date(2030, 1, 15), "short_front", "USD-OIS"
+            ),
         )
         b.reporting_currency(usd)
         # Then transition through periods and node addition

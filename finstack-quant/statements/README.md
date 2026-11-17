@@ -169,8 +169,8 @@ matches a qualified metric id shadows that metric — prefer a distinct namespac
 
 ## Capital structure (`cs.*`)
 
-A model may carry typed debt instruments (`add_bond`, `add_bond_with_convention`,
-`add_swap`, `add_swap_with_conventions`, `add_debt`) plus a reporting currency,
+A model may carry typed debt instruments, built through their canonical
+Valuations APIs and attached with `add_debt`, plus a reporting currency,
 FX policy, and an optional `WaterfallSpec`. Formulas then reference aggregated
 instrument flows through the `cs.*` namespace.
 
