@@ -706,13 +706,15 @@ export interface D_5De9F28B928C01E49782 {
  * Full suite definitions (built-in + formula) can be stored as a single JSON
  * document and resolved directly with [`CheckSuiteSpec::resolve`].
  *
- * Each period ends in one of three verdicts: pass, fail (a finding with the
- * configured `severity`), or insufficient data. A period has insufficient
- * data when a same-period input is missing or non-finite, or when the
- * formula consumes a non-finite value, such as a lag or rolling window that
- * reaches before the first period. It is reported as a `warning` finding
- * naming the inputs, records no comparison, and never fails the check. A
- * division by zero over finite inputs is not missing data and still fails.
+ * The mode and the period scope are stated explicitly. In each in-scope
+ * period the check ends in one of three ways: pass, breach (a finding with
+ * the configured `severity`), or incomplete. The formula is evaluated on
+ * the typed cells of the verified run and consumes observations only on the
+ * paths it takes: an untaken branch may read a missing cell, and an
+ * explicit `coalesce` supplies a fallback. A period is incomplete (a
+ * coverage finding) when a needed observation, or the eligibility
+ * condition, is missing or unavailable. A division by zero, a domain error
+ * or an overflow is an execution error, for an advisory check too.
  */
 export interface D_270Bee76F784Bc446378 {
   /**
@@ -725,7 +727,14 @@ export interface D_270Bee76F784Bc446378 {
     | "credit_reasonableness"
     | "data_quality";
   /**
-   * Statements DSL expression to evaluate (e.g. `"revenue > 0"`).
+   * Optional Boolean formula; a period in which it is false is out of
+   * scope, and one in which it has no value is incomplete.
+   */
+  eligibility?: string | null;
+  /**
+   * Statements DSL expression to evaluate: Boolean in predicate mode
+   * (`"revenue > 0"`), a scalar or monetary amount in residual mode
+   * (`"assets - liabilities - equity"`).
    *
    * Formula checks use the same evaluator as calculated statement nodes,
    * including time-series functions and `cs.*` capital-structure references.
@@ -736,22 +745,28 @@ export interface D_270Bee76F784Bc446378 {
    */
   id: string;
   /**
-   * Template for the finding message (`{period}` is replaced at runtime).
+   * Template for the breach message (`{period}` is replaced at runtime).
    */
   message_template: string;
+  /**
+   * Whether the formula is a Boolean predicate or a residual.
+   */
+  mode: "predicate" | "residual";
   /**
    * Human-readable name shown in reports.
    */
   name: string;
   /**
-   * Severity assigned to findings when the formula fails.
+   * Which periods the check covers: all, actuals only or forecasts only.
+   */
+  scope: "all_periods" | "actuals_only" | "forecast_only";
+  /**
+   * Severity assigned to a breach.
    */
   severity: "info" | "warning" | "error";
   /**
-   * Finite, nonnegative absolute residual bound in the formula's result units.
-   * When present, the formula passes when its absolute result is at most
-   * this bound. When absent, the formula is a predicate and any finite
-   * nonzero result passes.
+   * Residual mode only: finite, non-negative absolute bound in the
+   * residual's units. Omitted means zero, an exact comparison.
    */
   tolerance?: number | null;
 }

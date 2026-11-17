@@ -31,7 +31,9 @@
           "formula": "net_debt / ebitda < 8",
           "id": "leverage_bound",
           "message_template": "Net leverage exceeds 8x",
+          "mode": "predicate",
           "name": "Net leverage below 8x",
+          "scope": "all_periods",
           "severity": "warning"
         }
       ],
@@ -193,14 +195,21 @@
     },
     "d_270bee76f784bc446378": {
       "additionalProperties": false,
-      "description": "Serializable, runnable user-defined formula-check specification.\n\nFull suite definitions (built-in + formula) can be stored as a single JSON\ndocument and resolved directly with [`CheckSuiteSpec::resolve`].\n\nEach period ends in one of three verdicts: pass, fail (a finding with the\nconfigured `severity`), or insufficient data. A period has insufficient\ndata when a same-period input is missing or non-finite, or when the\nformula consumes a non-finite value, such as a lag or rolling window that\nreaches before the first period. It is reported as a `warning` finding\nnaming the inputs, records no comparison, and never fails the check. A\ndivision by zero over finite inputs is not missing data and still fails.",
+      "description": "Serializable, runnable user-defined formula-check specification.\n\nFull suite definitions (built-in + formula) can be stored as a single JSON\ndocument and resolved directly with [`CheckSuiteSpec::resolve`].\n\nThe mode and the period scope are stated explicitly. In each in-scope\nperiod the check ends in one of three ways: pass, breach (a finding with\nthe configured `severity`), or incomplete. The formula is evaluated on\nthe typed cells of the verified run and consumes observations only on the\npaths it takes: an untaken branch may read a missing cell, and an\nexplicit `coalesce` supplies a fallback. A period is incomplete (a\ncoverage finding) when a needed observation, or the eligibility\ncondition, is missing or unavailable. A division by zero, a domain error\nor an overflow is an execution error, for an advisory check too.",
       "properties": {
         "category": {
           "$ref": "#/$defs/d_545b6f75d3fd6017c27d",
           "description": "Category grouping."
         },
+        "eligibility": {
+          "description": "Optional Boolean formula; a period in which it is false is out of\nscope, and one in which it has no value is incomplete.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "formula": {
-          "description": "Statements DSL expression to evaluate (e.g. `\"revenue > 0\"`).\n\nFormula checks use the same evaluator as calculated statement nodes,\nincluding time-series functions and `cs.*` capital-structure references.",
+          "description": "Statements DSL expression to evaluate: Boolean in predicate mode\n(`\"revenue > 0\"`), a scalar or monetary amount in residual mode\n(`\"assets - liabilities - equity\"`).\n\nFormula checks use the same evaluator as calculated statement nodes,\nincluding time-series functions and `cs.*` capital-structure references.",
           "type": "string"
         },
         "id": {
@@ -208,19 +217,27 @@
           "type": "string"
         },
         "message_template": {
-          "description": "Template for the finding message (`{period}` is replaced at runtime).",
+          "description": "Template for the breach message (`{period}` is replaced at runtime).",
           "type": "string"
+        },
+        "mode": {
+          "$ref": "#/$defs/d_d277b1328099ab8e8b10",
+          "description": "Whether the formula is a Boolean predicate or a residual."
         },
         "name": {
           "description": "Human-readable name shown in reports.",
           "type": "string"
         },
+        "scope": {
+          "$ref": "#/$defs/d_32be215bf9263ac78fcf",
+          "description": "Which periods the check covers: all, actuals only or forecasts only."
+        },
         "severity": {
           "$ref": "#/$defs/d_06907e07480e89ff7314",
-          "description": "Severity assigned to findings when the formula fails."
+          "description": "Severity assigned to a breach."
         },
         "tolerance": {
-          "description": "Finite, nonnegative absolute residual bound in the formula's result units.\nWhen present, the formula passes when its absolute result is at most\nthis bound. When absent, the formula is a predicate and any finite\nnonzero result passes.",
+          "description": "Residual mode only: finite, non-negative absolute bound in the\nresidual's units. Omitted means zero, an exact comparison.",
           "format": "double",
           "type": [
             "number",
@@ -233,6 +250,8 @@
         "name",
         "category",
         "severity",
+        "mode",
+        "scope",
         "formula",
         "message_template"
       ],
@@ -1448,6 +1467,21 @@
         "equity_nodes"
       ],
       "type": "object"
+    },
+    "d_d277b1328099ab8e8b10": {
+      "description": "How a formula check judges its formula.",
+      "oneOf": [
+        {
+          "const": "predicate",
+          "description": "The formula is Boolean: true passes and false is a breach.",
+          "type": "string"
+        },
+        {
+          "const": "residual",
+          "description": "The formula is a signed scalar or monetary residual compared with\nzero: it passes when its absolute value is at most the tolerance.",
+          "type": "string"
+        }
+      ]
     },
     "d_e92ffd809a0a9b085dba": {
       "description": "Exact decimal encoded only as a JSON string.\n\nRestoration routes through [`crate::decimal::parse_decimal`], the single\nexact text-admission rule: JSON numbers, malformed text and inexact values\nare rejected rather than rounded. Serialization writes canonical\nfixed-point text with trailing zeros removed and signed zero normalized\n(`\"1.5\"`, `\"0\"`), never scientific notation.",

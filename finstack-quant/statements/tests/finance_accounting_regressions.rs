@@ -31,6 +31,13 @@ fn formula_check(formula: &str, tolerance: Option<f64>) -> FormulaCheckSpec {
         severity: Severity::Error,
         formula: formula.into(),
         message_template: "Identity failed in {period}".into(),
+        mode: if tolerance.is_some() {
+            finstack_quant_statements::checks::FormulaCheckMode::Residual
+        } else {
+            finstack_quant_statements::checks::FormulaCheckMode::Predicate
+        },
+        scope: finstack_quant_statements::checks::PeriodScope::AllPeriods,
+        eligibility: None,
         tolerance,
     }
 }

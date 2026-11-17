@@ -66,8 +66,11 @@ fn formula_tolerance_is_residual_acceptance_and_no_tolerance_is_predicate() {
         model_builder.build().unwrap()
     };
     let results = Evaluator::new().evaluate(&model).unwrap();
-    for (formula, tolerance) in [("residual", Some(0.1)), ("residual <= 0.1", None)] {
-        let suite:CheckSuiteSpec=serde_json::from_value(json!({"name":"residual", "formula_checks":[{"id":"r","name":"residual","category":"accounting_identity","severity":"error","formula":formula,"message_template":"bad {period}","tolerance":tolerance}]})).unwrap();
+    for (formula, mode, tolerance) in [
+        ("residual", "residual", Some(0.1)),
+        ("residual <= 0.1", "predicate", None),
+    ] {
+        let suite:CheckSuiteSpec=serde_json::from_value(json!({"name":"residual", "formula_checks":[{"id":"r","name":"residual","category":"accounting_identity","severity":"error","mode":mode,"scope":"all_periods","formula":formula,"message_template":"bad {period}","tolerance":tolerance}]})).unwrap();
         let report = suite.resolve().unwrap().run(&model, &results).unwrap();
         assert_eq!(report.results[0].findings.len(), 1);
         assert_eq!(report.results[0].findings[0].period, Some(periods[3]));

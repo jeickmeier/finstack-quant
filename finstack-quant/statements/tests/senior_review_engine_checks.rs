@@ -432,6 +432,9 @@ fn shared_formula_check_history_preserves_temporal_results_and_visibility() {
         severity: Severity::Error,
         formula: "expected - (coalesce(lag(x, 1), 0) + rolling_mean(x, 2, 1))".into(),
         message_template: "bad {period}".into(),
+        mode: finstack_quant_statements::checks::FormulaCheckMode::Residual,
+        scope: finstack_quant_statements::checks::PeriodScope::AllPeriods,
+        eligibility: None,
         tolerance: Some(1e-10),
     };
     let result = check.execute(&CheckContext::new(&model, &results)).unwrap();

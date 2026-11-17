@@ -33,7 +33,9 @@ export default [
             "formula": "net_debt / ebitda < 8",
             "id": "leverage_bound",
             "message_template": "Net leverage exceeds 8x",
+            "mode": "predicate",
             "name": "Net leverage below 8x",
+            "scope": "all_periods",
             "severity": "warning"
           }
         ],
@@ -179,7 +181,7 @@ export default [
   {
     "path": "#/$defs/d_270bee76f784bc446378",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/FormulaCheckSpec",
-    "description": "Serializable, runnable user-defined formula-check specification.\n\nFull suite definitions (built-in + formula) can be stored as a single JSON\ndocument and resolved directly with [`CheckSuiteSpec::resolve`].\n\nEach period ends in one of three verdicts: pass, fail (a finding with the\nconfigured `severity`), or insufficient data. A period has insufficient\ndata when a same-period input is missing or non-finite, or when the\nformula consumes a non-finite value, such as a lag or rolling window that\nreaches before the first period. It is reported as a `warning` finding\nnaming the inputs, records no comparison, and never fails the check. A\ndivision by zero over finite inputs is not missing data and still fails."
+    "description": "Serializable, runnable user-defined formula-check specification.\n\nFull suite definitions (built-in + formula) can be stored as a single JSON\ndocument and resolved directly with [`CheckSuiteSpec::resolve`].\n\nThe mode and the period scope are stated explicitly. In each in-scope\nperiod the check ends in one of three ways: pass, breach (a finding with\nthe configured `severity`), or incomplete. The formula is evaluated on\nthe typed cells of the verified run and consumes observations only on the\npaths it takes: an untaken branch may read a missing cell, and an\nexplicit `coalesce` supplies a fallback. A period is incomplete (a\ncoverage finding) when a needed observation, or the eligibility\ncondition, is missing or unavailable. A division by zero, a domain error\nor an overflow is an execution error, for an advisory check too."
   },
   {
     "path": "#/$defs/d_270bee76f784bc446378/properties/category",
@@ -189,9 +191,14 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/CheckCategory"
   },
   {
+    "path": "#/$defs/d_270bee76f784bc446378/properties/eligibility",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/FormulaCheckSpec/properties/eligibility",
+    "description": "Optional Boolean formula; a period in which it is false is out of\nscope, and one in which it has no value is incomplete."
+  },
+  {
     "path": "#/$defs/d_270bee76f784bc446378/properties/formula",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/FormulaCheckSpec/properties/formula",
-    "description": "Statements DSL expression to evaluate (e.g. `\"revenue > 0\"`).\n\nFormula checks use the same evaluator as calculated statement nodes,\nincluding time-series functions and `cs.*` capital-structure references."
+    "description": "Statements DSL expression to evaluate: Boolean in predicate mode\n(`\"revenue > 0\"`), a scalar or monetary amount in residual mode\n(`\"assets - liabilities - equity\"`).\n\nFormula checks use the same evaluator as calculated statement nodes,\nincluding time-series functions and `cs.*` capital-structure references."
   },
   {
     "path": "#/$defs/d_270bee76f784bc446378/properties/id",
@@ -201,7 +208,14 @@ export default [
   {
     "path": "#/$defs/d_270bee76f784bc446378/properties/message_template",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/FormulaCheckSpec/properties/message_template",
-    "description": "Template for the finding message (`{period}` is replaced at runtime)."
+    "description": "Template for the breach message (`{period}` is replaced at runtime)."
+  },
+  {
+    "path": "#/$defs/d_270bee76f784bc446378/properties/mode",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/FormulaCheckSpec/properties/mode",
+    "description": "Whether the formula is a Boolean predicate or a residual.",
+    "ref": "#/$defs/FormulaCheckMode",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/FormulaCheckMode"
   },
   {
     "path": "#/$defs/d_270bee76f784bc446378/properties/name",
@@ -209,16 +223,23 @@ export default [
     "description": "Human-readable name shown in reports."
   },
   {
+    "path": "#/$defs/d_270bee76f784bc446378/properties/scope",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/FormulaCheckSpec/properties/scope",
+    "description": "Which periods the check covers: all, actuals only or forecasts only.",
+    "ref": "#/$defs/PeriodScope",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/PeriodScope"
+  },
+  {
     "path": "#/$defs/d_270bee76f784bc446378/properties/severity",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/FormulaCheckSpec/properties/severity",
-    "description": "Severity assigned to findings when the formula fails.",
+    "description": "Severity assigned to a breach.",
     "ref": "#/$defs/CheckSeverity",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/CheckSeverity"
   },
   {
     "path": "#/$defs/d_270bee76f784bc446378/properties/tolerance",
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/FormulaCheckSpec/properties/tolerance",
-    "description": "Finite, nonnegative absolute residual bound in the formula's result units.\nWhen present, the formula passes when its absolute result is at most\nthis bound. When absent, the formula is a predicate and any finite\nnonzero result passes.",
+    "description": "Residual mode only: finite, non-negative absolute bound in the\nresidual's units. Omitted means zero, an exact comparison.",
     "format": "double"
   },
   {
@@ -1625,6 +1646,23 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/BalanceSheetArticulation/properties/tolerance",
     "description": "Absolute tolerance override in the balances' units; replaces both\nterms of the suite's\n[`CheckConfig`](crate::checks::CheckConfig) allowance.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_d277b1328099ab8e8b10",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/FormulaCheckMode",
+    "description": "How a formula check judges its formula."
+  },
+  {
+    "path": "#/$defs/d_d277b1328099ab8e8b10/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/FormulaCheckMode/oneOf/0",
+    "const": "predicate",
+    "description": "The formula is Boolean: true passes and false is a breach."
+  },
+  {
+    "path": "#/$defs/d_d277b1328099ab8e8b10/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/check_suite_spec.schema.json#/$defs/FormulaCheckMode/oneOf/1",
+    "const": "residual",
+    "description": "The formula is a signed scalar or monetary residual compared with\nzero: it passes when its absolute value is at most the tolerance."
   },
   {
     "path": "#/$defs/d_e92ffd809a0a9b085dba",

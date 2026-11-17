@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any, Literal
 import pandas as pd
 
@@ -825,66 +826,70 @@ class CheckConfig:
         ...
 
 class FormulaCheckSpec:
-    """A user-defined check expressed as a statements DSL predicate.
+    """A user-defined check expressed as a statements DSL formula.
 
-    Each period passes, fails (a finding with the configured severity), or
-    has insufficient data: a same-period input is missing or non-finite, or
-    the formula consumes a non-finite value such as a ``lag`` before the first
-    period. Insufficient data is reported as a ``"warning"`` finding naming
-    the inputs and never fails the check. A division by zero over finite
-    inputs still fails.
+    The ``mode`` states how the formula is judged. A ``"predicate"`` formula
+    is Boolean (a comparison) and a period passes when it is true. A
+    ``"residual"`` formula is a scalar or monetary amount and a period passes
+    when its absolute value is at most ``tolerance`` (zero when omitted).
+    Truthiness is never inferred: a numeric predicate, a Boolean residual and
+    a tolerance on a predicate are rejected when the suite runs.
+
+    ``scope`` selects all periods, actual periods or forecast periods, and the
+    optional Boolean ``eligibility`` formula selects periods within the scope:
+    a period in which it is false is not covered, and one in which it has no
+    value is incomplete. Evaluation is lazy, so ``coalesce(a, b)`` uses ``b``
+    when ``a`` has no value and an untaken ``if`` branch never reads its
+    inputs. A period whose formula needed an observation without a value (a
+    missing or unavailable cell, a ``lag`` before the first period) carries a
+    coverage finding and makes the check ``"incomplete"``. An invalid
+    operation such as a division by zero is an execution error, not a finding.
 
     Examples
     --------
     >>> from finstack_quant.statements import FormulaCheckSpec
-    >>> FormulaCheckSpec(
-    ...     "c1", "Positive revenue", "revenue > 0", "revenue <= 0", "internal_consistency", "error"
-    ... ).severity
-    'error'
+    >>> spec = FormulaCheckSpec({
+    ...     "id": "c1",
+    ...     "name": "Positive revenue",
+    ...     "category": "internal_consistency",
+    ...     "severity": "error",
+    ...     "mode": "predicate",
+    ...     "scope": "all_periods",
+    ...     "formula": "revenue > 0",
+    ...     "message_template": "revenue <= 0 in {period}",
+    ... })
+    >>> spec.mode, spec.scope
+    ('predicate', 'all_periods')
 
     """
 
-    def __init__(
-        self,
-        id: str,
-        name: str,
-        formula: str,
-        message_template: str,
-        category: str,
-        severity: str,
-        tolerance: float | None = None,
-    ) -> None:
-        """Define a formula check.
+    def __init__(self, spec: Mapping[str, object]) -> None:
+        """Define a formula check from its canonical fields.
 
         Parameters
         ----------
-        id : str
-            Check identifier, unique within a suite.
-        name : str
-            Human-readable label.
-        formula : str
-            DSL predicate that must hold; a false result raises a finding.
-        message_template : str
-            Message emitted when the predicate fails.
-        category : str
-            Classification bucket: ``"accounting_identity"``,
+        spec : Mapping[str, object]
+            The Rust ``FormulaCheckSpec`` serde form; unknown keys are
+            rejected and nothing is defaulted beyond the two optional keys.
+            Required keys: ``id`` (unique within a suite), ``name``,
+            ``category`` (``"accounting_identity"``,
             ``"cross_statement_reconciliation"``, ``"internal_consistency"``,
-            ``"credit_reasonableness"`` or ``"data_quality"``. Required, as in
-            the Rust/JSON form.
-        severity : str
-            ``"info"``, ``"warning"`` or ``"error"``. Required, as in the
-            Rust/JSON form.
-        tolerance : float, optional
-            Finite, non-negative absolute residual bound in the formula's result
-            units. When supplied, a period passes if the formula result's absolute
-            value is at most this bound. None treats the formula as a predicate
-            whose nonzero result passes. Validated when the suite executes.
+            ``"credit_reasonableness"`` or ``"data_quality"``), ``severity``
+            (``"info"``, ``"warning"`` or ``"error"``), ``mode``
+            (``"predicate"`` or ``"residual"``), ``scope`` (``"all_periods"``,
+            ``"actuals_only"`` or ``"forecast_only"``), ``formula`` (statements
+            DSL) and ``message_template`` (``{period}`` is replaced at run
+            time). Optional keys: ``eligibility`` (Boolean DSL formula) and
+            ``tolerance`` (residual mode only; finite, non-negative absolute
+            bound in the residual's units, zero when omitted).
 
         Raises
         ------
         ValueError
-            If ``category`` or ``severity`` is not recognized. Formula compilation,
-            node references, and tolerance validation occur when the suite executes.
+            If ``spec`` is not a mapping, a required key is missing, a key is
+            unknown or a discriminant is not recognized. Formula compilation,
+            node references and the mode and tolerance rules are validated
+            when the suite executes.
 
         """
         ...
@@ -920,28 +925,28 @@ class FormulaCheckSpec:
     @property
     def formula(self) -> str:
         """
-        DSL predicate that must hold.
+        DSL formula judged per period.
 
         This property does not raise.
 
         Returns
         -------
         str
-            DSL predicate that must hold.
+            A Boolean formula in predicate mode, an amount in residual mode.
         """
         ...
 
     @property
     def message_template(self) -> str:
         """
-        Message emitted when the predicate fails.
+        Message emitted for a breach.
 
         This property does not raise.
 
         Returns
         -------
         str
-            Message emitted when the predicate fails.
+            Message emitted for a breach.
         """
         ...
 
@@ -980,17 +985,66 @@ class FormulaCheckSpec:
         ...
 
     @property
+    def mode(self) -> str:
+        """
+        How the formula is judged.
+
+        Returns
+        -------
+        str
+            ``"predicate"`` for a Boolean formula or ``"residual"`` for an
+            amount compared with zero.
+
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
+        """
+        ...
+
+    @property
+    def scope(self) -> str:
+        """
+        Which periods the check covers.
+
+        Returns
+        -------
+        str
+            ``"all_periods"``, ``"actuals_only"`` or ``"forecast_only"``.
+
+        Raises
+        ------
+        RuntimeError
+            If the stored enum cannot be rendered as its canonical Rust wire label.
+        """
+        ...
+
+    @property
+    def eligibility(self) -> str | None:
+        """
+        Boolean formula selecting the covered periods within the scope.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str | None
+            The eligibility formula, or None when every in-scope period is covered.
+        """
+        ...
+
+    @property
     def tolerance(self) -> float | None:
         """
-        Absolute residual bound, or ``None`` to interpret the formula as a predicate.
+        Absolute residual bound of a residual check.
 
         This property does not raise.
 
         Returns
         -------
         float | None
-            Bound in the formula result's units; None makes any finite nonzero
-            result pass. A configured bound makes absolute results at or below it pass.
+            Bound in the residual's units; None means zero, an exact
+            comparison. Always None for a predicate.
         """
         ...
 

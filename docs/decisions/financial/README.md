@@ -377,8 +377,9 @@ and qualified; typed comparison values remain.
 
 The Statements formula-check contract was accepted on 2026-11-15.
 It covers explicit modes and scope, typed residual comparisons, eligibility,
-lazy observation consumption and execution errors. Implementation and
-independent qualification remain pending.
+lazy observation consumption and execution errors. It is implemented and
+qualified; the residual and its tolerance are recorded as floats until
+comparison values are typed.
 [STATEMENTS-CONTRACTS-015](statements-contracts/15-formula-checks.md#accepted-decision-for-formula-checks-and-coverage).
 
 The Statements wire admission, schema and error contract was accepted on

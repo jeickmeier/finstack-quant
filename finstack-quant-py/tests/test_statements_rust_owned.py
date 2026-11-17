@@ -391,10 +391,22 @@ def test_mappings_reject_unknown_keys() -> None:
 
 
 def test_check_specs_have_no_python_only_defaults_or_grammar() -> None:
-    with pytest.raises(TypeError):
-        FormulaCheckSpec("x", "x", "revenue > 0", "m")  # type: ignore[call-arg]
-    spec = FormulaCheckSpec("x", "x", "revenue > 0", "m", "internal_consistency", "error")
-    assert json.loads(spec.to_json())["severity"] == "error"
+    fields = {
+        "id": "x",
+        "name": "x",
+        "category": "internal_consistency",
+        "severity": "error",
+        "mode": "predicate",
+        "scope": "all_periods",
+        "formula": "revenue > 0",
+        "message_template": "m",
+    }
+    for required in ("category", "severity", "mode", "scope"):
+        with pytest.raises(ValueError, match=required):
+            FormulaCheckSpec({key: value for key, value in fields.items() if key != required})
+    spec = FormulaCheckSpec(fields)
+    assert json.loads(spec.to_json()) == fields
+    assert (spec.mode, spec.scope, spec.eligibility, spec.tolerance) == ("predicate", "all_periods", None, None)
     with pytest.raises(ValueError, match="dict"):
         CheckSuiteSpec("s", builtin_checks=["non_finite"])  # type: ignore[list-item]
     suite = CheckSuiteSpec("s", builtin_checks=[{"type": "non_finite", "nodes": "all"}], formula_checks=[spec])

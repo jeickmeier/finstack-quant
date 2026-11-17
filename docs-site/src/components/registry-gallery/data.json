@@ -87840,6 +87840,8 @@
         "name": "Gross leverage <= 3.50x",
         "category": "credit_reasonableness",
         "severity": "error",
+        "mode": "predicate",
+        "scope": "all_periods",
         "formula": "leverage <= 3.5",
         "message_template": "Leverage above 3.50x in {period}",
         "tolerance": null
@@ -87849,6 +87851,8 @@
         "name": "Interest coverage >= 3.00x",
         "category": "credit_reasonableness",
         "severity": "error",
+        "mode": "predicate",
+        "scope": "all_periods",
         "formula": "interest_coverage >= 3.0",
         "message_template": "Coverage below 3.00x in {period}",
         "tolerance": null
@@ -87858,6 +87862,8 @@
         "name": "Gross margin between 55% and 75%",
         "category": "internal_consistency",
         "severity": "warning",
+        "mode": "predicate",
+        "scope": "all_periods",
         "formula": "gross_margin_pct > 0.55 and gross_margin_pct < 0.75",
         "message_template": "Gross margin outside band in {period}",
         "tolerance": null
@@ -87867,6 +87873,8 @@
         "name": "Free cash flow positive",
         "category": "credit_reasonableness",
         "severity": "warning",
+        "mode": "predicate",
+        "scope": "all_periods",
         "formula": "free_cash_flow > 0 * free_cash_flow",
         "message_template": "Negative free cash flow in {period}",
         "tolerance": null
@@ -87876,7 +87884,9 @@
         "name": "Opening + draws - repayments = closing",
         "category": "accounting_identity",
         "severity": "error",
-        "formula": "debt_opening + debt_draws - debt_repayments == total_debt",
+        "mode": "residual",
+        "scope": "all_periods",
+        "formula": "debt_opening + debt_draws - debt_repayments - total_debt",
         "message_template": "Debt corkscrew does not tie in {period}",
         "tolerance": 1
       }
@@ -91395,25 +91405,22 @@
           {
             "check_id": "leverage_covenant",
             "severity": "warning",
-            "message": "Gross leverage <= 3.50x: insufficient data for 2024Q1: missing or non-finite inputs [leverage]",
+            "message": "Gross leverage <= 3.50x: incomplete for 2024Q1: the formula needed an observation that has no value (a missing or unavailable cell, or a lag or window reaching before the first period)",
             "period": "2024Q1",
-            "nodes": ["leverage"],
             "coverage": true
           },
           {
             "check_id": "leverage_covenant",
             "severity": "warning",
-            "message": "Gross leverage <= 3.50x: insufficient data for 2024Q2: missing or non-finite inputs [leverage]",
+            "message": "Gross leverage <= 3.50x: incomplete for 2024Q2: the formula needed an observation that has no value (a missing or unavailable cell, or a lag or window reaching before the first period)",
             "period": "2024Q2",
-            "nodes": ["leverage"],
             "coverage": true
           },
           {
             "check_id": "leverage_covenant",
             "severity": "warning",
-            "message": "Gross leverage <= 3.50x: insufficient data for 2024Q3: missing or non-finite inputs [leverage]",
+            "message": "Gross leverage <= 3.50x: incomplete for 2024Q3: the formula needed an observation that has no value (a missing or unavailable cell, or a lag or window reaching before the first period)",
             "period": "2024Q3",
-            "nodes": ["leverage"],
             "coverage": true
           }
         ]
@@ -91453,56 +91460,56 @@
           {
             "identity": "debt_corkscrew_ties",
             "period": "2024Q1",
-            "actual": 1,
+            "actual": 0,
             "expected": 0,
             "tolerance": 1
           },
           {
             "identity": "debt_corkscrew_ties",
             "period": "2024Q2",
-            "actual": 1,
+            "actual": 0,
             "expected": 0,
             "tolerance": 1
           },
           {
             "identity": "debt_corkscrew_ties",
             "period": "2024Q3",
-            "actual": 1,
+            "actual": 0,
             "expected": 0,
             "tolerance": 1
           },
           {
             "identity": "debt_corkscrew_ties",
             "period": "2024Q4",
-            "actual": 1,
+            "actual": 0,
             "expected": 0,
             "tolerance": 1
           },
           {
             "identity": "debt_corkscrew_ties",
             "period": "2025Q1",
-            "actual": 1,
+            "actual": 0,
             "expected": 0,
             "tolerance": 1
           },
           {
             "identity": "debt_corkscrew_ties",
             "period": "2025Q2",
-            "actual": 1,
+            "actual": 0,
             "expected": 0,
             "tolerance": 1
           },
           {
             "identity": "debt_corkscrew_ties",
             "period": "2025Q3",
-            "actual": 1,
+            "actual": 0,
             "expected": 0,
             "tolerance": 1
           },
           {
             "identity": "debt_corkscrew_ties",
             "period": "2025Q4",
-            "actual": 1,
+            "actual": 0,
             "expected": 0,
             "tolerance": 1
           }

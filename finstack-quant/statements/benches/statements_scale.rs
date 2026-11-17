@@ -231,6 +231,9 @@ fn bench_formula_check_scaling(c: &mut Criterion) {
             severity: Severity::Error,
             formula: "revenue > 0".into(),
             message_template: "Revenue was not positive in {period}".into(),
+            mode: finstack_quant_statements::checks::FormulaCheckMode::Predicate,
+            scope: finstack_quant_statements::checks::PeriodScope::AllPeriods,
+            eligibility: None,
             tolerance: None,
         };
         let context = CheckContext::new(&model, &results);

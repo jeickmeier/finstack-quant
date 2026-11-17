@@ -173,6 +173,8 @@ fn run_checks_returns_structured_report() {
             "name": "Revenue must be positive",
             "category": "internal_consistency",
             "severity": "error",
+            "mode": "predicate",
+            "scope": "all_periods",
             "formula": "revenue > 0",
             "message_template": "Revenue not positive in {period}",
             "tolerance": null

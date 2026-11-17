@@ -314,6 +314,21 @@ impl ResultCell {
         self.value.map(|value| value.value())
     }
 
+    /// The evaluator's typed cell for this published cell.
+    pub(crate) fn to_cell(self) -> super::cell::Cell {
+        use super::cell::Cell;
+        match (self.status, self.value, self.reason) {
+            (CellStatus::Value, Some(AmountOrScalar::Scalar(value)), _) => Cell::Scalar(value),
+            (CellStatus::Value, Some(AmountOrScalar::Amount(money)), _) => Cell::Money(money),
+            (CellStatus::Masked, _, _) => Cell::Masked,
+            (CellStatus::Unavailable, _, Some(reason)) => Cell::Unavailable(reason),
+            (CellStatus::Unavailable, _, None) => {
+                Cell::Unavailable(UnavailableReason::MissingInput)
+            }
+            (CellStatus::Missing, _, _) | (CellStatus::Value, None, _) => Cell::Missing,
+        }
+    }
+
     pub(crate) fn from_cell(cell: super::cell::Cell, source: Option<CellSource>) -> Self {
         use super::cell::Cell;
         match cell {

@@ -51,6 +51,8 @@ def test_residual_tolerance_boundary_and_signed_dividends() -> None:
                 "name": "Residual",
                 "category": "accounting_identity",
                 "severity": "error",
+                "mode": "residual",
+                "scope": "all_periods",
                 "formula": "residual",
                 "message_template": "bad {period}",
                 "tolerance": 0.1,

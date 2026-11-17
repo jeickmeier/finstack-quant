@@ -566,7 +566,8 @@ fn optional_results(
 /// >>> from finstack_quant.statements_analytics import run_checks
 /// >>> b = ModelBuilder("m"); b.periods("2024Q1..Q2", None); b.value("revenue", [("2024Q1", 1.0), ("2024Q2", 2.0)])
 /// >>> spec = {"name": "s", "builtin_checks": [], "formula_checks": [{"id": "pos", "name": "positive",
-/// ...   "category": "internal_consistency", "severity": "error", "formula": "revenue > 0",
+/// ...   "category": "internal_consistency", "severity": "error", "mode": "predicate",
+/// ...   "scope": "all_periods", "formula": "revenue > 0",
 /// ...   "message_template": "bad {period}"}]}
 /// >>> run_checks(b.build(), spec).passed
 /// True

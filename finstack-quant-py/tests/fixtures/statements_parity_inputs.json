@@ -62,6 +62,8 @@
         "name": "Revenue above 110",
         "category": "internal_consistency",
         "severity": "error",
+        "mode": "predicate",
+        "scope": "all_periods",
         "formula": "revenue > 110",
         "message_template": "Revenue too small in {period}",
         "tolerance": null

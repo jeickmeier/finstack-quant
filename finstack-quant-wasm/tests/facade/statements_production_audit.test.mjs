@@ -65,6 +65,8 @@ test('formula residual checks accept the tolerance boundary and reject larger re
         name: 'Residual',
         category: 'accounting_identity',
         severity: 'error',
+        mode: 'residual',
+        scope: 'all_periods',
         formula: 'revenue',
         message_template: 'residual {period}',
         tolerance: 0.1,
@@ -77,6 +79,7 @@ test('formula residual checks accept the tolerance boundary and reject larger re
     ['2025Q4']
   );
   suite.formula_checks[0].formula = 'revenue <= 0.1';
+  suite.formula_checks[0].mode = 'predicate';
   suite.formula_checks[0].tolerance = null;
   assert.deepEqual(
     statements_analytics

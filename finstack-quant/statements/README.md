@@ -237,12 +237,18 @@ serializable `CheckSuiteSpec` via `CheckSuiteSpec::resolve()`.
 
 Built-ins: `BalanceSheetArticulation`, `RetainedEarningsReconciliation`,
 `CashReconciliation`, `MissingValueCheck`, `NonFiniteCheck`,
-`SignConventionCheck`. `FormulaCheckSpec` evaluates an arbitrary DSL predicate per
-period. Findings carry `Severity`, `CheckCategory`, `PeriodScope`, and a
-`Materiality` tolerance. A formula-check period whose same-period input is
-missing, or whose formula result is unavailable (a `lag` before the first
-period), reports insufficient data as a warning instead of failing; a division
-by zero or other invalid arithmetic is an execution error.
+`SignConventionCheck`. `FormulaCheckSpec` evaluates a DSL formula per period in
+an explicit `mode`: a `predicate` is a Boolean formula that must be true, a
+`residual` is an amount compared with zero under an optional absolute
+`tolerance`. Truthiness is never inferred, so a numeric predicate, a Boolean
+residual and a tolerance on a predicate are rejected. `scope` (`PeriodScope`)
+selects all, actual or forecast periods, and the optional Boolean `eligibility`
+formula selects periods within it. Evaluation is lazy over typed cells:
+`coalesce(a, b)` uses `b` when `a` has no value and an untaken `if` branch does
+not read its inputs. A period whose formula or eligibility condition needed an
+observation without a value (a missing or unavailable cell, a `lag` before the
+first period) carries a coverage finding and makes the check incomplete; a
+division by zero or other invalid arithmetic is an execution error.
 
 Identity checks treat a missing operand and a non-finite operand the same way —
 both skip with a warning rather than passing, because `NaN > tolerance` is

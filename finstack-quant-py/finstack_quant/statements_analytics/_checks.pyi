@@ -849,6 +849,8 @@ def run_checks(model: Any, spec: Any, results: Any | None = None) -> CheckReport
     ...             "name": "positive",
     ...             "category": "internal_consistency",
     ...             "severity": "error",
+    ...             "mode": "predicate",
+    ...             "scope": "all_periods",
     ...             "formula": "revenue > 0",
     ...             "message_template": "bad {period}",
     ...         }

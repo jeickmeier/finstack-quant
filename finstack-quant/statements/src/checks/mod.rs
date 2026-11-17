@@ -23,7 +23,8 @@ pub use helpers::{get_finite_node_value, sum_nodes};
 pub use identity::DatedOpening;
 
 pub use suite::{
-    BuiltinCheckSpec, CheckSuite, CheckSuiteBuilder, CheckSuiteSpec, FormulaCheckSpec,
+    BuiltinCheckSpec, CheckSuite, CheckSuiteBuilder, CheckSuiteSpec, FormulaCheckMode,
+    FormulaCheckSpec,
 };
 pub use traits::{Check, CheckContext};
 pub use types::{

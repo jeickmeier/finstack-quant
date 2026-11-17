@@ -388,6 +388,8 @@ it("routes scenario sets, rollups and data-gap checks to WASM", async () => {
             name: "Revenue up year on year",
             category: "internal_consistency",
             severity: "error",
+            mode: "predicate",
+            scope: "all_periods",
             formula: "revenue > lag(revenue, 4)",
             message_template: "Revenue fell year on year in {period}",
           },
@@ -395,9 +397,7 @@ it("routes scenario sets, rollups and data-gap checks to WASM", async () => {
       }),
     }),
   );
-  const gaps = report.results[0].findings.filter((finding) =>
-    finding.message.includes("insufficient data"),
-  );
+  const gaps = report.results[0].findings.filter((finding) => finding.coverage);
   expect(gaps.map((finding) => finding.period)).toEqual([
     "2024Q1",
     "2024Q2",

@@ -150,6 +150,8 @@ def test_formula_check_reports_insufficient_data_instead_of_failing() -> None:
                     "name": "Growth below 50%",
                     "category": "internal_consistency",
                     "severity": "error",
+                    "mode": "predicate",
+                    "scope": "all_periods",
                     "formula": "revenue / lag(revenue, 1) - 1 < 0.5",
                     "message_template": "Growth above 50% in {period}",
                 }
@@ -164,7 +166,7 @@ def test_formula_check_reports_insufficient_data_instead_of_failing() -> None:
     assert report.total_findings == 1
     (finding,) = report.findings_by_severity("warning")
     assert finding.period == "2025Q1"
-    assert "insufficient data" in finding.message
+    assert "incomplete for 2025Q1" in finding.message
 
 
 def _declared_model() -> object:

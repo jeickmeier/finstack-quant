@@ -78,6 +78,8 @@ const configJson = JSON.stringify({
       name: "Revenue up year on year",
       category: "internal_consistency",
       severity: "error",
+      mode: "predicate",
+      scope: "all_periods",
       formula: "revenue > lag(revenue, 4)",
       message_template: "Revenue fell year on year in {period}",
     },

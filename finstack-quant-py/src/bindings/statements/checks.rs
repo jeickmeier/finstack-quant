@@ -7,7 +7,7 @@ use crate::bindings::pandas_utils::{ColumnSchema, serde_to_py};
 use crate::bindings::pydoc::pydoc;
 use crate::errors::{serde_json_to_py, statements_to_py, value_error};
 use finstack_quant_statements::checks::{
-    BuiltinCheckSpec, CheckCategory, CheckConfig, CheckFinding, FormulaCheckSpec, Severity,
+    BuiltinCheckSpec, CheckConfig, CheckFinding, FormulaCheckSpec, Severity,
 };
 use pyo3::prelude::*;
 
@@ -58,17 +58,6 @@ fn parse_severity(severity: &str) -> PyResult<Severity> {
     finstack_quant_core::wire::serde_parse(severity).map_err(|e| {
         value_error(format!(
             "invalid severity {severity:?}: {e}; expected info, warning, or error"
-        ))
-    })
-}
-
-/// Parse a check category discriminant.
-fn parse_category(category: &str) -> PyResult<CheckCategory> {
-    finstack_quant_core::wire::serde_parse(category).map_err(|e| {
-        value_error(format!(
-            "invalid check category {category:?}: {e}; expected accounting_identity, \
-             cross_statement_reconciliation, internal_consistency, credit_reasonableness, \
-             or data_quality"
         ))
     })
 }
@@ -241,62 +230,16 @@ wire_methods!(PyFormulaCheckSpec, FormulaCheckSpec, "FormulaCheckSpec");
 
 #[pymethods]
 impl PyFormulaCheckSpec {
-    /// Build a formula check.
-    ///
-    /// Parameters
-    /// ----------
-    /// id : str
-    ///     Unique identifier for this check instance.
-    /// name : str
-    ///     Human-readable name shown in reports.
-    /// formula : str
-    ///     Statements DSL predicate (``"revenue > 0"``,
-    ///     ``"cs.debt_balance.total <= 5 * ebitda"``). Uses the same
-    ///     evaluator as calculated nodes, including time-series functions.
-    /// message_template : str
-    ///     Finding message; ``{period}`` is replaced at run time.
-    /// category : str
-    ///     One of ``accounting_identity``, ``cross_statement_reconciliation``,
-    ///     ``internal_consistency``, ``credit_reasonableness``,
-    ///     ``data_quality``. Required, as in the Rust/JSON form.
-    /// severity : str
-    ///     Severity of findings: ``"info"``, ``"warning"`` or ``"error"``.
-    ///     Only error findings fail a report. Required, as in the Rust/JSON
-    ///     form.
-    /// tolerance : float | None
-    ///     Optional finite, non-negative absolute residual bound in the formula's
-    ///     result units. With ``None``, finite nonzero predicate outputs pass;
-    ///     with a bound, absolute outputs at or below it pass. Validated at execution.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``category`` or ``severity`` is not a known discriminant.
-    ///     Formula syntax is validated when the suite runs against a model.
+    #[doc = pydoc!("finstack_quant.statements._checks", "FormulaCheckSpec.__init__")]
     #[new]
-    #[pyo3(
-        signature = (id, name, formula, message_template, category, severity, tolerance=None),
-        text_signature = "(id, name, formula, message_template, category, severity, tolerance=None)"
-    )]
-    fn new(
-        id: String,
-        name: String,
-        formula: String,
-        message_template: String,
-        category: &str,
-        severity: &str,
-        tolerance: Option<f64>,
-    ) -> PyResult<Self> {
+    #[pyo3(signature = (spec), text_signature = "(spec)")]
+    fn new(spec: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
-            inner: FormulaCheckSpec {
-                id,
-                name,
-                category: parse_category(category)?,
-                severity: parse_severity(severity)?,
-                formula,
-                message_template,
-                tolerance,
-            },
+            inner: crate::bindings::module_utils::spec_from_py(
+                spec.py(),
+                spec,
+                "formula check spec",
+            )?,
         })
     }
 
@@ -334,6 +277,24 @@ impl PyFormulaCheckSpec {
     #[getter]
     fn severity(&self) -> PyResult<String> {
         crate::bindings::extract::label(&self.inner.severity)
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._checks", "FormulaCheckSpec.mode")]
+    #[getter]
+    fn mode(&self) -> PyResult<String> {
+        crate::bindings::extract::label(&self.inner.mode)
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._checks", "FormulaCheckSpec.scope")]
+    #[getter]
+    fn scope(&self) -> PyResult<String> {
+        crate::bindings::extract::label(&self.inner.scope)
+    }
+
+    /// Optional Boolean eligibility formula, or ``None``.
+    #[getter]
+    fn eligibility(&self) -> Option<&str> {
+        self.inner.eligibility.as_deref()
     }
 
     /// Optional absolute tolerance, or ``None``.

@@ -1317,6 +1317,31 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements checks: formula checks state their mode and scope
+
+STATEMENTS-CONTRACTS-015. **Breaking.**
+
+- **`mode` and `scope` are required** on every `FormulaCheckSpec`
+  (`"mode": "predicate" | "residual"`, `"scope": "all_periods" |
+  "actuals_only" | "forecast_only"`). The mode is no longer inferred from the
+  tolerance.
+- **A predicate is Boolean.** `revenue > 0`, not `revenue`; a numeric
+  predicate, a Boolean residual (`a == b` with a tolerance: write `a - b`) and
+  a tolerance on a predicate are rejected. A residual without a tolerance is
+  an exact comparison with zero.
+- **`eligibility`.** An optional Boolean formula; a period in which it is
+  false is out of scope.
+- **Lazy evaluation.** `coalesce(a, b)` uses `b` when `a` has no value and an
+  untaken `if` branch does not read its inputs; the check no longer skips a
+  period because some referenced cell is missing.
+- **Incomplete, not a warning.** A period whose formula or eligibility
+  condition needed an observation without a value is a coverage finding and
+  the check is `incomplete`. A reference to a node the model does not have is
+  an error.
+- **Python.** `FormulaCheckSpec(spec)` takes the canonical fields as one
+  mapping and has `mode`, `scope` and `eligibility` properties; the positional
+  constructor is removed.
+
 ### Statements checks: data-quality coverage and validity are separate
 
 STATEMENTS-CONTRACTS-013. **Breaking.**

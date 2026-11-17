@@ -9,8 +9,8 @@ use finstack_quant_statements::checks::builtins::{
     RetainedEarningsReconciliation, SignConventionCheck,
 };
 use finstack_quant_statements::checks::{
-    BuiltinCheckSpec, CheckCategory, CheckSuite, CheckSuiteSpec, FormulaCheckSpec, PeriodScope,
-    Severity,
+    BuiltinCheckSpec, CheckCategory, CheckSuite, CheckSuiteSpec, FormulaCheckMode,
+    FormulaCheckSpec, PeriodScope, Severity,
 };
 use finstack_quant_statements::evaluator::Evaluator;
 use finstack_quant_statements::types::{AmountOrScalar, ForecastMethod, ForecastSpec, NodeId};
@@ -33,6 +33,9 @@ fn positive_revenue_suite() -> CheckSuite {
             severity: Severity::Error,
             formula: "revenue > 0".into(),
             message_template: "Revenue was non-positive in {period}".into(),
+            mode: finstack_quant_statements::checks::FormulaCheckMode::Predicate,
+            scope: finstack_quant_statements::checks::PeriodScope::AllPeriods,
+            eligibility: None,
             tolerance: None,
         })
         .build()
@@ -70,6 +73,9 @@ fn suite_spec_json_roundtrip_and_resolve() {
             severity: Severity::Error,
             formula: "revenue > 0".into(),
             message_template: "Revenue bad in {period}".into(),
+            mode: finstack_quant_statements::checks::FormulaCheckMode::Predicate,
+            scope: finstack_quant_statements::checks::PeriodScope::AllPeriods,
+            eligibility: None,
             tolerance: None,
         }],
         config: Default::default(),
@@ -206,15 +212,20 @@ fn formula_check_spec_serde() {
         "name": "Margin >= 20%",
         "category": "internal_consistency",
         "severity": "warning",
+        "mode": "predicate",
+        "scope": "actuals_only",
         "formula": "(revenue - cogs) / revenue >= 0.20",
-        "message_template": "Margin too low in {period}",
-        "tolerance": 0.001
+        "eligibility": "revenue > 0",
+        "message_template": "Margin too low in {period}"
     }"#;
 
     let spec: FormulaCheckSpec = serde_json::from_str(json).unwrap();
     assert_eq!(spec.id, "margin_check");
     assert_eq!(spec.severity, Severity::Warning);
-    assert_eq!(spec.tolerance, Some(0.001));
+    assert_eq!(spec.tolerance, None);
+    assert_eq!(spec.mode, FormulaCheckMode::Predicate);
+    assert_eq!(spec.scope, PeriodScope::ActualsOnly);
+    assert_eq!(spec.eligibility.as_deref(), Some("revenue > 0"));
 }
 
 // Resolved suite runs against a model
@@ -421,6 +432,9 @@ fn formula(id: &str, severity: Severity, formula: &str) -> FormulaCheckSpec {
         severity,
         formula: formula.into(),
         message_template: format!("{id} in {{period}}"),
+        mode: finstack_quant_statements::checks::FormulaCheckMode::Predicate,
+        scope: finstack_quant_statements::checks::PeriodScope::AllPeriods,
+        eligibility: None,
         tolerance: None,
     }
 }

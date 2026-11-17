@@ -197,6 +197,8 @@ fn check_suite_examples() -> finstack_quant_core::Result<Vec<Value>> {
                 "name": "Net leverage below 8x",
                 "category": "credit_reasonableness",
                 "severity": "warning",
+                "mode": "predicate",
+                "scope": "all_periods",
                 "formula": "net_debt / ebitda < 8",
                 "message_template": "Net leverage exceeds 8x"
             }]
