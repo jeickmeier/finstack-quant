@@ -263,7 +263,8 @@ to the waterfall allocation contract.
 The Statements residual coupon rebuilding contract was accepted on 2026-11-15.
 It uses canonical terms to rebuild affected coupon parents, principal and fees
 after dated balance changes while preserving earned interest, settled cash and
-dated claims. Implementation and independent qualification remain pending.
+dated claims. It is implemented and qualified: term loans and revolvers
+recompile their schedules from the waterfall's dated principal postings.
 [STATEMENTS-CAPITAL-005](statements-capital/05-residual-coupons.md#accepted-decision-for-residual-coupon-rebuilding).
 
 The Statements waterfall allocation and conservation contract was accepted on

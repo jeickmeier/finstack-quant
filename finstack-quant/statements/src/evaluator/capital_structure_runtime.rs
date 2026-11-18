@@ -133,38 +133,39 @@ impl Evaluator {
         )?;
 
         let mut waterfall_replaced_flows = false;
-        if let Some(cs_spec) = &model.capital_structure {
-            if let Some(waterfall_spec) = &cs_spec.waterfall {
-                let waterfall_result = crate::capital_structure::waterfall::execute_waterfall(
-                    &context,
-                    waterfall_spec,
-                    cs_state,
-                    &contractual_flows,
-                    model.capital_structure_currency()?,
-                )?;
+        if let Some(cs_spec) = &model.capital_structure
+            && let Some(waterfall_spec) = &cs_spec.waterfall
+        {
+            // The debt ledger and the schedules the owners rebuild from
+            // this period's principal changes commit together.
+            let waterfall_result = crate::capital_structure::waterfall::execute_waterfall_then(
+                &context,
+                waterfall_spec,
+                cs_state,
+                &contractual_flows,
+                model.capital_structure_currency()?,
+                |staged| settle_postings(staged, instruments, period, market_ctx, as_of),
+            )?;
 
-                merge_updated_flows(&mut cs_cashflows, &waterfall_result.flows, period_id);
-                recompute_cs_totals(&mut cs_cashflows, period_id, fx_ctx.as_ref())?;
-                if let Some(equity) = waterfall_result.equity_distribution {
-                    cs_cashflows.equity_distribution.insert(period_id, equity);
-                }
-                if !waterfall_result.prepayments.is_empty() {
-                    cs_cashflows
-                        .prepayments
-                        .insert(period_id, waterfall_result.prepayments);
-                }
-                if let Some(retained) = waterfall_result.retained_cash {
-                    cs_cashflows.retained_cash.insert(period_id, retained);
-                }
-                if let Some(cash) = waterfall_result.available_cash {
-                    cs_cashflows.available_cash.insert(period_id, cash);
-                }
-                contractual_warnings.extend(waterfall_result.warnings);
-                context.set_capital_structure_cashflows(cs_cashflows);
-                waterfall_replaced_flows = true;
+            merge_updated_flows(&mut cs_cashflows, &waterfall_result.flows, period_id);
+            recompute_cs_totals(&mut cs_cashflows, period_id, fx_ctx.as_ref())?;
+            if let Some(equity) = waterfall_result.equity_distribution {
+                cs_cashflows.equity_distribution.insert(period_id, equity);
             }
-            let from_date = crate::capital_structure::period_flows::period_snapshot_date(period);
-            cs_state.rebuild_residuals(from_date)?;
+            if !waterfall_result.prepayments.is_empty() {
+                cs_cashflows
+                    .prepayments
+                    .insert(period_id, waterfall_result.prepayments);
+            }
+            if let Some(retained) = waterfall_result.retained_cash {
+                cs_cashflows.retained_cash.insert(period_id, retained);
+            }
+            if let Some(cash) = waterfall_result.available_cash {
+                cs_cashflows.available_cash.insert(period_id, cash);
+            }
+            contractual_warnings.extend(waterfall_result.warnings);
+            context.set_capital_structure_cashflows(cs_cashflows);
+            waterfall_replaced_flows = true;
         }
 
         if waterfall_replaced_flows && !cs_affected_nodes.is_empty() {
@@ -215,6 +216,72 @@ pub(crate) fn dependent_closure(
     }
 
     visited
+}
+
+/// Rebuild the schedule of every instrument whose principal the waterfall
+/// changed this period.
+///
+/// Each change is appended to the instrument's posting ledger, effective the
+/// day after the period close, and the owner recompiles the schedule from the
+/// contract and the whole ledger. A schedule is accepted only when the
+/// principal it carries into the next period equals the ledger's closing
+/// balance; nothing is stored unless every instrument rebuilds.
+fn settle_postings(
+    state: &mut crate::capital_structure::CapitalStructureState,
+    instruments: &Instruments,
+    period: &Period,
+    market_ctx: &finstack_quant_core::market_data::context::MarketContext,
+    as_of: Date,
+) -> Result<()> {
+    use crate::capital_structure::period_flows::scheduled_opening_principal;
+    use finstack_quant_valuations::instruments::fixed_income::loan_terms::PrincipalPosting;
+
+    let posted = std::mem::take(&mut state.period_postings);
+    let mut rebuilt = Vec::with_capacity(posted.len());
+    for (instrument_id, delta) in posted {
+        let instrument = instruments.get(&instrument_id).ok_or_else(|| {
+            crate::error::Error::capital_structure(format!(
+                "principal was posted to '{instrument_id}', which is not an instrument of the \
+                 capital structure"
+            ))
+        })?;
+        let mut ledger = state
+            .postings
+            .get(&instrument_id)
+            .cloned()
+            .unwrap_or_default();
+        ledger.push(PrincipalPosting {
+            effective_date: period.end,
+            delta,
+        });
+        let schedule = crate::capital_structure::residual_schedule::rebuild_from_postings(
+            instrument.as_ref(),
+            market_ctx,
+            as_of,
+            &ledger,
+        )?;
+        let carried = scheduled_opening_principal(&schedule, period.end)?;
+        let closing = state
+            .closing_balances
+            .get(&instrument_id)
+            .copied()
+            .unwrap_or(carried);
+        // Half a minor unit is the dust bound the ledger itself uses.
+        let bound = crate::capital_structure::period_flows::half_minor_unit(carried.currency());
+        if (carried.amount() - closing.amount()).abs() > bound {
+            return Err(crate::error::Error::capital_structure(format!(
+                "instrument '{instrument_id}', period {}: the rebuilt schedule carries {} into \
+                 the next period but the debt ledger closes at {}",
+                period.id, carried, closing
+            )));
+        }
+        rebuilt.push((instrument_id, ledger, schedule));
+    }
+    for (instrument_id, ledger, schedule) in rebuilt {
+        state.postings.insert(instrument_id.clone(), ledger);
+        state.residual_schedules.insert(instrument_id, schedule);
+    }
+    Ok(())
 }
 
 pub(crate) fn resolve_opening_balance(

@@ -245,6 +245,7 @@ fn apply_named_prepay(
 /// # References
 ///
 /// - Fixed-income capital structure context: `docs/REFERENCES.md#tuckman-serrat-fixed-income`
+#[cfg(test)]
 pub(crate) fn execute_waterfall(
     context: &EvaluationContext,
     waterfall_spec: &WaterfallSpec,
@@ -252,7 +253,37 @@ pub(crate) fn execute_waterfall(
     contractual_flows: &IndexMap<String, CashflowBreakdown>,
     pool_currency: Option<finstack_quant_core::currency::Currency>,
 ) -> Result<WaterfallPeriodResult> {
+    execute_waterfall_then(
+        context,
+        waterfall_spec,
+        state,
+        contractual_flows,
+        pool_currency,
+        |_| Ok(()),
+    )
+}
+
+/// Execute the waterfall, then run `settle` on the staged state before
+/// anything is committed.
+///
+/// `settle` rebuilds the schedules of the instruments whose principal the
+/// waterfall changed (`CapitalStructureState::period_postings`). The debt
+/// ledger and the rebuilt schedules are committed together, and neither is
+/// when the waterfall or `settle` fails.
+///
+/// # Errors
+///
+/// Returns the waterfall's error or `settle`'s; `state` is unchanged then.
+pub(crate) fn execute_waterfall_then(
+    context: &EvaluationContext,
+    waterfall_spec: &WaterfallSpec,
+    state: &mut CapitalStructureState,
+    contractual_flows: &IndexMap<String, CashflowBreakdown>,
+    pool_currency: Option<finstack_quant_core::currency::Currency>,
+    settle: impl FnOnce(&mut CapitalStructureState) -> Result<()>,
+) -> Result<WaterfallPeriodResult> {
     let mut staged_state = state.clone();
+    staged_state.period_postings.clear();
     let result = execute_waterfall_inner(
         context,
         waterfall_spec,
@@ -260,6 +291,7 @@ pub(crate) fn execute_waterfall(
         contractual_flows,
         pool_currency,
     )?;
+    settle(&mut staged_state)?;
     *state = staged_state;
     Ok(result)
 }
@@ -718,16 +750,16 @@ fn execute_waterfall_inner(
         // balance — an upstream accounting bug the dust floor must not mask.
         // The per-rung caps make this unreachable; keep it as a loud
         // invariant guard rather than letting the floor absorb it.
-        if post_pay_amount < -0.005 {
+        let dust = crate::capital_structure::period_flows::half_minor_unit(currency);
+        if post_pay_amount < -dust {
             return Err(crate::error::Error::capital_structure(format!(
                 "Post-payment balance for instrument '{instrument_id}' is negative \
                  ({post_pay_amount}): principal payment exceeded the payable balance."
             )));
         }
-        // Dust floor: collapse sub-cent residuals on full paydown. Currency
-        // agnostic fallback; modelers in JPY should override via explicit
-        // rounding upstream.
-        let post_sweep_balance = if post_pay_amount.abs() < 0.005 {
+        // Dust floor: collapse a residual below half a minor unit on full
+        // paydown; contractual schedule amounts are not rounded to the unit.
+        let post_sweep_balance = if post_pay_amount.abs() < dust {
             Money::from((0_i64, currency))
         } else {
             Money::new(post_pay_amount, currency)?
@@ -737,6 +769,22 @@ fn execute_waterfall_inner(
         let closing_balance = post_sweep_balance.checked_add(toggled_pik_moved)?;
         state.set_closing_balance(instrument_id.to_string(), closing_balance);
         breakdown.debt_balance = closing_balance;
+        // The principal this waterfall changed outside the contractual
+        // schedule: prepayments paid and the coupon the toggle capitalized.
+        let mut posted = toggled_pik_moved;
+        for prepaid in [
+            breakdown.mandatory_prepayment,
+            breakdown.voluntary_prepayment,
+            breakdown.sweep_prepayment,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            posted = posted.checked_sub(prepaid)?;
+        }
+        if posted != Money::from((0_i64, currency)) {
+            state.period_postings.insert(instrument_id.clone(), posted);
+        }
 
         // Unpaid interest from the available-cash cap is overdue: it is
         // reported as arrears and carried as a claim in the next period's
@@ -2644,5 +2692,76 @@ mod tests {
             assert_eq!(format!("{state:?}"), format!("{clean_state:?}"));
             assert_eq!(format!("{retry:?}"), format!("{clean:?}"));
         }
+    }
+
+    /// The waterfall reports the principal it changed in exact money, and the
+    /// ledger commits only when the schedules rebuilt from it are accepted.
+    #[test]
+    fn the_ledger_and_the_rebuilt_schedules_commit_together() {
+        use finstack_quant_core::dates::{Date, Period};
+        let id = PeriodId::quarter(2025, 1).unwrap();
+        let period = Period {
+            id,
+            start: Date::MIN,
+            end: Date::MAX,
+            is_actual: false,
+        };
+        let usd = |amount: i64| Money::from((amount, Currency::USD));
+        let mut flow = CashflowBreakdown::with_currency(Currency::USD);
+        flow.interest_expense_cash = usd(30);
+        flow.debt_balance = usd(1000);
+        let contractual = IndexMap::from([("TL-1".to_string(), flow)]);
+        let mut initial = CapitalStructureState::new();
+        initial.opening_balances.insert("TL-1".into(), usd(1000));
+        initial
+            .set_period_principal_flows("TL-1", &period, Vec::new())
+            .unwrap();
+        let spec = WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Amortization,
+                PaymentPriority::MandatoryPrepayment,
+                PaymentPriority::Equity,
+            ],
+            available_cash_node: "cash".into(),
+            pik_toggle: Some(PikToggleSpec {
+                liquidity_metric: "liquidity".into(),
+                threshold: 100.0,
+                target_instrument_ids: vec!["TL-1".into()],
+                min_periods_in_pik: 0,
+            }),
+            mandatory_prepayment: Some(crate::capital_structure::PrepaymentSpec {
+                amount: "200".into(),
+                facilities: crate::capital_structure::FacilitySelection::AllEligible,
+            }),
+            ..Default::default()
+        };
+        let context = build_context(id, &[("liquidity", 50.0), ("cash", 1000.0)]);
+
+        // 200 prepaid and the 30 coupon capitalized by the toggle: -170.
+        let mut state = initial.clone();
+        let before = format!("{state:?}");
+        let error =
+            execute_waterfall_then(&context, &spec, &mut state, &contractual, None, |staged| {
+                assert_eq!(staged.period_postings["TL-1"], usd(-170));
+                assert_eq!(staged.closing_balances["TL-1"], usd(830));
+                Err(crate::error::Error::capital_structure("schedule rejected"))
+            })
+            .expect_err("a rejected rebuild fails the period");
+        assert!(error.to_string().contains("schedule rejected"));
+        assert_eq!(
+            format!("{state:?}"),
+            before,
+            "a failed rebuild changed state"
+        );
+
+        execute_waterfall_then(&context, &spec, &mut state, &contractual, None, |staged| {
+            staged.period_postings.clear();
+            Ok(())
+        })
+        .expect("accepted rebuild");
+        assert_eq!(state.closing_balances["TL-1"], usd(830));
+        assert!(state.period_postings.is_empty());
     }
 }

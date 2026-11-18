@@ -1317,6 +1317,35 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements capital: coupons are rebuilt by the instrument after a principal change
+
+Breaking, with no compatibility path (STATEMENTS-CAPITAL-005).
+
+- After a waterfall prepayment or a toggled PIK coupon, the term loan or
+  revolver recompiles its own schedule from its terms and the dated principal
+  changes. Statements no longer infers a coupon rate from schedule rows.
+  Coupons, the contractual cash/PIK split, balance-based fees, later
+  amortization and the terminal repayment all follow the dated principal.
+- A change posted at a period close earns from the following day. Interest
+  earned before a change inside a coupon is kept whole in `cs.accrued_interest`.
+- Revolver commitment and usage fees now respond to a sweep (they were left on
+  the original balance), and a swept revolver keeps its commitment and terms
+  for a contractual redraw.
+- The debt ledger and the rebuilt schedules commit together. A period fails,
+  changing nothing, when a schedule cannot be rebuilt or does not carry the
+  ledger's closing balance.
+- `pik_toggle.target_instrument_ids` may name only term loans and revolvers;
+  a bond target is rejected when the model is validated. A revolver rejects a
+  principal change on or before its balance anchor (the later of the valuation
+  date and the commitment date). A coupon toggled to PIK in the period in which
+  its loan matures fails that period (it was capitalized after maturity).
+- The ledger and schedule agreement bounds are half of the currency's minor
+  unit (they were 0.005 in every currency).
+- Rust: `loan_terms::PrincipalPosting`, `TermLoan::cashflow_schedule_with_postings`
+  and `RevolvingCredit::cashflow_schedule_with_postings` in
+  `finstack-quant-valuations-fixed-income`. A revolver emits one interest row
+  per stretch between postings inside a coupon period.
+
 ### Statements capital: prepayments elect their facilities; the sweep formula is authored term by term
 
 Breaking, with no compatibility path (STATEMENTS-CAPITAL-007).

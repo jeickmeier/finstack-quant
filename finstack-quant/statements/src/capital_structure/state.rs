@@ -9,12 +9,12 @@ use crate::capital_structure::CashflowBreakdown;
 use crate::capital_structure::principal::{
     PeriodPrincipalFlows, PrincipalAllocation, PrincipalClaim,
 };
-use crate::capital_structure::residual_schedule::rebuild_residual_interest;
 use crate::error::Result;
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, Period};
+use finstack_quant_core::dates::Period;
 use finstack_quant_core::money::Money;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::PrincipalPosting;
 use indexmap::IndexMap;
 
 /// Capital structure state tracking for dynamic evaluation.
@@ -59,10 +59,19 @@ pub(crate) struct CapitalStructureState {
     /// are not demoted into the interest rung) and re-recorded if unpaid.
     pub(crate) fee_shortfall: IndexMap<String, Money>,
 
-    /// Residual cashflow schedule per instrument, rebuilt after each period's
-    /// outstanding change so the next coupon is `outstanding × rate ×
-    /// accrual_factor` rather than a scale of the original schedule.
+    /// Schedule per instrument as it stands: the contractual schedule, then
+    /// the owner's recompilation after each principal change the waterfall
+    /// posts.
     pub(crate) residual_schedules: IndexMap<String, CashFlowSchedule>,
+
+    /// Every principal change the waterfall has posted to an instrument
+    /// (prepayments and toggled PIK), each effective the day after its period
+    /// close. The owner recompiles the schedule from its terms and this ledger.
+    pub(crate) postings: IndexMap<String, Vec<PrincipalPosting>>,
+
+    /// Net principal change the waterfall posted in the current period, by
+    /// instrument, in exact money. Consumed when the schedules are rebuilt.
+    pub(crate) period_postings: IndexMap<String, Money>,
 
     /// Dated current-period claims, supplied by market-aware evaluation or
     /// explicitly by callers allocating schedules with separate cash dates.
@@ -95,6 +104,7 @@ impl CapitalStructureState {
     pub(crate) fn advance_period(&mut self) {
         self.opening_balances = std::mem::take(&mut self.closing_balances);
         self.period_principal_flows.clear();
+        self.period_postings.clear();
     }
 
     /// Set dated principal claims for the current waterfall period.
@@ -160,44 +170,5 @@ impl CapitalStructureState {
         self.principal_shortfall.shift_remove(instrument_id);
         self.principal_advance_payments.shift_remove(instrument_id);
         Ok(allocation)
-    }
-
-    /// Reproject future interest only when closing outstanding differs from
-    /// the contractual schedule. Preserve all interest earned before the change.
-    ///
-    /// # Arguments
-    ///
-    /// * `from_date` - Inclusive period-end snapshot (`period.end - 1 day`).
-    ///   Principal changes affect accrual from the following day. Past flows
-    ///   remain as accrual anchors; future coupons retain dated amortization,
-    ///   draw, and PIK effects. Repayments cannot exceed remaining principal.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error when a residual rate cannot be
-    /// inferred or a schedule currency does not match the closing balance.
-    pub(crate) fn rebuild_residuals(&mut self, from_date: Date) -> Result<()> {
-        let updates: Vec<(String, Money)> = self
-            .closing_balances
-            .iter()
-            .filter(|(id, _)| self.residual_schedules.contains_key(*id))
-            .map(|(id, closing)| (id.clone(), *closing))
-            .collect();
-        for (id, closing) in updates {
-            if let Some(schedule) = self.residual_schedules.get(&id) {
-                let preserved_claims: Vec<_> = self
-                    .principal_advance_payments
-                    .get(&id)
-                    .into_iter()
-                    .chain(self.principal_shortfall.get(&id))
-                    .flatten()
-                    .cloned()
-                    .collect();
-                let rebuilt =
-                    rebuild_residual_interest(schedule, closing, from_date, &preserved_claims)?;
-                self.residual_schedules.insert(id, rebuilt);
-            }
-        }
-        Ok(())
     }
 }

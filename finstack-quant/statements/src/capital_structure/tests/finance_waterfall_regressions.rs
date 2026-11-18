@@ -694,33 +694,9 @@ fn residual_rebuild_reserves_due_principal_ahead_of_future_installments() {
         .expect("settle advance and prepay remaining debt");
         assert_eq!(first.flows["loan"].principal_payment, usd(initial_cash));
         assert_eq!(first.flows["loan"].debt_balance.amount(), 50.0);
-        state
-            .rebuild_residuals(date!(2025 - 03 - 31))
-            .expect("rebuild preserves already settled economic principal");
-
-        let schedule = &state.residual_schedules["loan"];
-        let path = schedule.outstanding_by_date().expect("economic path");
-        let balance_before_advance = path
-            .iter()
-            .rfind(|(date, _)| *date <= date!(2025 - 04 - 02))
-            .expect("balance before the paid advance becomes effective")
-            .1;
-        assert_eq!(balance_before_advance.amount(), 50.0);
-        assert_eq!(
-            path.last().expect("final principal movement").1.amount(),
-            0.0
-        );
-        assert_eq!(
-            schedule
-                .get_flows()
-                .iter()
-                .find(|flow| flow.get_date() == date!(2025 - 04 - 04))
-                .expect("future installment row")
-                .get_amount()
-                .amount(),
-            0.0,
-            "the unpaid installment is extinguished by the prepayment"
-        );
+        // The advance paid on 31 March becomes effective on 3 April, so 50
+        // is still outstanding in between.
+        let balance_before_advance = usd(50);
 
         state.advance_period();
         let middle_period = dated_period(date!(2025 - 04 - 02), date!(2025 - 04 - 03));

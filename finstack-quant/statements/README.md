@@ -267,8 +267,15 @@ on any same-period `cs` component, directly or through the formulas and masks
 of the nodes it names: every such component is an output of the waterfall the
 pool funds. Read a prior period with `lag(...)`.
 
-Known limits (also stated in the module rustdoc): loan residual schedules
-rebuild interest after outstanding changes; omitted `fx_policy` converts
+After a prepayment or a toggled PIK coupon, the term loan or revolver
+recompiles its schedule from its own terms and the dated principal changes:
+coupons, the contractual cash/PIK split, balance-based fees and later principal
+follow the new balance from the day after the period close, and interest
+already earned is preserved. The ledger and the rebuilt schedules commit
+together. Only term loans and revolvers rebuild, so a PIK toggle may target
+only those.
+
+Known limits (also stated in the module rustdoc): omitted `fx_policy` converts
 period-aggregated reporting totals on the inclusive period-end date
 (`PeriodEnd`); prepayment penalties, call premiums, and OID accretion are
 not modeled.

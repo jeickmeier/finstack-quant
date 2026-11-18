@@ -857,6 +857,29 @@ impl CapitalStructureSpec {
                     }
                 }
             }
+            // A toggled coupon is capitalized, and only a term loan or a
+            // revolver recompiles its schedule from a principal change.
+            if let Some(pik) = &waterfall.pik_toggle {
+                for target in &pik.target_instrument_ids {
+                    let rebuildable = self.debt_instruments.iter().any(|debt| {
+                        &debt.id == target
+                            && matches!(
+                                debt.spec,
+                                FinancialStatementInstrument::TermLoan(_)
+                                    | FinancialStatementInstrument::RevolvingCredit(_)
+                            )
+                    });
+                    let known = self.debt_instruments.iter().any(|debt| &debt.id == target);
+                    if known && !rebuildable {
+                        return Err(Error::build(format!(
+                            "WaterfallSpec: `pik_toggle.target_instrument_ids` names \
+                             '{target}', which is not a term loan or a revolving credit \
+                             facility. Capitalizing its coupon changes principal, and only \
+                             those instruments rebuild their schedule from a principal change."
+                        )));
+                    }
+                }
+            }
             // Each prepayment names its eligible facilities. A named facility
             // must exist, and a facility whose agreement prices a payoff (a
             // call schedule with a premium or make-whole) cannot be repaid at
@@ -1371,6 +1394,60 @@ mod period_timeline_tests {
             assert!(error.contains("'TL-CALL'"), "{error}");
             assert!(error.contains("call schedule"), "{error}");
         }
+    }
+
+    /// A PIK toggle capitalizes a coupon, so it may only target an
+    /// instrument that rebuilds its schedule from a principal change.
+    #[test]
+    fn pik_toggle_targets_must_rebuild_from_principal_changes() {
+        use crate::capital_structure::{PikToggleSpec, WaterfallSpec};
+
+        let bond = Bond::fixed(
+            finstack_quant_core::types::InstrumentId::new("BOND-PIK"),
+            finstack_quant_core::money::Money::from((
+                1_000_000_i64,
+                finstack_quant_core::currency::Currency::USD,
+            )),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
+            Date::from_calendar_date(2025, Month::January, 1).expect("valid date"),
+            Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
+            finstack_quant_core::dates::StubKind::ShortFront,
+            finstack_quant_core::types::CurveId::new("USD-OIS"),
+        )
+        .expect("bond");
+        let mut loan = TermLoan::example().expect("loan");
+        loan.id = finstack_quant_core::types::InstrumentId::new("TL-PIK");
+        let capital = |target: &str| CapitalStructureSpec {
+            debt_instruments: vec![
+                DebtInstrumentSpec {
+                    id: "BOND-PIK".to_string(),
+                    spec: FinancialStatementInstrument::Bond(bond.clone()),
+                },
+                DebtInstrumentSpec {
+                    id: "TL-PIK".to_string(),
+                    spec: FinancialStatementInstrument::TermLoan(loan.clone()),
+                },
+            ],
+            meta: IndexMap::new(),
+            reporting_currency: None,
+            fx_policy: None,
+            waterfall: Some(WaterfallSpec {
+                pik_toggle: Some(PikToggleSpec {
+                    liquidity_metric: "cash".into(),
+                    threshold: 1.0,
+                    target_instrument_ids: vec![target.into()],
+                    min_periods_in_pik: 0,
+                }),
+                ..WaterfallSpec::default()
+            }),
+        };
+        capital("TL-PIK").validate().expect("a term loan target");
+        let error = capital("BOND-PIK")
+            .validate()
+            .expect_err("a bond target")
+            .to_string();
+        assert!(error.contains("'BOND-PIK'"), "{error}");
+        assert!(error.contains("pik_toggle"), "{error}");
     }
 
     /// The supported `Pay` side must continue to pass validation.

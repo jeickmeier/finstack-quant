@@ -119,6 +119,12 @@ pub(crate) fn funding_principal(flow: &CashFlow) -> Option<Money> {
         .filter(|delta| delta.amount() > 0.0)
 }
 
+/// Half of `currency`'s minor unit (0.005 for USD, 0.5 for JPY): the bound
+/// within which a debt ledger and its dated schedule agree on a balance.
+pub(crate) fn half_minor_unit(currency: finstack_quant_core::currency::Currency) -> f64 {
+    0.5 * 10f64.powi(-i32::from(currency.decimals()))
+}
+
 /// Capitalized amount of a PIK row: its explicit signed principal delta,
 /// never its cash amount (record CORE-CONVENTIONS-015 #1, #4). A negative
 /// delta is an authorized correction and reduces the capitalized total.
@@ -508,9 +514,8 @@ pub fn calculate_period_flows(
     // stands; a disagreement is an error, never a rescaling of the period's
     // amounts. Half a minor unit is the same dust bound the ledger uses.
     if is_debt {
-        const OPENING_TOLERANCE: f64 = 0.005;
         let gap = opening_balance.amount() - scheduled_opening.amount();
-        if gap.abs() > OPENING_TOLERANCE {
+        if gap.abs() > half_minor_unit(currency) {
             return Err(crate::error::Error::capital_structure(format!(
                 "instrument '{}', period {}: the debt ledger opens at {} {currency} but its \
                  dated schedule carries {} {currency} into the period. The schedule and the \
