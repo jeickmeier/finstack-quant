@@ -4288,6 +4288,13 @@
           "$ref": "#/$defs/DateWire",
           "description": "Contractual accrual-period end date."
         },
+        "nominal_dates": {
+          "description": "Consecutive nominal boundaries for a coupon spanning multiple ICMA reference periods.",
+          "items": {
+            "$ref": "#/$defs/DateWire"
+          },
+          "type": "array"
+        },
         "projected_index_rate": {
           "description": "Projected index rate before spread, gearing, caps, or floors.\nSerialization rejects non-finite rates instead of encoding them as absent.",
           "format": "double",

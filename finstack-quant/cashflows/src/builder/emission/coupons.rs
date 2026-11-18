@@ -5,7 +5,7 @@ use crate::builder::orchestrator::BuildState;
 use finstack_quant_core::InputError;
 use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual, CashFlowParams};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
@@ -244,17 +244,31 @@ pub(crate) fn emit_fixed_coupons_on(
                 let day_count_ctx = crate::builder::periods::period_day_count_context(
                     period,
                     calendar,
-                    crate::builder::periods::AccrualConventions::from_schedule(&spec.schedule),
+                    crate::builder::periods::AccrualConventions {
+                        grid_anchor: (spec.schedule.day_count == DayCount::ActActIsma)
+                            .then_some(schedule.grid_anchor),
+                        ..crate::builder::periods::AccrualConventions::from_schedule(&spec.schedule)
+                    },
                     is_termination_date,
                 )?;
                 let coupon_period = day_count_ctx.coupon_period;
-                let yf = crate::builder::periods::contractual_accrual(
-                    spec.schedule.day_count,
-                    (period.accrual_start, period.accrual_end),
-                    accrual_start,
-                    accrual_end,
-                    day_count_ctx,
-                )?;
+                let yf = if spec.schedule.day_count == DayCount::ActActIsma {
+                    crate::builder::date_generation::icma_sliced_year_fraction(
+                        accrual_start,
+                        accrual_end,
+                        day_count_ctx,
+                        Some(spec.schedule.end_of_month),
+                        Some(schedule.grid_anchor),
+                    )
+                } else {
+                    crate::builder::periods::contractual_accrual(
+                        spec.schedule.day_count,
+                        (period.accrual_start, period.accrual_end),
+                        accrual_start,
+                        accrual_end,
+                        day_count_ctx,
+                    )
+                }?;
 
                 let yf_dec = f64_to_decimal(yf)?;
                 let coupon_total_dec = base_out
@@ -291,21 +305,55 @@ pub(crate) fn emit_fixed_coupons_on(
                 };
 
                 let rate_f64 = spec.rate.as_f64();
-                let accrual = CashFlowAccrual::new(
-                    accrual_start,
-                    accrual_end,
-                    spec.schedule.day_count,
+                let is_icma = spec.schedule.day_count == DayCount::ActActIsma;
+                let mut nominal_dates = Vec::new();
+                let mut reference = coupon_period;
+                if is_icma
+                    && coupon_period.is_some_and(|(lo, hi)| accrual_start < lo || accrual_end > hi)
+                {
+                    crate::builder::date_generation::visit_icma_periods(
+                        accrual_start,
+                        accrual_end,
+                        day_count_ctx,
+                        Some(spec.schedule.end_of_month),
+                        Some(schedule.grid_anchor),
+                        |lo, hi| {
+                            if nominal_dates.is_empty() {
+                                nominal_dates.push(lo);
+                            }
+                            nominal_dates.push(hi);
+                            Ok(())
+                        },
+                    )?;
+                    reference = match nominal_dates.as_slice() {
+                        [lo, hi] => Some((*lo, *hi)),
+                        _ => None,
+                    };
+                }
+                let context = finstack_quant_core::dates::DayCountContextState::try_new(
+                    Some(spec.schedule.calendar_id.to_string()),
+                    is_icma.then_some(spec.schedule.frequency),
                     None,
-                    finstack_quant_core::dates::DayCountContextState::try_new(
-                        Some(spec.schedule.calendar_id.to_string()),
-                        (spec.schedule.day_count
-                            == finstack_quant_core::dates::DayCount::ActActIsma)
-                            .then_some(spec.schedule.frequency),
-                        None,
-                        coupon_period,
-                        Some(is_termination_date),
-                    )?,
+                    reference,
+                    Some(is_termination_date),
                 )?;
+                let accrual = if nominal_dates.len() > 2 {
+                    CashFlowAccrual::from_nominal_dates(
+                        accrual_start,
+                        accrual_end,
+                        None,
+                        context,
+                        nominal_dates,
+                    )
+                } else {
+                    CashFlowAccrual::new(
+                        accrual_start,
+                        accrual_end,
+                        spec.schedule.day_count,
+                        None,
+                        context,
+                    )
+                }?;
 
                 // Gate on cash split, not amount sign, so negative-rate coupons emit.
                 if cash_fraction > Decimal::ZERO {

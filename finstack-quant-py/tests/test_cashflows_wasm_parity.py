@@ -552,3 +552,28 @@ def test_period_lookup_preserves_exact_labels_and_empty_buckets() -> None:
         assert missing not in aggregation
         with pytest.raises(KeyError):
             _ = aggregation[missing]
+
+
+@pytest.mark.parametrize(("end_of_month", "nominal_days"), [(False, 366), (True, 365)])
+def test_annual_icma_coupon_retains_contractual_february_roll(end_of_month: bool, nominal_days: int) -> None:
+    schedule = (
+        CashFlowSchedule
+        .builder()
+        .principal(usd(100_000_000), dt.date(2024, 6, 30), dt.date(2027, 2, 28))
+        .fixed_cf(
+            fixed(
+                rate="0.05",
+                frequency={"count": 1, "unit": "years"},
+                day_count="act_act_isma",
+                business_day_convention="unadjusted",
+                stub="long_front",
+                end_of_month=end_of_month,
+            )
+        )
+        .build()
+    )
+    stub = next(flow for flow in json.loads(schedule.to_json())["flows"] if flow["kind"] == "stub")
+    dates = stub["accrual"]["nominal_dates"]
+    assert dates == ["2024-02-29" if end_of_month else "2024-02-28", "2025-02-28", "2026-02-28"]
+    assert stub["accrual"]["context"]["coupon_period"] is None
+    assert float(stub["amount"]["amount"]) == pytest.approx(5_000_000 * (1 + 243 / nominal_days), rel=0, abs=0.005)

@@ -3271,6 +3271,10 @@ export interface D_63Aec3D47748D9F3D86A {
    */
   end: string;
   /**
+   * Consecutive nominal boundaries for a coupon spanning multiple ICMA reference periods.
+   */
+  nominal_dates?: D_2331411247Fb4Fdd46Dd[];
+  /**
    * Projected index rate before spread, gearing, caps, or floors.
    * Serialization rejects non-finite rates instead of encoding them as absent.
    */

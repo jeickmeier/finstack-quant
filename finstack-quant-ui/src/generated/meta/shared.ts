@@ -3941,6 +3941,17 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
+    "path": "#/$defs/CashFlowAccrual/properties/nominal_dates",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CashFlowAccrual/properties/nominal_dates",
+    "description": "Consecutive nominal boundaries for a coupon spanning multiple ICMA reference periods."
+  },
+  {
+    "path": "#/$defs/CashFlowAccrual/properties/nominal_dates/items",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CashFlowAccrual/properties/nominal_dates/items",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
     "path": "#/$defs/CashFlowAccrual/properties/projected_index_rate",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CashFlowAccrual/properties/projected_index_rate",
     "description": "Projected index rate before spread, gearing, caps, or floors.\nSerialization rejects non-finite rates instead of encoding them as absent.",

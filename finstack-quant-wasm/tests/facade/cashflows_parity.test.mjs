@@ -838,3 +838,31 @@ test('explicit observation cutoff requires and consumes post-anchor fixings', ()
   assert.ok(Math.abs(coupon.rate - 0.06) < 1e-12);
   assert.ok(Math.abs(Number(coupon.amount.amount) - 15000) < 1e-8);
 });
+
+test('annual ICMA stub respects the contractual February roll', () => {
+  for (const [endOfMonth, nominalDays] of [
+    [false, 366],
+    [true, 365],
+  ]) {
+    const schedule = cashflows.CashFlowSchedule.builder()
+      .principal(usd('100000000'), '2024-06-30', '2027-02-28')
+      .fixedCf({
+        ...fixedSpec,
+        rate: '0.05',
+        frequency: { count: 1, unit: 'years' },
+        day_count: 'act_act_isma',
+        business_day_convention: 'unadjusted',
+        stub: 'long_front',
+        end_of_month: endOfMonth,
+      })
+      .build();
+    const stub = json(schedule).flows.find((flow) => flow.kind === 'stub');
+    assert.deepEqual(stub.accrual.nominal_dates, [
+      endOfMonth ? '2024-02-29' : '2024-02-28',
+      '2025-02-28',
+      '2026-02-28',
+    ]);
+    assert.equal(stub.accrual.context.coupon_period, null);
+    assert.ok(Math.abs(Number(stub.amount.amount) - 5000000 * (1 + 243 / nominalDays)) < 0.005);
+  }
+});

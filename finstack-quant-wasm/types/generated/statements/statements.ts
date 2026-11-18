@@ -3105,6 +3105,10 @@ export interface CashFlowAccrual {
    */
   end: DateWire;
   /**
+   * Consecutive nominal boundaries for a coupon spanning multiple ICMA reference periods.
+   */
+  nominal_dates?: DateWire[];
+  /**
    * Projected index rate before spread, gearing, caps, or floors.
    * Serialization rejects non-finite rates instead of encoding them as absent.
    */

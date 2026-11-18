@@ -211,6 +211,7 @@ class CashFlowAccrual:
         day_count: DayCount,
         context: DayCountContext,
         projected_index_rate: float | None = None,
+        nominal_dates: list[datetime.date | str] | None = None,
     ) -> None:
         """Create coupon accrual metadata.
 
@@ -231,6 +232,9 @@ class CashFlowAccrual:
             exception requires it stated, not left as None).
         projected_index_rate : float, optional
             Decimal index rate before spread, gearing, floors and caps.
+        nominal_dates : list of dates, optional
+            Consecutive unadjusted nominal boundaries covering a multi-period ACT/ACT ICMA coupon.
+            Supply at least three boundaries and omit the single reference period from context.
 
         Raises
         ------
@@ -243,6 +247,17 @@ class CashFlowAccrual:
             fails ``day_count`` validation (missing ``BUS_252`` calendar,
             missing or non-overlapping ``ACT/ACT ICMA`` coupon period, or
             out-of-bounds ``ACT/365L`` period).
+        """
+        ...
+
+    @property
+    def nominal_dates(self) -> list[datetime.date]:
+        """Return nominal boundaries used to accrue across multiple ACT/ACT ICMA periods.
+
+        Returns
+        -------
+        list of datetime.date
+            Ordered unadjusted boundaries, empty for a single reference period. Access does not raise domain errors.
         """
         ...
 

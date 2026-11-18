@@ -2102,3 +2102,35 @@ mod slice6_regressions {
         );
     }
 }
+
+#[test]
+fn annual_icma_coupon_retains_contractual_february_roll() {
+    for (end_of_month, nominal_days) in [(false, 366.0), (true, 365.0)] {
+        let mut value = spec("2024-06-30", "2027-02-28");
+        value["notional"]["initial"]["amount"] = json!("100000000");
+        let coupon = &mut value["coupon_program"][0]["spec"];
+        coupon["rate"] = json!("0.05");
+        coupon["frequency"] = json!({"count": 1, "unit": "years"});
+        coupon["day_count"] = json!("act_act_isma");
+        coupon["stub"] = json!("long_front");
+        coupon["end_of_month"] = json!(end_of_month);
+        let schedule = build(value);
+        let first = schedule
+            .get_flows()
+            .iter()
+            .find(|flow| flow.get_kind() == CFKind::Stub)
+            .expect("long first coupon");
+        let accrual = first.get_accrual().as_ref().expect("stub metadata");
+        assert_eq!(accrual.get_context().get_coupon_period(), None);
+        assert_eq!(accrual.get_nominal_dates().len(), 3);
+        let wire = serde_json::to_string(&schedule).expect("serialize schedule");
+        close(
+            accrued_json(&wire, "2025-02-28", None).expect("accrued after partial nominal year"),
+            5_000_000.0 * 243.0 / nominal_days,
+        );
+        close(
+            first.get_amount().amount(),
+            5_000_000.0 * (1.0 + 243.0 / nominal_days),
+        );
+    }
+}
