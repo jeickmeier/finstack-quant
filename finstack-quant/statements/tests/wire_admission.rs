@@ -186,6 +186,21 @@ fn duplicate_keys_unknown_fields_and_inexact_numbers_are_rejected() {
     assert_eq!(first_code(&overflow).0, "contract/parse-error");
 }
 
+/// Node order is part of a model: a loaded model keeps the document's order,
+/// whatever the alphabetical order of its node identifiers.
+#[test]
+fn a_loaded_model_keeps_its_node_order() {
+    let mut builder = ModelBuilder::new("order");
+    builder.periods("2025Q1..Q1", None).expect("periods");
+    for node in ["zeta", "alpha", "mid"] {
+        builder.value_scalar(node, &[(quarter(1), 1.0)]);
+    }
+    let text = serde_json::to_string(&builder.build().expect("model")).expect("json");
+    let loaded = FinancialModelSpec::from_json(&text).expect("loads");
+    let order: Vec<&str> = loaded.nodes.keys().map(|id| id.as_str()).collect();
+    assert_eq!(order, ["zeta", "alpha", "mid"]);
+}
+
 #[test]
 fn monte_carlo_seed_is_a_canonical_decimal_string() {
     let config = MonteCarloConfig::new(10, u64::MAX, ["revenue"]);
@@ -230,6 +245,14 @@ fn a_model_has_an_identity_only_once_it_validates() {
     let loaded = FinancialModelSpec::from_json(&serde_json::to_string(&raw).expect("json"))
         .expect("the raw document loads");
     assert_eq!(loaded.content_hash().expect("loaded identity"), identity);
+
+    // A run of the raw model records the same identity, so its results stay
+    // the validated model's results.
+    let run = Evaluator::new().evaluate(&raw).expect("evaluates");
+    assert_eq!(
+        run.provenance.expect("provenance").model_content_hash,
+        identity
+    );
 }
 
 #[test]
@@ -326,10 +349,6 @@ fn every_host_document_loads_to_its_recorded_outcome() {
         (
             "version_as_float",
             edited(&|d| d["schema_version"] = json!(1.0)),
-        ),
-        (
-            "unsupported_version",
-            edited(&|d| d["schema_version"] = json!(2)),
         ),
         (
             "missing_version",

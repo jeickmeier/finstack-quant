@@ -189,6 +189,32 @@ fn a_term_loan_rejects_postings_it_cannot_apply() {
     assert!(error.contains("EUR"), "{error}");
 }
 
+/// A PIK loan's balance includes its capitalized interest: 100 at 10% is 105
+/// after the first semi-annual coupon, so 105 repays it and 106 is refused.
+#[test]
+fn a_posting_may_repay_capitalized_interest() {
+    let loan = semiannual_loan(CouponType::Pik);
+    let market = MarketContext::new();
+    let rebuild = |amount: f64| {
+        loan.cashflow_schedule_with_postings(
+            &market,
+            &[posting(date!(2025 - 10 - 01), -amount)],
+            &[],
+        )
+    };
+    let repaid = rebuild(105.0).expect("the capitalized balance is repayable");
+    let balances = repaid.outstanding_by_date().expect("balances");
+    let on_posting = balances
+        .iter()
+        .rfind(|(on, _)| *on <= date!(2025 - 10 - 01))
+        .expect("balance at the posting");
+    assert_close(on_posting.1.amount(), 0.0);
+    let error = rebuild(106.0)
+        .expect_err("more than outstanding")
+        .to_string();
+    assert!(error.contains("negative"), "{error}");
+}
+
 /// A 200 commitment with 100 drawn at 8%, a 50 bp commitment fee on the
 /// undrawn amount and a 25 bp usage fee on the drawn amount, on ACT/360.
 fn revolver(events: Vec<DrawRepayEvent>) -> RevolvingCredit {

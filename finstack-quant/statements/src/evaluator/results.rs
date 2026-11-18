@@ -428,25 +428,43 @@ impl RunProvenance {
     ///
     /// # Arguments
     ///
-    /// * `model` - The evaluated model; its id, content hash and source
+    /// * `model` - The evaluated model; its id, content identity
+    ///   ([`FinancialModelSpec::content_hash`], which validates it) and source
     ///   snapshot are recorded.
     /// * `observation_cutoff` - Observations the run was allowed to read.
     /// * `valuation_date` - Pricing date when the run used a market.
     ///
     /// # Errors
     ///
-    /// Returns an evaluation error if the model cannot be hashed.
+    /// Returns an evaluation error if the model is not runnable or cannot be
+    /// hashed.
+    ///
+    /// [`FinancialModelSpec::content_hash`]: crate::types::FinancialModelSpec::content_hash
     pub fn for_run(
         model: &crate::types::FinancialModelSpec,
         observation_cutoff: super::ObservationCutoff,
         valuation_date: Option<Date>,
     ) -> crate::error::Result<Self> {
-        let hash_error = |error: finstack_quant_core::Error| {
-            crate::error::Error::eval(format!("cannot derive run provenance: {error}"))
-        };
+        let model_content_hash = model.content_hash().map_err(hash_error)?;
+        Self::with_model_hash(
+            model,
+            model_content_hash,
+            observation_cutoff,
+            valuation_date,
+        )
+    }
+
+    /// [`Self::for_run`] for a caller that already holds the validated
+    /// model's content identity.
+    pub(crate) fn with_model_hash(
+        model: &crate::types::FinancialModelSpec,
+        model_content_hash: String,
+        observation_cutoff: super::ObservationCutoff,
+        valuation_date: Option<Date>,
+    ) -> crate::error::Result<Self> {
         let mut provenance = Self {
             model_id: model.id.clone(),
-            model_content_hash: model.canonical_hash().map_err(hash_error)?,
+            model_content_hash,
             source_snapshot: model.source_snapshot.clone(),
             observation_cutoff,
             valuation_date,
@@ -457,6 +475,10 @@ impl RunProvenance {
             finstack_quant_core::canonical::content_hash(&provenance).map_err(hash_error)?;
         Ok(provenance)
     }
+}
+
+pub(super) fn hash_error(error: finstack_quant_core::Error) -> crate::error::Error {
+    crate::error::Error::eval(format!("cannot derive run provenance: {error}"))
 }
 
 /// The single-run stream of every stochastic forecast node of `model`.
@@ -594,11 +616,13 @@ impl StatementResult {
                 "their observation cutoff is not the requested one",
             ));
         }
+        // A model that no longer validates is not the model that was run.
         let expected = RunProvenance::for_run(
             model,
             provenance.observation_cutoff,
             provenance.valuation_date,
-        )?;
+        )
+        .map_err(|error| mismatch(&format!("the model does not validate ({error})")))?;
         if expected != *provenance {
             return Err(mismatch(
                 "their model content, source snapshot or run identity differs",
@@ -610,7 +634,7 @@ impl StatementResult {
         Ok(provenance)
     }
 
-    /// The periods `nodes` is keyed by, in timeline order; empty for a
+    /// The periods `cells` is keyed by, in timeline order; empty for a
     /// hand-built result without a period plan.
     #[must_use]
     pub fn get_periods(&self) -> &[finstack_quant_core::dates::Period] {

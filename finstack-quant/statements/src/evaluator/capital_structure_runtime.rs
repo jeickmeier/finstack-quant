@@ -332,7 +332,8 @@ fn settle_postings(
                     }
                 }),
                 // A PIK election ends only after its minimum number of
-                // coupon periods, counting the first elected one.
+                // coupon periods, counting the first elected one. With no
+                // minimum, one that has not started is simply withdrawn.
                 (false, Some(since)) => {
                     let elapsed = starts
                         .iter()
@@ -594,11 +595,14 @@ fn recompute_cs_totals(
     let Some(rc) = ctx.reporting_currency else {
         // More than one native currency and no target currency: only the
         // per-instrument and native-currency scopes exist.
-        cashflows.consolidation_unavailable.insert(
-            period_id,
+        let reason = if totals_by_currency.is_empty() {
+            "the capital structure has no instrument and no reporting currency is set"
+        } else {
             "the instruments are in more than one currency and no reporting currency is set"
-                .to_string(),
-        );
+        };
+        cashflows
+            .consolidation_unavailable
+            .insert(period_id, reason.to_string());
         return Ok(());
     };
     cashflows.reporting_currency = Some(rc);

@@ -5,7 +5,6 @@ use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_statements::checks::CheckSuiteSpec;
 use finstack_quant_statements::evaluator::{Evaluator, MonteCarloConfig};
 use finstack_quant_statements::registry::Registry;
-use finstack_quant_statements::types::FinancialModelSpec;
 use wasm_bindgen::prelude::*;
 
 /// Evaluator for financial statement models.
@@ -96,8 +95,7 @@ impl JsEvaluator {
         &mut self,
         #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
     ) -> Result<JsValue, JsValue> {
-        let model = FinancialModelSpec::from_json(&json_text(&model, "model")?)
-            .map_err(crate::utils::contract_to_js_err)?;
+        let model = crate::api::statements::load_model(&model, "model")?;
         to_js_value(&self.inner.evaluate(&model).map_err(to_js_err)?)
     }
 
@@ -125,8 +123,7 @@ impl JsEvaluator {
     ) -> Result<JsValue, JsValue> {
         use finstack_quant_statements::evaluator::ObservationCutoff;
 
-        let model = FinancialModelSpec::from_json(&json_text(&model, "model")?)
-            .map_err(crate::utils::contract_to_js_err)?;
+        let model = crate::api::statements::load_model(&model, "model")?;
         let market: finstack_quant_core::market_data::context::MarketContext =
             from_js_json(&market, "market")?;
         let as_of = crate::utils::wire::js_date(&as_of, "asOf")?;
@@ -177,8 +174,7 @@ impl JsEvaluator {
         use finstack_quant_statements::evaluator::{MonteCarloContext, ObservationCutoff};
 
         let absent = |value: &JsValue| value.is_undefined() || value.is_null();
-        let model = FinancialModelSpec::from_json(&json_text(&model, "model")?)
-            .map_err(crate::utils::contract_to_js_err)?;
+        let model = crate::api::statements::load_model(&model, "model")?;
         let config: MonteCarloConfig = from_js_json(&config, "config")?;
         let run = match (absent(&market), absent(&as_of)) {
             (false, false) => {

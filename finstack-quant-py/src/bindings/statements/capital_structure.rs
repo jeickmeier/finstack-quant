@@ -111,7 +111,7 @@ impl PyEcfSweepSpec {
 /// PIK toggle specification.
 ///
 /// Controls when interest accrues as PIK (added to principal) vs. cash, based
-/// on a liquidity metric threshold with optional hysteresis.
+/// on a liquidity metric threshold, for the loans its elections list.
 #[pyclass(
     name = "PikToggleSpec",
     module = "finstack_quant.statements",

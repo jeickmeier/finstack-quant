@@ -335,8 +335,9 @@ def test_model_ingest_is_rust_from_json() -> None:
         FinancialModelSpec.from_json(empty)
     with pytest.raises(ValueError, match="at least one period"):
         DependencyTracer(empty)
-    with pytest.raises(ValueError, match="invalid FinancialModelSpec JSON"):
+    with pytest.raises(ValueError, match="validation failed") as malformed:
         FinancialModelSpec.from_json("{")
+    assert "JSON parse error" in malformed.value.report[0]["message"]
 
 
 def test_capital_structure_sub_specs_validate() -> None:

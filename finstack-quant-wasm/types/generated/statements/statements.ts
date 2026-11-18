@@ -7212,8 +7212,9 @@ export interface PikElectionSpec {
   instrument_id: string;
   /**
    * Minimum number of consecutive coupon periods a PIK election lasts,
-   * counting the first elected period. `0` and `1` let the election end
-   * after one coupon period.
+   * counting the first elected period. With `0` a request for cash before
+   * the election starts withdraws it; with `1` an election, once made,
+   * covers its first coupon period.
    */
   min_coupon_periods?: number;
   /**

@@ -471,7 +471,7 @@ def test_cashflow_lookup_preserves_currency_guards() -> None:
     payload["totals_by_currency"] = {"USD": {}, "EUR": {}}
     cashflows = st.CapitalStructureCashflows.from_json(json.dumps(payload))
     assert cashflows.get_component("interest_expense", "TL-A", Q1) == 35.0
-    with pytest.raises(RuntimeError, match="Multiple currencies"):
+    with pytest.raises(RuntimeError, match="No total cashflow data"):
         cashflows.get_component("fees", "total", Q1)
     payload["by_instrument"]["TL-A"][Q1]["interest_expense_pik"]["currency"] = "EUR"
     cashflows = st.CapitalStructureCashflows.from_json(json.dumps(payload))

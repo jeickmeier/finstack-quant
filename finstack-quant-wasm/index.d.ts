@@ -9841,21 +9841,23 @@ export interface StatementsNamespace {
    */
   readonly statementResultGetScalar: typeof wasm.statementResultGetScalar;
   /**
-   * Value of one node in one period, or a fallback when it is absent.
+   * Value of one node in one period, or a fallback for a missing observation.
    *
    * Free-function twin of Python `StatementResult.get_or` (Rust
-   * `StatementResult::get_or`).
+   * `StatementResult::get_or`). The fallback applies only to a `missing` cell
+   * at a node and period the result holds.
    * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
    * @param nodeId - Node identifier to read.
    * @param period - Period identifier, e.g. `"2025Q1"`.
-   * @param defaultValue - Value returned when the node or period is absent, in the node's own units.
-   * @returns The node value, or `defaultValue`.
+   * @param defaultValue - Value returned for a missing observation, in the node's own units.
+   * @returns The node value, or `defaultValue` when the cell is missing.
    *
    * # Errors
    *
-   * Throws with kind `validation` if the result input is malformed or `period`
-   * is not a valid period identifier, and kind `invalid_type` if
-   * `defaultValue` is not a number.
+   * Throws with kind `validation` if the result input is malformed, `period`
+   * is not a valid period identifier or the cell is masked or unavailable,
+   * kind `not_found` if the result has no cell for the node and period, and
+   * kind `invalid_type` if `defaultValue` is not a number.
    */
   readonly statementResultGetOr: typeof wasm.statementResultGetOr;
   /**

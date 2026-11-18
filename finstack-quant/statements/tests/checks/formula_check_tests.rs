@@ -218,6 +218,14 @@ fn missing_node_returns_error() {
     let error = check.execute(&ctx).unwrap_err();
 
     assert!(error.to_string().contains("nonexistent"));
+
+    // A reference read only through `lag` is validated the same way.
+    let lagged = FormulaCheckSpec {
+        formula: "placeholder - lag(nonexistent, 1) > 0".into(),
+        ..check
+    };
+    let error = lagged.execute(&ctx).unwrap_err();
+    assert!(error.to_string().contains("nonexistent"), "{error}");
 }
 
 // Complex nested expression with parentheses

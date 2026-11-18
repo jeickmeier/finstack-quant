@@ -14,7 +14,6 @@ use finstack_quant_core::dates::{Date, PeriodId};
 use finstack_quant_core::money::Money;
 use finstack_quant_statements::builder::{MixedNodeBuilder, ModelBuilder};
 use finstack_quant_statements::capital_structure::WaterfallSpec;
-use finstack_quant_statements::types::FinancialModelSpec;
 use finstack_quant_statements::types::{
     AmountOrScalar, FinancialStatementInstrument, ForecastSpec, NodeSpec, RollupMethod,
 };
@@ -115,8 +114,7 @@ impl JsModelBuilder {
     pub fn from_spec(
         #[wasm_bindgen(unchecked_param_type = "JsonInput")] spec: JsValue,
     ) -> Result<JsModelBuilder, JsValue> {
-        let spec = FinancialModelSpec::from_json(&json_text(&spec, "spec")?)
-            .map_err(crate::utils::contract_to_js_err)?;
+        let spec = crate::api::statements::load_model(&spec, "spec")?;
         let builder = ModelBuilder::from_spec(spec).map_err(to_js_err)?;
         Ok(JsModelBuilder {
             inner: Some(builder),

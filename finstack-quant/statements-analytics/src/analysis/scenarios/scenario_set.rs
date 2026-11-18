@@ -718,11 +718,11 @@ impl ScenarioResults {
                 periods_col.push(period.to_string());
                 metrics_col.push((*metric).to_string());
 
-                let baseline_value = crate::cell_float(baseline_results, metric, &period);
+                let baseline_value = crate::cell_value(baseline_results, metric, &period);
 
                 for (idx, scenario_name) in scenario_names.iter().enumerate() {
                     if let Some(results) = self.scenarios.get(*scenario_name) {
-                        let value = crate::cell_float(results, metric, &period);
+                        let value = crate::cell_value(results, metric, &period);
                         scenario_values[idx].push(value);
                     } else {
                         scenario_values[idx].push(None);
@@ -731,7 +731,7 @@ impl ScenarioResults {
 
                 for (pct_idx, scenario_name) in non_baseline_names.iter().enumerate() {
                     if let Some(results) = self.scenarios.get(*scenario_name) {
-                        let value = crate::cell_float(results, metric, &period);
+                        let value = crate::cell_value(results, metric, &period);
 
                         // Percent change is undefined on a (near-)zero
                         // baseline; emit a null instead of a misleading 0%

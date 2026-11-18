@@ -1317,6 +1317,30 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements: fixes from the branch review
+
+- A run's provenance records the content identity of the validated model, so
+  a hand-built model whose value types were not yet inferred keeps a run that
+  verifies against it (rollups and supplied-results checks rejected it).
+- `lag`, `diff` and the other history functions over a consolidated
+  `cs.<component>.total` are unavailable for a period whose close FX quote is
+  missing, as the same-period read is; the evaluation used to fail.
+- A formula check rejects a reference to an unknown node inside `lag` or
+  `shift` when it is built; it used to report every period incomplete.
+- `MonteCarloResults.breach_probability` refuses a restored result whose path
+  count is zero or above 4,294,967,295.
+- The P&L summary, the credit assessment and the variance and scenario
+  comparison tables treat a cell without a value as a gap or as missing data;
+  they showed `NaN`.
+- A principal posting may repay interest a term loan has capitalized; it was
+  refused as exceeding the funded principal.
+- An excess-cash-flow sweep request is rounded to the currency's minor unit
+  (half away from zero) before it is paid; it used to be truncated.
+- `CapitalStructureCashflows.periods()` lists every period an instrument has,
+  including one that could not be consolidated.
+- WASM `applyScenario` reports a model that fails to load as a
+  `ContractValidationError` with its `report`, as every other entry point does.
+
 ### Statements models: one bounded loading path, identity after validation, decimal-string seeds
 
 Breaking, with no compatibility path (STATEMENTS-CONTRACTS-016).

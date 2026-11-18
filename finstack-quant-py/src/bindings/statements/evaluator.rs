@@ -233,7 +233,7 @@ impl PyStatementResult {
 
     /// Capital-structure cashflows (interest, principal, fees, balances per
     /// instrument and period), or ``None`` when the model has no capital
-    /// structure or was evaluated without a market context.
+    /// structure.
     #[getter]
     fn cs_cashflows(&self) -> Option<PyCapitalStructureCashflows> {
         self.inner

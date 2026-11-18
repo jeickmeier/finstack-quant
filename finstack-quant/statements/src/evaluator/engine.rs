@@ -68,6 +68,40 @@ pub struct PreparedEvaluation {
     formula_fingerprint: u64,
     /// Canonical units inferred and validated when the plan was prepared.
     pub(super) node_value_types: IndexMap<NodeId, NodeValueType>,
+    /// The `value_type` validation recorded on each node of the validated
+    /// model, so a run can hash the validated form of the caller's model.
+    validated_value_types: IndexMap<NodeId, NodeValueType>,
+}
+
+impl PreparedEvaluation {
+    /// The content identity of `model` in its validated form.
+    ///
+    /// Validation only adds inferred `value_type`s, so the caller's model with
+    /// those filled in is the validated model, without a second analysis.
+    fn model_content_hash(&self, model: &FinancialModelSpec) -> Result<String> {
+        let inferred = |id: &NodeId, node: &crate::types::NodeSpec| {
+            node.value_type
+                .is_none()
+                .then(|| self.validated_value_types.get(id).copied())
+                .flatten()
+        };
+        let hash = if model
+            .nodes
+            .iter()
+            .any(|(id, node)| inferred(id, node).is_some())
+        {
+            let mut validated = model.clone();
+            for (id, node) in &mut validated.nodes {
+                if let Some(value_type) = inferred(id, node) {
+                    node.value_type = Some(value_type);
+                }
+            }
+            validated.canonical_hash()
+        } else {
+            model.canonical_hash()
+        };
+        hash.map_err(super::results::hash_error)
+    }
 }
 
 /// Fingerprint the evaluation timeline and each node's calculation structure.
@@ -664,6 +698,11 @@ impl Evaluator {
             .map(|(id, node)| (id.clone(), node.value_type.unwrap_or(NodeValueType::Scalar)))
             .collect();
         self.node_value_types = std::sync::Arc::new(node_value_types.clone());
+        let validated_value_types = validated
+            .nodes
+            .iter()
+            .filter_map(|(id, node)| Some((id.clone(), node.value_type?)))
+            .collect();
         Ok(PreparedEvaluation {
             eval_order,
             node_to_column,
@@ -671,6 +710,7 @@ impl Evaluator {
             compiled_cache: std::sync::Arc::clone(&self.compiled_cache),
             formula_fingerprint: formula_fingerprint(model),
             node_value_types,
+            validated_value_types,
         })
     }
 
@@ -990,8 +1030,9 @@ impl Evaluator {
         results.meta = meta;
         results.periods = Some(model.periods.clone());
         results.populate_value_types(&prepared.node_value_types);
-        results.provenance = Some(crate::evaluator::RunProvenance::for_run(
+        results.provenance = Some(crate::evaluator::RunProvenance::with_model_hash(
             model,
+            prepared.model_content_hash(model)?,
             self.visibility_cutoff
                 .map_or(ObservationCutoff::FullSnapshot, ObservationCutoff::Through),
             valuation_date,

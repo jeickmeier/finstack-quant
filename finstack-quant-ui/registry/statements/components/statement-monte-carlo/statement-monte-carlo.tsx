@@ -6,6 +6,7 @@ import { scalePoint } from "@tanstack/charts/scales/point";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import type { MonteCarloResults } from "finstack-quant-wasm";
+import type { core as wire } from "finstack-quant-wasm/types";
 import { Button } from "@/components/ui/button";
 import { formatPercent, formatExact } from "@/lib/finstack/format/format";
 import { labelFor } from "@/lib/finstack/format/label.mjs";
@@ -52,7 +53,7 @@ function warningText(warning: unknown): string {
 export interface BreachRequest {
   metric: string;
   /** A number for a scalar metric; money in the metric's currency for a monetary one. */
-  threshold: number | { amount: string; currency: string };
+  threshold: number | wire.Money;
 }
 export interface StatementMonteCarloProps {
   /** Initial MonteCarloConfig; remount to load another. Omitted starts empty. */

@@ -230,38 +230,6 @@ impl EvaluationContext {
         }
     }
 
-    /// Get a capital-structure component from one completed period.
-    ///
-    /// `component` accepts `interest_expense`, `interest_expense_cash`,
-    /// `interest_expense_pik`, `principal_payment`, `debt_balance`, `fees`,
-    /// `accrued_interest`, `interest_arrears`, `principal_pending`,
-    /// `principal_arrears` or `principal_advance_reserve`. Pass an instrument identifier in
-    /// `instrument_or_total` for its native-currency value, or `total` for the
-    /// cashflow aggregate, which requires the reporting-currency invariant.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error if no historical snapshot exists for
-    /// `period_id`, the component is unknown, the instrument or its cashflow is
-    /// absent, or an aggregate cannot be formed under the currency invariant.
-    pub fn get_historical_cs_value(
-        &self,
-        component: &str,
-        instrument_or_total: &str,
-        period_id: &PeriodId,
-    ) -> Result<f64> {
-        let cashflows = self
-            .historical_capital_structure_cashflows
-            .get(period_id)
-            .ok_or_else(|| {
-                Error::capital_structure(format!(
-                    "No historical capital structure data for period {}",
-                    period_id
-                ))
-            })?;
-        cashflows.get_component(component, instrument_or_total, period_id)
-    }
-
     /// Get capital structure value for the current period.
     ///
     /// # Arguments
@@ -315,24 +283,30 @@ impl EvaluationContext {
     /// period could not be consolidated (a missing period-close FX quote, or
     /// no reporting currency) is unavailable; native values still resolve.
     pub(crate) fn get_cs(&self, component: &str, scope: &str) -> Result<super::value::Value> {
-        use crate::capital_structure::CsScope;
         let cs_cashflows = self
             .capital_structure_cashflows
             .as_ref()
             .ok_or_else(|| Error::capital_structure("No capital structure defined in model"))?;
-        let scope: CsScope = scope.parse()?;
-        if scope == CsScope::Consolidated
-            && cs_cashflows
-                .consolidation_unavailable
-                .contains_key(&self.period_id)
-        {
-            return Ok(super::value::Value::Unavailable(
-                super::UnavailableReason::MissingFxQuote,
-            ));
-        }
-        cs_cashflows
-            .get_money(component.parse()?, &scope, &self.period_id)
-            .map(super::value::Value::Money)
+        cs_value(cs_cashflows, component, scope, &self.period_id)
+    }
+
+    /// The typed value of a `cs.<component>.<scope>` reference in a completed
+    /// period, with the availability rules of [`Self::get_cs`].
+    pub(crate) fn get_historical_cs(
+        &self,
+        component: &str,
+        scope: &str,
+        period_id: &PeriodId,
+    ) -> Result<super::value::Value> {
+        let cashflows = self
+            .historical_capital_structure_cashflows
+            .get(period_id)
+            .ok_or_else(|| {
+                Error::capital_structure(format!(
+                    "No historical capital structure data for period {period_id}"
+                ))
+            })?;
+        cs_value(cashflows, component, scope, period_id)
     }
 
     /// Record which evaluation layer produced the current-period value of
@@ -378,6 +352,26 @@ impl EvaluationContext {
         }
         (results, self.warnings)
     }
+}
+
+/// One `cs.<component>.<scope>` value of `period_id` read from `cashflows`.
+fn cs_value(
+    cashflows: &crate::capital_structure::CapitalStructureCashflows,
+    component: &str,
+    scope: &str,
+    period_id: &PeriodId,
+) -> Result<super::value::Value> {
+    use crate::capital_structure::CsScope;
+    let scope: CsScope = scope.parse()?;
+    if scope == CsScope::Consolidated && cashflows.consolidation_unavailable.contains_key(period_id)
+    {
+        return Ok(super::value::Value::Unavailable(
+            super::UnavailableReason::MissingFxQuote,
+        ));
+    }
+    cashflows
+        .get_money(component.parse()?, &scope, period_id)
+        .map(super::value::Value::Money)
 }
 
 #[cfg(test)]

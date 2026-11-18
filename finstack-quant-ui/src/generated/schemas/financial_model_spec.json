@@ -7202,7 +7202,7 @@
         },
         "min_coupon_periods": {
           "default": 0,
-          "description": "Minimum number of consecutive coupon periods a PIK election lasts,\ncounting the first elected period. `0` and `1` let the election end\nafter one coupon period.",
+          "description": "Minimum number of consecutive coupon periods a PIK election lasts,\ncounting the first elected period. With `0` a request for cash before\nthe election starts withdraws it; with `1` an election, once made,\ncovers its first coupon period.",
           "format": "uint",
           "minimum": 0,
           "type": "integer"

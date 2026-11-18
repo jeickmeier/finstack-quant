@@ -1,7 +1,6 @@
 //! Stateful statements-analytics handles: the dependency tracer and the
 //! corkscrew and credit-scorecard extensions.
 
-use super::parse_model;
 use crate::utils::input::{from_js_json, js_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_statements::evaluator::{DependencyGraph, StatementResult};
@@ -54,7 +53,7 @@ impl JsDependencyTracer {
     pub fn new(
         #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
     ) -> Result<JsDependencyTracer, JsValue> {
-        let model = parse_model(&model)?;
+        let model = crate::api::statements::load_model(&model, "model")?;
         let graph = DependencyGraph::from_model(&model).map_err(to_js_err)?;
         Ok(JsDependencyTracer { model, graph })
     }
@@ -261,7 +260,7 @@ impl JsCorkscrewExtension {
         #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
         #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
     ) -> Result<JsValue, JsValue> {
-        let model = parse_model(&model)?;
+        let model = crate::api::statements::load_model(&model, "model")?;
         let results: StatementResult = from_js_json(&results, "results")?;
         to_js_value(&self.inner.execute(&model, &results).map_err(to_js_err)?)
     }
@@ -367,7 +366,7 @@ impl JsCreditScorecardExtension {
         #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
         #[wasm_bindgen(unchecked_param_type = "StatementResult | string")] results: JsValue,
     ) -> Result<JsValue, JsValue> {
-        let model = parse_model(&model)?;
+        let model = crate::api::statements::load_model(&model, "model")?;
         let results: StatementResult = from_js_json(&results, "results")?;
         to_js_value(&self.inner.execute(&model, &results).map_err(to_js_err)?)
     }

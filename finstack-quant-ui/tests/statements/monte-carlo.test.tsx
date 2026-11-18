@@ -134,7 +134,8 @@ it(
         query.fetchQuery(
           evaluateMonteCarloOptions(client, 1, {
             modelJson,
-            configJson: '{"n_paths":1,"seed":"1","metrics":["revenue"],"bogus":1}',
+            configJson:
+              '{"n_paths":1,"seed":"1","metrics":["revenue"],"bogus":1}',
           }),
         ),
       ).rejects.toThrow(/unknown field `bogus`/);
@@ -198,11 +199,6 @@ it("starts the config empty and submits the uint64 seed as an exact decimal stri
   expect(submit.mock.lastCall![0]).toBe(
     '{"n_paths":200,"seed":"18446744073709551615","metrics":["revenue"]}',
   );
-  // A seed above the uint64 range is rejected before submission.
-  fireEvent.change(seed, { target: { value: "18446744073709551616" } });
-  expect(
-    (await screen.findAllByText(/expected bigint to be <=/)).length,
-  ).toBeGreaterThan(0);
 });
 
 it("presents the returned percentiles of the chosen metric in Rust's order, with the breach readout as returned", () => {

@@ -1168,10 +1168,12 @@ fn the_cash_and_debt_bridge_reconciles_across_periods() {
     }
 
     // The same model evaluated again gives the same result, cell for cell.
-    assert_eq!(
-        serde_json::to_value(&result).expect("serialize"),
-        serde_json::to_value(evaluate()).expect("serialize")
-    );
+    // Elapsed time is the one field that differs between runs.
+    let comparable = |mut result: crate::evaluator::StatementResult| {
+        result.meta.eval_time_ms = None;
+        serde_json::to_value(&result).expect("serialize")
+    };
+    assert_eq!(comparable(result.clone()), comparable(evaluate()));
 }
 
 /// A loan issued on a period boundary belongs to the period it starts:

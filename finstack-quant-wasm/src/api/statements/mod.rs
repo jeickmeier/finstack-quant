@@ -25,6 +25,26 @@ use crate::utils::to_js_err;
 use finstack_quant_statements::types::FinancialModelSpec;
 use wasm_bindgen::prelude::*;
 
+/// Load a model argument (object or JSON) through the one Rust loader.
+///
+/// # Arguments
+///
+/// * `value` - The JavaScript model argument.
+/// * `label` - The camelCase argument name, used in a type error.
+///
+/// # Errors
+///
+/// A decode failure is a `ContractValidationError` with its `report`; a
+/// model that is not runnable is the Rust error with its kind.
+pub(crate) fn load_model(value: &JsValue, label: &str) -> Result<FinancialModelSpec, JsValue> {
+    load_model_text(&json_text(value, label)?)
+}
+
+/// [`load_model`] for model JSON already held as text.
+pub(crate) fn load_model_text(json: &str) -> Result<FinancialModelSpec, JsValue> {
+    FinancialModelSpec::from_json(json).map_err(crate::utils::contract_to_js_err)
+}
+
 /// Validate a `FinancialModelSpec` JSON string.
 ///
 /// Parses the input with the Rust `FinancialModelSpec::from_json` (schema
@@ -45,7 +65,7 @@ pub fn validate_financial_model_json(
     #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
 ) -> Result<String, JsValue> {
     let json: &str = &json_text(&json, "json")?;
-    let model = FinancialModelSpec::from_json(json).map_err(crate::utils::contract_to_js_err)?;
+    let model = crate::api::statements::load_model_text(json)?;
     serde_json::to_string(&model).map_err(to_js_err)
 }
 
@@ -68,7 +88,7 @@ pub fn model_node_ids(
     #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
 ) -> Result<JsValue, JsValue> {
     let json: &str = &json_text(&json, "json")?;
-    let model = FinancialModelSpec::from_json(json).map_err(crate::utils::contract_to_js_err)?;
+    let model = crate::api::statements::load_model_text(json)?;
     let ids: Vec<&str> = model.nodes.keys().map(|k| k.as_str()).collect();
     crate::utils::to_js_value(&ids)
 }
@@ -90,8 +110,7 @@ pub fn apply_model_edits(
     #[wasm_bindgen(unchecked_param_type = "generated.statements.ModelEdit[] | string")]
     edits: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let mut model = FinancialModelSpec::from_json(&json_text(&model, "model")?)
-        .map_err(crate::utils::contract_to_js_err)?;
+    let mut model = crate::api::statements::load_model(&model, "model")?;
     let edits: Vec<finstack_quant_statements::types::ModelEdit> = from_js_json(&edits, "edits")?;
     model.apply_edits(&edits).map_err(to_js_err)?;
     crate::utils::to_js_value(&model)
@@ -449,8 +468,7 @@ pub fn statement_result_to_table_wide(
 pub fn financial_model_content_hash(
     #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
 ) -> Result<String, JsValue> {
-    FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?)
-        .map_err(crate::utils::contract_to_js_err)?
+    crate::api::statements::load_model(&model_json, "modelJson")?
         .content_hash()
         .map_err(to_js_err)
 }

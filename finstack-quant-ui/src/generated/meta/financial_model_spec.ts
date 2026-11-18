@@ -7530,7 +7530,7 @@ export default [
     "path": "#/$defs/d_b19f3a94967e48a6e9b7/properties/min_coupon_periods",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikElectionSpec/properties/min_coupon_periods",
     "default": 0,
-    "description": "Minimum number of consecutive coupon periods a PIK election lasts,\ncounting the first elected period. `0` and `1` let the election end\nafter one coupon period.",
+    "description": "Minimum number of consecutive coupon periods a PIK election lasts,\ncounting the first elected period. With `0` a request for cash before\nthe election starts withdraws it; with `1` an election, once made,\ncovers its first coupon period.",
     "format": "uint",
     "minimum": 0
   },

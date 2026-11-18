@@ -268,7 +268,7 @@ pub fn apply_scenario(
         .as_deref()
         .map(finstack_quant_statements::types::FinancialModelSpec::from_json)
         .transpose()
-        .map_err(to_js_err)?;
+        .map_err(crate::utils::contract_to_js_err)?;
     let date = parse_iso_date(as_of)?;
     let mut instruments = extract_instruments(instruments_json)?;
     let report = {

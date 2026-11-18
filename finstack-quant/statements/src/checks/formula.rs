@@ -225,8 +225,11 @@ impl FormulaCheckSpec {
         what: &str,
     ) -> Result<(finstack_quant_core::expr::Expr, bool)> {
         let ast = crate::dsl::parse_formula(text)?;
-        for node in crate::utils::formula::extract_direct_dependencies(&ast) {
-            if !node.as_str().starts_with("cs.") && !units.node_types.contains_key(&node) {
+        // Every identifier, including one read only through `lag` or `shift`.
+        let mut references = indexmap::IndexSet::new();
+        crate::utils::formula::collect_identifiers_from_ast(&ast, &mut references, false);
+        for node in references {
+            if !node.starts_with("cs.") && !units.node_types.contains_key(node.as_str()) {
                 return Err(crate::Error::invalid_input(format!(
                     "formula check '{}': the {what} references '{node}', which is not a node \
                      of the model",

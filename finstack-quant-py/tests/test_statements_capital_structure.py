@@ -382,7 +382,7 @@ def test_pik_elections_are_required_and_checked() -> None:
             threshold=1.0,
             elections=[{"instrument_id": "TL", "pik_fraction": "1.5"}],
         ).validate()
-    with pytest.raises(ValueError, match="threshold"):
+    with pytest.raises(ValueError, match="finite"):
         statements.PikToggleSpec(
             liquidity_metric="cash", threshold=float("nan"), elections=[{"instrument_id": "TL", "pik_fraction": "1"}]
         ).validate()

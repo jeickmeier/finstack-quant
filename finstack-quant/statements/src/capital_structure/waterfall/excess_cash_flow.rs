@@ -65,5 +65,9 @@ pub(super) fn calculate_ecf_sweep(
     if ecf.amount_decimal() <= rust_decimal::Decimal::ZERO {
         return Ok(Money::from((0_i64, currency)));
     }
-    Ok(ecf.checked_mul_f64(spec.sweep_percentage)?)
+    // The request is the swept fraction rounded to the currency's minor unit.
+    Ok(ecf.checked_mul_f64(spec.sweep_percentage)?.round(
+        u32::from(currency.decimals()),
+        finstack_quant_core::config::RoundingMode::MidpointAwayFromZero,
+    )?)
 }

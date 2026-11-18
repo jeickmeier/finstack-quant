@@ -359,6 +359,14 @@ impl MonteCarloResults {
                 "breach threshold for metric '{metric}' must be finite, got {level}"
             )));
         }
+        // A restored result is untrusted: the path count sizes the tally.
+        if self.n_paths == 0 || u32::try_from(self.n_paths).is_err() {
+            return Err(Error::eval(format!(
+                "Monte Carlo results record {} paths; a run has 1 to {}",
+                self.n_paths,
+                u32::MAX
+            )));
+        }
         let restored;
         let metric_map = if self.path_values.is_empty() {
             let Some(table) = self.path_data.as_ref() else {
@@ -445,7 +453,7 @@ impl MonteCarloResults {
             }
             out.entry(period).or_default().push((*path_id, *value));
         }
-        if seen.len() != self.n_paths * self.forecast_periods.len() {
+        if Some(seen.len()) != self.n_paths.checked_mul(self.forecast_periods.len()) {
             return Err(malformed(&format!(
                 "'{metric}' has {} samples; a complete run has {} paths x {} forecast periods",
                 seen.len(),
@@ -871,8 +879,8 @@ impl MonteCarloAccumulator {
     }
 
     // Only the rayon `reduce` path calls `merge`; the wasm32 serial
-    // accumulator folds in place, so this is dead code there.
-    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+    // accumulator folds in place.
+    #[cfg(any(not(target_arch = "wasm32"), test))]
     pub(crate) fn merge(mut self, other: Self) -> Result<Self> {
         if self.expected_paths != other.expected_paths
             || self.percentiles != other.percentiles
@@ -1238,6 +1246,14 @@ mod tests {
             breach(&restored, AmountOrScalar::scalar(5.0)).expect("typed"),
             Some(0.5)
         );
+        // A restored path count outside a run's domain is refused before it
+        // sizes anything.
+        for n_paths in [0_u64, 1 << 63] {
+            let mut forged = wire.clone();
+            forged["n_paths"] = serde_json::json!(n_paths);
+            let forged: MonteCarloResults = serde_json::from_value(forged).expect("restore");
+            assert!(breach(&forged, AmountOrScalar::scalar(5.0)).is_err());
+        }
         // Without path samples it is unavailable.
         let mut without = wire;
         without.as_object_mut().expect("object").remove("path_data");

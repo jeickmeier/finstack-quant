@@ -4,14 +4,13 @@
 //! `StatementResult`, `CapitalStructureCashflows`, `CheckReport` and
 //! `FinancialModelSpec` is a function taking the object (or its JSON).
 
-use crate::utils::input::{from_js_json, js_f64, js_string, json_text};
+use crate::utils::input::{from_js_json, js_f64, js_string};
 use crate::utils::wire::js_wire;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::{PeriodId, PeriodKind};
 use finstack_quant_statements::capital_structure::CapitalStructureCashflows;
 use finstack_quant_statements::checks::{CheckReport, Severity};
 use finstack_quant_statements::evaluator::{RollupSpec, StatementResult};
-use finstack_quant_statements::types::FinancialModelSpec;
 use wasm_bindgen::prelude::*;
 
 fn period_id(period: &JsValue) -> Result<PeriodId, JsValue> {
@@ -83,8 +82,7 @@ pub fn statement_result_rollup(
     spec: JsValue,
 ) -> Result<JsValue, JsValue> {
     let result: StatementResult = from_js_json(&result_json, "resultJson")?;
-    let model = FinancialModelSpec::from_json(&json_text(&model, "model")?)
-        .map_err(crate::utils::contract_to_js_err)?;
+    let model = crate::api::statements::load_model(&model, "model")?;
     let spec: RollupSpec = from_js_json(&spec, "spec")?;
     to_js_value(&result.rollup(&model, &spec).map_err(to_js_err)?)
 }
@@ -109,8 +107,7 @@ pub fn rollup_spec_declared_methods(
     #[wasm_bindgen(unchecked_param_type = "'quarterly' | 'semi_annual' | 'annual'")]
     frequency: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let model = FinancialModelSpec::from_json(&json_text(&model, "model")?)
-        .map_err(crate::utils::contract_to_js_err)?;
+    let model = crate::api::statements::load_model(&model, "model")?;
     let frequency: PeriodKind = js_wire(&frequency, "frequency")?;
     to_js_value(&RollupSpec::declared_methods(&model, frequency))
 }
@@ -205,21 +202,23 @@ pub fn statement_result_get_scalar(
     Ok(result.get_scalar(&js_string(&node_id, "nodeId")?, &period_id(&period)?))
 }
 
-/// Value of one node in one period, or a fallback when it is absent.
+/// Value of one node in one period, or a fallback for a missing observation.
 ///
 /// Free-function twin of Python `StatementResult.get_or` (Rust
-/// `StatementResult::get_or`).
+/// `StatementResult::get_or`). The fallback applies only to a `missing` cell
+/// at a node and period the result holds.
 /// @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
 /// @param nodeId - Node identifier to read.
 /// @param period - Period identifier, e.g. `"2025Q1"`.
-/// @param defaultValue - Value returned when the node or period is absent, in the node's own units.
-/// @returns The node value, or `defaultValue`.
+/// @param defaultValue - Value returned for a missing observation, in the node's own units.
+/// @returns The node value, or `defaultValue` when the cell is missing.
 ///
 /// # Errors
 ///
-/// Throws with kind `validation` if the result input is malformed or `period`
-/// is not a valid period identifier, and kind `invalid_type` if
-/// `defaultValue` is not a number.
+/// Throws with kind `validation` if the result input is malformed, `period`
+/// is not a valid period identifier or the cell is masked or unavailable,
+/// kind `not_found` if the result has no cell for the node and period, and
+/// kind `invalid_type` if `defaultValue` is not a number.
 #[wasm_bindgen(js_name = statementResultGetOr)]
 pub fn statement_result_get_or(
     #[wasm_bindgen(
@@ -337,8 +336,7 @@ pub fn financial_model_has_node(
     #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
     #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
 ) -> Result<bool, JsValue> {
-    let model = FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?)
-        .map_err(crate::utils::contract_to_js_err)?;
+    let model = crate::api::statements::load_model(&model_json, "modelJson")?;
     Ok(model.has_node(&js_string(&node_id, "nodeId")?))
 }
 
@@ -359,8 +357,7 @@ pub fn financial_model_get_node(
     #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
     #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let model = FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?)
-        .map_err(crate::utils::contract_to_js_err)?;
+    let model = crate::api::statements::load_model(&model_json, "modelJson")?;
     match model.get_node(&js_string(&node_id, "nodeId")?) {
         Some(node) => to_js_value(node),
         None => Ok(JsValue::UNDEFINED),

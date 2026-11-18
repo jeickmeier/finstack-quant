@@ -294,6 +294,17 @@ pub(crate) fn generate_cashflows_with_postings(
     // the remaining balance.  This guards against over-amortization when
     // PercentOfOriginalPerPeriod pct × num_periods > 1 or when cash sweeps
     // combine with scheduled amortization to exceed the notional.
+    //
+    // This pass sees funded principal only. On a loan that can capitalize
+    // interest the balance a posting repays includes PIK the builder has not
+    // produced yet, so a posting neither enters the running balance nor is
+    // judged here; the builder refuses one that takes the balance negative.
+    let capitalizes = loan.coupon_type != CouponType::Cash
+        || !elections.is_empty()
+        || loan
+            .covenants
+            .as_ref()
+            .is_some_and(|covenants| !covenants.pik_toggles.is_empty());
     {
         let mut running = 0.0_f64;
         for event in &mut principal_events {
@@ -310,7 +321,7 @@ pub(crate) fn generate_cashflows_with_postings(
                     }
                     running -= capped;
                 }
-                CFKind::PrePayment => {
+                CFKind::PrePayment if !capitalizes => {
                     running += event.delta.amount();
                     if running < -1e-9 {
                         return Err(finstack_quant_core::Error::Validation(format!(

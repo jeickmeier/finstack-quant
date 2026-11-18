@@ -1,7 +1,6 @@
 //! Free-function twins of the Python analysis entry points and of the
 //! methods on plain-object analysis types.
 
-use super::parse_model;
 use crate::utils::input::{from_js_json, js_opt_string, js_string, js_string_seq, js_uint};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::PeriodId;
@@ -48,7 +47,7 @@ pub fn evaluate_dcf(
     #[wasm_bindgen(js_name = "asOf", unchecked_optional_param_type = "string | null")]
     as_of: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let model = parse_model(&model)?;
+    let model = crate::api::statements::load_model(&model, "model")?;
     let inputs: fa::DcfInputs = from_js_json(&inputs, "inputs")?;
     let options: fa::DcfOptions =
         crate::utils::wire::js_opt_wire(options.as_ref(), "options")?.unwrap_or_default();
@@ -86,7 +85,7 @@ pub fn run_corporate_analysis(
     options: Option<JsValue>,
     #[wasm_bindgen(unchecked_optional_param_type = "JsonInput | null")] market: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let model = parse_model(&model)?;
+    let model = crate::api::statements::load_model(&model, "model")?;
     let options: fa::CorporateAnalysisOptions =
         crate::utils::wire::js_opt_wire(options.as_ref(), "options")?.unwrap_or_default();
     let market: Option<finstack_quant_core::market_data::context::MarketContext> =

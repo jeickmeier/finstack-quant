@@ -101,7 +101,7 @@ class MonteCarloConfig:
         Examples
         --------
         >>> from finstack_quant.statements import MonteCarloConfig
-        >>> config = MonteCarloConfig(4, 7, [0.5])
+        >>> config = MonteCarloConfig(4, 7, ["revenue"], [0.5])
         >>> MonteCarloConfig.from_json(config.to_json()).n_paths
         4
 
@@ -221,7 +221,7 @@ class MonteCarloResults:
     Examples
     --------
     >>> from finstack_quant.statements import MonteCarloResults
-    >>> payload = '{"percentile_results":{},"n_paths":2,"percentiles":[0.5],"forecast_periods":[],"path_data":null}'
+    >>> payload = '{"percentile_results":{},"n_paths":2,"seed":"7","stream_version":1,"metrics":[],"percentiles":[0.5],"forecast_periods":[]}'
     >>> MonteCarloResults.from_json(payload).n_paths
     2
 
@@ -251,7 +251,7 @@ class MonteCarloResults:
         Examples
         --------
         >>> from finstack_quant.statements import MonteCarloResults
-        >>> payload = '{"percentile_results":{},"n_paths":2,"percentiles":[0.5],"forecast_periods":[],"path_data":null}'
+        >>> payload = '{"percentile_results":{},"n_paths":2,"seed":"7","stream_version":1,"metrics":[],"percentiles":[0.5],"forecast_periods":[]}'
         >>> MonteCarloResults.from_json(payload).forecast_periods
         []
 
@@ -475,8 +475,8 @@ class MonteCarloResults:
             Node identifier whose simulated distribution to read.
         percentile : float
             Quantile as a decimal fraction in [0, 1] (``0.95`` for the 95th
-            percentile). It must match a configured percentile to within
-            1e-12; nothing is interpolated between configured levels.
+            percentile). It must equal a configured percentile exactly; nothing
+            is interpolated between configured levels.
 
         Returns
         -------
@@ -502,8 +502,8 @@ class MonteCarloResults:
         monetary nodes, unitless otherwise).
 
         Columns: one per configured percentile, named ``p<q>`` where ``q`` is
-        the quantile as a decimal fraction — ``p0.05``, ``p0.5``, ``p0.95`` for
-        the default levels. A cell is ``NaN`` when a period is missing that
+        the quantile in percent — ``p5``, ``p50``, ``p95`` for the default
+        levels. A cell is ``NaN`` when a period is missing that
         percentile.
 
         Parameters

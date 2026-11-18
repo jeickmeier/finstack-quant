@@ -688,19 +688,17 @@ fn flows_table<'a>(
 }
 
 impl CapitalStructureCashflows {
-    /// Periods covered by these cashflows, in ascending order.
-    ///
-    /// Uses the periods of the reporting totals when they exist; otherwise the
-    /// sorted union of every instrument's periods.
+    /// Periods covered by these cashflows, in ascending order: every period
+    /// any instrument has a breakdown for, whether or not that period could
+    /// be consolidated.
     #[must_use]
     pub fn periods(&self) -> Vec<PeriodId> {
-        if !self.totals.is_empty() {
-            return self.totals.keys().copied().collect();
-        }
         let mut periods: Vec<PeriodId> = self
             .by_instrument
             .values()
+            .chain(self.totals_by_currency.values())
             .flat_map(|by_period| by_period.keys().copied())
+            .chain(self.totals.keys().copied())
             .collect();
         periods.sort();
         periods.dedup();

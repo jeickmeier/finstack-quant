@@ -33,15 +33,13 @@
 //! - Same seed → identical forecast values across runs
 //! - Different seeds → different (but still deterministic) values
 //!
-//! Both single-run evaluation and Monte Carlo mode mix a stable hash of the
-//! node identifier into the configured seed so independent stochastic nodes do
-//! not share identical shock draws (Monte Carlo additionally layers a per-path
-//! seed offset).
+//! Each stochastic node draws from its own versioned stream, keyed by the
+//! configured seed, the node identifier and, in Monte Carlo, the path (see
+//! `forecast::stream`), so independent nodes never share shock draws.
 //! Optional `correlation_with` / `correlation` parameters pair Normal,
 //! LogNormal, and MeanReverting nodes for correlated
-//! shocks (see `forecast::statistical::correlation`). The peer node must
-//! appear earlier in the evaluation order (for example via a formula dependency) so its
-//! Z-scores are available when the dependent node is simulated.
+//! shocks (see `forecast::statistical::correlation`); the peer's run is
+//! generated on demand when the dependent node is simulated.
 //!
 //! The RNG uses the Box-Muller transform for normal distribution sampling,
 //! with guards against edge cases (e.g., ln(0)).

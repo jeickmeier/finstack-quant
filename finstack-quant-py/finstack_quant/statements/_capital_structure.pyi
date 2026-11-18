@@ -827,7 +827,7 @@ class WaterfallSpec:
         Returns
         -------
         PikToggleSpec | None
-            PIK signal, threshold, eligible instruments, and hysteresis, or None when omitted.
+            PIK signal, threshold and per-loan elections, or None when omitted.
 
         Notes
         -----

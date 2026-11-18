@@ -119,6 +119,17 @@ pub mod templates;
 #[doc = include_str!("../README.md")]
 struct ReadmeDoctests;
 
+/// A cell's finite number, or `None` when the cell is absent or has no value
+/// (missing, masked or unavailable): for output a reader sees, where a cell
+/// without a value is a gap or a missing-data error, never `NaN`.
+pub(crate) fn cell_value(
+    results: &finstack_quant_statements::evaluator::StatementResult,
+    node_id: &str,
+    period_id: &finstack_quant_core::dates::PeriodId,
+) -> Option<f64> {
+    cell_float(results, node_id, period_id).filter(|value| value.is_finite())
+}
+
 /// The float view analytics computes on: a value cell's number, `NaN` for a
 /// cell that is present without a value (missing, masked or unavailable), and
 /// `None` when the result has no cell for the node and period.

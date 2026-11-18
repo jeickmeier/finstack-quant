@@ -66,9 +66,7 @@ fn historical_value(
             if !has_snapshot {
                 return Ok(MISSING);
             }
-            context
-                .get_historical_cs_value(component, instrument_or_total, &target_period)
-                .map(Value::from_float)
+            context.get_historical_cs(component, instrument_or_total, &target_period)
         }
         _ => {
             if !context.history.contains_key(&target_period) && !has_snapshot {

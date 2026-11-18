@@ -229,7 +229,7 @@ impl PLSummaryReport<'_> {
             for period in &self.periods {
                 line_items.push(line_item.clone());
                 periods.push(period.to_string());
-                values.push(crate::cell_float(self.results, line_item, period));
+                values.push(crate::cell_value(self.results, line_item, period));
             }
         }
         let columns = vec![
@@ -261,7 +261,7 @@ impl fmt::Display for PLSummaryReport<'_> {
             for period in &self.periods {
                 // Render missing line items as "-" rather than a misleading
                 // 0.00 (zero is a legitimate value, absence is not).
-                let cell = match crate::cell_float(self.results, line_item, period) {
+                let cell = match crate::cell_value(self.results, line_item, period) {
                     Some(value) => format!("{:.2}", value),
                     None => "-".to_string(),
                 };
@@ -479,8 +479,7 @@ impl CreditAssessment {
                     period: period.to_string(),
                     leverage_ratio: leverage_at(results, &period)?,
                     interest_coverage: interest_coverage_at(results, &period)?,
-                    free_cash_flow: crate::cell_float(results, "free_cash_flow", &period)
-                        .filter(|value| value.is_finite()),
+                    free_cash_flow: crate::cell_value(results, "free_cash_flow", &period),
                 })
             })
             .collect::<finstack_quant_statements::Result<_>>()?;
@@ -489,8 +488,7 @@ impl CreditAssessment {
             period: period.to_string(),
             leverage_ratio: leverage_at(results, &period)?,
             interest_coverage: interest_coverage_at(results, &period)?,
-            free_cash_flow: crate::cell_float(results, "free_cash_flow", &period)
-                .filter(|value| value.is_finite()),
+            free_cash_flow: crate::cell_value(results, "free_cash_flow", &period),
             series,
         })
     }
@@ -551,7 +549,7 @@ impl CreditAssessmentReport {
             period,
             leverage_ratio: leverage_at(results, &period)?,
             interest_coverage: interest_coverage_at(results, &period)?,
-            free_cash_flow: crate::cell_float(results, "free_cash_flow", &period),
+            free_cash_flow: crate::cell_value(results, "free_cash_flow", &period),
         })
     }
 }
@@ -684,6 +682,32 @@ mod tests {
             !output.contains("0.00"),
             "missing value must not render as 0.00: {output}"
         );
+    }
+
+    /// An evaluated two-quarter model whose `revenue` has no observation in
+    /// Q2: the result holds a cell there, without a value.
+    fn evaluated_with_a_gap() -> StatementResult {
+        use finstack_quant_statements::builder::ModelBuilder;
+        use finstack_quant_statements::evaluator::Evaluator;
+        let mut builder = ModelBuilder::new("gap");
+        builder.periods("2025Q1..Q2", None).expect("periods");
+        builder.value_scalar(
+            "revenue",
+            &[(PeriodId::quarter(2025, 1).expect("quarter"), 1234.5)],
+        );
+        let model = builder.build().expect("model");
+        Evaluator::new().evaluate(&model).expect("evaluates")
+    }
+
+    #[test]
+    fn pl_summary_renders_dash_for_a_cell_without_a_value() {
+        let results = evaluated_with_a_gap();
+        let q1 = PeriodId::quarter(2025, 1).expect("quarter");
+        let q2 = PeriodId::quarter(2025, 2).expect("quarter");
+        let report = PLSummaryReport::new(&results, vec!["revenue"], vec![q1, q2]);
+        let output = report.to_string();
+        assert!(output.contains("1234.50"), "{output}");
+        assert!(!output.contains("NaN"), "{output}");
     }
 
     #[test]

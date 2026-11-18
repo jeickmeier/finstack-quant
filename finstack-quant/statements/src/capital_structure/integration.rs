@@ -1,13 +1,9 @@
 //! Capital Structure Integration Logic
 //!
-//! Aggregation driver that walks every instrument in a
-//! [`crate::types::CapitalStructureSpec`], pulls per-instrument cashflows via
-//! [`finstack_quant_valuations::instruments::Instrument`], classifies them using
-//! `CFKind` and the declared instrument kind into
-//! the [`CashflowBreakdown`] buckets, and rolls them into per-period totals
-//! both per-currency and (when FX is available) in the reporting currency.
-//!
-//! The single-instrument / single-period extraction lives in
+//! Builds the typed instruments of a [`crate::types::CapitalStructureSpec`].
+//! Period aggregation and consolidation run in the evaluator's
+//! capital-structure runtime; the single-instrument / single-period
+//! extraction lives in
 //! [`crate::capital_structure::period_flows`]. The optional JSON-spec →
 //! instrument constructor `build_instrument_from_spec()` resolves the typed
 //! instrument payload through the valuations registry.

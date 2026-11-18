@@ -444,7 +444,7 @@ export interface MonteCarloBreachRequest {
   readonly resultsJson: string;
   readonly metric: string;
   /** Breach level in the metric's own units: a number for a scalar metric, money in its currency for a monetary one. */
-  readonly threshold: number | { amount: string; currency: string };
+  readonly threshold: number | wire.Money;
 }
 /** Native CovenantSpec wire object (a template's specs, ready to wrap as `{ specs }`). */
 export type CovenantSpec = covenantsWire.CovenantSpec;

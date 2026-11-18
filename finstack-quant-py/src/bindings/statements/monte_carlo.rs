@@ -220,8 +220,8 @@ impl PyMonteCarloResults {
     ///     Node identifier whose simulated distribution to read.
     /// percentile : float
     ///     Quantile as a decimal fraction in [0, 1] (``0.95`` for the 95th
-    ///     percentile). It must match a configured percentile to within
-    ///     1e-12; nothing is interpolated between configured levels.
+    ///     percentile). It must equal a configured percentile exactly;
+    ///     nothing is interpolated between configured levels.
     ///
     /// Returns
     /// -------

@@ -46,7 +46,7 @@
 //! # }
 //! ```
 
-use finstack_quant_core::contract::{LoadLimits, deserialize_json_value, parse_json_value};
+use finstack_quant_core::contract::{LoadLimits, parse_json_value};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_statements::evaluator::Evaluator;
@@ -140,9 +140,8 @@ impl GoalSeekResult {
     /// Load a goal-seek result from its canonical JSON, validating the model.
     ///
     /// The document is parsed under the default [`LoadLimits`] with duplicate
-    /// keys rejected, and the embedded model goes through
-    /// [`FinancialModelSpec::from_slice_strict`], so a persisted or
-    /// hand-edited result cannot carry a model the model loader would reject.
+    /// keys rejected, and the embedded model is validated, so a persisted or
+    /// hand-edited result cannot carry a model that is not runnable.
     ///
     /// # Arguments
     ///
@@ -157,38 +156,15 @@ impl GoalSeekResult {
     /// version, and the model's validation error when the embedded model is
     /// not runnable.
     pub fn from_json(json: &str) -> Result<Self> {
-        #[derive(serde::Deserialize)]
-        #[serde(deny_unknown_fields)]
-        struct Wire {
-            solved_value: f64,
-            model: Option<serde_json::Value>,
-            #[serde(default)]
-            residual: f64,
-            #[serde(default)]
-            tolerance: f64,
-            #[serde(default)]
-            evaluations: usize,
-            #[serde(default)]
-            converged: bool,
+        // Limits and key uniqueness are checked on a JSON value; the result
+        // is decoded from the text so the model keeps its node order.
+        parse_json_value(json.as_bytes(), &LoadLimits::default())?;
+        let mut result: Self = serde_json::from_str(json)
+            .map_err(|e| Error::Serde(format!("invalid GoalSeekResult JSON: {e}")))?;
+        if let Some(model) = result.model.as_mut() {
+            model.validate_semantics()?;
         }
-        let limits = LoadLimits::default();
-        let wire: Wire =
-            deserialize_json_value(parse_json_value(json.as_bytes(), &limits)?, &limits)?;
-        let model = wire
-            .model
-            .map(|model| {
-                let bytes = serde_json::to_vec(&model)?;
-                Ok::<_, Error>(FinancialModelSpec::from_slice_strict(&bytes, &limits)?)
-            })
-            .transpose()?;
-        Ok(Self {
-            solved_value: wire.solved_value,
-            model,
-            residual: wire.residual,
-            tolerance: wire.tolerance,
-            evaluations: wire.evaluations,
-            converged: wire.converged,
-        })
+        Ok(result)
     }
 }
 

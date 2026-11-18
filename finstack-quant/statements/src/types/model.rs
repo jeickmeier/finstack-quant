@@ -2,7 +2,10 @@
 
 use crate::error::{Error, Result};
 use crate::types::{ForecastSpec, NodeId, NodeSpec, NodeType};
-use finstack_quant_core::contract::{ContractDescriptor, ContractError, LoadLimits};
+use finstack_quant_core::contract::{
+    ContractDescriptor, ContractError, Diagnostic, LoadLimits, LoadPhase, Severity,
+    ValidationReport,
+};
 use finstack_quant_core::dates::{PeriodId, PeriodPlan};
 use finstack_quant_core::wire::SchemaVersion;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
@@ -322,7 +325,24 @@ impl FinancialModelSpec {
         bytes: &[u8],
         limits: &LoadLimits,
     ) -> std::result::Result<Self, ContractError> {
-        let mut model: Self = FINANCIAL_MODEL_CONTRACT.decode_versioned(bytes, limits)?;
+        // The bounded pass checks the limits, key uniqueness and the version
+        // on a JSON value, which does not keep key order. Node order is part
+        // of a model, so the model itself is decoded from the bytes.
+        FINANCIAL_MODEL_CONTRACT.decode_versioned::<serde::de::IgnoredAny>(bytes, limits)?;
+        let mut model: Self = serde_json::from_slice(bytes).map_err(|error| {
+            let mut report = ValidationReport::default();
+            report.push_bounded(
+                limits,
+                Diagnostic::new(
+                    "contract/structure-invalid",
+                    LoadPhase::Structure,
+                    Severity::Error,
+                    error.to_string(),
+                )
+                .with_contract(FINANCIAL_MODEL_CONTRACT.id),
+            );
+            ContractError::Report(Box::new(report))
+        })?;
         model
             .validate_semantics()
             .map_err(|error| ContractError::Core(error.into()))?;
@@ -350,8 +370,9 @@ impl FinancialModelSpec {
 
     /// Hash this model's canonical JSON without validating it.
     ///
-    /// For a model the caller has just validated: the evaluator validates in
-    /// `prepare` and must not pay for a second semantic analysis per run.
+    /// For a model already in its validated form: [`Self::content_hash`]
+    /// after validating, and the evaluator after filling in the value types
+    /// its `prepare` inferred.
     pub(crate) fn canonical_hash(&self) -> finstack_quant_core::Result<String> {
         finstack_quant_core::canonical::content_hash(self)
     }
