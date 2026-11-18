@@ -40,7 +40,20 @@ pub(crate) fn generate_cashflows(
     loan: &TermLoan,
     market: &MarketContext,
 ) -> finstack_quant_core::Result<CashFlowSchedule> {
-    generate_cashflows_with_postings(loan, market, &[])
+    generate_cashflows_with_postings(loan, market, &[], &[])
+}
+
+/// Unadjusted start date of each coupon period of `loan`, in order.
+pub(crate) fn coupon_period_starts(loan: &TermLoan) -> finstack_quant_core::Result<Vec<Date>> {
+    use finstack_quant_cashflows::builder::{BuildPeriodsParams, build_periods};
+    let schedule = loan_schedule_params(loan);
+    let periods = build_periods(BuildPeriodsParams::from_schedule(
+        &schedule,
+        loan.issue_date,
+        loan.maturity,
+        None,
+    ))?;
+    Ok(periods.iter().map(|period| period.accrual_start).collect())
 }
 
 /// Generate the schedule of a term loan with principal postings applied.
@@ -53,6 +66,7 @@ pub(crate) fn generate_cashflows_with_postings(
     loan: &TermLoan,
     market: &MarketContext,
     postings: &[crate::loan_terms::PrincipalPosting],
+    elections: &[crate::loan_terms::CouponElection],
 ) -> finstack_quant_core::Result<CashFlowSchedule> {
     let mut principal_events: Vec<PrincipalEventSpec> = Vec::new();
     for posting in postings {
@@ -427,11 +441,29 @@ pub(crate) fn generate_cashflows_with_postings(
     // Payment split windows for PIK toggles.
     // Handle both enable (→ PIK) and disable (→ Cash) events so that
     // a loan can transition back to cash interest after a PIK period.
-    let mut toggle_events = BTreeMap::<Date, bool>::new();
+    let mut toggle_events = BTreeMap::<Date, CouponType>::new();
     if let Some(cov) = &loan.covenants {
         for t in &cov.pik_toggles {
-            toggle_events.insert(t.date, t.enable_pik);
+            toggle_events.insert(
+                t.date,
+                if t.enable_pik {
+                    CouponType::Pik
+                } else {
+                    CouponType::Cash
+                },
+            );
         }
+    }
+    // A dated election starts at a coupon-period boundary and replaces a
+    // contractual toggle of the same date.
+    for election in elections {
+        if !accrual_starts.contains(&election.effective_date) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "term loan '{}': a coupon election effective {} does not start a coupon period",
+                loan.id, election.effective_date
+            )));
+        }
+        toggle_events.insert(election.effective_date, election.coupon_type);
     }
 
     if !toggle_events.is_empty() {
@@ -441,15 +473,11 @@ pub(crate) fn generate_cashflows_with_postings(
         // the final state to maturity.
         let mut payment_steps = Vec::with_capacity(toggle_events.len() + 1);
         let mut active_coupon_type = loan.coupon_type;
-        for (date, enable_pik) in toggle_events {
+        for (date, coupon_type) in toggle_events {
             if date > loan.issue_date {
                 payment_steps.push((date, active_coupon_type));
             }
-            active_coupon_type = if enable_pik {
-                CouponType::Pik
-            } else {
-                CouponType::Cash
-            };
+            active_coupon_type = coupon_type;
         }
         if payment_steps
             .last()

@@ -951,7 +951,22 @@ impl finstack_quant_cashflows::CashflowScheduleSource for TermLoan {
 }
 
 impl TermLoan {
-    /// Recompile the contractual schedule with principal postings applied.
+    /// Unadjusted start date of each coupon period, in order.
+    ///
+    /// A [`CouponElection`](crate::loan_terms::CouponElection) takes effect on
+    /// one of these dates.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the coupon schedule's construction error.
+    pub fn coupon_period_starts(
+        &self,
+    ) -> finstack_quant_core::Result<Vec<finstack_quant_core::dates::Date>> {
+        crate::term_loan::cashflows::coupon_period_starts(self)
+    }
+
+    /// Recompile the contractual schedule with principal postings and coupon
+    /// elections applied.
     ///
     /// The schedule is rebuilt from the loan's own terms, not adjusted row by
     /// row: each affected coupon accrues on the dated principal under the
@@ -969,19 +984,28 @@ impl TermLoan {
     ///   `effective_date`, which must be after issue and no later than
     ///   maturity, and appears as a zero-cash `PrePayment` row carrying the
     ///   principal change.
+    /// * `elections` - Dated coupon payment elections. From its
+    ///   `effective_date`, which must start a coupon period, each coupon is
+    ///   paid as the election's cash, PIK or split type until the next
+    ///   election; the PIK share is zero cash and capitalizes once on the
+    ///   coupon date. An election replaces a contractual PIK toggle of the
+    ///   same date.
     ///
     /// # Errors
     ///
     /// Returns a validation error when a posting is in another currency, is
     /// effective outside the life of the loan or repays more than the
-    /// principal outstanding on its date, and propagates schedule errors.
+    /// principal outstanding on its date, or an election does not start a
+    /// coupon period, and propagates schedule errors.
     pub fn cashflow_schedule_with_postings(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         postings: &[crate::loan_terms::PrincipalPosting],
+        elections: &[crate::loan_terms::CouponElection],
     ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
-        let schedule =
-            crate::term_loan::cashflows::generate_cashflows_with_postings(self, market, postings)?;
+        let schedule = crate::term_loan::cashflows::generate_cashflows_with_postings(
+            self, market, postings, elections,
+        )?;
         Ok(schedule.with_representation(
             finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
         ))

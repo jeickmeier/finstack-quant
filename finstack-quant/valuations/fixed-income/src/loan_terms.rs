@@ -34,6 +34,40 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 
+/// A coupon payment election taking effect at the start of a coupon period.
+///
+/// From `effective_date` the loan's coupons are paid as `coupon_type` (all
+/// cash, all PIK, or a cash/PIK split), until the next election. It is the
+/// dated form of a borrower's PIK election under a toggle provision.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_cashflows::builder::CouponType;
+/// use finstack_quant_valuations_fixed_income::loan_terms::CouponElection;
+/// use rust_decimal_macros::dec;
+/// use time::macros::date;
+///
+/// // 40% of each coupon capitalizes from the period starting 1 April.
+/// let election = CouponElection {
+///     effective_date: date!(2025 - 04 - 01),
+///     coupon_type: CouponType::Split {
+///         cash_fraction: dec!(0.6),
+///         pik_fraction: dec!(0.4),
+///     },
+/// };
+/// assert_eq!(election.effective_date, date!(2025 - 04 - 01));
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CouponElection {
+    /// Start of the first coupon period the election applies to. It must be
+    /// a coupon-period start of the loan.
+    pub effective_date: Date,
+    /// How coupons are paid from that period on: cash, PIK, or a split whose
+    /// fractions are decimals summing to one.
+    pub coupon_type: finstack_quant_cashflows::builder::CouponType,
+}
+
 /// A principal change posted to a loan outside its contractual schedule.
 ///
 /// A posting is a change in outstanding principal that has already been

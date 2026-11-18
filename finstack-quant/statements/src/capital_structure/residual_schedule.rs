@@ -48,7 +48,7 @@ pub(crate) fn rebuild_from_postings(
 ) -> Result<CashFlowSchedule> {
     let any = instrument.as_any();
     let rebuilt = if let Some(loan) = any.downcast_ref::<TermLoan>() {
-        loan.cashflow_schedule_with_postings(market, postings)
+        loan.cashflow_schedule_with_postings(market, postings, &[])
     } else if let Some(revolver) = any.downcast_ref::<RevolvingCredit>() {
         revolver.cashflow_schedule_with_postings(market, as_of, postings)
     } else {

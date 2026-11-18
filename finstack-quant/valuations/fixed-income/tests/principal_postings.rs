@@ -66,7 +66,7 @@ fn a_term_loan_coupon_accrues_on_the_dated_principal() {
     let loan = semiannual_loan(CouponType::Cash);
     let market = MarketContext::new();
     let rebuilt = loan
-        .cashflow_schedule_with_postings(&market, &[posting(date!(2025 - 04 - 01), -40.0)])
+        .cashflow_schedule_with_postings(&market, &[posting(date!(2025 - 04 - 01), -40.0)], &[])
         .expect("rebuilt schedule");
 
     assert_close(
@@ -95,7 +95,7 @@ fn a_term_loan_coupon_accrues_on_the_dated_principal() {
 
     // With no postings the loan's ordinary schedule is returned.
     let plain = loan
-        .cashflow_schedule_with_postings(&market, &[])
+        .cashflow_schedule_with_postings(&market, &[], &[])
         .expect("plain schedule");
     let raw = loan
         .raw_cashflow_schedule(&market, loan.issue_date)
@@ -116,6 +116,7 @@ fn the_cash_pik_split_applies_once_to_the_rebuilt_coupon() {
         .cashflow_schedule_with_postings(
             &MarketContext::new(),
             &[posting(date!(2025 - 04 - 01), -40.0)],
+            &[],
         )
         .expect("rebuilt schedule");
     let capitalized = |on: Date| -> f64 {
@@ -146,7 +147,7 @@ fn later_term_loan_principal_is_sized_on_what_remains() {
     loan.amortization = AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.30 };
     let effective = date!(2025 - 02 - 15);
     let rebuilt = loan
-        .cashflow_schedule_with_postings(&MarketContext::new(), &[posting(effective, -50.0)])
+        .cashflow_schedule_with_postings(&MarketContext::new(), &[posting(effective, -50.0)], &[])
         .expect("rebuilt schedule");
 
     // 45 days on 100 and 45 days on 50 in the first quarter.
@@ -173,7 +174,7 @@ fn a_term_loan_rejects_postings_it_cannot_apply() {
     let loan = semiannual_loan(CouponType::Cash);
     let market = MarketContext::new();
     let rebuild = |posting: PrincipalPosting| {
-        loan.cashflow_schedule_with_postings(&market, &[posting])
+        loan.cashflow_schedule_with_postings(&market, &[posting], &[])
             .expect_err("rejected posting")
             .to_string()
     };
@@ -363,4 +364,62 @@ fn a_revolver_rejects_postings_it_cannot_apply() {
         },
     );
     assert!(error.contains("EUR"), "{error}");
+}
+
+/// The record's example: a 10 coupon with a 40% PIK election pays 6 in cash
+/// and capitalizes 4 once, on the coupon date; earlier coupons are unchanged.
+#[test]
+fn a_dated_coupon_election_splits_the_coupons_it_covers() {
+    use finstack_quant_valuations_fixed_income::loan_terms::CouponElection;
+    let mut loan = semiannual_loan(CouponType::Cash);
+    loan.rate = RateSpec::Fixed { rate: 0.20 };
+    let market = MarketContext::new();
+    assert_eq!(
+        loan.coupon_period_starts().expect("coupon grid"),
+        vec![date!(2025 - 01 - 01), date!(2025 - 07 - 01)]
+    );
+    let split = CouponType::Split {
+        cash_fraction: dec!(0.6),
+        pik_fraction: dec!(0.4),
+    };
+    let rebuilt = loan
+        .cashflow_schedule_with_postings(
+            &market,
+            &[],
+            &[CouponElection {
+                effective_date: date!(2025 - 07 - 01),
+                coupon_type: split,
+            }],
+        )
+        .expect("elected schedule");
+    let capitalized = |on: Date| -> f64 {
+        rebuilt
+            .get_flows()
+            .iter()
+            .filter(|flow| flow.get_kind() == CFKind::Pik && flow.get_date() == on)
+            .filter_map(|flow| flow.get_principal_delta())
+            .map(|delta| delta.amount())
+            .sum()
+    };
+    let july = date!(2025 - 07 - 01);
+    let january = date!(2026 - 01 - 01);
+    assert_close(total(&rebuilt, &[CFKind::Fixed], july), 10.0);
+    assert_close(capitalized(july), 0.0);
+    assert_close(total(&rebuilt, &[CFKind::Fixed], january), 6.0);
+    assert_close(capitalized(january), 4.0);
+    assert_close(total(&rebuilt, &[CFKind::Notional], january), 104.0);
+
+    // An election takes effect only at the start of a coupon period.
+    let error = loan
+        .cashflow_schedule_with_postings(
+            &market,
+            &[],
+            &[CouponElection {
+                effective_date: date!(2025 - 05 - 15),
+                coupon_type: split,
+            }],
+        )
+        .expect_err("off-cycle election")
+        .to_string();
+    assert!(error.contains("does not start a coupon period"), "{error}");
 }
