@@ -884,35 +884,6 @@ impl StatementResult {
             .insert(period_id, cell);
     }
 
-    /// The sample of every requested metric in every period for Monte Carlo
-    /// aggregation: its value, or why the cell has none on this path.
-    pub(crate) fn path_samples(
-        &self,
-        metrics: &[String],
-    ) -> IndexMap<String, IndexMap<PeriodId, super::monte_carlo::PathSample>> {
-        use super::monte_carlo::PathSample;
-        metrics
-            .iter()
-            .filter_map(|metric| {
-                let cells = self.cells.get(metric)?;
-                Some((
-                    metric.clone(),
-                    cells
-                        .iter()
-                        .map(|(period, cell)| {
-                            let sample = match (cell.numeric(), cell.reason) {
-                                (Some(value), _) => PathSample::Value(value),
-                                (None, Some(reason)) => PathSample::Absent(reason.as_str()),
-                                (None, None) => PathSample::Absent(cell.status.as_str()),
-                            };
-                            (*period, sample)
-                        })
-                        .collect(),
-                ))
-            })
-            .collect()
-    }
-
     /// Record the resolved units of every evaluated node.
     ///
     /// # Arguments

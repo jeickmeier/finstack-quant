@@ -15,7 +15,8 @@ use indexmap::IndexMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 
-type Instruments = IndexMap<String, Arc<dyn finstack_quant_valuations::instruments::Instrument>>;
+pub(super) type Instruments =
+    IndexMap<String, Arc<dyn finstack_quant_valuations::instruments::Instrument>>;
 type DynamicPeriodEvaluation = (
     IndexMap<String, crate::evaluator::ResultCell>,
     crate::evaluator::engine::PeriodRow,
@@ -197,11 +198,7 @@ impl Evaluator {
             .capital_structure_cashflows
             .take()
             .unwrap_or_default();
-        let row = (
-            context.current_values.clone(),
-            context.current_cells.clone(),
-        );
-        let (values, mut warnings) = context.into_results();
+        let (values, row, mut warnings) = context.into_results();
         // The second `evaluate_nodes_in_order` pass re-evaluates cs-affected
         // nodes into the same context, so node-level warnings (e.g.
         // DivisionByZero) can be pushed twice for the same node/period.

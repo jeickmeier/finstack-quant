@@ -333,12 +333,18 @@ impl EvaluationContext {
         }
     }
 
-    /// The period's published cells, with their value sources, and the
-    /// warnings raised while evaluating it.
+    /// The period's published cells with their value sources, its row for the
+    /// period history, and the warnings raised while evaluating it.
     ///
     /// A value set outside the precedence loop becomes a scalar value cell,
     /// or a missing cell when it is not finite.
-    pub(crate) fn into_results(self) -> (IndexMap<String, super::ResultCell>, Vec<EvalWarning>) {
+    pub(crate) fn into_results(
+        self,
+    ) -> (
+        IndexMap<String, super::ResultCell>,
+        super::engine::PeriodRow,
+        Vec<EvalWarning>,
+    ) {
         let mut results = IndexMap::new();
         for (node_id, idx) in self.node_to_column.iter() {
             let cell = match (self.current_cells[*idx], self.current_values[*idx]) {
@@ -350,7 +356,11 @@ impl EvaluationContext {
             };
             results.insert(node_id.as_str().to_string(), cell);
         }
-        (results, self.warnings)
+        (
+            results,
+            (self.current_values, self.current_cells),
+            self.warnings,
+        )
     }
 }
 

@@ -9,22 +9,6 @@ use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, 
 use indexmap::IndexMap;
 use serde_json::json;
 
-/// One path's value of one requested metric in one period.
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) enum PathSample {
-    /// A finite value.
-    Value(f64),
-    /// The cell had no value on this path, for the stated reason.
-    Absent(&'static str),
-}
-
-/// Results for a single Monte Carlo path: one sample per requested metric
-/// and period, and any warnings emitted.
-pub(crate) type PathResult = (
-    IndexMap<String, IndexMap<PeriodId, PathSample>>,
-    Vec<EvalWarning>,
-);
-
 /// Most samples a run may hold: paths x metrics x forecast periods.
 pub const MAX_MONTE_CARLO_SAMPLES: usize = 100_000_000;
 use serde::{Deserialize, Serialize};
@@ -582,6 +566,14 @@ fn warning_period(warning: &EvalWarning) -> &PeriodId {
 /// least one in this order is the one reported.
 type Gap = (usize, PeriodId, u32, &'static str);
 
+/// Count a gap and keep the least one in metric, period and path order.
+fn note_gap(first_gap: &mut Option<Gap>, gaps: &mut usize, gap: Gap) {
+    *gaps += 1;
+    if first_gap.is_none_or(|held| (gap.0, gap.1, gap.2) < (held.0, held.1, held.2)) {
+        *first_gap = Some(gap);
+    }
+}
+
 pub(crate) struct MonteCarloAccumulator {
     expected_paths: usize,
     observed_paths: usize,
@@ -590,8 +582,8 @@ pub(crate) struct MonteCarloAccumulator {
     value_types: Vec<crate::types::NodeValueType>,
     percentiles: Vec<f64>,
     forecast_periods: Vec<PeriodId>,
-    forecast_set: HashSet<PeriodId>,
-    path_values: IndexMap<String, IndexMap<PeriodId, Vec<(u32, f64)>>>,
+    /// `(path, value)` samples indexed by metric, then by forecast period.
+    samples: Vec<Vec<Vec<(u32, f64)>>>,
     first_gap: Option<Gap>,
     gaps: usize,
     include_path_data: bool,
@@ -677,9 +669,8 @@ impl MonteCarloAccumulator {
             metrics: config.metrics.clone(),
             value_types: metric_types,
             percentiles: normalize_percentiles(&config.percentiles)?,
-            forecast_set: forecast_periods.iter().copied().collect(),
+            samples: vec![vec![Vec::new(); forecast_periods.len()]; config.metrics.len()],
             forecast_periods,
-            path_values: IndexMap::new(),
             first_gap: None,
             gaps: 0,
             include_path_data: config.include_path_data,
@@ -687,15 +678,12 @@ impl MonteCarloAccumulator {
         })
     }
 
-    /// The requested metrics, in order.
-    pub(crate) fn metrics(&self) -> &[String] {
-        &self.metrics
-    }
-
+    /// Fold one path's result into the run: exactly one sample per requested
+    /// metric and forecast period, read from the path's typed cells.
     pub(crate) fn push_path(
         &mut self,
         path_idx: usize,
-        path_results: IndexMap<String, IndexMap<PeriodId, PathSample>>,
+        results: &crate::evaluator::StatementResult,
         warnings: Vec<EvalWarning>,
     ) -> Result<()> {
         self.observed_paths += 1;
@@ -705,49 +693,37 @@ impl MonteCarloAccumulator {
         self.warnings.extend(
             warnings
                 .into_iter()
-                .filter(|warning| self.forecast_set.contains(warning_period(warning))),
+                .filter(|warning| self.forecast_periods.contains(warning_period(warning))),
         );
 
-        // Exactly one sample per requested metric and forecast period.
-        for index in 0..self.metrics.len() {
-            let metric = self.metrics[index].clone();
-            let samples = path_results.get(&metric);
-            for period_index in 0..self.forecast_periods.len() {
-                let period = &self.forecast_periods[period_index].clone();
-                match samples.and_then(|samples| samples.get(period)) {
-                    Some(PathSample::Value(value)) if value.is_finite() => {
-                        self.path_values
-                            .entry(metric.clone())
-                            .or_default()
-                            .entry(*period)
-                            .or_default()
-                            .push((path, *value));
-                    }
-                    Some(PathSample::Value(value)) => {
-                        return Err(Error::eval(format!(
-                            "Monte Carlo path {path} produced the invalid sample {value} for \
-                             metric '{metric}' in period {period}"
-                        )));
-                    }
-                    Some(PathSample::Absent(reason)) => {
-                        self.note_gap((index, *period, path, reason));
-                    }
-                    None => self.note_gap((index, *period, path, "missing")),
-                }
+        for (index, metric) in self.metrics.iter().enumerate() {
+            for (period_index, period) in self.forecast_periods.iter().enumerate() {
+                let gap = match results.get_cell(metric, period) {
+                    Some(cell) => match (cell.numeric(), cell.reason) {
+                        (Some(value), _) if value.is_finite() => {
+                            self.samples[index][period_index].push((path, value));
+                            continue;
+                        }
+                        (Some(value), _) => {
+                            return Err(Error::eval(format!(
+                                "Monte Carlo path {path} produced the invalid sample {value} \
+                                 for metric '{metric}' in period {period}"
+                            )));
+                        }
+                        (None, Some(reason)) => reason.as_str(),
+                        (None, None) => cell.status.as_str(),
+                    },
+                    None => "missing",
+                };
+                note_gap(
+                    &mut self.first_gap,
+                    &mut self.gaps,
+                    (index, *period, path, gap),
+                );
             }
         }
 
         Ok(())
-    }
-
-    fn note_gap(&mut self, gap: Gap) {
-        self.gaps += 1;
-        let earlier = self
-            .first_gap
-            .is_none_or(|held| (gap.0, gap.1, gap.2) < (held.0, held.1, held.2));
-        if earlier {
-            self.first_gap = Some(gap);
-        }
     }
 
     pub(crate) fn finish(mut self) -> Result<MonteCarloResults> {
@@ -792,29 +768,27 @@ impl MonteCarloAccumulator {
         }
 
         let mut percentile_results: IndexMap<String, PercentileSeries> = IndexMap::new();
-        for (metric, value_type) in self.metrics.iter().zip(&self.value_types) {
+        for ((metric, value_type), by_period) in self
+            .metrics
+            .iter()
+            .zip(&self.value_types)
+            .zip(&self.samples)
+        {
             let mut series = PercentileSeries {
                 metric: metric.clone(),
                 value_type: *value_type,
                 sample_count: self.observed_paths,
                 values: IndexMap::new(),
             };
-            for period_id in &self.forecast_periods {
-                let values = self
-                    .path_values
-                    .get(metric)
-                    .and_then(|periods| periods.get(period_id))
-                    .ok_or_else(|| {
-                        Error::eval(format!(
-                            "Monte Carlo aggregation has no samples of '{metric}' in {period_id}"
-                        ))
-                    })?;
+            for (period_id, values) in self.forecast_periods.iter().zip(by_period) {
                 let mut sorted: Vec<f64> = values.iter().map(|(_, v)| *v).collect();
                 sorted.sort_by(|a, b| a.total_cmp(b));
                 let mut pairs: Vec<(f64, f64)> = Vec::with_capacity(self.percentiles.len());
                 for &q in &self.percentiles {
                     let value = quantile_sorted(&sorted, q)?.ok_or_else(|| {
-                        Error::eval("Monte Carlo quantile requested for empty sorted sample")
+                        Error::eval(format!(
+                            "Monte Carlo aggregation has no samples of '{metric}' in {period_id}"
+                        ))
                     })?;
                     pairs.push((q, value));
                 }
@@ -823,11 +797,29 @@ impl MonteCarloAccumulator {
             percentile_results.insert(metric.clone(), series);
         }
 
+        // The per-metric store the breach test reads, keyed for lookup.
+        let path_values: IndexMap<String, IndexMap<PeriodId, Vec<(u32, f64)>>> = self
+            .metrics
+            .iter()
+            .cloned()
+            .zip(std::mem::take(&mut self.samples))
+            .map(|(metric, by_period)| {
+                (
+                    metric,
+                    self.forecast_periods
+                        .iter()
+                        .copied()
+                        .zip(by_period)
+                        .collect(),
+                )
+            })
+            .collect();
+
         let path_data = if !self.include_path_data {
             None
         } else {
             let mut rows = Vec::new();
-            for (metric, period_values) in &self.path_values {
+            for (metric, period_values) in &path_values {
                 for (period, values) in period_values {
                     for &(path, value) in values {
                         rows.push((path, metric.as_str(), period.to_string(), value));
@@ -873,7 +865,7 @@ impl MonteCarloAccumulator {
             percentiles: self.percentiles,
             forecast_periods: self.forecast_periods,
             warnings: self.warnings,
-            path_values: self.path_values,
+            path_values,
             path_data,
         })
     }
@@ -898,14 +890,16 @@ impl MonteCarloAccumulator {
         self.gaps += other.gaps;
         if let Some(gap) = other.first_gap {
             self.gaps -= 1;
-            self.note_gap(gap);
+            note_gap(&mut self.first_gap, &mut self.gaps, gap);
         }
 
-        for (metric, period_map) in other.path_values {
-            let target_metric = self.path_values.entry(metric).or_default();
-            for (period_id, values) in period_map {
-                target_metric.entry(period_id).or_default().extend(values);
-            }
+        for (target, source) in self
+            .samples
+            .iter_mut()
+            .flatten()
+            .zip(other.samples.into_iter().flatten())
+        {
+            target.extend(source);
         }
 
         Ok(self)
@@ -920,8 +914,7 @@ impl MonteCarloAccumulator {
             value_types: self.value_types.clone(),
             percentiles: self.percentiles.clone(),
             forecast_periods: self.forecast_periods.clone(),
-            forecast_set: self.forecast_set.clone(),
-            path_values: IndexMap::new(),
+            samples: vec![vec![Vec::new(); self.forecast_periods.len()]; self.metrics.len()],
             first_gap: None,
             gaps: 0,
             include_path_data: self.include_path_data,
@@ -934,10 +927,11 @@ impl MonteCarloAccumulator {
 mod tests {
     use super::{
         MAX_MONTE_CARLO_SAMPLES, MonteCarloAccumulator, MonteCarloConfig, MonteCarloResults,
-        PathSample, normalize_percentiles, percentile_label,
+        normalize_percentiles, percentile_label,
     };
     use crate::builder::ModelBuilder;
     use crate::error::Result;
+    use crate::evaluator::{CellStatus, ResultCell, StatementResult, UnavailableReason};
     use crate::types::{AmountOrScalar, FinancialModelSpec, NodeId, NodeValueType};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::PeriodId;
@@ -982,22 +976,35 @@ mod tests {
         MonteCarloAccumulator::new(&model(), config, &value_types())
     }
 
+    /// One path's result holding `ratio` cells for the second and third
+    /// quarters.
+    fn ratio_cells(second: ResultCell, third: ResultCell) -> StatementResult {
+        let mut result = StatementResult::new();
+        result.set_cell("ratio", q(2), second);
+        result.set_cell("ratio", q(3), third);
+        result
+    }
+
+    /// A value cell, without the finiteness check a result setter applies.
+    fn raw(value: f64) -> ResultCell {
+        ResultCell {
+            status: CellStatus::Value,
+            value: Some(AmountOrScalar::Scalar(value)),
+            reason: None,
+            source: None,
+        }
+    }
+
     /// One path's samples of `ratio`: its second- and third-quarter values.
-    fn ratio_path(second: f64, third: f64) -> IndexMap<String, IndexMap<PeriodId, PathSample>> {
-        IndexMap::from([(
-            "ratio".to_string(),
-            IndexMap::from([
-                (q(2), PathSample::Value(second)),
-                (q(3), PathSample::Value(third)),
-            ]),
-        )])
+    fn ratio_path(second: f64, third: f64) -> StatementResult {
+        ratio_cells(raw(second), raw(third))
     }
 
     fn aggregate(config: &MonteCarloConfig, paths: &[(f64, f64)]) -> MonteCarloResults {
         let mut accumulator = accumulator(config).expect("valid run");
         for (path, (second, third)) in paths.iter().enumerate() {
             accumulator
-                .push_path(path, ratio_path(*second, *third), Vec::new())
+                .push_path(path, &ratio_path(*second, *third), Vec::new())
                 .expect("valid sample");
         }
         accumulator.finish().expect("aggregation")
@@ -1128,24 +1135,24 @@ mod tests {
     fn a_missing_sample_makes_the_run_incomplete() {
         let config = MonteCarloConfig::new(3, 7, ["ratio"]).with_path_data(true);
         let mut accumulator = accumulator(&config).expect("valid run");
-        let gap = |reason: &'static str| {
-            IndexMap::from([(
-                "ratio".to_string(),
-                IndexMap::from([
-                    (q(2), PathSample::Value(1.0)),
-                    (q(3), PathSample::Absent(reason)),
-                ]),
-            )])
-        };
+        let gap = |cell: ResultCell| ratio_cells(raw(1.0), cell);
         // The later path arrives first.
         accumulator
-            .push_path(2, gap("masked"), Vec::new())
+            .push_path(
+                2,
+                &gap(ResultCell::without_value(CellStatus::Masked)),
+                Vec::new(),
+            )
             .expect("a gap is not an error");
         accumulator
-            .push_path(1, gap("missing_peer_shock"), Vec::new())
+            .push_path(
+                1,
+                &gap(ResultCell::unavailable(UnavailableReason::MissingPeerShock)),
+                Vec::new(),
+            )
             .expect("a gap is not an error");
         accumulator
-            .push_path(0, ratio_path(1.0, 1.0), Vec::new())
+            .push_path(0, &ratio_path(1.0, 1.0), Vec::new())
             .expect("valid sample");
         let results = accumulator
             .finish()
@@ -1174,7 +1181,7 @@ mod tests {
         let mut accumulator = super::MonteCarloAccumulator::new(&model(), &config, &value_types())
             .expect("valid run");
         let error = accumulator
-            .push_path(0, ratio_path(f64::NAN, 1.0), Vec::new())
+            .push_path(0, &ratio_path(f64::NAN, 1.0), Vec::new())
             .expect_err("invalid sample")
             .to_string();
         assert!(error.contains("invalid sample"), "{error}");
@@ -1193,13 +1200,13 @@ mod tests {
         let mut right = seed.empty_like();
         for path in [3, 1] {
             let (second, third) = paths[path];
-            left.push_path(path, ratio_path(second, third), Vec::new())
+            left.push_path(path, &ratio_path(second, third), Vec::new())
                 .expect("sample");
         }
         for path in [2, 0] {
             let (second, third) = paths[path];
             right
-                .push_path(path, ratio_path(second, third), Vec::new())
+                .push_path(path, &ratio_path(second, third), Vec::new())
                 .expect("sample");
         }
         let merged = right.merge(left).expect("merge").finish().expect("finish");

@@ -6,9 +6,7 @@ use crate::evaluator::context::EvaluationContext;
 use crate::evaluator::dag::{DependencyGraph, evaluate_order};
 use crate::evaluator::forecast_eval;
 use crate::evaluator::formula::evaluate_value;
-use crate::evaluator::monte_carlo::{
-    MonteCarloAccumulator, MonteCarloConfig, MonteCarloResults, PathResult,
-};
+use crate::evaluator::monte_carlo::{MonteCarloAccumulator, MonteCarloConfig, MonteCarloResults};
 use crate::evaluator::precedence::{NodeValueSource, resolve_node_value};
 use crate::evaluator::results::{CellSource, EvalStats, EvalWarning, StatementResult};
 use crate::evaluator::value::{self, At};
@@ -50,6 +48,27 @@ pub(crate) struct PeriodEval<'a> {
     pub(crate) eval_order: &'a [NodeId],
 }
 
+/// What one run fixes before any period is evaluated, shared by every
+/// Monte Carlo path.
+struct RunSetup {
+    /// Empty period history carrying the model's timeline.
+    history: PeriodHistory,
+    /// Capital-structure state of the run; `None` without a capital
+    /// structure or a market to generate it from.
+    capital: Option<CapitalSetup>,
+}
+
+/// The path-invariant capital-structure state of a run.
+struct CapitalSetup {
+    /// The model's instruments, built once.
+    instruments: capital_structure_runtime::Instruments,
+    /// Capital state holding each instrument's opening balance at the first
+    /// period.
+    opening_state: crate::capital_structure::CapitalStructureState,
+    /// Nodes that read `cs.*`, with their dependents.
+    affected_nodes: HashSet<NodeId>,
+}
+
 /// Cached structural analysis from [`Evaluator::prepare`], allowing repeated
 /// evaluations of the same model structure without recompilation.
 pub struct PreparedEvaluation {
@@ -67,7 +86,7 @@ pub struct PreparedEvaluation {
     /// this plan was compiled from, rejecting changes beyond input values.
     formula_fingerprint: u64,
     /// Canonical units inferred and validated when the plan was prepared.
-    pub(super) node_value_types: IndexMap<NodeId, NodeValueType>,
+    pub(super) node_value_types: std::sync::Arc<IndexMap<NodeId, NodeValueType>>,
     /// The `value_type` validation recorded on each node of the validated
     /// model, so a run can hash the validated form of the caller's model.
     validated_value_types: IndexMap<NodeId, NodeValueType>,
@@ -390,8 +409,9 @@ impl Evaluator {
 
         let prepared = self.prepare(model)?;
         self.visibility_cutoff = visibility_cutoff;
+        let setup = self.run_setup(model, &prepared, capital_structure)?;
         let (mut results, all_warnings) =
-            self.evaluate_periods(model, &prepared, capital_structure, None)?;
+            self.evaluate_periods(model, &prepared, &setup, capital_structure, None)?;
 
         self.finalize_results(
             &mut results,
@@ -414,10 +434,80 @@ impl Evaluator {
         Ok(results)
     }
 
-    /// Run every period in timeline order on a prepared plan.
+    /// Everything a run needs that does not vary by Monte Carlo path.
     ///
     /// `capital_structure` is the market and cashflow date the model's
     /// instruments are generated from; `None` skips the capital structure.
+    fn run_setup(
+        &self,
+        model: &FinancialModelSpec,
+        prepared: &PreparedEvaluation,
+        capital_structure: Option<(
+            &finstack_quant_core::market_data::context::MarketContext,
+            finstack_quant_core::dates::Date,
+        )>,
+    ) -> Result<RunSetup> {
+        let history = PeriodHistory::with_periods(
+            std::sync::Arc::clone(&prepared.node_to_column),
+            &model.periods,
+        );
+        let Some((market_ctx, as_of)) = capital_structure else {
+            return Ok(RunSetup {
+                history,
+                capital: None,
+            });
+        };
+
+        // Only nodes whose formula or where clause reaches `cs.*` (and their
+        // dependents) need the capital-structure pass.
+        let mut cs_seed_nodes = HashSet::new();
+        for (node_id, spec) in &model.nodes {
+            for text in [spec.formula_text.as_deref(), spec.where_text.as_deref()]
+                .into_iter()
+                .flatten()
+            {
+                if crate::utils::formula::contains_capital_structure_reference(text)? {
+                    cs_seed_nodes.insert(node_id.clone());
+                }
+            }
+        }
+        let affected_nodes = dependent_closure(&prepared.dag, &cs_seed_nodes);
+
+        let Some(instruments) = self.build_instruments(model)? else {
+            return Ok(RunSetup {
+                history,
+                capital: None,
+            });
+        };
+        let mut opening_state = crate::capital_structure::CapitalStructureState::new();
+        if let Some(first_period) = model.periods.first() {
+            for (instrument_id, instrument) in &instruments {
+                let opening_balance = instrument_opening_balance(
+                    instrument.as_ref(),
+                    market_ctx,
+                    as_of,
+                    first_period.start,
+                )
+                .map_err(|err| missing_market_data(instrument_id, err))?;
+                opening_state
+                    .opening_balances
+                    .insert(instrument_id.clone(), opening_balance);
+            }
+        }
+        Ok(RunSetup {
+            history,
+            capital: Some(CapitalSetup {
+                instruments,
+                opening_state,
+                affected_nodes,
+            }),
+        })
+    }
+
+    /// Run every period in timeline order on a prepared plan.
+    ///
+    /// `setup` is the run's path-invariant state and `capital_structure` the
+    /// market and cashflow date its instruments were generated from.
     /// `mc_path` is the Monte Carlo path (`None` for a single
     /// deterministic run); each path runs this same loop, capital-structure
     /// waterfall included. Shared by [`evaluate_inner`](Self::evaluate_inner),
@@ -427,6 +517,7 @@ impl Evaluator {
         &mut self,
         model: &FinancialModelSpec,
         prepared: &PreparedEvaluation,
+        setup: &RunSetup,
         capital_structure: Option<(
             &finstack_quant_core::market_data::context::MarketContext,
             finstack_quant_core::dates::Date,
@@ -434,71 +525,11 @@ impl Evaluator {
         mc_path: Option<PathId>,
     ) -> Result<(StatementResult, Vec<EvalWarning>)> {
         let mut mc_z_cache = McZCache::new();
-        let market_ctx = capital_structure.map(|(market, _)| market);
-        let as_of = capital_structure.map(|(_, as_of)| as_of);
+        let capital = capital_structure.zip(setup.capital.as_ref());
+        // Each run, and each path, starts from the seeded opening state.
+        let mut cs_state = capital.map(|(_, capital)| capital.opening_state.clone());
 
-        // Only nodes whose formula or where clause reaches `cs.*` (and their
-        // dependents) need the capital-structure pass.
-        let mut cs_seed_nodes = HashSet::new();
-        for (node_id, spec) in model.nodes.iter().filter(|_| capital_structure.is_some()) {
-            let formula_references_cs = spec
-                .formula_text
-                .as_deref()
-                .map(crate::utils::formula::contains_capital_structure_reference)
-                .transpose()?
-                .unwrap_or(false);
-            let predicate_references_cs = spec
-                .where_text
-                .as_deref()
-                .map(crate::utils::formula::contains_capital_structure_reference)
-                .transpose()?
-                .unwrap_or(false);
-            if formula_references_cs || predicate_references_cs {
-                cs_seed_nodes.insert(node_id.clone());
-            }
-        }
-
-        let cs_affected_nodes = dependent_closure(&prepared.dag, &cs_seed_nodes);
-
-        let mut cs_state = if let (Some(_market_ctx), Some(_as_of)) = (market_ctx, as_of) {
-            Some(crate::capital_structure::CapitalStructureState::new())
-        } else {
-            None
-        };
-
-        // Pre-compute instruments if market context is available
-        let instruments = if let (Some(_market_ctx), Some(_as_of)) = (market_ctx, as_of) {
-            self.build_instruments(model)?
-        } else {
-            None
-        };
-
-        if let (Some(state), Some(insts), Some(market_ctx), Some(as_of_date), Some(first_period)) = (
-            cs_state.as_mut(),
-            instruments.as_ref(),
-            market_ctx,
-            as_of,
-            model.periods.first(),
-        ) {
-            for (instrument_id, instrument) in insts {
-                let opening_balance = instrument_opening_balance(
-                    instrument.as_ref(),
-                    market_ctx,
-                    as_of_date,
-                    first_period.start,
-                )
-                .map_err(|err| missing_market_data(instrument_id, err))?;
-
-                state
-                    .opening_balances
-                    .insert(instrument_id.clone(), opening_balance);
-            }
-        }
-
-        let mut historical = std::sync::Arc::new(PeriodHistory::with_periods(
-            std::sync::Arc::clone(&prepared.node_to_column),
-            &model.periods,
-        ));
+        let mut historical = std::sync::Arc::new(setup.history.clone());
         let mut historical_cs: std::sync::Arc<
             IndexMap<PeriodId, crate::capital_structure::CapitalStructureCashflows>,
         > = std::sync::Arc::new(IndexMap::new());
@@ -511,8 +542,8 @@ impl Evaluator {
 
         for period in &model.periods {
             let (period_results, period_row, period_warnings) =
-                if let (Some(market_ctx), Some(as_of), Some(ref mut state), Some(insts)) =
-                    (market_ctx, as_of, cs_state.as_mut(), instruments.as_ref())
+                if let (Some(((market_ctx, as_of), capital)), Some(state)) =
+                    (capital, cs_state.as_mut())
                 {
                     let (vals, row, warns, period_cs) = self.evaluate_period_dynamic(
                         PeriodEval {
@@ -526,9 +557,9 @@ impl Evaluator {
                         capital_structure_runtime::CapitalStructureRun {
                             market_ctx,
                             as_of,
-                            instruments: insts,
+                            instruments: &capital.instruments,
                             state,
-                            affected_nodes: &cs_affected_nodes,
+                            affected_nodes: &capital.affected_nodes,
                         },
                         mc_path.map(|path| (path, &mut mc_z_cache)),
                     )?;
@@ -697,7 +728,8 @@ impl Evaluator {
             .iter()
             .map(|(id, node)| (id.clone(), node.value_type.unwrap_or(NodeValueType::Scalar)))
             .collect();
-        self.node_value_types = std::sync::Arc::new(node_value_types.clone());
+        let node_value_types = std::sync::Arc::new(node_value_types);
+        self.node_value_types = std::sync::Arc::clone(&node_value_types);
         let validated_value_types = validated
             .nodes
             .iter()
@@ -778,7 +810,7 @@ impl Evaluator {
         // a different model sharing node ids would otherwise leak its formulas
         // into this prepared evaluation).
         self.compiled_cache = std::sync::Arc::clone(&prepared.compiled_cache);
-        self.node_value_types = std::sync::Arc::new(prepared.node_value_types.clone());
+        self.node_value_types = std::sync::Arc::clone(&prepared.node_value_types);
 
         // Structural guard: the prepared plan must cover exactly the model's
         // nodes. A node present in the model but absent from the plan would be
@@ -830,12 +862,10 @@ impl Evaluator {
         }
 
         let empty_market = finstack_quant_core::market_data::context::MarketContext::new();
-        let (mut results, all_warnings) = self.evaluate_periods(
-            model,
-            prepared,
-            contractual_capital_structure(model, &empty_market),
-            None,
-        )?;
+        let capital_structure = contractual_capital_structure(model, &empty_market);
+        let setup = self.run_setup(model, prepared, capital_structure)?;
+        let (mut results, all_warnings) =
+            self.evaluate_periods(model, prepared, &setup, capital_structure, None)?;
 
         self.finalize_results(
             &mut results,
@@ -953,7 +983,8 @@ impl Evaluator {
         // (rayon's thread pool is unavailable in single-threaded wasm).
         // Both paths are deterministic for a given seed, and both report the
         // lowest-index failing path when several paths fail.
-        let run_single_path = |path_idx: usize| -> Result<PathResult> {
+        let setup = self.run_setup(model, &prepared, capital_structure)?;
+        let run_single_path = |path_idx: usize| -> Result<(StatementResult, Vec<EvalWarning>)> {
             let mut path_eval = self.clone();
             path_eval.forecast_cache.clear();
 
@@ -961,9 +992,7 @@ impl Evaluator {
                 run_seed: config.seed,
                 path: path_idx as u64,
             };
-            let (results, warnings) =
-                path_eval.evaluate_periods(model, &prepared, capital_structure, Some(path))?;
-            Ok((results.path_samples(accumulator_seed.metrics()), warnings))
+            path_eval.evaluate_periods(model, &prepared, &setup, capital_structure, Some(path))
         };
 
         // Native: each rayon split folds its paths in increasing index order and
@@ -984,7 +1013,7 @@ impl Evaluator {
                         let mut acc = state?;
                         run_single_path(path_idx)
                             .and_then(|(path_results, warnings)| {
-                                acc.push_path(path_idx, path_results, warnings)
+                                acc.push_path(path_idx, &path_results, warnings)
                             })
                             .map_err(|error| (path_idx, error))?;
                         Ok(acc)
@@ -1010,7 +1039,7 @@ impl Evaluator {
             let mut acc = accumulator_seed.empty_like();
             for path_idx in 0..config.n_paths {
                 let (path_results, warnings) = run_single_path(path_idx)?;
-                acc.push_path(path_idx, path_results, warnings)?;
+                acc.push_path(path_idx, &path_results, warnings)?;
             }
             acc
         };
@@ -1219,12 +1248,7 @@ impl Evaluator {
         };
         self.evaluate_nodes_in_order(eval, &mut context, mc_path, None, mc_z_cache)?;
 
-        let row = (
-            context.current_values.clone(),
-            context.current_cells.clone(),
-        );
-        let (results, warnings) = context.into_results();
-        Ok((results, row, warnings))
+        Ok(context.into_results())
     }
 }
 
