@@ -1,5 +1,6 @@
 //! Forecast counterexamples from the quantitative finance review.
 
+use crate::AllMetrics;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::evaluator::Evaluator;
@@ -266,7 +267,7 @@ fn metric_paths(
 
 #[test]
 fn rounded_peer_levels_preserve_correlated_paths_and_chains() {
-    let config = MonteCarloConfig::new(32, 7).with_path_data(true);
+    let config = MonteCarloConfig::new(32, 7, [""; 0]).with_path_data(true);
     for method in [
         ForecastMethod::Normal,
         ForecastMethod::LogNormal,
@@ -274,10 +275,10 @@ fn rounded_peer_levels_preserve_correlated_paths_and_chains() {
     ] {
         for rho in [-1.0, 0.0, 0.6, 1.0] {
             let baseline = Evaluator::new()
-                .evaluate_monte_carlo(&shock_chain_model(method, false, rho), &config)
+                .evaluate_all_metrics(&shock_chain_model(method, false, rho), &config)
                 .unwrap();
             let rounded = Evaluator::new()
-                .evaluate_monte_carlo(&shock_chain_model(method, true, rho), &config)
+                .evaluate_all_metrics(&shock_chain_model(method, true, rho), &config)
                 .unwrap();
             // The lognormal level is restored from its logarithm.
             assert!(
@@ -299,9 +300,9 @@ fn rounded_peer_levels_preserve_correlated_paths_and_chains() {
 #[test]
 fn clipping_and_explicit_overrides_preserve_latent_correlated_paths() {
     let baseline = shock_chain_model(ForecastMethod::Normal, true, 0.6);
-    let config = MonteCarloConfig::new(32, 7).with_path_data(true);
+    let config = MonteCarloConfig::new(32, 7, [""; 0]).with_path_data(true);
     let expected = Evaluator::new()
-        .evaluate_monte_carlo(&baseline, &config)
+        .evaluate_all_metrics(&baseline, &config)
         .unwrap();
     for override_explicit in [false, true] {
         let mut model = baseline.clone();
@@ -322,7 +323,7 @@ fn clipping_and_explicit_overrides_preserve_latent_correlated_paths() {
             );
         }
         let actual = Evaluator::new()
-            .evaluate_monte_carlo(&model, &config)
+            .evaluate_all_metrics(&model, &config)
             .unwrap();
         for metric in ["follower", "child"] {
             assert_eq!(
@@ -337,7 +338,7 @@ fn clipping_and_explicit_overrides_preserve_latent_correlated_paths() {
 #[test]
 fn direct_shocks_have_identical_serial_and_parallel_wire_results() {
     let model = shock_chain_model(ForecastMethod::LogNormal, true, 0.6);
-    let config = MonteCarloConfig::new(64, 7).with_path_data(true);
+    let config = MonteCarloConfig::new(64, 7, [""; 0]).with_path_data(true);
     let run = |threads| {
         rayon::ThreadPoolBuilder::new()
             .num_threads(threads)
@@ -346,7 +347,7 @@ fn direct_shocks_have_identical_serial_and_parallel_wire_results() {
             .install(|| {
                 serde_json::to_value(
                     Evaluator::new()
-                        .evaluate_monte_carlo(&model, &config)
+                        .evaluate_all_metrics(&model, &config)
                         .unwrap(),
                 )
                 .unwrap()
@@ -402,9 +403,9 @@ fn uncorrelated_nodes_draw_independent_shocks_on_each_path() {
             builder.forecast(id, ForecastSpec::mean_reverting(0.0, 1.0, 1.0, node_seed));
         }
         let results = Evaluator::new()
-            .evaluate_monte_carlo(
+            .evaluate_all_metrics(
                 &builder.build().unwrap(),
-                &MonteCarloConfig::new(paths, config_seed).with_path_data(true),
+                &MonteCarloConfig::new(paths, config_seed, [""; 0]).with_path_data(true),
             )
             .unwrap();
         let series: Vec<Vec<f64>> = names
@@ -455,10 +456,10 @@ fn zero_correlation_keeps_the_uncorrelated_draws() {
         builder.forecast("peer", ForecastSpec::normal(0.0, 1.0, 42));
         builder.build().unwrap()
     };
-    let config = MonteCarloConfig::new(64, 7).with_path_data(true);
+    let config = MonteCarloConfig::new(64, 7, [""; 0]).with_path_data(true);
     let paths = |correlated: bool| {
         let results = Evaluator::new()
-            .evaluate_monte_carlo(&model(correlated), &config)
+            .evaluate_all_metrics(&model(correlated), &config)
             .unwrap();
         metric_paths(&results, "node")
     };
@@ -746,9 +747,9 @@ fn exponential_fade_halves_the_remaining_gap_each_half_life() {
 
 /// Mean and variance of node `x` in the last period across Monte Carlo paths.
 fn terminal_moments(forecast: ForecastSpec, base: f64, paths: usize) -> (f64, f64) {
-    let config = MonteCarloConfig::new(paths, 20_261_117).with_path_data(true);
+    let config = MonteCarloConfig::new(paths, 20_261_117, [""; 0]).with_path_data(true);
     let results = Evaluator::new()
-        .evaluate_monte_carlo(&growth_model(forecast, Some(base), &[]), &config)
+        .evaluate_all_metrics(&growth_model(forecast, Some(base), &[]), &config)
         .unwrap();
     // Path data is ordered by path, then period: the last period of each
     // path is every third value.
@@ -962,9 +963,9 @@ fn peer_model(nodes: &[(&str, ForecastSpec)]) -> FinancialModelSpec {
 /// First-period changes of a node across paths: with a unit-volatility
 /// driftless normal walk from 100 this is the node's standardized shock.
 fn first_shocks(model: &FinancialModelSpec, node: &str, paths: usize) -> Vec<f64> {
-    let config = MonteCarloConfig::new(paths, 5).with_path_data(true);
+    let config = MonteCarloConfig::new(paths, 5, [""; 0]).with_path_data(true);
     let results = Evaluator::new()
-        .evaluate_monte_carlo(model, &config)
+        .evaluate_all_metrics(model, &config)
         .unwrap();
     metric_paths(&results, node)
         .chunks(3)
@@ -1107,7 +1108,7 @@ fn active_correlation_is_rejected_in_a_single_run() {
 fn peer_shocks_follow_the_peer_forecast_not_its_published_cells() {
     let unit = |seed| ForecastSpec::normal(0.0, 1.0, seed);
     let follower = ("follower", correlated_with(unit(2), "peer", 0.7));
-    let config = MonteCarloConfig::new(8, 5).with_path_data(true);
+    let config = MonteCarloConfig::new(8, 5, [""; 0]).with_path_data(true);
 
     // The peer publishes explicit values in every forecast period.
     let mut published = peer_model_builder(std::slice::from_ref(&follower));
@@ -1125,7 +1126,7 @@ fn peer_shocks_follow_the_peer_forecast_not_its_published_cells() {
     let plain = peer_model(&[follower.clone(), ("peer", unit(1))]);
     let run = |model: &FinancialModelSpec| {
         let results = Evaluator::new()
-            .evaluate_monte_carlo(model, &config)
+            .evaluate_all_metrics(model, &config)
             .unwrap();
         metric_paths(&results, "follower")
     };

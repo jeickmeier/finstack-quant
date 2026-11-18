@@ -463,7 +463,8 @@ It is implemented and qualified.
 The Statements Monte Carlo path, quantile and breach contract was accepted on
 2026-11-15. It covers bounded complete paths, typed metric samples, exact R-7
 quantiles, path export and strict-upper breach probability.
-Implementation and independent qualification remain pending.
+It is implemented and qualified, with one entry point that takes the
+evaluation context.
 [STATEMENTS-EVALUATION-011](statements-evaluation/11-monte-carlo-evaluation.md#accepted-decision-for-monte-carlo-paths-quantiles-and-breach-probabilities).
 
 The Statements capital-state orchestration contract was accepted on

@@ -126,7 +126,9 @@ def test_correlated_paths_keep_shocks_when_peer_levels_round_flat(method: str, r
                 )
             )
             builder = mixed.build()
-        result = s.Evaluator().evaluate_monte_carlo(builder.build(), s.MonteCarloConfig(16, 7, [0.5], True))
+        result = s.Evaluator().evaluate_monte_carlo(
+            builder.build(), s.MonteCarloConfig(16, 7, ["peer", "follower", "child"], [0.5], True)
+        )
         return json.loads(result.to_json())
 
     def paths(result: dict[str, Any], metric: str) -> list[float]:

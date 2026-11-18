@@ -10,15 +10,24 @@ export interface MonteCarloConfigWire {
    */
   include_path_data?: boolean;
   /**
-   * Number of Monte Carlo paths to simulate.
+   * Node identifiers to report. Required: at least one, each a node of
+   * the model, none repeated. Only these are sampled and stored.
+   */
+  metrics: string[];
+  /**
+   * Number of Monte Carlo paths to simulate: at least one, and at most
+   * `u32::MAX`, the path-identifier domain.
    */
   n_paths: number;
   /**
-   * Percentiles to compute in the closed interval [0, 1].
+   * Probability levels to compute, each finite in `[0, 1]` and distinct.
+   * Omitted or empty selects `0.05`, `0.5` and `0.95`.
    */
   percentiles?: number[];
   /**
-   * Base random seed used to derive per-path seeds.
+   * Base random seed used to derive per-path streams: an exact unsigned
+   * 64-bit integer. A JavaScript host must pass the configuration as JSON
+   * text to keep a seed above 2^53 exact.
    */
   seed: number;
 }

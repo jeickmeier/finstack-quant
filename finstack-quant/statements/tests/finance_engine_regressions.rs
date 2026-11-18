@@ -1,5 +1,6 @@
 //! Regression coverage for validated execution plans and result diagnostics.
 
+use crate::AllMetrics;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -42,7 +43,7 @@ fn all_plan_building_entry_points_revalidate_mutated_formulas() {
             )
             .unwrap_err(),
         evaluator
-            .evaluate_monte_carlo(&model, &MonteCarloConfig::new(2, 42))
+            .evaluate_all_metrics(&model, &MonteCarloConfig::new(2, 42, [""; 0]))
             .unwrap_err(),
         evaluator
             .prepare(&model)
@@ -248,7 +249,7 @@ fn monte_carlo_reports_each_forecast_warning_once() {
         model_builder.build().unwrap()
     };
     let results = Evaluator::new()
-        .evaluate_monte_carlo(&model, &MonteCarloConfig::new(50, 7))
+        .evaluate_all_metrics(&model, &MonteCarloConfig::new(50, 7, [""; 0]))
         .unwrap();
 
     assert!(!results.warnings.is_empty(), "the 2025Q4 warning is kept");

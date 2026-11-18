@@ -817,32 +817,48 @@ impl Evaluator {
 
     /// Evaluate a financial model in Monte Carlo mode.
     ///
-    /// This method replays the model `n_paths` times with independent, but
-    /// deterministic, seeds for stochastic forecast methods and aggregates
-    /// the resulting distribution into percentile bands.
+    /// The model is replayed `config.n_paths` times on the ordinary period
+    /// engine, each path with fresh state and its own deterministic random
+    /// streams, and the requested metrics are aggregated into R-7 sample
+    /// quantiles per forecast period. A model with a capital structure has
+    /// its instruments and waterfall evaluated on every path, so each `cs.*`
+    /// reference sees that path's own debt service and balances. The same
+    /// seed replays the same paths, serially or in parallel.
     ///
-    /// Each path runs the deterministic period loop of [`Evaluator::evaluate`]
-    /// on its sampled forecasts, so a model with a capital structure has its
-    /// instruments and waterfall evaluated per path (from an empty market as
-    /// of the first period's start, as in [`Evaluator::evaluate`]), and every
-    /// `cs.*` reference sees that path's own debt service and balances.
-    /// The same configuration seed produces reproducible path draws across
-    /// runs. The returned distribution aggregates node-by-period results into
-    /// percentile bands rather than returning every raw path.
+    /// # Arguments
+    ///
+    /// * `model` - The model to simulate. It needs at least one forecast
+    ///   period.
+    /// * `config` - Path count, exact seed, the metrics to report and the
+    ///   probability levels.
+    /// * `context` - The market, valuation date and observation cutoff the
+    ///   paths evaluate in, as for
+    ///   [`evaluate_with_market`](Self::evaluate_with_market). `None`
+    ///   evaluates as [`evaluate`](Self::evaluate) does: the full snapshot,
+    ///   with the capital structure projected on an empty market as of the
+    ///   first period's start.
+    ///
+    /// # Returns
+    ///
+    /// Quantiles for a complete run. When a requested sample has no value on
+    /// some path the run is incomplete: no statistics are published and
+    /// `incomplete` names the first such sample.
     ///
     /// # Errors
     ///
-    /// Returns an evaluation error when `config.n_paths` is zero, model
-    /// compilation or dependency analysis fails, a capital-structure
-    /// instrument needs market data to generate its cashflows, or any
-    /// simulated path cannot resolve a required formula, input, forecast or
-    /// waterfall step.
+    /// Returns an evaluation error when the configuration is invalid (a path
+    /// count of zero or beyond the path-identifier domain, no or unknown or
+    /// repeated metrics, repeated or out-of-range percentiles, a run larger
+    /// than the sample limit), the model has no forecast period, the model
+    /// cannot be prepared, or a path fails; of several failing paths the
+    /// lowest-numbered one is reported.
     pub fn evaluate_monte_carlo(
         &mut self,
         model: &FinancialModelSpec,
         config: &MonteCarloConfig,
+        context: Option<crate::evaluator::MonteCarloContext<'_>>,
     ) -> Result<MonteCarloResults> {
-        self.evaluate_monte_carlo_inner(model, config)
+        self.evaluate_monte_carlo_inner(model, config, context)
             .inspect_err(|err| {
                 tracing::error!(
                     model_id = %model.id,
@@ -860,6 +876,7 @@ impl Evaluator {
         &mut self,
         model: &FinancialModelSpec,
         config: &MonteCarloConfig,
+        context: Option<crate::evaluator::MonteCarloContext<'_>>,
     ) -> Result<MonteCarloResults> {
         let _span = tracing::info_span!(
             "statements.evaluate_monte_carlo",
@@ -869,15 +886,28 @@ impl Evaluator {
             nodes = model.nodes.len()
         )
         .entered();
-        if config.n_paths == 0 {
-            return Err(Error::eval(
-                "Monte Carlo configuration requires n_paths > 0",
-            ));
-        }
 
         let prepared = self.prepare(model)?;
+        // Size and requests are checked before any path runs.
+        let accumulator_seed =
+            MonteCarloAccumulator::new(model, config, &prepared.node_value_types)?;
         let empty_market = finstack_quant_core::market_data::context::MarketContext::new();
-        let capital_structure = contractual_capital_structure(model, &empty_market);
+        let capital_structure = match context {
+            Some(context) => {
+                self.visibility_cutoff = match context.cutoff {
+                    ObservationCutoff::FullSnapshot => None,
+                    ObservationCutoff::Through(date) => {
+                        model.validate_point_in_time()?;
+                        Some(date)
+                    }
+                };
+                model
+                    .capital_structure
+                    .as_ref()
+                    .map(|_| (context.market, context.as_of))
+            }
+            None => contractual_capital_structure(model, &empty_market),
+        };
 
         // Run paths — parallel via rayon on native targets, serial on wasm32
         // (rayon's thread pool is unavailable in single-threaded wasm).
@@ -893,10 +923,8 @@ impl Evaluator {
             };
             let (results, warnings) =
                 path_eval.evaluate_periods(model, &prepared, capital_structure, Some(path))?;
-            Ok((results.path_values(), warnings))
+            Ok((results.path_samples(accumulator_seed.metrics()), warnings))
         };
-
-        let accumulator_seed = MonteCarloAccumulator::new(model, config)?;
 
         // Native: each rayon split folds its paths in increasing index order and
         // stops at its first failure, carrying `(path_idx, error)`; the reduce

@@ -1317,6 +1317,39 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements Monte Carlo: explicit metrics, one entry point with the evaluation context, typed samples
+
+Breaking, with no compatibility path (STATEMENTS-EVALUATION-011).
+
+- `MonteCarloConfig` requires `metrics`: the node identifiers to report, at
+  least one, each a node of the model, none repeated. Only these are sampled
+  and stored (every node was). `MonteCarloConfig::new(n_paths, seed, metrics)`
+  in Rust; `MonteCarloConfig(n_paths, seed, metrics, percentiles=None,
+  include_path_data=False)` in Python.
+- `n_paths` must be 1 to 4,294,967,295, and paths x metrics x forecast periods
+  may not exceed 100,000,000 samples. Both are checked before a path runs.
+- Requested percentiles must be distinct; a repeated level is an error (it was
+  dropped).
+- `Evaluator::evaluate_monte_carlo(model, config, context)` takes an optional
+  market, valuation date and observation cutoff, the context of
+  `evaluate_with_market`. A model with floating-rate debt can now be
+  simulated. Python: `evaluate_monte_carlo(model, config, market=None,
+  as_of=None, observation_cutoff=None)`; WASM: `evaluateMonteCarlo(model,
+  config, market?, asOf?, observationCutoff?)`.
+- A requested sample without a value no longer fails the run. The run is
+  incomplete: `percentile_results` is empty and `incomplete` names the first
+  such sample, its reason and the count. A value that is not finite is still
+  an error.
+- `MonteCarloResults` gains `incomplete`, `seed` (a decimal string in JSON),
+  `stream_version` and `metrics`; each `PercentileSeries` gains `value_type` and `sample_count`.
+- `percentile_by_period` matches the probability level exactly (it matched
+  within 1e-12).
+- `breach_probability(metric, threshold)` takes a typed threshold: a number
+  for a scalar metric, money in the metric's currency for a monetary one. A
+  threshold in other units or not finite is an error, as is a restored path
+  table without exactly one finite sample per path and forecast period. In
+  Rust it returns `Result<Option<f64>>`.
+
 ### Statements capital: a period's debt state commits once, and the PIK metric is a traced input
 
 Breaking, with no compatibility path (STATEMENTS-EVALUATION-012).

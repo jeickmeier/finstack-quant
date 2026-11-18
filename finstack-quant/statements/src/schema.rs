@@ -232,12 +232,14 @@ fn metric_registry_examples() -> finstack_quant_core::Result<Vec<Value>> {
     )
 }
 
-/// A seeded 1,000-path run reporting the 5th, 50th and 95th percentiles.
+/// A seeded 1,000-path run reporting the 5th, 50th and 95th percentiles of
+/// revenue.
 fn monte_carlo_config_examples() -> finstack_quant_core::Result<Vec<Value>> {
     finstack_quant_core::schema::example_from_json::<crate::evaluator::MonteCarloConfig>(
         serde_json::json!({
             "n_paths": 1000,
             "seed": 42,
+            "metrics": ["revenue"],
             "percentiles": [0.05, 0.5, 0.95]
         }),
     )
@@ -250,6 +252,8 @@ fn monte_carlo_results_examples() -> finstack_quant_core::Result<Vec<Value>> {
             "percentile_results": {
                 "revenue": {
                     "metric": "revenue",
+                    "value_type": {"type": "scalar"},
+                    "sample_count": 1000,
                     "values": {
                         "2025Q1": [[0.05, 940_000.0], [0.5, 1_000_000.0], [0.95, 1_065_000.0]],
                         "2025Q2": [[0.05, 925_000.0], [0.5, 1_020_000.0], [0.95, 1_120_000.0]]
@@ -257,6 +261,9 @@ fn monte_carlo_results_examples() -> finstack_quant_core::Result<Vec<Value>> {
                 }
             },
             "n_paths": 1000,
+            "seed": "42",
+            "stream_version": 1,
+            "metrics": ["revenue"],
             "percentiles": [0.05, 0.5, 0.95],
             "forecast_periods": ["2025Q1", "2025Q2"]
         }),

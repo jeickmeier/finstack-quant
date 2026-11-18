@@ -43,26 +43,30 @@ impl PyMonteCarloConfig {
     /// seed : int
     ///     Base seed from which per-path and per-node seeds are derived. The
     ///     same seed reproduces the run exactly, in serial and in parallel.
+    /// metrics : list[str]
+    ///     Node identifiers to report: at least one, each a node of the
+    ///     model, none repeated. Only these are sampled and stored.
     /// percentiles : list[float] | None
     ///     Percentiles to compute, each a **decimal fraction in [0, 1]** —
     ///     ``0.05`` is the 5th percentile, not ``5``. Stored as given; the
-    ///     engine sorts, deduplicates and range-checks them when
+    ///     engine sorts and checks them when
     ///     ``Evaluator.evaluate_monte_carlo`` starts, which raises
-    ///     ``ValueError`` for a value that is not finite or lies outside
-    ///     [0, 1]. ``None`` or an empty list uses the engine default
-    ///     ``[0.05, 0.5, 0.95]``.
+    ///     ``ValueError`` for a value that is not finite, lies outside
+    ///     [0, 1] or is repeated. ``None`` or an empty list uses the engine
+    ///     default ``[0.05, 0.5, 0.95]``.
     /// include_path_data : bool
     ///     Whether to retain the full per-path long table. Off by default
     ///     because it grows as ``n_paths * metrics * forecast periods``.
     #[new]
-    #[pyo3(signature = (n_paths, seed, percentiles=None, include_path_data=false))]
+    #[pyo3(signature = (n_paths, seed, metrics, percentiles=None, include_path_data=false))]
     fn new(
         n_paths: usize,
         seed: u64,
+        metrics: Vec<String>,
         percentiles: Option<Vec<f64>>,
         include_path_data: bool,
     ) -> Self {
-        let mut inner = RustMonteCarloConfig::new(n_paths, seed);
+        let mut inner = RustMonteCarloConfig::new(n_paths, seed, metrics);
         if let Some(percentiles) = percentiles {
             inner = inner.with_percentiles(percentiles);
         }
@@ -103,6 +107,12 @@ impl PyMonteCarloConfig {
     #[getter]
     fn include_path_data(&self) -> bool {
         self.inner.include_path_data
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._monte_carlo", "MonteCarloConfig.metrics")]
+    #[getter]
+    fn metrics(&self) -> Vec<String> {
+        self.inner.metrics.clone()
     }
 
     /// Identify this value in notebooks and logs.
@@ -175,7 +185,25 @@ impl PyMonteCarloResults {
     #[doc = pydoc!("finstack_quant.statements._monte_carlo", "MonteCarloResults.metrics")]
     #[getter]
     fn metrics(&self) -> Vec<String> {
-        self.inner.percentile_results.keys().cloned().collect()
+        self.inner.metrics.clone()
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._monte_carlo", "MonteCarloResults.incomplete")]
+    #[getter]
+    fn incomplete<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.incomplete)
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._monte_carlo", "MonteCarloResults.seed")]
+    #[getter]
+    fn seed(&self) -> u64 {
+        self.inner.seed
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._monte_carlo", "MonteCarloResults.stream_version")]
+    #[getter]
+    fn stream_version(&self) -> u32 {
+        self.inner.stream_version
     }
 
     #[doc = pydoc!("finstack_quant.statements._monte_carlo", "MonteCarloResults.warnings")]
@@ -219,8 +247,20 @@ impl PyMonteCarloResults {
 
     #[doc = pydoc!("finstack_quant.statements._monte_carlo", "MonteCarloResults.breach_probability")]
     #[pyo3(text_signature = "($self, metric, threshold)")]
-    fn breach_probability(&self, metric: &str, threshold: f64) -> Option<f64> {
-        self.inner.breach_probability(metric, threshold)
+    fn breach_probability(
+        &self,
+        metric: &str,
+        threshold: &Bound<'_, PyAny>,
+    ) -> PyResult<Option<f64>> {
+        use finstack_quant_statements::types::AmountOrScalar;
+        let threshold =
+            match threshold.extract::<PyRef<'_, crate::bindings::core::money::PyMoney>>() {
+                Ok(money) => AmountOrScalar::Amount(money.inner),
+                Err(_) => AmountOrScalar::scalar(threshold.extract::<f64>()?),
+            };
+        self.inner
+            .breach_probability(metric, threshold)
+            .map_err(statements_to_py)
     }
 
     /// Export one metric's percentile fan as a pandas ``DataFrame``.

@@ -58,7 +58,10 @@ pub use context::EvaluationContext;
 pub use dag::DependencyGraph;
 pub use engine::{Evaluator, ObservationCutoff, PreparedEvaluation};
 pub use formula::evaluate_formula;
-pub use monte_carlo::{MonteCarloConfig, MonteCarloResults, PercentileSeries};
+pub use monte_carlo::{
+    MAX_MONTE_CARLO_SAMPLES, MonteCarloConfig, MonteCarloContext, MonteCarloIncomplete,
+    MonteCarloResults, PercentileSeries,
+};
 pub(crate) use period_history::PeriodHistory;
 pub use results::{
     CapitalStructureWarning, CellSource, CellStatus, EvalStats, EvalWarning, ForecastStream,

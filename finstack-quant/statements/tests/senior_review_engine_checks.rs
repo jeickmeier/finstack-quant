@@ -1,6 +1,7 @@
 //! Regression coverage for evaluated input units and accounting-check policies.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::float_cmp)]
 
+use crate::AllMetrics;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::money::Money;
@@ -103,7 +104,7 @@ fn prepared_and_ordinary_evaluation_reject_changed_input_currency() {
         evaluator.evaluate_prepared(&model, &prepared).unwrap_err(),
         evaluator.evaluate(&model).unwrap_err(),
         evaluator
-            .evaluate_monte_carlo(&model, &MonteCarloConfig::new(2, 42))
+            .evaluate_all_metrics(&model, &MonteCarloConfig::new(2, 42, [""; 0]))
             .unwrap_err(),
     ] {
         assert!(

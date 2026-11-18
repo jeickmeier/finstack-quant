@@ -306,19 +306,22 @@ pub fn node_to_pricing_flows(
 /// Probability that a metric exceeds a threshold in any forecast period.
 ///
 /// Free-function twin of Python `MonteCarloResults.breach_probability` (Rust
-/// `MonteCarloResults::breach_probability`). Checks upside breaches only
-/// (`value > threshold`); negate values and threshold for a downside test.
-/// Per-path values come from the result's `path_data` table, so the
-/// simulation must run with `include_path_data: true`.
+/// `MonteCarloResults::breach_probability`). A path counts once when any
+/// forecast-period value is strictly greater than the threshold; for a floor,
+/// simulate a derived node that flips the sign. Per-path values come from the
+/// result's `path_data` table, so the simulation must run with
+/// `include_path_data: true`.
 /// @param resultsJson - `MonteCarloResults` returned by `Evaluator.evaluateMonteCarlo` (object or JSON).
-/// @param metric - Node identifier to test.
-/// @param threshold - Breach level in the metric's own units.
-/// @returns Fraction of paths that breach in at least one forecast period, or `undefined` when the metric has no path data (including results run without `include_path_data`), there are no forecast periods, or the simulation is incomplete.
+/// @param metric - A requested metric's node identifier.
+/// @param threshold - Finite upper threshold in the metric's own units: a number for a scalar metric, or `{amount, currency}` money in the metric's currency for a monetary one.
+/// @returns Fraction of paths that breach in at least one forecast period, or `undefined` when no path samples are available: the run is incomplete, the metric was not requested, or the result carries no `path_data`.
 ///
 /// # Errors
 ///
-/// Throws with kind `validation` if the results input is malformed, and kind
-/// `invalid_type` if `threshold` is not a number.
+/// Throws with kind `validation` if the results input is malformed, the
+/// threshold is not a finite number or money in the metric's units, or the
+/// path table does not hold exactly one finite sample for every path and
+/// forecast period.
 #[wasm_bindgen(js_name = monteCarloBreachProbability)]
 pub fn monte_carlo_breach_probability(
     #[wasm_bindgen(
@@ -327,14 +330,19 @@ pub fn monte_carlo_breach_probability(
     )]
     results_json: JsValue,
     #[wasm_bindgen(unchecked_param_type = "string")] metric: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "number")] threshold: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "number | generated.statements.Money")]
+    threshold: JsValue,
 ) -> Result<Option<f64>, JsValue> {
     let results: finstack_quant_statements::evaluator::MonteCarloResults =
         serde_json::from_str(&json_text(&results_json, "resultsJson")?).map_err(to_js_err)?;
-    Ok(results.breach_probability(
-        &js_string(&metric, "metric")?,
-        crate::utils::input::js_f64(&threshold, "threshold")?,
-    ))
+    // A number is a scalar threshold; anything else is read as money.
+    let threshold = match threshold.as_f64() {
+        Some(value) => finstack_quant_statements::types::AmountOrScalar::Scalar(value),
+        None => crate::utils::input::from_js_json(&threshold, "threshold")?,
+    };
+    results
+        .breach_probability(&js_string(&metric, "metric")?, threshold)
+        .map_err(to_js_err)
 }
 
 /// Percentile time series of one metric across the forecast periods.

@@ -9651,19 +9651,22 @@ export interface StatementsNamespace {
    * Probability that a metric exceeds a threshold in any forecast period.
    *
    * Free-function twin of Python `MonteCarloResults.breach_probability` (Rust
-   * `MonteCarloResults::breach_probability`). Checks upside breaches only
-   * (`value > threshold`); negate values and threshold for a downside test.
-   * Per-path values come from the result's `path_data` table, so the
-   * simulation must run with `include_path_data: true`.
+   * `MonteCarloResults::breach_probability`). A path counts once when any
+   * forecast-period value is strictly greater than the threshold; for a floor,
+   * simulate a derived node that flips the sign. Per-path values come from the
+   * result's `path_data` table, so the simulation must run with
+   * `include_path_data: true`.
    * @param resultsJson - `MonteCarloResults` returned by `Evaluator.evaluateMonteCarlo` (object or JSON).
-   * @param metric - Node identifier to test.
-   * @param threshold - Breach level in the metric's own units.
-   * @returns Fraction of paths that breach in at least one forecast period, or `undefined` when the metric has no path data (including results run without `include_path_data`), there are no forecast periods, or the simulation is incomplete.
+   * @param metric - A requested metric's node identifier.
+   * @param threshold - Finite upper threshold in the metric's own units: a number for a scalar metric, or `{amount, currency}` money in the metric's currency for a monetary one.
+   * @returns Fraction of paths that breach in at least one forecast period, or `undefined` when no path samples are available: the run is incomplete, the metric was not requested, or the result carries no `path_data`.
    *
    * # Errors
    *
-   * Throws with kind `validation` if the results input is malformed, and kind
-   * `invalid_type` if `threshold` is not a number.
+   * Throws with kind `validation` if the results input is malformed, the
+   * threshold is not a finite number or money in the metric's units, or the
+   * path table does not hold exactly one finite sample for every path and
+   * forecast period.
    */
   readonly monteCarloBreachProbability: typeof wasm.monteCarloBreachProbability;
   /**

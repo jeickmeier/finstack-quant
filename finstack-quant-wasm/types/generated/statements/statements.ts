@@ -8138,17 +8138,55 @@ export interface MonteCarloConfig {
    */
   include_path_data?: boolean;
   /**
-   * Number of Monte Carlo paths to simulate.
+   * Node identifiers to report. Required: at least one, each a node of
+   * the model, none repeated. Only these are sampled and stored.
+   */
+  metrics: string[];
+  /**
+   * Number of Monte Carlo paths to simulate: at least one, and at most
+   * `u32::MAX`, the path-identifier domain.
    */
   n_paths: number;
   /**
-   * Percentiles to compute in the closed interval [0, 1].
+   * Probability levels to compute, each finite in `[0, 1]` and distinct.
+   * Omitted or empty selects `0.05`, `0.5` and `0.95`.
    */
   percentiles?: number[];
   /**
-   * Base random seed used to derive per-path seeds.
+   * Base random seed used to derive per-path streams: an exact unsigned
+   * 64-bit integer. A JavaScript host must pass the configuration as JSON
+   * text to keep a seed above 2^53 exact.
    */
   seed: number;
+}
+/**
+ * Why a Monte Carlo run published no statistics.
+ *
+ * A run is complete only when every path has a value for every requested
+ * metric in every forecast period.
+ */
+export interface MonteCarloIncomplete {
+  /**
+   * First metric, in the requested order, with a sample without a value.
+   */
+  metric: string;
+  /**
+   * Number of samples without a value across the run.
+   */
+  missing_samples: number;
+  /**
+   * Lowest path with such a sample for that metric and period.
+   */
+  path: number;
+  /**
+   * First forecast period of that metric with such a sample.
+   */
+  period: PeriodId;
+  /**
+   * Why that cell had no value: `missing`, `masked`, or the reason an
+   * unavailable cell gives (for example `missing_peer_shock`).
+   */
+  reason: string;
 }
 /**
  * Percentile summaries of a Monte Carlo statement-model evaluation.
@@ -8159,6 +8197,15 @@ export interface MonteCarloResults {
    */
   forecast_periods: PeriodId[];
   /**
+   * Why no statistics were published, when a requested sample had no
+   * value on some path. `None` for a complete run.
+   */
+  incomplete?: MonteCarloIncomplete | null;
+  /**
+   * The metrics requested, in order.
+   */
+  metrics: string[];
+  /**
    * Number of Monte Carlo paths simulated.
    */
   n_paths: number;
@@ -8167,7 +8214,8 @@ export interface MonteCarloResults {
    */
   path_data?: TableEnvelope | null;
   /**
-   * Aggregated percentile results: `metric → PercentileSeries`.
+   * Aggregated percentile results: `metric → PercentileSeries`, in the
+   * requested metric order. Empty when the run is incomplete.
    */
   percentile_results: {
     [k: string]: PercentileSeries;
@@ -8176,6 +8224,16 @@ export interface MonteCarloResults {
    * Percentiles computed for each metric/period.
    */
   percentiles: number[];
+  /**
+   * The run's exact base seed, a decimal string in JSON: an unsigned
+   * 64-bit value does not fit a JavaScript number.
+   */
+  seed: string;
+  /**
+   * Version of the mapping from the seed, path and node to a random
+   * stream. With the seed it replays any path from the result alone.
+   */
+  stream_version: number;
   /**
    * Distinct warnings raised in the simulated forecast periods, each
    * reported once however many paths raised it, in a canonical sorted
@@ -8241,7 +8299,16 @@ export interface PercentileSeries {
    */
   metric: string;
   /**
-   * Period → ordered list of `(percentile, value)` pairs.
+   * Number of samples behind each quantile: the path count.
+   */
+  sample_count: number;
+  /**
+   * Units of every value: scalar, or money in one currency.
+   */
+  value_type: NodeValueType;
+  /**
+   * Period → `(probability, value)` pairs in ascending probability. The
+   * value is the R-7 sample quantile, in `value_type` units.
    */
   values: {
     [k: string]: [number, number][];

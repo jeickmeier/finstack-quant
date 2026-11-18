@@ -67,6 +67,7 @@ def test_typed_configs_round_trip_structured_fields() -> None:
     monte_carlo = MonteCarloConfig(
         n_paths=8,
         seed=17,
+        metrics=["revenue"],
         percentiles=[0.1, 0.5, 0.9],
         include_path_data=False,
     )
@@ -75,8 +76,8 @@ def test_typed_configs_round_trip_structured_fields() -> None:
 
 
 def test_monte_carlo_config_json_uses_canonical_omitted_field_defaults() -> None:
-    structured = MonteCarloConfig(n_paths=8, seed=17)
-    compatible_json = MonteCarloConfig.from_json('{"n_paths":8,"seed":17}')
+    structured = MonteCarloConfig(n_paths=8, seed=17, metrics=["revenue"])
+    compatible_json = MonteCarloConfig.from_json('{"n_paths":8,"seed":17,"metrics":["revenue"]}')
 
     expected_percentiles = [0.05, 0.5, 0.95]
     assert structured.percentiles == expected_percentiles
@@ -151,7 +152,7 @@ def test_analysis_functions_retain_json_config_input() -> None:
 
 def test_statement_monte_carlo_result_is_typed_and_deterministic() -> None:
     model = _model()
-    config = MonteCarloConfig(4, 123, [0.5])
+    config = MonteCarloConfig(4, 123, ["revenue"], [0.5])
     first = Evaluator().evaluate_monte_carlo(model, config)
     second = Evaluator().evaluate_monte_carlo(model, config.to_json())
     assert isinstance(first, MonteCarloResults)
@@ -172,7 +173,7 @@ def test_statement_monte_carlo_percentile_series_preserves_period_order() -> Non
     )
     model = builder.build()
 
-    results = Evaluator().evaluate_monte_carlo(model, MonteCarloConfig(2, 7, [0.5]))
+    results = Evaluator().evaluate_monte_carlo(model, MonteCarloConfig(2, 7, ["revenue"], [0.5]))
     series = results.percentile_by_period("revenue", 0.5)
 
     assert series is not None

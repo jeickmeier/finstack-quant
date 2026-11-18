@@ -414,11 +414,17 @@ changed input values only. Rebuild the plan after any structural or formula
 change — it deliberately reuses the compiled expressions captured at prepare
 time. This is what sensitivity sweeps and goal seek run on.
 
-`Evaluator::evaluate_monte_carlo(&model, &MonteCarloConfig::new(n_paths, seed))`
-runs stochastic forecast nodes across paths and returns percentile series, plus
-an optional long-format path table when `with_path_data(true)` is set. Capital
-structure is rejected in Monte Carlo mode; run instrument-level Monte Carlo in
-`finstack-quant-valuations` instead.
+`Evaluator::evaluate_monte_carlo(&model, &MonteCarloConfig::new(n_paths, seed, metrics), context)`
+replays the complete model on each path and returns R-7 quantiles of the
+requested `metrics` per forecast period, with their units and sample count,
+plus an optional long-format path table when `with_path_data(true)` is set.
+`context` is the optional market, valuation date and observation cutoff of
+`evaluate_with_market`; `None` evaluates as `evaluate` does. A capital
+structure runs on every path. When a requested sample has no value on some
+path the run is incomplete: no statistics are published and `incomplete` names
+the first such sample. `breach_probability(metric, threshold)` takes a
+threshold typed in the metric's units and counts paths with any forecast value
+strictly above it.
 
 ## Conventions that bite
 
@@ -439,8 +445,9 @@ structure is rejected in Monte Carlo mode; run instrument-level Monte Carlo in
   so a parallel run and a serial run at the same seed agree.
 - **Non-finite values.** Ordinary evaluation stores non-finite results (for
   example, division by zero) and surfaces them as `EvalWarning`s rather than
-  aborting; `NonFiniteCheck` is how you make them fail. Monte Carlo aggregation
-  is stricter and errors on the first non-finite path value.
+  aborting; `NonFiniteCheck` is how you make them fail. A Monte Carlo sample
+  that is not finite is an error, and a sample without a value makes the run
+  incomplete.
 - **Serde strictness.** `FinancialModelSpec`, `StatementResult`,
   `NormalizationConfig`, `MetricRegistry`, and the check/waterfall specs all
   deny unknown fields. `StatementResult.schema_version` accepts only numeric `1`.

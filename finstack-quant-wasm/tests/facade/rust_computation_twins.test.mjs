@@ -613,7 +613,12 @@ test('monteCarloBreachProbability reads the serialized path table', () => {
     },
     schema_version: 1,
   });
-  const config = { n_paths: 200, seed: 42, percentiles: [0.05, 0.5, 0.95] };
+  const config = {
+    n_paths: 200,
+    seed: 42,
+    metrics: ['revenue'],
+    percentiles: [0.05, 0.5, 0.95],
+  };
   const withPaths = new statements.Evaluator().evaluateMonteCarlo(model, {
     ...config,
     include_path_data: true,

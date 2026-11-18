@@ -1107,6 +1107,14 @@ it("simulates the current model in the Monte Carlo tab only once a config is sub
   fireEvent.change(within(simulation).getByRole("textbox", { name: "Seed" }), {
     target: { value: "9007199254740993" },
   });
+  // The metrics to report are listed explicitly.
+  fireEvent.click(
+    within(simulation).getByRole("button", { name: "Add Metrics" }),
+  );
+  fireEvent.change(
+    within(simulation).getByRole("textbox", { name: "Metrics 1" }),
+    { target: { value: "revenue" } },
+  );
   const simulate = within(simulation).getByRole("button", { name: "Simulate" });
   await waitFor(() =>
     expect((simulate as HTMLButtonElement).disabled).toBe(false),
@@ -1116,7 +1124,7 @@ it("simulates the current model in the Monte Carlo tab only once a config is sub
   await waitFor(() => expect(lastCall("evaluateMonteCarlo")).toBeDefined());
   // The seed beyond 2^53 reaches the worker as its exact integer token.
   expect(lastCall("evaluateMonteCarlo").configJson).toBe(
-    '{"n_paths":8,"seed":9007199254740993}',
+    '{"n_paths":8,"seed":9007199254740993,"metrics":["revenue"]}',
   );
   expect(
     await within(simulation).findByRole("table", {
@@ -1135,7 +1143,11 @@ it("simulates the current model in the Monte Carlo tab only once a config is sub
   );
   fireEvent.click(within(readout).getByRole("button", { name: "Test breach" }));
   await waitFor(() =>
-    expect(lastCall("monteCarloBreachProbability")?.threshold).toBe(1),
+    // Revenue is in dollars, so the threshold is sent as money.
+    expect(lastCall("monteCarloBreachProbability")?.threshold).toEqual({
+      amount: "1",
+      currency: "USD",
+    }),
   );
   expect(
     await within(readout).findByText(/Rust reports no probability/),

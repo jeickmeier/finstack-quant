@@ -2,6 +2,11 @@
   "percentile_results": {
     "cash": {
       "metric": "cash",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 113600000],
@@ -28,6 +33,11 @@
     },
     "debt_repayments": {
       "metric": "debt_repayments",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 10000000],
@@ -54,6 +64,11 @@
     },
     "debt_draws": {
       "metric": "debt_draws",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 0],
@@ -80,6 +95,11 @@
     },
     "debt_at_inception": {
       "metric": "debt_at_inception",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 420000000],
@@ -106,6 +126,11 @@
     },
     "total_debt": {
       "metric": "total_debt",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 420000000],
@@ -132,6 +157,11 @@
     },
     "debt_opening": {
       "metric": "debt_opening",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 430000000],
@@ -158,6 +188,11 @@
     },
     "interest_expense": {
       "metric": "interest_expense",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 9137500],
@@ -184,6 +219,11 @@
     },
     "d_and_a": {
       "metric": "d_and_a",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 12317800],
@@ -210,6 +250,11 @@
     },
     "opex": {
       "metric": "opex",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 87994200],
@@ -236,6 +281,11 @@
     },
     "revenue": {
       "metric": "revenue",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 198292245.7248328],
@@ -262,6 +312,11 @@
     },
     "capex": {
       "metric": "capex",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 10906073.514865804],
@@ -288,6 +343,11 @@
     },
     "cogs": {
       "metric": "cogs",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 66923632.932131074],
@@ -314,6 +374,11 @@
     },
     "gross_profit": {
       "metric": "gross_profit",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 131368612.79270174],
@@ -340,6 +405,11 @@
     },
     "ebitda": {
       "metric": "ebitda",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 43374412.79270173],
@@ -366,6 +436,10 @@
     },
     "interest_coverage": {
       "metric": "interest_coverage",
+      "value_type": {
+        "type": "scalar"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 4.746857761171188],
@@ -392,6 +466,11 @@
     },
     "ltm_ebitda": {
       "metric": "ltm_ebitda",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 196894412.79270172],
@@ -418,6 +497,10 @@
     },
     "leverage": {
       "metric": "leverage",
+      "value_type": {
+        "type": "scalar"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 1.9341949283148336],
@@ -444,6 +527,11 @@
     },
     "ebit": {
       "metric": "ebit",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 31056612.79270173],
@@ -470,6 +558,11 @@
     },
     "ufcf": {
       "metric": "ufcf",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 25170035.27155102],
@@ -496,6 +589,11 @@
     },
     "pretax_income": {
       "metric": "pretax_income",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 21919112.79270173],
@@ -522,6 +620,11 @@
     },
     "taxes": {
       "metric": "taxes",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 5150991.5062849065],
@@ -548,6 +651,11 @@
     },
     "free_cash_flow": {
       "metric": "free_cash_flow",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 27317347.77155102],
@@ -574,6 +682,11 @@
     },
     "net_income": {
       "metric": "net_income",
+      "value_type": {
+        "type": "monetary",
+        "currency": "USD"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 16768121.286416823],
@@ -600,6 +713,10 @@
     },
     "ebitda_margin_pct": {
       "metric": "ebitda_margin_pct",
+      "value_type": {
+        "type": "scalar"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 0.21873943304383617],
@@ -626,6 +743,10 @@
     },
     "gross_margin_pct": {
       "metric": "gross_margin_pct",
+      "value_type": {
+        "type": "scalar"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, 0.6625],
@@ -652,6 +773,10 @@
     },
     "revenue_growth_qoq": {
       "metric": "revenue_growth_qoq",
+      "value_type": {
+        "type": "scalar"
+      },
+      "sample_count": 200,
       "values": {
         "2025Q2": [
           [0.05, -0.04804490770603553],
@@ -678,6 +803,36 @@
     }
   },
   "n_paths": 200,
+  "seed": "42",
+  "stream_version": 1,
+  "metrics": [
+    "cash",
+    "debt_repayments",
+    "debt_draws",
+    "debt_at_inception",
+    "total_debt",
+    "debt_opening",
+    "interest_expense",
+    "d_and_a",
+    "opex",
+    "revenue",
+    "capex",
+    "cogs",
+    "gross_profit",
+    "ebitda",
+    "interest_coverage",
+    "ltm_ebitda",
+    "leverage",
+    "ebit",
+    "ufcf",
+    "pretax_income",
+    "taxes",
+    "free_cash_flow",
+    "net_income",
+    "ebitda_margin_pct",
+    "gross_margin_pct",
+    "revenue_growth_qoq"
+  ],
   "percentiles": [0.05, 0.25, 0.5, 0.75, 0.95],
   "forecast_periods": ["2025Q2", "2025Q3", "2025Q4"]
 }

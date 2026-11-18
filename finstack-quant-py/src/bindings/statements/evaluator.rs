@@ -650,12 +650,14 @@ impl PyEvaluator {
     /// Parameters
     /// ----------
     /// model : FinancialModelSpec | str
-    ///     A typed model or its canonical JSON. Models with a capital
-    ///     structure are rejected.
+    ///     A typed model or its canonical JSON.
     /// config : MonteCarloConfig | str
-    ///     Typed configuration or JSON with ``n_paths``, ``seed``, optional
-    ///     ``percentiles`` (decimal fractions in [0, 1]), and optional
-    ///     ``include_path_data``.
+    ///     Typed configuration or JSON with ``n_paths``, ``seed``,
+    ///     ``metrics``, optional ``percentiles`` (decimal fractions in
+    ///     [0, 1]) and optional ``include_path_data``.
+    /// market, as_of, observation_cutoff
+    ///     The market context of ``evaluate_with_market``; omit all three to
+    ///     evaluate as ``evaluate`` does.
     ///
     /// Returns
     /// -------
@@ -666,24 +668,58 @@ impl PyEvaluator {
     /// Raises
     /// ------
     /// ValueError
-    ///     If the model or config JSON is malformed, ``n_paths`` is zero, a
-    ///     percentile is outside [0, 1], the model has a capital structure,
-    ///     or any path fails to evaluate.
+    ///     If the model or config is rejected, only one of ``market`` and
+    ///     ``as_of`` is given, or any path fails to evaluate.
     /// KeyError
     ///     If a formula references an unknown node.
-    #[pyo3(text_signature = "($self, model, config)")]
+    #[pyo3(
+        signature = (model, config, market=None, as_of=None, observation_cutoff=None),
+        text_signature = "($self, model, config, market=None, as_of=None, observation_cutoff=None)"
+    )]
     fn evaluate_monte_carlo(
         &mut self,
         py: Python<'_>,
         model: &Bound<'_, PyAny>,
         config: &Bound<'_, PyAny>,
+        market: Option<&Bound<'_, PyAny>>,
+        as_of: Option<&Bound<'_, PyAny>>,
+        observation_cutoff: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyMonteCarloResults> {
+        use finstack_quant_statements::evaluator::{MonteCarloContext, ObservationCutoff};
+
         let model = extract_model_ref(model)?;
         let config = extract_config(config)?;
         let model_inner: &finstack_quant_statements::types::FinancialModelSpec = &model;
+        let run = match (market, as_of) {
+            (Some(market), Some(as_of)) => {
+                let cutoff = match observation_cutoff {
+                    None => ObservationCutoff::FullSnapshot,
+                    Some(cutoff) => match cutoff.extract::<String>() {
+                        Ok(mode) if mode == "full_snapshot" => ObservationCutoff::FullSnapshot,
+                        _ => ObservationCutoff::Through(py_to_date(cutoff)?),
+                    },
+                };
+                Some((extract_market_ref(py, market)?, py_to_date(as_of)?, cutoff))
+            }
+            (None, None) if observation_cutoff.is_none() => None,
+            _ => {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "evaluate_monte_carlo: give `market` and `as_of` together; \
+                     `observation_cutoff` needs both",
+                ));
+            }
+        };
+        let context = run.as_ref().map(|(market, as_of, cutoff)| {
+            let market: &finstack_quant_core::market_data::context::MarketContext = market;
+            MonteCarloContext {
+                market,
+                as_of: *as_of,
+                cutoff: *cutoff,
+            }
+        });
         let evaluator = &mut self.inner;
         let inner = py
-            .detach(|| evaluator.evaluate_monte_carlo(model_inner, &config))
+            .detach(|| evaluator.evaluate_monte_carlo(model_inner, &config, context))
             .map_err(statements_to_py)?;
         Ok(PyMonteCarloResults { inner })
     }

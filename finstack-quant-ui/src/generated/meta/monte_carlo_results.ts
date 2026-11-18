@@ -10,10 +10,17 @@ export default [
           "2025Q1",
           "2025Q2"
         ],
+        "metrics": [
+          "revenue"
+        ],
         "n_paths": 1000,
         "percentile_results": {
           "revenue": {
             "metric": "revenue",
+            "sample_count": 1000,
+            "value_type": {
+              "type": "scalar"
+            },
             "values": {
               "2025Q1": [
                 [
@@ -50,10 +57,44 @@ export default [
           0.05,
           0.5,
           0.95
-        ]
+        ],
+        "seed": "42",
+        "stream_version": 1
       }
     ],
     "title": "MonteCarloResults"
+  },
+  {
+    "path": "#/$defs/d_0764b89834ca123e9b7c",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NodeValueType",
+    "description": "Node value type classification.\n\nDetermines whether a node represents monetary values (with a specific currency)\nor scalar values (ratios, percentages, counts, etc.)."
+  },
+  {
+    "path": "#/$defs/d_0764b89834ca123e9b7c/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NodeValueType/oneOf/0",
+    "description": "Monetary value with a specific currency (e.g., revenue, costs, balance sheet items)"
+  },
+  {
+    "path": "#/$defs/d_0764b89834ca123e9b7c/oneOf/0/properties/currency",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NodeValueType/oneOf/0/properties/currency",
+    "description": "Currency of the monetary value",
+    "ref": "#/$defs/Currency",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency"
+  },
+  {
+    "path": "#/$defs/d_0764b89834ca123e9b7c/oneOf/0/properties/type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NodeValueType/oneOf/0/properties/type",
+    "const": "monetary"
+  },
+  {
+    "path": "#/$defs/d_0764b89834ca123e9b7c/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NodeValueType/oneOf/1",
+    "description": "Unitless scalar value (e.g., ratios, percentages, counts)"
+  },
+  {
+    "path": "#/$defs/d_0764b89834ca123e9b7c/oneOf/1/properties/type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NodeValueType/oneOf/1/properties/type",
+    "const": "scalar"
   },
   {
     "path": "#/$defs/d_090e21e61cdf3e0563e2",
@@ -309,6 +350,42 @@ export default [
     ]
   },
   {
+    "path": "#/$defs/d_6dbdf0cc2ba8afa48229",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/MonteCarloIncomplete",
+    "description": "Why a Monte Carlo run published no statistics.\n\nA run is complete only when every path has a value for every requested\nmetric in every forecast period."
+  },
+  {
+    "path": "#/$defs/d_6dbdf0cc2ba8afa48229/properties/metric",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/MonteCarloIncomplete/properties/metric",
+    "description": "First metric, in the requested order, with a sample without a value."
+  },
+  {
+    "path": "#/$defs/d_6dbdf0cc2ba8afa48229/properties/missing_samples",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/MonteCarloIncomplete/properties/missing_samples",
+    "description": "Number of samples without a value across the run.",
+    "format": "uint",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_6dbdf0cc2ba8afa48229/properties/path",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/MonteCarloIncomplete/properties/path",
+    "description": "Lowest path with such a sample for that metric and period.",
+    "format": "uint32",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_6dbdf0cc2ba8afa48229/properties/period",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/MonteCarloIncomplete/properties/period",
+    "description": "First forecast period of that metric with such a sample.",
+    "ref": "#/$defs/PeriodId",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/PeriodId"
+  },
+  {
+    "path": "#/$defs/d_6dbdf0cc2ba8afa48229/properties/reason",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/MonteCarloIncomplete/properties/reason",
+    "description": "Why that cell had no value: `missing`, `masked`, or the reason an\nunavailable cell gives (for example `missing_peer_shock`)."
+  },
+  {
     "path": "#/$defs/d_797699a3f0493b0ba6f3",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CapitalStructureWarning",
     "description": "Typed reason for a capital-structure evaluation warning."
@@ -437,9 +514,23 @@ export default [
     "description": "Metric / node identifier."
   },
   {
+    "path": "#/$defs/d_9ebf84cf8414d0c617ec/properties/sample_count",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/PercentileSeries/properties/sample_count",
+    "description": "Number of samples behind each quantile: the path count.",
+    "format": "uint",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_9ebf84cf8414d0c617ec/properties/value_type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/PercentileSeries/properties/value_type",
+    "description": "Units of every value: scalar, or money in one currency.",
+    "ref": "#/$defs/NodeValueType",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/NodeValueType"
+  },
+  {
     "path": "#/$defs/d_9ebf84cf8414d0c617ec/properties/values",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/PercentileSeries/properties/values",
-    "description": "Period → ordered list of `(percentile, value)` pairs."
+    "description": "Period → `(probability, value)` pairs in ascending probability. The\nvalue is the R-7 sample quantile, in `value_type` units."
   },
   {
     "path": "#/$defs/d_9ebf84cf8414d0c617ec/properties/values/additionalProperties",
@@ -652,6 +743,977 @@ export default [
     "minimum": 0
   },
   {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency",
+    "description": "ISO 4217 currency enumeration"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/0",
+    "const": "AED",
+    "description": "UAE Dirham (784)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/1",
+    "const": "AFN",
+    "description": "Afghani (971)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/10",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/10",
+    "const": "BAM",
+    "description": "Convertible Mark (977)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/100",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/100",
+    "const": "NIO",
+    "description": "Cordoba Oro (558)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/101",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/101",
+    "const": "NOK",
+    "description": "Norwegian Krone (578)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/102",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/102",
+    "const": "NPR",
+    "description": "Nepalese Rupee (524)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/103",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/103",
+    "const": "NZD",
+    "description": "New Zealand Dollar (554)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/104",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/104",
+    "const": "OMR",
+    "description": "Rial Omani (512)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/105",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/105",
+    "const": "PAB",
+    "description": "Balboa (590)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/106",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/106",
+    "const": "PEN",
+    "description": "Sol (604)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/107",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/107",
+    "const": "PGK",
+    "description": "Kina (598)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/108",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/108",
+    "const": "PHP",
+    "description": "Philippine Peso (608)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/109",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/109",
+    "const": "PKR",
+    "description": "Pakistan Rupee (586)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/11",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/11",
+    "const": "BBD",
+    "description": "Barbados Dollar (52)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/110",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/110",
+    "const": "PLN",
+    "description": "Zloty (985)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/111",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/111",
+    "const": "PYG",
+    "description": "Guarani (600)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/112",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/112",
+    "const": "QAR",
+    "description": "Qatari Rial (634)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/113",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/113",
+    "const": "RON",
+    "description": "Romanian Leu (946)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/114",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/114",
+    "const": "RSD",
+    "description": "Serbian Dinar (941)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/115",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/115",
+    "const": "RUB",
+    "description": "Russian Ruble (643)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/116",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/116",
+    "const": "RWF",
+    "description": "Rwanda Franc (646)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/117",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/117",
+    "const": "SAR",
+    "description": "Saudi Riyal (682)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/118",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/118",
+    "const": "SBD",
+    "description": "Solomon Islands Dollar (90)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/119",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/119",
+    "const": "SCR",
+    "description": "Seychelles Rupee (690)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/12",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/12",
+    "const": "BDT",
+    "description": "Taka (50)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/120",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/120",
+    "const": "SDG",
+    "description": "Sudanese Pound (938)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/121",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/121",
+    "const": "SEK",
+    "description": "Swedish Krona (752)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/122",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/122",
+    "const": "SGD",
+    "description": "Singapore Dollar (702)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/123",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/123",
+    "const": "SHP",
+    "description": "Saint Helena Pound (654)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/124",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/124",
+    "const": "SLE",
+    "description": "Leone (925)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/125",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/125",
+    "const": "SLL",
+    "description": "Leone (694)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/126",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/126",
+    "const": "SOS",
+    "description": "Somali Shilling (706)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/127",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/127",
+    "const": "SRD",
+    "description": "Surinam Dollar (968)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/128",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/128",
+    "const": "SSP",
+    "description": "South Sudanese Pound (728)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/129",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/129",
+    "const": "STN",
+    "description": "Dobra (930)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/13",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/13",
+    "const": "BGN",
+    "description": "Bulgarian Lev (975)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/130",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/130",
+    "const": "SYP",
+    "description": "Syrian Pound (760)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/131",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/131",
+    "const": "SZL",
+    "description": "Lilangeni (748)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/132",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/132",
+    "const": "THB",
+    "description": "Baht (764)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/133",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/133",
+    "const": "TJS",
+    "description": "Somoni (972)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/134",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/134",
+    "const": "TMT",
+    "description": "Turkmenistan New Manat (934)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/135",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/135",
+    "const": "TND",
+    "description": "Tunisian Dinar (788)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/136",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/136",
+    "const": "TOP",
+    "description": "Pa'anga (776)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/137",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/137",
+    "const": "TRY",
+    "description": "Turkish Lira (949)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/138",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/138",
+    "const": "TTD",
+    "description": "Trinidad and Tobago Dollar (780)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/139",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/139",
+    "const": "TWD",
+    "description": "New Taiwan Dollar (901)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/14",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/14",
+    "const": "BHD",
+    "description": "Bahraini Dinar (48)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/140",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/140",
+    "const": "TZS",
+    "description": "Tanzanian Shilling (834)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/141",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/141",
+    "const": "UAH",
+    "description": "Hryvnia (980)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/142",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/142",
+    "const": "UGX",
+    "description": "Uganda Shilling (800)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/143",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/143",
+    "const": "USD",
+    "description": "US Dollar (840)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/144",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/144",
+    "const": "UYU",
+    "description": "Peso Uruguayo (858)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/145",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/145",
+    "const": "UZS",
+    "description": "Uzbekistan Sum (860)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/146",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/146",
+    "const": "VED",
+    "description": "Bolívar Soberano (926)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/147",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/147",
+    "const": "VES",
+    "description": "Bolívar Soberano (928)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/148",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/148",
+    "const": "VND",
+    "description": "Dong (704)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/149",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/149",
+    "const": "VUV",
+    "description": "Vatu (548)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/15",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/15",
+    "const": "BIF",
+    "description": "Burundi Franc (108)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/150",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/150",
+    "const": "WST",
+    "description": "Tala (882)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/151",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/151",
+    "const": "XAF",
+    "description": "CFA Franc BEAC (950)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/152",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/152",
+    "const": "XCD",
+    "description": "East Caribbean Dollar (951)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/153",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/153",
+    "const": "XCG",
+    "description": "Caribbean Guilder (532)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/154",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/154",
+    "const": "XOF",
+    "description": "CFA Franc BCEAO (952)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/155",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/155",
+    "const": "XPF",
+    "description": "CFP Franc (953)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/156",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/156",
+    "const": "YER",
+    "description": "Yemeni Rial (886)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/157",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/157",
+    "const": "ZAR",
+    "description": "Rand (710)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/158",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/158",
+    "const": "ZMW",
+    "description": "Zambian Kwacha (967)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/159",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/159",
+    "const": "ZWG",
+    "description": "Zimbabwe Gold (924)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/16",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/16",
+    "const": "BMD",
+    "description": "Bermudian Dollar (60)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/160",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/160",
+    "const": "ZWL",
+    "description": "Zimbabwe Dollar (932)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/17",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/17",
+    "const": "BND",
+    "description": "Brunei Dollar (96)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/18",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/18",
+    "const": "BOB",
+    "description": "Boliviano (68)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/19",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/19",
+    "const": "BRL",
+    "description": "Brazilian Real (986)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/2",
+    "const": "ALL",
+    "description": "Lek (8)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/20",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/20",
+    "const": "BSD",
+    "description": "Bahamian Dollar (44)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/21",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/21",
+    "const": "BTN",
+    "description": "Ngultrum (64)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/22",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/22",
+    "const": "BWP",
+    "description": "Pula (72)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/23",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/23",
+    "const": "BYN",
+    "description": "Belarusian Ruble (933)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/24",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/24",
+    "const": "BZD",
+    "description": "Belize Dollar (84)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/25",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/25",
+    "const": "CAD",
+    "description": "Canadian Dollar (124)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/26",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/26",
+    "const": "CDF",
+    "description": "Congolese Franc (976)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/27",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/27",
+    "const": "CHF",
+    "description": "Swiss Franc (756)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/28",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/28",
+    "const": "CLF",
+    "description": "Unidad de Fomento (990)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/29",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/29",
+    "const": "CLP",
+    "description": "Chilean Peso (152)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/3",
+    "const": "AMD",
+    "description": "Armenian Dram (51)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/30",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/30",
+    "const": "CNY",
+    "description": "Yuan Renminbi (156)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/31",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/31",
+    "const": "COP",
+    "description": "Colombian Peso (170)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/32",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/32",
+    "const": "CRC",
+    "description": "Costa Rican Colon (188)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/33",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/33",
+    "const": "CUC",
+    "description": "Peso Convertible (931)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/34",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/34",
+    "const": "CUP",
+    "description": "Cuban Peso (192)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/35",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/35",
+    "const": "CVE",
+    "description": "Cabo Verde Escudo (132)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/36",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/36",
+    "const": "CZK",
+    "description": "Czech Koruna (203)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/37",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/37",
+    "const": "DJF",
+    "description": "Djibouti Franc (262)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/38",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/38",
+    "const": "DKK",
+    "description": "Danish Krone (208)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/39",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/39",
+    "const": "DOP",
+    "description": "Dominican Peso (214)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/4",
+    "const": "ANG",
+    "description": "Netherlands Antillean Guilder (532)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/40",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/40",
+    "const": "DZD",
+    "description": "Algerian Dinar (12)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/41",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/41",
+    "const": "EGP",
+    "description": "Egyptian Pound (818)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/42",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/42",
+    "const": "ERN",
+    "description": "Nakfa (232)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/43",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/43",
+    "const": "ETB",
+    "description": "Ethiopian Birr (230)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/44",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/44",
+    "const": "EUR",
+    "description": "Euro (978)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/45",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/45",
+    "const": "FJD",
+    "description": "Fiji Dollar (242)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/46",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/46",
+    "const": "FKP",
+    "description": "Falkland Islands Pound (238)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/47",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/47",
+    "const": "GBP",
+    "description": "Pound Sterling (826)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/48",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/48",
+    "const": "GEL",
+    "description": "Lari (981)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/49",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/49",
+    "const": "GHS",
+    "description": "Ghana Cedi (936)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/5",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/5",
+    "const": "AOA",
+    "description": "Kwanza (973)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/50",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/50",
+    "const": "GIP",
+    "description": "Gibraltar Pound (292)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/51",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/51",
+    "const": "GMD",
+    "description": "Dalasi (270)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/52",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/52",
+    "const": "GNF",
+    "description": "Guinean Franc (324)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/53",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/53",
+    "const": "GTQ",
+    "description": "Quetzal (320)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/54",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/54",
+    "const": "GYD",
+    "description": "Guyana Dollar (328)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/55",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/55",
+    "const": "HKD",
+    "description": "Hong Kong Dollar (344)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/56",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/56",
+    "const": "HNL",
+    "description": "Lempira (340)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/57",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/57",
+    "const": "HRK",
+    "description": "Kuna (191)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/58",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/58",
+    "const": "HTG",
+    "description": "Gourde (332)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/59",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/59",
+    "const": "HUF",
+    "description": "Forint (348)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/6",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/6",
+    "const": "ARS",
+    "description": "Argentine Peso (32)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/60",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/60",
+    "const": "IDR",
+    "description": "Rupiah (360)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/61",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/61",
+    "const": "ILS",
+    "description": "New Israeli Sheqel (376)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/62",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/62",
+    "const": "INR",
+    "description": "Indian Rupee (356)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/63",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/63",
+    "const": "IQD",
+    "description": "Iraqi Dinar (368)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/64",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/64",
+    "const": "IRR",
+    "description": "Iranian Rial (364)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/65",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/65",
+    "const": "ISK",
+    "description": "Iceland Krona (352)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/66",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/66",
+    "const": "JMD",
+    "description": "Jamaican Dollar (388)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/67",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/67",
+    "const": "JOD",
+    "description": "Jordanian Dinar (400)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/68",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/68",
+    "const": "JPY",
+    "description": "Yen (392)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/69",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/69",
+    "const": "KES",
+    "description": "Kenyan Shilling (404)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/7",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/7",
+    "const": "AUD",
+    "description": "Australian Dollar (36)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/70",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/70",
+    "const": "KGS",
+    "description": "Som (417)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/71",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/71",
+    "const": "KHR",
+    "description": "Riel (116)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/72",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/72",
+    "const": "KMF",
+    "description": "Comorian Franc (174)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/73",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/73",
+    "const": "KPW",
+    "description": "North Korean Won (408)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/74",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/74",
+    "const": "KRW",
+    "description": "Won (410)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/75",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/75",
+    "const": "KWD",
+    "description": "Kuwaiti Dinar (414)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/76",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/76",
+    "const": "KYD",
+    "description": "Cayman Islands Dollar (136)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/77",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/77",
+    "const": "KZT",
+    "description": "Tenge (398)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/78",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/78",
+    "const": "LAK",
+    "description": "Lao Kip (418)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/79",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/79",
+    "const": "LBP",
+    "description": "Lebanese Pound (422)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/8",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/8",
+    "const": "AWG",
+    "description": "Aruban Florin (533)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/80",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/80",
+    "const": "LKR",
+    "description": "Sri Lanka Rupee (144)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/81",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/81",
+    "const": "LRD",
+    "description": "Liberian Dollar (430)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/82",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/82",
+    "const": "LSL",
+    "description": "Loti (426)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/83",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/83",
+    "const": "LYD",
+    "description": "Libyan Dinar (434)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/84",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/84",
+    "const": "MAD",
+    "description": "Moroccan Dirham (504)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/85",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/85",
+    "const": "MDL",
+    "description": "Moldovan Leu (498)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/86",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/86",
+    "const": "MGA",
+    "description": "Malagasy Ariary (969)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/87",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/87",
+    "const": "MKD",
+    "description": "Denar (807)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/88",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/88",
+    "const": "MMK",
+    "description": "Kyat (104)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/89",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/89",
+    "const": "MNT",
+    "description": "Tugrik (496)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/9",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/9",
+    "const": "AZN",
+    "description": "Azerbaijan Manat (944)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/90",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/90",
+    "const": "MOP",
+    "description": "Pataca (446)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/91",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/91",
+    "const": "MRU",
+    "description": "Ouguiya (929)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/92",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/92",
+    "const": "MUR",
+    "description": "Mauritius Rupee (480)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/93",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/93",
+    "const": "MVR",
+    "description": "Rufiyaa (462)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/94",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/94",
+    "const": "MWK",
+    "description": "Malawi Kwacha (454)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/95",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/95",
+    "const": "MXN",
+    "description": "Mexican Peso (484)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/96",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/96",
+    "const": "MYR",
+    "description": "Malaysian Ringgit (458)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/97",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/97",
+    "const": "MZN",
+    "description": "Mozambique Metical (943)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/98",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/98",
+    "const": "NAD",
+    "description": "Namibia Dollar (516)"
+  },
+  {
+    "path": "#/$defs/d_f9e62a3bcc69a530af26/oneOf/99",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/Currency/oneOf/99",
+    "const": "NGN",
+    "description": "Naira (566)"
+  },
+  {
     "path": "#/properties/forecast_periods",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/forecast_periods",
     "description": "Forecast (non-actual) periods included in the simulation."
@@ -661,6 +1723,30 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/forecast_periods/items",
     "ref": "#/$defs/PeriodId",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/PeriodId"
+  },
+  {
+    "path": "#/properties/incomplete",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/incomplete",
+    "description": "Why no statistics were published, when a requested sample had no\nvalue on some path. `None` for a complete run."
+  },
+  {
+    "path": "#/properties/incomplete/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/incomplete/anyOf/0",
+    "ref": "#/$defs/MonteCarloIncomplete",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/MonteCarloIncomplete"
+  },
+  {
+    "path": "#/properties/incomplete/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/incomplete/anyOf/1"
+  },
+  {
+    "path": "#/properties/metrics",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/metrics",
+    "description": "The metrics requested, in order."
+  },
+  {
+    "path": "#/properties/metrics/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/metrics/items"
   },
   {
     "path": "#/properties/n_paths",
@@ -687,7 +1773,7 @@ export default [
   {
     "path": "#/properties/percentile_results",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/percentile_results",
-    "description": "Aggregated percentile results: `metric → PercentileSeries`."
+    "description": "Aggregated percentile results: `metric → PercentileSeries`, in the\nrequested metric order. Empty when the run is incomplete."
   },
   {
     "path": "#/properties/percentile_results/additionalProperties",
@@ -704,6 +1790,18 @@ export default [
     "path": "#/properties/percentiles/items",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/percentiles/items",
     "format": "double"
+  },
+  {
+    "path": "#/properties/seed",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/seed",
+    "description": "The run's exact base seed, a decimal string in JSON: an unsigned\n64-bit value does not fit a JavaScript number."
+  },
+  {
+    "path": "#/properties/stream_version",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/properties/stream_version",
+    "description": "Version of the mapping from the seed, path and node to a random\nstream. With the seed it replays any path from the result alone.",
+    "format": "uint32",
+    "minimum": 0
   },
   {
     "path": "#/properties/warnings",

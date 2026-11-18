@@ -116,7 +116,8 @@ it(
       const wide = await query.fetchQuery(
         evaluateMonteCarloOptions(client, 1, {
           modelJson,
-          configJson: '{"n_paths":4,"seed":18446744073709551615}',
+          configJson:
+            '{"n_paths":4,"seed":18446744073709551615,"metrics":["revenue"]}',
         }),
       );
       expect(wide.n_paths).toBe(4);
@@ -125,7 +126,7 @@ it(
         query.fetchQuery(
           evaluateMonteCarloOptions(client, 1, {
             modelJson,
-            configJson: '{"n_paths":0,"seed":1}',
+            configJson: '{"n_paths":0,"seed":1,"metrics":["revenue"]}',
           }),
         ),
       ).rejects.toMatchObject({ kind: "validation" });
@@ -133,7 +134,7 @@ it(
         query.fetchQuery(
           evaluateMonteCarloOptions(client, 1, {
             modelJson,
-            configJson: '{"n_paths":1,"seed":1,"bogus":1}',
+            configJson: '{"n_paths":1,"seed":1,"metrics":["revenue"],"bogus":1}',
           }),
         ),
       ).rejects.toThrow(/unknown field `bogus`/);
@@ -183,6 +184,11 @@ it("starts the config empty and submits the uint64 seed as an exact integer toke
   expect((seed as HTMLInputElement).value).toBe("");
   fireEvent.change(paths, { target: { value: "200" } });
   fireEvent.change(seed, { target: { value: "18446744073709551615" } });
+  // The metrics to report are listed explicitly.
+  fireEvent.click(screen.getByRole("button", { name: "Add Metrics" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Metrics 1" }), {
+    target: { value: "revenue" },
+  });
   const simulate = screen.getByRole("button", { name: "Simulate" });
   await waitFor(() =>
     expect((simulate as HTMLButtonElement).disabled).toBe(false),
@@ -190,7 +196,7 @@ it("starts the config empty and submits the uint64 seed as an exact integer toke
   fireEvent.click(simulate);
   await waitFor(() => expect(submit).toHaveBeenCalled());
   expect(submit.mock.lastCall![0]).toBe(
-    '{"n_paths":200,"seed":18446744073709551615}',
+    '{"n_paths":200,"seed":18446744073709551615,"metrics":["revenue"]}',
   );
   // A seed above the uint64 range is rejected before submission.
   fireEvent.change(seed, { target: { value: "18446744073709551616" } });

@@ -171,6 +171,15 @@ export interface MonteCarloResultsWire {
    */
   forecast_periods: DB888A5Be75073Df7B251[];
   /**
+   * Why no statistics were published, when a requested sample had no
+   * value on some path. `None` for a complete run.
+   */
+  incomplete?: D_6Dbdf0Cc2Ba8Afa48229 | null;
+  /**
+   * The metrics requested, in order.
+   */
+  metrics: string[];
+  /**
    * Number of Monte Carlo paths simulated.
    */
   n_paths: number;
@@ -179,7 +188,8 @@ export interface MonteCarloResultsWire {
    */
   path_data?: DCe059E1E5Fd8531C74Da | null;
   /**
-   * Aggregated percentile results: `metric → PercentileSeries`.
+   * Aggregated percentile results: `metric → PercentileSeries`, in the
+   * requested metric order. Empty when the run is incomplete.
    */
   percentile_results: {
     [k: string]: D_9Ebf84Cf8414D0C617Ec;
@@ -189,6 +199,16 @@ export interface MonteCarloResultsWire {
    */
   percentiles: number[];
   /**
+   * The run's exact base seed, a decimal string in JSON: an unsigned
+   * 64-bit value does not fit a JavaScript number.
+   */
+  seed: string;
+  /**
+   * Version of the mapping from the seed, path and node to a random
+   * stream. With the seed it replays any path from the result alone.
+   */
+  stream_version: number;
+  /**
    * Distinct warnings raised in the simulated forecast periods, each
    * reported once however many paths raised it, in a canonical sorted
    * order. Warnings in actual periods are omitted: those periods are not
@@ -196,6 +216,36 @@ export interface MonteCarloResultsWire {
    */
   warnings?: DCf776B61125046D84B45[];
   [k: string]: unknown;
+}
+/**
+ * Why a Monte Carlo run published no statistics.
+ *
+ * A run is complete only when every path has a value for every requested
+ * metric in every forecast period.
+ */
+export interface D_6Dbdf0Cc2Ba8Afa48229 {
+  /**
+   * First metric, in the requested order, with a sample without a value.
+   */
+  metric: string;
+  /**
+   * Number of samples without a value across the run.
+   */
+  missing_samples: number;
+  /**
+   * Lowest path with such a sample for that metric and period.
+   */
+  path: number;
+  /**
+   * Identifier for a Gregorian period like `2025Q1` or a fiscal period like
+   * `FY2025W53`.
+   */
+  period: string;
+  /**
+   * Why that cell had no value: `missing`, `masked`, or the reason an
+   * unavailable cell gives (for example `missing_peer_shock`).
+   */
+  reason: string;
 }
 /**
  * Serializable columnar table envelope.
@@ -289,7 +339,189 @@ export interface D_9Ebf84Cf8414D0C617Ec {
    */
   metric: string;
   /**
-   * Period → ordered list of `(percentile, value)` pairs.
+   * Number of samples behind each quantile: the path count.
+   */
+  sample_count: number;
+  /**
+   * Units of every value: scalar, or money in one currency.
+   */
+  value_type:
+    | {
+        /**
+         * Currency of the monetary value
+         */
+        currency:
+          | "AED"
+          | "AFN"
+          | "ALL"
+          | "AMD"
+          | "ANG"
+          | "AOA"
+          | "ARS"
+          | "AUD"
+          | "AWG"
+          | "AZN"
+          | "BAM"
+          | "BBD"
+          | "BDT"
+          | "BGN"
+          | "BHD"
+          | "BIF"
+          | "BMD"
+          | "BND"
+          | "BOB"
+          | "BRL"
+          | "BSD"
+          | "BTN"
+          | "BWP"
+          | "BYN"
+          | "BZD"
+          | "CAD"
+          | "CDF"
+          | "CHF"
+          | "CLF"
+          | "CLP"
+          | "CNY"
+          | "COP"
+          | "CRC"
+          | "CUC"
+          | "CUP"
+          | "CVE"
+          | "CZK"
+          | "DJF"
+          | "DKK"
+          | "DOP"
+          | "DZD"
+          | "EGP"
+          | "ERN"
+          | "ETB"
+          | "EUR"
+          | "FJD"
+          | "FKP"
+          | "GBP"
+          | "GEL"
+          | "GHS"
+          | "GIP"
+          | "GMD"
+          | "GNF"
+          | "GTQ"
+          | "GYD"
+          | "HKD"
+          | "HNL"
+          | "HRK"
+          | "HTG"
+          | "HUF"
+          | "IDR"
+          | "ILS"
+          | "INR"
+          | "IQD"
+          | "IRR"
+          | "ISK"
+          | "JMD"
+          | "JOD"
+          | "JPY"
+          | "KES"
+          | "KGS"
+          | "KHR"
+          | "KMF"
+          | "KPW"
+          | "KRW"
+          | "KWD"
+          | "KYD"
+          | "KZT"
+          | "LAK"
+          | "LBP"
+          | "LKR"
+          | "LRD"
+          | "LSL"
+          | "LYD"
+          | "MAD"
+          | "MDL"
+          | "MGA"
+          | "MKD"
+          | "MMK"
+          | "MNT"
+          | "MOP"
+          | "MRU"
+          | "MUR"
+          | "MVR"
+          | "MWK"
+          | "MXN"
+          | "MYR"
+          | "MZN"
+          | "NAD"
+          | "NGN"
+          | "NIO"
+          | "NOK"
+          | "NPR"
+          | "NZD"
+          | "OMR"
+          | "PAB"
+          | "PEN"
+          | "PGK"
+          | "PHP"
+          | "PKR"
+          | "PLN"
+          | "PYG"
+          | "QAR"
+          | "RON"
+          | "RSD"
+          | "RUB"
+          | "RWF"
+          | "SAR"
+          | "SBD"
+          | "SCR"
+          | "SDG"
+          | "SEK"
+          | "SGD"
+          | "SHP"
+          | "SLE"
+          | "SLL"
+          | "SOS"
+          | "SRD"
+          | "SSP"
+          | "STN"
+          | "SYP"
+          | "SZL"
+          | "THB"
+          | "TJS"
+          | "TMT"
+          | "TND"
+          | "TOP"
+          | "TRY"
+          | "TTD"
+          | "TWD"
+          | "TZS"
+          | "UAH"
+          | "UGX"
+          | "USD"
+          | "UYU"
+          | "UZS"
+          | "VED"
+          | "VES"
+          | "VND"
+          | "VUV"
+          | "WST"
+          | "XAF"
+          | "XCD"
+          | "XCG"
+          | "XOF"
+          | "XPF"
+          | "YER"
+          | "ZAR"
+          | "ZMW"
+          | "ZWG"
+          | "ZWL";
+        type: "monetary";
+        [k: string]: unknown;
+      }
+    | {
+        type: "scalar";
+        [k: string]: unknown;
+      };
+  /**
+   * Period → `(probability, value)` pairs in ascending probability. The
+   * value is the R-7 sample quantile, in `value_type` units.
    */
   values: {
     [k: string]: [number, number][];

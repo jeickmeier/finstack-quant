@@ -36,3 +36,28 @@ mod forecast_all;
 mod integration_all;
 #[path = "production_valuation_audit.rs"]
 mod production_valuation_audit;
+
+/// Monte Carlo over every node of the model, for tests that predate the
+/// explicit metric list.
+pub(crate) trait AllMetrics {
+    fn evaluate_all_metrics(
+        &mut self,
+        model: &finstack_quant_statements::types::FinancialModelSpec,
+        config: &finstack_quant_statements::evaluator::MonteCarloConfig,
+    ) -> finstack_quant_statements::Result<finstack_quant_statements::evaluator::MonteCarloResults>;
+}
+
+impl AllMetrics for finstack_quant_statements::evaluator::Evaluator {
+    fn evaluate_all_metrics(
+        &mut self,
+        model: &finstack_quant_statements::types::FinancialModelSpec,
+        config: &finstack_quant_statements::evaluator::MonteCarloConfig,
+    ) -> finstack_quant_statements::Result<finstack_quant_statements::evaluator::MonteCarloResults>
+    {
+        let config = finstack_quant_statements::evaluator::MonteCarloConfig {
+            metrics: model.nodes.keys().map(ToString::to_string).collect(),
+            ..config.clone()
+        };
+        self.evaluate_monte_carlo(model, &config, None)
+    }
+}

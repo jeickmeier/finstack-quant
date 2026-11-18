@@ -443,8 +443,8 @@ export interface MonteCarloBreachRequest {
   /** Host-serialized MonteCarloResults; only results run with path data carry a probability. */
   readonly resultsJson: string;
   readonly metric: string;
-  /** Breach level in the metric's own units. */
-  readonly threshold: number;
+  /** Breach level in the metric's own units: a number for a scalar metric, money in its currency for a monetary one. */
+  readonly threshold: number | { amount: string; currency: string };
 }
 /** Native CovenantSpec wire object (a template's specs, ready to wrap as `{ specs }`). */
 export type CovenantSpec = covenantsWire.CovenantSpec;

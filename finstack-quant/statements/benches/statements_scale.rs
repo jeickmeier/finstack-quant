@@ -72,10 +72,14 @@ fn bench_monte_carlo_scaling(c: &mut Criterion) {
             |b, &paths| {
                 b.iter(|| {
                     let mut evaluator = Evaluator::new();
-                    let config = MonteCarloConfig::new(paths, 42);
+                    let config = MonteCarloConfig::new(
+                        paths,
+                        42,
+                        model.nodes.keys().map(ToString::to_string),
+                    );
                     black_box(
                         evaluator
-                            .evaluate_monte_carlo(black_box(&model), &config)
+                            .evaluate_monte_carlo(black_box(&model), &config, None)
                             .unwrap(),
                     )
                 });

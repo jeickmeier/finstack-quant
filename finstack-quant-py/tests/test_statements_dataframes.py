@@ -147,7 +147,7 @@ def _monte_carlo_results(*, include_path_data: bool, n_paths: int = 16) -> Monte
     builder.value("revenue", [("2025Q1", 100.0)])
     builder.forecast("revenue", ForecastSpec.normal(0.0, 5.0, 42))
     model = builder.build()
-    config = MonteCarloConfig(n_paths, 7, [0.05, 0.5, 0.95], include_path_data)
+    config = MonteCarloConfig(n_paths, 7, ["revenue"], [0.05, 0.5, 0.95], include_path_data)
     return Evaluator().evaluate_monte_carlo(model, config)
 
 

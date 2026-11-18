@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **622 review items across 33 source scopes with open items**
+This backlog consolidates **621 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -26,7 +26,7 @@ The labels distinguish the work required:
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (479): implementation and verification work against an
+- **Reconciliation** (478): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (36): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -69,7 +69,7 @@ product consequences remain in their product scope.
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
 | [Statements: capital structure](#statements-capital-structure) | 4 |
 | [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 3 |
-| [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 4 |
+| [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 3 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
 | [Statements analytics: credit checks and impairment](#statements-analytics-credit-checks-and-impairment) | 18 |
 | [Scenarios](#scenarios) | 16 |
@@ -1037,8 +1037,6 @@ product consequences remain in their product scope.
 [Scope inventory](statements-evaluation/README.md).
 
 - **Reconciliation — Check suites over rolled-up results.** Evaluate a check suite against a rolled result at the target periods; today a suite accepts only a verified evaluation run, and a rolled result is not one, so target checks cannot run and source check reports stay on the source run. Explicit methods with no automatic sum, verified source runs, complete canonical coarser periods, exact money and compensated scalar sums, final-cell status for period-end, formula and mask re-evaluation at the target cadence and provenance to the source run, methods and source periods are reconciled. [Accepted STATEMENTS-EVALUATION-014](statements-evaluation/14-period-rollup.md#accepted-decision-for-period-rollup) · [Check suites](statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
-
-- **Reconciliation — Complete Monte Carlo paths, typed samples and exact quantiles.** Implement the path-ID and resource limits, fresh complete paths with deterministic failure order, explicit metric coverage and typed sample validation. Qualify R-7, exact percentile keys, sample count and units, complete path restoration and finite typed strict-upper breach probability. Establish independent moment, quantile and sampling-error evidence. Record the run seed and the forecast stream version on the Monte Carlo result, so a path replays from the result alone as a single run does from its provenance. Qualify a correlated follower whose peer forecast is unavailable on a path: it is unavailable with reason `missing_peer_shock`, which the aggregation cannot report until samples are typed (today any valueless sample fails the run). [Accepted STATEMENTS-EVALUATION-011](statements-evaluation/11-monte-carlo-evaluation.md#accepted-decision-for-monte-carlo-paths-quantiles-and-breach-probabilities).
 
 - **Reconciliation — Float views of typed values inside Statements.** Typed cells and typed formula values are authoritative, but these internal consumers still read a float view in which a value that is missing, masked or unavailable is `NaN`: capital-structure references, whose values enter formulas as an untyped number that takes the units static analysis fixed; inline waterfall expressions (`evaluate_formula`); and Monte Carlo path collection (`StatementResult::path_values`). Move each to typed values and delete its view when its owning contract is reconciled. [Waterfall allocation](statements-capital/06-priority-allocation.md) · [Monte Carlo paths](statements-evaluation/11-monte-carlo-evaluation.md) · [Capital reporting](statements-capital/09-reporting-and-fx.md).
 

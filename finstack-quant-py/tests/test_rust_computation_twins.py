@@ -116,11 +116,11 @@ def test_breach_probability_survives_from_json_with_path_data() -> None:
         .build()
         .build()
     )
-    live = Evaluator().evaluate_monte_carlo(model, MonteCarloConfig(200, 42, include_path_data=True))
+    live = Evaluator().evaluate_monte_carlo(model, MonteCarloConfig(200, 42, ["revenue"], include_path_data=True))
     assert live.breach_probability("revenue", 410.0) == 0.255
     restored = MonteCarloResults.from_json(live.to_json())
     assert restored.breach_probability("revenue", 410.0) == 0.255
-    without_paths = Evaluator().evaluate_monte_carlo(model, MonteCarloConfig(200, 42))
+    without_paths = Evaluator().evaluate_monte_carlo(model, MonteCarloConfig(200, 42, ["revenue"]))
     assert MonteCarloResults.from_json(without_paths.to_json()).breach_probability("revenue", 410.0) is None
 
 

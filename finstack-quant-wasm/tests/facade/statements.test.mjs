@@ -127,7 +127,7 @@ test('statements.Evaluator.evaluate returns a structured StatementResult', () =>
 });
 
 test('statements.Evaluator.evaluateMonteCarlo returns a structured object', () => {
-  const config = JSON.stringify({ n_paths: 10, seed: 42 });
+  const config = JSON.stringify({ n_paths: 10, seed: 42, metrics: ['revenue'] });
   const results = new statements.Evaluator().evaluateMonteCarlo(MODEL_JSON, config);
   assertStructured(results, 'evaluateMonteCarlo result');
 });
@@ -304,7 +304,13 @@ test('statements correlated paths retain sampled shocks when peer values round f
     try {
       return evaluator.evaluateMonteCarlo(
         JSON.stringify(model),
-        JSON.stringify({ n_paths: 16, seed: 7, percentiles: [0.5], include_path_data: true })
+        JSON.stringify({
+          n_paths: 16,
+          seed: 7,
+          metrics: ['peer', 'follower', 'child'],
+          percentiles: [0.5],
+          include_path_data: true,
+        })
       );
     } finally {
       evaluator.free();

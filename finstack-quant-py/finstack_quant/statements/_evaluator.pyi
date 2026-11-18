@@ -1026,33 +1026,57 @@ class Evaluator:
         self,
         model: FinancialModelSpec,
         config: MonteCarloConfig,
+        market: MarketContext | None = None,
+        as_of: date | str | None = None,
+        observation_cutoff: date | str | None = None,
     ) -> MonteCarloResults:
         """
         Run a Monte Carlo simulation of ``model`` under this evaluator.
 
-        Each path evaluates the model as ``evaluate`` does on that path's
-        sampled forecasts, so a capital structure (built from an empty market
-        as of the first period's start) and its waterfall run per path and
-        ``cs.*`` references see that path's debt service and balances.
+        Each path evaluates the complete model on that path's sampled
+        forecasts with fresh state, so a capital structure and its waterfall
+        run per path and ``cs.*`` references see that path's debt service and
+        balances. The requested metrics are aggregated into R-7 sample
+        quantiles per forecast period.
 
         Parameters
         ----------
         model : FinancialModelSpec
-            Model whose stochastic forecast nodes are sampled.
+            Model whose stochastic forecast nodes are sampled. It needs at
+            least one forecast period.
         config : MonteCarloConfig
-            Path count, seed and requested percentiles.
+            Path count, seed, the metrics to report and the percentiles.
+        market : MarketContext or None, default None
+            Market the capital structure is projected on, as for
+            ``evaluate_with_market``. ``None`` evaluates as ``evaluate`` does:
+            the full snapshot on an empty market as of the first period's
+            start. Give ``market`` and ``as_of`` together.
+        as_of : date or str or None, default None
+            Valuation date of the capital structure's contractual flows;
+            required with ``market``.
+        observation_cutoff : date or str or None, default None
+            ``"full_snapshot"`` (the default with a market) or the date
+            through which explicit observations are visible.
 
         Returns
         -------
         MonteCarloResults
-            Percentile summaries, warnings and optional retained paths.
+            Percentile summaries for a complete run. When a requested sample
+            has no value on some path, no statistics are published and
+            ``incomplete`` names the first such sample.
 
         Raises
         ------
         ValueError
-            If the model or configuration is rejected.
+            If the model or configuration is rejected (a path count of zero,
+            no, unknown or repeated metrics, repeated or out-of-range
+            percentiles, a run above the sample limit, no forecast period),
+            only one of ``market`` and ``as_of`` is given, or a path fails.
+        KeyError
+            If a formula references an unknown node or required market data
+            is missing.
         RuntimeError
-            If simulation fails.
+            If a capital-structure calculation fails on a path.
 
         Examples
         --------
@@ -1060,7 +1084,8 @@ class Evaluator:
         >>> builder = ModelBuilder("demo")
         >>> _ = builder.periods("2025Q1..Q2", "2025Q1")
         >>> _ = builder.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
-        >>> Evaluator().evaluate_monte_carlo(builder.build(), MonteCarloConfig(2, 7, [0.5])).n_paths
+        >>> config = MonteCarloConfig(2, 7, ["revenue"], [0.5])
+        >>> Evaluator().evaluate_monte_carlo(builder.build(), config).n_paths
         2
 
         """

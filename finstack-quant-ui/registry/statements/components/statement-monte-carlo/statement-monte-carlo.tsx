@@ -51,7 +51,8 @@ function warningText(warning: unknown): string {
 /** A metric's breach test, as requested from the caller. */
 export interface BreachRequest {
   metric: string;
-  threshold: number;
+  /** A number for a scalar metric; money in the metric's currency for a monetary one. */
+  threshold: number | { amount: string; currency: string };
 }
 export interface StatementMonteCarloProps {
   /** Initial MonteCarloConfig; remount to load another. Omitted starts empty. */
@@ -103,7 +104,11 @@ export function StatementMonteCarlo({
   const [chosen, setChosen] = useState(defaultBreach?.metric ?? "");
   const metric = metrics.includes(chosen) ? chosen : (metrics[0] ?? "");
   const [threshold, setThreshold] = useState(
-    defaultBreach === undefined ? "" : String(defaultBreach.threshold),
+    defaultBreach === undefined
+      ? ""
+      : typeof defaultBreach.threshold === "number"
+        ? String(defaultBreach.threshold)
+        : defaultBreach.threshold.amount,
   );
   const [showWarnings, setShowWarnings] = useState(false);
   const series = results?.percentile_results[metric];
@@ -296,11 +301,17 @@ export function StatementMonteCarlo({
                   onClick={() =>
                     onBreach({
                       metric,
-                      // A cleared threshold is NaN, never 0, so Rust rejects it.
+                      // Typed in the metric's units. A cleared threshold is
+                      // NaN or an empty amount, never 0, so Rust rejects it.
                       threshold:
-                        threshold.trim() === ""
-                          ? Number.NaN
-                          : Number(threshold),
+                        series?.value_type.type === "monetary"
+                          ? {
+                              amount: threshold.trim(),
+                              currency: series.value_type.currency,
+                            }
+                          : threshold.trim() === ""
+                            ? Number.NaN
+                            : Number(threshold),
                     })
                   }
                 >

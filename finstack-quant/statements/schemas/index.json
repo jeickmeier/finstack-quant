@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
-      "bytes": 1364,
+      "bytes": 1939,
       "kind": "input",
       "path": "schemas/statements/1/monte_carlo_config.schema.json",
       "summary": "Path count, seed and reported percentiles of a Monte Carlo statement-model evaluation.",
@@ -74,7 +74,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json",
-      "bytes": 22482,
+      "bytes": 46152,
       "kind": "output",
       "path": "schemas/statements/1/monte_carlo_results.schema.json",
       "summary": "Percentile summaries of a Monte Carlo statement-model evaluation.",

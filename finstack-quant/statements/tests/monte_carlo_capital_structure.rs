@@ -5,6 +5,7 @@
 //! reference must match a deterministic evaluation of the same inputs.
 #![allow(clippy::expect_used)]
 
+use crate::AllMetrics;
 use finstack_quant_cashflows::builder::{AmortizationSpec, CouponType, RateSpec};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
@@ -131,12 +132,12 @@ fn monte_carlo_runs_a_model_with_debt_and_varies_cs_nodes() {
         Some(ForecastSpec::normal(1_000_000.0, 300_000.0, 11)),
         &[(q(1), 1_000_000.0)],
     );
-    let config = MonteCarloConfig::new(64, 7).with_percentiles(vec![0.05, 0.5, 0.95]);
+    let config = MonteCarloConfig::new(64, 7, [""; 0]).with_percentiles(vec![0.05, 0.5, 0.95]);
     let first = Evaluator::new()
-        .evaluate_monte_carlo(&model, &config)
+        .evaluate_all_metrics(&model, &config)
         .expect("Monte Carlo with a capital structure");
     let second = Evaluator::new()
-        .evaluate_monte_carlo(&model, &config)
+        .evaluate_all_metrics(&model, &config)
         .expect("Monte Carlo with a capital structure");
 
     for node in CS_NODES {
@@ -164,9 +165,9 @@ fn a_monte_carlo_path_equals_deterministic_evaluation_of_its_samples() {
     );
     // One path: every percentile is that path's value.
     let path = Evaluator::new()
-        .evaluate_monte_carlo(
+        .evaluate_all_metrics(
             &model,
-            &MonteCarloConfig::new(1, 99).with_percentiles(vec![0.5]),
+            &MonteCarloConfig::new(1, 99, [""; 0]).with_percentiles(vec![0.5]),
         )
         .expect("Monte Carlo with a capital structure");
     let sampled = path.percentile_by_period("ebitda", 0.5).expect("ebitda");
@@ -198,7 +199,7 @@ fn zero_variance_monte_carlo_equals_deterministic_evaluation() {
         &[(q(1), 1_000_000.0)],
     );
     let mc = Evaluator::new()
-        .evaluate_monte_carlo(&model, &MonteCarloConfig::new(8, 3))
+        .evaluate_all_metrics(&model, &MonteCarloConfig::new(8, 3, [""; 0]))
         .expect("Monte Carlo with a capital structure");
     let deterministic = Evaluator::new()
         .evaluate(&model)
@@ -215,4 +216,108 @@ fn zero_variance_monte_carlo_equals_deterministic_evaluation() {
             }
         }
     }
+}
+
+/// A floating-rate loan needs a market. The one Monte Carlo entry point takes
+/// the same market, valuation date and cutoff as a market-aware evaluation,
+/// and every path's debt service is the deterministic one: only the
+/// statement forecast is random.
+#[test]
+fn monte_carlo_evaluates_floating_debt_on_the_supplied_market() {
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::scalars::{
+        ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+    };
+    use finstack_quant_core::market_data::term_structures::ForwardCurve;
+    use finstack_quant_statements::evaluator::{MonteCarloContext, ObservationCutoff};
+
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+    let FinancialStatementInstrument::TermLoan(mut loan) = term_loan() else {
+        unreachable!("fixture is a term loan");
+    };
+    loan.rate = TermLoan::example_floating_with_ddtl()
+        .expect("floating loan")
+        .rate;
+    let model = {
+        let mut builder = ModelBuilder::new("mc-floating");
+        builder
+            .periods("2025Q1..Q4", Some("2025Q1"))
+            .expect("periods");
+        let mut ebitda = builder.mixed("ebitda");
+        ebitda.values(&[(q(1), AmountOrScalar::scalar(1_000_000.0))]);
+        ebitda.forecast(ForecastSpec::normal(1_000_000.0, 100_000.0, 11));
+        let mut builder = ebitda.build().expect("mixed node");
+        builder.add_debt("TL-001", FinancialStatementInstrument::TermLoan(loan));
+        builder
+            .compute("interest", "cs.interest_expense_cash.total")
+            .expect("capital reference");
+        builder.build().expect("model")
+    };
+    let market = MarketContext::new()
+        .insert(ForwardCurve::flat("USD-SOFR-3M", as_of, 0.03, DayCount::Act360).expect("curve"))
+        .insert_series(
+            ScalarTimeSeries::new(
+                "FIXING:USD-SOFR-3M",
+                vec![(
+                    Date::from_calendar_date(2024, Month::December, 30).expect("valid date"),
+                    0.05,
+                )],
+                None,
+                SeriesInterpolation::Step,
+                SeriesExtrapolation::Error,
+            )
+            .expect("fixing history"),
+        );
+    let config = MonteCarloConfig::new(32, 7, ["ebitda", "interest"])
+        .with_percentiles(vec![0.05, 0.5, 0.95]);
+
+    // Without a market the floating coupon cannot be projected.
+    Evaluator::new()
+        .evaluate_monte_carlo(&model, &config, None)
+        .expect_err("a floating loan needs a market");
+
+    let context = MonteCarloContext {
+        market: &market,
+        as_of,
+        cutoff: ObservationCutoff::FullSnapshot,
+    };
+    let results = Evaluator::new()
+        .evaluate_monte_carlo(&model, &config, Some(context))
+        .expect("market-aware Monte Carlo");
+    assert!(results.incomplete.is_none());
+    let deterministic = Evaluator::new()
+        .evaluate_with_market(&model, &market, as_of, ObservationCutoff::FullSnapshot)
+        .expect("deterministic evaluation");
+    for quarter in 2..=4 {
+        let expected = deterministic
+            .get("interest", &q(quarter))
+            .expect("deterministic interest");
+        assert!(expected > 0.0, "Q{quarter} pays a floating coupon");
+        // Debt service does not vary across paths: every level is the same.
+        for level in [0.05, 0.5, 0.95] {
+            let value = results
+                .percentile_by_period("interest", level)
+                .expect("interest")[&q(quarter)];
+            assert!(
+                (value - expected).abs() < 1e-6,
+                "Q{quarter} p{level}: {value}"
+            );
+        }
+    }
+    // The statement forecast does vary.
+    let low = results
+        .percentile_by_period("ebitda", 0.05)
+        .expect("ebitda")[&q(4)];
+    let high = results
+        .percentile_by_period("ebitda", 0.95)
+        .expect("ebitda")[&q(4)];
+    assert!(low < high);
+    // The same seed and context replay the same result.
+    let again = Evaluator::new()
+        .evaluate_monte_carlo(&model, &config, Some(context))
+        .expect("replay");
+    assert_eq!(
+        serde_json::to_value(&results).expect("serialize"),
+        serde_json::to_value(&again).expect("serialize")
+    );
 }

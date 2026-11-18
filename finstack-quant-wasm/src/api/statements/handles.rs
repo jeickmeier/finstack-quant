@@ -149,25 +149,71 @@ impl JsEvaluator {
     /// Evaluate a model under Monte Carlo simulation of its stochastic forecasts.
     ///
     /// Twin of Python `Evaluator.evaluate_monte_carlo` (Rust
-    /// `Evaluator::evaluate_monte_carlo`).
+    /// `Evaluator::evaluate_monte_carlo`). Each path evaluates the complete
+    /// model with fresh state and its own random streams; the requested
+    /// metrics are aggregated into R-7 sample quantiles per forecast period.
     ///
-    /// @param model - `FinancialModelSpec` whose stochastic forecast nodes are simulated (object or JSON).
-    /// @param config - `MonteCarloConfig`: `n_paths`, `seed`, optional `percentiles` (fractions in `[0, 1]`) and `include_path_data` (object or JSON).
-    /// @returns `MonteCarloResults` plain object with percentile summaries per metric, the distinct forecast-period `warnings` (each reported once however many paths raised it; actual periods are not simulated and are omitted) and, when requested, the per-path table.
-    /// @throws Error with kind `validation` if an input is malformed, `n_paths` is zero, or a path fails to evaluate; kind `not_found` if a formula references a missing node or a capital-structure instrument needs market data; kind `computation` for a capital-structure failure on a path.
+    /// @param model - `FinancialModelSpec` whose stochastic forecast nodes are simulated (object or JSON). It needs at least one forecast period.
+    /// @param config - `MonteCarloConfig`: `n_paths` (1 to 4294967295), `seed` (unsigned 64-bit integer; pass the config as JSON text to keep a seed above 2^53 exact), `metrics` (the node identifiers to report: at least one, each a node of the model, none repeated), optional `percentiles` (distinct fractions in `[0, 1]`) and `include_path_data` (object or JSON).
+    /// @param market - Optional `MarketContext` state the capital structure is projected on, as for `evaluateWithMarket` (object or JSON). Omit it to evaluate as `evaluate` does: the full snapshot on an empty market as of the first period's start. Give `market` and `asOf` together.
+    /// @param asOf - ISO 8601 valuation date of the capital structure's contractual flows; required with `market`.
+    /// @param observationCutoff - `"full_snapshot"` (the default with a market) or the ISO 8601 date through which explicit observations are visible.
+    /// @returns `MonteCarloResults` plain object. A complete run has percentile summaries per requested metric (with units and sample count), the run's `seed` and `stream_version`, the distinct forecast-period `warnings` and, when requested, the per-path table. When a requested sample has no value on some path the run is incomplete: `percentile_results` is empty and `incomplete` names the first such sample.
+    /// @throws Error with kind `validation` if an input is malformed, the configuration is rejected (a path count of zero, no, unknown or repeated metrics, repeated or out-of-range percentiles, a run above the sample limit), the model has no forecast period, only one of `market` and `asOf` is given, or a path fails to evaluate; kind `not_found` if a formula references a missing node or a capital-structure instrument needs market data; kind `computation` for a capital-structure failure on a path.
     #[wasm_bindgen(js_name = evaluateMonteCarlo, unchecked_return_type = "MonteCarloResults")]
     pub fn evaluate_monte_carlo(
         &mut self,
         #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
         #[wasm_bindgen(unchecked_param_type = "generated.statements.MonteCarloConfig | string")]
         config: JsValue,
+        #[wasm_bindgen(unchecked_optional_param_type = "JsonInput")] market: JsValue,
+        #[wasm_bindgen(js_name = "asOf", unchecked_optional_param_type = "string")] as_of: JsValue,
+        #[wasm_bindgen(
+            js_name = "observationCutoff",
+            unchecked_optional_param_type = "string"
+        )]
+        observation_cutoff: JsValue,
     ) -> Result<JsValue, JsValue> {
+        use finstack_quant_statements::evaluator::{MonteCarloContext, ObservationCutoff};
+
+        let absent = |value: &JsValue| value.is_undefined() || value.is_null();
         let model =
             FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
         let config: MonteCarloConfig = from_js_json(&config, "config")?;
+        let run = match (absent(&market), absent(&as_of)) {
+            (false, false) => {
+                let market: finstack_quant_core::market_data::context::MarketContext =
+                    from_js_json(&market, "market")?;
+                let cutoff = if absent(&observation_cutoff)
+                    || observation_cutoff.as_string().as_deref() == Some("full_snapshot")
+                {
+                    ObservationCutoff::FullSnapshot
+                } else {
+                    ObservationCutoff::Through(crate::utils::wire::js_date(
+                        &observation_cutoff,
+                        "observationCutoff",
+                    )?)
+                };
+                Some((market, crate::utils::wire::js_date(&as_of, "asOf")?, cutoff))
+            }
+            (true, true) if absent(&observation_cutoff) => None,
+            _ => {
+                return Err(to_js_err(finstack_quant_statements::Error::eval(
+                    "evaluateMonteCarlo: give `market` and `asOf` together; \
+                     `observationCutoff` needs both",
+                )));
+            }
+        };
+        let context = run
+            .as_ref()
+            .map(|(market, as_of, cutoff)| MonteCarloContext {
+                market,
+                as_of: *as_of,
+                cutoff: *cutoff,
+            });
         let result = self
             .inner
-            .evaluate_monte_carlo(&model, &config)
+            .evaluate_monte_carlo(&model, &config, context)
             .map_err(to_js_err)?;
         let js = to_js_value(&result)?;
         if let Some(table) = &result.path_data {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 import pandas as pd
+from finstack_quant.core.money import Money
 
 class MonteCarloConfig:
     """
@@ -16,6 +17,8 @@ class MonteCarloConfig:
         precision at greater runtime and memory cost.
     seed : int
         Deterministic random-number seed used to reproduce the simulation.
+    metrics : list[str]
+        Node identifiers to report; only these are sampled and stored.
     percentiles : list[float] or None
         Requested percentile levels as decimal probabilities, such as ``0.95``;
         ``None`` uses the engine defaults.
@@ -25,15 +28,16 @@ class MonteCarloConfig:
     Examples
     --------
     >>> from finstack_quant.statements import MonteCarloConfig
-    >>> config = MonteCarloConfig(4, 7, [0.5])
-    >>> (config.n_paths, config.seed, config.percentiles)
-    (4, 7, [0.5])
+    >>> config = MonteCarloConfig(4, 7, ["revenue"], [0.5])
+    >>> (config.n_paths, config.seed, config.metrics, config.percentiles)
+    (4, 7, ['revenue'], [0.5])
 
     """
     def __init__(
         self,
         n_paths: int,
         seed: int,
+        metrics: list[str],
         percentiles: list[float] | None = ...,
         include_path_data: bool = ...,
     ) -> None:
@@ -51,14 +55,18 @@ class MonteCarloConfig:
         seed : int
             Base seed from which per-path and per-node seeds are derived. The
             same seed reproduces the run exactly, in serial and in parallel.
+        metrics : list[str]
+            Node identifiers to report: at least one, each a node of the
+            model, none repeated. Only these are sampled and stored, and the
+            run holds ``n_paths * len(metrics) * forecast periods`` samples.
         percentiles : list[float] or None, default None
             Percentiles to compute, each a **decimal fraction in [0, 1]** —
             ``0.05`` is the 5th percentile, not ``5``. Stored as given; the
-            engine sorts, deduplicates and range-checks them when
+            engine sorts and checks them when
             ``Evaluator.evaluate_monte_carlo`` starts, which raises
-            ``ValueError`` for a value that is not finite or lies outside
-            [0, 1]. ``None`` or an empty list uses the engine default
-            ``[0.05, 0.5, 0.95]``.
+            ``ValueError`` for a value that is not finite, lies outside
+            [0, 1] or is repeated. ``None`` or an empty list uses the engine
+            default ``[0.05, 0.5, 0.95]``.
         include_path_data : bool, default False
             Whether to retain the full per-path long table. Off by default
             because it grows as ``n_paths * metrics * forecast periods``.
@@ -188,6 +196,24 @@ class MonteCarloConfig:
         """
         ...
 
+    @property
+    def metrics(self) -> list[str]:
+        """
+        Node identifiers the run reports, as supplied.
+
+        Returns
+        -------
+        list[str]
+            The requested metrics, in order. The engine requires at least
+            one, each a node of the model and none repeated, when
+            ``Evaluator.evaluate_monte_carlo`` starts.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
 class MonteCarloResults:
     """
     Hold percentile summaries from statement-model Monte Carlo evaluation.
@@ -306,12 +332,70 @@ class MonteCarloResults:
     @property
     def metrics(self) -> list[str]:
         """
-        Metric (node) identifiers that were simulated, in model order.
+        Metric (node) identifiers that were requested, in the requested order.
 
         Returns
         -------
         list[str]
-            Node identifiers with percentile summaries.
+            The run's metrics. Each has a percentile summary when the run is
+            complete.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def incomplete(self) -> dict[str, Any] | None:
+        """
+        Why the run published no statistics, or ``None`` for a complete run.
+
+        A run is complete only when every path has a value for every
+        requested metric in every forecast period.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            ``{"metric", "period", "path", "reason", "missing_samples"}``: the
+            first sample without a value in metric, period and path order, why
+            its cell had none (``"missing"``, ``"masked"`` or an unavailable
+            reason such as ``"missing_peer_shock"``), and how many samples
+            had none across the run.
+
+        Raises
+        ------
+        ValueError
+            If the stored record cannot be serialized.
+        """
+        ...
+
+    @property
+    def seed(self) -> int:
+        """
+        The run's exact base seed.
+
+        Returns
+        -------
+        int
+            The seed the run was configured with. With ``stream_version`` it
+            replays any path from the result alone.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def stream_version(self) -> int:
+        """
+        Version of the mapping from seed, path and node to a random stream.
+
+        Returns
+        -------
+        int
+            The stream version the run used.
 
         Notes
         -----
@@ -347,33 +431,37 @@ class MonteCarloResults:
         """
         ...
 
-    def breach_probability(self, metric: str, threshold: float) -> float | None:
+    def breach_probability(self, metric: str, threshold: float | Money) -> float | None:
         """
         Probability that ``metric`` exceeds ``threshold`` in any forecast period.
 
-        Counts upside breaches only (``value > threshold``) across the
-        simulated paths; for a downside test simulate a negated metric or a
-        derived node that flips the sign.
+        A path counts once when any forecast-period value is strictly greater
+        than the threshold. For a floor, simulate a derived node that flips
+        the sign.
 
         Parameters
         ----------
         metric : str
-            Simulated node identifier.
-        threshold : float
-            Breach level in the metric's own units.
+            A requested metric.
+        threshold : float | Money
+            Finite upper threshold in the metric's own units: a ``float`` for
+            a scalar metric, ``Money`` in the metric's currency for a monetary
+            one.
 
         Returns
         -------
         float | None
             Fraction of paths in ``[0, 1]`` with at least one breach, or
-            ``None`` when the metric was not simulated, there are no forecast
-            periods, or the retained path data is incomplete. Results restored
-            from JSON / pickle support this calculation when they include
-            complete path data (``include_path_data=True``).
+            ``None`` when no path samples are available: the run is
+            incomplete, the metric was not requested, or the result was
+            restored without path data (``include_path_data=True``).
 
-        Notes
-        -----
-        This method reads already-computed state and does not raise.
+        Raises
+        ------
+        ValueError
+            If the threshold is not finite or not in the metric's units, or a
+            restored path table does not hold exactly one finite sample for
+            every path and forecast period.
         """
         ...
 

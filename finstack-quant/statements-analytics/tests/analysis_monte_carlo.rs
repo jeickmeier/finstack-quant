@@ -1,6 +1,7 @@
 //! Monte Carlo analysis integration tests.
 #![allow(clippy::expect_used)]
 
+use crate::AllMetrics;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::builder::ModelBuilder;
 use finstack_quant_statements::evaluator::MonteCarloConfig;
@@ -29,16 +30,16 @@ fn evaluate_monte_carlo_produces_deterministic_results() {
         model_builder.build().expect("valid model")
     };
 
-    let config = MonteCarloConfig::new(32, 7);
+    let config = MonteCarloConfig::new(32, 7, [""; 0]);
 
     let mut eval1 = finstack_quant_statements::evaluator::Evaluator::new();
     let mut eval2 = finstack_quant_statements::evaluator::Evaluator::new();
 
     let res1 = eval1
-        .evaluate_monte_carlo(&model, &config)
+        .evaluate_all_metrics(&model, &config)
         .expect("mc eval 1");
     let res2 = eval2
-        .evaluate_monte_carlo(&model, &config)
+        .evaluate_all_metrics(&model, &config)
         .expect("mc eval 2");
 
     assert_eq!(res1.n_paths, res2.n_paths);
@@ -101,9 +102,9 @@ fn evaluate_monte_carlo_correlated_normals_constant_spread() {
         model_builder.build().expect("valid model")
     };
 
-    let config = MonteCarloConfig::new(4, 1);
+    let config = MonteCarloConfig::new(4, 1, [""; 0]);
     let mut eval = finstack_quant_statements::evaluator::Evaluator::new();
-    let res = eval.evaluate_monte_carlo(&model, &config).expect("mc eval");
+    let res = eval.evaluate_all_metrics(&model, &config).expect("mc eval");
 
     let q3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
     let a = res
@@ -171,9 +172,9 @@ fn evaluate_monte_carlo_correlated_lognormals_preserve_ratio() {
         model_builder.build().expect("valid model")
     };
 
-    let config = MonteCarloConfig::new(4, 1);
+    let config = MonteCarloConfig::new(4, 1, [""; 0]);
     let mut eval = finstack_quant_statements::evaluator::Evaluator::new();
-    let res = eval.evaluate_monte_carlo(&model, &config).expect("mc eval");
+    let res = eval.evaluate_all_metrics(&model, &config).expect("mc eval");
 
     let q3 = PeriodId::quarter(2025, 3).expect("valid period fixture");
     let a = res

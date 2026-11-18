@@ -7,6 +7,9 @@ export default [
     "examples": [
       {
         "include_path_data": false,
+        "metrics": [
+          "revenue"
+        ],
         "n_paths": 1000,
         "percentiles": [
           0.05,
@@ -25,9 +28,18 @@ export default [
     "description": "Whether to include the long-format path table in serialized results."
   },
   {
+    "path": "#/properties/metrics",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json#/properties/metrics",
+    "description": "Node identifiers to report. Required: at least one, each a node of\nthe model, none repeated. Only these are sampled and stored."
+  },
+  {
+    "path": "#/properties/metrics/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json#/properties/metrics/items"
+  },
+  {
     "path": "#/properties/n_paths",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json#/properties/n_paths",
-    "description": "Number of Monte Carlo paths to simulate.",
+    "description": "Number of Monte Carlo paths to simulate: at least one, and at most\n`u32::MAX`, the path-identifier domain.",
     "format": "uint",
     "minimum": 0
   },
@@ -39,7 +51,7 @@ export default [
       0.5,
       0.95
     ],
-    "description": "Percentiles to compute in the closed interval [0, 1]."
+    "description": "Probability levels to compute, each finite in `[0, 1]` and distinct.\nOmitted or empty selects `0.05`, `0.5` and `0.95`."
   },
   {
     "path": "#/properties/percentiles/items",
@@ -49,7 +61,7 @@ export default [
   {
     "path": "#/properties/seed",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json#/properties/seed",
-    "description": "Base random seed used to derive per-path seeds.",
+    "description": "Base random seed used to derive per-path streams: an exact unsigned\n64-bit integer. A JavaScript host must pass the configuration as JSON\ntext to keep a seed above 2^53 exact.",
     "format": "uint64",
     "minimum": 0
   }
