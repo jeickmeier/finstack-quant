@@ -472,6 +472,15 @@ impl<'a> CashflowEngine<'a> {
 
             // Track weighted average rates for this period
             let mut weighted_interest_rate = 0.0;
+            // A posting inside the period closes an interest row: what was
+            // earned before it is a row of its own, with its own accrual
+            // dates, so accrued interest at a later date keeps it whole.
+            let mut stretch_start = period_start;
+            let mut emitted = (Money::from((0_i64, ccy)), 0.0_f64, 0.0_f64);
+            let interest_kind = match &self.facility.rate {
+                RateSpec::Fixed { .. } => CFKind::Fixed,
+                RateSpec::Floating(_) => CFKind::Floating,
+            };
 
             for window in timeline.windows(2) {
                 let sub_start = window[0];
@@ -649,7 +658,67 @@ impl<'a> CashflowEngine<'a> {
                             )?;
                         }
                     }
+                    if self
+                        .postings
+                        .iter()
+                        .any(|posting| posting.effective_date == sub_end)
+                    {
+                        let interest = total_interest.checked_sub(emitted.0)?;
+                        let accrual = total_accrual - emitted.1;
+                        let weighted = weighted_interest_rate - emitted.2;
+                        if !rc.is_effectively_zero(interest.amount(), ZeroKind::Money(ccy)) {
+                            flows.push(
+                                CashFlowParams::new(
+                                    payment_date,
+                                    reset_date_opt,
+                                    interest,
+                                    interest_kind,
+                                    accrual,
+                                    (accrual > 0.0).then(|| weighted / accrual),
+                                )
+                                .with_accrual(finstack_quant_core::cashflow::CashFlowAccrual::new(
+                                    stretch_start,
+                                    sub_end,
+                                    self.day_count,
+                                    None,
+                                    accrual_context.try_into()?,
+                                )?)
+                                .build()?,
+                            );
+                        }
+                        emitted = (total_interest, total_accrual, weighted_interest_rate);
+                        stretch_start = sub_end;
+                    }
                 }
+            }
+
+            // The interest row of a period no posting split is unchanged.
+            if stretch_start != period_start {
+                let interest = total_interest.checked_sub(emitted.0)?;
+                let accrual = total_accrual - emitted.1;
+                let weighted = weighted_interest_rate - emitted.2;
+                if !rc.is_effectively_zero(interest.amount(), ZeroKind::Money(ccy)) {
+                    flows.push(
+                        CashFlowParams::new(
+                            payment_date,
+                            reset_date_opt,
+                            interest,
+                            interest_kind,
+                            accrual,
+                            (accrual > 0.0).then(|| weighted / accrual),
+                        )
+                        .with_accrual(finstack_quant_core::cashflow::CashFlowAccrual::new(
+                            stretch_start,
+                            period_end,
+                            self.day_count,
+                            None,
+                            accrual_context.try_into()?,
+                        )?)
+                        .build()?,
+                    );
+                }
+                fees.emit(&mut flows, payment_date, total_accrual, &rc)?;
+                continue;
             }
 
             // Post aggregated cashflows at period_end
