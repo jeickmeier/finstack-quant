@@ -114,28 +114,47 @@ and unavailable (`missing_input`) when it is missing. A loss keeps its sign on
 positive revenue. For a coarser period the ratio is recomputed from the
 aggregated numerator and revenue (`"rollup": "formula"`).
 
-### Trailing-twelve-month coverage
+### Leverage and coverage
 
-`fin_leverage.json` computes coverage and leverage on TTM aggregates
-(`ttm(ebitda)`, `ttm(interest_expense)`,
-`ttm(interest_expense + principal_payment)`). `ttm()` needs a full year of
-history — 4 quarters or 12 months — and returns `NaN` before that, so early
-periods in a model legitimately show no coverage value.
+`fin_leverage.json` divides with `ratio`, so every metric is unavailable when
+an input is missing or its denominator is zero or negative, and never fails
+the run. Zero debt is a valid zero and a negative EBITDA gives a negative
+coverage over a positive denominator.
+
+The balance ratios read period-end values. `debt_to_ebitda`,
+`interest_coverage` and `debt_service_coverage` read trailing-twelve-month
+aggregates (`ttm(ebitda)`, `ttm(interest_expense)`,
+`ttm(scheduled_cash_interest_due + scheduled_principal_due)`). `ttm()` needs a
+complete year of history, 4 quarters or 12 months with no gap, and is
+unavailable before that, so early periods legitimately show no value.
 
 ### Interest expense
 
-`interest_expense` must carry whatever your accounting policy includes: cash
-interest, PIK accruals, and debt-cost amortization. The capital-structure
-`cs.interest_expense` component is cash plus PIK; `cs.interest_expense_cash` and
-`cs.interest_expense_pik` are available separately. Capitalized interest during a
-construction phase typically does not reach `interest_expense` at all, which
-inflates coverage in development-stage models.
+`interest_expense` is the interest recognized in the income statement,
+including recognized PIK. The capital-structure `cs.interest_expense`
+component is cash plus PIK; `cs.interest_expense_cash` and
+`cs.interest_expense_pik` are available separately. Capitalized interest
+during a construction phase typically does not reach `interest_expense` at
+all, which inflates coverage in development-stage models.
 
-### Principal and taxes
+### Scheduled debt service
+
+`debt_service_coverage` divides by two explicit inputs:
+`scheduled_cash_interest_due` and `scheduled_principal_due`, the scheduled
+cash interest and scheduled principal (amortization and maturity) on
+borrowings, each recognized once on its contractual due date whether or not it
+was paid. They exclude arrears settlements, advance payments, prepayments and
+sweeps, PIK, fees, hedge flows and distress cash. With a capital structure,
+define them from its components:
+
+```text
+scheduled_cash_interest_due = cs.scheduled_cash_interest_due.total
+scheduled_principal_due     = cs.scheduled_principal_due.total
+```
 
 Principal repayment is not tax-deductible, so debt-service coverage measured on
 pre-tax EBITDA overstates capacity. Consider EBIAT (`EBIT × (1 - tax_rate)`) as a
-conservative numerator.
+conservative numerator in a custom metric.
 
 ### Returns on capital
 
@@ -162,14 +181,11 @@ reference. `build()` resolves every reference, so missing inputs (`opex`,
 Load selectively with
 `add_metric_from_registry` if you only model part of the chart.
 
-### Reference thresholds
+### Thresholds
 
-Industry rules of thumb, for orientation only — nothing in the registry enforces
-them:
-
-- Interest coverage: > 1.5x (investment grade), > 2.5x (strong)
-- Debt service coverage: > 1.25x (typical covenant), > 1.5x (comfortable)
-- Debt/EBITDA: < 3.0x (conservative), < 4.0x (acceptable in many industries)
+The bundled ratios carry no threshold. Covenant levels and the definitions of
+debt, EBITDA and debt service are agreement-specific: state them as explicit
+covenant terms or custom metrics.
 
 ## Defining custom metrics
 

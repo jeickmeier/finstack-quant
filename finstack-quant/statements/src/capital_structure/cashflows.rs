@@ -73,6 +73,8 @@ pub struct FxConversionRecord {
 ///         principal_pending: None,
 ///         principal_arrears: None,
 ///         principal_advance_reserve: None,
+///         scheduled_cash_interest_due: None,
+///         scheduled_principal_due: None,
 ///     });
 /// cs.totals.insert(period, CashflowBreakdown {
 ///     interest_expense_cash: Money::from((10_000_i64, Currency::USD)),
@@ -91,6 +93,8 @@ pub struct FxConversionRecord {
 ///     principal_pending: None,
 ///     principal_arrears: None,
 ///     principal_advance_reserve: None,
+///     scheduled_cash_interest_due: None,
+///     scheduled_principal_due: None,
 /// });
 ///
 /// assert_eq!(cs.get_component("interest_expense", "total", &period).unwrap(), 12_500.0);
@@ -329,6 +333,24 @@ pub struct CashflowBreakdown {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub voluntary_prepayment: Option<Money>,
 
+    /// Scheduled cash interest that fell due in the period under the
+    /// borrowing's contractual schedule, recognized once on its due date
+    /// whether or not it was paid. It excludes PIK, fees, arrears settled
+    /// from an earlier period and hedge flows. Positive amount in the
+    /// breakdown's currency. `Some` on evaluator-produced breakdowns of a
+    /// borrowing; `None` for a hedge and on hand-built breakdowns.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scheduled_cash_interest_due: Option<Money>,
+
+    /// Scheduled principal that fell due in the period under the borrowing's
+    /// contractual schedule (amortization and maturity), recognized once on
+    /// its due date whether or not it was paid. It excludes prepayments,
+    /// sweeps, arrears settled from an earlier period and advance payments.
+    /// Same sign, currency and absence rule as
+    /// [`Self::scheduled_cash_interest_due`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scheduled_principal_due: Option<Money>,
+
     /// Cash interest already due and still unpaid at the period close:
     /// overdue arrears carried as a claim into the next period. It is separate
     /// from `accrued_interest`, which is interest earned but not yet due.
@@ -380,7 +402,7 @@ pub struct PrepaymentOutcome {
 }
 
 /// Field names of [`CashflowBreakdown::audit_detail`], in the same order.
-const AUDIT_DETAIL_LABELS: [&str; 9] = [
+const AUDIT_DETAIL_LABELS: [&str; 11] = [
     "opening_balance",
     "scheduled_principal",
     "mandatory_prepayment",
@@ -390,6 +412,8 @@ const AUDIT_DETAIL_LABELS: [&str; 9] = [
     "principal_pending",
     "principal_arrears",
     "principal_advance_reserve",
+    "scheduled_cash_interest_due",
+    "scheduled_principal_due",
 ];
 
 impl CashflowBreakdown {
@@ -450,13 +474,16 @@ impl CashflowBreakdown {
             principal_pending: None,
             principal_arrears: None,
             principal_advance_reserve: None,
+            scheduled_cash_interest_due: None,
+            scheduled_principal_due: None,
         }
     }
 
-    /// Opening balance, the four principal components, interest arrears and
-    /// the three principal settlement amounts, in the order of
+    /// Opening balance, the four principal components, interest arrears, the
+    /// three principal settlement amounts and the two contractual due-date
+    /// service amounts, in the order of
     /// [`AUDIT_DETAIL_LABELS`].
-    pub(crate) fn audit_detail(&self) -> [Option<Money>; 9] {
+    pub(crate) fn audit_detail(&self) -> [Option<Money>; 11] {
         [
             self.opening_balance,
             self.scheduled_principal,
@@ -467,12 +494,14 @@ impl CashflowBreakdown {
             self.principal_pending,
             self.principal_arrears,
             self.principal_advance_reserve,
+            self.scheduled_cash_interest_due,
+            self.scheduled_principal_due,
         ]
     }
 
     /// Mutable view of the fields returned by [`Self::audit_detail`], in the
     /// same order.
-    pub(crate) fn audit_detail_mut(&mut self) -> [&mut Option<Money>; 9] {
+    pub(crate) fn audit_detail_mut(&mut self) -> [&mut Option<Money>; 11] {
         [
             &mut self.opening_balance,
             &mut self.scheduled_principal,
@@ -483,6 +512,8 @@ impl CashflowBreakdown {
             &mut self.principal_pending,
             &mut self.principal_arrears,
             &mut self.principal_advance_reserve,
+            &mut self.scheduled_cash_interest_due,
+            &mut self.scheduled_principal_due,
         ]
     }
 
@@ -1111,6 +1142,8 @@ mod tests {
             principal_pending: None,
             principal_arrears: None,
             principal_advance_reserve: None,
+            scheduled_cash_interest_due: None,
+            scheduled_principal_due: None,
         };
 
         let mut period_map = IndexMap::new();

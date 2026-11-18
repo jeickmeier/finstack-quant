@@ -749,9 +749,39 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/principal_pending/anyOf/1"
   },
   {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/scheduled_cash_interest_due",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/scheduled_cash_interest_due",
+    "description": "Scheduled cash interest that fell due in the period under the\nborrowing's contractual schedule, recognized once on its due date\nwhether or not it was paid. It excludes PIK, fees, arrears settled\nfrom an earlier period and hedge flows. Positive amount in the\nbreakdown's currency. `Some` on evaluator-produced breakdowns of a\nborrowing; `None` for a hedge and on hand-built breakdowns."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/scheduled_cash_interest_due/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/scheduled_cash_interest_due/anyOf/0",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/scheduled_cash_interest_due/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/scheduled_cash_interest_due/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/scheduled_principal",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/scheduled_principal",
     "description": "Part of `principal_payment` paid against the instrument's own\ncontractual schedule: amortization, maturity redemption,\nschedule-embedded prepayments and revolver repayments, including\nscheduled principal carried in arrears from an earlier period. Under a\nwaterfall this is the cash allocated at the `Amortization` priority.\nPositive amount in the breakdown's currency.\n\nThe four principal components\n(`scheduled_principal`, `mandatory_prepayment`, `sweep_prepayment`,\n`voluntary_prepayment`) sum to `principal_payment`. Always `Some` on\nbreakdowns produced by the evaluator or the waterfall; `None` on\nhand-built breakdowns and on JSON written before this field existed."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/scheduled_principal_due",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/scheduled_principal_due",
+    "description": "Scheduled principal that fell due in the period under the borrowing's\ncontractual schedule (amortization and maturity), recognized once on\nits due date whether or not it was paid. It excludes prepayments,\nsweeps, arrears settled from an earlier period and advance payments.\nSame sign, currency and absence rule as\n[`Self::scheduled_cash_interest_due`]."
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/scheduled_principal_due/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/scheduled_principal_due/anyOf/0",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_677810bf9653cfb0a467/properties/scheduled_principal_due/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/scheduled_principal_due/anyOf/1"
   },
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/scheduled_principal/anyOf/0",
@@ -3143,7 +3173,7 @@ export default [
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows",
-    "description": "Aggregated cashflows from capital structure instruments by period.\n\nInstances of this type are produced by the evaluator and exposed to the DSL\nvia the `cs.*` namespace. It keeps both per-instrument details and totals so\nthat downstream consumers can drill down or report aggregates.\n\nMonetary fields are stored as [`Money`] to preserve currency identity. The\ncomponent accessor returns raw `f64` amounts in the instrument's native\ncurrency or the reporting currency for totals. Callers that need currency\nmetadata should inspect the underlying maps directly.\n\n# Example\n\n```rust\n# use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};\n# use finstack_quant_core::dates::PeriodId;\n# use finstack_quant_core::money::Money;\n# use finstack_quant_core::currency::Currency;\nlet mut cs = CapitalStructureCashflows::new();\nlet period = PeriodId::quarter(2025, 1).expect(\"valid period fixture\");\ncs.by_instrument\n    .entry(\"BOND-1\".into())\n    .or_default()\n    .insert(period, CashflowBreakdown {\n        interest_expense_cash: Money::from((10_000_i64, Currency::USD)),\n        interest_income_cash: None,\n        interest_expense_pik: Money::from((2_500_i64, Currency::USD)),\n        principal_payment: Money::from((100_000_i64, Currency::USD)),\n        fees: Money::from((0_i64, Currency::USD)),\n        debt_balance: Money::from((4_900_000_i64, Currency::USD)),\n        accrued_interest: Money::from((5_000_i64, Currency::USD)),\n        opening_balance: None,\n        scheduled_principal: None,\n        mandatory_prepayment: None,\n        sweep_prepayment: None,\n        voluntary_prepayment: None,\n        interest_arrears: None,\n        principal_pending: None,\n        principal_arrears: None,\n        principal_advance_reserve: None,\n    });\ncs.totals.insert(period, CashflowBreakdown {\n    interest_expense_cash: Money::from((10_000_i64, Currency::USD)),\n    interest_income_cash: None,\n    interest_expense_pik: Money::from((2_500_i64, Currency::USD)),\n    principal_payment: Money::from((100_000_i64, Currency::USD)),\n    fees: Money::from((0_i64, Currency::USD)),\n    debt_balance: Money::from((4_900_000_i64, Currency::USD)),\n    accrued_interest: Money::from((5_000_i64, Currency::USD)),\n    opening_balance: None,\n    scheduled_principal: None,\n    mandatory_prepayment: None,\n    sweep_prepayment: None,\n    voluntary_prepayment: None,\n    interest_arrears: None,\n    principal_pending: None,\n    principal_arrears: None,\n    principal_advance_reserve: None,\n});\n\nassert_eq!(cs.get_component(\"interest_expense\", \"total\", &period).unwrap(), 12_500.0);\n```"
+    "description": "Aggregated cashflows from capital structure instruments by period.\n\nInstances of this type are produced by the evaluator and exposed to the DSL\nvia the `cs.*` namespace. It keeps both per-instrument details and totals so\nthat downstream consumers can drill down or report aggregates.\n\nMonetary fields are stored as [`Money`] to preserve currency identity. The\ncomponent accessor returns raw `f64` amounts in the instrument's native\ncurrency or the reporting currency for totals. Callers that need currency\nmetadata should inspect the underlying maps directly.\n\n# Example\n\n```rust\n# use finstack_quant_statements::capital_structure::{CapitalStructureCashflows, CashflowBreakdown};\n# use finstack_quant_core::dates::PeriodId;\n# use finstack_quant_core::money::Money;\n# use finstack_quant_core::currency::Currency;\nlet mut cs = CapitalStructureCashflows::new();\nlet period = PeriodId::quarter(2025, 1).expect(\"valid period fixture\");\ncs.by_instrument\n    .entry(\"BOND-1\".into())\n    .or_default()\n    .insert(period, CashflowBreakdown {\n        interest_expense_cash: Money::from((10_000_i64, Currency::USD)),\n        interest_income_cash: None,\n        interest_expense_pik: Money::from((2_500_i64, Currency::USD)),\n        principal_payment: Money::from((100_000_i64, Currency::USD)),\n        fees: Money::from((0_i64, Currency::USD)),\n        debt_balance: Money::from((4_900_000_i64, Currency::USD)),\n        accrued_interest: Money::from((5_000_i64, Currency::USD)),\n        opening_balance: None,\n        scheduled_principal: None,\n        mandatory_prepayment: None,\n        sweep_prepayment: None,\n        voluntary_prepayment: None,\n        interest_arrears: None,\n        principal_pending: None,\n        principal_arrears: None,\n        principal_advance_reserve: None,\n        scheduled_cash_interest_due: None,\n        scheduled_principal_due: None,\n    });\ncs.totals.insert(period, CashflowBreakdown {\n    interest_expense_cash: Money::from((10_000_i64, Currency::USD)),\n    interest_income_cash: None,\n    interest_expense_pik: Money::from((2_500_i64, Currency::USD)),\n    principal_payment: Money::from((100_000_i64, Currency::USD)),\n    fees: Money::from((0_i64, Currency::USD)),\n    debt_balance: Money::from((4_900_000_i64, Currency::USD)),\n    accrued_interest: Money::from((5_000_i64, Currency::USD)),\n    opening_balance: None,\n    scheduled_principal: None,\n    mandatory_prepayment: None,\n    sweep_prepayment: None,\n    voluntary_prepayment: None,\n    interest_arrears: None,\n    principal_pending: None,\n    principal_arrears: None,\n    principal_advance_reserve: None,\n    scheduled_cash_interest_due: None,\n    scheduled_principal_due: None,\n});\n\nassert_eq!(cs.get_component(\"interest_expense\", \"total\", &period).unwrap(), 12_500.0);\n```"
   },
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/available_cash",

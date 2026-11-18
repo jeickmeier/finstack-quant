@@ -1317,6 +1317,28 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements metrics: bundled leverage and coverage use `ratio`, complete windows and due-date service
+
+Breaking, with no compatibility path (STATEMENTS-CONTRACTS-008).
+
+- The six `fin_leverage` metrics divide with `ratio`: a missing input and a
+  zero or negative denominator are unavailable, where an exactly zero
+  denominator failed the run and a negative one produced a negative multiple.
+  Zero debt is a valid zero; a negative EBITDA still gives signed coverage over
+  a positive denominator.
+- `fin.debt_service_coverage` is
+  `ratio(ttm(ebitda), ttm(scheduled_cash_interest_due + scheduled_principal_due))`.
+  It no longer reads `interest_expense` or `principal_payment`: supply the two
+  new inputs, the scheduled cash interest and scheduled principal recognized
+  once on their contractual due dates.
+- New capital components `cs.scheduled_cash_interest_due.<scope>` and
+  `cs.scheduled_principal_due.<scope>` report those amounts from each
+  borrowing's contractual schedule: a missed installment is recognized on its
+  due date, and arrears settlements, prepayments, sweeps, PIK, fees and hedge
+  flows are excluded. `CashflowBreakdown` gains the two fields.
+- The bundled descriptions and the metrics README no longer state leverage or
+  coverage thresholds.
+
 ### Statements capital: typed `cs` selectors, three reporting scopes and period-close FX with provenance
 
 Breaking, with no compatibility path (STATEMENTS-CAPITAL-009,

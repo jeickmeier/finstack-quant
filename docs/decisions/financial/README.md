@@ -342,7 +342,7 @@ It is implemented and qualified across Rust, Python and WASM.
 The Statements bundled leverage and coverage contract was accepted on
 2026-11-15. It covers gross debt, reported-cost EBITDA, complete TTM windows,
 positive denominators and scheduled cash service on contractual due dates.
-Implementation and independent qualification remain pending.
+It is implemented and qualified.
 [STATEMENTS-CONTRACTS-008](statements-contracts/08-leverage-and-coverage.md#accepted-decision-for-bundled-leverage-and-coverage).
 
 The Statements bundled period returns contract was accepted on 2026-11-15.

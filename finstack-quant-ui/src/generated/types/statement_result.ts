@@ -1131,6 +1131,8 @@ export interface D_033184211Bfcc772Ee94 {
  *         principal_pending: None,
  *         principal_arrears: None,
  *         principal_advance_reserve: None,
+ *         scheduled_cash_interest_due: None,
+ *         scheduled_principal_due: None,
  *     });
  * cs.totals.insert(period, CashflowBreakdown {
  *     interest_expense_cash: Money::from((10_000_i64, Currency::USD)),
@@ -1149,6 +1151,8 @@ export interface D_033184211Bfcc772Ee94 {
  *     principal_pending: None,
  *     principal_arrears: None,
  *     principal_advance_reserve: None,
+ *     scheduled_cash_interest_due: None,
+ *     scheduled_principal_due: None,
  * });
  *
  * assert_eq!(cs.get_component("interest_expense", "total", &period).unwrap(), 12_500.0);
@@ -1538,6 +1542,15 @@ export interface D_677810Bf9653Cfb0A467 {
    */
   principal_pending?: D_1B5716Dde9957A614F3C1 | null;
   /**
+   * Scheduled cash interest that fell due in the period under the
+   * borrowing's contractual schedule, recognized once on its due date
+   * whether or not it was paid. It excludes PIK, fees, arrears settled
+   * from an earlier period and hedge flows. Positive amount in the
+   * breakdown's currency. `Some` on evaluator-produced breakdowns of a
+   * borrowing; `None` for a hedge and on hand-built breakdowns.
+   */
+  scheduled_cash_interest_due?: D_1B5716Dde9957A614F3C1 | null;
+  /**
    * Part of `principal_payment` paid against the instrument's own
    * contractual schedule: amortization, maturity redemption,
    * schedule-embedded prepayments and revolver repayments, including
@@ -1552,6 +1565,15 @@ export interface D_677810Bf9653Cfb0A467 {
    * hand-built breakdowns and on JSON written before this field existed.
    */
   scheduled_principal?: D_1B5716Dde9957A614F3C1 | null;
+  /**
+   * Scheduled principal that fell due in the period under the borrowing's
+   * contractual schedule (amortization and maturity), recognized once on
+   * its due date whether or not it was paid. It excludes prepayments,
+   * sweeps, arrears settled from an earlier period and advance payments.
+   * Same sign, currency and absence rule as
+   * [`Self::scheduled_cash_interest_due`].
+   */
+  scheduled_principal_due?: D_1B5716Dde9957A614F3C1 | null;
   /**
    * Part of `principal_payment` paid by the excess-cash-flow sweep at the
    * waterfall's `Sweep` priority. Zero when no waterfall ran. Same sign,

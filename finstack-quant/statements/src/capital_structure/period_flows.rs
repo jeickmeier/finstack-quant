@@ -693,6 +693,12 @@ pub fn calculate_period_flows(
     // Audit detail: every contractual principal flow is scheduled principal.
     breakdown.opening_balance = Some(opening_balance);
     breakdown.mark_principal_as_scheduled();
+    // Scheduled cash service of a borrowing is recognized once, on its
+    // contractual due date, whether or not a waterfall then pays it.
+    if is_debt {
+        breakdown.scheduled_cash_interest_due = Some(breakdown.interest_expense_cash);
+        breakdown.scheduled_principal_due = Some(breakdown.principal_payment);
+    }
     // Principal whose cash and face fall on opposite sides of the close. On
     // the contractual path every scheduled payment is made when due, so
     // nothing is in arrears and cash paid ahead of its reduction is reserved.

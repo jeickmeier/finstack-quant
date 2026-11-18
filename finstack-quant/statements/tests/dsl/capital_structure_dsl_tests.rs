@@ -149,6 +149,8 @@ fn test_context_get_cs_value_interest_total() {
         principal_pending: None,
         principal_arrears: None,
         principal_advance_reserve: None,
+        scheduled_cash_interest_due: None,
+        scheduled_principal_due: None,
     };
     cs_cashflows.totals.insert(period_id, breakdown);
 
@@ -590,6 +592,8 @@ fn test_capital_structure_cashflows_accessors() {
         principal_pending: None,
         principal_arrears: None,
         principal_advance_reserve: None,
+        scheduled_cash_interest_due: None,
+        scheduled_principal_due: None,
     };
 
     let mut instrument_map = indexmap::IndexMap::new();

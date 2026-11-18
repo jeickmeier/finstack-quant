@@ -422,6 +422,8 @@ mod tests {
             principal_pending: None,
             principal_arrears: None,
             principal_advance_reserve: None,
+            scheduled_cash_interest_due: None,
+            scheduled_principal_due: None,
         };
         let mut totals = IndexMap::new();
         totals.insert(period, breakdown);

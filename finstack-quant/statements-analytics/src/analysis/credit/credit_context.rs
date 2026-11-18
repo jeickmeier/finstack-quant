@@ -156,6 +156,8 @@ pub struct CreditNumeratorNodes<'a> {
 ///             principal_pending: None,
 ///             principal_arrears: None,
 ///             principal_advance_reserve: None,
+///             scheduled_cash_interest_due: None,
+///             scheduled_principal_due: None,
 ///         },
 ///     )]),
 /// );
@@ -488,6 +490,8 @@ mod tests {
                     principal_pending: None,
                     principal_arrears: None,
                     principal_advance_reserve: None,
+                    scheduled_cash_interest_due: None,
+                    scheduled_principal_due: None,
                 },
             );
         }

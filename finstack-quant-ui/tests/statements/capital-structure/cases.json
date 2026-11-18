@@ -346,6 +346,14 @@
               "amount": "0",
               "currency": "USD"
             },
+            "scheduled_cash_interest_due": {
+              "amount": "16800",
+              "currency": "USD"
+            },
+            "scheduled_principal_due": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "interest_arrears": {
               "amount": "0",
               "currency": "USD"
@@ -409,6 +417,14 @@
               "currency": "USD"
             },
             "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "scheduled_cash_interest_due": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "scheduled_principal_due": {
               "amount": "0",
               "currency": "USD"
             },
@@ -478,6 +494,14 @@
               "amount": "0",
               "currency": "USD"
             },
+            "scheduled_cash_interest_due": {
+              "amount": "16800",
+              "currency": "USD"
+            },
+            "scheduled_principal_due": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "interest_arrears": {
               "amount": "0",
               "currency": "USD"
@@ -541,6 +565,14 @@
               "currency": "USD"
             },
             "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "scheduled_cash_interest_due": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "scheduled_principal_due": {
               "amount": "0",
               "currency": "USD"
             },
@@ -612,6 +644,14 @@
               "amount": "0",
               "currency": "USD"
             },
+            "scheduled_cash_interest_due": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "scheduled_principal_due": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "interest_arrears": {
               "amount": "0",
               "currency": "USD"
@@ -675,6 +715,14 @@
               "currency": "USD"
             },
             "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "scheduled_cash_interest_due": {
+              "amount": "10000",
+              "currency": "USD"
+            },
+            "scheduled_principal_due": {
               "amount": "0",
               "currency": "USD"
             },
@@ -744,6 +792,14 @@
               "amount": "0",
               "currency": "USD"
             },
+            "scheduled_cash_interest_due": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "scheduled_principal_due": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "interest_arrears": {
               "amount": "0",
               "currency": "USD"
@@ -807,6 +863,14 @@
               "currency": "USD"
             },
             "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "scheduled_cash_interest_due": {
+              "amount": "10000",
+              "currency": "USD"
+            },
+            "scheduled_principal_due": {
               "amount": "0",
               "currency": "USD"
             },
@@ -878,6 +942,14 @@
               "amount": "0",
               "currency": "USD"
             },
+            "scheduled_cash_interest_due": {
+              "amount": "2500",
+              "currency": "USD"
+            },
+            "scheduled_principal_due": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "interest_arrears": {
               "amount": "0",
               "currency": "USD"
@@ -941,6 +1013,14 @@
               "currency": "USD"
             },
             "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "scheduled_cash_interest_due": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "scheduled_principal_due": {
               "amount": "0",
               "currency": "USD"
             },
@@ -1010,6 +1090,14 @@
               "amount": "0",
               "currency": "USD"
             },
+            "scheduled_cash_interest_due": {
+              "amount": "2500",
+              "currency": "USD"
+            },
+            "scheduled_principal_due": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "interest_arrears": {
               "amount": "0",
               "currency": "USD"
@@ -1073,6 +1161,14 @@
               "currency": "USD"
             },
             "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "scheduled_cash_interest_due": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "scheduled_principal_due": {
               "amount": "0",
               "currency": "USD"
             },
@@ -1145,6 +1241,14 @@
             "amount": "0",
             "currency": "USD"
           },
+          "scheduled_cash_interest_due": {
+            "amount": "19300",
+            "currency": "USD"
+          },
+          "scheduled_principal_due": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "interest_arrears": {
             "amount": "0",
             "currency": "USD"
@@ -1208,6 +1312,14 @@
             "currency": "USD"
           },
           "voluntary_prepayment": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "scheduled_cash_interest_due": {
+            "amount": "10000",
+            "currency": "USD"
+          },
+          "scheduled_principal_due": {
             "amount": "0",
             "currency": "USD"
           },
@@ -1277,6 +1389,14 @@
             "amount": "0",
             "currency": "USD"
           },
+          "scheduled_cash_interest_due": {
+            "amount": "19300",
+            "currency": "USD"
+          },
+          "scheduled_principal_due": {
+            "amount": "0",
+            "currency": "USD"
+          },
           "interest_arrears": {
             "amount": "0",
             "currency": "USD"
@@ -1340,6 +1460,14 @@
             "currency": "USD"
           },
           "voluntary_prepayment": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "scheduled_cash_interest_due": {
+            "amount": "10000",
+            "currency": "USD"
+          },
+          "scheduled_principal_due": {
             "amount": "0",
             "currency": "USD"
           },
@@ -1412,6 +1540,14 @@
               "amount": "0",
               "currency": "USD"
             },
+            "scheduled_cash_interest_due": {
+              "amount": "19300",
+              "currency": "USD"
+            },
+            "scheduled_principal_due": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "interest_arrears": {
               "amount": "0",
               "currency": "USD"
@@ -1475,6 +1611,14 @@
               "currency": "USD"
             },
             "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "scheduled_cash_interest_due": {
+              "amount": "10000",
+              "currency": "USD"
+            },
+            "scheduled_principal_due": {
               "amount": "0",
               "currency": "USD"
             },
@@ -1544,6 +1688,14 @@
               "amount": "0",
               "currency": "USD"
             },
+            "scheduled_cash_interest_due": {
+              "amount": "19300",
+              "currency": "USD"
+            },
+            "scheduled_principal_due": {
+              "amount": "0",
+              "currency": "USD"
+            },
             "interest_arrears": {
               "amount": "0",
               "currency": "USD"
@@ -1607,6 +1759,14 @@
               "currency": "USD"
             },
             "voluntary_prepayment": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "scheduled_cash_interest_due": {
+              "amount": "10000",
+              "currency": "USD"
+            },
+            "scheduled_principal_due": {
               "amount": "0",
               "currency": "USD"
             },

@@ -99,7 +99,8 @@ fn returns_model(
         ("tax_expense", [20.0; 4], RollupMethod::Sum),
         ("depreciation", [0.0; 4], RollupMethod::Sum),
         ("amortization", [0.0; 4], RollupMethod::Sum),
-        ("principal_payment", [0.0; 4], RollupMethod::Sum),
+        ("scheduled_cash_interest_due", [10.0; 4], RollupMethod::Sum),
+        ("scheduled_principal_due", [0.0; 4], RollupMethod::Sum),
         ("operating_tax", [8.0, 8.0, -4.0, 8.0], RollupMethod::Sum),
         (
             "total_equity",
@@ -392,7 +393,7 @@ fn test_builtin_leverage_metrics() {
     let interest_coverage = registry.get("fin.interest_coverage").unwrap();
     assert_eq!(
         interest_coverage.definition.formula,
-        "ttm(ebitda) / ttm(interest_expense)"
+        "ratio(ttm(ebitda), ttm(interest_expense))"
     );
 }
 
@@ -403,13 +404,13 @@ fn builtin_credit_ratios_use_ttm_flows() {
     let debt_to_ebitda = registry.get("fin.debt_to_ebitda").unwrap();
     assert_eq!(
         debt_to_ebitda.definition.formula,
-        "total_debt / ttm(ebitda)"
+        "ratio(total_debt, ttm(ebitda))"
     );
 
     let debt_service_coverage = registry.get("fin.debt_service_coverage").unwrap();
     assert_eq!(
         debt_service_coverage.definition.formula,
-        "ttm(ebitda) / ttm(interest_expense + principal_payment)"
+        "ratio(ttm(ebitda), ttm(scheduled_cash_interest_due + scheduled_principal_due))"
     );
 }
 
@@ -1132,7 +1133,8 @@ fn parity_add_metric_matches_with_builtin_metrics_for_same_nodes() {
         model_builder.value("tax_expense", &zero_periods(0.0));
         model_builder.value("depreciation", &zero_periods(0.0));
         model_builder.value("amortization", &zero_periods(0.0));
-        model_builder.value("principal_payment", &zero_periods(0.0));
+        model_builder.value("scheduled_cash_interest_due", &zero_periods(0.0));
+        model_builder.value("scheduled_principal_due", &zero_periods(0.0));
         model_builder.value("total_assets", &zero_periods(2.0));
         model_builder.value("total_debt", &zero_periods(0.0));
         model_builder.value("total_equity", &zero_periods(1.0));
@@ -1352,7 +1354,20 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
             ],
         );
         model_builder.value(
-            "principal_payment",
+            "scheduled_cash_interest_due",
+            &[
+                (
+                    PeriodId::quarter(2025, 1).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+                (
+                    PeriodId::quarter(2025, 2).expect("valid period fixture"),
+                    AmountOrScalar::scalar(0.0),
+                ),
+            ],
+        );
+        model_builder.value(
+            "scheduled_principal_due",
             &[
                 (
                     PeriodId::quarter(2025, 1).expect("valid period fixture"),
@@ -1457,4 +1472,167 @@ fn parity_with_builtin_metrics_qualifies_intra_namespace_refs() {
         "gross_margin = gross_profit/revenue = 100k/200k = 0.5, got {}",
         margin
     );
+}
+
+/// The bundled leverage and coverage ratios use period-end gross debt,
+/// complete trailing windows and positive denominators
+/// (STATEMENTS-CONTRACTS-008). Quarterly EBITDA is 40 (revenue 100, costs
+/// 60) unless `revenue` moves it.
+#[test]
+fn bundled_leverage_and_coverage_use_complete_windows_and_positive_denominators() {
+    use finstack_quant_core::dates::PeriodId;
+    use finstack_quant_statements::evaluator::CellStatus;
+
+    let q = |quarter: u8| PeriodId::quarter(2025, quarter).expect("quarter");
+    let series = |values: [f64; 4]| -> Vec<(PeriodId, f64)> {
+        (1..=4_u8)
+            .zip(values)
+            .map(|(n, value)| (q(n), value))
+            .collect()
+    };
+    // Replace an input the shared fixture already defines.
+    let reset = |builder: &mut finstack_quant_statements::builder::ModelBuilder,
+                 node: &str,
+                 values: &[(PeriodId, f64)]| {
+        builder.remove_node(node).expect("fixture node");
+        builder.value_scalar(node, values);
+        builder
+            .rollup(node, finstack_quant_statements::types::RollupMethod::Sum)
+            .expect("known node");
+    };
+    let evaluate =
+        |revenue: [f64; 4],
+         configure: &dyn Fn(&mut finstack_quant_statements::builder::ModelBuilder)| {
+            let model = returns_model(revenue, configure);
+            Evaluator::new().evaluate(&model).expect("evaluation")
+        };
+    let close = |actual: Option<f64>, expected: f64, what: &str| {
+        let actual = actual.unwrap_or_else(|| panic!("{what} has no value"));
+        assert!((actual - expected).abs() < 1e-12, "{what}: {actual}");
+    };
+    let unavailable = |results: &finstack_quant_statements::evaluator::StatementResult,
+                       metric: &str,
+                       quarter: u8| {
+        let cell = results.get_cell(metric, &q(quarter)).expect("cell");
+        assert_eq!(cell.status, CellStatus::Unavailable, "{metric} Q{quarter}");
+    };
+
+    // Scheduled principal of 5, 5, 5 and 25 falls due over the year.
+    let results = evaluate([100.0; 4], &|builder| {
+        reset(
+            builder,
+            "scheduled_principal_due",
+            &series([5.0, 5.0, 5.0, 25.0]),
+        );
+    });
+    // Balance ratios use each period's own close.
+    close(
+        results.get("fin.debt_to_equity", &q(2)),
+        400.0 / 300.0,
+        "D/E",
+    );
+    close(
+        results.get("fin.debt_to_assets", &q(4)),
+        400.0 / 1500.0,
+        "D/A",
+    );
+    close(
+        results.get("fin.equity_multiplier", &q(4)),
+        1500.0 / 700.0,
+        "multiplier",
+    );
+    // The trailing window is complete only in the fourth quarter:
+    // EBITDA 160, interest 40, scheduled service 40 + 40.
+    for metric in [
+        "fin.debt_to_ebitda",
+        "fin.interest_coverage",
+        "fin.debt_service_coverage",
+    ] {
+        for quarter in 1..=3 {
+            unavailable(&results, metric, quarter);
+        }
+    }
+    close(
+        results.get("fin.debt_to_ebitda", &q(4)),
+        400.0 / 160.0,
+        "D/EBITDA",
+    );
+    close(
+        results.get("fin.interest_coverage", &q(4)),
+        160.0 / 40.0,
+        "ICR",
+    );
+    close(
+        results.get("fin.debt_service_coverage", &q(4)),
+        160.0 / 80.0,
+        "DSCR",
+    );
+
+    // A gap inside the window leaves the trailing ratios unavailable.
+    let gapped = evaluate([100.0; 4], &|builder| {
+        reset(
+            builder,
+            "revenue",
+            &[(q(1), 100.0), (q(3), 100.0), (q(4), 100.0)],
+        );
+    });
+    unavailable(&gapped, "fin.debt_to_ebitda", 4);
+    unavailable(&gapped, "fin.interest_coverage", 4);
+
+    // Zero gross debt is a valid zero.
+    let debt_free = evaluate([100.0; 4], &|builder| {
+        reset(builder, "total_debt", &series([0.0; 4]));
+    });
+    close(debt_free.get("fin.debt_to_equity", &q(4)), 0.0, "zero D/E");
+    close(
+        debt_free.get("fin.debt_to_ebitda", &q(4)),
+        0.0,
+        "zero D/EBITDA",
+    );
+
+    // Negative EBITDA (-60 a quarter) gives signed coverage over positive
+    // denominators, and no leverage multiple over a negative denominator.
+    let losses = evaluate([0.0; 4], &|_| {});
+    close(
+        losses.get("fin.interest_coverage", &q(4)),
+        -240.0 / 40.0,
+        "signed ICR",
+    );
+    close(
+        losses.get("fin.debt_service_coverage", &q(4)),
+        -240.0 / 40.0,
+        "signed DSCR",
+    );
+    unavailable(&losses, "fin.debt_to_ebitda", 4);
+
+    // A zero denominator is unavailable, not a division error.
+    let no_interest = evaluate([100.0; 4], &|builder| {
+        reset(builder, "interest_expense", &series([0.0; 4]));
+    });
+    unavailable(&no_interest, "fin.interest_coverage", 4);
+
+    // The bundled descriptions make no threshold claim.
+    let registry = Registry::with_builtins().unwrap();
+    for id in [
+        "fin.debt_to_ebitda",
+        "fin.interest_coverage",
+        "fin.debt_service_coverage",
+    ] {
+        let description = registry
+            .get(id)
+            .unwrap()
+            .definition
+            .description
+            .clone()
+            .unwrap_or_default();
+        for claim in [
+            "3.0x",
+            "1.5x",
+            "1.25x",
+            "generally considered",
+            "typically required",
+        ] {
+            assert!(!description.contains(claim), "{id}: {claim}");
+        }
+    }
 }

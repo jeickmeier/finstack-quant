@@ -1049,7 +1049,10 @@ class CapitalStructureCashflows:
             ``net_interest_expense_cash`` (cash expense less cash income),
             ``principal_payment`` and its parts ``scheduled_principal``,
             ``mandatory_prepayment``, ``voluntary_prepayment`` and
-            ``sweep_prepayment``, ``fees``, ``opening_balance``,
+            ``sweep_prepayment``, ``scheduled_cash_interest_due`` and
+            ``scheduled_principal_due`` (scheduled service recognized once on
+            its contractual due date, paid or not), ``fees``,
+            ``opening_balance``,
             ``debt_balance``, ``accrued_interest`` (cash interest earned and
             not yet due), ``interest_arrears`` (cash interest due and unpaid),
             ``principal_pending`` (principal cash owed and not yet due),

@@ -5001,6 +5001,15 @@ export interface CashflowBreakdown {
    */
   principal_pending?: Money | null;
   /**
+   * Scheduled cash interest that fell due in the period under the
+   * borrowing's contractual schedule, recognized once on its due date
+   * whether or not it was paid. It excludes PIK, fees, arrears settled
+   * from an earlier period and hedge flows. Positive amount in the
+   * breakdown's currency. `Some` on evaluator-produced breakdowns of a
+   * borrowing; `None` for a hedge and on hand-built breakdowns.
+   */
+  scheduled_cash_interest_due?: Money | null;
+  /**
    * Part of `principal_payment` paid against the instrument's own
    * contractual schedule: amortization, maturity redemption,
    * schedule-embedded prepayments and revolver repayments, including
@@ -5015,6 +5024,15 @@ export interface CashflowBreakdown {
    * hand-built breakdowns and on JSON written before this field existed.
    */
   scheduled_principal?: Money | null;
+  /**
+   * Scheduled principal that fell due in the period under the borrowing's
+   * contractual schedule (amortization and maturity), recognized once on
+   * its due date whether or not it was paid. It excludes prepayments,
+   * sweeps, arrears settled from an earlier period and advance payments.
+   * Same sign, currency and absence rule as
+   * [`Self::scheduled_cash_interest_due`].
+   */
+  scheduled_principal_due?: Money | null;
   /**
    * Part of `principal_payment` paid by the excess-cash-flow sweep at the
    * waterfall's `Sweep` priority. Zero when no waterfall ran. Same sign,

@@ -607,6 +607,9 @@ fn the_contractual_split_applies_once_to_a_rebuilt_coupon() {
     let get = |name: &str, period: &str| component(&result, name, INSTRUMENT, period);
     assert_close(get("interest_expense_cash", "2025Q3"), 3.0);
     assert_close(get("interest_expense_pik", "2025Q3"), 1.0);
+    // Scheduled cash service excludes the capitalized share and the sweep.
+    assert_close(get("scheduled_cash_interest_due", "2025Q3"), 3.0);
+    assert_close(get("scheduled_principal_due", "2025Q1"), 0.0);
     assert_close(get("debt_balance", "2025Q2"), 60.0);
     assert_close(get("debt_balance", "2025Q3"), 61.0);
 }
@@ -709,6 +712,10 @@ fn a_swept_revolver_rebuilds_interest_and_fees_on_actual_days() {
         get("fees", "2025M04"),
         (0.005 * (100.0 * 31.0 + 140.0 * 59.0) + 0.0025 * (100.0 * 31.0 + 60.0 * 59.0)) / 360.0,
     );
+    // Fees are not scheduled debt service.
+    assert_close(get("scheduled_cash_interest_due", "2025M04"), paid);
+    assert!(get("fees", "2025M04") > 0.0);
+    assert_close(get("scheduled_principal_due", "2025M01"), 0.0);
     // Interest earned in January on 100 is preserved at the January close.
     assert_close(
         get("accrued_interest", "2025M01"),
@@ -764,8 +771,8 @@ fn arrears_and_a_later_sweep_repay_the_face_once() {
     loan.business_day_convention = BusinessDayConvention::Following;
     loan.calendar_id = Some("weekends_only".into());
     loan.amortization = AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.10 };
-    // No cash in the second quarter, when the first installment settles; a
-    // sweep of 20 in the third.
+    // No cash in the second quarter, when the 30 June installment falls due;
+    // a sweep of 20 in the third.
     let result = evaluate_2025_with(
         "2025Q1..2025Q4",
         FinancialStatementInstrument::TermLoan(loan),
@@ -789,12 +796,36 @@ fn arrears_and_a_later_sweep_repay_the_face_once() {
         .collect();
     // Economic principal follows the contract dates and the sweep.
     assert_eq!(balances, vec![90.0, 80.0, 50.0, 0.0], "{balances:?}");
-    // The installment due on 1 April is unpaid in the second quarter and
-    // settled with the 1 July installment and the sweep in the third.
+    // The installment due on 30 June is unpaid in the second quarter and
+    // settled with the 30 September installment and the sweep in the third.
     assert_eq!(arrears, vec![0.0, 10.0, 0.0, 0.0], "{arrears:?}");
     assert_eq!(paid[1], 0.0);
     assert_close(paid[2], 40.0);
     assert_close(paid.iter().sum::<f64>(), 100.0);
+
+    // Scheduled service is recognized once, on its contractual due date
+    // (STATEMENTS-CONTRACTS-008): the missed 30 June installment is due in
+    // the second quarter although nothing is paid, and the third quarter's
+    // due amount excludes both the arrears it settles and the sweep.
+    let due: Vec<f64> = quarters
+        .iter()
+        .map(|q| get("scheduled_principal_due", q))
+        .collect();
+    assert_eq!(due, vec![10.0, 10.0, 10.0, 50.0], "{due:?}");
+    // What falls due over the life is the face less the 20 swept.
+    assert_close(due.iter().sum::<f64>(), 80.0);
+    let interest_due: Vec<f64> = quarters
+        .iter()
+        .map(|q| get("scheduled_cash_interest_due", q))
+        .collect();
+    let interest_paid: Vec<f64> = quarters
+        .iter()
+        .map(|q| get("interest_expense_cash", q))
+        .collect();
+    // The 30 June coupon is due and unpaid; the third quarter pays it with
+    // its own coupon but only its own coupon falls due then.
+    assert!(interest_due[1] > 0.0 && interest_paid[1] == 0.0);
+    assert_close(interest_paid[2], interest_due[1] + interest_due[2]);
 }
 
 #[test]

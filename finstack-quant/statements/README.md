@@ -199,7 +199,9 @@ and native-currency values are unaffected.
 Components: `interest_expense` (cash + PIK), `interest_expense_cash`,
 `interest_expense_pik`, `interest_income`, `net_interest_expense_cash`,
 `principal_payment` and its parts `scheduled_principal`, `mandatory_prepayment`,
-`voluntary_prepayment` and `sweep_prepayment`, `fees`, `opening_balance`,
+`voluntary_prepayment` and `sweep_prepayment`, `scheduled_cash_interest_due`
+and `scheduled_principal_due` (scheduled service recognized once on its
+contractual due date, paid or not), `fees`, `opening_balance`,
 `debt_balance`, `accrued_interest`, `interest_arrears`, `principal_pending`,
 `principal_arrears` and `principal_advance_reserve`. An amount a period does
 not record is an error, never zero.

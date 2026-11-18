@@ -40,6 +40,12 @@ pub enum CsComponent {
     VoluntaryPrepayment,
     /// Excess-cash-flow sweep cash paid.
     SweepPrepayment,
+    /// Scheduled cash interest that fell due on its contractual date in the
+    /// period, whether or not it was paid.
+    ScheduledCashInterestDue,
+    /// Scheduled principal that fell due on its contractual date in the
+    /// period, whether or not it was paid.
+    ScheduledPrincipalDue,
     /// Fees paid.
     Fees,
     /// Economic principal outstanding at the period open.
@@ -60,7 +66,7 @@ pub enum CsComponent {
 
 impl CsComponent {
     /// Every component, in documentation order.
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 20] = [
         Self::InterestExpense,
         Self::InterestExpenseCash,
         Self::InterestExpensePik,
@@ -71,6 +77,8 @@ impl CsComponent {
         Self::MandatoryPrepayment,
         Self::VoluntaryPrepayment,
         Self::SweepPrepayment,
+        Self::ScheduledCashInterestDue,
+        Self::ScheduledPrincipalDue,
         Self::Fees,
         Self::OpeningBalance,
         Self::DebtBalance,
@@ -95,6 +103,8 @@ impl CsComponent {
             Self::MandatoryPrepayment => "mandatory_prepayment",
             Self::VoluntaryPrepayment => "voluntary_prepayment",
             Self::SweepPrepayment => "sweep_prepayment",
+            Self::ScheduledCashInterestDue => "scheduled_cash_interest_due",
+            Self::ScheduledPrincipalDue => "scheduled_principal_due",
             Self::Fees => "fees",
             Self::OpeningBalance => "opening_balance",
             Self::DebtBalance => "debt_balance",
@@ -137,6 +147,8 @@ impl CsComponent {
             Self::MandatoryPrepayment => recorded(flow.mandatory_prepayment),
             Self::VoluntaryPrepayment => recorded(flow.voluntary_prepayment),
             Self::SweepPrepayment => recorded(flow.sweep_prepayment),
+            Self::ScheduledCashInterestDue => recorded(flow.scheduled_cash_interest_due),
+            Self::ScheduledPrincipalDue => recorded(flow.scheduled_principal_due),
             Self::Fees => Ok(flow.fees),
             Self::OpeningBalance => recorded(flow.opening_balance),
             Self::DebtBalance => Ok(flow.debt_balance),
