@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **623 review items across 33 source scopes with open items**
+This backlog consolidates **622 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -28,7 +28,7 @@ The labels distinguish the work required:
   failure policy or result meaning requiring explicit agreement.
 - **Reconciliation** (479): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
-- **Evidence** (37): a particular primary-reference, empirical-calibration,
+- **Evidence** (36): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
 
 These categories are not severity rankings. A decision can expose implementation
@@ -67,7 +67,7 @@ product consequences remain in their product scope.
 | [Calibration: quotes and curve/smile targets](#calibration-quotes-and-curvesmile-targets) | 18 |
 | [Calibration: Hull–White and LMM](#calibration-hullwhite-and-lmm) | 18 |
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
-| [Statements: capital structure](#statements-capital-structure) | 5 |
+| [Statements: capital structure](#statements-capital-structure) | 4 |
 | [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 3 |
 | [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 4 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
@@ -962,9 +962,7 @@ product consequences remain in their product scope.
 
 - **Reconciliation — Dated PIK notices, amendments and authorized arrears capitalization.** The modeled exercise elects at the start of the next coupon period after the period that observes the metric. Implement separately elected observation, notice and election-effective dates, amendments on their authorized effective dates, capitalization of arrears through a separately authorized dated action, and qualified payoff terms for an earned coupon affected by a full payoff. Qualify them, and the metric's units against the threshold, with independent agreement examples. [Accepted STATEMENTS-CAPITAL-008](statements-capital/08-pik-and-carry-state.md#accepted-decision-for-contractual-pik-elections-and-carried-claims).
 
-- **Reconciliation — Exact capital exports and typed host accessors.** The capital long tables export amounts as floats, and the host component accessors (`get_component` in Python and WASM) return a float. Export amounts as exact decimal strings tagged with their currency and give hosts the typed selector lookup. Qualify native and consolidated results against an independent ledger across dated FX changes. [Accepted STATEMENTS-CAPITAL-009](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
-
-- **Evidence — Capital and waterfall policy lacks independent contractual reconciliation.** Selected tests cover formulas, boundaries, routing, state and internal conservation, but no independent debt ledger, lender ECF definition, legal waterfall, accounting-standard or currency/FX qualification was established. Obtain evidence scoped to the adopted contracts rather than treating test names as compliance. Records: [STATEMENTS-CAPITAL-004](statements-capital/04-dated-principal.md), [STATEMENTS-CAPITAL-006](statements-capital/06-priority-allocation.md), [STATEMENTS-CAPITAL-007](statements-capital/07-prepayments-and-ecf.md), [STATEMENTS-CAPITAL-008](statements-capital/08-pik-and-carry-state.md), [STATEMENTS-CAPITAL-009](statements-capital/09-reporting-and-fx.md).
+- **Reconciliation — Exact capital exports and typed host accessors.** The capital long tables export amounts as floats, and the host component accessors (`get_component` in Python and WASM) return a float. Export amounts as exact decimal strings tagged with their currency and give hosts the typed selector lookup. [Accepted STATEMENTS-CAPITAL-009](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
 
 ## Margin: collateral and initial margin
 

@@ -1,5 +1,6 @@
 mod classification;
 mod finance_residual_regressions;
 mod finance_waterfall_regressions;
+mod independent_qualification;
 mod senior_review_capital;
 mod waterfall_integration;

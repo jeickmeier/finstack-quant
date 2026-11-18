@@ -72,6 +72,12 @@ implemented and qualified; notice dates and amendments remain open.
 The reporting contract covers native and consolidated views, explicit
 period-close FX, exact component exports and atomic period replacement.
 It is implemented and qualified; exact-decimal table exports remain open.
+
+Dated principal, allocation, the excess-cash-flow sweep, PIK elections and
+reporting are also reconciled to arithmetic done by hand: a two-tranche
+agreement over eight quarters with a shortfall, an election, two sweeps and a
+maturity, and a two-currency structure across four period-close rates
+([independent qualification](../../../../finstack-quant/statements/src/capital_structure/tests/independent_qualification.rs)).
 [Accepted capital reporting decision](09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
 
 | Calculation / supported instruments | Implemented method / material variants | Actual selection | Decision record | Implementation / validation | Scope limits and tracking |
@@ -96,6 +102,6 @@ It is implemented and qualified; exact-decimal table exports remain open.
 | PIK capitalization and carried claims | The term loan applies the elected split: the PIK share is zero cash and capitalizes once on the coupon date; overdue cash interest and fees stay cash claims | Election ledger, debt ledger and rebuilt schedule committed together | [008](08-pik-and-carry-state.md) | Reconciled 2026-11-17; the record's 10 coupon, 40% election and 3 of arrears executed | Arrears are never capitalized; payoff terms for an earned coupon are not modeled |
 | Reporting components and scopes | Typed components: gross and net interest, the four parts of principal, balances, arrears and reserves; three exact scopes: instrument, native-currency total and consolidated total | `cs.<component>.<id>`, `.total.<CCY>` and `.total`; an unrecorded amount is an error, never zero | [009 — reporting/FX](09-reporting-and-fx.md) | Reconciled 2026-11-17; each selector parsed, rendered, compiled and evaluated | Host accessors return floats |
 | Period replacement and order | A period is cleared and replaced as a whole; a conflicting reporting currency is rejected first; periods read chronologically | Reporting currency fixed for the run | [009](09-reporting-and-fx.md) | Reconciled 2026-11-17; a stale row, a conflict and out-of-order arrival executed | Long-table amounts are floats |
-| Reporting FX boundary | One period-close rate per native currency, with pair, rate, date and source retained; a missing quote leaves only the consolidated scope unavailable | Explicit `period_end` policy and reporting currency; no default | [009](09-reporting-and-fx.md) | Reconciled 2026-11-17; the record's EUR/USD example and a missing quote executed | Dated FX changes not qualified against an independent ledger |
+| Reporting FX boundary | One period-close rate per native currency, with pair, rate, date and source retained; a missing quote leaves only the consolidated scope unavailable | Explicit `period_end` policy and reporting currency; no default | [009](09-reporting-and-fx.md) | Reconciled 2026-11-17; the record's EUR/USD example and a missing quote executed | None |
 
 The records distinguish confirmed static contracts/discrepancies from numerical impacts that still need reproduction. Tests named here are internal formula, routing, state and regression evidence; they were **not executed**. The [statement-capital follow-ups](../FOLLOW_UPS.md#statements-capital-structure) track scoped findings; [central follow-ups](../../FOLLOW_UPS.md#financial-methodology-audit) coordinate cross-scope decisions; this audit changes no runtime code, tests, fixtures or adopted model policy.
