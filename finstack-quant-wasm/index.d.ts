@@ -9567,9 +9567,9 @@ export interface StatementsNamespace {
    *
    * Rejects malformed or schema-incompatible `json`; duplicate or inconsistent
    * payment priorities; incomplete available-cash priorities; invalid PIK,
-   * payment-class, prepay-node, or ECF-sweep settings; or failure to serialize
+   * payment-class, prepayment, or ECF-sweep settings; or failure to serialize
    * the validated waterfall.
-   * @param json - Canonical JSON string for a `WaterfallSpec`, including `available_cash_node` and optional `priority_of_payments`, `ecf_sweep`, `pik_toggle`, `payment_classes`, `mandatory_prepay_node`, and `voluntary_prepay_node`.
+   * @param json - Canonical JSON string for a `WaterfallSpec`, including `available_cash_node` and optional `priority_of_payments`, `ecf_sweep`, `pik_toggle`, `payment_classes`, `mandatory_prepayment`, and `voluntary_prepayment` (each `{amount, facilities}`).
    * @returns Canonical waterfall JSON after schema validation.
    */
   readonly validateWaterfallSpecJson: typeof wasm.validateWaterfallSpecJson;
@@ -9583,9 +9583,10 @@ export interface StatementsNamespace {
    * # Errors
    *
    * Rejects malformed or schema-incompatible `json`, a `sweep_percentage`
-   * outside `[0.0, 1.0]`, or failure to serialize the validated ECF-sweep
-   * specification.
-   * @param json - Canonical JSON string defining the object to deserialize or normalize.
+   * outside `[0.0, 1.0]`, an empty cash measure or input expression, an empty
+   * or repeated named facility, or failure to serialize the validated
+   * ECF-sweep specification.
+   * @param json - Canonical JSON string for an `EcfSweepSpec`: `cash_measure` (a formula in the pool currency), `deductions` and `credits` (lists of `{type: "input", expression}`, `{type: "paid_cash_interest"}`, `{type: "paid_fees"}` or `{type: "paid_scheduled_principal"}`), `sweep_percentage` (decimal fraction in `[0, 1]`) and `facilities` (`"all_eligible"` or `{named: [...]}`).
    * @returns Canonical ECF-sweep JSON after schema validation.
    */
   readonly validateEcfSweepSpecJson: typeof wasm.validateEcfSweepSpecJson;

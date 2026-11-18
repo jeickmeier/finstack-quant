@@ -111,13 +111,18 @@ impl ModelBuilder {
     ///
     /// * `waterfall_spec` - Priority-of-payments, pre-waterfall cash node,
     ///   optional ECF sweep / PIK toggle, payment classes, and optional
-    ///   mandatory / voluntary prepay nodes.
+    ///   mandatory / voluntary prepayment requests.
     ///
     /// # Example
     /// ```
-    /// use finstack_quant_statements::capital_structure::{EcfSweepSpec, PaymentPriority, WaterfallSpec};
+    /// use finstack_quant_statements::capital_structure::{
+    ///     EcfSweepSpec, EcfTerm, FacilitySelection, PaymentPriority, WaterfallSpec,
+    /// };
     /// use finstack_quant_statements::builder::ModelBuilder;
     ///
+    /// let input = |expression: &str| EcfTerm::Input {
+    ///     expression: expression.to_string(),
+    /// };
     /// let waterfall = WaterfallSpec {
     ///     priority_of_payments: vec![
     ///         PaymentPriority::Fees,
@@ -127,13 +132,17 @@ impl ModelBuilder {
     ///         PaymentPriority::Equity,
     ///     ],
     ///     ecf_sweep: Some(EcfSweepSpec {
-    ///         ebitda_node: "ebitda".to_string(),
-    ///         taxes_node: Some("taxes".to_string()),
-    ///         capex_node: Some("capex".to_string()),
-    ///         working_capital_node: Some("wc_change".to_string()),
-    ///         cash_interest_node: None,
-    ///         sweep_percentage: 0.5,  // 50% sweep
-    ///         target_instrument_id: Some("TL-A".to_string()),
+    ///         cash_measure: "ebitda".to_string(),
+    ///         deductions: vec![
+    ///             input("taxes"),
+    ///             input("capex"),
+    ///             input("wc_change"),
+    ///             EcfTerm::PaidCashInterest,
+    ///             EcfTerm::PaidScheduledPrincipal,
+    ///         ],
+    ///         credits: Vec::new(),
+    ///         sweep_percentage: 0.5, // 50% sweep
+    ///         facilities: FacilitySelection::Named(vec!["TL-A".to_string()]),
     ///     }),
     ///     ..WaterfallSpec::default()
     /// };

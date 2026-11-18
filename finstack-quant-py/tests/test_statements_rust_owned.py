@@ -341,8 +341,8 @@ def test_model_ingest_is_rust_from_json() -> None:
 
 def test_capital_structure_sub_specs_validate() -> None:
     with pytest.raises(ValueError, match="sweep_percentage"):
-        EcfSweepSpec("ebitda", 5.0).validate()
-    EcfSweepSpec("ebitda", 0.5).validate()
+        EcfSweepSpec(cash_measure="ebitda", sweep_percentage=5.0, facilities="all_eligible").validate()
+    EcfSweepSpec(cash_measure="ebitda", sweep_percentage=0.5, facilities="all_eligible").validate()
     with pytest.raises(ValueError, match="target_instrument_ids"):
         PikToggleSpec("cash", 1.0, []).validate()
     PikToggleSpec("cash", 1.0, ["TL"]).validate()

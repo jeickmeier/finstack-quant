@@ -3,55 +3,39 @@
 //! This module implements dynamic cash flow allocation according to priority of payments,
 //! excess cash flow sweeps, and PIK toggles based on model results.
 //!
-//! # Sign Conventions
+//! # Excess cash flow
 //!
-//! The ECF (Excess Cash Flow) sweep calculation follows standard LBO model conventions:
-//!
-//! ## Input Nodes
-//!
-//! - **EBITDA** (`ebitda_node`): Positive value representing operating cash generation.
-//!   Example: $10M EBITDA → use `10_000_000.0`
-//!
-//! - **Taxes** (`taxes_node`): Positive value representing cash tax payments (outflow).
-//!   Example: $2M taxes paid → use `2_000_000.0` (not negative)
-//!
-//! - **CapEx** (`capex_node`): Positive value representing capital expenditures (outflow).
-//!   Example: $1.5M capex → use `1_500_000.0` (not negative)
-//!
-//! - **Working Capital** (`working_capital_node`): Signed value representing change in NWC.
-//!   - Positive = cash consumed (increase in receivables/inventory)
-//!   - Negative = cash released (increase in payables)
-//!   - Example: $500K increase in NWC → use `500_000.0`
-//!
-//! ## ECF Calculation
+//! The sweep is authored term by term (`EcfSweepSpec`): a cash measure, the
+//! deductions subtracted from it and the credits added back. Nothing is
+//! deducted unless it is listed.
 //!
 //! ```text
-//! ECF = EBITDA - Taxes - CapEx - Working_Capital_Change - Cash_Interest
-//!       - Fees                  (when Fees rank ahead of prepayment)
-//!       - Scheduled_Principal   (when Amortization ranks ahead of the
-//!   prepayment priority in the waterfall)
-//!   Sweep = max(0, ECF × sweep_percentage)
-//!   ```
+//! ECF     = cash_measure - sum(deductions) + sum(credits)
+//! Request = sweep_percentage x ECF     when ECF is positive, otherwise zero
+//! ```
 //!
-//! The optional `cash_interest_node` overrides the cash-interest deduction.
-//! Otherwise, ECF deducts actual cash interest, fees and scheduled amortization
-//! paid by priorities ahead of Sweep, including arrears. PIK coupons and unpaid
-//! claims are not cash deductions. Later priorities reserve neither cash nor
-//! principal capacity from an earlier prepayment rung.
+//! Every term is a money amount in the pool currency. An `Input` term is a
+//! signed formula over the model's nodes: a deduction of `2_000_000` lowers
+//! ECF by that amount, and a negative deduction (a working-capital release
+//! of 500,000 authored as `-500_000`) raises it. The `PaidCashInterest`, `PaidFees` and
+//! `PaidScheduledPrincipal` terms are the cash this period's waterfall
+//! actually paid at priorities ranking ahead of the sweep, including arrears;
+//! PIK coupons and unpaid claims are not cash and are never deducted.
 //!
-//! The sweep is floored at zero (cannot sweep negative cash flow) and then
-//! applied as additional principal prepayment to the target instrument.
+//! The request is paid from remaining available cash across the elected
+//! facilities (`FacilitySelection`), each up to its prepayment capacity. The
+//! requested, paid and unpaid amounts of every prepayment rung are recorded as
+//! a `PrepaymentOutcome`.
 //!
 //! ## Example
 //!
 //! ```text
-//! EBITDA:    $10,000,000  (positive)
-//! Taxes:     $ 2,000,000  (positive = outflow)
-//! CapEx:     $ 1,500,000  (positive = outflow)
-//! ΔWC:       $   500,000  (positive = cash used)
-//! ─────────────────────────────────
-//! ECF:       $ 6,000,000
-//! Sweep @50%: $ 3,000,000 → applied to debt prepayment
+//! EBITDA (cash measure):  10,000,000
+//! Taxes (deduction):       2,000,000
+//! CapEx (deduction):       1,500,000
+//! Working capital build:     500,000
+//! ECF:                     6,000,000
+//! Request at 50%:          3,000,000
 //! ```
 
 mod cash_distribution;
@@ -72,7 +56,7 @@ use cash_distribution::{
     PrincipalComponent, StagedInstrumentFlow, allocate_by_class, apply_cash_cap_to_category,
     apply_prepayment,
 };
-use excess_cash_flow::{EcfDeductions, calculate_ecf_sweep};
+use excess_cash_flow::{PaidAhead, calculate_ecf_sweep};
 use payment_in_kind::{apply_pik_transitions, evaluate_pik_toggle, is_pik_enabled};
 use payment_stack::waterfall_currency;
 
@@ -95,6 +79,9 @@ pub(crate) struct WaterfallPeriodResult {
     /// `fees + cash interest + principal + equity + retained == available cash`
     /// exactly. `None` as for `equity_distribution`.
     pub(crate) retained_cash: Option<Money>,
+    /// What each configured prepayment requested, paid and left unpaid, in
+    /// priority order.
+    pub(crate) prepayments: Vec<crate::capital_structure::PrepaymentOutcome>,
     /// Cash the waterfall allocated from: the `available_cash_node` value
     /// floored at zero, in the waterfall's currency. With the allocations in
     /// `flows` it satisfies
@@ -191,24 +178,29 @@ fn class_rank_for(spec: &WaterfallSpec, instrument_id: &str) -> Result<u32> {
         })
 }
 
-/// Apply a named mandatory/voluntary prepayment at its priority rung.
+/// Apply a mandatory or voluntary prepayment at its priority rung and return
+/// what it requested and paid.
 ///
 /// `component` selects the principal component of the breakdown that records
-/// the cash paid at this rung.
+/// the cash paid at this rung. A negative request is an error.
 fn apply_named_prepay(
     context: &EvaluationContext,
-    node: Option<&str>,
+    spec: &crate::capital_structure::PrepaymentSpec,
     staged: &mut [StagedInstrumentFlow],
     remaining_cash: &mut Money,
     warnings: &mut Vec<EvalWarning>,
     component: PrincipalComponent,
-) -> Result<()> {
-    let Some(expr) = node.filter(|n| !n.trim().is_empty()) else {
-        return Ok(());
-    };
-    let amount = eval_value_or_formula(context, expr, warnings)?.max(0.0);
-    let requested = money_from_expr(amount, remaining_cash.currency(), expr)?;
-    apply_prepayment(staged, remaining_cash, requested, None, component)
+) -> Result<(Money, Money)> {
+    let amount = eval_value_or_formula(context, &spec.amount, warnings)?;
+    let requested = money_from_expr(amount, remaining_cash.currency(), &spec.amount)?;
+    let paid = apply_prepayment(
+        staged,
+        remaining_cash,
+        requested,
+        &spec.facilities,
+        component,
+    )?;
+    Ok((requested, paid))
 }
 
 /// Execute waterfall logic for a single period.
@@ -303,6 +295,7 @@ fn execute_waterfall_inner(
                 warnings: Vec::new(),
                 equity_distribution: None,
                 retained_cash: None,
+                prepayments: Vec::new(),
                 available_cash: None,
             });
         };
@@ -314,25 +307,27 @@ fn execute_waterfall_inner(
             warnings,
             equity_distribution: Some(equity),
             retained_cash: Some(retained),
+            prepayments: Vec::new(),
             available_cash: Some(available_cash),
         });
     }
 
-    // Validate that configured sweep / PIK targets actually name a debt
+    // Validate that configured prepayment / PIK targets actually name a debt
     // instrument. A typo (e.g. a trailing space) would otherwise silently
     // disable the entire mechanism — no sweep, no PIK toggle — with no
     // diagnostic, materially shifting IRRs.
-    if let Some(target) = waterfall_spec
-        .ecf_sweep
-        .as_ref()
-        .and_then(|s| s.target_instrument_id.as_ref())
-        && !contractual_flows.contains_key(target)
-    {
-        return Err(crate::error::Error::build(format!(
-            "WaterfallSpec: `ecf_sweep.target_instrument_id` '{target}' does not match any \
-                 debt instrument; the sweep would be silently dropped. Check for typos or \
-                 trailing whitespace."
-        )));
+    for (_, name, facilities) in waterfall_spec.prepayments() {
+        if let crate::capital_structure::FacilitySelection::Named(ids) = facilities {
+            for id in ids {
+                if !contractual_flows.contains_key(id) {
+                    return Err(crate::error::Error::build(format!(
+                        "WaterfallSpec: `{name}.facilities` entry '{id}' does not match any \
+                         debt instrument; the prepayment would be silently dropped. Check for \
+                         typos or trailing whitespace."
+                    )));
+                }
+            }
+        }
     }
     if let Some(targets) = waterfall_spec
         .pik_toggle
@@ -495,6 +490,7 @@ fn execute_waterfall_inner(
     let mut fee_shortfalls: IndexMap<String, Money> = IndexMap::new();
     let equity_distribution: Money;
     let retained_cash: Money;
+    let mut prepayments = Vec::new();
     {
         let mut remaining_cash = available_cash;
         // Snapshot planned interest and fees so every unpaid amount, however
@@ -504,14 +500,25 @@ fn execute_waterfall_inner(
             .map(|s| s.breakdown.interest_expense_cash)
             .collect();
         let planned_fees: Vec<Money> = staged.iter().map(|s| s.breakdown.fees).collect();
-        let mut paid = EcfDeductions::default();
+        let mut paid = PaidAhead::zero(cash_currency);
+        let mut record = |kind: PaymentPriority, requested: Money, paid: Money| -> Result<()> {
+            prepayments.push(crate::capital_structure::PrepaymentOutcome {
+                kind,
+                requested,
+                paid,
+                unpaid: requested.checked_sub(paid)?,
+            });
+            Ok(())
+        };
         for priority in &waterfall_spec.priority_of_payments {
             match priority {
                 PaymentPriority::Fees => {
                     apply_cash_cap_to_category(&mut staged, &mut remaining_cash, "fee", |s| {
                         &mut s.breakdown.fees
                     })?;
-                    paid.fees = staged.iter().map(|s| s.breakdown.fees.amount()).sum();
+                    for s in &staged {
+                        paid.fees = paid.fees.checked_add(s.breakdown.fees)?;
+                    }
                 }
                 PaymentPriority::Interest => {
                     apply_cash_cap_to_category(
@@ -520,10 +527,11 @@ fn execute_waterfall_inner(
                         "cash interest",
                         |s| &mut s.breakdown.interest_expense_cash,
                     )?;
-                    paid.cash_interest = staged
-                        .iter()
-                        .map(|s| s.breakdown.interest_expense_cash.amount())
-                        .sum();
+                    for s in &staged {
+                        paid.cash_interest = paid
+                            .cash_interest
+                            .checked_add(s.breakdown.interest_expense_cash)?;
+                    }
                 }
                 PaymentPriority::Amortization => {
                     // Earlier prepayments extinguish the same principal as
@@ -547,46 +555,56 @@ fn execute_waterfall_inner(
                             Some(s.scheduled_principal),
                         )?;
                     }
-                    paid.scheduled_principal =
-                        staged.iter().map(|s| s.scheduled_principal.amount()).sum();
+                    for s in &staged {
+                        paid.scheduled_principal = paid
+                            .scheduled_principal
+                            .checked_add(s.scheduled_principal)?;
+                    }
                 }
                 PaymentPriority::MandatoryPrepayment => {
-                    apply_named_prepay(
-                        context,
-                        waterfall_spec.mandatory_prepay_node.as_deref(),
-                        &mut staged,
-                        &mut remaining_cash,
-                        &mut warnings,
-                        |b| &mut b.mandatory_prepayment,
-                    )?;
+                    if let Some(spec) = &waterfall_spec.mandatory_prepayment {
+                        let (requested, paid) = apply_named_prepay(
+                            context,
+                            spec,
+                            &mut staged,
+                            &mut remaining_cash,
+                            &mut warnings,
+                            |b| &mut b.mandatory_prepayment,
+                        )?;
+                        record(*priority, requested, paid)?;
+                    }
                 }
                 PaymentPriority::Sweep => {
                     if let Some(spec) = &waterfall_spec.ecf_sweep {
-                        let sweep = calculate_ecf_sweep(
+                        let requested = calculate_ecf_sweep(
                             context,
                             spec,
                             &paid,
                             cash_currency,
                             &mut warnings,
                         )?;
-                        apply_prepayment(
+                        let swept = apply_prepayment(
                             &mut staged,
                             &mut remaining_cash,
-                            sweep,
-                            spec.target_instrument_id.as_deref(),
+                            requested,
+                            &spec.facilities,
                             |b| &mut b.sweep_prepayment,
                         )?;
+                        record(*priority, requested, swept)?;
                     }
                 }
                 PaymentPriority::VoluntaryPrepayment => {
-                    apply_named_prepay(
-                        context,
-                        waterfall_spec.voluntary_prepay_node.as_deref(),
-                        &mut staged,
-                        &mut remaining_cash,
-                        &mut warnings,
-                        |b| &mut b.voluntary_prepayment,
-                    )?;
+                    if let Some(spec) = &waterfall_spec.voluntary_prepayment {
+                        let (requested, paid) = apply_named_prepay(
+                            context,
+                            spec,
+                            &mut staged,
+                            &mut remaining_cash,
+                            &mut warnings,
+                            |b| &mut b.voluntary_prepayment,
+                        )?;
+                        record(*priority, requested, paid)?;
+                    }
                 }
                 PaymentPriority::Equity => {}
             }
@@ -762,6 +780,7 @@ fn execute_waterfall_inner(
         warnings,
         equity_distribution: Some(equity_distribution),
         retained_cash: Some(retained_cash),
+        prepayments,
         available_cash: Some(available_cash),
     })
 }
@@ -916,13 +935,21 @@ mod tests {
             ],
             available_cash_node: "cash".into(),
             ecf_sweep: Some(EcfSweepSpec {
-                ebitda_node: "ebitda".into(),
-                taxes_node: Some("taxes".into()),
-                capex_node: Some("capex".into()),
-                working_capital_node: None,
-                cash_interest_node: None,
+                cash_measure: "ebitda".into(),
+                deductions: vec![
+                    crate::capital_structure::EcfTerm::Input {
+                        expression: "taxes".into(),
+                    },
+                    crate::capital_structure::EcfTerm::Input {
+                        expression: "capex".into(),
+                    },
+                    crate::capital_structure::EcfTerm::PaidCashInterest,
+                    crate::capital_structure::EcfTerm::PaidFees,
+                    crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+                ],
+                credits: Vec::new(),
                 sweep_percentage: 0.5,
-                target_instrument_id: Some("TL-1".into()),
+                facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
             }),
             pik_toggle: None,
             ..Default::default()
@@ -1357,13 +1384,15 @@ mod tests {
             ],
             available_cash_node: "cash".into(),
             ecf_sweep: Some(EcfSweepSpec {
-                ebitda_node: "ebitda".into(),
-                taxes_node: None,
-                capex_node: None,
-                working_capital_node: None,
-                cash_interest_node: None,
+                cash_measure: "ebitda".into(),
+                deductions: vec![
+                    crate::capital_structure::EcfTerm::PaidCashInterest,
+                    crate::capital_structure::EcfTerm::PaidFees,
+                    crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+                ],
+                credits: Vec::new(),
                 sweep_percentage: 0.5,
-                target_instrument_id: Some("TL-1".into()),
+                facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
             }),
             pik_toggle: None,
             ..Default::default()
@@ -1552,13 +1581,21 @@ mod tests {
             ],
             available_cash_node: "cash".into(),
             ecf_sweep: Some(EcfSweepSpec {
-                ebitda_node: "ebitda".into(),
-                taxes_node: Some("taxes".into()),
-                capex_node: Some("capex".into()),
-                working_capital_node: None,
-                cash_interest_node: None,
+                cash_measure: "ebitda".into(),
+                deductions: vec![
+                    crate::capital_structure::EcfTerm::Input {
+                        expression: "taxes".into(),
+                    },
+                    crate::capital_structure::EcfTerm::Input {
+                        expression: "capex".into(),
+                    },
+                    crate::capital_structure::EcfTerm::PaidCashInterest,
+                    crate::capital_structure::EcfTerm::PaidFees,
+                    crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+                ],
+                credits: Vec::new(),
                 sweep_percentage: 0.5,
-                target_instrument_id: None,
+                facilities: crate::capital_structure::FacilitySelection::AllEligible,
             }),
             pik_toggle: None,
             ..Default::default()
@@ -1607,13 +1644,15 @@ mod tests {
             ],
             available_cash_node: "cash".into(),
             ecf_sweep: Some(EcfSweepSpec {
-                ebitda_node: "ebitda".into(),
-                taxes_node: None,
-                capex_node: None,
-                working_capital_node: None,
-                cash_interest_node: None,
+                cash_measure: "ebitda".into(),
+                deductions: vec![
+                    crate::capital_structure::EcfTerm::PaidCashInterest,
+                    crate::capital_structure::EcfTerm::PaidFees,
+                    crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+                ],
+                credits: Vec::new(),
                 sweep_percentage: 0.5,
-                target_instrument_id: Some("TL-1".into()),
+                facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
             }),
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "liquidity".into(),
@@ -1817,13 +1856,15 @@ mod tests {
             ],
             available_cash_node: "cash".into(),
             ecf_sweep: Some(EcfSweepSpec {
-                ebitda_node: "ebitda".into(),
-                taxes_node: None,
-                capex_node: None,
-                working_capital_node: None,
-                cash_interest_node: None,
+                cash_measure: "ebitda".into(),
+                deductions: vec![
+                    crate::capital_structure::EcfTerm::PaidCashInterest,
+                    crate::capital_structure::EcfTerm::PaidFees,
+                    crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+                ],
+                credits: Vec::new(),
                 sweep_percentage: 1.0,
-                target_instrument_id: Some("TL-1".into()),
+                facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
             }),
             pik_toggle: None,
             ..Default::default()
@@ -1869,13 +1910,21 @@ mod tests {
             ],
             available_cash_node: "cash".into(),
             ecf_sweep: Some(EcfSweepSpec {
-                ebitda_node: "ebitda".into(),
-                taxes_node: Some("taxes".into()),
-                capex_node: Some("capex".into()),
-                working_capital_node: None,
-                cash_interest_node: None,
+                cash_measure: "ebitda".into(),
+                deductions: vec![
+                    crate::capital_structure::EcfTerm::Input {
+                        expression: "taxes".into(),
+                    },
+                    crate::capital_structure::EcfTerm::Input {
+                        expression: "capex".into(),
+                    },
+                    crate::capital_structure::EcfTerm::PaidCashInterest,
+                    crate::capital_structure::EcfTerm::PaidFees,
+                    crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+                ],
+                credits: Vec::new(),
                 sweep_percentage: 0.5,
-                target_instrument_id: Some("TL-1".into()),
+                facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
             }),
             pik_toggle: None,
             ..Default::default()
@@ -1917,13 +1966,21 @@ mod tests {
             ],
             available_cash_node: "cash".into(),
             ecf_sweep: Some(EcfSweepSpec {
-                ebitda_node: "ebitda".into(),
-                taxes_node: Some("taxes".into()),
-                capex_node: Some("capex".into()),
-                working_capital_node: None,
-                cash_interest_node: None,
+                cash_measure: "ebitda".into(),
+                deductions: vec![
+                    crate::capital_structure::EcfTerm::Input {
+                        expression: "taxes".into(),
+                    },
+                    crate::capital_structure::EcfTerm::Input {
+                        expression: "capex".into(),
+                    },
+                    crate::capital_structure::EcfTerm::PaidCashInterest,
+                    crate::capital_structure::EcfTerm::PaidFees,
+                    crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+                ],
+                credits: Vec::new(),
                 sweep_percentage: 0.5,
-                target_instrument_id: Some("TL-1".into()),
+                facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
             }),
             pik_toggle: None,
             ..Default::default()
@@ -2347,15 +2404,20 @@ mod tests {
                 PaymentPriority::Equity,
             ],
             available_cash_node: "cash_available".into(),
-            mandatory_prepay_node: Some("mandatory".into()),
+            mandatory_prepayment: Some(crate::capital_structure::PrepaymentSpec {
+                amount: "mandatory".into(),
+                facilities: crate::capital_structure::FacilitySelection::AllEligible,
+            }),
             ecf_sweep: Some(EcfSweepSpec {
-                ebitda_node: "ebitda".into(),
-                taxes_node: None,
-                capex_node: None,
-                working_capital_node: None,
-                cash_interest_node: None,
+                cash_measure: "ebitda".into(),
+                deductions: vec![
+                    crate::capital_structure::EcfTerm::PaidCashInterest,
+                    crate::capital_structure::EcfTerm::PaidFees,
+                    crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+                ],
+                credits: Vec::new(),
                 sweep_percentage: 1.0,
-                target_instrument_id: Some("TL-1".into()),
+                facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
             }),
             pik_toggle: None,
             ..Default::default()
@@ -2413,16 +2475,24 @@ mod tests {
                 PaymentPriority::Equity,
             ],
             available_cash_node: "cash_available".into(),
-            mandatory_prepay_node: Some("mandatory".into()),
-            voluntary_prepay_node: Some("voluntary".into()),
+            mandatory_prepayment: Some(crate::capital_structure::PrepaymentSpec {
+                amount: "mandatory".into(),
+                facilities: crate::capital_structure::FacilitySelection::AllEligible,
+            }),
+            voluntary_prepayment: Some(crate::capital_structure::PrepaymentSpec {
+                amount: "voluntary".into(),
+                facilities: crate::capital_structure::FacilitySelection::AllEligible,
+            }),
             ecf_sweep: Some(EcfSweepSpec {
-                ebitda_node: "ebitda".into(),
-                taxes_node: None,
-                capex_node: None,
-                working_capital_node: None,
-                cash_interest_node: None,
+                cash_measure: "ebitda".into(),
+                deductions: vec![
+                    crate::capital_structure::EcfTerm::PaidCashInterest,
+                    crate::capital_structure::EcfTerm::PaidFees,
+                    crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+                ],
+                credits: Vec::new(),
                 sweep_percentage: 1.0,
-                target_instrument_id: Some("TL-1".into()),
+                facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
             }),
             pik_toggle: None,
             ..Default::default()
@@ -2528,14 +2598,20 @@ mod tests {
                 target_instrument_ids: vec!["TL-1".into()],
                 min_periods_in_pik: 3,
             }),
-            mandatory_prepay_node: Some("0".into()),
+            mandatory_prepayment: Some(crate::capital_structure::PrepaymentSpec {
+                amount: "0".into(),
+                facilities: crate::capital_structure::FacilitySelection::AllEligible,
+            }),
             ..Default::default()
         };
         let valid_context = build_context(period, &[("liquidity", 50.0), ("cash", 1000.0)]);
         for late in [false, true] {
             let mut spec = valid_spec.clone();
             let context = if late {
-                spec.mandatory_prepay_node = Some("1 / 0".into());
+                spec.mandatory_prepayment = Some(crate::capital_structure::PrepaymentSpec {
+                    amount: "1 / 0".into(),
+                    facilities: crate::capital_structure::FacilitySelection::AllEligible,
+                });
                 valid_context.clone()
             } else {
                 build_context(period, &[("liquidity", 50.0), ("cash", 1e100)])

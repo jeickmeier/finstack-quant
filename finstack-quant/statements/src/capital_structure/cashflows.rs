@@ -116,6 +116,19 @@ pub struct CapitalStructureCashflows {
     #[cfg_attr(feature = "json-schema", schemars(with = "IndexMap<String, Money>"))]
     pub equity_distribution: IndexMap<PeriodId, Money>,
 
+    /// What each configured prepayment requested, paid and left unpaid in
+    /// each period, in the waterfall's priority order.
+    ///
+    /// Only populated for periods in which a waterfall with a prepayment
+    /// priority ran. An unpaid amount is not carried forward: a prepayment
+    /// request is not a dated contractual obligation.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "IndexMap<String, Vec<PrepaymentOutcome>>")
+    )]
+    pub prepayments: IndexMap<PeriodId, Vec<PrepaymentOutcome>>,
+
     /// Residual cash the company retains per period: the cash left after the
     /// payment stack when `Equity` is not a priority, and zero when it is.
     ///
@@ -256,7 +269,7 @@ pub struct CashflowBreakdown {
     pub scheduled_principal: Option<Money>,
 
     /// Part of `principal_payment` paid at the waterfall's
-    /// `MandatoryPrepayment` priority (`WaterfallSpec.mandatory_prepay_node`).
+    /// `MandatoryPrepayment` priority (`WaterfallSpec.mandatory_prepayment`).
     /// Zero when no waterfall ran. Same sign, currency and absence rule as
     /// [`Self::scheduled_principal`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -269,7 +282,7 @@ pub struct CashflowBreakdown {
     pub sweep_prepayment: Option<Money>,
 
     /// Part of `principal_payment` paid at the waterfall's
-    /// `VoluntaryPrepayment` priority (`WaterfallSpec.voluntary_prepay_node`).
+    /// `VoluntaryPrepayment` priority (`WaterfallSpec.voluntary_prepayment`).
     /// Zero when no waterfall ran. Same sign, currency and absence rule as
     /// [`Self::scheduled_principal`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -305,6 +318,24 @@ pub struct CashflowBreakdown {
     /// `Some` on evaluator-produced breakdowns.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub principal_advance_reserve: Option<Money>,
+}
+
+/// What one prepayment priority requested and paid in a period.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct PrepaymentOutcome {
+    /// The prepayment priority: mandatory prepayment, voluntary prepayment
+    /// or sweep.
+    pub kind: crate::capital_structure::PaymentPriority,
+    /// Amount the priority requested: the mandatory or voluntary amount, or
+    /// the sweep percentage of positive excess cash flow.
+    pub requested: Money,
+    /// Cash paid at par: the request limited by the cash the earlier
+    /// priorities left and by the eligible principal net of reserves.
+    pub paid: Money,
+    /// `requested - paid`. It is reported, not carried as arrears.
+    pub unpaid: Money,
 }
 
 /// The amount of an evaluator-recorded component, or an error for a
@@ -699,6 +730,9 @@ impl CapitalStructureCashflows {
         if let Some(retained) = self.retained_cash.get(&period_id) {
             snapshot.retained_cash.insert(period_id, *retained);
         }
+        if let Some(prepayments) = self.prepayments.get(&period_id) {
+            snapshot.prepayments.insert(period_id, prepayments.clone());
+        }
         if let Some(cash) = self.available_cash.get(&period_id) {
             snapshot.available_cash.insert(period_id, *cash);
         }
@@ -735,6 +769,9 @@ impl CapitalStructureCashflows {
         }
         for (pid, retained) in period_cs.retained_cash {
             self.retained_cash.insert(pid, retained);
+        }
+        for (pid, prepayments) in period_cs.prepayments {
+            self.prepayments.insert(pid, prepayments);
         }
         for (pid, cash) in period_cs.available_cash {
             self.available_cash.insert(pid, cash);

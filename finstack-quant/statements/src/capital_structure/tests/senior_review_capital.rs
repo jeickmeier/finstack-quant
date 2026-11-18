@@ -480,13 +480,15 @@ fn empty_debt_context() -> (
 
 fn ecf_sweep() -> EcfSweepSpec {
     EcfSweepSpec {
-        ebitda_node: "cash".into(),
-        taxes_node: None,
-        capex_node: None,
-        working_capital_node: None,
-        cash_interest_node: None,
+        cash_measure: "cash".into(),
+        deductions: vec![
+            crate::capital_structure::EcfTerm::PaidCashInterest,
+            crate::capital_structure::EcfTerm::PaidFees,
+            crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+        ],
+        credits: Vec::new(),
         sweep_percentage: 0.5,
-        target_instrument_id: Some("TL".into()),
+        facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL".into()]),
     }
 }
 
@@ -1277,14 +1279,24 @@ fn named_prepayment_without_its_priority_is_rejected_before_state_changes() {
     for mandatory in [true, false] {
         let (_, context, mut state, flows) = empty_debt_context();
         let spec = WaterfallSpec {
-            mandatory_prepay_node: mandatory.then(|| "20".into()),
-            voluntary_prepay_node: (!mandatory).then(|| "20".into()),
+            mandatory_prepayment: (mandatory.then(|| "20".into())).map(|amount: String| {
+                crate::capital_structure::PrepaymentSpec {
+                    amount,
+                    facilities: crate::capital_structure::FacilitySelection::AllEligible,
+                }
+            }),
+            voluntary_prepayment: ((!mandatory).then(|| "20".into())).map(|amount: String| {
+                crate::capital_structure::PrepaymentSpec {
+                    amount,
+                    facilities: crate::capital_structure::FacilitySelection::AllEligible,
+                }
+            }),
             ..Default::default()
         };
         let node_name = if mandatory {
-            "mandatory_prepay_node"
+            "mandatory_prepayment"
         } else {
-            "voluntary_prepay_node"
+            "voluntary_prepayment"
         };
         assert!(
             spec.validate()
@@ -1312,8 +1324,14 @@ fn named_prepayment_priorities_consume_the_shared_cash_pool() {
             PaymentPriority::VoluntaryPrepayment,
             PaymentPriority::Equity,
         ],
-        mandatory_prepay_node: Some("20".into()),
-        voluntary_prepay_node: Some("20".into()),
+        mandatory_prepayment: Some(crate::capital_structure::PrepaymentSpec {
+            amount: "20".into(),
+            facilities: crate::capital_structure::FacilitySelection::AllEligible,
+        }),
+        voluntary_prepayment: Some(crate::capital_structure::PrepaymentSpec {
+            amount: "20".into(),
+            facilities: crate::capital_structure::FacilitySelection::AllEligible,
+        }),
         ..Default::default()
     };
     let result = execute_waterfall_same_period(&context, &spec, &mut state, &flows)
@@ -1340,10 +1358,18 @@ fn positive_ecf_requires_sweep_even_with_other_prepayment_priorities() {
                 priority,
                 PaymentPriority::Equity,
             ],
-            mandatory_prepay_node: (priority == PaymentPriority::MandatoryPrepayment)
-                .then(|| "0".into()),
-            voluntary_prepay_node: (priority == PaymentPriority::VoluntaryPrepayment)
-                .then(|| "0".into()),
+            mandatory_prepayment: (priority == PaymentPriority::MandatoryPrepayment).then(|| {
+                crate::capital_structure::PrepaymentSpec {
+                    amount: "0".into(),
+                    facilities: crate::capital_structure::FacilitySelection::AllEligible,
+                }
+            }),
+            voluntary_prepayment: (priority == PaymentPriority::VoluntaryPrepayment).then(|| {
+                crate::capital_structure::PrepaymentSpec {
+                    amount: "0".into(),
+                    facilities: crate::capital_structure::FacilitySelection::AllEligible,
+                }
+            }),
             ecf_sweep: Some(ecf_sweep()),
             ..Default::default()
         };

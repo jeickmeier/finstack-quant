@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 import pandas as pd
@@ -11,52 +12,74 @@ class EcfSweepSpec:
     """
     Excess Cash Flow sweep specification.
 
-    Configures how ECF is computed (EBITDA minus taxes/capex/WC/cash interest)
-    and what fraction sweeps to debt paydown.
+    The agreement's formula is elected in full. Nothing is deducted
+    automatically::
+
+        ECF     = cash_measure - sum(deductions) + sum(credits)
+        request = sweep_percentage * ECF   when ECF is positive, otherwise zero
+
+    The request is paid at par from the cash the earlier priorities left, up to
+    the eligible principal net of reserves. It is sized, paid and applied to
+    principal in the same reporting period.
 
     Examples
     --------
     >>> from finstack_quant.statements import EcfSweepSpec
-    >>> sweep = EcfSweepSpec("ebitda", 0.5)
-    >>> (sweep.ebitda_node, sweep.sweep_percentage)
-    ('ebitda', 0.5)
+    >>> sweep = EcfSweepSpec(
+    ...     cash_measure="ebitda",
+    ...     deductions=[{"type": "input", "expression": "capex"}, {"type": "paid_cash_interest"}],
+    ...     sweep_percentage=0.5,
+    ...     facilities="all_eligible",
+    ... )
+    >>> (sweep.cash_measure, sweep.sweep_percentage, sweep.facilities)
+    ('ebitda', 0.5, 'all_eligible')
 
     """
 
     def __init__(
         self,
-        ebitda_node: str,
+        *,
+        cash_measure: str,
         sweep_percentage: float,
-        taxes_node: str | None = None,
-        capex_node: str | None = None,
-        working_capital_node: str | None = None,
-        cash_interest_node: str | None = None,
-        target_instrument_id: str | None = None,
+        facilities: str | Mapping[str, list[str]],
+        deductions: list[Mapping[str, str]] = ...,
+        credits: list[Mapping[str, str]] = ...,
     ) -> None:
         """
-        Configure an excess-cash-flow debt sweep.
+        Configure an excess-cash-flow debt sweep from its canonical fields.
+
+        The keywords are read as one mapping into the Rust ``EcfSweepSpec``,
+        which rejects an unknown keyword.
 
         Parameters
         ----------
-        ebitda_node : str
-            Model node identifier supplying EBITDA before ECF deductions.
+        cash_measure : str
+            Node or formula of the agreement's cash measure before deductions,
+            signed, in the waterfall currency.
         sweep_percentage : float
-            Decimal fraction of computed ECF swept to debt, such as ``0.50``.
-        taxes_node : str or None, default None
-            Optional node identifier for cash taxes deducted from EBITDA.
-        capex_node : str or None, default None
-            Optional node identifier for capital expenditures deducted from EBITDA.
-        working_capital_node : str or None, default None
-            Optional node identifier for working-capital cash use or release.
-        cash_interest_node : str or None, default None
-            Optional node identifier for cash interest deducted before the sweep.
-        target_instrument_id : str or None, default None
-            Optional debt instrument receiving the ECF paydown; ``None`` uses
-            the waterfall's eligible debt allocation.
+            Fraction of positive ECF requested, a decimal in ``[0, 1]`` (0.5
+            is 50%).
+        facilities : str or Mapping[str, list[str]]
+            ``"all_eligible"`` (every term loan and revolver) or
+            ``{"named": [instrument_id, ...]}``.
+        deductions : list[Mapping[str, str]], default []
+            Terms subtracted from the cash measure, each
+            ``{"type": "input", "expression": node_or_formula}``,
+            ``{"type": "paid_cash_interest"}``, ``{"type": "paid_fees"}`` or
+            ``{"type": "paid_scheduled_principal"}``. A paid term is the cash
+            the priorities ahead of the sweep actually allocated in the
+            period. Nothing is deducted unless it is listed.
+        credits : list[Mapping[str, str]], default []
+            Terms added to the cash measure, in the same form. No expression
+            may depend on a same-period ``cs`` component.
 
-        Notes
-        -----
-        Construction does not raise; arguments are stored as supplied.
+        Raises
+        ------
+        ValueError
+            If a required keyword is missing, a keyword is unknown or a term
+            has an unknown type. The percentage, the
+            facility list and the expressions are checked by :meth:`validate`
+            and when the model is built.
         """
         ...
     @staticmethod
@@ -82,7 +105,7 @@ class EcfSweepSpec:
         Examples
         --------
         >>> from finstack_quant.statements import EcfSweepSpec
-        >>> sweep = EcfSweepSpec("ebitda", 0.5)
+        >>> sweep = EcfSweepSpec(cash_measure="ebitda", sweep_percentage=0.5, facilities="all_eligible")
         >>> EcfSweepSpec.from_json(sweep.to_json()).sweep_percentage
         0.5
 
@@ -119,20 +142,72 @@ class EcfSweepSpec:
         ...
 
     @property
-    def ebitda_node(self) -> str:
+    def cash_measure(self) -> str:
         """
-        Node reference or DSL formula supplying EBITDA, the ECF starting point.
+        Node or formula of the agreement's cash measure before deductions.
 
         Returns
         -------
         str
-            A node id (``"ebitda"``) or an expression over nodes
-            (``"revenue - cogs - opex"``), evaluated per period as a monetary
-            amount.
+            A node id (``"ebitda"``) or an expression over nodes, evaluated
+            per period as a signed amount in the waterfall currency.
 
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def deductions(self) -> list[dict[str, Any]]:
+        """
+        The terms subtracted from the cash measure, in order.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            Each ``{"type": "input", "expression": ...}``,
+            ``{"type": "paid_cash_interest"}``, ``{"type": "paid_fees"}`` or
+            ``{"type": "paid_scheduled_principal"}``.
+
+        Raises
+        ------
+        ValueError
+            If the stored terms cannot be serialized.
+        """
+        ...
+
+    @property
+    def credits(self) -> list[dict[str, Any]]:
+        """
+        The terms added to the cash measure, in order.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            Terms in the same form as :attr:`deductions`.
+
+        Raises
+        ------
+        ValueError
+            If the stored terms cannot be serialized.
+        """
+        ...
+
+    @property
+    def facilities(self) -> str | dict[str, list[str]]:
+        """
+        The facilities the sweep may repay.
+
+        Returns
+        -------
+        str | dict[str, list[str]]
+            ``"all_eligible"`` or ``{"named": [instrument_id, ...]}``.
+
+        Raises
+        ------
+        ValueError
+            If the stored selection cannot be serialized.
         """
         ...
 
@@ -151,84 +226,6 @@ class EcfSweepSpec:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def target_instrument_id(self) -> str | None:
-        """
-        Debt instrument the sweep pays down, if the sweep is targeted.
-
-        Returns
-        -------
-        str | None
-            Instrument id, or ``None`` when the sweep applies to all term
-            loans in the capital structure.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    def __repr__(self) -> str: ...
-    @property
-    def taxes_node(self) -> str | None:
-        """Return the optional taxes node reference.
-
-        Returns
-        -------
-        str | None
-            Cash-tax node deducted from EBITDA. None means omitted.
-
-        Notes
-        -----
-        This accessor does not raise; it returns stored or derived model data.
-        """
-        ...
-
-    @property
-    def capex_node(self) -> str | None:
-        """Return the optional capex node reference.
-
-        Returns
-        -------
-        str | None
-            Capital-expenditure node deducted from EBITDA. None means omitted.
-
-        Notes
-        -----
-        This accessor does not raise; it returns stored or derived model data.
-        """
-        ...
-
-    @property
-    def working_capital_node(self) -> str | None:
-        """Return the optional working capital node reference.
-
-        Returns
-        -------
-        str | None
-            Working-capital movement node deducted from EBITDA. None means omitted.
-
-        Notes
-        -----
-        This accessor does not raise; it returns stored or derived model data.
-        """
-        ...
-
-    @property
-    def cash_interest_node(self) -> str | None:
-        """Return the optional cash interest node reference.
-
-        Returns
-        -------
-        str | None
-            Cash-interest node deducted from EBITDA; None uses contractual period debt-service interest. None means omitted.
-
-        Notes
-        -----
-        This accessor does not raise; it returns stored or derived model data.
         """
         ...
 
@@ -573,8 +570,8 @@ class WaterfallSpec:
         ecf_sweep: EcfSweepSpec | None = None,
         pik_toggle: PikToggleSpec | None = None,
         payment_classes: list[PaymentClassSpec] | None = None,
-        mandatory_prepay_node: str | None = None,
-        voluntary_prepay_node: str | None = None,
+        mandatory_prepayment: Mapping[str, Any] | None = None,
+        voluntary_prepayment: Mapping[str, Any] | None = None,
     ) -> None:
         """
         Configure dynamic cash allocation for a financial-model waterfall.
@@ -585,8 +582,9 @@ class WaterfallSpec:
             Ordered payment labels, from highest to lowest priority. ``None``
             selects ``fees``, ``interest``, ``amortization``, and ``equity``.
         available_cash_node : str or None, default None
-            Pre-waterfall cash-pool node or formula; ``None`` uses ``"cash"``.
-            Do not deduct ``cs`` debt-service tokens here.
+            Node or formula of the cash pool before debt service; ``None``
+            uses ``"cash"``. It may not depend on a same-period ``cs``
+            component, directly or through other nodes.
         ecf_sweep : EcfSweepSpec or None, default None
             Optional excess-cash-flow sweep applied within the waterfall.
             List ``sweep`` explicitly before any ``equity`` priority to
@@ -596,17 +594,23 @@ class WaterfallSpec:
         payment_classes : list[PaymentClassSpec] or None, default None
             Intra-category seniority classes; ``None`` or empty is one implicit
             class (pro-rata across all instruments).
-        mandatory_prepay_node : str or None, default None
-            Node or formula sizing the ``mandatory_prepayment`` rung. Required
-            when that priority is listed.
-        voluntary_prepay_node : str or None, default None
-            Node or formula sizing the ``voluntary_prepayment`` rung. Required
-            when that priority is listed.
+        mandatory_prepayment : Mapping[str, Any] or None, default None
+            The at-par mandatory prepayment, ``{"amount": node_or_formula,
+            "facilities": "all_eligible" | {"named": [...]}}``. The amount is
+            the non-negative request per period in the waterfall currency; a
+            negative request fails the period. Required when
+            ``mandatory_prepayment`` is a listed priority, and invalid without
+            it.
+        voluntary_prepayment : Mapping[str, Any] or None, default None
+            The at-par voluntary prepayment, in the same form. Required when
+            ``voluntary_prepayment`` is a listed priority, and invalid without
+            it.
 
         Raises
         ------
         ValueError
-            If priority_of_payments contains an unknown priority name.
+            If priority_of_payments contains an unknown priority name, or a
+            prepayment mapping has a missing or unknown key.
 
         """
         ...
@@ -727,34 +731,38 @@ class WaterfallSpec:
         ...
 
     @property
-    def mandatory_prepay_node(self) -> str | None:
+    def mandatory_prepayment(self) -> dict[str, Any] | None:
         """
-        Node or formula sizing the ``mandatory_prepayment`` rung.
+        The mandatory prepayment's amount and eligible facilities.
 
         Returns
         -------
-        str | None
-            Node id or formula, or ``None`` when that rung is unused.
+        dict[str, Any] | None
+            ``{"amount": ..., "facilities": ...}``, or ``None`` when that
+            priority is unused.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
+        Raises
+        ------
+        ValueError
+            If the stored specification cannot be serialized.
         """
         ...
 
     @property
-    def voluntary_prepay_node(self) -> str | None:
+    def voluntary_prepayment(self) -> dict[str, Any] | None:
         """
-        Node or formula sizing the ``voluntary_prepayment`` rung.
+        The voluntary prepayment's amount and eligible facilities.
 
         Returns
         -------
-        str | None
-            Node id or formula, or ``None`` when that rung is unused.
+        dict[str, Any] | None
+            ``{"amount": ..., "facilities": ...}``, or ``None`` when that
+            priority is unused.
 
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
+        Raises
+        ------
+        ValueError
+            If the stored specification cannot be serialized.
         """
         ...
 
@@ -896,6 +904,29 @@ class CapitalStructureCashflows:
         -------
         dict[str, Money]
             Period id to ``Money``; empty unless a waterfall ran.
+        """
+        ...
+
+    @property
+    def prepayments(self) -> dict[str, list[dict[str, Any]]]:
+        """
+        What each prepayment requested, paid and left unpaid, by period id.
+
+        Returns
+        -------
+        dict[str, list[dict[str, Any]]]
+            Period id to the period's prepayments in priority order, each
+            ``{"kind": "mandatory_prepayment" | "voluntary_prepayment" |
+            "sweep", "requested": money, "paid": money, "unpaid": money}``
+            with money as ``{"amount": ..., "currency": ...}``. ``paid`` is
+            the request limited by the cash left and the eligible principal
+            net of reserves; ``unpaid`` is reported and not carried forward.
+            Empty unless a waterfall with a prepayment priority ran.
+
+        Raises
+        ------
+        ValueError
+            If the stored outcomes cannot be serialized.
         """
         ...
 

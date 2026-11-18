@@ -223,18 +223,12 @@ impl PrincipalAllocation {
             let face_paid = if paid == claim.amount {
                 claim.face
             } else if claim.amount.amount() > 0.0 {
-                Money::new(
-                    claim.face.amount() * paid.amount() / claim.amount.amount(),
-                    paid.currency(),
-                )?
+                share_of(claim.face, paid, claim.amount)?
             } else {
                 Money::from((0_i64, paid.currency()))
             };
             let face_unreachable = if unreachable.amount() > 0.0 {
-                Money::new(
-                    claim.face.amount() * unreachable.amount() / claim.amount.amount(),
-                    paid.currency(),
-                )?
+                share_of(claim.face, unreachable, claim.amount)?
             } else {
                 Money::from((0_i64, paid.currency()))
             };
@@ -274,10 +268,7 @@ impl PrincipalAllocation {
                 let face = if payable == claim.amount {
                     claim.face
                 } else {
-                    Money::new(
-                        claim.face.amount() * payable.amount() / claim.amount.amount(),
-                        payable.currency(),
-                    )?
+                    share_of(claim.face, payable, claim.amount)?
                 };
                 Ok(PrincipalClaim {
                     amount: payable,
@@ -310,18 +301,28 @@ impl PrincipalAllocation {
                 headroom = headroom.checked_sub(claim.face)?;
                 claim.amount
             } else {
-                let share = if claim.face.amount() > 0.0 {
-                    headroom.amount() / claim.face.amount()
-                } else {
-                    0.0
-                };
+                let reachable = share_of(claim.amount, headroom, claim.face)?;
                 headroom = Money::from((0_i64, headroom.currency()));
-                Money::new(claim.amount.amount() * share, claim.amount.currency())?
+                reachable
             };
             payable.push((index, owed));
         }
         Ok(payable)
     }
+}
+
+/// `whole × part / of` in exact decimal arithmetic: the share of `whole`
+/// that `part` is of `of`. Zero when `of` is zero.
+fn share_of(whole: Money, part: Money, of: Money) -> Result<Money> {
+    if of.amount_decimal().is_zero() {
+        return Ok(Money::from((0_i64, whole.currency())));
+    }
+    whole
+        .amount_decimal()
+        .checked_mul(part.amount_decimal())
+        .and_then(|product| product.checked_div(of.amount_decimal()))
+        .map(|amount| Money::from_decimal(amount, whole.currency()))
+        .ok_or_else(|| Error::capital_structure("Principal claim arithmetic overflowed"))
 }
 
 fn check(claim: &PrincipalClaim, currency: finstack_quant_core::currency::Currency) -> Result<()> {

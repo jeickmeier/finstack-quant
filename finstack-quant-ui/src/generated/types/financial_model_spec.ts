@@ -766,6 +766,26 @@ export type D_1C91Cbdbb3238Adf0C02 = number;
  */
 export type D_97Ce4Fbfee051Bc20729 = "cashflow_date" | "period_end";
 /**
+ * One elected deduction from, or credit to, the excess-cash-flow measure.
+ */
+export type D_14123Cfe6730F5769328 =
+  | {
+      /**
+       * Node id or formula.
+       */
+      expression: string;
+      type: "input";
+    }
+  | {
+      type: "paid_cash_interest";
+    }
+  | {
+      type: "paid_fees";
+    }
+  | {
+      type: "paid_scheduled_principal";
+    };
+/**
  * Payment priority levels in the waterfall.
  */
 export type D_75Eaaaa2F753Dbeee283 =
@@ -15973,13 +15993,12 @@ export interface D_7D9F94Bbd332B01035F6 {
    */
   ecf_sweep?: D_7A9D5Ee9143003A0618A | null;
   /**
-   * Formula or node for the `MandatoryPrepayment` rung.
+   * The at-par mandatory prepayment: its amount and eligible facilities.
    *
-   * Required when `MandatoryPrepayment` appears in `priority_of_payments`.
-   * When configured, that priority must be present so payment consumes cash.
-   * Sized independently of the ECF sweep and voluntary prepay buckets.
+   * Supplied together with `MandatoryPrepayment` in
+   * `priority_of_payments`: neither is valid without the other.
    */
-  mandatory_prepay_node?: string | null;
+  mandatory_prepayment?: D_9Bd124F6Bce33F68Ae22 | null;
   /**
    * Payment classes for intra-category seniority (e.g. 1L then 2L).
    *
@@ -15998,33 +16017,27 @@ export interface D_7D9F94Bbd332B01035F6 {
    */
   priority_of_payments?: D_75Eaaaa2F753Dbeee283[];
   /**
-   * Formula or node for the `VoluntaryPrepayment` rung.
+   * The at-par voluntary prepayment: its amount and eligible facilities.
    *
-   * Required when `VoluntaryPrepayment` appears in `priority_of_payments`.
-   * When configured, that priority must be present so payment consumes cash.
-   * Sized independently of the ECF sweep and mandatory prepay buckets.
+   * Supplied together with `VoluntaryPrepayment` in
+   * `priority_of_payments`: neither is valid without the other.
    */
-  voluntary_prepay_node?: string | null;
+  voluntary_prepayment?: D_9Bd124F6Bce33F68Ae22 | null;
 }
 /**
  * Excess Cash Flow (ECF) sweep specification.
  *
- * Defines how to calculate ECF and what percentage to sweep to pay down debt.
- *
- * # ECF Calculation
- *
- * The ECF formula deducts cash interest, fees and scheduled principal paid
- * by payment categories ahead of the `Sweep` priority, including carried
- * arrears. Unpaid claims, PIK and later payment priorities are not deducted:
+ * The agreement's formula is elected in full: a cash measure, each
+ * deduction and each credit. Nothing is deducted automatically.
  *
  * ```text
- * ECF = EBITDA - Taxes - CapEx - ΔWC - Cash Interest Paid
- *       - Fees Paid Ahead of Prepayment
- *       - Scheduled Principal Paid Ahead of Prepayment
- *   ```
+ * ECF     = cash_measure - Σ deductions + Σ credits
+ * request = sweep_percentage × ECF   when ECF is positive, otherwise zero
+ * ```
  *
- * Set `cash_interest_node` to override the cash-interest input. If omitted,
- * the interest actually paid ahead of `Sweep` is deducted automatically.
+ * The request is paid at par from the cash the earlier priorities left, up
+ * to the eligible principal net of reserves. It is sized, paid and applied
+ * to principal in the same reporting period.
  *
  * # References
  *
@@ -16032,38 +16045,51 @@ export interface D_7D9F94Bbd332B01035F6 {
  */
 export interface D_7A9D5Ee9143003A0618A {
   /**
-   * Formula or node reference for capital expenditures (e.g., "capex")
+   * Formula or node for the agreement's cash measure before deductions
+   * (for example `ebitda`), in the waterfall currency. Signed and finite.
+   * It may not depend on a same-period `cs` component.
    */
-  capex_node?: string | null;
+  cash_measure: string;
   /**
-   * Formula or node reference for cash interest paid (e.g., "cs.interest_expense_cash.total").
-   *
-   * If omitted, deducts cash interest actually paid by the `Interest` priority
-   * ahead of `Sweep`, including carried coupon arrears. If `Interest` follows
-   * `Sweep`, this automatic deduction is zero. An explicit node overrides
-   * that amount in the model's cash currency units.
+   * Amounts added to the cash measure, each elected explicitly.
    */
-  cash_interest_node?: string | null;
+  credits?: D_14123Cfe6730F5769328[];
   /**
-   * Formula or node reference for EBITDA (e.g., "ebitda" or "revenue - cogs - opex")
+   * Amounts subtracted from the cash measure, each elected explicitly.
    */
-  ebitda_node: string;
+  deductions?: D_14123Cfe6730F5769328[];
   /**
-   * Sweep percentage (e.g., 0.5 for 50%, 0.75 for 75%)
+   * The facilities the sweep may repay.
+   */
+  facilities:
+    | "all_eligible"
+    | {
+        named: string[];
+      };
+  /**
+   * Fraction of positive ECF to sweep: a decimal in `[0, 1]` (0.5 for 50%).
    */
   sweep_percentage: number;
+}
+/**
+ * An at-par mandatory or voluntary prepayment.
+ */
+export interface D_9Bd124F6Bce33F68Ae22 {
   /**
-   * Target instrument ID for sweep payments (if None, applies to all term loans)
+   * Formula or node for the amount requested in the period, in the
+   * waterfall currency. It must be finite and non-negative: a negative
+   * request is an error, not zero. It may not depend on a same-period
+   * `cs` component.
    */
-  target_instrument_id?: string | null;
+  amount: string;
   /**
-   * Formula or node reference for taxes (e.g., "taxes")
+   * The facilities the prepayment may repay.
    */
-  taxes_node?: string | null;
-  /**
-   * Formula or node reference for working capital change (e.g., "wc_change")
-   */
-  working_capital_node?: string | null;
+  facilities:
+    | "all_eligible"
+    | {
+        named: string[];
+      };
 }
 /**
  * A seniority class for intra-category waterfall allocation.

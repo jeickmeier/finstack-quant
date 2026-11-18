@@ -68,6 +68,39 @@ export default [
     "minimum": 0
   },
   {
+    "path": "#/$defs/d_048108bf9dc923c7b537",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PrepaymentOutcome",
+    "description": "What one prepayment priority requested and paid in a period."
+  },
+  {
+    "path": "#/$defs/d_048108bf9dc923c7b537/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PrepaymentOutcome/properties/kind",
+    "description": "The prepayment priority: mandatory prepayment, voluntary prepayment\nor sweep.",
+    "ref": "#/$defs/PaymentPriority",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PaymentPriority"
+  },
+  {
+    "path": "#/$defs/d_048108bf9dc923c7b537/properties/paid",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PrepaymentOutcome/properties/paid",
+    "description": "Cash paid at par: the request limited by the cash the earlier\npriorities left and by the eligible principal net of reserves.",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_048108bf9dc923c7b537/properties/requested",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PrepaymentOutcome/properties/requested",
+    "description": "Amount the priority requested: the mandatory or voluntary amount, or\nthe sweep percentage of positive excess cash flow.",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_048108bf9dc923c7b537/properties/unpaid",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PrepaymentOutcome/properties/unpaid",
+    "description": "`requested - paid`. It is reported, not carried as arrears.",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
     "path": "#/$defs/d_07ccd5501efef381b26a",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/StatementNumericMode",
     "const": "float64",
@@ -636,7 +669,7 @@ export default [
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/mandatory_prepayment",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/mandatory_prepayment",
-    "description": "Part of `principal_payment` paid at the waterfall's\n`MandatoryPrepayment` priority (`WaterfallSpec.mandatory_prepay_node`).\nZero when no waterfall ran. Same sign, currency and absence rule as\n[`Self::scheduled_principal`]."
+    "description": "Part of `principal_payment` paid at the waterfall's\n`MandatoryPrepayment` priority (`WaterfallSpec.mandatory_prepayment`).\nZero when no waterfall ran. Same sign, currency and absence rule as\n[`Self::scheduled_principal`]."
   },
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/mandatory_prepayment/anyOf/0",
@@ -748,7 +781,7 @@ export default [
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/voluntary_prepayment",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown/properties/voluntary_prepayment",
-    "description": "Part of `principal_payment` paid at the waterfall's\n`VoluntaryPrepayment` priority (`WaterfallSpec.voluntary_prepay_node`).\nZero when no waterfall ran. Same sign, currency and absence rule as\n[`Self::scheduled_principal`]."
+    "description": "Part of `principal_payment` paid at the waterfall's\n`VoluntaryPrepayment` priority (`WaterfallSpec.voluntary_prepayment`).\nZero when no waterfall ran. Same sign, currency and absence rule as\n[`Self::scheduled_principal`]."
   },
   {
     "path": "#/$defs/d_677810bf9653cfb0a467/properties/voluntary_prepayment/anyOf/0",
@@ -2345,6 +2378,53 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DateWire"
   },
   {
+    "path": "#/$defs/d_b8537d51782604e2883c",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PaymentPriority",
+    "description": "Payment priority levels in the waterfall."
+  },
+  {
+    "path": "#/$defs/d_b8537d51782604e2883c/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PaymentPriority/oneOf/0",
+    "const": "fees",
+    "description": "Fees (commitment fees, facility fees, etc.)"
+  },
+  {
+    "path": "#/$defs/d_b8537d51782604e2883c/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PaymentPriority/oneOf/1",
+    "const": "interest",
+    "description": "Cash interest payments"
+  },
+  {
+    "path": "#/$defs/d_b8537d51782604e2883c/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PaymentPriority/oneOf/2",
+    "const": "amortization",
+    "description": "Scheduled amortization"
+  },
+  {
+    "path": "#/$defs/d_b8537d51782604e2883c/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PaymentPriority/oneOf/3",
+    "const": "mandatory_prepayment",
+    "description": "Mandatory prepayments"
+  },
+  {
+    "path": "#/$defs/d_b8537d51782604e2883c/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PaymentPriority/oneOf/4",
+    "const": "voluntary_prepayment",
+    "description": "Voluntary prepayments"
+  },
+  {
+    "path": "#/$defs/d_b8537d51782604e2883c/oneOf/5",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PaymentPriority/oneOf/5",
+    "const": "sweep",
+    "description": "Excess cash flow sweep"
+  },
+  {
+    "path": "#/$defs/d_b8537d51782604e2883c/oneOf/6",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PaymentPriority/oneOf/6",
+    "const": "equity",
+    "description": "Equity distributions"
+  },
+  {
     "path": "#/$defs/d_ba2543cd986556705dcc",
     "source": "https://finstack_quant.dev/schemas/statements_analytics/1/sensitivity_result.schema.json#/$defs/SensitivityScenario",
     "description": "Result of a single sensitivity scenario."
@@ -3073,6 +3153,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/equity_distribution/additionalProperties",
     "ref": "#/$defs/Money",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/prepayments",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/prepayments",
+    "description": "What each configured prepayment requested, paid and left unpaid in\neach period, in the waterfall's priority order.\n\nOnly populated for periods in which a waterfall with a prepayment\npriority ran. An unpaid amount is not carried forward: a prepayment\nrequest is not a dated contractual obligation."
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/prepayments/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/prepayments/additionalProperties"
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/prepayments/additionalProperties/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/prepayments/additionalProperties/items",
+    "ref": "#/$defs/PrepaymentOutcome",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PrepaymentOutcome"
   },
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/reporting_currency",

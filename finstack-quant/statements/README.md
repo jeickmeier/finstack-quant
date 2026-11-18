@@ -237,6 +237,19 @@ that order. Each prepayment requires an explicit payment priority and its
 matching sizing rule. A waterfall with any prepayment priority supports
 capital structures composed solely of term loans and revolvers.
 
+Each prepayment elects its facilities: `mandatory_prepayment` and
+`voluntary_prepayment` are `{amount, facilities}`, and `facilities` is
+`"all_eligible"` or `{"named": [...]}`. A named facility must exist, and a term
+loan with a call schedule cannot be elected, because prepayments are at par.
+The ECF sweep is authored term by term: `ECF = cash_measure - deductions +
+credits`, where each term is a formula in the waterfall currency or the cash
+interest, fees or scheduled principal that earlier priorities actually paid.
+Nothing is deducted unless it is listed. `sweep_percentage` applies to positive
+ECF. A rung pays the least of its request, the remaining cash and the elected
+facilities' principal, and `CapitalStructureCashflows.prepayments` records the
+requested, paid and unpaid amounts. A negative request is an error. Sizing,
+payment and the principal reduction all fall in the period being evaluated.
+
 Waterfall allocation is exact. Senior payment classes are paid first (empty
 `payment_classes` is one implicit class). Within a class, claims are paid in
 full when the cash covers them; otherwise each pro-rata quota is floored to the

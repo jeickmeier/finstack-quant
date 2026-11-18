@@ -283,13 +283,17 @@ pub fn waterfall_model(n_loans: usize, n_quarters: usize) -> FinancialModelSpec 
     builder
         .waterfall(WaterfallSpec {
             ecf_sweep: Some(EcfSweepSpec {
-                ebitda_node: "ebitda".to_string(),
-                taxes_node: Some("taxes".to_string()),
-                capex_node: Some("capex".to_string()),
-                working_capital_node: None,
-                cash_interest_node: None,
+                cash_measure: "ebitda".to_string(),
+                deductions: vec![
+                    finstack_quant_statements::capital_structure::EcfTerm::Input { expression: "taxes".to_string() },
+                    finstack_quant_statements::capital_structure::EcfTerm::Input { expression: "capex".to_string() },
+                    finstack_quant_statements::capital_structure::EcfTerm::PaidCashInterest,
+                    finstack_quant_statements::capital_structure::EcfTerm::PaidFees,
+                    finstack_quant_statements::capital_structure::EcfTerm::PaidScheduledPrincipal,
+                ],
+                credits: Vec::new(),
                 sweep_percentage: 0.5,
-                target_instrument_id: None,
+                facilities: finstack_quant_statements::capital_structure::FacilitySelection::AllEligible,
             }),
             priority_of_payments: vec![
                 PaymentPriority::Fees,

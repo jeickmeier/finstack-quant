@@ -1,74 +1,69 @@
-//! ECF calculation, cash-interest deduction rules, and sweep sizing.
+//! Excess-cash-flow sizing from the agreement's elected formula.
 
-use crate::capital_structure::waterfall_spec::EcfSweepSpec;
+use crate::capital_structure::waterfall_spec::{EcfSweepSpec, EcfTerm};
 use crate::error::Result;
 use crate::evaluator::EvaluationContext;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 
-use super::eval_value_or_formula;
+use super::{eval_value_or_formula, money_from_expr};
 
-/// Debt service already paid by priorities ahead of the ECF sweep.
-#[derive(Default)]
-pub(super) struct EcfDeductions {
+/// Debt service already paid by the priorities ahead of the ECF sweep.
+pub(super) struct PaidAhead {
     /// Cash interest paid, including carried coupon arrears.
-    pub cash_interest: f64,
+    pub cash_interest: Money,
     /// Scheduled principal paid, including carried amortization arrears.
-    pub scheduled_principal: f64,
+    pub scheduled_principal: Money,
     /// Fees paid, including carried fee arrears.
-    pub fees: f64,
+    pub fees: Money,
 }
 
-/// Calculate Excess Cash Flow and determine sweep amount.
+impl PaidAhead {
+    pub(super) fn zero(currency: Currency) -> Self {
+        let zero = Money::from((0_i64, currency));
+        Self {
+            cash_interest: zero,
+            scheduled_principal: zero,
+            fees: zero,
+        }
+    }
+}
+
+/// The amount the sweep requests in the period.
 ///
-/// Per S&P LCD / standard LPA definitions, ECF deducts **cash interest paid**,
-/// not contractual interest. When `ecf_spec.cash_interest_node` is omitted, the
-/// fallback deducts cash interest actually allocated by earlier priorities,
-/// including carried arrears. PIK coupons and unpaid claims consume no cash.
-/// Fees and scheduled principal paid by earlier priorities are also deducted
-/// before applying the sweep percentage. Later priorities reserve no cash.
+/// `ECF = cash_measure - Σ deductions + Σ credits`, every term elected by the
+/// specification and summed in exact money; the request is the sweep
+/// percentage of a positive ECF and zero otherwise. A paid-debt-service term
+/// is the amount the earlier priorities actually allocated this period.
 pub(super) fn calculate_ecf_sweep(
     context: &EvaluationContext,
-    ecf_spec: &EcfSweepSpec,
-    paid: &EcfDeductions,
+    spec: &EcfSweepSpec,
+    paid: &PaidAhead,
     currency: Currency,
     warnings: &mut Vec<crate::evaluator::EvalWarning>,
 ) -> Result<Money> {
-    let ebitda = eval_value_or_formula(context, &ecf_spec.ebitda_node, warnings)?;
-
-    let taxes = ecf_spec
-        .taxes_node
-        .as_ref()
-        .map(|expr| eval_value_or_formula(context, expr, warnings))
-        .transpose()?
-        .unwrap_or(0.0);
-
-    let capex = ecf_spec
-        .capex_node
-        .as_ref()
-        .map(|expr| eval_value_or_formula(context, expr, warnings))
-        .transpose()?
-        .unwrap_or(0.0);
-
-    let wc_change = ecf_spec
-        .working_capital_node
-        .as_ref()
-        .map(|expr| eval_value_or_formula(context, expr, warnings))
-        .transpose()?
-        .unwrap_or(0.0);
-
-    let cash_interest = if let Some(ref expr) = ecf_spec.cash_interest_node {
-        eval_value_or_formula(context, expr, warnings)?
-    } else {
-        paid.cash_interest
+    let mut term = |term: &EcfTerm| -> Result<Money> {
+        Ok(match term {
+            EcfTerm::Input { expression } => {
+                let value = eval_value_or_formula(context, expression, warnings)?;
+                money_from_expr(value, currency, expression)?
+            }
+            EcfTerm::PaidCashInterest => paid.cash_interest,
+            EcfTerm::PaidFees => paid.fees,
+            EcfTerm::PaidScheduledPrincipal => paid.scheduled_principal,
+        })
+    };
+    let mut ecf = term(&EcfTerm::Input {
+        expression: spec.cash_measure.clone(),
+    })?;
+    for deduction in &spec.deductions {
+        ecf = ecf.checked_sub(term(deduction)?)?;
     }
-    .max(0.0);
-
-    let ecf =
-        ebitda - taxes - capex - wc_change - cash_interest - paid.scheduled_principal - paid.fees;
-    let sweep_amount = ecf * ecf_spec.sweep_percentage;
-
-    // Every ECF input is finite (`eval_value_or_formula` enforces it), but the
-    // arithmetic above can still overflow `Decimal`'s range on extreme inputs.
-    super::money_from_expr(sweep_amount.max(0.0), currency, &ecf_spec.ebitda_node)
+    for credit in &spec.credits {
+        ecf = ecf.checked_add(term(credit)?)?;
+    }
+    if ecf.amount_decimal() <= rust_decimal::Decimal::ZERO {
+        return Ok(Money::from((0_i64, currency)));
+    }
+    Ok(ecf.checked_mul_f64(spec.sweep_percentage)?)
 }

@@ -80,13 +80,18 @@ fn loans(
 
 fn sweep(percentage: f64, target: Option<&str>) -> EcfSweepSpec {
     EcfSweepSpec {
-        ebitda_node: "ebitda".into(),
-        taxes_node: None,
-        capex_node: None,
-        working_capital_node: None,
-        cash_interest_node: None,
+        cash_measure: "ebitda".into(),
+        deductions: vec![
+            crate::capital_structure::EcfTerm::PaidCashInterest,
+            crate::capital_structure::EcfTerm::PaidFees,
+            crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+        ],
+        credits: Vec::new(),
         sweep_percentage: percentage,
-        target_instrument_id: target.map(str::to_owned),
+        facilities: (target.map(str::to_owned)).map_or(
+            crate::capital_structure::FacilitySelection::AllEligible,
+            |id| crate::capital_structure::FacilitySelection::Named(vec![id]),
+        ),
     }
 }
 
@@ -146,7 +151,10 @@ fn prepayment_rungs_follow_configured_order_and_class_rank() {
                 PaymentPriority::Equity,
             ],
             ecf_sweep: Some(sweep(1.0, Some(target))),
-            mandatory_prepay_node: Some("mandatory".into()),
+            mandatory_prepayment: Some(crate::capital_structure::PrepaymentSpec {
+                amount: "mandatory".into(),
+                facilities: crate::capital_structure::FacilitySelection::AllEligible,
+            }),
             payment_classes: payment_classes(),
             ..Default::default()
         };
@@ -1141,4 +1149,245 @@ fn allocation_is_exact_and_independent_of_row_order() {
     }
     assert_eq!(by_order[0], by_order[1]);
     assert_eq!(by_order[0], by_order[2]);
+}
+
+// Agreement-defined prepayments and ECF sweeps (STATEMENTS-CAPITAL-007)
+
+use crate::capital_structure::{EcfTerm, FacilitySelection, PrepaymentOutcome, PrepaymentSpec};
+
+fn input(expression: &str) -> EcfTerm {
+    EcfTerm::Input {
+        expression: expression.into(),
+    }
+}
+
+fn elected_sweep(facilities: FacilitySelection) -> WaterfallSpec {
+    WaterfallSpec {
+        priority_of_payments: vec![
+            PaymentPriority::Fees,
+            PaymentPriority::Interest,
+            PaymentPriority::Amortization,
+            PaymentPriority::Sweep,
+        ],
+        ecf_sweep: Some(EcfSweepSpec {
+            cash_measure: "measure".into(),
+            deductions: vec![input("capex"), input("taxes")],
+            credits: Vec::new(),
+            sweep_percentage: 0.5,
+            facilities,
+        }),
+        ..Default::default()
+    }
+}
+
+/// The record's example: a cash measure of 95 with 35 of elected deductions
+/// is 60 of ECF, and a 50% sweep requests 30. With 22 in the pool and 18 of
+/// eligible principal after reserves, 18 is paid and 4 stays in the pool.
+#[test]
+fn the_sweep_pays_the_least_of_its_request_the_cash_and_eligible_principal() {
+    // 28 outstanding, of which 10 was paid ahead of its reduction and is
+    // reserved: 18 is eligible.
+    let (mut state, mut flows) = loans(&["loan"], 28);
+    let march = dated_period(date!(2025 - 03 - 01), date!(2025 - 04 - 01));
+    flows.get_mut("loan").expect("loan").debt_balance = usd(28);
+    state.principal_advance_payments.insert(
+        "loan".into(),
+        vec![PrincipalClaim::at_par(
+            date!(2025 - 02 - 20),
+            date!(2025 - 04 - 10),
+            usd(10),
+        )],
+    );
+    state
+        .set_period_principal_flows("loan", &march, Vec::new())
+        .expect("nothing due");
+    let result = execute_waterfall_same_period(
+        &context_for(
+            march.id,
+            &[
+                ("cash", 22.0),
+                ("measure", 95.0),
+                ("capex", 25.0),
+                ("taxes", 10.0),
+            ],
+        ),
+        &elected_sweep(FacilitySelection::AllEligible),
+        &mut state,
+        &flows,
+    )
+    .expect("sweep");
+
+    assert_eq!(
+        result.prepayments,
+        [PrepaymentOutcome {
+            kind: PaymentPriority::Sweep,
+            requested: usd(30),
+            paid: usd(18),
+            unpaid: usd(12),
+        }]
+    );
+    assert_eq!(result.flows["loan"].sweep_prepayment, Some(usd(18)));
+    assert_eq!(result.flows["loan"].debt_balance, usd(10));
+    // No Equity priority: the 4 left in the pool is retained.
+    assert_eq!(result.retained_cash, Some(usd(4)));
+    // The unpaid request is reported, not carried as arrears.
+    assert!(state.principal_shortfall.is_empty());
+}
+
+/// Nothing is deducted unless the agreement elects it: the paid debt
+/// service terms are the amounts the earlier priorities actually allocated.
+#[test]
+fn deductions_and_credits_are_only_the_elected_terms() {
+    let run = |deductions: Vec<EcfTerm>, credits: Vec<EcfTerm>| {
+        let (mut state, mut flows) = loans(&["loan"], 1_000);
+        let loan = flows.get_mut("loan").expect("loan");
+        loan.interest_expense_cash = usd(10);
+        loan.fees = usd(2);
+        loan.principal_payment = usd(8);
+        let mut spec = elected_sweep(FacilitySelection::AllEligible);
+        let sweep = spec.ecf_sweep.as_mut().expect("sweep");
+        sweep.deductions = deductions;
+        sweep.credits = credits;
+        sweep.sweep_percentage = 1.0;
+        let result = execute_waterfall_same_period(
+            &context(&[("cash", 500.0), ("measure", 100.0), ("refund", 5.0)]),
+            &spec,
+            &mut state,
+            &flows,
+        )
+        .expect("sweep");
+        result.prepayments[0].requested
+    };
+    // No election: the measure alone, although 20 of debt service was paid.
+    assert_eq!(run(Vec::new(), Vec::new()), usd(100));
+    assert_eq!(run(vec![EcfTerm::PaidCashInterest], Vec::new()), usd(90));
+    assert_eq!(
+        run(
+            vec![
+                EcfTerm::PaidCashInterest,
+                EcfTerm::PaidFees,
+                EcfTerm::PaidScheduledPrincipal
+            ],
+            vec![input("refund")]
+        ),
+        usd(85)
+    );
+    // A negative ECF requests nothing.
+    assert_eq!(
+        run(vec![input("measure"), input("refund")], Vec::new()),
+        usd(0)
+    );
+}
+
+/// Eligibility is elected: a named list repays only those facilities, and
+/// `all_eligible` repays every one by class and pro rata.
+#[test]
+fn a_prepayment_repays_only_its_elected_facilities() {
+    let mandatory = |facilities: FacilitySelection| WaterfallSpec {
+        priority_of_payments: vec![
+            PaymentPriority::Fees,
+            PaymentPriority::Interest,
+            PaymentPriority::Amortization,
+            PaymentPriority::MandatoryPrepayment,
+            PaymentPriority::Equity,
+        ],
+        mandatory_prepayment: Some(PrepaymentSpec {
+            amount: "request".into(),
+            facilities,
+        }),
+        ..Default::default()
+    };
+    let run = |facilities: FacilitySelection, request: f64| {
+        let (mut state, flows) = loans(&["term_loan", "revolver"], 100);
+        execute_waterfall_same_period(
+            &context(&[("cash", 500.0), ("request", request)]),
+            &mandatory(facilities),
+            &mut state,
+            &flows,
+        )
+    };
+
+    let all = run(FacilitySelection::AllEligible, 60.0).expect("all eligible");
+    assert_eq!(all.flows["term_loan"].mandatory_prepayment, Some(usd(30)));
+    assert_eq!(all.flows["revolver"].mandatory_prepayment, Some(usd(30)));
+
+    let named = run(FacilitySelection::Named(vec!["revolver".into()]), 60.0).expect("named");
+    assert_eq!(named.flows["term_loan"].mandatory_prepayment, Some(usd(0)));
+    assert_eq!(named.flows["revolver"].mandatory_prepayment, Some(usd(60)));
+    // A request beyond the named facility's principal pays what is eligible.
+    let capped = run(FacilitySelection::Named(vec!["revolver".into()]), 160.0).expect("capped");
+    assert_eq!(
+        capped.prepayments[0],
+        PrepaymentOutcome {
+            kind: PaymentPriority::MandatoryPrepayment,
+            requested: usd(160),
+            paid: usd(100),
+            unpaid: usd(60),
+        }
+    );
+    assert_eq!(capped.flows["term_loan"].debt_balance, usd(100));
+
+    // A negative request and an unknown facility are errors.
+    let error = run(FacilitySelection::AllEligible, -5.0)
+        .expect_err("negative request")
+        .to_string();
+    assert!(error.contains("negative"), "{error}");
+    let error = run(FacilitySelection::Named(vec!["ghost".into()]), 5.0)
+        .expect_err("unknown facility")
+        .to_string();
+    assert!(error.contains("'ghost'"), "{error}");
+}
+
+/// Each prepayment and its priority are supplied together, a zero-percentage
+/// sweep included; an empty or repeated facility list and sizing inputs that
+/// read a same-period `cs` output are rejected.
+#[test]
+fn prepayment_elections_are_validated_before_any_period() {
+    let mut zero = elected_sweep(FacilitySelection::AllEligible);
+    zero.ecf_sweep.as_mut().expect("sweep").sweep_percentage = 0.0;
+    zero.validate()
+        .expect("a zero-percentage sweep with its priority");
+    zero.priority_of_payments
+        .retain(|p| *p != PaymentPriority::Sweep);
+    assert!(zero.validate().is_err());
+    let mut missing = elected_sweep(FacilitySelection::AllEligible);
+    missing.ecf_sweep = None;
+    assert!(missing.validate().is_err());
+
+    for facilities in [
+        FacilitySelection::Named(Vec::new()),
+        FacilitySelection::Named(vec!["a".into(), "a".into()]),
+    ] {
+        assert!(elected_sweep(facilities).validate().is_err());
+    }
+
+    let mut reads_output = elected_sweep(FacilitySelection::AllEligible);
+    reads_output.ecf_sweep.as_mut().expect("sweep").deductions =
+        vec![input("cs.interest_expense_cash.total")];
+    let error = reads_output
+        .validate()
+        .expect_err("cs deduction")
+        .to_string();
+    assert!(error.contains("cs.interest_expense_cash.total"), "{error}");
+    assert!(error.contains("ecf_sweep"), "{error}");
+
+    // The wire form is explicit.
+    let spec: EcfSweepSpec = serde_json::from_value(serde_json::json!({
+        "cash_measure": "ebitda",
+        "deductions": [{"type": "input", "expression": "capex"}, {"type": "paid_cash_interest"}],
+        "sweep_percentage": 0.5,
+        "facilities": {"named": ["TL"]}
+    }))
+    .expect("explicit sweep");
+    assert_eq!(spec.facilities, FacilitySelection::Named(vec!["TL".into()]));
+    assert!(
+        serde_json::from_value::<EcfSweepSpec>(serde_json::json!({
+            "cash_measure": "ebitda", "sweep_percentage": 0.5
+        }))
+        .is_err(),
+        "the eligible facilities must be elected"
+    );
+    let all: FacilitySelection =
+        serde_json::from_value(serde_json::json!("all_eligible")).expect("all");
+    assert_eq!(all, FacilitySelection::AllEligible);
 }

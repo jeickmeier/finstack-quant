@@ -517,6 +517,80 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FeeTier"
   },
   {
+    "path": "#/$defs/d_14123cfe6730f5769328",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfTerm",
+    "description": "One elected deduction from, or credit to, the excess-cash-flow measure."
+  },
+  {
+    "path": "#/$defs/d_14123cfe6730f5769328/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfTerm/oneOf/0",
+    "description": "A model amount: a node or formula in the waterfall currency, signed\nas the model states it. It may not depend on a same-period `cs`\ncomponent."
+  },
+  {
+    "path": "#/$defs/d_14123cfe6730f5769328/oneOf/0/properties/expression",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfTerm/oneOf/0/properties/expression",
+    "description": "Node id or formula."
+  },
+  {
+    "path": "#/$defs/d_14123cfe6730f5769328/oneOf/0/properties/type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfTerm/oneOf/0/properties/type",
+    "const": "input"
+  },
+  {
+    "path": "#/$defs/d_14123cfe6730f5769328/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfTerm/oneOf/1",
+    "description": "Cash interest actually paid by the priorities ahead of the sweep in\nthis period, including carried arrears. PIK and unpaid interest are\nnot cash and are not included."
+  },
+  {
+    "path": "#/$defs/d_14123cfe6730f5769328/oneOf/1/properties/type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfTerm/oneOf/1/properties/type",
+    "const": "paid_cash_interest"
+  },
+  {
+    "path": "#/$defs/d_14123cfe6730f5769328/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfTerm/oneOf/2",
+    "description": "Fees actually paid by the priorities ahead of the sweep."
+  },
+  {
+    "path": "#/$defs/d_14123cfe6730f5769328/oneOf/2/properties/type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfTerm/oneOf/2/properties/type",
+    "const": "paid_fees"
+  },
+  {
+    "path": "#/$defs/d_14123cfe6730f5769328/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfTerm/oneOf/3",
+    "description": "Scheduled principal actually paid by the priorities ahead of the\nsweep, including carried arrears. Other prepayments are not included."
+  },
+  {
+    "path": "#/$defs/d_14123cfe6730f5769328/oneOf/3/properties/type",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfTerm/oneOf/3/properties/type",
+    "const": "paid_scheduled_principal"
+  },
+  {
+    "path": "#/$defs/d_14e07e1641eb164f0229",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FacilitySelection",
+    "description": "The facilities a prepayment may repay.\n\nEligibility is elected, never implied: either every eligible facility of\nthe structure (its term loans and revolvers), or the named ones."
+  },
+  {
+    "path": "#/$defs/d_14e07e1641eb164f0229/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FacilitySelection/oneOf/0",
+    "const": "all_eligible",
+    "description": "Every term loan and revolver of the capital structure."
+  },
+  {
+    "path": "#/$defs/d_14e07e1641eb164f0229/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FacilitySelection/oneOf/1",
+    "description": "The listed instrument ids only. Each must be a term loan or revolver\nof the structure."
+  },
+  {
+    "path": "#/$defs/d_14e07e1641eb164f0229/oneOf/1/properties/named",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FacilitySelection/oneOf/1/properties/named"
+  },
+  {
+    "path": "#/$defs/d_14e07e1641eb164f0229/oneOf/1/properties/named/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FacilitySelection/oneOf/1/properties/named/items"
+  },
+  {
     "path": "#/$defs/d_15e0a0e0c92dbbdf6d8d",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DrawEvent",
     "description": "A scheduled draw `{date, amount}` on a committed facility.\n\nA delayed-draw term loan funds on `date` (inside its availability\nwindow); an asset-backed facility funds on the first payment date on or\nafter `date`."
@@ -5066,43 +5140,47 @@ export default [
   {
     "path": "#/$defs/d_7a9d5ee9143003a0618a",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfSweepSpec",
-    "description": "Excess Cash Flow (ECF) sweep specification.\n\nDefines how to calculate ECF and what percentage to sweep to pay down debt.\n\n# ECF Calculation\n\nThe ECF formula deducts cash interest, fees and scheduled principal paid\nby payment categories ahead of the `Sweep` priority, including carried\narrears. Unpaid claims, PIK and later payment priorities are not deducted:\n\n```text\nECF = EBITDA - Taxes - CapEx - ΔWC - Cash Interest Paid\n      - Fees Paid Ahead of Prepayment\n      - Scheduled Principal Paid Ahead of Prepayment\n  ```\n\nSet `cash_interest_node` to override the cash-interest input. If omitted,\nthe interest actually paid ahead of `Sweep` is deducted automatically.\n\n# References\n\n- Fixed-income and leverage context: `docs/REFERENCES.md#tuckman-serrat-fixed-income`"
+    "description": "Excess Cash Flow (ECF) sweep specification.\n\nThe agreement's formula is elected in full: a cash measure, each\ndeduction and each credit. Nothing is deducted automatically.\n\n```text\nECF     = cash_measure - Σ deductions + Σ credits\nrequest = sweep_percentage × ECF   when ECF is positive, otherwise zero\n```\n\nThe request is paid at par from the cash the earlier priorities left, up\nto the eligible principal net of reserves. It is sized, paid and applied\nto principal in the same reporting period.\n\n# References\n\n- Fixed-income and leverage context: `docs/REFERENCES.md#tuckman-serrat-fixed-income`"
   },
   {
-    "path": "#/$defs/d_7a9d5ee9143003a0618a/properties/capex_node",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfSweepSpec/properties/capex_node",
-    "description": "Formula or node reference for capital expenditures (e.g., \"capex\")"
+    "path": "#/$defs/d_7a9d5ee9143003a0618a/properties/cash_measure",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfSweepSpec/properties/cash_measure",
+    "description": "Formula or node for the agreement's cash measure before deductions\n(for example `ebitda`), in the waterfall currency. Signed and finite.\nIt may not depend on a same-period `cs` component."
   },
   {
-    "path": "#/$defs/d_7a9d5ee9143003a0618a/properties/cash_interest_node",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfSweepSpec/properties/cash_interest_node",
-    "description": "Formula or node reference for cash interest paid (e.g., \"cs.interest_expense_cash.total\").\n\nIf omitted, deducts cash interest actually paid by the `Interest` priority\nahead of `Sweep`, including carried coupon arrears. If `Interest` follows\n`Sweep`, this automatic deduction is zero. An explicit node overrides\nthat amount in the model's cash currency units."
+    "path": "#/$defs/d_7a9d5ee9143003a0618a/properties/credits",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfSweepSpec/properties/credits",
+    "description": "Amounts added to the cash measure, each elected explicitly."
   },
   {
-    "path": "#/$defs/d_7a9d5ee9143003a0618a/properties/ebitda_node",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfSweepSpec/properties/ebitda_node",
-    "description": "Formula or node reference for EBITDA (e.g., \"ebitda\" or \"revenue - cogs - opex\")"
+    "path": "#/$defs/d_7a9d5ee9143003a0618a/properties/credits/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfSweepSpec/properties/credits/items",
+    "ref": "#/$defs/EcfTerm",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfTerm"
+  },
+  {
+    "path": "#/$defs/d_7a9d5ee9143003a0618a/properties/deductions",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfSweepSpec/properties/deductions",
+    "description": "Amounts subtracted from the cash measure, each elected explicitly."
+  },
+  {
+    "path": "#/$defs/d_7a9d5ee9143003a0618a/properties/deductions/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfSweepSpec/properties/deductions/items",
+    "ref": "#/$defs/EcfTerm",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfTerm"
+  },
+  {
+    "path": "#/$defs/d_7a9d5ee9143003a0618a/properties/facilities",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfSweepSpec/properties/facilities",
+    "description": "The facilities the sweep may repay.",
+    "ref": "#/$defs/FacilitySelection",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FacilitySelection"
   },
   {
     "path": "#/$defs/d_7a9d5ee9143003a0618a/properties/sweep_percentage",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfSweepSpec/properties/sweep_percentage",
-    "description": "Sweep percentage (e.g., 0.5 for 50%, 0.75 for 75%)",
+    "description": "Fraction of positive ECF to sweep: a decimal in `[0, 1]` (0.5 for 50%).",
     "format": "double"
-  },
-  {
-    "path": "#/$defs/d_7a9d5ee9143003a0618a/properties/target_instrument_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfSweepSpec/properties/target_instrument_id",
-    "description": "Target instrument ID for sweep payments (if None, applies to all term loans)"
-  },
-  {
-    "path": "#/$defs/d_7a9d5ee9143003a0618a/properties/taxes_node",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfSweepSpec/properties/taxes_node",
-    "description": "Formula or node reference for taxes (e.g., \"taxes\")"
-  },
-  {
-    "path": "#/$defs/d_7a9d5ee9143003a0618a/properties/working_capital_node",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/EcfSweepSpec/properties/working_capital_node",
-    "description": "Formula or node reference for working capital change (e.g., \"wc_change\")"
   },
   {
     "path": "#/$defs/d_7af15f20a258d1def9dd",
@@ -5512,9 +5590,19 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/WaterfallSpec/properties/ecf_sweep/anyOf/1"
   },
   {
-    "path": "#/$defs/d_7d9f94bbd332b01035f6/properties/mandatory_prepay_node",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/WaterfallSpec/properties/mandatory_prepay_node",
-    "description": "Formula or node for the `MandatoryPrepayment` rung.\n\nRequired when `MandatoryPrepayment` appears in `priority_of_payments`.\nWhen configured, that priority must be present so payment consumes cash.\nSized independently of the ECF sweep and voluntary prepay buckets."
+    "path": "#/$defs/d_7d9f94bbd332b01035f6/properties/mandatory_prepayment",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/WaterfallSpec/properties/mandatory_prepayment",
+    "description": "The at-par mandatory prepayment: its amount and eligible facilities.\n\nSupplied together with `MandatoryPrepayment` in\n`priority_of_payments`: neither is valid without the other."
+  },
+  {
+    "path": "#/$defs/d_7d9f94bbd332b01035f6/properties/mandatory_prepayment/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/WaterfallSpec/properties/mandatory_prepayment/anyOf/0",
+    "ref": "#/$defs/PrepaymentSpec",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PrepaymentSpec"
+  },
+  {
+    "path": "#/$defs/d_7d9f94bbd332b01035f6/properties/mandatory_prepayment/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/WaterfallSpec/properties/mandatory_prepayment/anyOf/1"
   },
   {
     "path": "#/$defs/d_7d9f94bbd332b01035f6/properties/payment_classes",
@@ -5560,9 +5648,19 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PaymentPriority"
   },
   {
-    "path": "#/$defs/d_7d9f94bbd332b01035f6/properties/voluntary_prepay_node",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/WaterfallSpec/properties/voluntary_prepay_node",
-    "description": "Formula or node for the `VoluntaryPrepayment` rung.\n\nRequired when `VoluntaryPrepayment` appears in `priority_of_payments`.\nWhen configured, that priority must be present so payment consumes cash.\nSized independently of the ECF sweep and mandatory prepay buckets."
+    "path": "#/$defs/d_7d9f94bbd332b01035f6/properties/voluntary_prepayment",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/WaterfallSpec/properties/voluntary_prepayment",
+    "description": "The at-par voluntary prepayment: its amount and eligible facilities.\n\nSupplied together with `VoluntaryPrepayment` in\n`priority_of_payments`: neither is valid without the other."
+  },
+  {
+    "path": "#/$defs/d_7d9f94bbd332b01035f6/properties/voluntary_prepayment/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/WaterfallSpec/properties/voluntary_prepayment/anyOf/0",
+    "ref": "#/$defs/PrepaymentSpec",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PrepaymentSpec"
+  },
+  {
+    "path": "#/$defs/d_7d9f94bbd332b01035f6/properties/voluntary_prepayment/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/WaterfallSpec/properties/voluntary_prepayment/anyOf/1"
   },
   {
     "path": "#/$defs/d_7f4d9a4ecfa35776a8bf",
@@ -6911,6 +7009,23 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ConversionPolicy/oneOf/4/properties/mandatory_variable/properties/upper_conversion_price",
     "description": "Upper conversion price (above this, holder receives min shares).",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_9bd124f6bce33f68ae22",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PrepaymentSpec",
+    "description": "An at-par mandatory or voluntary prepayment."
+  },
+  {
+    "path": "#/$defs/d_9bd124f6bce33f68ae22/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PrepaymentSpec/properties/amount",
+    "description": "Formula or node for the amount requested in the period, in the\nwaterfall currency. It must be finite and non-negative: a negative\nrequest is an error, not zero. It may not depend on a same-period\n`cs` component."
+  },
+  {
+    "path": "#/$defs/d_9bd124f6bce33f68ae22/properties/facilities",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PrepaymentSpec/properties/facilities",
+    "description": "The facilities the prepayment may repay.",
+    "ref": "#/$defs/FacilitySelection",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FacilitySelection"
   },
   {
     "path": "#/$defs/d_9c329cd1343617d285e8",

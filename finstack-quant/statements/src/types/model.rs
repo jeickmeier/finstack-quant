@@ -857,6 +857,38 @@ impl CapitalStructureSpec {
                     }
                 }
             }
+            // Each prepayment names its eligible facilities. A named facility
+            // must exist, and a facility whose agreement prices a payoff (a
+            // call schedule with a premium or make-whole) cannot be repaid at
+            // par here.
+            for (_, name, facilities) in waterfall.prepayments() {
+                if let crate::capital_structure::FacilitySelection::Named(ids) = facilities {
+                    for id in ids {
+                        if !self.debt_instruments.iter().any(|debt| &debt.id == id) {
+                            return Err(Error::build(format!(
+                                "WaterfallSpec: `{name}.facilities` names '{id}', which is \
+                                 not a debt instrument of the capital structure."
+                            )));
+                        }
+                    }
+                }
+                for debt in &self.debt_instruments {
+                    if facilities.includes(&debt.id)
+                        && matches!(
+                            &debt.spec,
+                            FinancialStatementInstrument::TermLoan(loan)
+                                if loan.call_schedule.is_some()
+                        )
+                    {
+                        return Err(Error::build(format!(
+                            "WaterfallSpec: `{name}` would repay '{}' at par, but that loan \
+                             has a call schedule with its own payoff terms, which the \
+                             waterfall does not price. Exclude it from `{name}.facilities`.",
+                            debt.id
+                        )));
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -1254,13 +1286,15 @@ mod period_timeline_tests {
                 PaymentPriority::Equity,
             ],
             ecf_sweep: Some(EcfSweepSpec {
-                ebitda_node: "ebitda".into(),
-                taxes_node: None,
-                capex_node: None,
-                working_capital_node: None,
-                cash_interest_node: None,
+                cash_measure: "ebitda".into(),
+                deductions: vec![
+                    crate::capital_structure::EcfTerm::PaidCashInterest,
+                    crate::capital_structure::EcfTerm::PaidFees,
+                    crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+                ],
+                credits: Vec::new(),
                 sweep_percentage: 0.5,
-                target_instrument_id: None,
+                facilities: crate::capital_structure::FacilitySelection::AllEligible,
             }),
             ..default_waterfall
         });
@@ -1272,6 +1306,71 @@ mod period_timeline_tests {
             err.to_string().contains("bond"),
             "expected the Bond+sweep diagnostic: {err}"
         );
+    }
+
+    /// A prepayment names facilities of the capital structure, and cannot
+    /// repay at par a loan whose agreement prices its own payoff.
+    #[test]
+    fn prepayment_facilities_must_exist_and_be_repayable_at_par() {
+        use crate::capital_structure::{
+            FacilitySelection, PaymentPriority, PrepaymentSpec, WaterfallSpec,
+        };
+
+        let loan = |id: &str, callable: bool| {
+            let mut loan = if callable {
+                TermLoan::example_callable().expect("callable loan")
+            } else {
+                TermLoan::example().expect("loan")
+            };
+            loan.id = finstack_quant_core::types::InstrumentId::new(id);
+            DebtInstrumentSpec {
+                id: id.to_string(),
+                spec: FinancialStatementInstrument::TermLoan(loan),
+            }
+        };
+        let capital = |facilities: FacilitySelection| CapitalStructureSpec {
+            debt_instruments: vec![loan("TL-PAR", false), loan("TL-CALL", true)],
+            meta: IndexMap::new(),
+            reporting_currency: None,
+            fx_policy: None,
+            waterfall: Some(WaterfallSpec {
+                priority_of_payments: vec![
+                    PaymentPriority::Fees,
+                    PaymentPriority::Interest,
+                    PaymentPriority::Amortization,
+                    PaymentPriority::VoluntaryPrepayment,
+                    PaymentPriority::Equity,
+                ],
+                voluntary_prepayment: Some(PrepaymentSpec {
+                    amount: "prepay".into(),
+                    facilities,
+                }),
+                ..WaterfallSpec::default()
+            }),
+        };
+
+        capital(FacilitySelection::Named(vec!["TL-PAR".into()]))
+            .validate()
+            .expect("a loan without payoff terms is repaid at par");
+
+        let error = capital(FacilitySelection::Named(vec!["TL-GHOST".into()]))
+            .validate()
+            .expect_err("unknown facility")
+            .to_string();
+        assert!(error.contains("'TL-GHOST'"), "{error}");
+        assert!(error.contains("voluntary_prepayment"), "{error}");
+
+        for facilities in [
+            FacilitySelection::AllEligible,
+            FacilitySelection::Named(vec!["TL-CALL".into()]),
+        ] {
+            let error = capital(facilities)
+                .validate()
+                .expect_err("callable loan repaid at par")
+                .to_string();
+            assert!(error.contains("'TL-CALL'"), "{error}");
+            assert!(error.contains("call schedule"), "{error}");
+        }
     }
 
     /// The supported `Pay` side must continue to pass validation.

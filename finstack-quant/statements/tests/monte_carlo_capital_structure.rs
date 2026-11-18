@@ -106,13 +106,16 @@ fn levered_model(
             PaymentPriority::Equity,
         ],
         ecf_sweep: Some(EcfSweepSpec {
-            ebitda_node: "ebitda".to_string(),
-            taxes_node: None,
-            capex_node: None,
-            working_capital_node: None,
-            cash_interest_node: None,
+            cash_measure: "ebitda".to_string(),
+            deductions: vec![
+                finstack_quant_statements::capital_structure::EcfTerm::PaidCashInterest,
+                finstack_quant_statements::capital_structure::EcfTerm::PaidFees,
+                finstack_quant_statements::capital_structure::EcfTerm::PaidScheduledPrincipal,
+            ],
+            credits: Vec::new(),
             sweep_percentage: 0.5,
-            target_instrument_id: None,
+            facilities:
+                finstack_quant_statements::capital_structure::FacilitySelection::AllEligible,
         }),
         available_cash_node: "cash".into(),
         ..Default::default()

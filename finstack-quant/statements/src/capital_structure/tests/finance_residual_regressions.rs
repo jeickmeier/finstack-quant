@@ -477,13 +477,17 @@ fn model_preserves_economic_amortization_across_quarter_end_with_optional_sweep(
                     PaymentPriority::Equity,
                 ],
                 ecf_sweep: Some(EcfSweepSpec {
-                    ebitda_node: "ebitda".into(),
-                    taxes_node: None,
-                    capex_node: None,
-                    working_capital_node: None,
-                    cash_interest_node: None,
+                    cash_measure: "ebitda".into(),
+                    deductions: vec![
+                        crate::capital_structure::EcfTerm::PaidCashInterest,
+                        crate::capital_structure::EcfTerm::PaidFees,
+                        crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+                    ],
+                    credits: Vec::new(),
                     sweep_percentage: 0.5,
-                    target_instrument_id: Some(INSTRUMENT.into()),
+                    facilities: crate::capital_structure::FacilitySelection::Named(vec![
+                        INSTRUMENT.into(),
+                    ]),
                 }),
                 ..Default::default()
             });
@@ -741,4 +745,132 @@ fn loan_funded_inside_the_model_repays_its_face_once() {
             assert_close(total_principal, 100.0);
         }
     }
+}
+
+/// A mandatory prepayment under `all_eligible` is paid across a real term
+/// loan and a real revolver through the evaluator, the rung's requested, paid
+/// and unpaid amounts are recorded, and a sizing input that reaches a
+/// same-period `cs` output through another node is rejected before the run.
+#[test]
+fn evaluator_prepays_a_term_loan_and_a_revolver_and_records_the_outcome() {
+    use finstack_quant_statements::capital_structure::{FacilitySelection, PrepaymentSpec};
+    use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
+        DrawRepaySpec, RevolvingCredit,
+    };
+
+    let issue = date!(2023 - 12 - 31);
+    let maturity = date!(2024 - 12 - 31);
+    let mut loan = TermLoan::example().expect("canonical term loan");
+    loan.id = INSTRUMENT.into();
+    loan.notional_limit = usd(100.0);
+    loan.issue_date = issue;
+    loan.maturity = maturity;
+    loan.rate = RateSpec::Fixed { rate: 0.10 };
+    loan.frequency = Tenor::quarterly();
+    loan.day_count = DayCount::Act365F;
+    loan.business_day_convention = BusinessDayConvention::Following;
+    loan.calendar_id = Some("weekends_only".into());
+    loan.amortization = AmortizationSpec::None;
+    let mut revolver = RevolvingCredit::example().expect("canonical revolver");
+    revolver.id = "RCF".into();
+    revolver.commitment = usd(200.0);
+    revolver.drawn = usd(100.0);
+    revolver.issue_date = issue;
+    revolver.maturity = maturity;
+    revolver.rate = RateSpec::Fixed { rate: 0.08 };
+    revolver.draw_repay_spec = DrawRepaySpec::Deterministic(Vec::new());
+    let discount = DiscountCurve::builder("USD-OIS")
+        .base_date(issue)
+        .knots([(0.0, 1.0), (2.0, 0.9)])
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
+        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
+        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+        .build()
+        .expect("discount curve");
+    let market = MarketContext::new().insert(discount);
+
+    let quarters: Vec<_> = (1..=4)
+        .map(|quarter| PeriodId::quarter(2024, quarter).expect("valid quarter"))
+        .collect();
+    let series = |amount: fn(usize) -> f64| -> Vec<_> {
+        quarters
+            .iter()
+            .enumerate()
+            .map(|(index, period)| (*period, AmountOrScalar::scalar(amount(index))))
+            .collect()
+    };
+    let model = |amount: &str| {
+        let mut builder = ModelBuilder::new("mixed-prepayment");
+        builder
+            .periods("2024Q1..2024Q4", None)
+            .expect("reporting quarters");
+        builder.value("cash", &series(|_| 1_000.0));
+        builder.value(
+            "request",
+            &series(|index| if index == 0 { 60.0 } else { 0.0 }),
+        );
+        builder
+            .compute("interest_alias", "cs.interest_expense_cash.total")
+            .expect("alias of a waterfall output");
+        builder.add_debt(
+            INSTRUMENT,
+            FinancialStatementInstrument::TermLoan(loan.clone()),
+        );
+        builder.add_debt(
+            "RCF",
+            FinancialStatementInstrument::RevolvingCredit(revolver.clone()),
+        );
+        builder.waterfall(WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Amortization,
+                PaymentPriority::MandatoryPrepayment,
+                PaymentPriority::Equity,
+            ],
+            mandatory_prepayment: Some(PrepaymentSpec {
+                amount: amount.into(),
+                facilities: FacilitySelection::AllEligible,
+            }),
+            ..Default::default()
+        });
+        builder.build()
+    };
+    let evaluate = |amount: &str| {
+        Evaluator::new().evaluate_with_market(
+            &model(amount).expect("mixed capital structure"),
+            &market,
+            issue,
+            crate::evaluator::ObservationCutoff::FullSnapshot,
+        )
+    };
+
+    let result = evaluate("request").expect("mixed prepayment evaluation");
+    let cashflows = result.cs_cashflows.as_ref().expect("capital cash flows");
+    let first = &cashflows.prepayments[&quarters[0]];
+    assert_eq!(first.len(), 1);
+    assert_eq!(first[0].kind, PaymentPriority::MandatoryPrepayment);
+    assert_eq!(first[0].requested, usd(60.0));
+    assert_eq!(first[0].paid, usd(60.0));
+    assert_eq!(first[0].unpaid, usd(0.0));
+    // Equal principal, one class: the request is shared equally.
+    for id in [INSTRUMENT, "RCF"] {
+        assert_eq!(
+            cashflows.by_instrument[id][&quarters[0]].mandatory_prepayment,
+            Some(usd(30.0))
+        );
+        assert_close(
+            cashflows
+                .get_component("debt_balance", id, &quarters[0])
+                .expect("closing balance"),
+            70.0,
+        );
+    }
+    assert_eq!(cashflows.prepayments[&quarters[1]][0].requested, usd(0.0));
+
+    let error = evaluate("interest_alias")
+        .expect_err("a request sized from this period's interest")
+        .to_string();
+    assert!(error.contains("mandatory_prepayment"), "{error}");
+    assert!(error.contains("interest_alias"), "{error}");
 }

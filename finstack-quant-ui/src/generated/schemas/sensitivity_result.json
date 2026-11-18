@@ -97,6 +97,35 @@
       ],
       "type": "object"
     },
+    "d_048108bf9dc923c7b537": {
+      "additionalProperties": false,
+      "description": "What one prepayment priority requested and paid in a period.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/d_b8537d51782604e2883c",
+          "description": "The prepayment priority: mandatory prepayment, voluntary prepayment\nor sweep."
+        },
+        "paid": {
+          "$ref": "#/$defs/d_1b5716dde9957a614f3c",
+          "description": "Cash paid at par: the request limited by the cash the earlier\npriorities left and by the eligible principal net of reserves."
+        },
+        "requested": {
+          "$ref": "#/$defs/d_1b5716dde9957a614f3c",
+          "description": "Amount the priority requested: the mandatory or voluntary amount, or\nthe sweep percentage of positive excess cash flow."
+        },
+        "unpaid": {
+          "$ref": "#/$defs/d_1b5716dde9957a614f3c",
+          "description": "`requested - paid`. It is reported, not carried as arrears."
+        }
+      },
+      "required": [
+        "kind",
+        "requested",
+        "paid",
+        "unpaid"
+      ],
+      "type": "object"
+    },
     "d_07ccd5501efef381b26a": {
       "const": "float64",
       "description": "Numeric mode used for evaluation.",
@@ -618,7 +647,7 @@
               "type": "null"
             }
           ],
-          "description": "Part of `principal_payment` paid at the waterfall's\n`MandatoryPrepayment` priority (`WaterfallSpec.mandatory_prepay_node`).\nZero when no waterfall ran. Same sign, currency and absence rule as\n[`Self::scheduled_principal`]."
+          "description": "Part of `principal_payment` paid at the waterfall's\n`MandatoryPrepayment` priority (`WaterfallSpec.mandatory_prepayment`).\nZero when no waterfall ran. Same sign, currency and absence rule as\n[`Self::scheduled_principal`]."
         },
         "opening_balance": {
           "anyOf": [
@@ -699,7 +728,7 @@
               "type": "null"
             }
           ],
-          "description": "Part of `principal_payment` paid at the waterfall's\n`VoluntaryPrepayment` priority (`WaterfallSpec.voluntary_prepay_node`).\nZero when no waterfall ran. Same sign, currency and absence rule as\n[`Self::scheduled_principal`]."
+          "description": "Part of `principal_payment` paid at the waterfall's\n`VoluntaryPrepayment` priority (`WaterfallSpec.voluntary_prepayment`).\nZero when no waterfall ran. Same sign, currency and absence rule as\n[`Self::scheduled_principal`]."
         }
       },
       "required": [
@@ -2150,6 +2179,46 @@
       ],
       "type": "object"
     },
+    "d_b8537d51782604e2883c": {
+      "description": "Payment priority levels in the waterfall.",
+      "oneOf": [
+        {
+          "const": "fees",
+          "description": "Fees (commitment fees, facility fees, etc.)",
+          "type": "string"
+        },
+        {
+          "const": "interest",
+          "description": "Cash interest payments",
+          "type": "string"
+        },
+        {
+          "const": "amortization",
+          "description": "Scheduled amortization",
+          "type": "string"
+        },
+        {
+          "const": "mandatory_prepayment",
+          "description": "Mandatory prepayments",
+          "type": "string"
+        },
+        {
+          "const": "voluntary_prepayment",
+          "description": "Voluntary prepayments",
+          "type": "string"
+        },
+        {
+          "const": "sweep",
+          "description": "Excess cash flow sweep",
+          "type": "string"
+        },
+        {
+          "const": "equity",
+          "description": "Equity distributions",
+          "type": "string"
+        }
+      ]
+    },
     "d_ba2543cd986556705dcc": {
       "description": "Result of a single sensitivity scenario.",
       "properties": {
@@ -2792,6 +2861,16 @@
             "$ref": "#/$defs/d_1b5716dde9957a614f3c"
           },
           "description": "Residual cash distributed to equity per period: the cash left after\nfees, interest and principal when `Equity` is the waterfall's terminal\npriority, and zero when it is not.\n\nOnly populated for periods in which a waterfall ran. With the\nper-period allocations,\n`fees + cash interest + principal + equity + retained == available cash`\nexactly.",
+          "type": "object"
+        },
+        "prepayments": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/d_048108bf9dc923c7b537"
+            },
+            "type": "array"
+          },
+          "description": "What each configured prepayment requested, paid and left unpaid in\neach period, in the waterfall's priority order.\n\nOnly populated for periods in which a waterfall with a prepayment\npriority ran. An unpaid amount is not carried forward: a prepayment\nrequest is not a dated contractual obligation.",
           "type": "object"
         },
         "reporting_currency": {

@@ -275,8 +275,9 @@ payment quantum.
 
 The Statements prepayment and ECF sweep contract was accepted on 2026-11-15.
 It covers explicit agreement terms and eligible facilities, dated sizing,
-payment limits and requested, paid and unpaid reporting. Implementation and
-independent qualification remain pending.
+payment limits and requested, paid and unpaid reporting. The same-period
+contract is implemented and qualified; the separately elected measurement,
+trigger, payment and principal-effective dates remain open.
 [STATEMENTS-CAPITAL-007](statements-capital/07-prepayments-and-ecf.md#accepted-decision-for-agreement-defined-prepayments-and-ecf-sweeps).
 
 The Statements PIK election and carried-claims contract was accepted on

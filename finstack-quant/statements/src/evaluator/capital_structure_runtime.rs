@@ -51,10 +51,13 @@ impl Evaluator {
         // Once per run: the cash pool may not depend, through any chain of
         // formulas and masks, on a same-period output of its own waterfall.
         if let Some(waterfall) = &cs_spec.waterfall {
-            crate::capital_structure::reject_pool_output_dependence(
-                &model.nodes,
-                &waterfall.available_cash_node,
-            )?;
+            for (setting, expression) in waterfall.sizing_expressions() {
+                crate::capital_structure::reject_pool_output_dependence(
+                    &model.nodes,
+                    setting,
+                    expression,
+                )?;
+            }
         }
         let mut instruments = Instruments::new();
 
@@ -144,6 +147,11 @@ impl Evaluator {
                 recompute_cs_totals(&mut cs_cashflows, period_id, fx_ctx.as_ref())?;
                 if let Some(equity) = waterfall_result.equity_distribution {
                     cs_cashflows.equity_distribution.insert(period_id, equity);
+                }
+                if !waterfall_result.prepayments.is_empty() {
+                    cs_cashflows
+                        .prepayments
+                        .insert(period_id, waterfall_result.prepayments);
                 }
                 if let Some(retained) = waterfall_result.retained_cash {
                     cs_cashflows.retained_cash.insert(period_id, retained);

@@ -512,6 +512,98 @@
       ],
       "type": "object"
     },
+    "d_14123cfe6730f5769328": {
+      "description": "One elected deduction from, or credit to, the excess-cash-flow measure.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A model amount: a node or formula in the waterfall currency, signed\nas the model states it. It may not depend on a same-period `cs`\ncomponent.",
+          "properties": {
+            "expression": {
+              "description": "Node id or formula.",
+              "type": "string"
+            },
+            "type": {
+              "const": "input",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "expression"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Cash interest actually paid by the priorities ahead of the sweep in\nthis period, including carried arrears. PIK and unpaid interest are\nnot cash and are not included.",
+          "properties": {
+            "type": {
+              "const": "paid_cash_interest",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Fees actually paid by the priorities ahead of the sweep.",
+          "properties": {
+            "type": {
+              "const": "paid_fees",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Scheduled principal actually paid by the priorities ahead of the\nsweep, including carried arrears. Other prepayments are not included.",
+          "properties": {
+            "type": {
+              "const": "paid_scheduled_principal",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "d_14e07e1641eb164f0229": {
+      "description": "The facilities a prepayment may repay.\n\nEligibility is elected, never implied: either every eligible facility of\nthe structure (its term loans and revolvers), or the named ones.",
+      "oneOf": [
+        {
+          "const": "all_eligible",
+          "description": "Every term loan and revolver of the capital structure.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "The listed instrument ids only. Each must be a term loan or revolver\nof the structure.",
+          "properties": {
+            "named": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "named"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "d_15e0a0e0c92dbbdf6d8d": {
       "additionalProperties": false,
       "description": "A scheduled draw `{date, amount}` on a committed facility.\n\nA delayed-draw term loan funds on `date` (inside its availability\nwindow); an asset-backed facility funds on the first payment date on or\nafter `date`.",
@@ -4788,56 +4880,40 @@
     },
     "d_7a9d5ee9143003a0618a": {
       "additionalProperties": false,
-      "description": "Excess Cash Flow (ECF) sweep specification.\n\nDefines how to calculate ECF and what percentage to sweep to pay down debt.\n\n# ECF Calculation\n\nThe ECF formula deducts cash interest, fees and scheduled principal paid\nby payment categories ahead of the `Sweep` priority, including carried\narrears. Unpaid claims, PIK and later payment priorities are not deducted:\n\n```text\nECF = EBITDA - Taxes - CapEx - ΔWC - Cash Interest Paid\n      - Fees Paid Ahead of Prepayment\n      - Scheduled Principal Paid Ahead of Prepayment\n  ```\n\nSet `cash_interest_node` to override the cash-interest input. If omitted,\nthe interest actually paid ahead of `Sweep` is deducted automatically.\n\n# References\n\n- Fixed-income and leverage context: `docs/REFERENCES.md#tuckman-serrat-fixed-income`",
+      "description": "Excess Cash Flow (ECF) sweep specification.\n\nThe agreement's formula is elected in full: a cash measure, each\ndeduction and each credit. Nothing is deducted automatically.\n\n```text\nECF     = cash_measure - Σ deductions + Σ credits\nrequest = sweep_percentage × ECF   when ECF is positive, otherwise zero\n```\n\nThe request is paid at par from the cash the earlier priorities left, up\nto the eligible principal net of reserves. It is sized, paid and applied\nto principal in the same reporting period.\n\n# References\n\n- Fixed-income and leverage context: `docs/REFERENCES.md#tuckman-serrat-fixed-income`",
       "properties": {
-        "capex_node": {
-          "description": "Formula or node reference for capital expenditures (e.g., \"capex\")",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "cash_interest_node": {
-          "description": "Formula or node reference for cash interest paid (e.g., \"cs.interest_expense_cash.total\").\n\nIf omitted, deducts cash interest actually paid by the `Interest` priority\nahead of `Sweep`, including carried coupon arrears. If `Interest` follows\n`Sweep`, this automatic deduction is zero. An explicit node overrides\nthat amount in the model's cash currency units.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "ebitda_node": {
-          "description": "Formula or node reference for EBITDA (e.g., \"ebitda\" or \"revenue - cogs - opex\")",
+        "cash_measure": {
+          "description": "Formula or node for the agreement's cash measure before deductions\n(for example `ebitda`), in the waterfall currency. Signed and finite.\nIt may not depend on a same-period `cs` component.",
           "type": "string"
         },
+        "credits": {
+          "description": "Amounts added to the cash measure, each elected explicitly.",
+          "items": {
+            "$ref": "#/$defs/d_14123cfe6730f5769328"
+          },
+          "type": "array"
+        },
+        "deductions": {
+          "description": "Amounts subtracted from the cash measure, each elected explicitly.",
+          "items": {
+            "$ref": "#/$defs/d_14123cfe6730f5769328"
+          },
+          "type": "array"
+        },
+        "facilities": {
+          "$ref": "#/$defs/d_14e07e1641eb164f0229",
+          "description": "The facilities the sweep may repay."
+        },
         "sweep_percentage": {
-          "description": "Sweep percentage (e.g., 0.5 for 50%, 0.75 for 75%)",
+          "description": "Fraction of positive ECF to sweep: a decimal in `[0, 1]` (0.5 for 50%).",
           "format": "double",
           "type": "number"
-        },
-        "target_instrument_id": {
-          "description": "Target instrument ID for sweep payments (if None, applies to all term loans)",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "taxes_node": {
-          "description": "Formula or node reference for taxes (e.g., \"taxes\")",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "working_capital_node": {
-          "description": "Formula or node reference for working capital change (e.g., \"wc_change\")",
-          "type": [
-            "string",
-            "null"
-          ]
         }
       },
       "required": [
-        "ebitda_node",
-        "sweep_percentage"
+        "cash_measure",
+        "sweep_percentage",
+        "facilities"
       ],
       "type": "object"
     },
@@ -5175,12 +5251,16 @@
           ],
           "description": "Excess Cash Flow (ECF) sweep specification.\nThis specification and the `Sweep` payment priority must be supplied together."
         },
-        "mandatory_prepay_node": {
-          "description": "Formula or node for the `MandatoryPrepayment` rung.\n\nRequired when `MandatoryPrepayment` appears in `priority_of_payments`.\nWhen configured, that priority must be present so payment consumes cash.\nSized independently of the ECF sweep and voluntary prepay buckets.",
-          "type": [
-            "string",
-            "null"
-          ]
+        "mandatory_prepayment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9bd124f6bce33f68ae22"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The at-par mandatory prepayment: its amount and eligible facilities.\n\nSupplied together with `MandatoryPrepayment` in\n`priority_of_payments`: neither is valid without the other."
         },
         "payment_classes": {
           "description": "Payment classes for intra-category seniority (e.g. 1L then 2L).\n\nEmpty means one implicit class: today's single-class pro-rata. When\nnon-empty, every contractual instrument must appear in exactly one\nclass, ranks and ids must be unique, and allocation walks rank order.",
@@ -5213,12 +5293,16 @@
           },
           "type": "array"
         },
-        "voluntary_prepay_node": {
-          "description": "Formula or node for the `VoluntaryPrepayment` rung.\n\nRequired when `VoluntaryPrepayment` appears in `priority_of_payments`.\nWhen configured, that priority must be present so payment consumes cash.\nSized independently of the ECF sweep and mandatory prepay buckets.",
-          "type": [
-            "string",
-            "null"
-          ]
+        "voluntary_prepayment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_9bd124f6bce33f68ae22"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The at-par voluntary prepayment: its amount and eligible facilities.\n\nSupplied together with `VoluntaryPrepayment` in\n`priority_of_payments`: neither is valid without the other."
         }
       },
       "required": [
@@ -6568,6 +6652,25 @@
           "type": "object"
         }
       ]
+    },
+    "d_9bd124f6bce33f68ae22": {
+      "additionalProperties": false,
+      "description": "An at-par mandatory or voluntary prepayment.",
+      "properties": {
+        "amount": {
+          "description": "Formula or node for the amount requested in the period, in the\nwaterfall currency. It must be finite and non-negative: a negative\nrequest is an error, not zero. It may not depend on a same-period\n`cs` component.",
+          "type": "string"
+        },
+        "facilities": {
+          "$ref": "#/$defs/d_14e07e1641eb164f0229",
+          "description": "The facilities the prepayment may repay."
+        }
+      },
+      "required": [
+        "amount",
+        "facilities"
+      ],
+      "type": "object"
     },
     "d_9c329cd1343617d285e8": {
       "description": "Type of borrower call provision on a term loan.\n\nInstitutional term loans use several types of call provisions:\n- **Hard call**: Non-callable until the call date, then callable at the stated price.\n- **Soft call**: Callable at any time, but subject to a premium (call protection).\n  Typically applies for the first 6-24 months (\"non-call period\").\n- **Make-whole**: Borrower must pay the present value of remaining cashflows\n  discounted at a reference rate (typically a Treasury rate) plus a spread.\n  This ensures the lender receives full economic value upon early prepayment.\n\n# Industry Practice\n\nLeveraged term loans typically have 6-12 months of soft call protection\n(101% of par, sometimes called \"soft call 101\"), after which they become\ncallable at par. Make-whole provisions are more common in investment-grade\nterm loans and private placements.",

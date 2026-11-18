@@ -263,14 +263,19 @@ test('capital-structure validators run the Rust validate()', () => {
   const invertedWaterfall = {
     priority_of_payments: ['fees', 'interest', 'amortization', 'equity', 'sweep'],
     available_cash_node: 'cash',
-    ecf_sweep: { ebitda_node: 'cash', sweep_percentage: 0.5 },
+    ecf_sweep: { cash_measure: 'cash', sweep_percentage: 0.5, facilities: 'all_eligible' },
   };
   assert.throws(
     () => statements.validateCapitalStructureSpecJson({ waterfall: invertedWaterfall }),
     (e) => e.kind === 'validation' && /last entry/.test(e.message)
   );
   assert.throws(
-    () => statements.validateEcfSweepSpecJson({ ebitda_node: 'ebitda', sweep_percentage: 5.0 }),
+    () =>
+      statements.validateEcfSweepSpecJson({
+        cash_measure: 'ebitda',
+        sweep_percentage: 5.0,
+        facilities: 'all_eligible',
+      }),
     (e) => e.kind === 'validation' && /sweep_percentage/.test(e.message)
   );
   assert.throws(
@@ -283,7 +288,11 @@ test('capital-structure validators run the Rust validate()', () => {
     (e) => e.kind === 'validation' && /target_instrument_ids/.test(e.message)
   );
   const ok = JSON.parse(
-    statements.validateEcfSweepSpecJson({ ebitda_node: 'ebitda', sweep_percentage: 0.5 })
+    statements.validateEcfSweepSpecJson({
+      cash_measure: 'ebitda',
+      sweep_percentage: 0.5,
+      facilities: 'all_eligible',
+    })
   );
   assert.equal(ok.sweep_percentage, 0.5);
 });

@@ -118,7 +118,8 @@ mod waterfall_spec;
 // Curated public facade for capital-structure types.
 pub(crate) use cashflows::add_optional_money;
 pub use cashflows::{
-    CapitalStructureCashflows, CashflowBreakdown, DistressCashflow, TOTAL_ROW_LABEL,
+    CapitalStructureCashflows, CashflowBreakdown, DistressCashflow, PrepaymentOutcome,
+    TOTAL_ROW_LABEL,
 };
 pub use integration::build_instrument_from_spec;
 pub use period_flows::{
@@ -128,8 +129,8 @@ pub(crate) use principal::PrincipalClaim;
 pub(crate) use state::CapitalStructureState;
 pub(crate) use waterfall_spec::reject_pool_output_dependence;
 pub use waterfall_spec::{
-    EcfSweepSpec, PaymentClassSpec, PaymentPriority, PikToggleSpec, WaterfallSpec,
-    default_priority_of_payments,
+    EcfSweepSpec, EcfTerm, FacilitySelection, PaymentClassSpec, PaymentPriority, PikToggleSpec,
+    PrepaymentSpec, WaterfallSpec, default_priority_of_payments,
 };
 
 #[cfg(test)]

@@ -152,9 +152,9 @@ fn validate_waterfall_spec_roundtrips_minimal_spec() {
 
 #[wasm_bindgen_test]
 fn validate_ecf_sweep_spec_accepts_minimal() {
-    let json = r#"{"ebitda_node":"ebitda","sweep_percentage":0.5}"#;
+    let json = r#"{"cash_measure":"ebitda","sweep_percentage":0.5,"facilities":"all_eligible"}"#;
     let out = validate_ecf_sweep_spec_json(JsValue::from(json)).unwrap();
-    assert!(out.contains("ebitda_node"));
+    assert!(out.contains("cash_measure"));
 }
 
 #[wasm_bindgen_test]

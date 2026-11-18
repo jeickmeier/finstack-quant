@@ -2340,7 +2340,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 414495
+            "bytes": 417387
           },
           {
             "path": "schemas/statements/1/forecast_method.schema.json",
@@ -2417,7 +2417,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 102074
+            "bytes": 104773
           }
         ]
       },
@@ -2503,9 +2503,11 @@
           "DynamicRecoveryModel",
           "DynamicRecoverySpec",
           "EcfSweepSpec",
+          "EcfTerm",
           "EligibleCollateralSchedule",
           "EndogenousHazardSpec",
           "ExerciseStyle",
+          "FacilitySelection",
           "FadeToTargetParams",
           "FeeStep",
           "FeeTier",
@@ -2582,6 +2584,7 @@
           "PikToggleSpec",
           "PoolGranularity",
           "PositiveF64Wire",
+          "PrepaymentSpec",
           "PriceTrigger",
           "ProjectedFixing",
           "ProtectionWindow",
@@ -2710,9 +2713,11 @@
           "DynamicRecoveryModel",
           "DynamicRecoverySpec",
           "EcfSweepSpec",
+          "EcfTerm",
           "EligibleCollateralSchedule",
           "EndogenousHazardSpec",
           "ExerciseStyle",
+          "FacilitySelection",
           "FadeToTargetParams",
           "FeeStep",
           "FeeTier",
@@ -2789,6 +2794,7 @@
           "PikToggleSpec",
           "PoolGranularity",
           "PositiveF64Wire",
+          "PrepaymentSpec",
           "PriceTrigger",
           "ProjectedFixing",
           "ProtectionWindow",
@@ -5158,7 +5164,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 414495
+            "bytes": 417387
           },
           {
             "domain": "statements",
@@ -5246,7 +5252,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 102074
+            "bytes": 104773
           },
           {
             "domain": "valuations",

@@ -3,6 +3,7 @@
 
 use crate::capital_structure::cashflows::{CashflowBreakdown, add_optional_money};
 use crate::capital_structure::principal::PrincipalAllocation;
+use crate::capital_structure::waterfall_spec::FacilitySelection;
 use crate::error::Result;
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
@@ -32,23 +33,26 @@ pub(super) struct StagedInstrumentFlow {
 /// `voluntary_prepayment`) that a payment rung records its cash in.
 pub(super) type PrincipalComponent = fn(&mut CashflowBreakdown) -> &mut Option<Money>;
 
-/// Apply a prepayment at its position in the priority stack.
+/// Apply a prepayment at its position in the priority stack and return the
+/// cash paid.
 ///
-/// Earlier payments consume principal capacity; later scheduled claims and
-/// prepayments reserve none. This preserves payment-class seniority within
-/// each rung even when a later sweep targets a particular instrument.
+/// The payment is limited by the request, the cash left and the eligible
+/// economic principal net of reserves. Earlier payments consume principal
+/// capacity; later scheduled claims and prepayments reserve none. Payment
+/// classes keep their seniority within the eligible facilities.
 pub(super) fn apply_prepayment(
     staged: &mut [StagedInstrumentFlow],
     remaining_cash: &mut Money,
     requested: Money,
-    target: Option<&str>,
+    facilities: &FacilitySelection,
     component: PrincipalComponent,
-) -> Result<()> {
+) -> Result<Money> {
     let currency = remaining_cash.currency();
     if requested.amount_decimal().is_sign_negative() && !requested.amount_decimal().is_zero() {
-        return Err(crate::error::Error::capital_structure(
-            "A prepayment request cannot be negative",
-        ));
+        return Err(crate::error::Error::capital_structure(format!(
+            "A prepayment request of {} {currency} is negative; a request cannot be negative",
+            requested.amount()
+        )));
     }
     // The rung spends the lesser of its request and the cash left.
     let budget = if requested.amount_decimal() < remaining_cash.amount_decimal() {
@@ -58,19 +62,20 @@ pub(super) fn apply_prepayment(
     };
     let mut unallocated = budget;
     let allocations = allocate_by_class(staged, &mut unallocated, |s| {
-        Ok(if target.is_some_and(|id| id != s.instrument_id) {
-            Money::from((0_i64, currency))
-        } else {
+        Ok(if facilities.includes(&s.instrument_id) {
             s.principal.get_prepayment_capacity()
+        } else {
+            Money::from((0_i64, currency))
         })
     })?;
-    *remaining_cash = remaining_cash.checked_sub(budget.checked_sub(unallocated)?)?;
+    let paid = budget.checked_sub(unallocated)?;
+    *remaining_cash = remaining_cash.checked_sub(paid)?;
     for (s, payment) in staged.iter_mut().zip(allocations) {
         s.principal.pay_prepayment(payment)?;
         s.breakdown.principal_payment = s.breakdown.principal_payment.checked_add(payment)?;
         add_optional_money(component(&mut s.breakdown), Some(payment))?;
     }
-    Ok(())
+    Ok(paid)
 }
 
 /// Pay one category (fees, interest) across instruments from the remaining

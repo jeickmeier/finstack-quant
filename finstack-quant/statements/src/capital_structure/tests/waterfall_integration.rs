@@ -113,13 +113,21 @@ fn test_ecf_sweep_basic() {
         );
         model_builder.waterfall(WaterfallSpec {
             ecf_sweep: Some(EcfSweepSpec {
-                ebitda_node: "ebitda".to_string(),
-                taxes_node: Some("taxes".to_string()),
-                capex_node: Some("capex".to_string()),
-                working_capital_node: None,
-                cash_interest_node: None,
-                sweep_percentage: 0.5,      // 50% sweep
-                target_instrument_id: None, // Apply to all
+                cash_measure: "ebitda".to_string(),
+                deductions: vec![
+                    crate::capital_structure::EcfTerm::Input {
+                        expression: "taxes".to_string(),
+                    },
+                    crate::capital_structure::EcfTerm::Input {
+                        expression: "capex".to_string(),
+                    },
+                    crate::capital_structure::EcfTerm::PaidCashInterest,
+                    crate::capital_structure::EcfTerm::PaidFees,
+                    crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+                ],
+                credits: Vec::new(),
+                sweep_percentage: 0.5,
+                facilities: crate::capital_structure::FacilitySelection::AllEligible,
             }),
             priority_of_payments: vec![
                 finstack_quant_statements::capital_structure::PaymentPriority::Fees,
@@ -460,13 +468,15 @@ mod period_flow_waterfall_integration {
             ],
             available_cash_node: "cash".into(),
             ecf_sweep: Some(EcfSweepSpec {
-                ebitda_node: "sweep_cash".into(),
-                taxes_node: None,
-                capex_node: None,
-                working_capital_node: None,
-                cash_interest_node: None,
+                cash_measure: "sweep_cash".into(),
+                deductions: vec![
+                    crate::capital_structure::EcfTerm::PaidCashInterest,
+                    crate::capital_structure::EcfTerm::PaidFees,
+                    crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
+                ],
+                credits: Vec::new(),
                 sweep_percentage: 1.0,
-                target_instrument_id: Some("TL-1".into()),
+                facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
             }),
             pik_toggle: None,
             ..Default::default()

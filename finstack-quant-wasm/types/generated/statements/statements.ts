@@ -1332,6 +1332,11 @@ export type SettlementType = "physical" | "cash";
  */
 export type CapFloorVolType = "lognormal" | "shifted_lognormal" | "normal" | "auto";
 /**
+ * Payment priority levels in the waterfall.
+ */
+export type PaymentPriority =
+  "fees" | "interest" | "amortization" | "mandatory_prepayment" | "voluntary_prepayment" | "sweep" | "equity";
+/**
  * Instruments supported by company financial statement capital structures.
  *
  * This intentionally smaller union keeps the financial statement schema
@@ -1779,10 +1784,36 @@ export type VolatilityModel = "black" | "normal";
  */
 export type FxConversionPolicy = "cashflow_date" | "period_end";
 /**
- * Payment priority levels in the waterfall.
+ * One elected deduction from, or credit to, the excess-cash-flow measure.
  */
-export type PaymentPriority =
-  "fees" | "interest" | "amortization" | "mandatory_prepayment" | "voluntary_prepayment" | "sweep" | "equity";
+export type EcfTerm =
+  | {
+      /**
+       * Node id or formula.
+       */
+      expression: string;
+      type: "input";
+    }
+  | {
+      type: "paid_cash_interest";
+    }
+  | {
+      type: "paid_fees";
+    }
+  | {
+      type: "paid_scheduled_principal";
+    };
+/**
+ * The facilities a prepayment may repay.
+ *
+ * Eligibility is elected, never implied: either every eligible facility of
+ * the structure (its term loans and revolvers), or the named ones.
+ */
+export type FacilitySelection =
+  | "all_eligible"
+  | {
+      named: string[];
+    };
 /**
  * Typed reason for a capital-structure evaluation warning.
  */
@@ -4807,6 +4838,17 @@ export interface CapitalStructureCashflows {
     [k: string]: Money;
   };
   /**
+   * What each configured prepayment requested, paid and left unpaid in
+   * each period, in the waterfall's priority order.
+   *
+   * Only populated for periods in which a waterfall with a prepayment
+   * priority ran. An unpaid amount is not carried forward: a prepayment
+   * request is not a dated contractual obligation.
+   */
+  prepayments?: {
+    [k: string]: PrepaymentOutcome[];
+  };
+  /**
    * Reporting currency used for `totals` (if populated)
    */
   reporting_currency?: Currency | null;
@@ -4901,7 +4943,7 @@ export interface CashflowBreakdown {
   interest_income_cash?: Money | null;
   /**
    * Part of `principal_payment` paid at the waterfall's
-   * `MandatoryPrepayment` priority (`WaterfallSpec.mandatory_prepay_node`).
+   * `MandatoryPrepayment` priority (`WaterfallSpec.mandatory_prepayment`).
    * Zero when no waterfall ran. Same sign, currency and absence rule as
    * [`Self::scheduled_principal`].
    */
@@ -4964,7 +5006,7 @@ export interface CashflowBreakdown {
   sweep_prepayment?: Money | null;
   /**
    * Part of `principal_payment` paid at the waterfall's
-   * `VoluntaryPrepayment` priority (`WaterfallSpec.voluntary_prepay_node`).
+   * `VoluntaryPrepayment` priority (`WaterfallSpec.voluntary_prepayment`).
    * Zero when no waterfall ran. Same sign, currency and absence rule as
    * [`Self::scheduled_principal`].
    */
@@ -4995,6 +5037,30 @@ export interface DistressCashflow {
    * Actual payment date of the cash.
    */
   payment_date: DateWire;
+}
+/**
+ * What one prepayment priority requested and paid in a period.
+ */
+export interface PrepaymentOutcome {
+  /**
+   * The prepayment priority: mandatory prepayment, voluntary prepayment
+   * or sweep.
+   */
+  kind: PaymentPriority;
+  /**
+   * Cash paid at par: the request limited by the cash the earlier
+   * priorities left and by the eligible principal net of reserves.
+   */
+  paid: Money;
+  /**
+   * Amount the priority requested: the mandatory or voluntary amount, or
+   * the sweep percentage of positive excess cash flow.
+   */
+  requested: Money;
+  /**
+   * `requested - paid`. It is reported, not carried as arrears.
+   */
+  unpaid: Money;
 }
 /**
  * Capital structure specification.
@@ -6931,13 +6997,12 @@ export interface WaterfallSpec {
    */
   ecf_sweep?: EcfSweepSpec | null;
   /**
-   * Formula or node for the `MandatoryPrepayment` rung.
+   * The at-par mandatory prepayment: its amount and eligible facilities.
    *
-   * Required when `MandatoryPrepayment` appears in `priority_of_payments`.
-   * When configured, that priority must be present so payment consumes cash.
-   * Sized independently of the ECF sweep and voluntary prepay buckets.
+   * Supplied together with `MandatoryPrepayment` in
+   * `priority_of_payments`: neither is valid without the other.
    */
-  mandatory_prepay_node?: string | null;
+  mandatory_prepayment?: PrepaymentSpec | null;
   /**
    * Payment classes for intra-category seniority (e.g. 1L then 2L).
    *
@@ -6956,33 +7021,27 @@ export interface WaterfallSpec {
    */
   priority_of_payments?: PaymentPriority[];
   /**
-   * Formula or node for the `VoluntaryPrepayment` rung.
+   * The at-par voluntary prepayment: its amount and eligible facilities.
    *
-   * Required when `VoluntaryPrepayment` appears in `priority_of_payments`.
-   * When configured, that priority must be present so payment consumes cash.
-   * Sized independently of the ECF sweep and mandatory prepay buckets.
+   * Supplied together with `VoluntaryPrepayment` in
+   * `priority_of_payments`: neither is valid without the other.
    */
-  voluntary_prepay_node?: string | null;
+  voluntary_prepayment?: PrepaymentSpec | null;
 }
 /**
  * Excess Cash Flow (ECF) sweep specification.
  *
- * Defines how to calculate ECF and what percentage to sweep to pay down debt.
- *
- * # ECF Calculation
- *
- * The ECF formula deducts cash interest, fees and scheduled principal paid
- * by payment categories ahead of the `Sweep` priority, including carried
- * arrears. Unpaid claims, PIK and later payment priorities are not deducted:
+ * The agreement's formula is elected in full: a cash measure, each
+ * deduction and each credit. Nothing is deducted automatically.
  *
  * ```text
- * ECF = EBITDA - Taxes - CapEx - ΔWC - Cash Interest Paid
- *       - Fees Paid Ahead of Prepayment
- *       - Scheduled Principal Paid Ahead of Prepayment
- *   ```
+ * ECF     = cash_measure - Σ deductions + Σ credits
+ * request = sweep_percentage × ECF   when ECF is positive, otherwise zero
+ * ```
  *
- * Set `cash_interest_node` to override the cash-interest input. If omitted,
- * the interest actually paid ahead of `Sweep` is deducted automatically.
+ * The request is paid at par from the cash the earlier priorities left, up
+ * to the eligible principal net of reserves. It is sized, paid and applied
+ * to principal in the same reporting period.
  *
  * # References
  *
@@ -6990,38 +7049,43 @@ export interface WaterfallSpec {
  */
 export interface EcfSweepSpec {
   /**
-   * Formula or node reference for capital expenditures (e.g., "capex")
+   * Formula or node for the agreement's cash measure before deductions
+   * (for example `ebitda`), in the waterfall currency. Signed and finite.
+   * It may not depend on a same-period `cs` component.
    */
-  capex_node?: string | null;
+  cash_measure: string;
   /**
-   * Formula or node reference for cash interest paid (e.g., "cs.interest_expense_cash.total").
-   *
-   * If omitted, deducts cash interest actually paid by the `Interest` priority
-   * ahead of `Sweep`, including carried coupon arrears. If `Interest` follows
-   * `Sweep`, this automatic deduction is zero. An explicit node overrides
-   * that amount in the model's cash currency units.
+   * Amounts added to the cash measure, each elected explicitly.
    */
-  cash_interest_node?: string | null;
+  credits?: EcfTerm[];
   /**
-   * Formula or node reference for EBITDA (e.g., "ebitda" or "revenue - cogs - opex")
+   * Amounts subtracted from the cash measure, each elected explicitly.
    */
-  ebitda_node: string;
+  deductions?: EcfTerm[];
   /**
-   * Sweep percentage (e.g., 0.5 for 50%, 0.75 for 75%)
+   * The facilities the sweep may repay.
+   */
+  facilities: FacilitySelection;
+  /**
+   * Fraction of positive ECF to sweep: a decimal in `[0, 1]` (0.5 for 50%).
    */
   sweep_percentage: number;
+}
+/**
+ * An at-par mandatory or voluntary prepayment.
+ */
+export interface PrepaymentSpec {
   /**
-   * Target instrument ID for sweep payments (if None, applies to all term loans)
+   * Formula or node for the amount requested in the period, in the
+   * waterfall currency. It must be finite and non-negative: a negative
+   * request is an error, not zero. It may not depend on a same-period
+   * `cs` component.
    */
-  target_instrument_id?: string | null;
+  amount: string;
   /**
-   * Formula or node reference for taxes (e.g., "taxes")
+   * The facilities the prepayment may repay.
    */
-  taxes_node?: string | null;
-  /**
-   * Formula or node reference for working capital change (e.g., "wc_change")
-   */
-  working_capital_node?: string | null;
+  facilities: FacilitySelection;
 }
 /**
  * A seniority class for intra-category waterfall allocation.

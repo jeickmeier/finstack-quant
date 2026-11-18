@@ -36,61 +36,16 @@ wire_methods!(PyEcfSweepSpec, EcfSweepSpec, "EcfSweepSpec");
 
 #[pymethods]
 impl PyEcfSweepSpec {
-    /// Construct an ECF sweep spec.
-    ///
-    /// Excess cash flow is built as
-    /// ``ECF = EBITDA - taxes - capex - ΔWC - cash interest paid``, less any
-    /// fees and scheduled principal that rank ahead of the prepayment
-    /// priority. Every node reference is evaluated per period as a monetary
-    /// amount in the model's reporting currency.
-    ///
-    /// Parameters
-    /// ----------
-    /// ebitda_node : str
-    ///     Node reference or DSL formula for EBITDA.
-    /// sweep_percentage : float
-    ///     Fraction of ECF swept to debt paydown, as a **decimal fraction in
-    ///     [0, 1]** (0.5 = 50%), not a percentage.
-    /// taxes_node, capex_node, working_capital_node, cash_interest_node : str | None
-    ///     Optional node references deducted from EBITDA to compute ECF. When
-    ///     ``cash_interest_node`` is omitted the engine deducts contractual
-    ///     cash interest from the period's debt-service magnitude instead.
-    /// target_instrument_id : str | None
-    ///     If set, sweep applies only to this debt instrument id; otherwise
-    ///     it applies to all term loans.
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "EcfSweepSpec.__init__")]
     #[new]
     #[pyo3(
-        signature = (
-            ebitda_node,
-            sweep_percentage,
-            taxes_node=None,
-            capex_node=None,
-            working_capital_node=None,
-            cash_interest_node=None,
-            target_instrument_id=None,
-        ),
-        text_signature = "(ebitda_node, sweep_percentage, taxes_node=None, capex_node=None, working_capital_node=None, cash_interest_node=None, target_instrument_id=None)"
+        signature = (**fields),
+        text_signature = "(*, cash_measure, sweep_percentage, facilities, deductions=[], credits=[])"
     )]
-    fn new(
-        ebitda_node: String,
-        sweep_percentage: f64,
-        taxes_node: Option<String>,
-        capex_node: Option<String>,
-        working_capital_node: Option<String>,
-        cash_interest_node: Option<String>,
-        target_instrument_id: Option<String>,
-    ) -> Self {
-        Self {
-            inner: EcfSweepSpec {
-                ebitda_node,
-                taxes_node,
-                capex_node,
-                working_capital_node,
-                cash_interest_node,
-                sweep_percentage,
-                target_instrument_id,
-            },
-        }
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        Ok(Self {
+            inner: crate::bindings::module_utils::fields_from_py(py, fields, "EcfSweepSpec")?,
+        })
     }
 
     /// Validate the sweep on its own (the Rust ``EcfSweepSpec::validate``).
@@ -107,43 +62,22 @@ impl PyEcfSweepSpec {
         self.inner.validate().map_err(statements_to_py)
     }
 
-    /// Node reference or DSL formula supplying EBITDA, the ECF starting
-    /// point.
-    ///
-    /// Returns
-    /// -------
-    /// str
-    ///     A node id (``"ebitda"``) or an expression over nodes
-    ///     (``"revenue - cogs - opex"``), evaluated per period as a monetary
-    ///     amount.
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "EcfSweepSpec.cash_measure")]
     #[getter]
-    fn ebitda_node(&self) -> &str {
-        &self.inner.ebitda_node
+    fn cash_measure(&self) -> &str {
+        &self.inner.cash_measure
     }
 
-    /// Node deducted as cash taxes, or ``None``.
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "EcfSweepSpec.deductions")]
     #[getter]
-    fn taxes_node(&self) -> Option<&str> {
-        self.inner.taxes_node.as_deref()
+    fn deductions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.deductions)
     }
 
-    /// Node deducted as capital expenditure, or ``None``.
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "EcfSweepSpec.credits")]
     #[getter]
-    fn capex_node(&self) -> Option<&str> {
-        self.inner.capex_node.as_deref()
-    }
-
-    /// Node deducted as the working-capital movement, or ``None``.
-    #[getter]
-    fn working_capital_node(&self) -> Option<&str> {
-        self.inner.working_capital_node.as_deref()
-    }
-
-    /// Node deducted as cash interest paid, or ``None`` (the engine then
-    /// deducts contractual cash interest from the debt schedule).
-    #[getter]
-    fn cash_interest_node(&self) -> Option<&str> {
-        self.inner.cash_interest_node.as_deref()
+    fn credits<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.credits)
     }
 
     /// Fraction of excess cash flow swept to debt paydown.
@@ -159,29 +93,17 @@ impl PyEcfSweepSpec {
         self.inner.sweep_percentage
     }
 
-    /// Debt instrument the sweep pays down, if the sweep is targeted.
-    ///
-    /// Returns
-    /// -------
-    /// str | None
-    ///     Instrument id, or ``None`` when the sweep applies to all term
-    ///     loans in the capital structure.
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "EcfSweepSpec.facilities")]
     #[getter]
-    fn target_instrument_id(&self) -> Option<&str> {
-        self.inner.target_instrument_id.as_deref()
+    fn facilities<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.facilities)
     }
 
-    /// Return the representation with the EBITDA source, sweep fraction and
-    /// target instrument.
+    /// Return the representation with the cash measure and sweep fraction.
     fn __repr__(&self) -> String {
         format!(
-            "EcfSweepSpec(ebitda_node={:?}, sweep_percentage={}, target_instrument_id={})",
-            self.inner.ebitda_node,
-            self.inner.sweep_percentage,
-            self.inner
-                .target_instrument_id
-                .as_deref()
-                .map_or_else(|| "None".to_string(), |id| format!("{id:?}"))
+            "EcfSweepSpec(cash_measure={:?}, sweep_percentage={})",
+            self.inner.cash_measure, self.inner.sweep_percentage
         )
     }
 }
@@ -370,32 +292,7 @@ wire_methods!(PyWaterfallSpec, WaterfallSpec, "WaterfallSpec");
 
 #[pymethods]
 impl PyWaterfallSpec {
-    /// Construct a waterfall spec.
-    ///
-    /// Parameters
-    /// ----------
-    /// priority_of_payments : list[str] | None
-    ///     Priority order (strings: fees, interest, amortization, mandatory_prepayment,
-    ///     voluntary_prepayment, sweep, equity). Defaults to
-    ///     [fees, interest, amortization, equity].
-    /// available_cash_node : str | None
-    ///     Pre-waterfall cash pool node or formula. ``None`` uses ``"cash"``.
-    ///     Do not deduct ``cs.interest_expense``, ``cs.principal_payment``, or
-    ///     ``cs.fees`` here — the waterfall allocates those.
-    /// ecf_sweep : EcfSweepSpec | None
-    ///     Optional ECF sweep configuration. List `sweep` explicitly before
-    ///     any `equity` priority to allocate excess cash to principal.
-    /// pik_toggle : PikToggleSpec | None
-    ///     Optional PIK toggle configuration.
-    /// payment_classes : list[PaymentClassSpec] | None
-    ///     Intra-category seniority classes. ``None`` or empty is one implicit
-    ///     class (pro-rata across all instruments).
-    /// mandatory_prepay_node : str | None
-    ///     Node or formula sizing the ``mandatory_prepayment`` rung. Required
-    ///     when that priority is listed.
-    /// voluntary_prepay_node : str | None
-    ///     Node or formula sizing the ``voluntary_prepayment`` rung. Required
-    ///     when that priority is listed.
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "WaterfallSpec.__init__")]
     #[new]
     #[pyo3(
         signature = (
@@ -404,10 +301,10 @@ impl PyWaterfallSpec {
             ecf_sweep=None,
             pik_toggle=None,
             payment_classes=None,
-            mandatory_prepay_node=None,
-            voluntary_prepay_node=None,
+            mandatory_prepayment=None,
+            voluntary_prepayment=None,
         ),
-        text_signature = "(priority_of_payments=None, available_cash_node=None, ecf_sweep=None, pik_toggle=None, payment_classes=None, mandatory_prepay_node=None, voluntary_prepay_node=None)"
+        text_signature = "(priority_of_payments=None, available_cash_node=None, ecf_sweep=None, pik_toggle=None, payment_classes=None, mandatory_prepayment=None, voluntary_prepayment=None)"
     )]
     fn new(
         priority_of_payments: Option<Vec<String>>,
@@ -415,8 +312,8 @@ impl PyWaterfallSpec {
         ecf_sweep: Option<&PyEcfSweepSpec>,
         pik_toggle: Option<&PyPikToggleSpec>,
         payment_classes: Option<Vec<Bound<'_, PyPaymentClassSpec>>>,
-        mandatory_prepay_node: Option<String>,
-        voluntary_prepay_node: Option<String>,
+        mandatory_prepayment: Option<&Bound<'_, PyAny>>,
+        voluntary_prepayment: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
         let mut inner = WaterfallSpec::default();
         if let Some(priority) = priority_of_payments {
@@ -433,8 +330,12 @@ impl PyWaterfallSpec {
         if let Some(classes) = payment_classes {
             inner.payment_classes = classes.iter().map(|c| c.borrow().inner.clone()).collect();
         }
-        inner.mandatory_prepay_node = mandatory_prepay_node;
-        inner.voluntary_prepay_node = voluntary_prepay_node;
+        let prepayment = |spec: Option<&Bound<'_, PyAny>>, label: &str| {
+            spec.map(|spec| crate::bindings::module_utils::spec_from_py(spec.py(), spec, label))
+                .transpose()
+        };
+        inner.mandatory_prepayment = prepayment(mandatory_prepayment, "mandatory prepayment spec")?;
+        inner.voluntary_prepayment = prepayment(voluntary_prepayment, "voluntary prepayment spec")?;
         Ok(Self { inner })
     }
 
@@ -516,26 +417,24 @@ impl PyWaterfallSpec {
             .collect()
     }
 
-    /// Node or formula sizing the ``mandatory_prepayment`` rung, if set.
-    ///
-    /// Returns
-    /// -------
-    /// str | None
-    ///     Node id or formula, or ``None`` when that rung is unused.
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "WaterfallSpec.mandatory_prepayment")]
     #[getter]
-    fn mandatory_prepay_node(&self) -> Option<&str> {
-        self.inner.mandatory_prepay_node.as_deref()
+    fn mandatory_prepayment<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .mandatory_prepayment
+            .as_ref()
+            .map(|spec| crate::bindings::pandas_utils::serde_to_py(py, spec))
+            .transpose()
     }
 
-    /// Node or formula sizing the ``voluntary_prepayment`` rung, if set.
-    ///
-    /// Returns
-    /// -------
-    /// str | None
-    ///     Node id or formula, or ``None`` when that rung is unused.
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "WaterfallSpec.voluntary_prepayment")]
     #[getter]
-    fn voluntary_prepay_node(&self) -> Option<&str> {
-        self.inner.voluntary_prepay_node.as_deref()
+    fn voluntary_prepayment<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .voluntary_prepayment
+            .as_ref()
+            .map(|spec| crate::bindings::pandas_utils::serde_to_py(py, spec))
+            .transpose()
     }
 
     /// Whether an excess-cash-flow sweep is configured.
@@ -670,6 +569,12 @@ impl PyCapitalStructureCashflows {
             dict.set_item(period.to_string(), PyMoney { inner: *money })?;
         }
         Ok(dict)
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "CapitalStructureCashflows.prepayments")]
+    #[getter]
+    fn prepayments<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.prepayments)
     }
 
     #[doc = pydoc!("finstack_quant.statements._capital_structure", "CapitalStructureCashflows.retained_cash")]

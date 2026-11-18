@@ -36,25 +36,38 @@ def _debt_envelope_json(instrument_id: str) -> str:
 
 class TestEcfSweepSpec:
     def test_construct_with_minimum_args(self) -> None:
-        ecf = statements.EcfSweepSpec(ebitda_node="ebitda", sweep_percentage=0.5)
-        assert ecf.ebitda_node == "ebitda"
+        ecf = statements.EcfSweepSpec(cash_measure="ebitda", sweep_percentage=0.5, facilities="all_eligible")
+        assert ecf.cash_measure == "ebitda"
         assert ecf.sweep_percentage == 0.5
-        assert ecf.target_instrument_id is None
+        assert ecf.deductions == []
+        assert ecf.credits == []
+        assert ecf.facilities == "all_eligible"
 
     def test_construct_with_all_args(self) -> None:
         ecf = statements.EcfSweepSpec(
-            ebitda_node="ebitda",
+            cash_measure="ebitda",
+            deductions=[
+                {"type": "input", "expression": "taxes"},
+                {"type": "input", "expression": "capex"},
+                {"type": "input", "expression": "wc"},
+                {"type": "paid_cash_interest"},
+                {"type": "paid_fees"},
+                {"type": "paid_scheduled_principal"},
+            ],
+            credits=[{"type": "input", "expression": "asset_sale_proceeds"}],
             sweep_percentage=0.75,
-            taxes_node="taxes",
-            capex_node="capex",
-            working_capital_node="wc",
-            cash_interest_node="cs.interest_expense_cash.total",
-            target_instrument_id="TL-A",
+            facilities={"named": ["TL-A"]},
         )
-        assert ecf.target_instrument_id == "TL-A"
+        assert ecf.facilities == {"named": ["TL-A"]}
+        assert ecf.deductions[3] == {"type": "paid_cash_interest"}
+        assert ecf.credits == [{"type": "input", "expression": "asset_sale_proceeds"}]
+
+    def test_rejects_unknown_fields(self) -> None:
+        with pytest.raises(ValueError, match="ebitda_node"):
+            statements.EcfSweepSpec(ebitda_node="ebitda", sweep_percentage=0.5, facilities="all_eligible")
 
     def test_json_roundtrip(self) -> None:
-        ecf = statements.EcfSweepSpec(ebitda_node="ebitda", sweep_percentage=0.5, target_instrument_id="X")
+        ecf = statements.EcfSweepSpec(cash_measure="ebitda", sweep_percentage=0.5, facilities={"named": ["X"]})
         restored = statements.EcfSweepSpec.from_json(ecf.to_json())
         assert restored.to_json() == ecf.to_json()
 
@@ -98,8 +111,8 @@ class TestWaterfallSpec:
         assert not ws.has_pik_toggle
         assert ws.available_cash_node == "cash"
         assert ws.payment_classes == []
-        assert ws.mandatory_prepay_node is None
-        assert ws.voluntary_prepay_node is None
+        assert ws.mandatory_prepayment is None
+        assert ws.voluntary_prepayment is None
 
     def test_custom_priority(self) -> None:
         priorities = ["fees", "amortization", "interest", "equity"]
@@ -112,7 +125,7 @@ class TestWaterfallSpec:
             statements.WaterfallSpec(priority_of_payments=["nonexistent"])
 
     def test_with_ecf_and_pik(self) -> None:
-        ecf = statements.EcfSweepSpec(ebitda_node="ebitda", sweep_percentage=0.5)
+        ecf = statements.EcfSweepSpec(cash_measure="ebitda", sweep_percentage=0.5, facilities="all_eligible")
         pik = statements.PikToggleSpec(liquidity_metric="cash", threshold=1e6, target_instrument_ids=["TL"])
         ws = statements.WaterfallSpec(priority_of_payments=SWEEP_PRIORITIES, ecf_sweep=ecf, pik_toggle=pik)
         ws.validate()
@@ -124,7 +137,7 @@ class TestWaterfallSpec:
 
     @pytest.mark.parametrize("percentage", [0.0, 0.5])
     def test_validate_requires_explicit_sweep_priority(self, percentage: float) -> None:
-        ecf = statements.EcfSweepSpec(ebitda_node="ebitda", sweep_percentage=percentage)
+        ecf = statements.EcfSweepSpec(cash_measure="ebitda", sweep_percentage=percentage, facilities="all_eligible")
         ws = statements.WaterfallSpec(ecf_sweep=ecf, available_cash_node="cash")
         with pytest.raises(ValueError, match="requires the `Sweep` priority"):
             ws.validate()
@@ -135,7 +148,7 @@ class TestWaterfallSpec:
             ws.validate()
 
     def test_validate_rejects_sweep_after_equity(self) -> None:
-        ecf = statements.EcfSweepSpec(ebitda_node="ebitda", sweep_percentage=0.5)
+        ecf = statements.EcfSweepSpec(cash_measure="ebitda", sweep_percentage=0.5, facilities="all_eligible")
         ws = statements.WaterfallSpec(
             priority_of_payments=["fees", "interest", "amortization", "equity", "sweep"],
             ecf_sweep=ecf,
@@ -147,7 +160,7 @@ class TestWaterfallSpec:
             ws.validate()
 
     def test_json_roundtrip(self) -> None:
-        ecf = statements.EcfSweepSpec(ebitda_node="ebitda", sweep_percentage=0.25)
+        ecf = statements.EcfSweepSpec(cash_measure="ebitda", sweep_percentage=0.25, facilities="all_eligible")
         ws = statements.WaterfallSpec(
             priority_of_payments=SWEEP_PRIORITIES,
             available_cash_node="free_cash_flow",
@@ -237,11 +250,7 @@ class TestModelBuilderCapitalStructure:
 
     def test_waterfall_attaches_to_model(self) -> None:
         loan = TermLoan.example()
-        ecf = statements.EcfSweepSpec(
-            ebitda_node="ebitda",
-            sweep_percentage=0.5,
-            target_instrument_id=loan.id,
-        )
+        ecf = statements.EcfSweepSpec(cash_measure="ebitda", sweep_percentage=0.5, facilities={"named": [loan.id]})
         first_lien = statements.PaymentClassSpec("1L", 0, [loan.id])
         ws = statements.WaterfallSpec(
             priority_of_payments=SWEEP_PRIORITIES,

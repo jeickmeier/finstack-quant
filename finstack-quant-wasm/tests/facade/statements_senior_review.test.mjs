@@ -161,13 +161,13 @@ test('waterfall validation requires funded prepayment and sweep priorities', () 
   };
   const defaults = JSON.parse(statements.validateWaterfallSpecJson(JSON.stringify(waterfall)));
   assert.deepEqual(defaults.priority_of_payments, ['fees', 'interest', 'amortization', 'equity']);
-  waterfall.mandatory_prepay_node = 'prepay';
+  waterfall.mandatory_prepayment = { amount: 'prepay', facilities: 'all_eligible' };
   assert.throws(
     () => statements.validateWaterfallSpecJson(JSON.stringify(waterfall)),
     /MandatoryPrepayment|mandatory_prepay/i
   );
-  delete waterfall.mandatory_prepay_node;
-  waterfall.ecf_sweep = { sweep_percentage: 0.5, ebitda_node: 'cash' };
+  delete waterfall.mandatory_prepayment;
+  waterfall.ecf_sweep = { sweep_percentage: 0.5, cash_measure: 'cash', facilities: 'all_eligible' };
   assert.throws(
     () => statements.validateWaterfallSpecJson(JSON.stringify(waterfall)),
     /Sweep|sweep/i

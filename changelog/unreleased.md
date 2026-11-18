@@ -1317,6 +1317,39 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements capital: prepayments elect their facilities; the sweep formula is authored term by term
+
+Breaking, with no compatibility path (STATEMENTS-CAPITAL-007).
+
+- `WaterfallSpec.mandatory_prepay_node` and `voluntary_prepay_node` are
+  replaced by `mandatory_prepayment` and `voluntary_prepayment`, each
+  `{"amount": <formula>, "facilities": ...}`. `facilities` is required:
+  `"all_eligible"` or `{"named": ["TL-A", ...]}`.
+- `EcfSweepSpec` is `{cash_measure, deductions, credits, sweep_percentage,
+  facilities}`. `ebitda_node`, `taxes_node`, `capex_node`,
+  `working_capital_node`, `cash_interest_node` and `target_instrument_id` are
+  removed. A deduction or credit is `{"type": "input", "expression": ...}`,
+  `{"type": "paid_cash_interest"}`, `{"type": "paid_fees"}` or
+  `{"type": "paid_scheduled_principal"}`; the paid terms are the cash earlier
+  priorities actually paid this period. Nothing is deducted unless listed, so
+  a sweep that relied on the automatic interest, fee and scheduled-principal
+  deductions must now list them.
+- ECF is exact money in the waterfall currency:
+  `cash_measure - deductions + credits`. The percentage applies to positive
+  ECF; a non-positive ECF requests nothing.
+- A negative mandatory or voluntary request is an error (it was floored to
+  zero). A sizing expression that reads a same-period `cs` output is rejected
+  when the run starts.
+- A named facility must be a debt instrument of the capital structure. A term
+  loan with a call schedule cannot be elected by any prepayment: the waterfall
+  repays at par and does not price the call premium or make-whole.
+- Each rung reports its requested, paid and unpaid amounts:
+  `CapitalStructureCashflows.prepayments` maps a period to its
+  `PrepaymentOutcome` list. Python gains `CapitalStructureCashflows.prepayments`
+  and `retained_cash`; `EcfSweepSpec` takes its fields as
+  keyword-only arguments and the `WaterfallSpec` prepayment arguments take the
+  wire mappings.
+
 ### Statements capital: waterfall allocation is exact; residual cash is equity or retained
 
 STATEMENTS-CAPITAL-006. **Breaking.**
