@@ -37,13 +37,16 @@ fn strict_json_rejects_node_identity_that_would_share_another_forecast_cache() {
 
     let error = FinancialModelSpec::from_slice_strict(&bytes, &LoadLimits::default())
         .expect_err("two map entries must not share an embedded forecast-cache identity");
-    let ContractError::Core(core) = &error else {
-        panic!("expected the typed validation error, got {error:?}");
+    let ContractError::Report(report) = &error else {
+        panic!("expected a located diagnostic, got {error:?}");
     };
-    assert_eq!(core.kind(), finstack_quant_core::ErrorKind::Validation);
-    let message = error.to_string();
-    assert!(message.contains("Node map key 'cost'"), "{message}");
-    assert!(message.contains("embedded node_id 'revenue'"), "{message}");
+    let diagnostic = &report.diagnostics[0];
+    assert_eq!(diagnostic.code, "statements/build");
+    assert_eq!(diagnostic.pointer.as_deref(), Some("/nodes/cost"));
+    assert!(diagnostic.message.contains("Node map key 'cost'"));
+    assert!(diagnostic.message.contains("embedded node_id 'revenue'"));
+    // The error text alone names the failure.
+    assert!(error.to_string().contains("Node map key 'cost'"), "{error}");
 
     let model: FinancialModelSpec = serde_json::from_value(payload).unwrap();
     let evaluation_error = Evaluator::new()

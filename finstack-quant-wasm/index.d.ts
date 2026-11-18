@@ -9923,7 +9923,7 @@ export interface StatementsNamespace {
   /**
    * Period-to-value map of one node: the float view of its value cells.
    *
-   * Free-function twin of Python `StatementResult.get_node` (Rust
+   * Free-function twin of Python `StatementResult.numeric_series` (Rust
    * `StatementResult::numeric_series`). Cells without a value are omitted;
    * read `cells` or `statementResultGetCell` for their status.
    * @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
@@ -9934,7 +9934,7 @@ export interface StatementsNamespace {
    *
    * Throws with kind `validation` if the result input is malformed.
    */
-  readonly statementResultGetNode: typeof wasm.statementResultGetNode;
+  readonly statementResultNumericSeries: typeof wasm.statementResultNumericSeries;
   /**
    * Node identifiers held by a statement result.
    *

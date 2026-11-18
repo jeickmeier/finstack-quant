@@ -3961,10 +3961,10 @@
       "statementResultGet",
       "statementResultGetCell",
       "statementResultGetMoney",
-      "statementResultGetNode",
       "statementResultGetOr",
       "statementResultGetScalar",
       "statementResultNodeIds",
+      "statementResultNumericSeries",
       "statementResultRollup",
       "statementResultToTableLong",
       "statementResultToTableWide",
@@ -4113,7 +4113,7 @@
   "statements.rollupSpecDeclaredMethods": {
     "kind": "function"
   },
-  "statements.statementResultGetNode": {
+  "statements.statementResultNumericSeries": {
     "kind": "function"
   },
   "statements.statementResultNodeIds": {

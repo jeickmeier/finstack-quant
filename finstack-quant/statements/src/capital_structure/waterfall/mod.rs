@@ -95,75 +95,104 @@ pub(crate) struct WaterfallPeriodResult {
     pub(crate) pik_request: Option<bool>,
 }
 
-/// Evaluate a node reference or inline DSL expression against the current context.
-///
-/// The result is required to be finite. The evaluator deliberately produces
-/// `NaN` for division by zero and `±Inf` on overflow, and stores them so
-/// downstream formulas can guard them — but every waterfall input feeds a
-/// cash allocation, where a non-finite value degrades silently rather than
-/// loudly: `NaN.max(0.0)` is `0.0` (an empty cash pool that shorts every
-/// creditor) and `NaN < threshold` is `false` (a PIK toggle that never fires).
-/// Both surface only as misleading downstream shortfall warnings. Fail here
-/// instead, naming the expression that produced the value.
+/// The typed value of a waterfall input: a node of the model, or an inline
+/// formula evaluated in the period's context.
 ///
 /// Warnings raised while evaluating an inline expression are appended to
 /// `warnings`. The expression runs against a scratch copy of the context, so
 /// without this they would be dropped with the copy: an expression that guards
-/// its own bad arithmetic (`coalesce(a / 0, 0)`) returns a finite value and
-/// would otherwise hide the division entirely.
-fn eval_value_or_formula(
+/// its own bad arithmetic (`coalesce(a / 0, 0)`) would otherwise hide it.
+fn eval_input(
+    context: &EvaluationContext,
+    expr: &str,
+    warnings: &mut Vec<EvalWarning>,
+) -> Result<crate::evaluator::value::Value> {
+    if let Ok(value) = context.get_operand(expr) {
+        return Ok(value);
+    }
+    let compiled = crate::dsl::parse_and_compile(expr)?;
+    let mut scratch = context.clone();
+    // The scratch inherits the context's existing warnings; only those added
+    // by this evaluation are new. Warnings are attributed to the expression
+    // text: an inline waterfall expression has no node id of its own.
+    let inherited = scratch.warnings.len();
+    let result = crate::evaluator::formula::evaluate_value(&compiled, &mut scratch, Some(expr));
+    warnings.extend(scratch.warnings.drain(inherited..));
+    result
+}
+
+/// A waterfall input without a usable value: every input feeds a cash
+/// allocation, where a silent zero would short every creditor.
+fn input_error(context: &EvaluationContext, expr: &str, why: &str) -> crate::error::Error {
+    crate::error::Error::capital_structure(format!(
+        "waterfall input '{expr}' {why} in period {}",
+        context.period_id
+    ))
+}
+
+/// A waterfall input as an exact amount in the waterfall `currency`.
+///
+/// Money keeps its exact amount and must be in `currency`; a unitless number
+/// is an amount of `currency`. A value in another currency, a Boolean, or an
+/// input with no value is an error naming the expression.
+fn eval_money(
+    context: &EvaluationContext,
+    expr: &str,
+    currency: finstack_quant_core::currency::Currency,
+    warnings: &mut Vec<EvalWarning>,
+) -> Result<Money> {
+    use crate::evaluator::value::Value;
+    match eval_input(context, expr, warnings)? {
+        Value::Money(money) if money.currency() == currency => Ok(money),
+        Value::Money(money) => Err(input_error(
+            context,
+            expr,
+            &format!(
+                "is in {}, not the waterfall currency {currency}",
+                money.currency()
+            ),
+        )),
+        // `Money::new` rejects a non-finite or unrepresentable amount.
+        Value::Scalar(amount) | Value::Number(amount) => {
+            Money::new(amount, currency).map_err(|error| {
+                input_error(
+                    context,
+                    expr,
+                    &format!("produced {amount}, not a representable {currency} amount ({error})"),
+                )
+            })
+        }
+        Value::Bool(_) => Err(input_error(context, expr, "is a condition, not an amount")),
+        Value::Unavailable(reason) => Err(input_error(
+            context,
+            expr,
+            &format!("has no value ({})", reason.as_str()),
+        )),
+    }
+}
+
+/// A waterfall input as a number in its own units, for a threshold test.
+fn eval_number(
     context: &EvaluationContext,
     expr: &str,
     warnings: &mut Vec<EvalWarning>,
 ) -> Result<f64> {
-    let value = if let Ok(value) = context.get_value(expr) {
-        value
-    } else {
-        let compiled = crate::dsl::parse_and_compile(expr)?;
-        let mut scratch = context.clone();
-        // The scratch inherits the context's existing warnings; only those
-        // added by this evaluation are new.
-        let inherited = scratch.warnings.len();
-        // Attribute warnings to the expression itself. The formula evaluator
-        // only records a warning when it has a node id to attach it to, so
-        // passing `None` here silently suppressed them at the source; an
-        // inline waterfall expression has no node id of its own, and the
-        // expression text is the most useful thing to name in a diagnostic.
-        let result =
-            crate::evaluator::formula::evaluate_formula(&compiled, &mut scratch, Some(expr));
-        warnings.extend(scratch.warnings.drain(inherited..));
-        result?
-    };
-
-    if !value.is_finite() {
-        return Err(crate::error::Error::capital_structure(format!(
-            "waterfall input '{expr}' evaluated to the non-finite value {value} in period {}. \
-             Cash allocation requires finite inputs; a non-finite value would be silently \
-             read as zero cash (or as a PIK toggle that never fires). Check the expression \
-             for division by zero or overflow.",
-            context.period_id
-        )));
+    use crate::evaluator::value::Value;
+    match eval_input(context, expr, warnings)? {
+        Value::Money(money) => Ok(money.amount()),
+        Value::Scalar(value) | Value::Number(value) if value.is_finite() => Ok(value),
+        Value::Scalar(value) | Value::Number(value) => Err(input_error(
+            context,
+            expr,
+            &format!("evaluated to the non-finite value {value}"),
+        )),
+        Value::Bool(_) => Err(input_error(context, expr, "is a condition, not a number")),
+        Value::Unavailable(reason) => Err(input_error(
+            context,
+            expr,
+            &format!("has no value ({})", reason.as_str()),
+        )),
     }
-
-    Ok(value)
-}
-
-/// Convert a waterfall-derived `f64` into `Money`, naming `expr` on failure.
-///
-/// `Money::new` panics on amounts outside `rust_decimal`'s representable range
-/// (~7.9e28), which a plain model value can reach. Library code must not panic
-/// on user input (INVARIANTS.md §5), so surface it as an error instead.
-fn money_from_expr(
-    amount: f64,
-    currency: finstack_quant_core::currency::Currency,
-    expr: &str,
-) -> Result<Money> {
-    Money::new(amount, currency).map_err(|e| {
-        crate::error::Error::capital_structure(format!(
-            "waterfall input '{expr}' produced the amount {amount}, which is not a \
-             representable {currency} value: {e}"
-        ))
-    })
 }
 
 /// Payment-class rank for `instrument_id`. Empty `payment_classes` is rank `0`.
@@ -196,8 +225,7 @@ fn apply_named_prepay(
     warnings: &mut Vec<EvalWarning>,
     component: PrincipalComponent,
 ) -> Result<(Money, Money)> {
-    let amount = eval_value_or_formula(context, &spec.amount, warnings)?;
-    let requested = money_from_expr(amount, remaining_cash.currency(), &spec.amount)?;
+    let requested = eval_money(context, &spec.amount, remaining_cash.currency(), warnings)?;
     let paid = apply_prepayment(
         staged,
         remaining_cash,
@@ -759,19 +787,20 @@ fn available_cash(
     warnings: &mut Vec<EvalWarning>,
 ) -> Result<Money> {
     let node = &waterfall_spec.available_cash_node;
-    let cash = eval_value_or_formula(context, node, warnings)?;
+    let cash = eval_money(context, node, currency, warnings)?;
     // The shortfall itself must stay visible: without this warning the period
     // simply shorts every creditor and the negative signal disappears.
-    if cash < 0.0 {
+    if cash.amount_decimal() < rust_decimal::Decimal::ZERO {
         warnings.push(EvalWarning::CapitalStructure {
             period: context.period_id,
             warning: CapitalStructureWarning::NegativeAvailableCashFloored {
                 node_id: node.clone(),
-                amount: cash,
+                amount: cash.amount(),
             },
         });
+        return Ok(Money::from((0_i64, currency)));
     }
-    money_from_expr(cash.max(0.0), currency, node)
+    Ok(cash)
 }
 
 #[cfg(test)]
@@ -1009,9 +1038,9 @@ mod tests {
     /// against an empty cash pool while reporting only downstream shortfall
     /// warnings — no diagnostic pointing at the broken formula.
     #[test]
-    fn available_cash_node_rejects_non_finite_value() {
+    fn available_cash_node_rejects_an_input_without_a_value() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        // `0 / 0` is NaN under the DSL's documented division-by-zero policy.
+        // A lag with no prior period has no value.
         let context = build_context(period, &[("cash", 0.0)]);
 
         let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
@@ -1039,12 +1068,50 @@ mod tests {
 
         let err =
             execute_waterfall_same_period(&context, &waterfall, &mut state, &contractual_flows)
-                .expect_err("non-finite available cash must error rather than coerce to zero");
+                .expect_err("available cash without a value must error rather than read as zero");
         let msg = err.to_string();
         assert!(
-            msg.contains("non-finite") && msg.contains("lag(cash, 1)"),
+            msg.contains("has no value") && msg.contains("lag(cash, 1)"),
             "error must name the offending expression: {msg}"
         );
+    }
+
+    /// Typed inputs keep their units: money in another currency is refused,
+    /// not allocated as if it were the waterfall currency.
+    #[test]
+    fn a_cash_pool_in_another_currency_is_refused() {
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let mut context = build_context(period, &[]);
+        context
+            .set_cell(
+                "cash",
+                crate::evaluator::cell::Cell::Money(Money::from((500_i64, Currency::EUR))),
+            )
+            .expect("cell");
+        let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
+        contractual_flows.insert(
+            "TL-1".to_string(),
+            CashflowBreakdown::with_currency(Currency::USD),
+        );
+        let mut state = CapitalStructureState::new();
+        state
+            .opening_balances
+            .insert("TL-1".to_string(), Money::from((10_000_i64, Currency::USD)));
+        let waterfall = WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Amortization,
+                PaymentPriority::Equity,
+            ],
+            available_cash_node: "cash".into(),
+            ..Default::default()
+        };
+        let msg =
+            execute_waterfall_same_period(&context, &waterfall, &mut state, &contractual_flows)
+                .expect_err("a EUR pool cannot pay a USD waterfall")
+                .to_string();
+        assert!(msg.contains("EUR") && msg.contains("USD"), "{msg}");
     }
 
     /// `available_cash_node` is the pre-waterfall cash pool. Deducting

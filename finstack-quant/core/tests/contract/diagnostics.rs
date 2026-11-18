@@ -110,7 +110,7 @@ fn validation_report_detects_errors_and_bounds_diagnostics() {
     assert!(report.truncated);
     assert_eq!(
         ContractError::Report(Box::new(report)).to_string(),
-        "validation failed with 1 error(s)"
+        "validation failed with 1 error(s): position is invalid"
     );
 }
 
@@ -129,7 +129,7 @@ fn warning_filled_limit_retains_error_across_json_roundtrip() {
     assert!(restored.has_errors());
     assert_eq!(
         ContractError::Report(Box::new(restored)).to_string(),
-        "validation failed with 1 error(s)"
+        "validation failed with 1 error(s): position is invalid"
     );
 }
 
@@ -191,6 +191,6 @@ fn report_contract_error_counts_only_error_diagnostics() {
 
     assert_eq!(
         ContractError::Report(Box::new(report)).to_string(),
-        "validation failed with 2 error(s)"
+        "validation failed with 2 error(s): position is invalid"
     );
 }

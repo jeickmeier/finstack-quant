@@ -174,6 +174,31 @@ impl Error {
 }
 
 impl Error {
+    /// Stable snake_case name of the failure, identical to the variant's
+    /// serde tag: the code a load diagnostic carries after `statements/`.
+    #[must_use]
+    pub fn code(&self) -> &'static str {
+        match self {
+            Error::Build(_) => "build",
+            Error::FormulaParse(_) => "formula_parse",
+            Error::Eval(_) => "eval",
+            Error::NodeNotFound(_) => "node_not_found",
+            Error::CircularDependency(_) => "circular_dependency",
+            Error::CurrencyMismatch(..) => "currency_mismatch",
+            Error::Period(_) => "period",
+            Error::MissingData(_) => "missing_data",
+            Error::InvalidInput(_) => "invalid_input",
+            Error::Forecast(_) => "forecast",
+            Error::Registry(_) => "registry",
+            Error::RegistryNotFound(_) => "registry_not_found",
+            Error::CapitalStructure(_) => "capital_structure",
+            Error::Serde(_) => "serde",
+            Error::Core(_) => "core",
+        }
+    }
+}
+
+impl Error {
     /// Classify this error for host-language exception mapping.
     ///
     /// | Kind | Variants |

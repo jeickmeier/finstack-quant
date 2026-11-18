@@ -309,7 +309,6 @@ fn outcome(document: &str) -> Value {
         Ok(model) => json!({"content_hash": model.content_hash().expect("identity")}),
         Err(error) => {
             let (kind, code, pointer) = match &error {
-                ContractError::Core(core) => (core.kind().as_str(), None, None),
                 ContractError::Report(report) => (
                     "validation",
                     report.diagnostics.first().map(|d| d.code.clone()),

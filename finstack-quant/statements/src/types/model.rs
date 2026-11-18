@@ -317,10 +317,12 @@ impl FinancialModelSpec {
     ///   absent or different `schema_version`, or a document that does not
     ///   match the model shape. Its first diagnostic carries the failure
     ///   code and, where one exists, the JSON pointer of the offending field.
-    /// * [`ContractError::Core`] when the decoded model fails
-    ///   [`Self::validate_semantics`]: the statements error converted to the
-    ///   core error, which keeps its kind (validation, lookup or computation)
-    ///   and its message.
+    /// * [`ContractError::Report`] in the semantic phase when the decoded
+    ///   model fails [`Self::validate_semantics`]: its diagnostic code is
+    ///   `statements/<failure>` (for example `statements/build`,
+    ///   `statements/node_not_found` or `statements/circular_dependency`), its
+    ///   pointer the node, period plan or capital-structure field concerned,
+    ///   and its message the validation error.
     pub fn from_slice_strict(
         bytes: &[u8],
         limits: &LoadLimits,
@@ -343,9 +345,21 @@ impl FinancialModelSpec {
             );
             ContractError::Report(Box::new(report))
         })?;
-        model
-            .validate_semantics()
-            .map_err(|error| ContractError::Core(error.into()))?;
+        model.validate_located().map_err(|(pointer, error)| {
+            let mut diagnostic = Diagnostic::new(
+                format!("statements/{}", error.code()),
+                LoadPhase::Semantic,
+                Severity::Error,
+                error.to_string(),
+            )
+            .with_contract(FINANCIAL_MODEL_CONTRACT.id);
+            if !pointer.is_empty() {
+                diagnostic = diagnostic.with_pointer(pointer);
+            }
+            let mut report = ValidationReport::default();
+            report.push_bounded(limits, diagnostic);
+            ContractError::Report(Box::new(report))
+        })?;
         Ok(model)
     }
 
@@ -483,12 +497,29 @@ impl FinancialModelSpec {
 
     /// Validate the mutable model and retain expressions and the dependency graph.
     pub(crate) fn analyze_semantics(&mut self) -> Result<SemanticAnalysis> {
+        self.analyze_semantics_at(&mut SemanticLocation::Field(""))
+    }
+
+    /// Validate the model and, when it is not runnable, report the JSON
+    /// pointer of the field the failure concerns with its error.
+    fn validate_located(&mut self) -> std::result::Result<(), (String, Error)> {
+        let mut at = SemanticLocation::Field("");
+        self.analyze_semantics_at(&mut at)
+            .map(|_| ())
+            .map_err(|error| (at.pointer(self), error))
+    }
+
+    /// [`Self::analyze_semantics`], keeping `at` on the field being checked
+    /// so a failure can be located without an allocation on the success path.
+    fn analyze_semantics_at(&mut self, at: &mut SemanticLocation) -> Result<SemanticAnalysis> {
         let mut parsed = IndexMap::new();
         let mut compiled = IndexMap::new();
+        *at = SemanticLocation::Field("/periods");
         if self.periods.is_empty() {
             return Err(Error::build("Model must have at least one period"));
         }
         Self::validate_period_timeline(&self.periods)?;
+        *at = SemanticLocation::Field("/source_snapshot");
         if self
             .source_snapshot
             .as_ref()
@@ -498,6 +529,7 @@ impl FinancialModelSpec {
                 "Model source_snapshot must be a nonempty identifier when set",
             ));
         }
+        *at = SemanticLocation::Field("/nodes");
         let evaluable_capital_structure = self
             .capital_structure
             .as_ref()
@@ -509,11 +541,13 @@ impl FinancialModelSpec {
         }
         let inferred_explicit_types = self.validate_explicit_values()?;
 
-        for node_id in self.nodes.keys() {
+        for (index, node_id) in self.nodes.keys().enumerate() {
+            *at = SemanticLocation::Node(index);
             crate::builder::validate_node_id(node_id.as_str())?;
         }
 
-        for (node_id, node) in &self.nodes {
+        for (index, (node_id, node)) in self.nodes.iter().enumerate() {
+            *at = SemanticLocation::Node(index);
             if node.node_id != *node_id {
                 return Err(Error::build(format!(
                     "Node map key '{node_id}' does not match its embedded node_id '{}'",
@@ -565,7 +599,8 @@ impl FinancialModelSpec {
 
         // References and cycles first: an unknown node or a cycle would
         // otherwise surface as an unresolved unit.
-        for (node_id, node) in &self.nodes {
+        for (index, (node_id, node)) in self.nodes.iter().enumerate() {
+            *at = SemanticLocation::Node(index);
             for (label, source) in [
                 ("formula", &node.formula_text),
                 ("where clause", &node.where_text),
@@ -577,9 +612,23 @@ impl FinancialModelSpec {
                 }
             }
         }
-        let graph = crate::evaluator::DependencyGraph::from_parsed(self, &parsed)?;
-        graph.detect_cycles()?;
+        *at = SemanticLocation::Field("/nodes");
+        let graph = crate::evaluator::DependencyGraph::from_parsed(self, &parsed, &mut |index| {
+            *at = SemanticLocation::Node(index);
+        })?;
+        *at = SemanticLocation::Field("/nodes");
+        // A cycle is located at the first node of the reported loop.
+        graph.detect_cycles().inspect_err(|error| {
+            if let Error::CircularDependency(path) = error
+                && let Some(index) = path
+                    .first()
+                    .and_then(|id| self.nodes.get_index_of(id.as_str()))
+            {
+                *at = SemanticLocation::Node(index);
+            }
+        })?;
 
+        *at = SemanticLocation::Field("/capital_structure");
         let capital_structure_currency = self.capital_structure_currency()?;
         let instrument_currencies = self.capital_structure_instrument_currencies()?;
         let mut node_value_types: IndexMap<NodeId, crate::types::NodeValueType> = self
@@ -600,6 +649,10 @@ impl FinancialModelSpec {
             let mut next = Vec::new();
             let mut progress = false;
             for node_id in unresolved {
+                *at = self
+                    .nodes
+                    .get_index_of(&node_id)
+                    .map_or(SemanticLocation::Field("/nodes"), SemanticLocation::Node);
                 let inferred = {
                     let node = self.nodes.get(&node_id).ok_or_else(|| {
                         Error::build(format!("Formula node '{node_id}' disappeared"))
@@ -660,6 +713,7 @@ impl FinancialModelSpec {
             provisional: false,
         };
         let has_capital_structure = self.capital_structure.is_some();
+        *at = SemanticLocation::Field("/capital_structure");
         // Consolidating more than one native currency needs the conversion
         // policy chosen explicitly, and `total` is the consolidated scope.
         if let Some(cs) = &self.capital_structure {
@@ -687,7 +741,8 @@ impl FinancialModelSpec {
                 )));
             }
         }
-        for (node_id, node) in &self.nodes {
+        for (index, (node_id, node)) in self.nodes.iter().enumerate() {
+            *at = SemanticLocation::Node(index);
             if node.formula_text.is_none() && node.value_type.is_none() {
                 return Err(Error::build(format!(
                     "Cannot resolve the units of node '{node_id}': it has no observations; \
@@ -752,11 +807,37 @@ impl FinancialModelSpec {
             }
         }
 
+        *at = SemanticLocation::Field("/capital_structure");
         if let Some(cs) = &self.capital_structure {
             cs.validate()?;
         }
 
         Ok(SemanticAnalysis { compiled, graph })
+    }
+}
+
+/// The model field semantic validation is checking.
+#[derive(Clone, Copy)]
+enum SemanticLocation {
+    /// A fixed JSON pointer; empty for the whole document.
+    Field(&'static str),
+    /// The node at this position of the node map.
+    Node(usize),
+}
+
+impl SemanticLocation {
+    /// The JSON pointer (RFC 6901) of this location in `model`.
+    fn pointer(self, model: &FinancialModelSpec) -> String {
+        match self {
+            Self::Field(pointer) => pointer.to_string(),
+            Self::Node(index) => match model.nodes.get_index(index) {
+                Some((node_id, _)) => format!(
+                    "/nodes/{}",
+                    node_id.as_str().replace('~', "~0").replace('/', "~1")
+                ),
+                None => "/nodes".to_string(),
+            },
+        }
     }
 }
 
@@ -1573,10 +1654,11 @@ mod period_timeline_tests {
             r#"{"id": "m", "periods": {"calendar": "gregorian", "periods": []}, "nodes": {}, "schema_version": 1}"#,
         )
         .expect_err("empty timeline is rejected");
-        assert!(
-            matches!(&err, ContractError::Core(core) if core.kind() == finstack_quant_core::ErrorKind::Validation),
-            "{err:?}"
-        );
+        let ContractError::Report(report) = &err else {
+            panic!("expected a located diagnostic, got {err:?}");
+        };
+        assert_eq!(report.diagnostics[0].code, "statements/build");
+        assert_eq!(report.diagnostics[0].pointer.as_deref(), Some("/periods"));
         assert!(err.to_string().contains("at least one period"), "{err}");
 
         let err =

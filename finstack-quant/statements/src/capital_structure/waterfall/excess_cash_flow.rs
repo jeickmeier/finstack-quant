@@ -6,7 +6,7 @@ use crate::evaluator::EvaluationContext;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 
-use super::{eval_value_or_formula, money_from_expr};
+use super::eval_money;
 
 /// Debt service already paid by the priorities ahead of the ECF sweep.
 pub(super) struct PaidAhead {
@@ -44,10 +44,7 @@ pub(super) fn calculate_ecf_sweep(
 ) -> Result<Money> {
     let mut term = |term: &EcfTerm| -> Result<Money> {
         Ok(match term {
-            EcfTerm::Input { expression } => {
-                let value = eval_value_or_formula(context, expression, warnings)?;
-                money_from_expr(value, currency, expression)?
-            }
+            EcfTerm::Input { expression } => eval_money(context, expression, currency, warnings)?,
             EcfTerm::PaidCashInterest => paid.cash_interest,
             EcfTerm::PaidFees => paid.fees,
             EcfTerm::PaidScheduledPrincipal => paid.scheduled_principal,

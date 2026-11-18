@@ -1317,6 +1317,30 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements: located load diagnostics, typed waterfall inputs, `numeric_series`
+
+Breaking, with no compatibility path.
+
+- A model that decodes but is not runnable now fails on load with a located
+  diagnostic: `ContractError::Report` whose code is `statements/<failure>`
+  and whose pointer is the offending node, period plan or capital-structure
+  field (STATEMENTS-CONTRACTS-016). Python raises `ContractValidationError`
+  for it (a `ValueError`; a dependency cycle used to raise `RuntimeError`),
+  and WASM throws `ContractValidationError` with kind `validation`.
+- The message of every contract report error now ends with its first error
+  diagnostic's text: `validation failed with 1 error(s): <message>`.
+- Waterfall inputs (the cash pool, prepayment amounts, ECF terms, the PIK
+  metric) are evaluated as typed values. Money keeps its exact amount and
+  must be in the waterfall currency; an input in another currency, a
+  condition, or an input with no value is an error naming the expression.
+- Python `StatementResult.get_node` is renamed `numeric_series` and WASM
+  `statementResultGetNode` is renamed `statementResultNumericSeries`,
+  matching the Rust accessor they wrap.
+- `EvaluationContext::get_cs_value`, a float reader of a capital reference,
+  is removed; capital references are typed.
+- Monetary rounding in formulas keeps its one mode, midpoint ties away from
+  zero (owner resolution; STATEMENTS-EVALUATION-002).
+
 ### Statements: fixes from the branch review
 
 - A run's provenance records the content identity of the validated model, so

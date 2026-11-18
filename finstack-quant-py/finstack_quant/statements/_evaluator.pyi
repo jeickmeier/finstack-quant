@@ -576,7 +576,7 @@ class StatementResult:
         """
         ...
 
-    def get_node(self, node_id: str) -> dict[str, float] | None:
+    def numeric_series(self, node_id: str) -> dict[str, float] | None:
         """
         Get every evaluated period for one node as a dict.
 

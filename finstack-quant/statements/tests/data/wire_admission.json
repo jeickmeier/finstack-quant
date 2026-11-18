@@ -91,27 +91,27 @@
     {
       "document": "{\"id\":\"wire\",\"nodes\":{\"profit\":{\"formula_text\":\"missing * 2\",\"node_id\":\"profit\",\"node_type\":\"calculated\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"}},\"revenue\":{\"node_id\":\"revenue\",\"node_type\":\"value\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"},\"values\":{\"2025Q1\":{\"amount\":\"100\",\"currency\":\"USD\"},\"2025Q2\":{\"amount\":\"110\",\"currency\":\"USD\"}}}},\"periods\":{\"calendar\":\"gregorian\",\"periods\":[{\"end\":\"2025-04-01\",\"id\":\"2025Q1\",\"is_actual\":false,\"start\":\"2025-01-01\"},{\"end\":\"2025-07-01\",\"id\":\"2025Q2\",\"is_actual\":false,\"start\":\"2025-04-01\"}]},\"schema_version\":1}",
       "expect": {
-        "code": null,
+        "code": "statements/eval",
         "kind": "validation",
-        "pointer": null
+        "pointer": "/nodes/profit"
       },
       "name": "unknown_node_reference"
     },
     {
       "document": "{\"id\":\"wire\",\"nodes\":{\"profit\":{\"formula_text\":\"profit + revenue\",\"node_id\":\"profit\",\"node_type\":\"calculated\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"}},\"revenue\":{\"node_id\":\"revenue\",\"node_type\":\"value\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"},\"values\":{\"2025Q1\":{\"amount\":\"100\",\"currency\":\"USD\"},\"2025Q2\":{\"amount\":\"110\",\"currency\":\"USD\"}}}},\"periods\":{\"calendar\":\"gregorian\",\"periods\":[{\"end\":\"2025-04-01\",\"id\":\"2025Q1\",\"is_actual\":false,\"start\":\"2025-01-01\"},{\"end\":\"2025-07-01\",\"id\":\"2025Q2\",\"is_actual\":false,\"start\":\"2025-04-01\"}]},\"schema_version\":1}",
       "expect": {
-        "code": null,
-        "kind": "computation",
-        "pointer": null
+        "code": "statements/circular_dependency",
+        "kind": "validation",
+        "pointer": "/nodes/profit"
       },
       "name": "dependency_cycle"
     },
     {
       "document": "{\"id\":\"wire\",\"nodes\":{\"profit\":{\"formula_text\":\"revenue * 0.4\",\"node_id\":\"profit\",\"node_type\":\"calculated\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"}},\"revenue\":{\"node_id\":\"revenue\",\"node_type\":\"value\",\"value_type\":{\"currency\":\"USD\",\"type\":\"monetary\"},\"values\":{\"2025Q1\":{\"amount\":\"100\",\"currency\":\"USD\"},\"2025Q2\":{\"amount\":\"110\",\"currency\":\"USD\"}}}},\"periods\":{\"calendar\":\"gregorian\",\"periods\":[]},\"schema_version\":1}",
       "expect": {
-        "code": null,
+        "code": "statements/build",
         "kind": "validation",
-        "pointer": null
+        "pointer": "/periods"
       },
       "name": "empty_timeline"
     }

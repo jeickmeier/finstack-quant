@@ -230,53 +230,6 @@ impl EvaluationContext {
         }
     }
 
-    /// Get capital structure value for the current period.
-    ///
-    /// # Arguments
-    /// * `component` - Component type: "interest_expense", "interest_expense_cash", "interest_expense_pik",
-    ///   "principal_payment", or "debt_balance"
-    /// * `instrument_or_total` - Instrument ID or "total" for aggregate
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use finstack_quant_statements::evaluator::EvaluationContext;
-    ///
-    /// # fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    /// # let context: EvaluationContext = unimplemented!("obtained during evaluation");
-    /// // Total interest (cash + PIK)
-    /// let total_interest = context.get_cs_value("interest_expense", "total")?;
-    ///
-    /// // Cash interest only
-    /// let cash_interest = context.get_cs_value("interest_expense_cash", "total")?;
-    ///
-    /// // PIK interest only
-    /// let pik_interest = context.get_cs_value("interest_expense_pik", "total")?;
-    /// # let _ = (total_interest, cash_interest, pik_interest);
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// The component names `fees`, `accrued_interest`, `interest_arrears`,
-    /// `principal_pending`, `principal_arrears` and
-    /// `principal_advance_reserve` are also supported.
-    /// Per-instrument values use their native currencies; `total` values use
-    /// the capital structure's reporting-currency aggregation convention.
-    ///
-    /// # Errors
-    ///
-    /// Returns a capital-structure error if this evaluation has no cashflow
-    /// state, `component` is unsupported, the requested instrument or period
-    /// cashflow is absent, or an aggregate cannot satisfy the currency
-    /// invariant.
-    pub fn get_cs_value(&self, component: &str, instrument_or_total: &str) -> Result<f64> {
-        let cs_cashflows = self
-            .capital_structure_cashflows
-            .as_ref()
-            .ok_or_else(|| Error::capital_structure("No capital structure defined in model"))?;
-        cs_cashflows.get_component(component, instrument_or_total, &self.period_id)
-    }
-
     /// The typed value of a `cs.<component>.<scope>` reference this period.
     ///
     /// An exact amount in the scope's currency. A consolidated value whose

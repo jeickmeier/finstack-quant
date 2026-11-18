@@ -271,7 +271,7 @@ pub fn statement_result_all_periods(
 
 /// Period-to-value map of one node: the float view of its value cells.
 ///
-/// Free-function twin of Python `StatementResult.get_node` (Rust
+/// Free-function twin of Python `StatementResult.numeric_series` (Rust
 /// `StatementResult::numeric_series`). Cells without a value are omitted;
 /// read `cells` or `statementResultGetCell` for their status.
 /// @param resultJson - The `StatementResult` returned by `Evaluator.evaluate` / `evaluateWithMarket` (object or JSON).
@@ -281,8 +281,8 @@ pub fn statement_result_all_periods(
 /// # Errors
 ///
 /// Throws with kind `validation` if the result input is malformed.
-#[wasm_bindgen(js_name = statementResultGetNode, unchecked_return_type = "Record<string, number> | undefined")]
-pub fn statement_result_get_node(
+#[wasm_bindgen(js_name = statementResultNumericSeries, unchecked_return_type = "Record<string, number> | undefined")]
+pub fn statement_result_numeric_series(
     #[wasm_bindgen(
         js_name = "resultJson",
         unchecked_param_type = "StatementResult | string"

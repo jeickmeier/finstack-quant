@@ -1151,16 +1151,14 @@ class FinancialModelSpec:
         ------
         finstack_quant.portfolio.ContractValidationError
             A ``ValueError``. If ``json`` is malformed, repeats a key, has a
-            missing or different ``schema_version``, or does not match the
-            model schema; ``report`` lists the diagnostics with their ``code``
-            and JSON ``pointer``. An input over a size or depth limit raises
-            the subclass ``ContractLimitExceededError``.
-        ValueError
-            If the decoded model is not runnable: an empty or out-of-order
-            timeline, a reserved node id, an invalid formula or units, or an
-            invalid capital structure.
-        RuntimeError
-            If the model's formulas form a dependency cycle.
+            missing or different ``schema_version``, does not match the model
+            schema, or decodes to a model that is not runnable (an empty or
+            out-of-order timeline, a reserved node id, an invalid formula or
+            units, an unknown reference, a dependency cycle or an invalid
+            capital structure). ``report`` lists the diagnostics with their
+            ``code`` and the JSON ``pointer`` of the field concerned, and the
+            message carries the first diagnostic's text. An input over a size
+            or depth limit raises the subclass ``ContractLimitExceededError``.
 
         Examples
         --------

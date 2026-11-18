@@ -242,9 +242,9 @@ impl PyStatementResult {
             .map(|inner| PyCapitalStructureCashflows { inner })
     }
 
-    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.get_node")]
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.statements._evaluator", "StatementResult.numeric_series")]
     #[pyo3(text_signature = "($self, node_id)")]
-    fn get_node<'py>(
+    fn numeric_series<'py>(
         &self,
         py: Python<'py>,
         node_id: &str,

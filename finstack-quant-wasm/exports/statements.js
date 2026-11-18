@@ -40,7 +40,7 @@ export const statements = {
   statementResultAllPeriods: wasm.statementResultAllPeriods,
   statementResultRollup: wasm.statementResultRollup,
   rollupSpecDeclaredMethods: wasm.rollupSpecDeclaredMethods,
-  statementResultGetNode: wasm.statementResultGetNode,
+  statementResultNumericSeries: wasm.statementResultNumericSeries,
   statementResultNodeIds: wasm.statementResultNodeIds,
   financialModelHasNode: wasm.financialModelHasNode,
   financialModelGetNode: wasm.financialModelGetNode,
