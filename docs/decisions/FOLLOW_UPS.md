@@ -685,8 +685,9 @@ the items below connect it to broader decisions and qualification boundaries.
 
 [ADR 0026](financial/governance/0026-methodology-decisions-and-inventory.md) accepts the
 documentation process. [ADR 0033](financial/analytics/0033-value-at-risk-method-selection.md#accepted-decision-fixed-historical-tail-selection)
-accepts fixed historical tail-method selection; overview records 0027–0032
-remain Draft. Detailed algorithm records identify their accepted scopes;
+accepts fixed historical tail-method selection. The
+[methodology catalogue](financial/README.md#methodology-records) tracks the
+current statuses of the model-selection overviews. These records identify their accepted scopes;
 all 15 [analytics records](financial/analytics/README.md#accepted-scopes-in-detailed-records)
 are accepted as of 2026-11-07 and implemented on 2026-11-08, with
 [scoped implementation evidence](financial/analytics/README.md#implementation-evidence)
@@ -1909,21 +1910,19 @@ requiring reproduction, adoption choices and missing validation are distinct.
 
 - **Options and exercise:** agree the vanilla option domains, dividend and
   lifecycle treatment, tree choice and accuracy targets in
-  [0027](financial/valuations-equity-and-composition/0027-vanilla-option-model-selection.md). Agree the callable
-  bond default and supported rate-only alternatives in
-  [0028](financial/valuations-bonds/0028-callable-bond-model-selection.md), and the quotation/
-  exercise selection boundary in
-  [0029](financial/valuations-rates/0029-rate-option-exercise-and-volatility.md). Joint stochastic
-  rates-credit, LSMC policy, HW versus LMM, settlement annuities, and stochastic
-  volatility require their own scoped choices.
+  [0027](financial/valuations-equity-and-composition/0027-vanilla-option-model-selection.md). Reconcile the accepted callable-bond routing
+  and explicit rates-only subtype in
+  [0028](financial/valuations-bonds/0028-callable-bond-model-selection.md).
+  Reconcile explicit quote-law and exercise-engine selection under
+  [0029](financial/valuations-rates/0029-rate-option-exercise-and-volatility.md).
+  The linked detailed records own the model, settlement, and exercise requirements.
 - **Credit conventions and dependence:** reconcile the accepted single-name CDS
   [leg and quote-basis contract](financial/models-and-valuations-credit/12-cds-legs.md#accepted-decision-for-checked-cds-legs-and-quote-basis) linked from
-  [0030](financial/models-and-valuations-credit/0030-cds-survival-and-integration.md). Agree tranche
-  copula/calibration scope, settlement overrides, correlation clipping, and
-  interim loss/monotonicity repairs in
-  [0031](financial/models-and-valuations-credit/0031-tranche-loss-model-selection.md). Observed repairs are
-  not approved fallbacks. Standalone copula configuration also needs a host
-  reachability and result-provenance assessment.
+  [0030](financial/models-and-valuations-credit/0030-cds-survival-and-integration.md). Reconcile the accepted synthetic tranche model selection in
+  [0031](financial/models-and-valuations-credit/0031-tranche-loss-model-selection.md).
+  Verify explicit copula selection, fit and source identity, checked interim
+  losses, and consistent pricing and risk. Qualify calibration replay and host
+  reachability and provenance.
 - **Curve construction:** direct discount selection, tails and checked
   evaluation are accepted in [CORE-MARKET-01](financial/core-market/discount-evaluation.md#accepted-decision-explicit-discount-sources-and-checked-rate-extraction);
   index-specific projection factors and contractual rates are accepted in
@@ -2539,6 +2538,37 @@ requiring reproduction, adoption choices and missing validation are distinct.
   signed aggregation through existing result paths.
   [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
   [Accepted FRTB curvature](financial/margin-regulatory-xva/11-frtb-curvature.md#accepted-decision-for-checked-frtb-curvature).
+
+- **Non-securitisation default risk capital.** Reconcile prepared gross
+  JTD, live exposure and maturity evidence, eligible obligor offsets and
+  checked bucket hedge benefit through existing result paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted default risk capital](financial/margin-regulatory-xva/12-frtb-default-risk.md#accepted-decision-for-checked-non-securitisation-default-risk-capital).
+
+- **Residual risk add-on.** Reconcile chargeable categories, exemption and
+  lifecycle evidence, one gross contribution per transaction and checked
+  full-capital assembly through existing result paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted residual risk add-on](financial/margin-regulatory-xva/13-frtb-residual-risk.md#accepted-decision-for-checked-residual-risk-add-on).
+
+- **SA-CCR trade inputs and supervisory delta.** Reconcile rulebook and
+  legal set identity, margin eligibility and MPOR, contractual clocks and
+  qualified size, and typed supervisory delta through existing result paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted SA-CCR inputs and supervisory delta](financial/margin-regulatory-xva/14-saccr-inputs-and-supervisory-delta.md#accepted-decision-for-checked-sa-ccr-trade-inputs-and-supervisory-delta).
+
+- **SA-CCR maturity factors and supervisory duration.** Reconcile the
+  qualified clocks, duration floor, per-contribution MF and signed effective
+  notional. Carry applied factor evidence through existing result paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted SA-CCR maturity and duration](financial/margin-regulatory-xva/15-saccr-maturity-and-duration.md#accepted-decision-for-checked-sa-ccr-maturity-factors-and-supervisory-duration).
+
+- **SA-CCR interest-rate add-on.** Reconcile typed hedging-set identity,
+  underlying maturity buckets, prescribed partial offsets and checked set
+  charges. Carry contribution, factor and coverage evidence through the
+  existing result paths.
+  [Owning reconciliation](financial/FOLLOW_UPS.md#margin-regulatory-capital-and-xva) ·
+  [Accepted SA-CCR interest-rate add-on](financial/margin-regulatory-xva/16-saccr-ir-addon.md#accepted-decision-for-the-checked-sa-ccr-interest-rate-add-on).
 
 ### Implementation reconciliation
 

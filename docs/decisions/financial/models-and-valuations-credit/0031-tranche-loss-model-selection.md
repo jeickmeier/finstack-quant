@@ -1,10 +1,8 @@
 # ADR 0031: Synthetic tranche loss and copula selection
 
-**Decision status:** Draft — observed implementation; adoption and rationale
-pending agreement.
+**Decision status:** Accepted 2026-11-17 as the synthetic tranche model-selection overview. The linked detailed decisions govern valuation, calibration, and risk.
 
-**Implementation status:** Observed for `CdsTranche` and the standalone
-`CdsTranchePricer`; structured-credit waterfall simulation is outside scope.
+**Implementation status:** Instrument and standalone tranche dispatch were inspected. Reconciliation to explicit copula selection and the detailed contracts remains pending.
 
 **Validation status:** Evidence located and inspected; tests and reference
 generators not rerun for this documentation audit.
@@ -12,6 +10,12 @@ generators not rerun for this documentation audit.
 **Audit date:** 2026-11-05
 
 **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`
+
+## Accepted decision
+
+1. Explicitly choose a homogeneous or named finite pool and an admitted copula of Gaussian, Student-t, random factor loading, or shared two-factor Gaussian. Apply the same election across direct, registered, and prepared pricing. [Finite-pool losses](17-tranche-loss-distribution.md#accepted-decision-for-checked-finite-pool-tranche-losses) · [Copula laws](09-copula-kernels.md#accepted-decision-for-checked-copula-laws-and-latent-factors).
+2. Bind the base-correlation source to the exact pool and version, hazard and recovery basis, copula and parameters, market origin, and contractual maturity. Keep the base-correlation bootstrap and single-tranche Student-t fit within their accepted scopes. [Base-correlation calibration](../calibration-targets/15-base-correlation.md#accepted-decision-for-identified-base-correlation-bootstrap-and-atomic-publication) · [Student-t calibration](../calibration-targets/16-student-t.md#accepted-decision-for-identified-single-tranche-student-t-calibration).
+3. Reuse the checked loss and recovery state for cashflows and expected loss. Keep the selected copula in risk repricing. Infeasible or numerically unresolved losses fail qualification, including at interim dates. [Tranche cashflows and settlement](18-tranche-projection.md#accepted-decision-for-checked-tranche-cashflows-and-settlement) · [Tranche risk](19-tranche-risk.md#accepted-decision-for-checked-tranche-risk-and-default-scenarios).
 
 ## Observed choice and rationale
 
@@ -26,12 +30,9 @@ notional, while only losses trigger protection payments. The
 and finite-pool calculations, including exact small-pool state enumeration to
 avoid rounding across payoff kinks.
 
-Proposed adoption rationale, awaiting agreement: finite-pool conditional loss
-calculations preserve issuer granularity, while factor integration gives
-deterministic valuation without Monte Carlo sampling noise. Source explanations
-support the observed implementation; they do not establish model governance.
+Finite-pool conditional loss calculations preserve issuer granularity. Deterministic factor integration measures losses without Monte Carlo sampling noise.
 
-## Scope and selection
+## Observed scope and selection
 
 Inputs are tranche terms, a discount curve and `CreditIndexData`, including
 index hazard, constituent count, recovery and base correlation. Supplied issuer
@@ -69,7 +70,7 @@ migration are outside scope.
 The owners retain formulas, units, numerical settings, failure branches and
 evidence. Generic copula integration and its tranche-specific integration
 override are distinct methods; neither record's settings supersede the other's.
-Adjacent calibration records remain Draft and do not resolve model adoption.
+The calibration owners define admitted fit objectives, source identity, and publication.
 
 ## Alternatives and tradeoffs
 
@@ -95,5 +96,5 @@ limits under [ADR 0014](../../project/0014-financial-reference-evidence.md).
 
 ## Follow-up tracking
 
-Adoption questions and implementation or validation work are tracked in the
+Implementation reconciliation and independent qualification are tracked in the
 [credit-model and valuation follow-ups](../FOLLOW_UPS.md#credit-models-and-valuations).

@@ -242,7 +242,7 @@
 
 ### Choice, scope and rationale
 
-European swaptions use a Black/shifted-Black or Bachelier option on a projected par swap rate, multiplied by notional and a settlement-specific annuity. `vol_model` sets the default model; explicit Black/Normal pricers reject mismatch. SABR supplies a quote when parameters exist and there is no implied-vol override. HW tree and LMM paths are separate records. [ADR 0029](0029-rate-option-exercise-and-volatility.md) is the existing selection draft.
+European swaptions use a Black/shifted-Black or Bachelier option on a projected par swap rate, multiplied by notional and a settlement-specific annuity. `vol_model` sets the default model; explicit Black/Normal pricers reject mismatch. SABR supplies a quote when parameters exist and there is no implied-vol override. HW tree and LMM paths are separate records. [ADR 0029](0029-rate-option-exercise-and-volatility.md) summarizes the accepted rate-option selection contract.
 
 ### Algorithm and conventions
 

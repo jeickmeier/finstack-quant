@@ -2380,6 +2380,38 @@ and zero floors. Runtime, host and regulatory qualification remain
 pending.
 [MARGIN-REGULATORY-XVA-011](margin-regulatory-xva/11-frtb-curvature.md#accepted-decision-for-checked-frtb-curvature).
 
+The default risk review checked the nine rating weights and the gross JTD
+rules. Independent examples covered zero-notional bond calls, maturity
+boundaries, seniority offsets and mixed-rating hedge benefit. Runtime,
+host and regulatory qualification remain pending.
+[MARGIN-REGULATORY-XVA-012](margin-regulatory-xva/12-frtb-default-risk.md#accepted-decision-for-checked-non-securitisation-default-risk-capital).
+
+The residual risk add-on review checked chargeable scope, the exemptions
+and both prescribed weights. Independent examples covered unmatched gross
+aggregation and finite-input overflow. Runtime, host and regulatory
+qualification remain pending.
+[MARGIN-REGULATORY-XVA-013](margin-regulatory-xva/13-frtb-residual-risk.md#accepted-decision-for-checked-residual-risk-add-on).
+
+The SA-CCR trade input review checked Basel eligibility, classification,
+delta and MPOR rules and the current Rust validation paths. Independent
+examples covered ordinary option deltas, tranche magnitude, physical
+exercise maturity, FX leg selection and MPOR floors. Runtime, schema,
+host and regulatory qualification remain pending.
+[MARGIN-REGULATORY-XVA-014](margin-regulatory-xva/14-saccr-inputs-and-supervisory-delta.md#accepted-decision-for-checked-sa-ccr-trade-inputs-and-supervisory-delta).
+
+The SA-CCR maturity and duration review checked the prescribed floors,
+maturity horizons and current Rust and host result paths. Independent
+examples covered short and forward-starting duration, cash and physical
+exercise, and MPOR factors above one. Runtime, schema, host and regulatory
+qualification remain pending.
+[MARGIN-REGULATORY-XVA-015](margin-regulatory-xva/15-saccr-maturity-and-duration.md#accepted-decision-for-checked-sa-ccr-maturity-factors-and-supervisory-duration).
+
+The SA-CCR IR add-on review checked prescribed hedging sets, maturity
+buckets, offsets and factors. Independent examples covered boundaries,
+opposing contributions, set separation and the scaled norm on large finite
+amounts. Runtime, schema, host and regulatory qualification remain pending.
+[MARGIN-REGULATORY-XVA-016](margin-regulatory-xva/16-saccr-ir-addon.md#accepted-decision-for-the-checked-sa-ccr-interest-rate-add-on).
+
 Selected tests and references were inspected; this does not claim review of
 every test body. Numerical suites, simulation experiments and vendor comparisons
 were not executed for these documentation audits. Independent semantic reviews

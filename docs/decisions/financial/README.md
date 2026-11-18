@@ -680,9 +680,8 @@ Implementation reconciliation and independent qualification remain pending.
 [STATEMENTS-ANALYTICS-CREDIT-18](statements-analytics-credit/18-cecl-warm.md#accepted-decision-for-warm-exposure-years-and-annual-loss-rates).
 
 The [invariant-to-decision map](../INVARIANT_MAP.md) records the detailed
-cross-crate conventions covered by these decisions. Acceptance does not adopt
-drafts 0027–0032 or every observed instrument default; accepted analytics
-selection in 0033 retains its own scope.
+cross-crate conventions covered by these decisions. The methodology record table
+shows the status and scope of each model-selection overview.
 
 ## Methodology records
 
@@ -2757,6 +2756,33 @@ and scenario, and applies squared correlations to raw signed sums with
 the prescribed residual rules.
 [MARGIN-REGULATORY-XVA-011](margin-regulatory-xva/11-frtb-curvature.md#accepted-decision-for-checked-frtb-curvature).
 
+Non-securitisation default risk capital was accepted on 2026-11-17. The
+package uses prepared gross JTD, live exposure and maturity qualification,
+constrained obligor offsets and checked bucket hedge benefit.
+[MARGIN-REGULATORY-XVA-012](margin-regulatory-xva/12-frtb-default-risk.md#accepted-decision-for-checked-non-securitisation-default-risk-capital).
+
+The residual risk add-on was accepted on 2026-11-17. The package uses
+qualified eligibility and exemptions, one gross reporting-currency
+contribution per chargeable trade and the checked additive total.
+[MARGIN-REGULATORY-XVA-013](margin-regulatory-xva/13-frtb-residual-risk.md#accepted-decision-for-checked-residual-risk-add-on).
+
+SA-CCR trade inputs and supervisory delta were accepted on 2026-11-17.
+The package requires a qualified legal set and effective rulebook, agreement
+and lifecycle evidence, and checked Rust calculation from typed risk and
+trade terms.
+[MARGIN-REGULATORY-XVA-014](margin-regulatory-xva/14-saccr-inputs-and-supervisory-delta.md#accepted-decision-for-checked-sa-ccr-trade-inputs-and-supervisory-delta).
+
+SA-CCR maturity factors and supervisory duration were accepted on
+2026-11-17. The package uses qualified contractual clocks, the
+ten-business-day IR and credit duration floor, per-contribution maturity
+factors and applied factor reporting.
+[MARGIN-REGULATORY-XVA-015](margin-regulatory-xva/15-saccr-maturity-and-duration.md#accepted-decision-for-checked-sa-ccr-maturity-factors-and-supervisory-duration).
+
+The SA-CCR interest-rate add-on was accepted on 2026-11-17. It uses
+qualified signed effective notionals, typed hedging sets, underlying
+maturity buckets, prescribed partial offsets and checked set charges.
+[MARGIN-REGULATORY-XVA-016](margin-regulatory-xva/16-saccr-ir-addon.md#accepted-decision-for-the-checked-sa-ccr-interest-rate-add-on).
+
 All 13 [Covenants methodology records](covenants/README.md) were accepted on
 2026-11-17. They cover explicit terms and metric bindings, assessment and
 breach history, consequence execution, forecast methods, and checked reporting
@@ -2782,10 +2808,10 @@ algorithms and broader policies retain their status in the owning catalogues.
 | --- | --- | --- | --- |
 | [0026: Methodology inventory and decisions](governance/0026-methodology-decisions-and-inventory.md) | Accepted policy | Source catalogues established for the declared crates; exclusions explicit | Evidence mapped; no model certification |
 | [0027: Vanilla equity and FX options](valuations-equity-and-composition/0027-vanilla-option-model-selection.md) | Equity and FX vanilla baselines and lifecycle accepted in the owners | Reconciliation pending | Detailed records retain independent examples and qualification status |
-| [0028: Callable bond model selection](valuations-bonds/0028-callable-bond-model-selection.md) | Draft | Model resolution and option-bearing paths observed | Source/test evidence inspected; numerical checks not rerun |
-| [0029: Rate-option exercise and volatility](valuations-rates/0029-rate-option-exercise-and-volatility.md) | Draft | Vanilla rate-option and Bermudan selection observed | Source/test evidence inspected; numerical checks not rerun |
+| [0028: Callable bond model selection](valuations-bonds/0028-callable-bond-model-selection.md) | Accepted | Routing, explicit rates-only subtype, and price and risk basis. Runtime reconciliation pending. | Independent pricing and risk qualification pending |
+| [0029: Rate-option exercise and volatility](valuations-rates/0029-rate-option-exercise-and-volatility.md) | Accepted | Explicit model selection by quotation, settlement, and exercise. Runtime reconciliation pending. | Independent pricing, convergence, and risk qualification pending |
 | [0030: CDS survival and integration](models-and-valuations-credit/0030-cds-survival-and-integration.md) | Accepted | Single-name CDS engine selection; detailed contract in CREDIT-12 | Independent date, integral and quote checks; runtime reconciliation pending |
-| [0031: Tranche loss model selection](models-and-valuations-credit/0031-tranche-loss-model-selection.md) | Draft | Gaussian default and explicit copula paths observed | Source/test evidence inspected; numerical checks not rerun |
+| [0031: Tranche loss model selection](models-and-valuations-credit/0031-tranche-loss-model-selection.md) | Accepted | Explicit finite-pool and copula selection, source identity, and reuse across valuation and risk. Runtime reconciliation pending. | Production pricing, calibration replay, and host qualification pending |
 | [0032: Curve interpolation and calibration](calibration-targets/0032-curve-interpolation-and-calibration.md#accepted-decision-for-explicit-rate-curve-interpolation-and-calibration) | Accepted | Explicit factor interpolation, tails, fit selection and final artifact admission | Independent factor, tail and PCHIP checks; production qualification pending |
 | [0033: Return-series VaR and ES](analytics/0033-value-at-risk-method-selection.md) | Accepted fixed historical selection | Historical scalar/summary dispatch; explicit inputs and invalid-CF errors reconciled | [Scoped implementation evidence](analytics/README.md#implementation-evidence) |
 

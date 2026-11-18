@@ -1,14 +1,22 @@
 # FEATURES-014: Cross-sectional centering, population and robust standardization
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** Four transforms and exact partitioning are implemented. Varying zero-MAD partitions and checked arithmetic require reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** An independent majority-flat example checked centering, min-max, and MAD. Rust fixtures were inspected. Zero-MAD and extreme-scale qualification remain pending.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and selection
+## Accepted decision
+
+1. Use equally weighted finite observations within each exact time or time-and-group partition and preserve missing rows. Demean subtracts the arithmetic mean in input units. Zscore divides centered values by population standard deviation. MinmaxScale maps the minimum and maximum to 0 and 1. Constant partitions, including singletons, give zero for all three.
+2. RobustZscore uses the Type-7 median and median absolute deviation with the existing normal-consistency factor 0.6744897501960817. An eligible constant partition gives zero. When values vary but MAD is zero, return missing throughout that partition. [Shared statistics](04-scaled-statistics-and-quantiles.md).
+3. Use checked scaled arithmetic to preserve small representable differences. Apply the whole-call numerical failure rule from [FEATURES-002](02-parameters-missing-and-failure.md).
+
+For [2, 2, 2, 10], demeaning gives [−2, −2, −2, 6], min-max scaling gives [0, 0, 0, 1], and MAD is zero. All four robust scores are missing.
+
+## Observed scope and selection
 
 `Zscore`, `Demean`, `RobustZscore` and `MinmaxScale` accept no parameters. They operate independently on finite values in each exact time partition or grouped `(time_key,group)` partition, with missing rows excluded and preserved as None. There is no weighting, minimum population size, sector inference or financial-unit conversion.
 
@@ -33,5 +41,5 @@ The source documents population normalization and MAD normal-consistency scaling
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification work are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

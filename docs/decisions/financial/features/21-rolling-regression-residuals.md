@@ -1,14 +1,21 @@
 # FEATURES-021: Inclusive rolling OLS current-row residuals
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** Inclusive rolling fits and missing-window behavior are implemented. Empty-design admission and checked raw residual evaluation require reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** Exact arithmetic checked rolling residuals with a missing current response. Rust fixtures were inspected. Empty-design and solver boundaries still require qualification.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and selection
+## Accepted decision
+
+1. Fit complete rows in the inclusive trailing window using the checked full-rank SVD contract. Require at least max(min_periods, p) complete rows, where p counts exposures and the intercept. The intercept defaults to on. Allow intercept-only fitting and reject a request with neither exposures nor an intercept. [Shared OLS](20-scaled-svd-neutralization.md).
+2. Return the current row's observed minus fitted residual in response units, with the current row included in its own fit. Return missing for an incomplete current row, insufficient complete rows, or rank deficiency. Preserve small representable residuals. Solver or arithmetic failures fail the whole call. [Numerical failure policy](02-parameters-missing-and-failure.md).
+
+For exposures [1, 2, 3, 4] and responses [1, 1, 2, missing], a four-row window with minimum count 3 gives [missing, missing, 1/6, missing].
+
+## Observed scope and selection
 
 `rolling_regression_residual` uses the [scaled SVD solver](20-scaled-svd-neutralization.md) per entity and inclusive trailing row window. Parameters are positive `window` (default 1), `min_periods` (default window, <=window), and boolean `fit_intercept` (default true). Exposure columns and entity/order keys must match the response row count. The result is the residual at the current row, not fitted coefficients or forecasts.
 
@@ -32,5 +39,5 @@ Documentation explicitly distinguishes rolling rank-deficient None from cross-se
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification work are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

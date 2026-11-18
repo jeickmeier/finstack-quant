@@ -40,9 +40,9 @@
    effective distance to zero for both the affected downward reprice and
    its delta deduction. The upward shock uses the full weight. On the
    direct FX reporting basis, require both legs for options on two
-   currencies outside the reporting currency. When `1.5` relief is
-   elected, divide each eligible
-   option's two directional amounts before netting with other exposures.
+   non-reporting currencies. When `1.5` relief is elected, divide each
+   eligible option's two directional amounts before netting with other
+   exposures.
    The all-FX relief route requires supervisory approval and qualified
    coverage of shocks to the reporting currency against all other
    currencies.

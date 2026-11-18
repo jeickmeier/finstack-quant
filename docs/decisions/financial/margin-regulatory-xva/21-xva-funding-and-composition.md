@@ -1,14 +1,20 @@
 # MARGIN-REGULATORY-XVA-021: Asymmetric FVA, bilateral activation and total-XVA sign contract
 
-- Decision status: **Draft — observed implementation; adoption pending.**
-- Implementation status: **Observed** in the stated source scope.
-- Validation status: **Evidence inspected/located, not executed.** Selected test bodies were read; no runtime test, build or numerical experiment was run.
+- Decision status: **Accepted 2026-11-17 for explicit funding balances and leg elections, and scoped additive XVA.**
+- Implementation status: Funding and composition paths were inspected. Qualified funding balances, explicit spread and leg elections, and cross-leg admission require reconciliation.
+- Validation status: Exact arithmetic checked asymmetric FVA. Rust fixtures were inspected. Funding-basis and cross-leg qualification remain pending.
 - Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 - Scope and hashes: [inventory](README.md), [coverage ledger](coverage.json).
 
-## Choice and domain
+## Accepted decision
 
-This describes the observed design. No historical adoption rationale is inferred; the alternatives and tradeoffs below are the audit's assessment.
+1. Use qualified funding need and reusable surplus balances. EPE and ENE qualify as proxies only when explicitly authorized. Require separate cost and benefit spreads, including an explicit zero benefit when applicable. Standalone FVA is unweighted by survival. The bilateral bucket approximation uses the product of the two names' average survival probabilities.
+2. Elect FVA and MVA independently. An omitted leg remains absent and an elected leg can return zero. MVA requires its own IM profile and funding spread. DVA consumes the collateral-aware credit exposure under [XVA 020](20-xva-credit-adjustments.md).
+3. Compose total XVA as CVA − DVA + FVA + MVA on a common valuation, currency, and netting basis. Require a funding transfer-pricing basis that avoids double-counting own-credit benefits across DVA and FVA. Treat additive composition as a scoped approximation. [Funding and credit research](https://arxiv.org/abs/1112.1521).
+
+With one year of funding need of 100 at 50 bp and reusable surplus of 60 at 30 bp, undiscounted and unweighted FVA is 0.32.
+
+## Observed choice and domain
 
 Funding cost applies to positive expected exposure, benefit to negative exposure. Configuring an IM profile also changes bilateral DVA and activates MVA. Optional-leg presence therefore has financial meaning even when a spread is zero. The observed default FundingConfig has zero cost spread and symmetric zero benefit.
 
@@ -37,4 +43,4 @@ A unified funding/credit valuation equation can address feedback and double coun
 
 Config/accessors/result composition: [src/xva/types.rs](../../../../finstack-quant/margin/src/xva/types.rs); routing and FVA: [src/xva/cva.rs](../../../../finstack-quant/margin/src/xva/cva.rs). Inspected flat-funding test compares against a discounted flat-exposure closed form at 3% tolerance; inspected bilateral tests establish survival-weighted inequalities. Located tests cover asymmetric benefit, IM horizon mismatch, posted-IM DVA and zero-spread activation. These do not establish funding economics or independent joint-default validation. [Gregory XVA](../../../REFERENCES.md#gregory-xva-challenge), [Green XVA](../../../REFERENCES.md#green-xva).
 
-The implementation establishes observed behavior, not financial adoption or regulatory compliance. Actionable work is tracked in the [regulatory-margin/XVA follow-ups](../FOLLOW_UPS.md#margin-regulatory-capital-and-xva).
+Implementation reconciliation and independent qualification are tracked in the [regulatory-margin/XVA follow-ups](../FOLLOW_UPS.md#margin-regulatory-capital-and-xva).

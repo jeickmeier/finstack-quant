@@ -1,14 +1,21 @@
 # FEATURES-015: Cross-sectional tie ranks, quantile buckets and normal scores
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** Tie rules and normal-score mapping are implemented. Exact bucket boundary arithmetic and a portable count range require reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** Exact arithmetic checked tied ranks and labels. An independent floating-point calculation reproduced a bucket boundary error. Rust fixtures were inspected. Host and boundary qualification remain open.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and selection
+## Accepted decision
+
+1. Rank finite partition members and preserve missing rows. Closed rank uses the lowest tied zero-based position divided by n−1, with zero for singletons. Open percentile uses the average tied one-based position divided by n+1. Normal score applies the standard-normal inverse CDF to the open percentile. Singleton and all-equal partitions receive open percentile 0.5 and normal score zero.
+2. Default to 10 buckets and use a shared portable count range with exactly representable labels. Compute floor(closed rank × buckets) with exact integer arithmetic and cap at buckets−1. Keep ties together and permit empty buckets.
+
+For [1, 2, 2, 4], open percentiles are [0.2, 0.5, 0.5, 0.8] and four-bucket labels are [0, 1, 1, 3]. Floating evaluation of (15/22) × 22 can floor to 14. Exact arithmetic gives bucket 15.
+
+## Observed scope and selection
 
 `Rank`, `PercentileRank`, `QuantileBucket` and `NormalScoreTransform` operate on the same finite partition sort. Only quantile bucket accepts a parameter: positive integer `buckets`, default 10. No percentile estimation method, random tie breaking, equal-population constraint or tail clamp is selectable.
 
@@ -34,5 +41,5 @@ No external quantile package was executed.
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification work are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

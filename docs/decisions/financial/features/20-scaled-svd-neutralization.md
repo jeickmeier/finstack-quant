@@ -1,14 +1,22 @@
 # FEATURES-020: Scaled full-rank SVD neutralization and standardized residuals
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** Scaled full-rank OLS is implemented. Raw residual preservation and whole-vector roundoff handling before standardization require reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** Exact arithmetic checked fitted residuals and their orthogonality. Rust fixtures were inspected. Rank boundaries and roundoff handling still require qualification.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and actual selection
+## Accepted decision
+
+1. Fit equal-weighted OLS on complete rows in each exact time partition, with an intercept by default. Keep scaled SVD and the rank cutoff ε × max(n, p) × σmax, where p counts fitted coefficients. Allow exactly determined full-rank fits. An underdetermined or rank-deficient partition fails the call with partition context.
+2. Return checked observed minus fitted residuals in response units. Exactly determined full-rank fits yield zero residuals in exact arithmetic. Preserve small representable residuals from overdetermined fits.
+3. In neutralize_and_zscore, always fit an intercept and standardize residuals using population standard deviation. Return zero scores if the entire residual vector is within a qualified solver-roundoff bound. Otherwise standardize the full vector. [Population standardization](14-cross-sectional-standardization.md).
+
+For exposures [1, 2, 3] and responses [1, 1, 2], the residuals are [1/6, −1/3, 1/6]. Their sum and exposure dot product are both zero.
+
+## Observed scope and actual selection
 
 `neutralize` performs equal-weighted OLS separately by exact time key, with `fit_intercept=true` by default (the only parameter). Exposure input is column-major: each numeric optional column must match the response length. Missing/nonfinite response or any exposure excludes that row from both fitting and residual output. The same solver supplies [rolling residuals](21-rolling-regression-residuals.md), whose failure/output policy differs.
 
@@ -37,5 +45,5 @@ No solve or threshold experiment was executed.
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification work are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

@@ -1,14 +1,22 @@
 # FEATURES-013: Pandas-span EWMA mean, biased centered volatility and scores
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** The centered recurrence and finite-observation clock are implemented. Initial score availability and checked extreme-scale arithmetic require reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** Exact arithmetic checked a gapped recurrence. Rust fixtures were inspected. Extreme scales and native/WASM reproducibility still require qualification.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and actual selection
+## Accepted decision
+
+1. Require a finite span ≥ 1 and use α = 2 / (span + 1). Advance on finite observations only. The first finite observation initializes and emits the mean. Missing observations yield missing and leave the state unchanged.
+2. Use centered, unannualized EWMA variance with recurrence v_new = (1−α) × (v_old + α × (x−m_old)²), with zero initial variance and the previous mean m_old. Return missing volatility and z-score until the second finite observation. Then emit volatility as the square root of variance and score against the updated mean and volatility. A mature state with genuinely zero dispersion gives zero volatility and zero score, including at span 1.
+3. Use checked arithmetic for state and score. Preserve representable results at extreme scales and fail the call on numerical error under [FEATURES-002](02-parameters-missing-and-failure.md).
+
+For [1, missing, 3, 5] at span 3, the means are [1, missing, 2, 3.5] and the volatilities are [missing, missing, 1, √2.75].
+
+## Observed scope and actual selection
 
 `EwmaMean`, `EwmaVol` and `EwmaZscore` share one state recurrence. Required finite `span>=1` gives `alpha=2/(span+1)`, `b=1-alpha`. Span counts finite observations; it is not RiskMetrics lambda or elapsed time. The documented input is a return series, but the numeric kernel accepts any finite scalar units. No annualization, warm-up count or unbiased-variance option is exposed.
 
@@ -36,5 +44,5 @@ No native/WASM comparison was executed.
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification work are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

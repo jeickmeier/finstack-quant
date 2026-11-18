@@ -1,14 +1,22 @@
 # FEATURES-004: Shared scaled statistics and Type-7 interpolation
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** Estimator definitions are implemented. Shared checked kernels, stable centered evaluation, and removal of the standalone mean clamp require reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** Exact arithmetic checked the mean, sample and population variance, and Type-7 quantile. Rust fixtures were inspected. Extreme-scale accuracy and shared-kernel behavior still require qualification.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and selection
+## Accepted decision
+
+1. Features selects eligible observations. Reuse checked core statistics where estimator definitions and availability agree. Use the arithmetic mean and population standard deviation for at least one eligible observation. Require two for sample standard deviation. Divide centered squares by n for population dispersion and n−1 for sample dispersion. Return missing below the relevant count and zero standard deviation for an eligible constant sample. [Core statistics](../core-numerics/sample-statistics.md).
+2. Use Type-7 quantiles with finite probability in [0, 1] and rank (n−1) × p. Empty input yields missing, a singleton yields its sole value, and endpoint probabilities return the minimum and maximum. Interpolate stably between adjacent sorted values.
+3. Use checked centering and scaling. Evaluate standard deviation directly from scaled moments, preserve representable results across supported scales, and avoid unsafe quantile endpoint subtraction. Remove the standalone mean clamp. Report numerical failures under [FEATURES-002](02-parameters-missing-and-failure.md).
+
+For [0, 2, 8], the mean is 10/3, sample variance is 52/3, population variance is 104/9, and the 25th percentile is 1.
+
+## Observed scope and selection
 
 Private helpers in `types.rs` supply centering, mean, sample/population standard deviations and continuous quantiles to the selected transforms. These are feature-layer implementations, not direct aliases of every similarly named core statistic. Callers filter finite inputs; quantile callers sort ascending with `total_cmp` and validate probabilities before entry.
 
@@ -31,9 +39,7 @@ Comments document unit-independent scaling and a continuous Type-7 quantile. [Ka
 - Inspected [audit regressions](../../../../finstack-quant/features/tests/audit_regressions.rs): unit-scale sweeps from 1e-150 to 1e150 and a 1e308 mean/opposite-sign median. Scale comparisons often reuse the same production method at another scale; they establish invariance expectations, not an independent oracle.
 - Inspected [transform tests](../../../../finstack-quant/features/tests/transforms.rs) contain hand-sized sample-SD and interpolated-winsor expectations, generally with absolute tolerance 1e-12. Inline constant tests in `types.rs` check the MAD reciprocal identity and a pinned normal quartile; they do not independently derive it.
 
-No numerical experiment or external-reference authentication was performed.
-
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

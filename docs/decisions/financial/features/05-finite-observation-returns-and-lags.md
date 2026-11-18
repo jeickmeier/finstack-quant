@@ -1,14 +1,22 @@
 # FEATURES-005: Finite-observation returns, log returns, differences and lags
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** The finite-observation clock and signed domains are implemented. Stable evaluation near equal levels and at extreme ratios requires reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** An independent signed-input example checked the clock and formulas. Rust fixtures were inspected. Extreme-ratio and near-equal cases require qualification.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and selection
+## Accepted decision
+
+1. Count finite observations within each entity, with a positive periods control defaulting to 1. A missing current row yields missing and does not advance history. Lag returns the selected earlier observation and Diff subtracts it from the current value. Both preserve input units and yield missing when history is insufficient.
+2. Simple return is current divided by prior minus one, with nonzero prior. Log return is the log ratio of two nonzero observations with the same sign, including two negative observations. A pair outside the respective domain yields missing. Returns are dimensionless, and observation lags may span irregular time gaps.
+3. Use stable arithmetic near equal values and at extreme ratios. Preserve small representable moves and evaluate an eligible log return when direct division overflows or underflows. Fail the whole call on an unrepresentable final result under [FEATURES-002](02-parameters-missing-and-failure.md).
+
+For [-4, missing, -2], the one-observation lag at -2 is -4, the difference is +2, the simple return is −50%, and the log return is ln(0.5).
+
+## Observed scope and selection
 
 `Returns`, `LogReturns`, `Diff` and `Lag` use positive integer `periods`, default 1. Inputs are numeric observations per lexically ordered entity. No price adjustment, calendar day count, annualization, cash flow or currency handling occurs. Prices need not be positive: the implemented signed-input domain is wider than a conventional positive-price interpretation.
 
@@ -35,5 +43,5 @@ Located tests do not establish those numerical boundaries.
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification work are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

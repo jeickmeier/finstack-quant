@@ -1,14 +1,20 @@
 # FEATURES-018: Sign-preserving capped neutral weights by proportional redistribution
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** Proportional capped redistribution is implemented. Final allocation checks and numerical boundary handling require reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** Exact arithmetic checked a capped allocation and infeasible capacity. Rust fixtures were inspected. Exact-capacity and near-zero centering still require qualification.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and selection
+## Accepted decision
+
+1. Center eligible signals within each partition and preserve the centered signs. Allocate 0.5 gross on each side. Rows at the mean receive zero, constant partitions receive zero weights, and missing rows stay missing.
+2. Require finite 0 < max_abs ≤ 1, defaulting to 1. Apply caps independently on each side and redistribute remaining exposure in proportion to uncapped centered magnitudes. Fail the whole call if either side lacks capacity.
+3. Enforce the individual cap. Check net zero and unit gross for varying partitions within a rounding tolerance before exposing the allocation. For [−10, −1, 1, 10], a cap of 0.30 gives [−0.30, −0.20, 0.20, 0.30]. A cap of 0.20 is infeasible because each side can carry only 0.40.
+
+## Observed scope and selection
 
 `CapWeights` accepts finite `max_abs` in (0,1], default 1. It is a separate allocation from simply clipping existing weights: center the original signal, retain centered signs, allocate positive gross 0.5 and negative gross 0.5, and enforce the final absolute cap. Missing values stay None. The grouped entry point applies the same method independently to each tuple partition.
 
@@ -36,5 +42,5 @@ No failure of these identities was numerically reproduced here.
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification work are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

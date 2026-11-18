@@ -1544,6 +1544,36 @@ including each FX reporting pair. Square base correlations before the
 scenario transform and aggregate with the selected raw signed sums.
 [Accepted FRTB curvature](docs/decisions/financial/margin-regulatory-xva/11-frtb-curvature.md#accepted-decision-for-checked-frtb-curvature).
 
+Non-securitisation DRC uses prepared signed gross JTD. Determine credit
+direction from loss or gain on default. Scale live exposures by maturity
+before legally eligible same-obligor offsets. Use unweighted residuals for
+the bucket hedge benefit and weighted residuals for the charge.
+[Accepted default risk capital](docs/decisions/financial/margin-regulatory-xva/12-frtb-default-risk.md#accepted-decision-for-checked-non-securitisation-default-risk-capital).
+
+The residual risk add-on uses dated eligibility and exemption evidence and
+one qualified gross contribution per chargeable transaction. Apply the
+class weight once and add the checked total outside the correlation scenarios.
+[Accepted residual risk add-on](docs/decisions/financial/margin-regulatory-xva/13-frtb-residual-risk.md#accepted-decision-for-checked-residual-risk-add-on).
+
+SA-CCR binds each trade to an effective rulebook, valuation cut, reporting
+currency and eligible legal set. Keep exercise, trade maturity and the
+referenced period distinct. Derive margin treatment and MPOR from qualified
+agreement terms and calculate the prescribed supervisory delta from typed
+trade inputs in Rust.
+[Accepted SA-CCR inputs and supervisory delta](docs/decisions/financial/margin-regulatory-xva/14-saccr-inputs-and-supervisory-delta.md#accepted-decision-for-checked-sa-ccr-trade-inputs-and-supervisory-delta).
+
+SA-CCR uses ACT/365F for qualified date offsets and 250 business days per
+regulatory year for the floors and MPOR. Apply the ten-business-day
+supervisory-duration floor to IR and credit. Form effective notional from
+each contribution's applied maturity factor and report the factors used.
+[Accepted SA-CCR maturity and duration](docs/decisions/financial/margin-regulatory-xva/15-saccr-maturity-and-duration.md#accepted-decision-for-checked-sa-ccr-maturity-factors-and-supervisory-duration).
+
+The SA-CCR IR add-on assigns qualified signed effective notionals to
+typed nominal, inflation, basis or volatility hedging sets. Use the
+underlying end time for maturity buckets. Apply the prescribed partial
+offset across buckets and sum the separately weighted set charges.
+[Accepted SA-CCR interest-rate add-on](docs/decisions/financial/margin-regulatory-xva/16-saccr-ir-addon.md#accepted-decision-for-the-checked-sa-ccr-interest-rate-add-on).
+
 Valuation model inputs bind an exact source, unit, clock and parameter block.
 Use dated relative factors for GBM carry. Simulations retain explicit controls,
 exact seed identity and actual work. Apply each tree and quote control on its
