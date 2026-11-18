@@ -116,13 +116,21 @@ class TestCorrelatedBernoulli:
         cb = CorrelatedBernoulli(0.2, 0.8, 0.1)
         assert cb.p1 == pytest.approx(0.2)
         assert cb.p2 == pytest.approx(0.8)
-        assert cb.requested_correlation == pytest.approx(0.1)
         assert cb.correlation == pytest.approx(0.1, abs=0.05)
 
-    def test_requested_and_effective_correlation_expose_clamping(self) -> None:
-        cb = CorrelatedBernoulli(0.05, 0.95, 0.9)
-        assert cb.requested_correlation == pytest.approx(0.9)
-        assert cb.correlation < cb.requested_correlation
+    def test_unequal_marginal_bounds_are_attainable(self) -> None:
+        low, high = correlation_bounds(0.2, 0.6)
+        assert CorrelatedBernoulli(0.2, 0.6, low).joint_p11 == 0.0
+        assert CorrelatedBernoulli(0.2, 0.6, high).joint_p11 == 0.2
+
+    @pytest.mark.parametrize("p", [2.0**-35, 2.0**-40])
+    def test_rare_default_dependence(self, p: float) -> None:
+        pair = CorrelatedBernoulli(p, p, 1.0)
+        assert pair.joint_p11 == p
+        assert pair.conditional_p2_given_x1() == 1.0
+        assert CorrelatedBernoulli(p, p, 0.0).joint_p11 == p * p
+        with pytest.raises(ValueError, match="infeasible"):
+            CorrelatedBernoulli(p, p, -1.0)
 
     def test_conditional_probabilities(self) -> None:
         """Conditional P(X2=1|X1=1) = p11 / p1 when p1 > 0."""

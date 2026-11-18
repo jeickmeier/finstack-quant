@@ -91,7 +91,7 @@ fn act365l_balance_segments_preserve_the_full_coupon_denominator() {
                     .expect("coupon")
                     .remove("rate");
                 value["coupon_program"][0]["spec"]["rate_spec"] = json!({
-                    "forward_curve_id":"TERM", "spread_bp":"0", "reset_frequency":frequency,
+                    "index_id":"TERM", "forward_curve_id":"TERM", "spread_bp":"0", "reset_frequency":frequency,
                     "reset_lag_days":0
                 });
             }
@@ -300,7 +300,7 @@ fn b14_overnight_principal_events_preserve_cumulative_rate_clock() {
         .expect("spec")
         .remove("rate");
     v["coupon_program"][0]["spec"]["rate_spec"] = json!({
-        "forward_curve_id":"RFR", "spread_bp":"0", "reset_frequency":{"count":3,"unit":"months"},
+        "index_id":"RFR", "forward_curve_id":"RFR", "spread_bp":"0", "reset_frequency":{"count":3,"unit":"months"},
         "reset_lag_days":0, "compounding":{"compounded_in_arrears":{"lookback_days":0}}
     });
     v["principal_events"] = json!([{
@@ -589,7 +589,7 @@ fn terminal_window_payment_lag_redeems_final_pik() {
             coupon.insert(
                 "rate_spec".into(),
                 json!({
-                    "forward_curve_id":"TEST-3M", "spread_bp":"0", "gearing":"1",
+                    "index_id":"TEST-3M", "forward_curve_id":"TEST-3M", "spread_bp":"0", "gearing":"1",
                     "reset_frequency":{"count":3,"unit":"months"},
                     "reset_lag_days":0, "fallback":{"fixed_rate":"0.1"}
                 }),
@@ -1260,6 +1260,7 @@ mod slice3_regressions {
         fallback: FloatingRateFallback,
     ) -> FloatingRateSpec {
         FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             spread_bp: dec!(100),
             gearing: dec!(1),
@@ -1518,7 +1519,7 @@ mod slice3_regressions {
                     "spec": {
                         "coupon_type": "cash",
                         "rate_spec": {
-                            "forward_curve_id": "USD-SOFR-3M",
+                            "index_id": "USD-SOFR-3M", "forward_curve_id": "USD-SOFR-3M",
                             "spread_bp": "0",
                             "reset_frequency": {"count": 3, "unit": "months"},
                             "fixing_calendar_id": "weekends_only"

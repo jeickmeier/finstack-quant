@@ -2057,6 +2057,16 @@
               },
               "type": "array"
             },
+            "series": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/InflationSeries"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "type": {
               "const": "inflation",
               "type": "string"
@@ -3848,6 +3858,16 @@
             "$ref": "#/$defs/InflationObservation"
           },
           "type": "array"
+        },
+        "series": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InflationSeries"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -3880,6 +3900,30 @@
         "reference_month",
         "value",
         "available_on"
+      ],
+      "type": "object"
+    },
+    "InflationSeries": {
+      "additionalProperties": false,
+      "description": "Publication identity and units of an observed or projected inflation level.",
+      "properties": {
+        "reference_base": {
+          "description": "Published reference period and index scale, for example `1982-84=100`.",
+          "type": "string"
+        },
+        "seasonally_adjusted": {
+          "description": "True for seasonally adjusted levels and false for unadjusted levels.",
+          "type": "boolean"
+        },
+        "series_id": {
+          "description": "Publisher-qualified identifier of the statistical series.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "series_id",
+        "reference_base",
+        "seasonally_adjusted"
       ],
       "type": "object"
     },
@@ -5185,6 +5229,36 @@
         }
       ]
     },
+    "RateCalibrationExecution": {
+      "additionalProperties": false,
+      "description": "Executed evaluator, resolved instruments and original outcome of a rate calibration.",
+      "properties": {
+        "accepted": {
+          "description": "Whether the original fit passed its recorded acceptance policy.",
+          "type": "boolean"
+        },
+        "bindings": {
+          "description": "Resolved quote identities and maturities, in input order.",
+          "items": {
+            "$ref": "#/$defs/RateQuoteBinding"
+          },
+          "type": "array"
+        },
+        "calibration_config": {
+          "description": "Solver controls and residual acceptance thresholds used by the evaluator."
+        },
+        "step_params": {
+          "description": "Discount or projection evaluator parameters, including pricing dependencies."
+        }
+      },
+      "required": [
+        "bindings",
+        "step_params",
+        "calibration_config",
+        "accepted"
+      ],
+      "type": "object"
+    },
     "RateCalibrationMethod": {
       "description": "Numerical method used to calibrate a rate curve.",
       "oneOf": [
@@ -5528,7 +5602,7 @@
     },
     "RateCalibrationRecipe": {
       "additionalProperties": false,
-      "description": "Typed conventions required to replay a rate-curve calibration.",
+      "description": "Benchmark conventions and quotes associated with a rate curve.",
       "properties": {
         "currency": {
           "$ref": "#/$defs/Currency",
@@ -5537,6 +5611,17 @@
         "curve_day_count": {
           "$ref": "#/$defs/DayCount",
           "description": "Day count used for the curve's time axis."
+        },
+        "execution": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RateCalibrationExecution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original execution evidence. A transcribed benchmark list has no qualified replay."
         },
         "method": {
           "$ref": "#/$defs/RateCalibrationMethod",
@@ -5571,6 +5656,31 @@
         "curve_day_count",
         "role",
         "quotes"
+      ],
+      "type": "object"
+    },
+    "RateQuoteBinding": {
+      "additionalProperties": false,
+      "description": "Identity and resolved maturity of a quote in its original evaluator.",
+      "properties": {
+        "pillar_date": {
+          "$ref": "#/$defs/DateWire",
+          "description": "Contractual maturity resolved using the instrument conventions."
+        },
+        "pillar_time": {
+          "description": "Curve-clock year fraction at the resolved maturity.",
+          "format": "double",
+          "type": "number"
+        },
+        "quote_id": {
+          "description": "Original stable market quote identifier.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "quote_id",
+        "pillar_date",
+        "pillar_time"
       ],
       "type": "object"
     },

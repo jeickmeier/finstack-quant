@@ -40,6 +40,7 @@ fn build_floating_loan(
         .issue_date(as_of)
         .maturity(maturity)
         .rate(RateSpec::Floating(FloatingRateSpec {
+            index_id: "USD-SOFR".into(),
             forward_curve_id: CurveId::from("USD-SOFR"),
             spread_bp: Decimal::from(250),
             gearing: Decimal::from(1),
@@ -241,6 +242,7 @@ fn solve_dm_at_clean_price(spread_bp: i64, clean_px: f64) -> f64 {
         .issue_date(as_of)
         .maturity(maturity)
         .rate(RateSpec::Floating(FloatingRateSpec {
+            index_id: "USD-SOFR".into(),
             forward_curve_id: CurveId::from("USD-SOFR"),
             spread_bp: Decimal::from(spread_bp),
             gearing: Decimal::from(1),

@@ -293,6 +293,13 @@ fn test_discount_curve_ordered_intervals_match_custom_schedule() {
 fn test_inflation_curve_shift() {
     let base = sample_date();
     let curve_t0 = InflationCurve::builder("CPI-USD")
+        .series(Some(
+            finstack_quant_core::market_data::scalars::InflationSeries {
+                series_id: "BLS:CUUR0000SA0".into(),
+                reference_base: "1982-84=100".into(),
+                seasonally_adjusted: false,
+            },
+        ))
         .base_date(base)
         .day_count(DayCount::Act365F)
         .interp(InterpStyle::LogLinear)
@@ -303,6 +310,13 @@ fn test_inflation_curve_shift() {
 
     // 2% higher CPI at all tenors
     let curve_t1 = InflationCurve::builder("CPI-USD")
+        .series(Some(
+            finstack_quant_core::market_data::scalars::InflationSeries {
+                series_id: "BLS:CUUR0000SA0".into(),
+                reference_base: "1982-84=100".into(),
+                seasonally_adjusted: false,
+            },
+        ))
         .base_date(base)
         .day_count(DayCount::Act365F)
         .interp(InterpStyle::LogLinear)

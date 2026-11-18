@@ -170,7 +170,7 @@ impl PyFloatLegSpec {
     #[new]
     #[pyo3(
         signature = (**fields),
-        text_signature = "(*, discount_curve_id, forward_curve_id, spread_bp, frequency, day_count, start, end, business_day_convention='modified_following', calendar_id=None, stub='short_front', reset_lag_days=0, fixing_calendar_id=None, compounding='simple', payment_lag_days=0, end_of_month=False)"
+        text_signature = "(*, discount_curve_id, index_id, forward_curve_id, spread_bp, frequency, day_count, start, end, business_day_convention='modified_following', calendar_id=None, stub='short_front', reset_lag_days=0, fixing_calendar_id=None, compounding='simple', payment_lag_days=0, end_of_month=False)"
     )]
     fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
         let inner: finstack_quant_valuations::instruments::FloatLegSpec =
@@ -264,6 +264,9 @@ reset_lag_days={}, fixing_calendar_id={}, compounding={}, payment_lag_days={}, e
 crate::bindings::macros::py_getters!(PyFloatLegSpec |s| {
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.discount_curve_id")]
     discount_curve_id -> String = s.inner.discount_curve_id.to_string();
+
+    #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.index_id")]
+    index_id -> String = s.inner.index_id.to_string();
 
     #[doc = crate::bindings::pydoc::pydoc!("finstack_quant.valuations.instruments._typed_legs", "FloatLegSpec.forward_curve_id")]
     forward_curve_id -> String = s.inner.forward_curve_id.to_string();

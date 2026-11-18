@@ -6,9 +6,6 @@ use super::*;
 use crate::api::engine::calibrate_from_json;
 use crate::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::dates::{DateExt, Tenor, adjust, calendar_by_id_strict};
-use finstack_quant_core::market_data::term_structures::{
-    RateCalibrationMethod, RateCalibrationPillar,
-};
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations_core::instruments::{Instrument, PayReceive};
@@ -229,32 +226,37 @@ fn linked_rate_quote_replay_composes_both_curve_recipes()
 fn discount_floor_fixture(
     rate: f64,
 ) -> std::result::Result<(DiscountCurve, RateCalibrationRecipe), Box<dyn std::error::Error>> {
+    let base_date = Date::from_calendar_date(2025, time::Month::January, 2)?;
     let mut quotes = Vec::new();
     for tenor in ["1Y", "2Y"] {
-        quotes.push(RateCalibrationQuote::Deposit {
-            index_id: IndexId::new("USD-SOFR-OIS"),
-            pillar: RateCalibrationPillar::Tenor(tenor.parse()?),
+        quotes.push(RateQuote::Deposit {
+            id: QuoteId::new(format!("USD-{tenor}")),
+            index: IndexId::new("USD-SOFR-OIS"),
+            pillar: Pillar::Tenor(tenor.parse()?),
             rate,
         });
     }
-    let recipe = RateCalibrationRecipe {
+    let params = DiscountCurveParams {
+        curve_id: CurveId::new("USD-OIS"),
+        base_date,
         currency: Currency::USD,
-        method: RateCalibrationMethod::Bootstrap,
-        curve_day_count: DayCount::Act365F,
-        ois_compounding: None,
-        role: RateCalibrationCurveRole::Discount {
-            projection_curve_id: CurveId::new("USD-OIS"),
+        method: CalibrationMethod::Bootstrap,
+        interpolation: InterpStyle::LogLinear,
+        extrapolation: ExtrapolationPolicy::Extend,
+        pricing_discount_id: None,
+        pricing_forward_id: None,
+        conventions: RatesStepConventions {
+            curve_day_count: Some(DayCount::Act365F),
+            ois_compounding: None,
         },
-        quotes,
     };
-    let curve = DiscountCurve::builder("USD-OIS")
-        .base_date(Date::from_calendar_date(2025, time::Month::January, 2)?)
-        .day_count(DayCount::Act365F)
-        .interp(InterpStyle::LogLinear)
-        .extrapolation(ExtrapolationPolicy::Extend)
-        .knots([(0.0, 1.0), (1.0, (-rate).exp()), (2.0, (-2.0 * rate).exp())])
-        .rate_calibration(recipe.clone())
-        .build()?;
+    let curve = solve_discount_curve(
+        &quotes,
+        &params,
+        &MarketContext::new(),
+        &CalibrationConfig::default(),
+    )?;
+    let recipe = required_discount_rate_calibration(&curve)?.clone();
     Ok((curve, recipe))
 }
 

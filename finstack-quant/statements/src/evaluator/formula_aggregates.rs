@@ -228,7 +228,7 @@ pub(crate) fn evaluate_period_aggregate_function(
         Function::Ytd => {
             require_args("ytd", args, 1, node_id)?;
             let current = context.period_id;
-            let calendar = context.history.model_plan()?.calendar;
+            let calendar = context.history.model_plan()?.get_calendar();
             let start_of_year = current.shift(1 - i32::from(current.index()), calendar)?;
             sum_expression_range(&args[0], context, start_of_year, current, node_id)
         }

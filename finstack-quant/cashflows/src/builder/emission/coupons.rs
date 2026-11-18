@@ -89,7 +89,7 @@ fn add_pik_flow_if_nonzero(
 /// carry the same `(rate, days)` weighting in the compounding product.
 ///
 /// - `obs_date < as_of`: realized fixing, resolved exactly from the
-///   `FIXING:{forward_curve_id}` series. Weekend/holiday carry is represented by the
+///   `FIXING:{index_id}` series. Weekend/holiday carry is represented by the
 ///   observation day weight, so a missing business-day publication is an
 ///   error rather than permission to reuse an arbitrarily old rate. Missing
 ///   history diagnostics identify the observation and valuation dates. An incomplete
@@ -104,10 +104,10 @@ fn observed_overnight_rate(
     day_count_basis: f64,
     fwd: &ForwardCurve,
     fixings: Option<&ScalarTimeSeries>,
-    forward_curve_id: &str,
+    index_id: &str,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
-    if let Some(fixing) = observed_index_fixing(obs_date, fixings, forward_curve_id, as_of)? {
+    if let Some(fixing) = observed_index_fixing(obs_date, fixings, index_id, as_of)? {
         return Ok(fixing);
     }
     project_overnight_rate(fwd, obs_date, day_count_basis)
@@ -123,7 +123,7 @@ fn require_supplied_historical_fixings(
     observation_date: Option<Date>,
     curve: Option<&ForwardCurve>,
     fixings: Option<&ScalarTimeSeries>,
-    forward_curve_id: &str,
+    index_id: &str,
 ) -> finstack_quant_core::Result<()> {
     let (Some(fixings), Some(as_of)) = (
         fixings,
@@ -132,7 +132,7 @@ fn require_supplied_historical_fixings(
         return Ok(());
     };
     let require_historical =
-        |date| observed_index_fixing(date, Some(fixings), forward_curve_id, as_of).map(drop);
+        |date| observed_index_fixing(date, Some(fixings), index_id, as_of).map(drop);
     match observation {
         FloatingRateObservation::Term { reset_date, .. } => require_historical(*reset_date),
         FloatingRateObservation::Overnight { schedule, .. } => schedule
@@ -252,59 +252,6 @@ pub(crate) fn emit_fixed_coupons_on(
                     is_termination_date,
                 )?;
                 let coupon_period = day_count_ctx.coupon_period;
-                let yf = if spec.schedule.day_count == DayCount::ActActIsma {
-                    crate::builder::date_generation::icma_sliced_year_fraction(
-                        accrual_start,
-                        accrual_end,
-                        day_count_ctx,
-                        Some(spec.schedule.end_of_month),
-                        Some(schedule.grid_anchor),
-                    )
-                } else {
-                    crate::builder::periods::contractual_accrual(
-                        spec.schedule.day_count,
-                        (period.accrual_start, period.accrual_end),
-                        accrual_start,
-                        accrual_end,
-                        day_count_ctx,
-                    )
-                }?;
-
-                let yf_dec = f64_to_decimal(yf)?;
-                let coupon_total_dec = base_out
-                    .checked_mul(spec.rate)
-                    .and_then(|amount| amount.checked_mul(yf_dec))
-                    .ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "fixed coupon amount exceeds Decimal range".into(),
-                        )
-                    })?;
-
-                let (cash_fraction, pik_fraction) = spec.coupon_type.split_parts()?;
-                let cash_amt_dec = if pik_fraction.is_zero() {
-                    coupon_total_dec
-                } else if cash_fraction.is_zero() {
-                    Decimal::ZERO
-                } else {
-                    coupon_total_dec.checked_mul(cash_fraction).ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "fixed cash coupon amount exceeds Decimal range".into(),
-                        )
-                    })?
-                };
-                let pik_amt_dec = if pik_fraction.is_zero() {
-                    Decimal::ZERO
-                } else if cash_fraction.is_zero() {
-                    coupon_total_dec
-                } else {
-                    coupon_total_dec.checked_sub(cash_amt_dec).ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "fixed PIK coupon amount exceeds Decimal range".into(),
-                        )
-                    })?
-                };
-
-                let rate_f64 = spec.rate.as_f64();
                 let is_icma = spec.schedule.day_count == DayCount::ActActIsma;
                 let mut nominal_dates = Vec::new();
                 let mut reference = coupon_period;
@@ -355,6 +302,53 @@ pub(crate) fn emit_fixed_coupons_on(
                     )
                 }?;
 
+                let yf = if is_icma {
+                    accrual.year_fraction()
+                } else {
+                    crate::builder::periods::contractual_accrual(
+                        spec.schedule.day_count,
+                        (period.accrual_start, period.accrual_end),
+                        accrual_start,
+                        accrual_end,
+                        day_count_ctx,
+                    )
+                }?;
+
+                let yf_dec = f64_to_decimal(yf)?;
+                let coupon_total_dec = base_out
+                    .checked_mul(spec.rate)
+                    .and_then(|amount| amount.checked_mul(yf_dec))
+                    .ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(
+                            "fixed coupon amount exceeds Decimal range".into(),
+                        )
+                    })?;
+
+                let (cash_fraction, pik_fraction) = spec.coupon_type.split_parts()?;
+                let cash_amt_dec = if pik_fraction.is_zero() {
+                    coupon_total_dec
+                } else if cash_fraction.is_zero() {
+                    Decimal::ZERO
+                } else {
+                    coupon_total_dec.checked_mul(cash_fraction).ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(
+                            "fixed cash coupon amount exceeds Decimal range".into(),
+                        )
+                    })?
+                };
+                let pik_amt_dec = if pik_fraction.is_zero() {
+                    Decimal::ZERO
+                } else if cash_fraction.is_zero() {
+                    coupon_total_dec
+                } else {
+                    coupon_total_dec.checked_sub(cash_amt_dec).ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(
+                            "fixed PIK coupon amount exceeds Decimal range".into(),
+                        )
+                    })?
+                };
+
+                let rate_f64 = spec.rate.as_f64();
                 // Gate on cash split, not amount sign, so negative-rate coupons emit.
                 if cash_fraction > Decimal::ZERO {
                     let kind = if is_stub { CFKind::Stub } else { CFKind::Fixed };
@@ -399,14 +393,14 @@ pub(crate) fn emit_fixed_coupons_on(
 ///
 /// Both slices are aligned index-for-index with the builder's float
 /// schedules; entries are `None` when the `MarketContext` lacks the
-/// corresponding curve or `FIXING:{forward_curve_id}` series.
+/// corresponding curve or `FIXING:{index_id}` series.
 #[derive(Clone, Copy)]
 pub(crate) struct ResolvedFloatMarket<'a> {
     /// Explicit observation cutoff; absent for curve-base projection builds.
     pub(crate) observation_date: Option<Date>,
     /// Forward curves, one per float schedule.
     pub(crate) curves: &'a [Option<std::sync::Arc<ForwardCurve>>],
-    /// Historical fixing series (`FIXING:{forward_curve_id}`), one per float schedule.
+    /// Historical fixing series (`FIXING:{index_id}`), one per float schedule.
     pub(crate) fixings: &'a [Option<&'a ScalarTimeSeries>],
 }
 
@@ -458,7 +452,8 @@ fn project_segment_indices(
 ) -> finstack_quant_core::Result<Vec<(f64, f64)>> {
     let (curve, fixings) = resolved;
     let forward_curve_id = schedule.spec.rate_spec.forward_curve_id.as_str();
-    let series_id = fixing_series_id(forward_curve_id);
+    let index_id = schedule.spec.rate_spec.index_id.as_str();
+    let series_id = fixing_series_id(index_id);
     let curve = curve.ok_or_else(|| {
         finstack_quant_core::Error::Input(InputError::NotFound {
             id: format!(
@@ -471,7 +466,7 @@ fn project_segment_indices(
     match observation {
         FloatingRateObservation::Term { reset_date, .. } => {
             let index_rate = if let Some(fixing) =
-                observed_index_fixing(*reset_date, fixings, forward_curve_id, as_of)?
+                observed_index_fixing(*reset_date, fixings, index_id, as_of)?
             {
                 fixing
             } else {
@@ -512,7 +507,7 @@ fn project_segment_indices(
                     *day_count_basis,
                     curve,
                     fixings,
-                    forward_curve_id,
+                    index_id,
                     as_of,
                 )?;
                 raw_fixings.insert(slice.observation_date, rate);
@@ -590,7 +585,7 @@ fn project_segment_indices(
 ///
 /// Seasoned coupons (observation dates before the valuation cutoff) resolve
 /// realized index fixings from `market.fixings`, the per-schedule
-/// `FIXING:{forward_curve_id}` series aligned with `market.curves` (exact-date
+/// `FIXING:{index_id}` series aligned with `market.curves` (exact-date
 /// observations for both overnight and term resets). The cutoff is the curve
 /// base date under `build` and `as_of` under `build_as_of`. A failed
 /// projection, including pre-cutoff observations with no series, routes the
@@ -699,7 +694,7 @@ pub(crate) fn emit_float_coupons_on(
             } else {
                 FloatingRateObservation::Term { reset_date }
             };
-            let series_id = fixing_series_id(spec.rate_spec.forward_curve_id.as_str());
+            let series_id = fixing_series_id(spec.rate_spec.index_id.as_str());
             match &observation {
                 FloatingRateObservation::Term { reset_date, .. } => {
                     projected_fixings.push(crate::fixings::ProjectedFixing {
@@ -743,7 +738,7 @@ pub(crate) fn emit_float_coupons_on(
                         market.observation_date,
                         resolved_curve.as_deref(),
                         *resolved_fixing,
-                        spec.rate_spec.forward_curve_id.as_str(),
+                        spec.rate_spec.index_id.as_str(),
                     )?;
                     if !is_absent_market_source(
                         &observation,

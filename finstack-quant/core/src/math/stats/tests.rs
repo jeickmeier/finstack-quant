@@ -13,8 +13,8 @@ fn range_estimators_use_each_observed_bar_from_the_first() {
         RealizedVarMethod::RogersSatchell,
     ] {
         assert_eq!(
-            realized_variance_ohlc(&[], &[], &[], &[], Some(method), Some(252.0)).unwrap(),
-            0.0
+            realized_variance_ohlc(&[], &[], &[], &[], Some(method), Some(252.0), None).unwrap(),
+            None
         );
         for n in 1..=3 {
             let sum: f64 = (0..n)
@@ -41,24 +41,35 @@ fn range_estimators_use_each_observed_bar_from_the_first() {
                 &close[..n],
                 Some(method),
                 Some(252.0),
+                None,
             )
+            .unwrap()
             .unwrap();
             assert!((actual - 252.0 * sum / n as f64).abs() < 1e-12);
             assert!(actual > 0.0);
         }
     }
-    for n in 1..=2 {
-        assert_eq!(
-            realized_variance_ohlc(
-                &open[..n],
-                &high[..n],
-                &low[..n],
-                &close[..n],
-                Some(RealizedVarMethod::YangZhang),
-                Some(252.0),
-            )
-            .unwrap(),
-            0.0
+    let flat = [110.0; 3];
+    for method in [
+        RealizedVarMethod::CloseToClose,
+        RealizedVarMethod::YangZhang,
+    ] {
+        let estimate = realized_variance_ohlc(
+            &flat,
+            &flat,
+            &flat,
+            &flat,
+            Some(method),
+            Some(252.0),
+            Some(100.0),
+        )
+        .unwrap()
+        .unwrap();
+        let expected = 252.0 * 1.1_f64.ln().powi(2) / 3.0;
+        assert!((estimate - expected).abs() < 1e-12);
+        assert!(
+            realized_variance_ohlc(&flat, &flat, &flat, &flat, Some(method), Some(252.0), None)
+                .is_err()
         );
     }
     assert_eq!(
@@ -67,11 +78,12 @@ fn range_estimators_use_each_observed_bar_from_the_first() {
             &high[..1],
             &low[..1],
             &close[..1],
-            Some(RealizedVarMethod::CloseToClose),
+            Some(RealizedVarMethod::YangZhang),
             Some(252.0),
+            Some(100.0)
         )
         .unwrap(),
-        0.0
+        None
     );
 }
 
@@ -630,6 +642,7 @@ fn realized_variance_rejects_invalid_ohlc_and_annualization() {
             &close,
             Some(RealizedVarMethod::Parkinson),
             Some(252.0),
+            None,
         )
         .is_err()
     );
@@ -641,6 +654,7 @@ fn realized_variance_rejects_invalid_ohlc_and_annualization() {
             &close,
             Some(RealizedVarMethod::GarmanKlass),
             Some(252.0),
+            None,
         )
         .is_err()
     );
@@ -652,6 +666,7 @@ fn realized_variance_rejects_invalid_ohlc_and_annualization() {
             &close,
             Some(RealizedVarMethod::RogersSatchell),
             Some(252.0),
+            None,
         )
         .is_err()
     );
@@ -663,6 +678,7 @@ fn realized_variance_rejects_invalid_ohlc_and_annualization() {
             &close,
             Some(RealizedVarMethod::YangZhang),
             Some(f64::INFINITY),
+            Some(100.0),
         )
         .is_err()
     );
@@ -689,7 +705,8 @@ fn realized_variance_defaults_are_rust_owned() {
         RealizedVarMethod::YangZhang
     );
     assert_eq!(
-        realized_variance_ohlc(&open, &high, &low, &close, None, None).expect("defaults"),
+        realized_variance_ohlc(&open, &high, &low, &close, None, None, Some(100.0))
+            .expect("defaults"),
         realized_variance_ohlc(
             &open,
             &high,
@@ -697,6 +714,7 @@ fn realized_variance_defaults_are_rust_owned() {
             &close,
             Some(RealizedVarMethod::YangZhang),
             Some(daily),
+            Some(100.0),
         )
         .expect("explicit"),
     );

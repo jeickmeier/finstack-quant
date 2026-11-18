@@ -138,6 +138,10 @@ export type Date = string;
  */
 export type Id3 = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id4 = string;
+/**
  * Spread in basis points added to the forward rate
  */
 export type Decimal = string;
@@ -647,6 +651,10 @@ export interface D_572Ad1Befb7D94914652 {
    * this forward curve instead of using a discount-curve par-rate proxy.
    */
   asw_forward_curve_id?: D_94Cb251104De5Cf587B6 | null;
+  /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: D_94Cb251104De5Cf587B6 | null;
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
@@ -1407,6 +1415,7 @@ export interface D_2479A404Fecfb3F42644 {
   fixing_calendar_id?: Id1 | null;
   forward_curve_id: Id3;
   frequency: Tenor;
+  index_id: Id4;
   /**
    * Payment lag in business days after period end (default: 0).
    *

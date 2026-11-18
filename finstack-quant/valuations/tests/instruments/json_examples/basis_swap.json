@@ -23,6 +23,7 @@
           "count": 3,
           "unit": "months"
         },
+        "index_id": "USD-SOFR-3M",
         "payment_lag_days": 0,
         "reset_lag_days": 0,
         "spread_bp": "5",
@@ -43,6 +44,7 @@
           "count": 1,
           "unit": "months"
         },
+        "index_id": "USD-SOFR-1M",
         "payment_lag_days": 0,
         "reset_lag_days": 0,
         "spread_bp": "0",

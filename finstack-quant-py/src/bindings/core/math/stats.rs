@@ -335,24 +335,35 @@ fn realized_variance(
 ///
 /// Raises `TypeError` when a series is not one-dimensional or contains non-numeric values.
 #[pyfunction]
-#[pyo3(signature = (open, high, low, close, method=None, annualization_factor=None))]
-#[pyo3(text_signature = "(open, high, low, close, method=None, annualization_factor=None)")]
+#[pyo3(signature = (open, high, low, close, method=None, annualization_factor=None, previous_close=None))]
+#[pyo3(
+    text_signature = "(open, high, low, close, method=None, annualization_factor=None, previous_close=None)"
+)]
 fn realized_variance_ohlc(
-    py: Python<'_>,
     open: &Bound<'_, PyAny>,
     high: &Bound<'_, PyAny>,
     low: &Bound<'_, PyAny>,
     close: &Bound<'_, PyAny>,
     method: Option<&str>,
     annualization_factor: Option<f64>,
-) -> PyResult<f64> {
+    previous_close: Option<f64>,
+) -> PyResult<Option<f64>> {
+    let py = open.py();
     let open = extract_series(open)?;
     let high = extract_series(high)?;
     let low = extract_series(low)?;
     let close = extract_series(close)?;
     let method = method.map(parse_label::<RealizedVarMethod>).transpose()?;
     py.detach(|| {
-        stats::realized_variance_ohlc(&open, &high, &low, &close, method, annualization_factor)
+        stats::realized_variance_ohlc(
+            &open,
+            &high,
+            &low,
+            &close,
+            method,
+            annualization_factor,
+            previous_close,
+        )
     })
     .map_err(core_to_py)
 }

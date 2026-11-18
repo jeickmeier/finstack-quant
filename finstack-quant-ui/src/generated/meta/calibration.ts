@@ -1483,7 +1483,7 @@ export default [
   {
     "path": "#/$defs/d_1da7f2b6c0211ad55af2",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationRecipe",
-    "description": "Typed conventions required to replay a rate-curve calibration."
+    "description": "Benchmark conventions and quotes associated with a rate curve."
   },
   {
     "path": "#/$defs/d_1da7f2b6c0211ad55af2/properties/currency",
@@ -1498,6 +1498,21 @@ export default [
     "description": "Day count used for the curve's time axis.",
     "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_1da7f2b6c0211ad55af2/properties/execution",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationRecipe/properties/execution",
+    "description": "Original execution evidence. A transcribed benchmark list has no qualified replay."
+  },
+  {
+    "path": "#/$defs/d_1da7f2b6c0211ad55af2/properties/execution/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationRecipe/properties/execution/anyOf/0",
+    "ref": "#/$defs/RateCalibrationExecution",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationExecution"
+  },
+  {
+    "path": "#/$defs/d_1da7f2b6c0211ad55af2/properties/execution/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationRecipe/properties/execution/anyOf/1"
   },
   {
     "path": "#/$defs/d_1da7f2b6c0211ad55af2/properties/method",
@@ -3007,6 +3022,20 @@ export default [
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/10/properties/observations/items",
     "ref": "#/$defs/InflationObservation",
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationObservation"
+  },
+  {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/10/properties/series",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/10/properties/series"
+  },
+  {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/10/properties/series/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/10/properties/series/anyOf/0",
+    "ref": "#/$defs/InflationSeries",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationSeries"
+  },
+  {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/10/properties/series/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/10/properties/series/anyOf/1"
   },
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/11",
@@ -5182,6 +5211,26 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ResidualWeightingScheme"
   },
   {
+    "path": "#/$defs/d_af96800aab5249199d14",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationSeries",
+    "description": "Publication identity and units of an observed or projected inflation level."
+  },
+  {
+    "path": "#/$defs/d_af96800aab5249199d14/properties/reference_base",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationSeries/properties/reference_base",
+    "description": "Published reference period and index scale, for example `1982-84=100`."
+  },
+  {
+    "path": "#/$defs/d_af96800aab5249199d14/properties/seasonally_adjusted",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationSeries/properties/seasonally_adjusted",
+    "description": "True for seasonally adjusted levels and false for unadjusted levels."
+  },
+  {
+    "path": "#/$defs/d_af96800aab5249199d14/properties/series_id",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationSeries/properties/series_id",
+    "description": "Publisher-qualified identifier of the statistical series."
+  },
+  {
     "path": "#/$defs/d_b7ebd05daecf38c26828",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/SwaptionConventionId",
     "description": "Identifier for Swaption market conventions (e.g., \"USD\", \"EUR\").\n\nUsed to look up [`SwaptionConventions`](crate::market::conventions::SwaptionConventions)\nfrom the convention registry."
@@ -6830,6 +6879,29 @@ export default [
     "description": "Piecewise quadratic forwards (C¹ forwards and C² log discount factors)."
   },
   {
+    "path": "#/$defs/d_e94f4b8b51127617865d",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateQuoteBinding",
+    "description": "Identity and resolved maturity of a quote in its original evaluator."
+  },
+  {
+    "path": "#/$defs/d_e94f4b8b51127617865d/properties/pillar_date",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateQuoteBinding/properties/pillar_date",
+    "description": "Contractual maturity resolved using the instrument conventions.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_e94f4b8b51127617865d/properties/pillar_time",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateQuoteBinding/properties/pillar_time",
+    "description": "Curve-clock year fraction at the resolved maturity.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_e94f4b8b51127617865d/properties/quote_id",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateQuoteBinding/properties/quote_id",
+    "description": "Original stable market quote identifier."
+  },
+  {
     "path": "#/$defs/d_e98120a9ebcd8bce537a",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDataTarget",
     "description": "Canonical family-typed identifier for an addressable entry in\n[`MarketContext`](crate::market_data::context::MarketContext).\n\nIdentifiers in `MarketContext` are namespace-local: the same `CurveId` may\ncoexist across distinct stores (for example a `VolSurface` and a\n`ScalarTimeSeries`). `MarketDataTarget` pairs an exact [`CurveId`] with the\nexact store and subkind to select without multi-store probing."
@@ -7449,6 +7521,20 @@ export default [
     "format": "double"
   },
   {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/3/properties/series",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/3/properties/series"
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/3/properties/series/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/3/properties/series/anyOf/0",
+    "ref": "#/$defs/InflationSeries",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InflationSeries"
+  },
+  {
+    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/3/properties/series/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/3/properties/series/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/4",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/4",
     "description": "Pre-built CDS-index base-correlation curve."
@@ -7824,6 +7910,37 @@ export default [
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/HullWhiteVolatilityMode/oneOf/1",
     "const": "piecewise",
     "description": "Bootstrap a piecewise-constant short-rate volatility schedule at quote expiries."
+  },
+  {
+    "path": "#/$defs/d_f1527fa0defa05fce4d2",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationExecution",
+    "description": "Executed evaluator, resolved instruments and original outcome of a rate calibration."
+  },
+  {
+    "path": "#/$defs/d_f1527fa0defa05fce4d2/properties/accepted",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationExecution/properties/accepted",
+    "description": "Whether the original fit passed its recorded acceptance policy."
+  },
+  {
+    "path": "#/$defs/d_f1527fa0defa05fce4d2/properties/bindings",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationExecution/properties/bindings",
+    "description": "Resolved quote identities and maturities, in input order."
+  },
+  {
+    "path": "#/$defs/d_f1527fa0defa05fce4d2/properties/bindings/items",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationExecution/properties/bindings/items",
+    "ref": "#/$defs/RateQuoteBinding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateQuoteBinding"
+  },
+  {
+    "path": "#/$defs/d_f1527fa0defa05fce4d2/properties/calibration_config",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationExecution/properties/calibration_config",
+    "description": "Solver controls and residual acceptance thresholds used by the evaluator."
+  },
+  {
+    "path": "#/$defs/d_f1527fa0defa05fce4d2/properties/step_params",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/RateCalibrationExecution/properties/step_params",
+    "description": "Discount or projection evaluator parameters, including pricing dependencies."
   },
   {
     "path": "#/$defs/d_f1a590578006650bb43d",

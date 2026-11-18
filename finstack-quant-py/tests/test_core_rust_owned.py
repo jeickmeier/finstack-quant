@@ -189,7 +189,9 @@ def test_realized_variance_defaults_are_rust_owned() -> None:
     h = [102.0, 103.0, 102.5, 103.5]
     lo = [99.0, 100.2, 99.9, 101.0]
     c = [101.0, 102.0, 101.5, 103.0]
-    assert stats.realized_variance_ohlc(o, h, lo, c) == stats.realized_variance_ohlc(o, h, lo, c, "yang_zhang", 252.0)
+    assert stats.realized_variance_ohlc(o, h, lo, c, previous_close=100.0) == stats.realized_variance_ohlc(
+        o, h, lo, c, "yang_zhang", 252.0, 100.0
+    )
 
 
 def test_fx_forward_trade_date_convention_defaults_in_rust() -> None:

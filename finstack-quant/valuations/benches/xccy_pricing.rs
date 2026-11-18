@@ -205,6 +205,7 @@ fn make_xccy(base: Date, maturity: Date, exchange: NotionalExchange) -> XccySwap
         notional: Money::new(usd_notional, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
         leg: FloatLegSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::from("USD-SOFR-3M"),
             discount_curve_id: CurveId::from("USD-OIS"),
             start: base,
@@ -227,6 +228,7 @@ fn make_xccy(base: Date, maturity: Date, exchange: NotionalExchange) -> XccySwap
         notional: Money::new(eur_notional, Currency::EUR).expect("valid money fixture"),
         side: PayReceive::Pay,
         leg: FloatLegSpec {
+            index_id: "EUR-EURIBOR-3M".into(),
             forward_curve_id: CurveId::from("EUR-EURIBOR-3M"),
             discount_curve_id: CurveId::from("EUR-OIS"),
             start: base,

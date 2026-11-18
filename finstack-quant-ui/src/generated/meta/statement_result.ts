@@ -493,7 +493,7 @@ export default [
   {
     "path": "#/$defs/d_6f601764dacadc213e87/properties/periods",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/PeriodPlan/properties/periods",
-    "description": "Ordered periods produced by the parser."
+    "description": "Chronologically ordered reporting periods, with optional gaps."
   },
   {
     "path": "#/$defs/d_6f601764dacadc213e87/properties/periods/items",
@@ -1828,6 +1828,12 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CFKind/oneOf/26",
     "const": "collateral_substitution_out",
     "description": "Collateral substitution outflow (original collateral returned).\n\nWhen a counterparty substitutes collateral, this represents the return\nof the original collateral being replaced."
+  },
+  {
+    "path": "#/$defs/d_c7156583a7d399a69ae5/oneOf/27",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CFKind/oneOf/27",
+    "const": "derivative_settlement",
+    "description": "Net contractual derivative payoff settled in cash without exchanging principal."
   },
   {
     "path": "#/$defs/d_c7156583a7d399a69ae5/oneOf/3",

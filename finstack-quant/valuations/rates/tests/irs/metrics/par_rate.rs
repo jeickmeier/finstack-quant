@@ -61,6 +61,7 @@ fn create_standard_swap(
         },
         float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
+            index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),

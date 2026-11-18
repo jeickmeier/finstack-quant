@@ -14,7 +14,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import init, { calibration, core, models } from '../../index.js';
+import init, { calibration, core, models, valuations } from '../../index.js';
 
 await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
@@ -316,6 +316,76 @@ test('validateCalibration returns the validated envelope object', () => {
     () => calibration.validateCalibration(broken),
     (error) => error.name === 'CalibrationEnvelopeError' && error.kind === 'undefined_quote_set'
   );
+});
+
+test('discount curve restoration preserves executed quote bindings and fit policy', () => {
+  const state = calibration.calibrate(GOLDEN.envelope).result.final_market;
+  const recipe = state.curves.find((curve) => curve.id === 'USD-OIS').rate_calibration;
+  assert.deepEqual(
+    recipe.execution.bindings.map((input) => input.quote_id).sort(),
+    [...GOLDEN.envelope.plan.quote_sets['USD-OIS']].sort()
+  );
+  assert.ok(recipe.execution.bindings.every((input) => input.pillar_time > 0));
+  assert.ok(recipe.execution.calibration_config.solver);
+  const restored = core.MarketContext.fromJson(JSON.stringify(state));
+  try {
+    const snapshot = JSON.parse(restored.toJson());
+    assert.deepEqual(
+      snapshot.curves.find((curve) => curve.id === 'USD-OIS').rate_calibration,
+      recipe
+    );
+  } finally {
+    restored.free();
+  }
+});
+
+test('CDS DV01 rejects a restored discount curve that fails its unshocked replay', () => {
+  const fixture = new URL(
+    '../../../finstack-quant/valuations/tests/golden/data/pricing/quantlib/cds/cds_quantlib_flat_hazard_decomposition.json',
+    import.meta.url
+  );
+  const deal = JSON.parse(readFileSync(fixture, 'utf8'));
+  const envelope = structuredClone(GOLDEN.envelope);
+  const asOf = deal.metadata.valuation_date;
+  Object.assign(envelope.plan.steps[0], {
+    base_date: asOf,
+    curve_id: 'USD-FLAT-2PCT',
+    extrapolation: 'extend',
+  });
+  envelope.prior_market = deal.market.envelope.prior_market.filter(
+    (item) => item.kind === 'hazard_curve'
+  );
+  const state = calibration.calibrate(envelope).result.final_market;
+  const dv01 = () => {
+    const restored = core.MarketContext.fromJson(JSON.stringify(state));
+    try {
+      return valuations.instruments.priceInstrument(
+        JSON.stringify(deal.instrument),
+        restored.toJson(),
+        asOf,
+        deal.model,
+        ['dv01']
+      ).measures.dv01;
+    } finally {
+      restored.free();
+    }
+  };
+  const repriced = (shift) => {
+    const shocked = structuredClone(envelope);
+    for (const quote of shocked.market_data) quote.rate += shift;
+    const market = calibration.calibrate(shocked).result.final_market;
+    return Number(
+      valuations.instruments.priceInstrument(
+        JSON.stringify(deal.instrument),
+        JSON.stringify(market),
+        asOf,
+        deal.model
+      ).value.amount
+    );
+  };
+  assert.ok(Math.abs(dv01() - (repriced(0.0001) - repriced(-0.0001)) / 2) < 1e-6);
+  state.curves.find((curve) => curve.id === 'USD-FLAT-2PCT').knot_points.at(-1)[1] *= 0.95;
+  assert.throws(dv01, /source factor/);
 });
 
 test('calibrationResultStepReport, its JSON twin and residuals read one step', () => {

@@ -39,7 +39,7 @@ fn model_node_ids_returns_array() {
 fn model_node_ids_empty_model() {
     let periods = finstack_quant_core::dates::build_periods("2025Q1..Q1", None)
         .unwrap()
-        .periods;
+        .into_periods();
     let model = finstack_quant_statements::types::FinancialModelSpec::new(
         "empty",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -186,7 +186,7 @@ fn validate_capital_structure_spec_accepts_empty() {
 fn validate_financial_model_json_accepts_valid_model() {
     let periods = finstack_quant_core::dates::build_periods("2025Q1..Q1", None)
         .expect("valid periods")
-        .periods;
+        .into_periods();
     let model = finstack_quant_statements::types::FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(

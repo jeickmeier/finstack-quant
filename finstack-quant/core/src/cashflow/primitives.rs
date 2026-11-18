@@ -248,6 +248,9 @@ pub enum CFKind {
     /// When a counterparty substitutes collateral, this represents the return
     /// of the original collateral being replaced.
     CollateralSubstitutionOut,
+
+    /// Net contractual derivative payoff settled in cash without exchanging principal.
+    DerivativeSettlement,
 }
 
 /// Writes the snake_case serde label (`fixed`, `floating`, ...).
@@ -356,7 +359,8 @@ impl CFKind {
             | CFKind::VariationMarginPay
             | CFKind::MarginInterest
             | CFKind::CollateralSubstitutionIn
-            | CFKind::CollateralSubstitutionOut => true,
+            | CFKind::CollateralSubstitutionOut
+            | CFKind::DerivativeSettlement => true,
         }
     }
 }

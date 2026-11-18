@@ -122,6 +122,7 @@ pub fn leg_usd_receive(
             .expect("valid money fixture"),
         side: finstack_quant_valuations_core::instruments::PayReceive::Receive,
         leg: FloatLegSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: finstack_quant_core::types::CurveId::new("USD-SOFR-3M"),
             discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
             start,
@@ -150,6 +151,7 @@ pub fn leg_eur_pay(
             .expect("valid money fixture"),
         side: finstack_quant_valuations_core::instruments::PayReceive::Pay,
         leg: FloatLegSpec {
+            index_id: "EUR-EURIBOR-3M".into(),
             forward_curve_id: finstack_quant_core::types::CurveId::new("EUR-EURIBOR-3M"),
             discount_curve_id: finstack_quant_core::types::CurveId::new("EUR-OIS"),
             start,

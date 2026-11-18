@@ -163,6 +163,17 @@
             "null"
           ]
         },
+        "previous_close_date": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual closing fixing immediately before the first Yang–Zhang target bar.\nResolved exactly in the same close series as the target bars."
+        },
         "price_series_policy": {
           "$ref": "#/$defs/EquityPriceSeriesPolicy",
           "description": "Corporate-action policy applied to all historical price series.\n\nThe selected policy is declarative: input series must already conform to\nit. `Adjusted` is appropriate for single-stock variance where splits\nmust not create artificial returns; `Raw` is explicit for official index\nlevels or contracts whose calculation agent retains raw observations."

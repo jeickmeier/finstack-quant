@@ -51,6 +51,7 @@ fn test_irs_at_par_npv_zero() {
         },
         float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -113,6 +114,7 @@ fn test_irs_receive_fixed_below_market() {
         },
         float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -174,6 +176,7 @@ fn test_irs_receive_fixed_above_market() {
         },
         float_leg: finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -231,6 +234,7 @@ fn test_irs_pay_vs_receive_opposite_signs() {
 
     let float_leg = finstack_quant_valuations_core::instruments::FloatLegSpec {
         discount_curve_id: "USD-OIS".into(),
+        index_id: "USD-SOFR-3M".into(),
         forward_curve_id: "USD-SOFR-3M".into(),
         spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
         frequency: Tenor::quarterly(),

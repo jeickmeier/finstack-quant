@@ -91,6 +91,7 @@ def test_swaption_builder_setters_accept_keyword_value() -> None:
     )
     float_leg = FloatLegSpec(
         discount_curve_id="USD-OIS",
+        index_id="USD-SOFR-3M",
         forward_curve_id="USD-SOFR-3M",
         spread_bp="0",
         frequency=Tenor.quarterly(),

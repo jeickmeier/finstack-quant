@@ -24,6 +24,7 @@
                 "count": 3,
                 "unit": "months"
               },
+              "index_id": "USD-SOFR-3M",
               "payment_lag_days": 0,
               "reset_lag_days": 0,
               "spread_bp": "0",
@@ -51,6 +52,7 @@
                 "count": 3,
                 "unit": "months"
               },
+              "index_id": "EUR-EURIBOR-3M",
               "payment_lag_days": 0,
               "reset_lag_days": 0,
               "spread_bp": "10",
@@ -624,6 +626,10 @@
           "$ref": "#/$defs/d_47e5e74524615b78a19f",
           "description": "Payment frequency"
         },
+        "index_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Contractual observed index identifying historical rate publications."
+        },
         "payment_lag_days": {
           "default": 0,
           "description": "Payment lag in business days after period end (default: 0).\n\nBloomberg OIS swaps typically use 2 business days payment lag.\nThe actual payment date is adjusted from the period end date by\nthis many business days using the leg's calendar.",
@@ -651,6 +657,7 @@
         }
       },
       "required": [
+        "index_id",
         "discount_curve_id",
         "forward_curve_id",
         "spread_bp",
@@ -1215,6 +1222,17 @@
             }
           ],
           "description": "Optional forward curve identifier for asset-swap spread metrics.\n\nWhen set, ASW par/market metrics project the floating receiver leg from\nthis forward curve instead of using a discount-curve par-rate proxy."
+        },
+        "asw_index_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_94cb251104de5cf587b6"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual floating index used for asset-swap accruals and historical resets."
         },
         "bdt_sigma": {
           "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",

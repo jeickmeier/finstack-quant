@@ -1371,6 +1371,10 @@ export type Id18 = string;
  */
 export type Decimal6 = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id19 = string;
+/**
  * Day-count convention.
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -1409,7 +1413,7 @@ export type BusinessDayConvention2 =
 /**
  * Opaque string identifier.
  */
-export type Id19 = string;
+export type Id20 = string;
 /**
  * Day-count convention.
  */
@@ -1558,11 +1562,11 @@ export type Date17 = string;
 /**
  * Opaque string identifier.
  */
-export type Id20 = string;
+export type Id21 = string;
 /**
  * Opaque string identifier.
  */
-export type Id21 = string;
+export type Id22 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -1609,7 +1613,7 @@ export type CallExercisePolicy =
 /**
  * Opaque string identifier.
  */
-export type Id22 = string;
+export type Id23 = string;
 /**
  * Rule the pool engine applies to holder put options on the collateral.
  *
@@ -1667,7 +1671,7 @@ export type DayCount9 =
 /**
  * Opaque string identifier.
  */
-export type Id23 = string;
+export type Id24 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -1675,7 +1679,7 @@ export type Date23 = string;
 /**
  * Opaque string identifier.
  */
-export type Id24 = string;
+export type Id25 = string;
 /**
  * Exact decimal encoded as a JSON string.
  */
@@ -1708,7 +1712,7 @@ export type UpfrontFee =
 /**
  * Opaque string identifier.
  */
-export type Id25 = string;
+export type Id26 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -2020,11 +2024,11 @@ export type Decimal14 = string;
 /**
  * Opaque string identifier.
  */
-export type Id26 = string;
+export type Id27 = string;
 /**
  * Opaque string identifier.
  */
-export type Id27 = string;
+export type Id28 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -2160,11 +2164,11 @@ export type DefaultModelSpec =
 /**
  * Opaque string identifier.
  */
-export type Id28 = string;
+export type Id29 = string;
 /**
  * Opaque string identifier.
  */
-export type Id29 = string;
+export type Id30 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -2793,15 +2797,11 @@ export type DayCount13 =
 /**
  * Opaque string identifier.
  */
-export type Id30 = string;
+export type Id31 = string;
 /**
  * ISO 8601 calendar date string.
  */
 export type Date42 = string;
-/**
- * Opaque string identifier.
- */
-export type Id31 = string;
 /**
  * Opaque string identifier.
  */
@@ -2810,6 +2810,10 @@ export type Id32 = string;
  * Opaque string identifier.
  */
 export type Id33 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id34 = string;
 /**
  * Asian averaging method.
  *
@@ -3019,7 +3023,7 @@ export type DayCount14 =
 /**
  * Opaque string identifier.
  */
-export type Id34 = string;
+export type Id35 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -3027,7 +3031,7 @@ export type Date43 = string;
 /**
  * Opaque string identifier.
  */
-export type Id35 = string;
+export type Id36 = string;
 /**
  * When an otherwise entitled barrier-conditional cash amount is paid.
  *
@@ -3044,11 +3048,11 @@ export type PayoutTiming = "at_hit" | "at_expiry";
 /**
  * Opaque string identifier.
  */
-export type Id36 = string;
+export type Id37 = string;
 /**
  * Opaque string identifier.
  */
-export type Id37 = string;
+export type Id38 = string;
 /**
  * Four-state barrier option classification.
  *
@@ -3063,7 +3067,7 @@ export type BarrierType = "up_and_out" | "up_and_in" | "down_and_out" | "down_an
 /**
  * Opaque string identifier.
  */
-export type Id38 = string;
+export type Id39 = string;
 /**
  * Business day convention for payment dates
  */
@@ -3090,7 +3094,7 @@ export type DayCount15 =
 /**
  * Opaque string identifier.
  */
-export type Id39 = string;
+export type Id40 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -3098,7 +3102,11 @@ export type Date44 = string;
 /**
  * Opaque string identifier.
  */
-export type Id40 = string;
+export type Id41 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id42 = string;
 /**
  * Exact decimal encoded as a JSON string.
  */
@@ -3457,11 +3465,11 @@ export type Date49 = string;
 /**
  * Opaque string identifier.
  */
-export type Id41 = string;
+export type Id43 = string;
 /**
  * Opaque string identifier.
  */
-export type Id42 = string;
+export type Id44 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -3481,11 +3489,11 @@ export type Date53 = string;
 /**
  * Opaque string identifier.
  */
-export type Id43 = string;
+export type Id45 = string;
 /**
  * Opaque string identifier.
  */
-export type Id44 = string;
+export type Id46 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -3516,15 +3524,15 @@ export type DayCount16 =
 /**
  * Opaque string identifier.
  */
-export type Id45 = string;
-/**
- * Opaque string identifier.
- */
-export type Id46 = string;
-/**
- * Opaque string identifier.
- */
 export type Id47 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id48 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id49 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -3540,11 +3548,11 @@ export type Decimal17 = string;
 /**
  * Opaque string identifier.
  */
-export type Id48 = string;
+export type Id50 = string;
 /**
  * Opaque string identifier.
  */
-export type Id49 = string;
+export type Id51 = string;
 /**
  * Business day convention for payment dates
  */
@@ -3571,7 +3579,7 @@ export type DayCount17 =
 /**
  * Opaque string identifier.
  */
-export type Id50 = string;
+export type Id52 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -3587,7 +3595,7 @@ export type Date58 = string;
 /**
  * Opaque string identifier.
  */
-export type Id51 = string;
+export type Id53 = string;
 /**
  * Base currency for margin calculations.
  *
@@ -3759,7 +3767,7 @@ export type Currency4 =
 /**
  * Opaque string identifier.
  */
-export type Id52 = string;
+export type Id54 = string;
 /**
  * Explicit ISDA SIMM credit risk-class and bucket assignment.
  *
@@ -3798,7 +3806,7 @@ export type SimmCreditClassification =
 /**
  * Opaque string identifier.
  */
-export type Id53 = string;
+export type Id55 = string;
 /**
  * PV reporting currency (output currency of `value`/`npv`).
  */
@@ -3991,7 +3999,7 @@ export type DayCount18 =
 /**
  * Opaque string identifier.
  */
-export type Id54 = string;
+export type Id56 = string;
 /**
  * Exact decimal encoded as a JSON string.
  */
@@ -3999,11 +4007,11 @@ export type Decimal19 = string;
 /**
  * Opaque string identifier.
  */
-export type Id55 = string;
+export type Id57 = string;
 /**
  * Opaque string identifier.
  */
-export type Id56 = string;
+export type Id58 = string;
 /**
  * Interpolation strategy for [`ScalarTimeSeries`].
  *
@@ -4099,7 +4107,7 @@ export type DayCount19 =
 /**
  * Opaque string identifier.
  */
-export type Id57 = string;
+export type Id59 = string;
 /**
  * Exact decimal encoded as a JSON string.
  */
@@ -4107,11 +4115,11 @@ export type Decimal20 = string;
 /**
  * Opaque string identifier.
  */
-export type Id58 = string;
+export type Id60 = string;
 /**
  * Opaque string identifier.
  */
-export type Id59 = string;
+export type Id61 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -4146,15 +4154,15 @@ export type DayCount20 =
 /**
  * Opaque string identifier.
  */
-export type Id60 = string;
-/**
- * Opaque string identifier.
- */
-export type Id61 = string;
-/**
- * Opaque string identifier.
- */
 export type Id62 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id63 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id64 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -4170,7 +4178,7 @@ export type Decimal21 = string;
 /**
  * Opaque string identifier.
  */
-export type Id63 = string;
+export type Id65 = string;
 /**
  * Day-count convention.
  */
@@ -4192,7 +4200,7 @@ export type DayCount21 =
 /**
  * Opaque string identifier.
  */
-export type Id64 = string;
+export type Id66 = string;
 /**
  * Exact decimal encoded as a JSON string.
  */
@@ -4208,11 +4216,11 @@ export type BusinessDayConvention11 =
 /**
  * Opaque string identifier.
  */
-export type Id65 = string;
+export type Id67 = string;
 /**
  * Opaque string identifier.
  */
-export type Id66 = string;
+export type Id68 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -4228,7 +4236,7 @@ export type Date67 = string;
 /**
  * Opaque string identifier.
  */
-export type Id67 = string;
+export type Id69 = string;
 /**
  * Finite JSON number that is strictly greater than zero.
  *
@@ -4242,15 +4250,15 @@ export type PositiveF64Wire = number;
 /**
  * Opaque string identifier.
  */
-export type Id68 = string;
-/**
- * Opaque string identifier.
- */
-export type Id69 = string;
-/**
- * Opaque string identifier.
- */
 export type Id70 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id71 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id72 = string;
 /**
  * Day-count convention.
  */
@@ -4272,15 +4280,15 @@ export type DayCount22 =
 /**
  * Opaque string identifier.
  */
-export type Id71 = string;
-/**
- * Opaque string identifier.
- */
-export type Id72 = string;
-/**
- * Opaque string identifier.
- */
 export type Id73 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id74 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id75 = string;
 /**
  * Currency in which variation margin is paid.
  */
@@ -4457,7 +4465,7 @@ export type Date69 = string;
 /**
  * Opaque string identifier.
  */
-export type Id74 = string;
+export type Id76 = string;
 /**
  * Premium, variation-margin, and settlement currency.
  */
@@ -4644,7 +4652,7 @@ export type DayCount23 =
 /**
  * Opaque string identifier.
  */
-export type Id75 = string;
+export type Id77 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -4691,15 +4699,15 @@ export type DayCount24 =
 /**
  * Opaque string identifier.
  */
-export type Id76 = string;
-/**
- * Opaque string identifier.
- */
-export type Id77 = string;
-/**
- * Opaque string identifier.
- */
 export type Id78 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id79 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id80 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -4719,7 +4727,7 @@ export type Decimal24 = string;
 /**
  * Opaque string identifier.
  */
-export type Id79 = string;
+export type Id81 = string;
 /**
  * Exact decimal encoded as a JSON string.
  */
@@ -4745,11 +4753,11 @@ export type DayCount25 =
 /**
  * Opaque string identifier.
  */
-export type Id80 = string;
+export type Id82 = string;
 /**
  * Opaque string identifier.
  */
-export type Id81 = string;
+export type Id83 = string;
 /**
  * Day-count convention.
  */
@@ -4809,7 +4817,7 @@ export type DayCount27 =
 /**
  * Opaque string identifier.
  */
-export type Id82 = string;
+export type Id84 = string;
 /**
  * Exact decimal encoded as a JSON string.
  */
@@ -4817,11 +4825,11 @@ export type Decimal27 = string;
 /**
  * Opaque string identifier.
  */
-export type Id83 = string;
+export type Id85 = string;
 /**
  * Opaque string identifier.
  */
-export type Id84 = string;
+export type Id86 = string;
 /**
  * Day-count convention.
  */
@@ -4843,15 +4851,15 @@ export type DayCount28 =
 /**
  * Opaque string identifier.
  */
-export type Id85 = string;
-/**
- * Opaque string identifier.
- */
-export type Id86 = string;
-/**
- * Opaque string identifier.
- */
 export type Id87 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id88 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id89 = string;
 /**
  * Exact decimal encoded as a JSON string.
  */
@@ -4859,7 +4867,7 @@ export type Decimal28 = string;
 /**
  * Opaque string identifier.
  */
-export type Id88 = string;
+export type Id90 = string;
 /**
  * Business-day adjustment convention.
  */
@@ -4886,11 +4894,11 @@ export type DayCount29 =
 /**
  * Opaque string identifier.
  */
-export type Id89 = string;
+export type Id91 = string;
 /**
  * Opaque string identifier.
  */
-export type Id90 = string;
+export type Id92 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -4907,11 +4915,11 @@ export type BusinessDayConvention14 =
 /**
  * Opaque string identifier.
  */
-export type Id91 = string;
+export type Id93 = string;
 /**
  * Opaque string identifier.
  */
-export type Id92 = string;
+export type Id94 = string;
 /**
  * Day-count convention.
  */
@@ -4933,11 +4941,11 @@ export type DayCount30 =
 /**
  * Opaque string identifier.
  */
-export type Id93 = string;
+export type Id95 = string;
 /**
  * Opaque string identifier.
  */
-export type Id94 = string;
+export type Id96 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -4973,7 +4981,7 @@ export type CdsDocClause =
 /**
  * Opaque string identifier.
  */
-export type Id95 = string;
+export type Id97 = string;
 /**
  * Business-day adjustment convention.
  */
@@ -5004,7 +5012,7 @@ export type DayCount31 =
 /**
  * Opaque string identifier.
  */
-export type Id96 = string;
+export type Id98 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -5016,15 +5024,15 @@ export type Date86 = string;
 /**
  * Opaque string identifier.
  */
-export type Id97 = string;
-/**
- * Opaque string identifier.
- */
-export type Id98 = string;
-/**
- * Opaque string identifier.
- */
 export type Id99 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id100 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id101 = string;
 /**
  * Business-day adjustment convention.
  */
@@ -5033,7 +5041,7 @@ export type BusinessDayConvention16 =
 /**
  * Opaque string identifier.
  */
-export type Id100 = string;
+export type Id102 = string;
 /**
  * Day-count convention.
  */
@@ -5055,18 +5063,6 @@ export type DayCount32 =
 /**
  * Opaque string identifier.
  */
-export type Id101 = string;
-/**
- * Opaque string identifier.
- */
-export type Id102 = string;
-/**
- * ISO 8601 calendar date string.
- */
-export type Date87 = string;
-/**
- * Opaque string identifier.
- */
 export type Id103 = string;
 /**
  * Opaque string identifier.
@@ -5075,11 +5071,23 @@ export type Id104 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date88 = string;
+export type Date87 = string;
 /**
  * Opaque string identifier.
  */
 export type Id105 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id106 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date88 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id107 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -5087,7 +5095,7 @@ export type Date89 = string;
 /**
  * Opaque string identifier.
  */
-export type Id106 = string;
+export type Id108 = string;
 /**
  * Currency in which the equity is quoted
  */
@@ -5256,11 +5264,11 @@ export type Currency8 =
 /**
  * Opaque string identifier.
  */
-export type Id107 = string;
+export type Id109 = string;
 /**
  * Opaque string identifier.
  */
-export type Id108 = string;
+export type Id110 = string;
 /**
  * Currency of the strike, premium and present value.
  */
@@ -5447,7 +5455,7 @@ export type DayCount33 =
 /**
  * Opaque string identifier.
  */
-export type Id109 = string;
+export type Id111 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -5463,15 +5471,15 @@ export type Date92 = string;
 /**
  * Opaque string identifier.
  */
-export type Id110 = string;
-/**
- * Opaque string identifier.
- */
-export type Id111 = string;
-/**
- * Opaque string identifier.
- */
 export type Id112 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id113 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id114 = string;
 /**
  * Currency of the strike, premium and present value.
  */
@@ -5658,7 +5666,7 @@ export type DayCount34 =
 /**
  * Opaque string identifier.
  */
-export type Id113 = string;
+export type Id115 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -5666,15 +5674,15 @@ export type Date93 = string;
 /**
  * Opaque string identifier.
  */
-export type Id114 = string;
-/**
- * Opaque string identifier.
- */
-export type Id115 = string;
-/**
- * Opaque string identifier.
- */
 export type Id116 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id117 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id118 = string;
 /**
  * Day-count convention.
  */
@@ -5696,11 +5704,11 @@ export type DayCount35 =
 /**
  * Opaque string identifier.
  */
-export type Id117 = string;
+export type Id119 = string;
 /**
  * Opaque string identifier.
  */
-export type Id118 = string;
+export type Id120 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -5713,23 +5721,15 @@ export type BusinessDayConvention17 =
 /**
  * Opaque string identifier.
  */
-export type Id119 = string;
-/**
- * Opaque string identifier.
- */
-export type Id120 = string;
-/**
- * ISO 8601 calendar date string.
- */
-export type Date95 = string;
-/**
- * Opaque string identifier.
- */
 export type Id121 = string;
 /**
  * Opaque string identifier.
  */
 export type Id122 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date95 = string;
 /**
  * Opaque string identifier.
  */
@@ -5738,6 +5738,14 @@ export type Id123 = string;
  * Opaque string identifier.
  */
 export type Id124 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id125 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id126 = string;
 /**
  * Base currency (the currency being priced)
  */
@@ -5906,7 +5914,7 @@ export type Currency11 =
 /**
  * Opaque string identifier.
  */
-export type Id125 = string;
+export type Id127 = string;
 /**
  * Quote currency (the currency used for pricing)
  */
@@ -6240,7 +6248,7 @@ export type Currency13 =
 /**
  * Opaque string identifier.
  */
-export type Id126 = string;
+export type Id128 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -6248,11 +6256,11 @@ export type Date96 = string;
 /**
  * Opaque string identifier.
  */
-export type Id127 = string;
+export type Id129 = string;
 /**
  * Opaque string identifier.
  */
-export type Id128 = string;
+export type Id130 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -6590,15 +6598,15 @@ export type Currency15 =
 /**
  * Opaque string identifier.
  */
-export type Id129 = string;
-/**
- * Opaque string identifier.
- */
-export type Id130 = string;
-/**
- * Opaque string identifier.
- */
 export type Id131 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id132 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id133 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -6936,7 +6944,7 @@ export type Currency17 =
 /**
  * Opaque string identifier.
  */
-export type Id132 = string;
+export type Id134 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -6996,7 +7004,7 @@ export type NdfFixingSource =
 /**
  * Opaque string identifier.
  */
-export type Id133 = string;
+export type Id135 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -7517,7 +7525,7 @@ export type Currency20 =
 /**
  * Opaque string identifier.
  */
-export type Id134 = string;
+export type Id136 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -7525,11 +7533,11 @@ export type Date101 = string;
 /**
  * Opaque string identifier.
  */
-export type Id135 = string;
+export type Id137 = string;
 /**
  * Opaque string identifier.
  */
-export type Id136 = string;
+export type Id138 = string;
 /**
  * Quote currency (domestic currency)
  */
@@ -7698,7 +7706,7 @@ export type Currency21 =
 /**
  * Opaque string identifier.
  */
-export type Id137 = string;
+export type Id139 = string;
 /**
  * Base currency (foreign currency)
  */
@@ -7885,7 +7893,7 @@ export type DayCount37 =
 /**
  * Opaque string identifier.
  */
-export type Id138 = string;
+export type Id140 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -7893,11 +7901,11 @@ export type Date102 = string;
 /**
  * Opaque string identifier.
  */
-export type Id139 = string;
+export type Id141 = string;
 /**
  * Opaque string identifier.
  */
-export type Id140 = string;
+export type Id142 = string;
 /**
  * Quote currency (domestic currency)
  */
@@ -8066,7 +8074,7 @@ export type Currency23 =
 /**
  * Opaque string identifier.
  */
-export type Id141 = string;
+export type Id143 = string;
 /**
  * Base currency (foreign currency)
  */
@@ -8253,7 +8261,7 @@ export type DayCount38 =
 /**
  * Opaque string identifier.
  */
-export type Id142 = string;
+export type Id144 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -8261,11 +8269,11 @@ export type Date103 = string;
 /**
  * Opaque string identifier.
  */
-export type Id143 = string;
+export type Id145 = string;
 /**
  * Opaque string identifier.
  */
-export type Id144 = string;
+export type Id146 = string;
 /**
  * Quote currency (domestic currency)
  */
@@ -8434,7 +8442,7 @@ export type Currency25 =
 /**
  * Opaque string identifier.
  */
-export type Id145 = string;
+export type Id147 = string;
 /**
  * Base currency (the currency being priced, formerly foreign_currency)
  */
@@ -8621,7 +8629,7 @@ export type DayCount39 =
 /**
  * Opaque string identifier.
  */
-export type Id146 = string;
+export type Id148 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -8629,11 +8637,11 @@ export type Date104 = string;
 /**
  * Opaque string identifier.
  */
-export type Id147 = string;
+export type Id149 = string;
 /**
  * Opaque string identifier.
  */
-export type Id148 = string;
+export type Id150 = string;
 /**
  * Quote currency (the pricing/settlement currency, formerly domestic_currency)
  */
@@ -8802,11 +8810,11 @@ export type Currency27 =
 /**
  * Opaque string identifier.
  */
-export type Id149 = string;
+export type Id151 = string;
 /**
  * Opaque string identifier.
  */
-export type Id150 = string;
+export type Id152 = string;
 /**
  * Base currency (foreign)
  */
@@ -8993,15 +9001,15 @@ export type DayCount40 =
 /**
  * Opaque string identifier.
  */
-export type Id151 = string;
-/**
- * Opaque string identifier.
- */
-export type Id152 = string;
-/**
- * Opaque string identifier.
- */
 export type Id153 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id154 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id155 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -9014,7 +9022,7 @@ export type BusinessDayConvention18 =
 /**
  * Opaque string identifier.
  */
-export type Id154 = string;
+export type Id156 = string;
 /**
  * Quote currency (domestic)
  */
@@ -9187,7 +9195,7 @@ export type Date106 = string;
 /**
  * Opaque string identifier.
  */
-export type Id155 = string;
+export type Id157 = string;
 /**
  * Base currency (equity denomination)
  */
@@ -9374,7 +9382,7 @@ export type DayCount41 =
 /**
  * Opaque string identifier.
  */
-export type Id156 = string;
+export type Id158 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -9382,11 +9390,11 @@ export type Date107 = string;
 /**
  * Opaque string identifier.
  */
-export type Id157 = string;
+export type Id159 = string;
 /**
  * Opaque string identifier.
  */
-export type Id158 = string;
+export type Id160 = string;
 /**
  * Quote currency (payment/settlement currency)
  */
@@ -9555,11 +9563,11 @@ export type Currency31 =
 /**
  * Opaque string identifier.
  */
-export type Id159 = string;
+export type Id161 = string;
 /**
  * Opaque string identifier.
  */
-export type Id160 = string;
+export type Id162 = string;
 /**
  * Base currency for pricing
  */
@@ -9746,7 +9754,7 @@ export type DayCount42 =
 /**
  * Opaque string identifier.
  */
-export type Id161 = string;
+export type Id163 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -9762,15 +9770,15 @@ export type Date110 = string;
 /**
  * Opaque string identifier.
  */
-export type Id162 = string;
-/**
- * Opaque string identifier.
- */
-export type Id163 = string;
-/**
- * Opaque string identifier.
- */
 export type Id164 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id165 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id166 = string;
 /**
  * Base currency for pricing
  */
@@ -9957,7 +9965,7 @@ export type DayCount43 =
 /**
  * Opaque string identifier.
  */
-export type Id165 = string;
+export type Id167 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -9965,15 +9973,15 @@ export type Date111 = string;
 /**
  * Opaque string identifier.
  */
-export type Id166 = string;
-/**
- * Opaque string identifier.
- */
-export type Id167 = string;
-/**
- * Opaque string identifier.
- */
 export type Id168 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id169 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id170 = string;
 /**
  * Standard commodity market conventions by product type.
  *
@@ -10173,15 +10181,15 @@ export type Currency34 =
 /**
  * Opaque string identifier.
  */
-export type Id169 = string;
-/**
- * Opaque string identifier.
- */
-export type Id170 = string;
-/**
- * Opaque string identifier.
- */
 export type Id171 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id172 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id173 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -10359,15 +10367,15 @@ export type Currency35 =
 /**
  * Opaque string identifier.
  */
-export type Id172 = string;
-/**
- * Opaque string identifier.
- */
-export type Id173 = string;
-/**
- * Opaque string identifier.
- */
 export type Id174 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id175 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id176 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -10567,7 +10575,7 @@ export type DayCount44 =
 /**
  * Opaque string identifier.
  */
-export type Id175 = string;
+export type Id177 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -10575,11 +10583,11 @@ export type Date115 = string;
 /**
  * Opaque string identifier.
  */
-export type Id176 = string;
+export type Id178 = string;
 /**
  * Opaque string identifier.
  */
-export type Id177 = string;
+export type Id179 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -10591,7 +10599,7 @@ export type Date117 = string;
 /**
  * Opaque string identifier.
  */
-export type Id178 = string;
+export type Id180 = string;
 /**
  * Settlement currency.
  */
@@ -10778,19 +10786,11 @@ export type DayCount45 =
 /**
  * Opaque string identifier.
  */
-export type Id179 = string;
+export type Id181 = string;
 /**
  * ISO 8601 calendar date string.
  */
 export type Date118 = string;
-/**
- * Opaque string identifier.
- */
-export type Id180 = string;
-/**
- * Opaque string identifier.
- */
-export type Id181 = string;
 /**
  * Opaque string identifier.
  */
@@ -10804,10 +10804,6 @@ export type Id183 = string;
  */
 export type Id184 = string;
 /**
- * ISO 8601 calendar date string.
- */
-export type Date119 = string;
-/**
  * Opaque string identifier.
  */
 export type Id185 = string;
@@ -10816,9 +10812,21 @@ export type Id185 = string;
  */
 export type Id186 = string;
 /**
+ * ISO 8601 calendar date string.
+ */
+export type Date119 = string;
+/**
  * Opaque string identifier.
  */
 export type Id187 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id188 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id189 = string;
 /**
  * Base currency, the numerator of the quoted pair.
  */
@@ -10987,14 +10995,6 @@ export type Currency38 =
 /**
  * Opaque string identifier.
  */
-export type Id188 = string;
-/**
- * Opaque string identifier.
- */
-export type Id189 = string;
-/**
- * Opaque string identifier.
- */
 export type Id190 = string;
 /**
  * Opaque string identifier.
@@ -11008,6 +11008,14 @@ export type Id192 = string;
  * Opaque string identifier.
  */
 export type Id193 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id194 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id195 = string;
 /**
  * Currency in which the underlying asset is quoted and financed.
  */
@@ -11176,19 +11184,19 @@ export type Currency39 =
 /**
  * Opaque string identifier.
  */
-export type Id194 = string;
-/**
- * Opaque string identifier.
- */
-export type Id195 = string;
-/**
- * Opaque string identifier.
- */
 export type Id196 = string;
 /**
  * Opaque string identifier.
  */
 export type Id197 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id198 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id199 = string;
 /**
  * Currency in which the underlying spot and dividends are quoted.
  */
@@ -11357,14 +11365,6 @@ export type Currency40 =
 /**
  * Opaque string identifier.
  */
-export type Id198 = string;
-/**
- * Opaque string identifier.
- */
-export type Id199 = string;
-/**
- * Opaque string identifier.
- */
 export type Id200 = string;
 /**
  * Opaque string identifier.
@@ -11378,6 +11378,14 @@ export type Id202 = string;
  * Opaque string identifier.
  */
 export type Id203 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id204 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id205 = string;
 /**
  * Day-count convention.
  */
@@ -11417,7 +11425,7 @@ export type DayCount47 =
 /**
  * Opaque string identifier.
  */
-export type Id204 = string;
+export type Id206 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -11425,15 +11433,15 @@ export type Date120 = string;
 /**
  * Opaque string identifier.
  */
-export type Id205 = string;
-/**
- * Opaque string identifier.
- */
-export type Id206 = string;
-/**
- * Opaque string identifier.
- */
 export type Id207 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id208 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id209 = string;
 /**
  * Day-count convention.
  */
@@ -11455,15 +11463,15 @@ export type DayCount48 =
 /**
  * Opaque string identifier.
  */
-export type Id208 = string;
-/**
- * Opaque string identifier.
- */
-export type Id209 = string;
-/**
- * Opaque string identifier.
- */
 export type Id210 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id211 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id212 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -11471,7 +11479,7 @@ export type Date121 = string;
 /**
  * Opaque string identifier.
  */
-export type Id211 = string;
+export type Id213 = string;
 /**
  * Day-count convention.
  */
@@ -11493,7 +11501,7 @@ export type DayCount49 =
 /**
  * Opaque string identifier.
  */
-export type Id212 = string;
+export type Id214 = string;
 /**
  * Exact decimal encoded as a JSON string.
  */
@@ -11501,11 +11509,11 @@ export type Decimal31 = string;
 /**
  * Opaque string identifier.
  */
-export type Id213 = string;
+export type Id215 = string;
 /**
  * Opaque string identifier.
  */
-export type Id214 = string;
+export type Id216 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -11531,7 +11539,7 @@ export type DayCount50 =
 /**
  * Opaque string identifier.
  */
-export type Id215 = string;
+export type Id217 = string;
 /**
  * Exact decimal encoded as a JSON string.
  */
@@ -11539,11 +11547,11 @@ export type Decimal32 = string;
 /**
  * Opaque string identifier.
  */
-export type Id216 = string;
+export type Id218 = string;
 /**
  * Opaque string identifier.
  */
-export type Id217 = string;
+export type Id219 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -11569,7 +11577,7 @@ export type DayCount51 =
 /**
  * Opaque string identifier.
  */
-export type Id218 = string;
+export type Id220 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -11577,15 +11585,15 @@ export type Date124 = string;
 /**
  * Opaque string identifier.
  */
-export type Id219 = string;
-/**
- * Opaque string identifier.
- */
-export type Id220 = string;
-/**
- * Opaque string identifier.
- */
 export type Id221 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id222 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id223 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -11593,7 +11601,7 @@ export type Date125 = string;
 /**
  * Opaque string identifier.
  */
-export type Id222 = string;
+export type Id224 = string;
 /**
  * Exact decimal encoded as a JSON string.
  */
@@ -11619,11 +11627,11 @@ export type DayCount52 =
 /**
  * Opaque string identifier.
  */
-export type Id223 = string;
+export type Id225 = string;
 /**
  * Opaque string identifier.
  */
-export type Id224 = string;
+export type Id226 = string;
 /**
  * Exact decimal encoded as a JSON string.
  */
@@ -11631,7 +11639,7 @@ export type Decimal34 = string;
 /**
  * Opaque string identifier.
  */
-export type Id225 = string;
+export type Id227 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -11644,7 +11652,7 @@ export type BusinessDayConvention21 =
 /**
  * Opaque string identifier.
  */
-export type Id226 = string;
+export type Id228 = string;
 /**
  * Day-count convention.
  */
@@ -11835,11 +11843,11 @@ export type Currency41 =
 /**
  * Opaque string identifier.
  */
-export type Id227 = string;
+export type Id229 = string;
 /**
  * Opaque string identifier.
  */
-export type Id228 = string;
+export type Id230 = string;
 /**
  * Currency the index (and so the swap notional) is denominated in.
  */
@@ -12008,7 +12016,7 @@ export type Currency42 =
 /**
  * Opaque string identifier.
  */
-export type Id229 = string;
+export type Id231 = string;
 /**
  * Functional currency of the fund.
  */
@@ -12181,7 +12189,7 @@ export type Date128 = string;
 /**
  * Opaque string identifier.
  */
-export type Id230 = string;
+export type Id232 = string;
 /**
  * Day-count convention.
  */
@@ -12434,7 +12442,7 @@ export type DayCount55 =
 /**
  * Opaque string identifier.
  */
-export type Id231 = string;
+export type Id233 = string;
 /**
  * Broad property classification for reporting / tagging.
  *
@@ -12611,7 +12619,7 @@ export type Currency45 =
 /**
  * Opaque string identifier.
  */
-export type Id232 = string;
+export type Id234 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -12619,7 +12627,7 @@ export type Date129 = string;
 /**
  * Opaque string identifier.
  */
-export type Id233 = string;
+export type Id235 = string;
 /**
  * Day-count convention.
  */
@@ -12641,18 +12649,6 @@ export type DayCount56 =
 /**
  * Opaque string identifier.
  */
-export type Id234 = string;
-/**
- * Opaque string identifier.
- */
-export type Id235 = string;
-/**
- * ISO 8601 calendar date string.
- */
-export type Date130 = string;
-/**
- * Opaque string identifier.
- */
 export type Id236 = string;
 /**
  * Opaque string identifier.
@@ -12661,7 +12657,7 @@ export type Id237 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date131 = string;
+export type Date130 = string;
 /**
  * Opaque string identifier.
  */
@@ -12670,6 +12666,18 @@ export type Id238 = string;
  * Opaque string identifier.
  */
 export type Id239 = string;
+/**
+ * ISO 8601 calendar date string.
+ */
+export type Date131 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id240 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id241 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -12748,7 +12756,7 @@ export type DefaultModelSpec2 =
 /**
  * Opaque string identifier.
  */
-export type Id240 = string;
+export type Id242 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -12756,7 +12764,7 @@ export type Date134 = string;
 /**
  * Opaque string identifier.
  */
-export type Id241 = string;
+export type Id243 = string;
 /**
  * How collateral losses reach the note balances.
  *
@@ -12865,7 +12873,7 @@ export type DayCount57 =
 /**
  * Opaque string identifier.
  */
-export type Id242 = string;
+export type Id244 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -13326,15 +13334,15 @@ export type RealEstateFinancing =
 /**
  * Opaque string identifier.
  */
-export type Id243 = string;
-/**
- * Opaque string identifier.
- */
-export type Id244 = string;
-/**
- * Opaque string identifier.
- */
 export type Id245 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id246 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id247 = string;
 /**
  * Business-day adjustment convention.
  */
@@ -13512,11 +13520,11 @@ export type Currency48 =
 /**
  * Opaque string identifier.
  */
-export type Id246 = string;
+export type Id248 = string;
 /**
  * Opaque string identifier.
  */
-export type Id247 = string;
+export type Id249 = string;
 /**
  * Built-in function identifiers.
  *
@@ -13592,19 +13600,19 @@ export type Date142 = string;
 /**
  * Opaque string identifier.
  */
-export type Id248 = string;
-/**
- * Opaque string identifier.
- */
-export type Id249 = string;
-/**
- * Opaque string identifier.
- */
 export type Id250 = string;
 /**
  * Opaque string identifier.
  */
 export type Id251 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id252 = string;
+/**
+ * Opaque string identifier.
+ */
+export type Id253 = string;
 /**
  * Reporting currency of the basket: NAV and PV are stated in it and every
  * constituent in another currency is FX-converted into it.
@@ -13875,7 +13883,8 @@ export type CFKind =
   | "variation_margin_pay"
   | "margin_interest"
   | "collateral_substitution_in"
-  | "collateral_substitution_out";
+  | "collateral_substitution_out"
+  | "derivative_settlement";
 /**
  * Which notes an assumed call redeems.
  *
@@ -14262,7 +14271,7 @@ export type ConstituentReference =
          * Type of asset for validation
          */
         asset_type: "equity" | "bond" | "etf" | "cash" | "commodity" | "derivative";
-        price_id: Id249;
+        price_id: Id251;
       };
     };
 /**
@@ -14404,7 +14413,7 @@ export type CreditSpreadProcessSpec =
     }
   | {
       market_anchored: {
-        credit_curve_id: Id24;
+        credit_curve_id: Id25;
         /**
          * Annualized CDS (index) option implied volatility for spreads.
          */
@@ -14646,7 +14655,7 @@ export type FinalPayoffType =
  *
  * The cashflow builder consults it whenever projecting a floating coupon
  * fails: a missing forward curve, a pre-cutoff observation with no
- * `FIXING:{forward_curve_id}` series supplied, a reset before the curve base
+ * `FIXING:{index_id}` series supplied, a reset before the curve base
  * date, or an overnight or day-count projection error. It never fills a gap
  * in recorded history: when a curve and a fixing series are both supplied, a
  * missing pre-cutoff observation is an error under every policy.
@@ -14697,7 +14706,7 @@ export type FundingLeg =
     }
   | {
       day_count: DayCount27;
-      forward_curve_id: Id82;
+      forward_curve_id: Id84;
       /**
        * Funding accrual, reset and payment schedule, in chronological order.
        */
@@ -15677,7 +15686,7 @@ export type WeightingMethod =
       kind: "notional_weighted";
     }
   | {
-      anchor_leg_id: Id246;
+      anchor_leg_id: Id248;
       /**
        * Non-zero signed quantity assigned to the anchor leg.
        */
@@ -15693,7 +15702,7 @@ export type WeightingMethod =
       neutralize: boolean;
     }
   | {
-      anchor_leg_id: Id247;
+      anchor_leg_id: Id249;
       /**
        * Non-zero signed quantity assigned to the anchor leg.
        */
@@ -17645,6 +17654,10 @@ export interface D_572Ad1Befb7D94914652 {
    * this forward curve instead of using a discount-curve par-rate proxy.
    */
   asw_forward_curve_id?: D_94Cb251104De5Cf587B6 | null;
+  /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: D_94Cb251104De5Cf587B6 | null;
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
@@ -20205,7 +20218,7 @@ export interface AssetBackedFacility {
    * bucket charges off. See [`DelinquencyModel`].
    */
   delinquency?: DelinquencyModel | null;
-  discount_curve_id: Id28;
+  discount_curve_id: Id29;
   drawn: Money32;
   /**
    * Scheduled draws after closing, ascending by date; each funds on the
@@ -20218,7 +20231,7 @@ export interface AssetBackedFacility {
    */
   fees?: DealFees | null;
   frequency: Tenor7;
-  id: Id29;
+  id: Id30;
   instrument_pricing_overrides?: InstrumentPricingOverrides7;
   /**
    * Price the collateral realizes when the term-out ends and the
@@ -22361,7 +22374,7 @@ export interface Bond {
    * generating cashflows from the cashflow_spec.
    */
   custom_cashflows?: CashFlowSchedule | null;
-  discount_curve_id: Id20;
+  discount_curve_id: Id21;
   /**
    * Calendar identifier for ex-coupon day counting.
    */
@@ -22370,7 +22383,7 @@ export interface Bond {
    * Number of ex-coupon days before coupon date.
    */
   ex_coupon_days?: number;
-  id: Id21;
+  id: Id22;
   instrument_pricing_overrides?: InstrumentPricingOverrides4;
   issue_date: Date18;
   maturity: Date19;
@@ -22770,6 +22783,7 @@ export interface FloatingRateSpec {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: Decimal5 | null;
+  index_id: Id19;
   /**
    * Expected term-index tenor, checked against the resolved forward curve.
    *
@@ -22906,7 +22920,7 @@ export interface StepUpCouponSpec {
    */
   adjust_accrual_dates?: boolean;
   business_day_convention: BusinessDayConvention2;
-  calendar_id: Id19;
+  calendar_id: Id20;
   /**
    * Coupon type (Cash/PIK/Split).
    */
@@ -23051,7 +23065,8 @@ export interface CashFlow {
     | "variation_margin_pay"
     | "margin_interest"
     | "collateral_substitution_in"
-    | "collateral_substitution_out";
+    | "collateral_substitution_out"
+    | "derivative_settlement";
   /**
    * Economic date of the principal movement, independent of cash payment.
    * Required with `principal_delta` on every principal-like row and absent
@@ -24051,7 +24066,7 @@ export interface InstrumentExerciseOverride {
    * Call policy for this instrument; `None` keeps the deal-level policy.
    */
   call?: CallExercisePolicy | null;
-  id: Id22;
+  id: Id23;
   /**
    * Put policy for this instrument; `None` keeps the deal-level policy.
    */
@@ -24098,7 +24113,7 @@ export interface RevolvingCredit {
    */
   credit_curve_id?: Id9 | null;
   day_count: DayCount9;
-  discount_curve_id: Id23;
+  discount_curve_id: Id24;
   /**
    * Draw and repayment schedule (deterministic or stochastic).
    */
@@ -24112,7 +24127,7 @@ export interface RevolvingCredit {
   drawn: Money20;
   fees: RevolvingCreditFees;
   frequency: Tenor5;
-  id: Id25;
+  id: Id26;
   instrument_pricing_overrides?: InstrumentPricingOverrides5;
   issue_date: Date25;
   /**
@@ -24880,7 +24895,7 @@ export interface McConfig {
       }
     | {
         market_anchored: {
-          credit_curve_id: Id24;
+          credit_curve_id: Id25;
           /**
            * Annualized CDS (index) option implied volatility for spreads.
            */
@@ -25933,7 +25948,7 @@ export interface OidEirSpec {
  * # Seasoned Instruments (Historical Fixings)
  *
  * Historical fixings **are supported** via the `MarketContext`: store a
- * `ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see
+ * `ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see
  * `finstack_quant_core::market_data::fixings`) containing realized index
  * observations. Observation dates strictly before the valuation cutoff then
  * resolve from that series instead of the curve. The cutoff is the forward
@@ -25968,6 +25983,7 @@ export interface OidEirSpec {
  *
  * // 3M SOFR + 200bps with 0% floor
  * let spec = FloatingRateSpec {
+ *     index_id: "USD-SOFR-3M".into(),
  *     forward_curve_id: "USD-SOFR-3M".into(),
  *     spread_bp: dec!(200.0),
  *     gearing: dec!(1.0),
@@ -26052,6 +26068,7 @@ export interface FloatingRateSpec1 {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: Decimal5 | null;
+  index_id: Id19;
   /**
    * Expected term-index tenor, checked against the resolved forward curve.
    *
@@ -26451,9 +26468,9 @@ export interface TermLoan {
    * Optional DDTL parameters; None => plain term loan
    */
   ddtl?: DdtlSpec | null;
-  discount_curve_id: Id26;
+  discount_curve_id: Id27;
   frequency: Tenor6;
-  id: Id27;
+  id: Id28;
   instrument_pricing_overrides?: InstrumentPricingOverrides6;
   issue_date: Date36;
   maturity: Date37;
@@ -29150,7 +29167,7 @@ export interface Autocallable {
    */
   coupons: number[];
   day_count: DayCount13;
-  discount_curve_id: Id30;
+  discount_curve_id: Id31;
   /**
    * Optional dividend-yield scalar ID.
    *
@@ -29198,7 +29215,7 @@ export interface Autocallable {
           strike_ratio: number;
         };
       };
-  id: Id31;
+  id: Id32;
   /**
    * Initial (strike-set) underlying level S_0 used as the reference for
    * barrier and payoff ratios.
@@ -29252,12 +29269,12 @@ export interface Autocallable {
    */
   payment_dates: Date[];
   scenario_pricing_overrides?: ScenarioPricingOverrides8;
-  spot_id: Id32;
+  spot_id: Id33;
   /**
    * Underlying asset ticker symbol
    */
   underlying_ticker: string;
-  vol_surface_id: Id33;
+  vol_surface_id: Id34;
 }
 /**
  * Attributes for scenario selection and grouping
@@ -29537,7 +29554,7 @@ export interface BarrierOption {
   barrier_type: "up_and_out" | "up_and_in" | "down_and_out" | "down_and_in";
   currency: Currency3;
   day_count: DayCount14;
-  discount_curve_id: Id34;
+  discount_curve_id: Id35;
   /**
    * Optional dividend-yield scalar ID
    */
@@ -29552,7 +29569,7 @@ export interface BarrierOption {
    * spot is used when this field is absent.
    */
   expiry_fixing?: number | null;
-  id: Id35;
+  id: Id36;
   instrument_pricing_overrides?: InstrumentPricingOverrides9;
   metric_pricing_overrides?: MetricPricingOverrides9;
   /**
@@ -29605,7 +29622,7 @@ export interface BarrierOption {
    */
   rebate_timing?: PayoutTiming | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides9;
-  spot_id: Id36;
+  spot_id: Id37;
   /**
    * Strike price
    */
@@ -29614,7 +29631,7 @@ export interface BarrierOption {
    * Underlying asset ticker symbol
    */
   underlying_ticker: string;
-  vol_surface_id: Id37;
+  vol_surface_id: Id38;
 }
 /**
  * Attributes for scenario selection and grouping
@@ -29722,6 +29739,7 @@ export interface ScenarioPricingOverrides9 {
  * let end = Date::from_calendar_date(2025, Month::January, 3).expect("valid date");
  *
  * let primary_leg = FloatLegSpec {
+ *     index_id: "3M-SOFR".into(),
  *     forward_curve_id: CurveId::new("3M-SOFR"),
  *     discount_curve_id: CurveId::new("OIS"),
  *     start,
@@ -29740,6 +29758,7 @@ export interface ScenarioPricingOverrides9 {
  * };
  *
  * let reference_leg = FloatLegSpec {
+ *     index_id: "6M-SOFR".into(),
  *     forward_curve_id: CurveId::new("6M-SOFR"),
  *     discount_curve_id: CurveId::new("OIS"),
  *     start,
@@ -29788,7 +29807,7 @@ export interface BasisSwap {
    */
   allow_same_curve?: boolean;
   attributes: Attributes10;
-  id: Id38;
+  id: Id39;
   instrument_pricing_overrides?: InstrumentPricingOverrides10;
   metric_pricing_overrides?: MetricPricingOverrides10;
   notional: Money35;
@@ -30100,7 +30119,7 @@ export interface FloatLegSpec {
         };
       };
   day_count: DayCount15;
-  discount_curve_id: Id39;
+  discount_curve_id: Id40;
   end: Date44;
   /**
    * End-of-month roll convention (default: false).
@@ -30120,8 +30139,9 @@ export interface FloatLegSpec {
    * Optional calendar for rate fixing (reset lag)
    */
   fixing_calendar_id?: Id9 | null;
-  forward_curve_id: Id40;
+  forward_curve_id: Id41;
   frequency: Tenor8;
+  index_id: Id42;
   /**
    * Payment lag in business days after period end (default: 0).
    *
@@ -30242,7 +30262,7 @@ export interface FloatLegSpec1 {
         };
       };
   day_count: DayCount15;
-  discount_curve_id: Id39;
+  discount_curve_id: Id40;
   end: Date44;
   /**
    * End-of-month roll convention (default: false).
@@ -30262,8 +30282,9 @@ export interface FloatLegSpec1 {
    * Optional calendar for rate fixing (reset lag)
    */
   fixing_calendar_id?: Id9 | null;
-  forward_curve_id: Id40;
+  forward_curve_id: Id41;
   frequency: Tenor8;
+  index_id: Id42;
   /**
    * Payment lag in business days after period end (default: 0).
    *
@@ -30338,13 +30359,13 @@ export interface Basket {
    * Basket constituents (the actual holdings)
    */
   constituents: BasketConstituent[];
-  discount_curve_id: Id250;
+  discount_curve_id: Id252;
   /**
    * Total expense ratio (as decimal, e.g., 0.0025 = 0.25%)
    * This affects pricing through expense drag calculations
    */
   expense_ratio: number;
-  id: Id251;
+  id: Id253;
   instrument_pricing_overrides?: InstrumentPricingOverrides77;
   metric_pricing_overrides?: MetricPricingOverrides77;
   notional: Money96;
@@ -30393,7 +30414,7 @@ export interface BasketConstituent {
            * Type of asset for validation
            */
           asset_type: "equity" | "bond" | "etf" | "cash" | "commodity" | "derivative";
-          price_id: Id249;
+          price_id: Id251;
         };
       };
   /**
@@ -30506,14 +30527,14 @@ export interface ConvertibleBond {
    * conditional stock drift includes the hazard compensator.
    */
   credit_curve_id?: Id9 | null;
-  discount_curve_id: Id41;
+  discount_curve_id: Id43;
   /**
    * Optional unitless continuous dividend-yield scalar id (decimal,
    * 0.02 = 2%). `None` means a zero dividend yield; a configured id must
    * resolve.
    */
   div_yield_id?: Id9 | null;
-  id: Id42;
+  id: Id44;
   instrument_pricing_overrides?: InstrumentPricingOverrides11;
   issue_date: Date50;
   maturity: Date51;
@@ -30561,8 +30582,8 @@ export interface ConvertibleBond {
    * k-of-n-days observation window; the realized path is not tracked.
    */
   soft_call_trigger?: PriceTrigger | null;
-  spot_id: Id43;
-  vol_surface_id: Id44;
+  spot_id: Id45;
+  vol_surface_id: Id46;
 }
 /**
  * Attributes for scenario selection and tagging
@@ -31353,7 +31374,7 @@ export interface InflationLinkedBond {
    * Deflation protection
    */
   deflation_protection: "none" | "maturity_only" | "all_payments";
-  discount_curve_id: Id45;
+  discount_curve_id: Id47;
   /**
    * Black lognormal volatility of the contractual reference-CPI/base-CPI ratio.
    * The surface uses expiry in Act/365F years to the last required publication
@@ -31364,12 +31385,12 @@ export interface InflationLinkedBond {
    */
   floor_vol_surface_id?: Id9 | null;
   frequency: Tenor9;
-  id: Id46;
+  id: Id48;
   /**
    * Indexation method
    */
   indexation_method: "canadian" | "tips" | "uk" | "french" | "japanese";
-  inflation_index_id: Id47;
+  inflation_index_id: Id49;
   instrument_pricing_overrides?: InstrumentPricingOverrides12;
   issue_date: Date55;
   /**
@@ -31753,7 +31774,7 @@ export interface DollarRoll {
    * Pass-through coupon rate.
    */
   coupon: number;
-  discount_curve_id: Id48;
+  discount_curve_id: Id50;
   /**
    * Front-month price (sell price).
    */
@@ -31772,7 +31793,7 @@ export interface DollarRoll {
    * Front-month settlement year.
    */
   front_settlement_year: number;
-  id: Id49;
+  id: Id51;
   instrument_pricing_overrides?: InstrumentPricingOverrides13;
   metric_pricing_overrides?: MetricPricingOverrides13;
   notional: Money40;
@@ -32139,7 +32160,7 @@ export interface InterestRateSwap {
   attributes: Attributes15;
   fixed_leg: FixedLegSpec;
   float_leg: FloatLegSpec2;
-  id: Id51;
+  id: Id53;
   instrument_pricing_overrides?: InstrumentPricingOverrides14;
   /**
    * Optional OTC margin specification for VM/IM.
@@ -32182,7 +32203,7 @@ export interface FixedLegSpec {
    */
   calendar_id?: Id9 | null;
   day_count: DayCount17;
-  discount_curve_id: Id50;
+  discount_curve_id: Id52;
   end: Date57;
   /**
    * End-of-month roll convention (default: false).
@@ -32304,7 +32325,7 @@ export interface FloatLegSpec2 {
         };
       };
   day_count: DayCount15;
-  discount_curve_id: Id39;
+  discount_curve_id: Id40;
   end: Date44;
   /**
    * End-of-month roll convention (default: false).
@@ -32324,8 +32345,9 @@ export interface FloatLegSpec2 {
    * Optional calendar for rate fixing (reset lag)
    */
   fixing_calendar_id?: Id9 | null;
-  forward_curve_id: Id40;
+  forward_curve_id: Id41;
   frequency: Tenor8;
+  index_id: Id42;
   /**
    * Payment lag in business days after period end (default: 0).
    *
@@ -32436,7 +32458,7 @@ export interface CsaSpec {
    */
   calendar_id: string;
   call_timing: MarginCallTiming;
-  collateral_curve_id: Id52;
+  collateral_curve_id: Id54;
   eligible_collateral: EligibleCollateralSchedule;
   /**
    * CSA identifier (e.g., "USD-CSA-STANDARD", "COUNTERPARTY-XYZ-CSA")
@@ -33956,7 +33978,7 @@ export interface XccySwap {
    */
   allow_calendar_fallback?: boolean;
   attributes: Attributes16;
-  id: Id53;
+  id: Id55;
   instrument_pricing_overrides?: InstrumentPricingOverrides15;
   leg1: XccySwapLeg;
   leg2: XccySwapLeg1;
@@ -34089,7 +34111,7 @@ export interface FloatLegSpec3 {
         };
       };
   day_count: DayCount15;
-  discount_curve_id: Id39;
+  discount_curve_id: Id40;
   end: Date44;
   /**
    * End-of-month roll convention (default: false).
@@ -34109,8 +34131,9 @@ export interface FloatLegSpec3 {
    * Optional calendar for rate fixing (reset lag)
    */
   fixing_calendar_id?: Id9 | null;
-  forward_curve_id: Id40;
+  forward_curve_id: Id41;
   frequency: Tenor8;
+  index_id: Id42;
   /**
    * Payment lag in business days after period end (default: 0).
    *
@@ -34425,10 +34448,10 @@ export interface InflationSwap {
    */
   calendar_id?: Id9 | null;
   day_count: DayCount18;
-  discount_curve_id: Id54;
+  discount_curve_id: Id56;
   fixed_rate: Decimal19;
-  id: Id55;
-  inflation_index_id: Id56;
+  id: Id57;
+  inflation_index_id: Id58;
   instrument_pricing_overrides?: InstrumentPricingOverrides16;
   /**
    * Explicit contractual monthly reference-index interpolation; no source default is used.
@@ -34726,11 +34749,11 @@ export interface YoYInflationSwap {
    */
   calendar_id?: Id9 | null;
   day_count: DayCount19;
-  discount_curve_id: Id57;
+  discount_curve_id: Id59;
   fixed_rate: Decimal20;
   frequency: Tenor11;
-  id: Id58;
-  inflation_index_id: Id59;
+  id: Id60;
+  inflation_index_id: Id61;
   instrument_pricing_overrides?: InstrumentPricingOverrides17;
   /**
    * Explicit contractual monthly reference-index interpolation; no source default is used.
@@ -35036,10 +35059,10 @@ export interface InflationCapFloor {
    */
   calendar_id?: Id9 | null;
   day_count: DayCount20;
-  discount_curve_id: Id60;
+  discount_curve_id: Id62;
   frequency: Tenor12;
-  id: Id61;
-  inflation_index_id: Id62;
+  id: Id63;
+  inflation_index_id: Id64;
   instrument_pricing_overrides?: InstrumentPricingOverrides18;
   /**
    * Explicit contractual monthly CPI interpolation; no source default is used.
@@ -35065,7 +35088,7 @@ export interface InflationCapFloor {
    * Schedule stub convention.
    */
   stub?: "none" | "short_front" | "short_back" | "long_front" | "long_back";
-  vol_surface_id: Id63;
+  vol_surface_id: Id65;
   /**
    * Clock used by the volatility surface's annualized quotes. This is
    * independent of CPI publication policy; changing it requires matching
@@ -35370,7 +35393,7 @@ export interface ScenarioPricingOverrides18 {
 export interface ForwardRateAgreement {
   attributes: Attributes20;
   day_count: DayCount21;
-  discount_curve_id: Id64;
+  discount_curve_id: Id66;
   fixed_rate: Decimal22;
   /**
    * Optional business day convention for fixing date adjustment (default: ModifiedFollowing)
@@ -35384,8 +35407,8 @@ export interface ForwardRateAgreement {
    * Rate fixing date. If `None`, inferred from `start_date - reset_lag_days` business days.
    */
   fixing_date?: Date | null;
-  forward_curve_id: Id65;
-  id: Id66;
+  forward_curve_id: Id67;
+  id: Id68;
   instrument_pricing_overrides?: InstrumentPricingOverrides19;
   maturity: Date65;
   metric_pricing_overrides?: MetricPricingOverrides19;
@@ -35690,7 +35713,7 @@ export interface Swaption {
    */
   cash_settlement_method: "collateralized_cash_price" | "par_yield" | "isda_par_par" | "zero_coupon";
   expiry: Date67;
-  id: Id67;
+  id: Id69;
   instrument_pricing_overrides?: InstrumentPricingOverrides20;
   metric_pricing_overrides?: MetricPricingOverrides20;
   notional: Money53;
@@ -35713,7 +35736,7 @@ export interface Swaption {
    * Volatility model (Black or Normal)
    */
   vol_model: "black" | "normal";
-  vol_surface_id: Id68;
+  vol_surface_id: Id70;
 }
 /**
  * Attributes for scenario selection and grouping
@@ -36010,7 +36033,7 @@ export interface FixedLegSpec1 {
    */
   calendar_id?: Id9 | null;
   day_count: DayCount17;
-  discount_curve_id: Id50;
+  discount_curve_id: Id52;
   end: Date57;
   /**
    * End-of-month roll convention (default: false).
@@ -36117,7 +36140,7 @@ export interface FloatLegSpec4 {
         };
       };
   day_count: DayCount15;
-  discount_curve_id: Id39;
+  discount_curve_id: Id40;
   end: Date44;
   /**
    * End-of-month roll convention (default: false).
@@ -36137,8 +36160,9 @@ export interface FloatLegSpec4 {
    * Optional calendar for rate fixing (reset lag)
    */
   fixing_calendar_id?: Id9 | null;
-  forward_curve_id: Id40;
+  forward_curve_id: Id41;
   frequency: Tenor8;
+  index_id: Id42;
   /**
    * Payment lag in business days after period end (default: 0).
    *
@@ -36211,7 +36235,7 @@ export interface BermudanSwaption {
    */
   bermudan_type: "co_terminal" | "non_co_terminal";
   exercise_schedule: BermudanSchedule;
-  id: Id69;
+  id: Id71;
   instrument_pricing_overrides?: InstrumentPricingOverrides21;
   metric_pricing_overrides?: MetricPricingOverrides21;
   notional: Money54;
@@ -36226,7 +36250,7 @@ export interface BermudanSwaption {
   settlement: "physical" | "cash";
   underlying_fixed_leg: FixedLegSpec2;
   underlying_float_leg: FloatLegSpec5;
-  vol_surface_id: Id70;
+  vol_surface_id: Id72;
 }
 /**
  * Attributes for scenario selection and tagging
@@ -36509,7 +36533,7 @@ export interface FixedLegSpec2 {
    */
   calendar_id?: Id9 | null;
   day_count: DayCount17;
-  discount_curve_id: Id50;
+  discount_curve_id: Id52;
   end: Date57;
   /**
    * End-of-month roll convention (default: false).
@@ -36616,7 +36640,7 @@ export interface FloatLegSpec5 {
         };
       };
   day_count: DayCount15;
-  discount_curve_id: Id39;
+  discount_curve_id: Id40;
   end: Date44;
   /**
    * End-of-month roll convention (default: false).
@@ -36636,8 +36660,9 @@ export interface FloatLegSpec5 {
    * Optional calendar for rate fixing (reset lag)
    */
   fixing_calendar_id?: Id9 | null;
-  forward_curve_id: Id40;
+  forward_curve_id: Id41;
   frequency: Tenor8;
+  index_id: Id42;
   /**
    * Payment lag in business days after period end (default: 0).
    *
@@ -36751,7 +36776,7 @@ export interface InterestRateFuture {
       };
   contract_specs: FutureContractSpecs;
   day_count: DayCount22;
-  discount_curve_id: Id71;
+  discount_curve_id: Id73;
   /**
    * Optional overnight fixing calendar identifier.
    *
@@ -36765,8 +36790,8 @@ export interface InterestRateFuture {
    * Defaults to `terms.last_trading_date` when omitted.
    */
   fixing_date?: Date | null;
-  forward_curve_id: Id72;
-  id: Id73;
+  forward_curve_id: Id74;
+  id: Id75;
   /**
    * Optional rate-index identity keying the historical fixing series.
    *
@@ -36977,7 +37002,7 @@ export interface ListedFutureTerms {
  */
 export interface InterestRateFutureOption {
   attributes?: Attributes24;
-  id: Id74;
+  id: Id76;
   instrument_pricing_overrides?: InstrumentPricingOverrides23;
   metric_pricing_overrides?: MetricPricingOverrides23;
   scenario_pricing_overrides?: ScenarioPricingOverrides23;
@@ -37075,7 +37100,7 @@ export interface FutureOptionTerms {
   contracts: number;
   currency: Currency7;
   day_count: DayCount23;
-  discount_curve_id: Id75;
+  discount_curve_id: Id77;
   /**
    * Recorded early-exercise or expiry observation. Required from expiry onward.
    */
@@ -37186,14 +37211,14 @@ export interface CapFloor {
    */
   calendar_id?: Id9 | null;
   day_count: DayCount24;
-  discount_curve_id: Id76;
+  discount_curve_id: Id78;
   /**
    * Exercise style (defaults to European; caps/floors are virtually always European)
    */
   exercise_style?: "european" | "american" | "bermudan";
-  forward_curve_id: Id77;
+  forward_curve_id: Id79;
   frequency: Tenor13;
-  id: Id78;
+  id: Id80;
   instrument_pricing_overrides?: InstrumentPricingOverrides24;
   maturity: Date75;
   metric_pricing_overrides?: MetricPricingOverrides24;
@@ -37246,7 +37271,7 @@ export interface CapFloor {
    * positive for the Black model to be well-defined.
    */
   vol_shift?: number;
-  vol_surface_id: Id79;
+  vol_surface_id: Id81;
   /**
    * Volatility type convention (lognormal/Black or normal/Bachelier).
    *
@@ -37668,12 +37693,12 @@ export interface CmsSwap {
   cms_spread_bp?: Decimal25;
   cms_tenor: Tenor14;
   day_count: DayCount25;
-  discount_curve_id: Id80;
+  discount_curve_id: Id82;
   /**
    * Fixing dates for CMS rate observations.
    */
   fixing_dates: Date[];
-  forward_curve_id: Id81;
+  forward_curve_id: Id83;
   /**
    * Funding leg definition (fixed or floating).
    */
@@ -37689,7 +37714,7 @@ export interface CmsSwap {
       }
     | {
         day_count: DayCount27;
-        forward_curve_id: Id82;
+        forward_curve_id: Id84;
         /**
          * Funding accrual, reset and payment schedule, in chronological order.
          */
@@ -37697,7 +37722,7 @@ export interface CmsSwap {
         spread_bp: Decimal27;
         type: "floating";
       };
-  id: Id83;
+  id: Id85;
   /**
    * Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).
    * Required for USD CMS; legacy contracts must name their legacy index explicitly.
@@ -37731,7 +37756,7 @@ export interface CmsSwap {
    * Floating leg frequency of the underlying swap (overrides convention).
    */
   swap_float_frequency?: Tenor2 | null;
-  vol_surface_id: Id84;
+  vol_surface_id: Id86;
 }
 /**
  * Attributes for scenario selection and grouping.
@@ -38040,13 +38065,13 @@ export interface CmsOption {
   cms_fixing_index_id?: Id9 | null;
   cms_tenor: Tenor15;
   day_count: DayCount28;
-  discount_curve_id: Id85;
+  discount_curve_id: Id87;
   /**
    * Observation/fixing dates for CMS rate
    */
   fixing_dates: Date[];
-  forward_curve_id: Id86;
-  id: Id87;
+  forward_curve_id: Id88;
+  id: Id89;
   /**
    * Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).
    *
@@ -38084,7 +38109,7 @@ export interface CmsOption {
    * Floating leg frequency of the underlying swap (overrides convention if set)
    */
   swap_float_frequency?: Tenor2 | null;
-  vol_surface_id: Id88;
+  vol_surface_id: Id90;
 }
 /**
  * Attributes for scenario selection and grouping
@@ -38391,7 +38416,7 @@ export interface Deposit {
    */
   calendar_id?: Id9 | null;
   day_count: DayCount29;
-  discount_curve_id: Id89;
+  discount_curve_id: Id91;
   /**
    * Optional contractual simple rate r (annualised decimal, 0.045 = 4.5%) for the deposit.
    *
@@ -38400,7 +38425,7 @@ export interface Deposit {
    * this instrument (e.g., constructing placeholders).
    */
   fixed_rate?: Decimal5 | null;
-  id: Id90;
+  id: Id92;
   instrument_pricing_overrides?: InstrumentPricingOverrides27;
   maturity: Date81;
   metric_pricing_overrides?: MetricPricingOverrides27;
@@ -38681,12 +38706,12 @@ export interface Repo {
   cash_amount: Money59;
   collateral: CollateralSpec;
   day_count: DayCount30;
-  discount_curve_id: Id93;
+  discount_curve_id: Id95;
   /**
    * Haircut percentage (as decimal, e.g., 0.02 = 2%)
    */
   haircut: number;
-  id: Id94;
+  id: Id96;
   instrument_pricing_overrides?: InstrumentPricingOverrides28;
   /**
    * Optional margin specification for mark-to-market margining.
@@ -38918,8 +38943,8 @@ export interface CollateralSpec {
           rate_adjustment_bp?: number | null;
         };
       };
-  instrument_id: Id91;
-  market_value_id: Id92;
+  instrument_id: Id93;
+  market_value_id: Id94;
   /**
    * Quantity/face value of collateral
    */
@@ -39184,7 +39209,7 @@ export interface CreditDefaultSwap {
    * See [`doc_clause_effective`](Self::doc_clause_effective) for resolution logic.
    */
   doc_clause?: CdsDocClause | null;
-  id: Id95;
+  id: Id97;
   instrument_pricing_overrides?: InstrumentPricingOverrides29;
   /**
    * Optional OTC margin specification for VM/IM.
@@ -39482,7 +39507,7 @@ export interface PremiumLegSpec {
    */
   date_regime: "standard" | "bespoke";
   day_count: DayCount31;
-  discount_curve_id: Id96;
+  discount_curve_id: Id98;
   end: Date85;
   frequency: Tenor16;
   start: Date86;
@@ -39511,7 +39536,7 @@ export interface Tenor16 {
  * Protection leg specification
  */
 export interface ProtectionLegSpec {
-  credit_curve_id: Id97;
+  credit_curve_id: Id99;
   /**
    * Recovery rate as a decimal fraction in `[0.0, 1.0)`
    */
@@ -39565,7 +39590,7 @@ export interface CdsIndex {
    * Regional ISDA convention
    */
   convention: "isda_na" | "isda_eu" | "isda_as" | "custom";
-  id: Id99;
+  id: Id101;
   /**
    * Index factor (fraction of surviving notional since series inception)
    */
@@ -39670,7 +39695,7 @@ export interface CdsIndexConstituent {
  * Credit configuration for the issuer (includes hazard curve id and recovery)
  */
 export interface CreditParams {
-  credit_curve_id: Id98;
+  credit_curve_id: Id100;
   /**
    * Recovery rate (0.0 to 1.0)
    */
@@ -39910,7 +39935,7 @@ export interface PremiumLegSpec1 {
    */
   date_regime: "standard" | "bespoke";
   day_count: DayCount31;
-  discount_curve_id: Id96;
+  discount_curve_id: Id98;
   end: Date85;
   frequency: Tenor16;
   start: Date86;
@@ -39924,7 +39949,7 @@ export interface PremiumLegSpec1 {
  * Protection leg specification (credit curve and settlement)
  */
 export interface ProtectionLegSpec1 {
-  credit_curve_id: Id97;
+  credit_curve_id: Id99;
   /**
    * Recovery rate as a decimal fraction in `[0.0, 1.0)`
    */
@@ -39983,7 +40008,7 @@ export interface CdsTranche {
    * Running coupon in basis points (e.g., 100 = 1.00%)
    */
   coupon_bp: number;
-  credit_index_id: Id100;
+  credit_index_id: Id102;
   /**
    * Contractual date regime of the coupon schedule (record
    * CALIBRATION-FRAMEWORK-007, O7): `standard` CDS roll dates (20th of Mar,
@@ -39996,9 +40021,9 @@ export interface CdsTranche {
    * Detachment point in percent (e.g., 3.0 for 0-3% tranche)
    */
   detach_pct: number;
-  discount_curve_id: Id101;
+  discount_curve_id: Id103;
   frequency: Tenor17;
-  id: Id102;
+  id: Id104;
   /**
    * Index name (e.g., "CDX.NA.IG", "CDX.NA.HY", "iTraxx EUR")
    */
@@ -40342,8 +40367,8 @@ export interface CdsOption {
    * term `H(K) = ξN(c − K)A(K)` (DOCS 2055833 Eq. 2.4) is populated.
    */
   coupon_bp?: Decimal5 | null;
-  credit_curve_id: Id103;
-  discount_curve_id: Id104;
+  credit_curve_id: Id105;
+  discount_curve_id: Id106;
   /**
    * Payment date of the exercise proceeds, defaulting to legal expiry.
    * Must be on or after expiry and before CDS maturity. Discounting uses
@@ -40351,7 +40376,7 @@ export interface CdsOption {
    */
   exercise_settlement_date?: Date | null;
   expiry: Date88;
-  id: Id105;
+  id: Id107;
   /**
    * Current index factor `f` at valuation: the surviving fraction of the
    * original index notional, in `(0, 1]`. Defaults to `1.0` (no settled
@@ -40448,7 +40473,7 @@ export interface CdsOption {
    * protection starts at expiry.
    */
   underlying_start_date?: Date | null;
-  vol_surface_id: Id106;
+  vol_surface_id: Id108;
 }
 /**
  * Additional attributes
@@ -40720,7 +40745,7 @@ export interface ScenarioPricingOverrides32 {
 export interface Equity {
   attributes: Attributes34;
   currency: Currency8;
-  discount_curve_id: Id107;
+  discount_curve_id: Id109;
   /**
    * Optional discrete cash dividends `(ex_date, amount)` for single-name forwards.
    */
@@ -40730,7 +40755,7 @@ export interface Equity {
    * 0.02 = 2%). `None` means a zero dividend yield.
    */
   div_yield_id?: Id9 | null;
-  id: Id108;
+  id: Id110;
   instrument_pricing_overrides?: InstrumentPricingOverrides33;
   metric_pricing_overrides?: MetricPricingOverrides33;
   /**
@@ -40844,7 +40869,7 @@ export interface EquityOption {
   attributes: Attributes35;
   currency: Currency9;
   day_count?: DayCount33;
-  discount_curve_id: Id109;
+  discount_curve_id: Id111;
   /**
    * Optional discrete dividend schedule for more accurate pricing.
    *
@@ -40911,7 +40936,7 @@ export interface EquityOption {
    */
   exercise_style?: "european" | "american" | "bermudan";
   expiry: Date92;
-  id: Id110;
+  id: Id112;
   instrument_pricing_overrides?: InstrumentPricingOverrides34;
   metric_pricing_overrides?: MetricPricingOverrides34;
   /**
@@ -40927,7 +40952,7 @@ export interface EquityOption {
    * Settlement type (physical or cash)
    */
   settlement?: "physical" | "cash";
-  spot_id: Id111;
+  spot_id: Id113;
   /**
    * Strike price
    */
@@ -40936,7 +40961,7 @@ export interface EquityOption {
    * Underlying equity ticker symbol
    */
   underlying_ticker: string;
-  vol_surface_id: Id112;
+  vol_surface_id: Id114;
 }
 /**
  * Attributes for scenario selection and grouping
@@ -41067,7 +41092,7 @@ export interface LookbackOption {
   attributes: Attributes36;
   currency: Currency10;
   day_count: DayCount34;
-  discount_curve_id: Id113;
+  discount_curve_id: Id115;
   /**
    * Optional dividend-yield scalar ID
    */
@@ -41082,7 +41107,7 @@ export interface LookbackOption {
    * spot is treated as the terminal fixing when this field is absent.
    */
   expiry_fixing?: number | null;
-  id: Id114;
+  id: Id116;
   instrument_pricing_overrides?: InstrumentPricingOverrides35;
   /**
    * Lookback type (fixed or floating strike)
@@ -41126,7 +41151,7 @@ export interface LookbackOption {
    */
   quantity: number;
   scenario_pricing_overrides?: ScenarioPricingOverrides35;
-  spot_id: Id115;
+  spot_id: Id117;
   /**
    * Strike price (None for floating strike lookbacks)
    */
@@ -41135,7 +41160,7 @@ export interface LookbackOption {
    * Underlying asset ticker symbol
    */
   underlying_ticker: string;
-  vol_surface_id: Id116;
+  vol_surface_id: Id118;
 }
 /**
  * Attributes for scenario selection and grouping
@@ -41272,7 +41297,7 @@ export interface VarianceSwap {
    */
   close_series_id?: string | null;
   day_count: DayCount35;
-  discount_curve_id: Id117;
+  discount_curve_id: Id119;
   /**
    * Optional unitless continuous dividend-yield scalar id (decimal,
    * 0.02 = 2%). `None` means a zero dividend yield.
@@ -41282,7 +41307,7 @@ export interface VarianceSwap {
    * Series ID for high prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
    */
   high_series_id?: string | null;
-  id: Id118;
+  id: Id120;
   instrument_pricing_overrides?: InstrumentPricingOverrides36;
   /**
    * Series ID for low prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
@@ -41292,7 +41317,7 @@ export interface VarianceSwap {
   metric_pricing_overrides?: MetricPricingOverrides36;
   notional: Money64;
   observation_business_day_convention?: BusinessDayConvention17;
-  observation_calendar_id: Id119;
+  observation_calendar_id: Id121;
   /**
    * Preserve month-end rolls for month/year observation frequencies.
    */
@@ -41302,6 +41327,11 @@ export interface VarianceSwap {
    * Series ID for open prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
    */
   open_series_id?: string | null;
+  /**
+   * Contractual closing fixing immediately before the first Yang–Zhang target bar.
+   * Resolved exactly in the same close series as the target bars.
+   */
+  previous_close_date?: Date | null;
   /**
    * Corporate-action policy applied to all historical price series.
    *
@@ -41324,7 +41354,7 @@ export interface VarianceSwap {
    * Pay/receive variance
    */
   side: "pay" | "receive";
-  spot_id: Id120;
+  spot_id: Id122;
   start_date: Date95;
   /**
    * Strike variance (annualized)
@@ -41344,7 +41374,7 @@ export interface VarianceSwap {
    * through `spot_id`, `vol_surface_id` and `div_yield_id`.
    */
   underlying_ticker: string;
-  vol_surface_id: Id121;
+  vol_surface_id: Id123;
 }
 /**
  * Attributes for scenario selection and tagging
@@ -41662,12 +41692,12 @@ export interface ScenarioPricingOverrides36 {
  */
 export interface VolatilityIndexFuture {
   attributes?: Attributes38;
-  id: Id122;
+  id: Id124;
   instrument_pricing_overrides?: InstrumentPricingOverrides37;
   metric_pricing_overrides?: MetricPricingOverrides37;
   scenario_pricing_overrides?: ScenarioPricingOverrides37;
   terms: ListedFutureTerms1;
-  vol_index_curve_id: Id123;
+  vol_index_curve_id: Id125;
 }
 /**
  * Attributes for scenario selection and tagging
@@ -41812,7 +41842,7 @@ export interface ListedFutureTerms1 {
  */
 export interface VolatilityIndexFutureOption {
   attributes?: Attributes39;
-  id: Id124;
+  id: Id126;
   instrument_pricing_overrides?: InstrumentPricingOverrides38;
   metric_pricing_overrides?: MetricPricingOverrides38;
   scenario_pricing_overrides?: ScenarioPricingOverrides38;
@@ -41910,7 +41940,7 @@ export interface FutureOptionTerms1 {
   contracts: number;
   currency: Currency7;
   day_count: DayCount23;
-  discount_curve_id: Id75;
+  discount_curve_id: Id77;
   /**
    * Recorded early-exercise or expiry observation. Required from expiry onward.
    */
@@ -42029,7 +42059,7 @@ export interface FxSpot {
    * (a 1–2 day effect for standard spot lags).
    */
   domestic_discount_curve_id?: Id9 | null;
-  id: Id125;
+  id: Id127;
   instrument_pricing_overrides?: InstrumentPricingOverrides39;
   metric_pricing_overrides?: MetricPricingOverrides39;
   notional: Money65;
@@ -42327,15 +42357,15 @@ export interface FxSwap {
    */
   base_calendar_id?: Id9 | null;
   base_currency: Currency13;
-  domestic_discount_curve_id: Id126;
+  domestic_discount_curve_id: Id128;
   far_date: Date96;
   /**
    * Optional far leg FX rate (quote per base). If absent, use the market
    * outright forward from the valuation date to far settlement.
    */
   far_rate?: number | null;
-  foreign_discount_curve_id: Id127;
-  id: Id128;
+  foreign_discount_curve_id: Id129;
+  id: Id130;
   instrument_pricing_overrides?: InstrumentPricingOverrides40;
   metric_pricing_overrides?: MetricPricingOverrides40;
   near_date: Date97;
@@ -42665,9 +42695,9 @@ export interface FxForward {
    * Contract forward rate (quote per base). If None, valued at-market.
    */
   contract_rate?: number | null;
-  domestic_discount_curve_id: Id129;
-  foreign_discount_curve_id: Id130;
-  id: Id131;
+  domestic_discount_curve_id: Id131;
+  foreign_discount_curve_id: Id132;
+  id: Id133;
   instrument_pricing_overrides?: InstrumentPricingOverrides41;
   maturity: Date98;
   metric_pricing_overrides?: MetricPricingOverrides41;
@@ -43022,7 +43052,7 @@ export interface Ndf {
    * forward, so the settlement amount and PV are zero.
    */
   contract_rate?: number | null;
-  domestic_discount_curve_id: Id132;
+  domestic_discount_curve_id: Id134;
   fixing_date: Date99;
   /**
    * Official fixing source/benchmark enum for type-safe specification.
@@ -43037,7 +43067,7 @@ export interface Ndf {
    * is supplied.
    */
   foreign_discount_curve_id?: Id9 | null;
-  id: Id133;
+  id: Id135;
   instrument_pricing_overrides?: InstrumentPricingOverrides42;
   maturity: Date100;
   metric_pricing_overrides?: MetricPricingOverrides42;
@@ -43341,10 +43371,10 @@ export interface FxOption {
   base_currency: Currency19;
   day_count?: DayCount36;
   delta_convention: FxDeltaConvention;
-  domestic_discount_curve_id: Id134;
+  domestic_discount_curve_id: Id136;
   expiry: Date101;
-  foreign_discount_curve_id: Id135;
-  id: Id136;
+  foreign_discount_curve_id: Id137;
+  id: Id138;
   instrument_pricing_overrides?: InstrumentPricingOverrides43;
   metric_pricing_overrides?: MetricPricingOverrides43;
   notional: Money69;
@@ -43363,7 +43393,7 @@ export interface FxOption {
    * the forward rate or DNS strike externally.
    */
   strike: number;
-  vol_surface_id: Id137;
+  vol_surface_id: Id139;
 }
 /**
  * Attributes for scenario selection and grouping
@@ -43666,10 +43696,10 @@ export interface FxDigitalOption {
   attributes: Attributes45;
   base_currency: Currency22;
   day_count?: DayCount37;
-  domestic_discount_curve_id: Id138;
+  domestic_discount_curve_id: Id140;
   expiry: Date102;
-  foreign_discount_curve_id: Id139;
-  id: Id140;
+  foreign_discount_curve_id: Id141;
+  id: Id142;
   instrument_pricing_overrides?: InstrumentPricingOverrides44;
   metric_pricing_overrides?: MetricPricingOverrides44;
   notional: Money70;
@@ -43688,7 +43718,7 @@ export interface FxDigitalOption {
    * Strike exchange rate (quote per base)
    */
   strike: number;
-  vol_surface_id: Id141;
+  vol_surface_id: Id143;
 }
 /**
  * Attributes for scenario selection and grouping
@@ -44176,10 +44206,10 @@ export interface FxTouchOption {
   barrier_direction: "up" | "down";
   base_currency: Currency24;
   day_count?: DayCount38;
-  domestic_discount_curve_id: Id142;
+  domestic_discount_curve_id: Id144;
   expiry: Date103;
-  foreign_discount_curve_id: Id143;
-  id: Id144;
+  foreign_discount_curve_id: Id145;
+  id: Id146;
   instrument_pricing_overrides?: InstrumentPricingOverrides45;
   metric_pricing_overrides?: MetricPricingOverrides45;
   /**
@@ -44216,7 +44246,7 @@ export interface FxTouchOption {
    * Touch type (one-touch or no-touch)
    */
   touch_type: "one_touch" | "no_touch";
-  vol_surface_id: Id145;
+  vol_surface_id: Id147;
 }
 /**
  * Attributes for scenario selection and grouping
@@ -44497,16 +44527,16 @@ export interface FxBarrierOption {
   barrier_type: "up_and_out" | "up_and_in" | "down_and_out" | "down_and_in";
   base_currency: Currency26;
   day_count?: DayCount39;
-  domestic_discount_curve_id: Id146;
+  domestic_discount_curve_id: Id148;
   expiry: Date104;
-  foreign_discount_curve_id: Id147;
+  foreign_discount_curve_id: Id149;
   /**
    * Optional FX spot scalar identifier.
    *
    * If omitted, pricing falls back to `FxMatrix(base_currency, quote_currency)`.
    */
   fx_spot_id?: Id9 | null;
-  id: Id148;
+  id: Id150;
   instrument_pricing_overrides?: InstrumentPricingOverrides46;
   metric_pricing_overrides?: MetricPricingOverrides46;
   /**
@@ -44572,7 +44602,7 @@ export interface FxBarrierOption {
    * Strike exchange rate (quote per base, dimensionless)
    */
   strike: number;
-  vol_surface_id: Id149;
+  vol_surface_id: Id151;
 }
 /**
  * Attributes for scenario selection and grouping
@@ -44852,21 +44882,21 @@ export interface ScenarioPricingOverrides46 {
  */
 export interface FxVarianceSwap {
   attributes: Attributes48;
-  base_calendar_id: Id150;
+  base_calendar_id: Id152;
   base_currency: Currency28;
   /**
    * Series ID for close prices. Defaults to `spot_id` (or currency-pair string) when absent.
    */
   close_series_id?: string | null;
   day_count?: DayCount40;
-  domestic_discount_curve_id: Id151;
-  foreign_discount_curve_id: Id152;
+  domestic_discount_curve_id: Id153;
+  foreign_discount_curve_id: Id154;
   /**
    * Series ID for high prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
    * Defaults to `spot_id` (or currency-pair string) when absent.
    */
   high_series_id?: string | null;
-  id: Id153;
+  id: Id155;
   instrument_pricing_overrides?: InstrumentPricingOverrides47;
   /**
    * Series ID for low prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
@@ -44887,7 +44917,12 @@ export interface FxVarianceSwap {
    * Defaults to `spot_id` (or currency-pair string) when absent.
    */
   open_series_id?: string | null;
-  quote_calendar_id: Id154;
+  /**
+   * Contractual closing fixing immediately before the first Yang–Zhang target bar.
+   * Resolved exactly in the same close series as the target bars.
+   */
+  previous_close_date?: Date | null;
+  quote_calendar_id: Id156;
   quote_currency: Currency29;
   /**
    * Method for calculating realized variance (defaults to CloseToClose)
@@ -44920,7 +44955,7 @@ export interface FxVarianceSwap {
    * [`finstack_quant_valuations_core::constants::TRADING_DAYS_PER_YEAR`] (252).
    */
   trading_days_per_year?: number;
-  vol_surface_id: Id155;
+  vol_surface_id: Id157;
 }
 /**
  * Attributes for scenario selection and tagging
@@ -45215,9 +45250,9 @@ export interface QuantoOption {
    * Optional dividend-yield scalar ID
    */
   div_yield_id?: Id9 | null;
-  domestic_discount_curve_id: Id156;
+  domestic_discount_curve_id: Id158;
   expiry: Date107;
-  foreign_discount_curve_id: Id157;
+  foreign_discount_curve_id: Id159;
   /**
    * Optional FX rate identifier.
    *
@@ -45239,7 +45274,7 @@ export interface QuantoOption {
    * contradicts this direction.
    */
   fx_vol_surface_id?: Id9 | null;
-  id: Id158;
+  id: Id160;
   instrument_pricing_overrides?: InstrumentPricingOverrides48;
   metric_pricing_overrides?: MetricPricingOverrides48;
   notional: Money75;
@@ -45263,7 +45298,7 @@ export interface QuantoOption {
   quantity?: number | null;
   quote_currency: Currency31;
   scenario_pricing_overrides?: ScenarioPricingOverrides48;
-  spot_id: Id159;
+  spot_id: Id161;
   /**
    * Per-unit strike of the equity underlying, in `base_currency` price units.
    */
@@ -45272,7 +45307,7 @@ export interface QuantoOption {
    * Underlying equity ticker symbol
    */
   underlying_ticker: string;
-  vol_surface_id: Id160;
+  vol_surface_id: Id162;
 }
 /**
  * Attributes for scenario selection and grouping
@@ -45577,7 +45612,7 @@ export interface CommoditySpotOption {
   commodity_type: string;
   currency: Currency32;
   day_count?: DayCount42;
-  discount_curve_id: Id161;
+  discount_curve_id: Id163;
   /**
    * Recorded exercise or expiry; required after expiry while settlement remains unpaid.
    */
@@ -45593,8 +45628,8 @@ export interface CommoditySpotOption {
    */
   exercise_style?: "european" | "american" | "bermudan";
   expiry: Date110;
-  forward_curve_id: Id162;
-  id: Id163;
+  forward_curve_id: Id164;
+  id: Id165;
   instrument_pricing_overrides?: InstrumentPricingOverrides49;
   metric_pricing_overrides?: MetricPricingOverrides49;
   /**
@@ -45647,7 +45682,7 @@ export interface CommoditySpotOption {
    * Unit of measurement (e.g., "BBL", "OZ", "MT", "MMBTU")
    */
   unit: string;
-  vol_surface_id: Id164;
+  vol_surface_id: Id166;
 }
 /**
  * Attributes for tagging and selection.
@@ -45791,7 +45826,7 @@ export interface CommodityAsianOption {
   commodity_type: string;
   currency: Currency33;
   day_count?: DayCount43;
-  discount_curve_id: Id165;
+  discount_curve_id: Id167;
   expiry: Date111;
   /**
    * Dates on which the commodity price is observed for averaging.
@@ -45799,8 +45834,8 @@ export interface CommodityAsianOption {
    * **Note**: These dates should be pre-adjusted for business day conventions.
    */
   fixing_dates: Date[];
-  forward_curve_id: Id166;
-  id: Id167;
+  forward_curve_id: Id168;
+  id: Id169;
   instrument_pricing_overrides?: InstrumentPricingOverrides50;
   metric_pricing_overrides?: MetricPricingOverrides50;
   /**
@@ -45834,7 +45869,7 @@ export interface CommodityAsianOption {
    * Unit of measurement (e.g., "BBL", "OZ", "MT", "MMBTU")
    */
   unit: string;
-  vol_surface_id: Id168;
+  vol_surface_id: Id170;
 }
 /**
  * Attributes for scenario selection and grouping.
@@ -46025,13 +46060,13 @@ export interface CommodityForward {
    */
   convention?: CommodityConvention | null;
   currency: Currency34;
-  discount_curve_id: Id169;
+  discount_curve_id: Id171;
   /**
    * Optional exchange identifier (e.g., "NYMEX", "ICE").
    */
   exchange?: string | null;
-  forward_curve_id: Id170;
-  id: Id171;
+  forward_curve_id: Id172;
+  id: Id173;
   instrument_pricing_overrides?: InstrumentPricingOverrides51;
   maturity: Date112;
   metric_pricing_overrides?: MetricPricingOverrides51;
@@ -46250,14 +46285,14 @@ export interface CommoditySwap {
    */
   commodity_type: string;
   currency: Currency35;
-  discount_curve_id: Id172;
+  discount_curve_id: Id174;
   /**
    * Fixed price per commodity unit, in the notional currency (finite).
    */
   fixed_price: number;
-  forward_curve_id: Id173;
+  forward_curve_id: Id175;
   frequency: Tenor20;
-  id: Id174;
+  id: Id176;
   /**
    * Optional index lag in **calendar days**: the floating-leg averaging
    * window is shifted back by exactly this many calendar days (no
@@ -46456,7 +46491,7 @@ export interface CommoditySwaption {
   commodity_type: string;
   currency: Currency36;
   day_count?: DayCount44;
-  discount_curve_id: Id175;
+  discount_curve_id: Id177;
   expiry: Date115;
   /**
    * Finite JSON number that is strictly greater than zero.
@@ -46465,8 +46500,8 @@ export interface CommoditySwaption {
    * generated schemas enforce the same positive-number contract.
    */
   fixed_price: number;
-  forward_curve_id: Id176;
-  id: Id177;
+  forward_curve_id: Id178;
+  id: Id179;
   instrument_pricing_overrides?: InstrumentPricingOverrides53;
   metric_pricing_overrides?: MetricPricingOverrides53;
   /**
@@ -46492,7 +46527,7 @@ export interface CommoditySwaption {
    * Unit of measurement (e.g., "BBL", "OZ", "MT", "MMBTU")
    */
   unit: string;
-  vol_surface_id: Id178;
+  vol_surface_id: Id180;
 }
 /**
  * Attributes for scenario selection and tagging.
@@ -46649,14 +46684,14 @@ export interface CommoditySpreadOption {
   correlation: number;
   currency: Currency37;
   day_count?: DayCount45;
-  discount_curve_id: Id179;
+  discount_curve_id: Id181;
   expiry: Date118;
-  id: Id180;
+  id: Id182;
   instrument_pricing_overrides?: InstrumentPricingOverrides54;
-  leg1_forward_curve_id: Id181;
-  leg1_vol_surface_id: Id182;
-  leg2_forward_curve_id: Id183;
-  leg2_vol_surface_id: Id184;
+  leg1_forward_curve_id: Id183;
+  leg1_vol_surface_id: Id184;
+  leg2_forward_curve_id: Id185;
+  leg2_vol_surface_id: Id186;
   metric_pricing_overrides?: MetricPricingOverrides54;
   /**
    * Option type (call or put on the spread S1 - S2).
@@ -46789,8 +46824,8 @@ export interface CommodityFuture {
         past_fixings?: [Date, number][];
         type: "arithmetic_average";
       };
-  forward_curve_id: Id185;
-  id: Id186;
+  forward_curve_id: Id187;
+  id: Id188;
   instrument_pricing_overrides?: InstrumentPricingOverrides55;
   metric_pricing_overrides?: MetricPricingOverrides55;
   scenario_pricing_overrides?: ScenarioPricingOverrides55;
@@ -46939,7 +46974,7 @@ export interface ListedFutureTerms2 {
  */
 export interface CommodityFutureOption {
   attributes?: Attributes57;
-  id: Id187;
+  id: Id189;
   instrument_pricing_overrides?: InstrumentPricingOverrides56;
   metric_pricing_overrides?: MetricPricingOverrides56;
   scenario_pricing_overrides?: ScenarioPricingOverrides56;
@@ -47037,7 +47072,7 @@ export interface FutureOptionTerms2 {
   contracts: number;
   currency: Currency7;
   day_count: DayCount23;
-  discount_curve_id: Id75;
+  discount_curve_id: Id77;
   /**
    * Recorded early-exercise or expiry observation. Required from expiry onward.
    */
@@ -47132,9 +47167,9 @@ export interface FutureOptionTerms2 {
 export interface FxFuture {
   attributes?: Attributes58;
   base_currency: Currency38;
-  domestic_discount_curve_id: Id188;
-  foreign_discount_curve_id: Id189;
-  id: Id190;
+  domestic_discount_curve_id: Id190;
+  foreign_discount_curve_id: Id191;
+  id: Id192;
   instrument_pricing_overrides?: InstrumentPricingOverrides57;
   metric_pricing_overrides?: MetricPricingOverrides57;
   /**
@@ -47284,7 +47319,7 @@ export interface ListedFutureTerms3 {
  */
 export interface FxFutureOption {
   attributes?: Attributes59;
-  id: Id191;
+  id: Id193;
   instrument_pricing_overrides?: InstrumentPricingOverrides58;
   metric_pricing_overrides?: MetricPricingOverrides58;
   scenario_pricing_overrides?: ScenarioPricingOverrides58;
@@ -47382,7 +47417,7 @@ export interface FutureOptionTerms3 {
   contracts: number;
   currency: Currency7;
   day_count: DayCount23;
-  discount_curve_id: Id75;
+  discount_curve_id: Id77;
   /**
    * Recorded early-exercise or expiry observation. Required from expiry onward.
    */
@@ -47466,7 +47501,7 @@ export interface FutureOptionTerms3 {
  */
 export interface EquityFuture {
   attributes?: Attributes60;
-  discount_curve_id: Id192;
+  discount_curve_id: Id194;
   /**
    * Optional discrete dividends `(ex_date, amount)` in index points.
    */
@@ -47475,7 +47510,7 @@ export interface EquityFuture {
    * Optional continuous dividend-yield scalar in decimal annual units.
    */
   div_yield_id?: Id9 | null;
-  id: Id193;
+  id: Id195;
   instrument_pricing_overrides?: InstrumentPricingOverrides59;
   metric_pricing_overrides?: MetricPricingOverrides59;
   /**
@@ -47485,7 +47520,7 @@ export interface EquityFuture {
    */
   quanto?: QuantoSpec | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides59;
-  spot_id: Id197;
+  spot_id: Id199;
   terms: ListedFutureTerms4;
   underlying_currency: Currency40;
   /**
@@ -47559,14 +47594,14 @@ export interface MetricPricingOverrides59 {
  */
 export interface QuantoSpec {
   asset_currency: Currency39;
-  asset_discount_curve_id: Id194;
+  asset_discount_curve_id: Id196;
   /**
    * Correlation between the asset price and payoff-currency units per asset-currency unit.
    * Must be in [-1, 1].
    */
   correlation: number;
-  fx_spot_id: Id195;
-  fx_vol_surface_id: Id196;
+  fx_spot_id: Id197;
+  fx_vol_surface_id: Id198;
 }
 /**
  * Scenario-only pricing adjustments.
@@ -47655,7 +47690,7 @@ export interface ListedFutureTerms4 {
  */
 export interface EquityFutureOption {
   attributes?: Attributes61;
-  id: Id198;
+  id: Id200;
   instrument_pricing_overrides?: InstrumentPricingOverrides60;
   metric_pricing_overrides?: MetricPricingOverrides60;
   scenario_pricing_overrides?: ScenarioPricingOverrides60;
@@ -47753,7 +47788,7 @@ export interface FutureOptionTerms4 {
   contracts: number;
   currency: Currency7;
   day_count: DayCount23;
-  discount_curve_id: Id75;
+  discount_curve_id: Id77;
   /**
    * Recorded early-exercise or expiry observation. Required from expiry onward.
    */
@@ -47840,15 +47875,15 @@ export interface FutureOptionTerms4 {
  * via the `definition` "EquityTotalReturnFuture".
  */
 export interface EquityTotalReturnFuture {
-  accrued_distributions_id: Id199;
-  accrued_funding_id: Id200;
+  accrued_distributions_id: Id201;
+  accrued_funding_id: Id202;
   attributes?: Attributes62;
-  id: Id201;
+  id: Id203;
   instrument_pricing_overrides?: InstrumentPricingOverrides61;
   metric_pricing_overrides?: MetricPricingOverrides61;
   scenario_pricing_overrides?: ScenarioPricingOverrides61;
-  spot_id: Id202;
-  spread_bp_id: Id203;
+  spot_id: Id204;
+  spread_bp_id: Id205;
   spread_day_count: DayCount46;
   terms: ListedFutureTerms5;
   /**
@@ -47996,7 +48031,7 @@ export interface ListedFutureTerms5 {
 export interface CliquetOption {
   attributes: Attributes63;
   day_count: DayCount47;
-  discount_curve_id: Id204;
+  discount_curve_id: Id206;
   /**
    * Optional dividend-yield scalar ID.
    *
@@ -48014,7 +48049,7 @@ export interface CliquetOption {
    * Global floor on sum of all period returns (default 0.0)
    */
   global_floor: number;
-  id: Id205;
+  id: Id207;
   /**
    * Strike-set underlying level anchoring the first period's return.
    *
@@ -48062,12 +48097,12 @@ export interface CliquetOption {
    */
   reset_dates: Date[];
   scenario_pricing_overrides?: ScenarioPricingOverrides62;
-  spot_id: Id206;
+  spot_id: Id208;
   /**
    * Underlying asset ticker symbol
    */
   underlying_ticker: string;
-  vol_surface_id: Id207;
+  vol_surface_id: Id209;
 }
 /**
  * Attributes for scenario selection and grouping
@@ -48370,7 +48405,7 @@ export interface RangeAccrual {
    */
   coupon_rate: number;
   day_count: DayCount48;
-  discount_curve_id: Id208;
+  discount_curve_id: Id210;
   /**
    * Optional dividend-yield scalar ID
    */
@@ -48379,7 +48414,7 @@ export interface RangeAccrual {
    * Rates forward curve that projects the observed index of a rate-linked range accrual.
    */
   forward_curve_id?: Id9 | null;
-  id: Id209;
+  id: Id211;
   /**
    * Rate-index identity (e.g. `USD-SOFR`) of a rate-linked range accrual.
    */
@@ -48415,7 +48450,7 @@ export interface RangeAccrual {
    */
   quanto?: QuantoSpec | null;
   scenario_pricing_overrides?: ScenarioPricingOverrides63;
-  spot_id: Id210;
+  spot_id: Id212;
   start_date: Date121;
   /**
    * Total number of past observations (for mid-life valuations).
@@ -48430,7 +48465,7 @@ export interface RangeAccrual {
    * Upper bound of accrual range (must be > lower_bound)
    */
   upper_bound: number;
-  vol_surface_id: Id211;
+  vol_surface_id: Id213;
 }
 /**
  * Attributes for scenario selection and grouping
@@ -48727,10 +48762,10 @@ export interface Tarn {
    */
   coupon_floor: number;
   day_count: DayCount49;
-  discount_curve_id: Id212;
+  discount_curve_id: Id214;
   fixed_rate: Decimal31;
-  forward_curve_id: Id213;
-  id: Id214;
+  forward_curve_id: Id215;
+  id: Id216;
   index_tenor: Tenor22;
   instrument_pricing_overrides?: InstrumentPricingOverrides64;
   metric_pricing_overrides?: MetricPricingOverrides64;
@@ -49070,14 +49105,14 @@ export interface Snowball {
    */
   coupon_floor: number;
   day_count: DayCount50;
-  discount_curve_id: Id215;
+  discount_curve_id: Id217;
   fixed_rate: Decimal32;
-  forward_curve_id: Id216;
+  forward_curve_id: Id218;
   /**
    * Multiplier on the floating fixing (1.0 for snowball, variable for inverse floater).
    */
   gearing: number;
-  id: Id217;
+  id: Id219;
   index_tenor: Tenor23;
   /**
    * Initial coupon for snowball (c_0); ignored for inverse floater.
@@ -49449,10 +49484,10 @@ export interface CmsSpreadOption {
    */
   correlation: number;
   day_count: DayCount51;
-  discount_curve_id: Id218;
+  discount_curve_id: Id220;
   expiry: Date124;
-  forward_curve_id: Id219;
-  id: Id220;
+  forward_curve_id: Id221;
+  id: Id222;
   /**
    * Rate-index convention-registry key of the underlying CMS swaps (e.g. `EUR-ESTR-OIS`).
    *
@@ -49469,7 +49504,7 @@ export interface CmsSpreadOption {
    */
   long_cms_fixing_index_id?: Id9 | null;
   long_cms_tenor: Tenor24;
-  long_vol_surface_id: Id221;
+  long_vol_surface_id: Id223;
   metric_pricing_overrides?: MetricPricingOverrides66;
   notional: Money80;
   /**
@@ -49486,7 +49521,7 @@ export interface CmsSpreadOption {
    */
   short_cms_fixing_index_id?: Id9 | null;
   short_cms_tenor: Tenor25;
-  short_vol_surface_id: Id222;
+  short_vol_surface_id: Id224;
   strike: Decimal33;
   /**
    * Fixed leg day count of the underlying CMS swaps (overrides convention).
@@ -49877,7 +49912,7 @@ export interface EquityTotalReturnSwap {
    */
   dividend_tax_rate?: number;
   financing_leg: FinancingLegSpec;
-  id: Id225;
+  id: Id227;
   /**
    * Optional first-period start level.
    *
@@ -49999,8 +50034,8 @@ export interface FinancingLegSpec {
         };
       };
   day_count: DayCount52;
-  discount_curve_id: Id223;
-  forward_curve_id: Id224;
+  discount_curve_id: Id225;
+  forward_curve_id: Id226;
   spread_bp: Decimal34;
 }
 /**
@@ -50274,7 +50309,7 @@ export interface ScheduleParams {
    */
   adjust_accrual_dates?: boolean;
   business_day_convention: BusinessDayConvention21;
-  calendar_id: Id226;
+  calendar_id: Id228;
   day_count: DayCount53;
   /**
    * Whether end-of-month rolling should be preserved when generating the
@@ -50332,7 +50367,7 @@ export interface EquityUnderlyingParams {
    * Optional dividend yield identifier
    */
   div_yield_id?: Id9 | null;
-  spot_id: Id227;
+  spot_id: Id229;
   /**
    * Underlying ticker/identifier
    */
@@ -50415,7 +50450,7 @@ export interface FiIndexTotalReturnSwap {
    * endpoints require exact observations; no yield-based history is inferred.
    */
   fixing_series_id?: string | null;
-  id: Id228;
+  id: Id230;
   /**
    * Index level at the first contractual reset, in the
    * index's own units.
@@ -50527,8 +50562,8 @@ export interface FinancingLegSpec1 {
         };
       };
   day_count: DayCount52;
-  discount_curve_id: Id223;
-  forward_curve_id: Id224;
+  discount_curve_id: Id225;
+  forward_curve_id: Id226;
   spread_bp: Decimal34;
 }
 /**
@@ -50791,7 +50826,7 @@ export interface IndexUnderlyingParams {
    * requesting FI TRS duration risk; the scalar must be unitless and finite. No duration is inferred from index name or maturity.
    */
   duration_id?: Id9 | null;
-  index_id: Id229;
+  index_id: Id231;
   /**
    * Optional yield curve/scalar identifier for carry calculation
    */
@@ -50822,7 +50857,7 @@ export interface PrivateMarketsFund {
    * Time-ordered list of fund events (contributions, proceeds, distributions).
    */
   events: FundEvent[];
-  id: Id230;
+  id: Id232;
   instrument_pricing_overrides?: InstrumentPricingOverrides69;
   metric_pricing_overrides?: MetricPricingOverrides69;
   scenario_pricing_overrides?: ScenarioPricingOverrides69;
@@ -51202,7 +51237,7 @@ export interface RealEstateAsset {
    * Optional detailed disposition cost line items (positive outflows) deducted from terminal proceeds.
    */
   disposition_costs?: Money6[];
-  id: Id231;
+  id: Id233;
   instrument_pricing_overrides?: InstrumentPricingOverrides70;
   metric_pricing_overrides?: MetricPricingOverrides70;
   /**
@@ -51384,7 +51419,7 @@ export interface DiscountedCashFlow {
    * Explicit period free cash flows (date, amount pairs).
    */
   flows: [Date, number][];
-  id: Id232;
+  id: Id234;
   instrument_pricing_overrides?: InstrumentPricingOverrides71;
   metric_pricing_overrides?: MetricPricingOverrides71;
   /**
@@ -51659,7 +51694,7 @@ export interface ValuationDiscounts {
 export interface CallableRangeAccrual {
   attributes: Attributes73;
   call_provision: BermudanCallProvision1;
-  id: Id233;
+  id: Id235;
   instrument_pricing_overrides?: InstrumentPricingOverrides72;
   metric_pricing_overrides?: MetricPricingOverrides72;
   range_accrual: RangeAccrualTerms;
@@ -51763,7 +51798,7 @@ export interface RangeAccrualTerms {
    */
   coupon_rate: number;
   day_count: DayCount56;
-  discount_curve_id: Id234;
+  discount_curve_id: Id236;
   /**
    * Optional dividend-yield scalar ID
    */
@@ -51804,7 +51839,7 @@ export interface RangeAccrualTerms {
    * underlying asset currency.
    */
   quanto?: QuantoSpec | null;
-  spot_id: Id235;
+  spot_id: Id237;
   start_date: Date130;
   /**
    * Total number of past observations (for mid-life valuations).
@@ -51819,7 +51854,7 @@ export interface RangeAccrualTerms {
    * Upper bound of accrual range (must be > lower_bound)
    */
   upper_bound: number;
-  vol_surface_id: Id236;
+  vol_surface_id: Id238;
 }
 /**
  * Currency-tagged monetary amount.
@@ -52109,8 +52144,8 @@ export interface BondFuture {
    */
   deliverable_basket: [DeliverableBond, ...DeliverableBond[]];
   delivery_start: Date131;
-  discount_curve_id: Id238;
-  id: Id239;
+  discount_curve_id: Id240;
+  id: Id241;
   instrument_pricing_overrides?: InstrumentPricingOverrides73;
   metric_pricing_overrides?: MetricPricingOverrides73;
   /**
@@ -52174,7 +52209,7 @@ export interface BondFutureSpecs {
  * via the `definition` "DeliverableBond".
  */
 export interface DeliverableBond {
-  bond_id: Id237;
+  bond_id: Id239;
   /**
    * Finite JSON number that is strictly greater than zero.
    *
@@ -52408,7 +52443,7 @@ export interface StructuredCredit {
    * bucket charges off. See [`DelinquencyModel`].
    */
   delinquency?: DelinquencyModel | null;
-  discount_curve_id: Id240;
+  discount_curve_id: Id242;
   /**
    * Senior transaction fees paid ahead of every note.
    *
@@ -52424,7 +52459,7 @@ export interface StructuredCredit {
    * [`HedgeSwap`].
    */
   hedge_swaps?: HedgeSwap[];
-  id: Id241;
+  id: Id243;
   instrument_pricing_overrides?: InstrumentPricingOverrides74;
   /**
    * Price at which the collateral is realized when the deal is called or
@@ -52883,7 +52918,7 @@ export interface InterestRateSwap1 {
   attributes: Attributes15;
   fixed_leg: FixedLegSpec;
   float_leg: FloatLegSpec2;
-  id: Id51;
+  id: Id53;
   instrument_pricing_overrides?: InstrumentPricingOverrides14;
   /**
    * Optional OTC margin specification for VM/IM.
@@ -53511,7 +53546,7 @@ export interface Tranche {
    * Interest coverage trigger specification
    */
   ic_trigger?: CoverageTrigger | null;
-  id: Id242;
+  id: Id244;
   maturity: Date137;
   /**
    * Whether the coupon is a non-deferrable claim the template pays from
@@ -55366,7 +55401,7 @@ export interface LeveredRealEstateEquity {
    * netted from asset PV.
    */
   financing?: RealEstateFinancing[];
-  id: Id243;
+  id: Id245;
   instrument_pricing_overrides?: InstrumentPricingOverrides75;
   metric_pricing_overrides?: MetricPricingOverrides75;
   scenario_pricing_overrides?: ScenarioPricingOverrides75;
@@ -55413,7 +55448,7 @@ export interface RealEstateAsset1 {
    * Optional detailed disposition cost line items (positive outflows) deducted from terminal proceeds.
    */
   disposition_costs?: Money6[];
-  id: Id231;
+  id: Id233;
   instrument_pricing_overrides?: InstrumentPricingOverrides70;
   metric_pricing_overrides?: MetricPricingOverrides70;
   /**
@@ -55661,7 +55696,7 @@ export interface ScenarioPricingOverrides76 {
 export interface CompositeSpec {
   attributes: Attributes78;
   capital: Money94;
-  id: Id244;
+  id: Id246;
   /**
    * Self-contained underlying instrument definitions.
    */
@@ -55707,7 +55742,7 @@ export interface CompositeSpec {
         kind: "notional_weighted";
       }
     | {
-        anchor_leg_id: Id246;
+        anchor_leg_id: Id248;
         /**
          * Non-zero signed quantity assigned to the anchor leg.
          */
@@ -55723,7 +55758,7 @@ export interface CompositeSpec {
         neutralize: boolean;
       }
     | {
-        anchor_leg_id: Id247;
+        anchor_leg_id: Id249;
         /**
          * Non-zero signed quantity assigned to the anchor leg.
          */
@@ -56283,7 +56318,7 @@ export interface CompositeLegSpec {
         spec: CompositeInstrument;
         type: "composite";
       };
-  instrument_id: Id245;
+  instrument_id: Id247;
   /**
    * Signed leg score: the resolved unit quantity under
    * [`WeightingMethod::FixedQuantity`] and a scale-free signed target score
@@ -56932,7 +56967,7 @@ export interface CompositeState {
  * via the `definition` "ResolvedCompositeLeg".
  */
 export interface ResolvedCompositeLeg {
-  instrument_id: Id248;
+  instrument_id: Id250;
   /**
    * Signed quantity held from the state's effective date until the next rebalance.
    */
@@ -57363,8 +57398,8 @@ export interface CollateralSpec1 {
           rate_adjustment_bp?: number | null;
         };
       };
-  instrument_id: Id91;
-  market_value_id: Id92;
+  instrument_id: Id93;
+  market_value_id: Id94;
   /**
    * Quantity/face value of collateral
    */
@@ -57379,7 +57414,7 @@ export interface CollateralSpec1 {
 export interface CompositeSpec1 {
   attributes: Attributes78;
   capital: Money94;
-  id: Id244;
+  id: Id246;
   /**
    * Self-contained underlying instrument definitions.
    */
@@ -57425,7 +57460,7 @@ export interface CompositeSpec1 {
         kind: "notional_weighted";
       }
     | {
-        anchor_leg_id: Id246;
+        anchor_leg_id: Id248;
         /**
          * Non-zero signed quantity assigned to the anchor leg.
          */
@@ -57441,7 +57476,7 @@ export interface CompositeSpec1 {
         neutralize: boolean;
       }
     | {
-        anchor_leg_id: Id247;
+        anchor_leg_id: Id249;
         /**
          * Non-zero signed quantity assigned to the anchor leg.
          */
@@ -57584,7 +57619,7 @@ export interface ConversionSpec1 {
  * via the `definition` "CreditParams".
  */
 export interface CreditParams1 {
-  credit_curve_id: Id98;
+  credit_curve_id: Id100;
   /**
    * Recovery rate (0.0 to 1.0)
    */
@@ -57645,7 +57680,7 @@ export interface CsaSpec1 {
    */
   calendar_id: string;
   call_timing: MarginCallTiming;
-  collateral_curve_id: Id52;
+  collateral_curve_id: Id54;
   eligible_collateral: EligibleCollateralSchedule;
   /**
    * CSA identifier (e.g., "USD-CSA-STANDARD", "COUNTERPARTY-XYZ-CSA")
@@ -57786,7 +57821,7 @@ export interface EquityUnderlyingParams1 {
    * Optional dividend yield identifier
    */
   div_yield_id?: Id9 | null;
-  spot_id: Id227;
+  spot_id: Id229;
   /**
    * Underlying ticker/identifier
    */
@@ -57865,8 +57900,8 @@ export interface FinancingLegSpec2 {
         };
       };
   day_count: DayCount52;
-  discount_curve_id: Id223;
-  forward_curve_id: Id224;
+  discount_curve_id: Id225;
+  forward_curve_id: Id226;
   spread_bp: Decimal34;
 }
 /**
@@ -57882,7 +57917,7 @@ export interface FixedLegSpec3 {
    */
   calendar_id?: Id9 | null;
   day_count: DayCount17;
-  discount_curve_id: Id50;
+  discount_curve_id: Id52;
   end: Date57;
   /**
    * End-of-month roll convention (default: false).
@@ -57992,7 +58027,7 @@ export interface FloatLegSpec6 {
         };
       };
   day_count: DayCount15;
-  discount_curve_id: Id39;
+  discount_curve_id: Id40;
   end: Date44;
   /**
    * End-of-month roll convention (default: false).
@@ -58012,8 +58047,9 @@ export interface FloatLegSpec6 {
    * Optional calendar for rate fixing (reset lag)
    */
   fixing_calendar_id?: Id9 | null;
-  forward_curve_id: Id40;
+  forward_curve_id: Id41;
   frequency: Tenor8;
+  index_id: Id42;
   /**
    * Payment lag in business days after period end (default: 0).
    *
@@ -58100,7 +58136,7 @@ export interface FutureOptionTerms5 {
   contracts: number;
   currency: Currency7;
   day_count: DayCount23;
-  discount_curve_id: Id75;
+  discount_curve_id: Id77;
   /**
    * Recorded early-exercise or expiry observation. Required from expiry onward.
    */
@@ -58206,7 +58242,7 @@ export interface IndexUnderlyingParams1 {
    * requesting FI TRS duration risk; the scalar must be unitless and finite. No duration is inferred from index name or maturity.
    */
   duration_id?: Id9 | null;
-  index_id: Id229;
+  index_id: Id231;
   /**
    * Optional yield curve/scalar identifier for carry calculation
    */
@@ -58459,7 +58495,7 @@ export interface PremiumLegSpec2 {
    */
   date_regime: "standard" | "bespoke";
   day_count: DayCount31;
-  discount_curve_id: Id96;
+  discount_curve_id: Id98;
   end: Date85;
   frequency: Tenor16;
   start: Date86;
@@ -58476,7 +58512,7 @@ export interface PremiumLegSpec2 {
  * via the `definition` "ProtectionLegSpec".
  */
 export interface ProtectionLegSpec2 {
-  credit_curve_id: Id97;
+  credit_curve_id: Id99;
   /**
    * Recovery rate as a decimal fraction in `[0.0, 1.0)`
    */
@@ -58507,7 +58543,7 @@ export interface RangeAccrualTerms1 {
    */
   coupon_rate: number;
   day_count: DayCount56;
-  discount_curve_id: Id234;
+  discount_curve_id: Id236;
   /**
    * Optional dividend-yield scalar ID
    */
@@ -58548,7 +58584,7 @@ export interface RangeAccrualTerms1 {
    * underlying asset currency.
    */
   quanto?: QuantoSpec | null;
-  spot_id: Id235;
+  spot_id: Id237;
   start_date: Date130;
   /**
    * Total number of past observations (for mid-life valuations).
@@ -58563,7 +58599,7 @@ export interface RangeAccrualTerms1 {
    * Upper bound of accrual range (must be > lower_bound)
    */
   upper_bound: number;
-  vol_surface_id: Id236;
+  vol_surface_id: Id238;
 }
 /**
  * Criteria for reinvestment during revolving period
@@ -58920,7 +58956,7 @@ export interface ScheduleParams1 {
    */
   adjust_accrual_dates?: boolean;
   business_day_convention: BusinessDayConvention21;
-  calendar_id: Id226;
+  calendar_id: Id228;
   day_count: DayCount53;
   /**
    * Whether end-of-month rolling should be preserved when generating the
@@ -59044,6 +59080,10 @@ export interface D_572Ad1Befb7D949146521 {
    * this forward curve instead of using a discount-curve par-rate proxy.
    */
   asw_forward_curve_id?: D_94Cb251104De5Cf587B6 | null;
+  /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: D_94Cb251104De5Cf587B6 | null;
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).

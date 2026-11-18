@@ -51,7 +51,7 @@ impl PreparedPool {
         let mut weights = Vec::with_capacity(count);
         let mut total_weight = 0.0;
         for (id, curve) in curves {
-            let weight = index_data.get_issuer_weight(id);
+            let weight = index_data.get_issuer_weight(id)?;
             if !weight.is_finite() || weight < 0.0 {
                 return Err(Error::Validation(
                     "issuer weights must be finite and non-negative".to_owned(),
@@ -69,7 +69,7 @@ impl PreparedPool {
                 DayCountContext::default(),
             )?;
             probabilities.push((1.0 - curve.sp(time)?).clamp(0.0, 1.0));
-            recoveries.push(index_data.get_issuer_recovery(id));
+            recoveries.push(index_data.get_issuer_recovery(id)?);
             weights.push(weight);
         }
         if (total_weight - 1.0).abs() > 1e-9 {

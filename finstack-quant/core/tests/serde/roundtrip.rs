@@ -228,7 +228,7 @@ mod period_strictness {
     fn period_rejects_unknown_fields() {
         let period = build_periods("2025Q1..Q1", None)
             .expect("valid period plan")
-            .periods
+            .into_periods()
             .into_iter()
             .next()
             .expect("one period");

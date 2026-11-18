@@ -438,7 +438,7 @@ fn test_statement_shock_negative_percent() {
     let mut market = MarketContext::new();
 
     let period_plan = build_periods("2025Q1..Q2", None).unwrap();
-    let periods = period_plan.periods;
+    let periods = period_plan.into_periods();
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -537,7 +537,7 @@ fn test_statement_assign_extreme_value() {
     let mut market = MarketContext::new();
 
     let period_plan = build_periods("2025Q1..Q2", None).unwrap();
-    let periods = period_plan.periods;
+    let periods = period_plan.into_periods();
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(

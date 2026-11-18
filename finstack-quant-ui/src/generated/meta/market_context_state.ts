@@ -104,9 +104,32 @@ export default [
     "description": "Piecewise quadratic forwards (C¹ forwards and C² log discount factors)."
   },
   {
+    "path": "#/$defs/d_15e86d33b70e6065d029",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateQuoteBinding",
+    "description": "Identity and resolved maturity of a quote in its original evaluator."
+  },
+  {
+    "path": "#/$defs/d_15e86d33b70e6065d029/properties/pillar_date",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateQuoteBinding/properties/pillar_date",
+    "description": "Contractual maturity resolved using the instrument conventions.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_15e86d33b70e6065d029/properties/pillar_time",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateQuoteBinding/properties/pillar_time",
+    "description": "Curve-clock year fraction at the resolved maturity.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_15e86d33b70e6065d029/properties/quote_id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateQuoteBinding/properties/quote_id",
+    "description": "Original stable market quote identifier."
+  },
+  {
     "path": "#/$defs/d_17ffcd7842a3f40268b1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationRecipe",
-    "description": "Typed conventions required to replay a rate-curve calibration."
+    "description": "Benchmark conventions and quotes associated with a rate curve."
   },
   {
     "path": "#/$defs/d_17ffcd7842a3f40268b1/properties/currency",
@@ -121,6 +144,21 @@ export default [
     "description": "Day count used for the curve's time axis.",
     "ref": "#/$defs/DayCount",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DayCount"
+  },
+  {
+    "path": "#/$defs/d_17ffcd7842a3f40268b1/properties/execution",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationRecipe/properties/execution",
+    "description": "Original execution evidence. A transcribed benchmark list has no qualified replay."
+  },
+  {
+    "path": "#/$defs/d_17ffcd7842a3f40268b1/properties/execution/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationRecipe/properties/execution/anyOf/0",
+    "ref": "#/$defs/RateCalibrationExecution",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationExecution"
+  },
+  {
+    "path": "#/$defs/d_17ffcd7842a3f40268b1/properties/execution/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationRecipe/properties/execution/anyOf/1"
   },
   {
     "path": "#/$defs/d_17ffcd7842a3f40268b1/properties/method",
@@ -542,6 +580,37 @@ export default [
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationObservation/properties/value",
     "description": "Published finite, strictly positive index level.",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_6435ec92a8bbd1a2e4bc",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationExecution",
+    "description": "Executed evaluator, resolved instruments and original outcome of a rate calibration."
+  },
+  {
+    "path": "#/$defs/d_6435ec92a8bbd1a2e4bc/properties/accepted",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationExecution/properties/accepted",
+    "description": "Whether the original fit passed its recorded acceptance policy."
+  },
+  {
+    "path": "#/$defs/d_6435ec92a8bbd1a2e4bc/properties/bindings",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationExecution/properties/bindings",
+    "description": "Resolved quote identities and maturities, in input order."
+  },
+  {
+    "path": "#/$defs/d_6435ec92a8bbd1a2e4bc/properties/bindings/items",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationExecution/properties/bindings/items",
+    "ref": "#/$defs/RateQuoteBinding",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateQuoteBinding"
+  },
+  {
+    "path": "#/$defs/d_6435ec92a8bbd1a2e4bc/properties/calibration_config",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationExecution/properties/calibration_config",
+    "description": "Solver controls and residual acceptance thresholds used by the evaluator."
+  },
+  {
+    "path": "#/$defs/d_6435ec92a8bbd1a2e4bc/properties/step_params",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationExecution/properties/step_params",
+    "description": "Discount or projection evaluator parameters, including pricing dependencies."
   },
   {
     "path": "#/$defs/d_683ec38b8d36db5534bc",
@@ -1968,6 +2037,20 @@ export default [
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/knot_points/items/prefixItems/1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/knot_points/items/prefixItems/1",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/series",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/series"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/series/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/series/anyOf/0",
+    "ref": "#/$defs/InflationSeries",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationSeries"
+  },
+  {
+    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/series/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/3/properties/series/anyOf/1"
   },
   {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/3/properties/type",
@@ -3501,6 +3584,20 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationObservation"
   },
   {
+    "path": "#/$defs/d_e771e792357014c84cb9/properties/series",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/series"
+  },
+  {
+    "path": "#/$defs/d_e771e792357014c84cb9/properties/series/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/series/anyOf/0",
+    "ref": "#/$defs/InflationSeries",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationSeries"
+  },
+  {
+    "path": "#/$defs/d_e771e792357014c84cb9/properties/series/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationIndex/properties/series/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_e94fd584c7a9c31df19d",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationMethod",
     "description": "Numerical method used to calibrate a rate curve."
@@ -3562,6 +3659,26 @@ export default [
     "path": "#/$defs/d_f401c4e712e4f497feef/properties/source_points/items/prefixItems/1",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/ForwardCurveTransform/properties/source_points/items/prefixItems/1",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_f411b3891ba92dd52290",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationSeries",
+    "description": "Publication identity and units of an observed or projected inflation level."
+  },
+  {
+    "path": "#/$defs/d_f411b3891ba92dd52290/properties/reference_base",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationSeries/properties/reference_base",
+    "description": "Published reference period and index scale, for example `1982-84=100`."
+  },
+  {
+    "path": "#/$defs/d_f411b3891ba92dd52290/properties/seasonally_adjusted",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationSeries/properties/seasonally_adjusted",
+    "description": "True for seasonally adjusted levels and false for unadjusted levels."
+  },
+  {
+    "path": "#/$defs/d_f411b3891ba92dd52290/properties/series_id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InflationSeries/properties/series_id",
+    "description": "Publisher-qualified identifier of the statistical series."
   },
   {
     "path": "#/$defs/d_f9d22f9148b706cb0598",

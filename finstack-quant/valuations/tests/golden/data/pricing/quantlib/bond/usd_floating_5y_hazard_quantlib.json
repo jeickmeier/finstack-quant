@@ -30,6 +30,7 @@
               "all_in_cap_bp": null,
               "all_in_floor_bp": null,
               "fixing_calendar_id": "weekends_only",
+              "index_id": "USD-SOFR-3M",
               "forward_curve_id": "USD-SOFR-3M",
               "gearing": "1",
               "gearing_includes_spread": true,

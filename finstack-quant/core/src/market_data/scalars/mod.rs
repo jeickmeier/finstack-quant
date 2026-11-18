@@ -44,6 +44,6 @@ mod primitives;
 mod inflation_index;
 
 pub use inflation_index::{
-    InflationExpectedRelease, InflationIndex, InflationLag, InflationObservation,
+    InflationExpectedRelease, InflationIndex, InflationLag, InflationObservation, InflationSeries,
 };
 pub use primitives::{MarketScalar, ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation};

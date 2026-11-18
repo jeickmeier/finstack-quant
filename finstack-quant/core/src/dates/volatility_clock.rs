@@ -84,6 +84,7 @@ impl VolatilityClock {
         day_count: DayCount,
         context: DayCountContextState,
     ) -> crate::Result<Self> {
+        day_count.validate_annualized_clock()?;
         let ctx = context.to_ctx()?;
         day_count.validate_context(ctx)?;
         let canonical_context = DayCountContextState::try_from(ctx)?;
@@ -135,6 +136,45 @@ mod tests {
     use super::VolatilityClock;
     use crate::dates::{DayCount, DayCountContextState};
     use time::macros::date;
+
+    #[test]
+    fn one_one_volatility_clock_is_rejected_on_restore() {
+        let base = time::macros::date!(2025 - 01 - 01);
+        let tomorrow = time::macros::date!(2025 - 01 - 02);
+        assert!(
+            crate::market_data::term_structures::DiscountCurve::flat(
+                "USD",
+                base,
+                0.05,
+                DayCount::OneOne
+            )
+            .is_err()
+        );
+        let discount = crate::market_data::term_structures::DiscountCurve::flat(
+            "USD",
+            base,
+            0.05,
+            DayCount::Act365F,
+        )
+        .unwrap();
+        for date in [
+            tomorrow,
+            time::macros::date!(2026 - 01 - 01),
+            time::macros::date!(2035 - 01 - 01),
+        ] {
+            let years = (date - base).whole_days() as f64 / 365.0;
+            assert!((discount.df_on_date(date).unwrap() - (-0.05 * years).exp()).abs() < 1e-12);
+        }
+        assert_eq!(
+            DayCount::OneOne
+                .year_fraction(base, tomorrow, crate::dates::DayCountContext::default())
+                .unwrap(),
+            1.0
+        );
+        let clock = serde_json::json!({"reference_date": "2025-01-01", "day_count": "one_one", "context": {}});
+        let err = serde_json::from_value::<VolatilityClock>(clock).unwrap_err();
+        assert!(err.to_string().contains("annualized"), "{err}");
+    }
 
     #[test]
     fn try_new_canonicalizes_composite_calendar_and_validates_day_count() {

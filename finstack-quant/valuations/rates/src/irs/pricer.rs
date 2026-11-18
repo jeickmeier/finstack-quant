@@ -413,6 +413,7 @@ mod tests {
             })
             .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
                 discount_curve_id: disc_id,
+                index_id: fwd_id.as_str().into(),
                 forward_curve_id: fwd_id,
                 spread_bp: rust_decimal::Decimal::ZERO,
                 frequency: Tenor::monthly(),
@@ -504,6 +505,7 @@ mod tests {
             })
             .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
                 discount_curve_id: disc_id.clone(),
+                index_id: disc_id.as_str().into(),
                 forward_curve_id: disc_id, // single-curve: same id as discount
                 spread_bp: rust_decimal::Decimal::ZERO,
                 frequency: finstack_quant_core::dates::Tenor::quarterly(),
@@ -590,6 +592,7 @@ mod tests {
             })
             .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
                 discount_curve_id: disc_id.clone(),
+                index_id: disc_id.as_str().into(),
                 forward_curve_id: disc_id,
                 spread_bp: rust_decimal::Decimal::ZERO,
                 frequency: finstack_quant_core::dates::Tenor::quarterly(),
@@ -671,6 +674,7 @@ mod tests {
             })
             .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
                 discount_curve_id: disc_id.clone(),
+                index_id: disc_id.as_str().into(),
                 forward_curve_id: disc_id,
                 spread_bp: rust_decimal::Decimal::ZERO,
                 frequency: finstack_quant_core::dates::Tenor::quarterly(),
@@ -756,6 +760,7 @@ mod tests {
             })
             .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
                 discount_curve_id: disc_id.clone(),
+                index_id: disc_id.as_str().into(),
                 forward_curve_id: disc_id,
                 spread_bp: rust_decimal::Decimal::ZERO,
                 frequency: Tenor::quarterly(),
@@ -827,6 +832,7 @@ mod tests {
             })
             .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
                 discount_curve_id: disc_id.clone(),
+                index_id: disc_id.as_str().into(),
                 forward_curve_id: disc_id,
                 spread_bp: rust_decimal::Decimal::ZERO,
                 frequency: Tenor::quarterly(),
@@ -929,6 +935,7 @@ mod tests {
             })
             .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
                 discount_curve_id: disc_id,
+                index_id: fwd_id.as_str().into(),
                 forward_curve_id: fwd_id,
                 spread_bp: rust_decimal::Decimal::ZERO,
                 frequency: Tenor::monthly(),
@@ -1016,6 +1023,7 @@ mod tests {
             })
             .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
                 discount_curve_id: disc_id.clone(),
+                index_id: disc_id.as_str().into(),
                 forward_curve_id: disc_id, // Single-curve: forward = discount
                 spread_bp: rust_decimal::Decimal::ZERO, // No spread
                 frequency: Tenor::quarterly(),

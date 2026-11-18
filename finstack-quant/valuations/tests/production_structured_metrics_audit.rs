@@ -312,6 +312,7 @@ fn production_structured_metrics_discount_margin_settles_clean_price_at_quote_da
     let settlement = date!(2024 - 05 - 15);
     deal.quote_settlement_date = Some(settlement);
     deal.tranches.tranches[0].coupon = RateSpec::Floating(FloatingRateSpec {
+        index_id: "SOFR-3M".into(),
         forward_curve_id: CurveId::new("SOFR-3M"),
         spread_bp: dec!(100),
         gearing: dec!(1),

@@ -841,6 +841,10 @@ export type Id5 = string;
  */
 export type Decimal6 = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id6 = string;
+/**
  * Day-count convention.
  */
 export type DayCount3 =
@@ -876,7 +880,7 @@ export type BusinessDayConvention2 =
 /**
  * Opaque string identifier.
  */
-export type Id6 = string;
+export type Id7 = string;
 /**
  * Day-count convention.
  */
@@ -1030,11 +1034,11 @@ export type Date8 = string;
 /**
  * Opaque string identifier.
  */
-export type Id7 = string;
+export type Id8 = string;
 /**
  * Opaque string identifier.
  */
-export type Id8 = string;
+export type Id9 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -1351,11 +1355,11 @@ export type Decimal12 = string;
 /**
  * Opaque string identifier.
  */
-export type Id9 = string;
+export type Id10 = string;
 /**
  * Opaque string identifier.
  */
-export type Id10 = string;
+export type Id11 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -1406,7 +1410,7 @@ export type DayCount8 =
 /**
  * Opaque string identifier.
  */
-export type Id11 = string;
+export type Id12 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -1414,7 +1418,7 @@ export type Date23 = string;
 /**
  * Opaque string identifier.
  */
-export type Id12 = string;
+export type Id13 = string;
 /**
  * Exact decimal encoded as a JSON string.
  */
@@ -1430,7 +1434,7 @@ export type Date24 = string;
 /**
  * Opaque string identifier.
  */
-export type Id13 = string;
+export type Id14 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -1455,11 +1459,11 @@ export type BusinessDayConvention5 =
 /**
  * Opaque string identifier.
  */
-export type Id14 = string;
+export type Id15 = string;
 /**
  * Opaque string identifier.
  */
-export type Id15 = string;
+export type Id16 = string;
 /**
  * Day-count convention.
  */
@@ -1481,11 +1485,11 @@ export type DayCount9 =
 /**
  * Opaque string identifier.
  */
-export type Id16 = string;
+export type Id17 = string;
 /**
  * Opaque string identifier.
  */
-export type Id17 = string;
+export type Id18 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -1501,7 +1505,7 @@ export type Date30 = string;
 /**
  * Opaque string identifier.
  */
-export type Id18 = string;
+export type Id19 = string;
 /**
  * Canonical schema marker for persisted instrument envelopes.
  */
@@ -1539,7 +1543,7 @@ export interface D_67Ac7Ae7Fa3C625D34Ff {
    * netted from asset PV.
    */
   financing?: DB428938E56E618C85C20[];
-  id: Id18;
+  id: Id19;
   instrument_pricing_overrides?: InstrumentPricingOverrides5;
   metric_pricing_overrides?: MetricPricingOverrides5;
   scenario_pricing_overrides?: ScenarioPricingOverrides5;
@@ -1926,6 +1930,10 @@ export interface D_572Ad1Befb7D94914652 {
    * this forward curve instead of using a discount-curve par-rate proxy.
    */
   asw_forward_curve_id?: D_94Cb251104De5Cf587B6 | null;
+  /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: D_94Cb251104De5Cf587B6 | null;
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
@@ -2911,7 +2919,7 @@ export interface DBead93058Da9E6B7D476 {
    * generating cashflows from the cashflow_spec.
    */
   custom_cashflows?: D_8Dac854926C6F4Ca503B | null;
-  discount_curve_id: Id7;
+  discount_curve_id: Id8;
   /**
    * Calendar identifier for ex-coupon day counting.
    */
@@ -2920,7 +2928,7 @@ export interface DBead93058Da9E6B7D476 {
    * Number of ex-coupon days before coupon date.
    */
   ex_coupon_days?: number;
-  id: Id8;
+  id: Id9;
   instrument_pricing_overrides?: InstrumentPricingOverrides1;
   issue_date: Date9;
   maturity: Date10;
@@ -3305,6 +3313,7 @@ export interface D_11E2Bbdddad8Dbf2F7F3 {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: Decimal5 | null;
+  index_id: Id6;
   /**
    * Expected term-index tenor, checked against the resolved forward curve.
    *
@@ -3435,7 +3444,7 @@ export interface DC40E1D7B8B06C6A5365D {
    */
   adjust_accrual_dates?: boolean;
   business_day_convention: BusinessDayConvention2;
-  calendar_id: Id6;
+  calendar_id: Id7;
   /**
    * Coupon type (Cash/PIK/Split).
    */
@@ -3751,7 +3760,8 @@ export interface D_561C56F793Cc06Bf015E {
     | "variation_margin_pay"
     | "margin_interest"
     | "collateral_substitution_in"
-    | "collateral_substitution_out";
+    | "collateral_substitution_out"
+    | "derivative_settlement";
   /**
    * Economic date of the principal movement, independent of cash payment.
    * Required with `principal_delta` on every principal-like row and absent
@@ -4864,9 +4874,9 @@ export interface DB0A7458B7623F012Eb4B {
    * Optional DDTL parameters; None => plain term loan
    */
   ddtl?: D_567A05766E75C7A74F60 | null;
-  discount_curve_id: Id9;
+  discount_curve_id: Id10;
   frequency: Tenor5;
-  id: Id10;
+  id: Id11;
   instrument_pricing_overrides?: InstrumentPricingOverrides2;
   issue_date: Date21;
   maturity: Date22;
@@ -6172,7 +6182,7 @@ export interface DBa65527Bb807631Cd58F {
  * # Seasoned Instruments (Historical Fixings)
  *
  * Historical fixings **are supported** via the `MarketContext`: store a
- * `ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see
+ * `ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see
  * `finstack_quant_core::market_data::fixings`) containing realized index
  * observations. Observation dates strictly before the valuation cutoff then
  * resolve from that series instead of the curve. The cutoff is the forward
@@ -6207,6 +6217,7 @@ export interface DBa65527Bb807631Cd58F {
  *
  * // 3M SOFR + 200bps with 0% floor
  * let spec = FloatingRateSpec {
+ *     index_id: "USD-SOFR-3M".into(),
  *     forward_curve_id: "USD-SOFR-3M".into(),
  *     spread_bp: dec!(200.0),
  *     gearing: dec!(1.0),
@@ -6288,6 +6299,7 @@ export interface D_11E2Bbdddad8Dbf2F7F31 {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: Decimal5 | null;
+  index_id: Id6;
   /**
    * Expected term-index tenor, checked against the resolved forward curve.
    *
@@ -6397,7 +6409,7 @@ export interface DBef55Fa450B231D7B330 {
    */
   credit_curve_id?: Id4 | null;
   day_count: DayCount8;
-  discount_curve_id: Id11;
+  discount_curve_id: Id12;
   /**
    * Draw and repayment schedule (deterministic or stochastic).
    */
@@ -6411,7 +6423,7 @@ export interface DBef55Fa450B231D7B330 {
   drawn: Money12;
   fees: DE3Ab2140A3C980De74A0;
   frequency: Tenor6;
-  id: Id13;
+  id: Id14;
   instrument_pricing_overrides?: InstrumentPricingOverrides3;
   issue_date: Date25;
   /**
@@ -6972,7 +6984,7 @@ export interface D_7Ab5Bac7015D046B3Dfb {
       }
     | {
         market_anchored: {
-          credit_curve_id: Id12;
+          credit_curve_id: Id13;
           /**
            * Annualized CDS (index) option implied volatility for spreads.
            */
@@ -8170,12 +8182,12 @@ export interface D_5D63D91B43268508D01D {
   cash_amount: Money17;
   collateral: D_0462C3A38Cc828Eadadf;
   day_count: DayCount9;
-  discount_curve_id: Id16;
+  discount_curve_id: Id17;
   /**
    * Haircut percentage (as decimal, e.g., 0.02 = 2%)
    */
   haircut: number;
-  id: Id17;
+  id: Id18;
   instrument_pricing_overrides?: InstrumentPricingOverrides4;
   /**
    * Optional margin specification for mark-to-market margining.
@@ -8407,8 +8419,8 @@ export interface D_0462C3A38Cc828Eadadf {
           rate_adjustment_bp?: number | null;
         };
       };
-  instrument_id: Id14;
-  market_value_id: Id15;
+  instrument_id: Id15;
+  market_value_id: Id16;
   /**
    * Quantity/face value of collateral
    */

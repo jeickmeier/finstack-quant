@@ -82,6 +82,7 @@ pub(crate) fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result
         notional: Money::new(base_notional, conv.base_currency)?,
         side: PayReceive::Receive,
         leg: FloatLegSpec {
+            index_id: conv.base_index_id.clone(),
             forward_curve_id: CurveId::new(foreign_forward),
             discount_curve_id: CurveId::new(foreign_discount),
             start: spot,
@@ -104,6 +105,7 @@ pub(crate) fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result
         notional: Money::new(quote_notional, conv.quote_currency)?,
         side: PayReceive::Pay,
         leg: FloatLegSpec {
+            index_id: conv.quote_index_id.clone(),
             forward_curve_id: CurveId::new(domestic_forward),
             discount_curve_id: CurveId::new(domestic_discount),
             start: spot,

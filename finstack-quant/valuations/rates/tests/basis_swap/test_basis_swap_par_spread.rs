@@ -264,6 +264,7 @@ fn par_spread_zeros_npv() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -281,6 +282,7 @@ fn par_spread_zeros_npv() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-1M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -316,6 +318,7 @@ fn par_spread_zeros_npv() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -333,6 +336,7 @@ fn par_spread_zeros_npv() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-1M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -372,6 +376,7 @@ fn par_spread_formula_validation() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -389,6 +394,7 @@ fn par_spread_formula_validation() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-1M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -451,6 +457,7 @@ fn par_spread_with_existing_spread() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -468,6 +475,7 @@ fn par_spread_with_existing_spread() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-1M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -572,6 +580,7 @@ fn par_spread_inverted_curves() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -589,6 +598,7 @@ fn par_spread_inverted_curves() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-1M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -633,6 +643,7 @@ fn par_spread_long_maturity() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -650,6 +661,7 @@ fn par_spread_long_maturity() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-1M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -697,6 +709,7 @@ fn par_spread_sign_convention() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -714,6 +727,7 @@ fn par_spread_sign_convention() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-1M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -779,6 +793,7 @@ fn incremental_par_spread_sign_convention() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -796,6 +811,7 @@ fn incremental_par_spread_sign_convention() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-1M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -832,6 +848,7 @@ fn incremental_par_spread_sign_convention() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -849,6 +866,7 @@ fn incremental_par_spread_sign_convention() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-1M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -897,6 +915,7 @@ fn incremental_par_spread_sign_convention() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -914,6 +933,7 @@ fn incremental_par_spread_sign_convention() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-1M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -960,6 +980,7 @@ fn incremental_par_spread_sign_convention() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -977,6 +998,7 @@ fn incremental_par_spread_sign_convention() {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-1M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),
@@ -1016,6 +1038,7 @@ fn zero_notional_par_spread_is_rejected_at_construction() {
     let leg = |forward_curve_id: &str| FloatLegSpec {
         end_of_month: false,
         fixing_calendar_id: None,
+        index_id: forward_curve_id.into(),
         forward_curve_id: CurveId::new(forward_curve_id),
         discount_curve_id: CurveId::new("USD-OIS"),
         start: d(2025, 1, 2),

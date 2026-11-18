@@ -34,6 +34,41 @@ impl ResolvedVarianceCalendar {
     }
 }
 
+/// Resolve the exact closing fixing preceding a Yang–Zhang swap window.
+///
+/// # Arguments
+///
+/// * `method` - Contractual estimator. Range estimators use no prior fixing.
+/// * `anchor` - Explicit fixing date immediately preceding the first target bar.
+/// * `dates` - Calendar-adjusted contractual observation dates in ascending order.
+/// * `market` - Market snapshot holding the closing series.
+/// * `series_id` - Identifier of the target bars' closing-price series.
+pub fn preceding_close(
+    method: RealizedVarMethod,
+    anchor: Option<Date>,
+    dates: &[Date],
+    market: &finstack_quant_core::market_data::context::MarketContext,
+    series_id: &str,
+) -> finstack_quant_core::Result<Option<f64>> {
+    match (method, anchor) {
+        (RealizedVarMethod::YangZhang, Some(date))
+            if dates.first().is_some_and(|first| date < *first) =>
+        {
+            market
+                .get_series(series_id)?
+                .get_value_exact(date)
+                .map(Some)
+        }
+        (RealizedVarMethod::YangZhang, _) => Err(finstack_quant_core::Error::Validation(
+            "Yang-Zhang requires previous_close_date before the first target bar".into(),
+        )),
+        (_, None) => Ok(None),
+        (_, Some(_)) => Err(finstack_quant_core::Error::Validation(
+            "previous_close_date applies only to Yang-Zhang swaps".into(),
+        )),
+    }
+}
+
 /// Generate a strictly validated, calendar-adjusted observation schedule.
 ///
 /// Day tenors advance in business-day steps. Week/month/year tenors are
@@ -110,9 +145,9 @@ pub fn annualization_factor(frequency: Tenor, trading_days_per_year: f64) -> f64
 
 /// Fraction of a variance swap's estimator samples observed by `as_of`.
 ///
-/// Close-to-close and Yang-Zhang need the first level as an anchor, so their
+/// Standalone close-to-close uses the first level as an anchor, so its
 /// samples are the return intervals between observations; Parkinson,
-/// Garman-Klass and Rogers-Satchell count each observed bar as one sample.
+/// Garman-Klass, Rogers-Satchell and externally anchored Yang–Zhang count each observed bar.
 ///
 /// # Arguments
 ///
@@ -130,8 +165,7 @@ pub fn annualization_factor(frequency: Tenor, trading_days_per_year: f64) -> f64
 /// # Errors
 ///
 /// Returns `Error::Validation` when the schedule has no estimator samples
-/// before its final observation (a single close-to-close or Yang-Zhang
-/// observation has no return interval).
+/// before its final observation (a single standalone close has no return interval).
 pub fn realized_sample_fraction(
     dates: &[Date],
     as_of: Date,
@@ -143,14 +177,8 @@ pub fn realized_sample_fraction(
     if as_of >= last {
         return Ok(1.0);
     }
-    let anchor = match method {
-        // Yang-Zhang's first close anchors the overnight return of the next
-        // bar; it is not itself an estimator sample.
-        RealizedVarMethod::CloseToClose | RealizedVarMethod::YangZhang => 1,
-        RealizedVarMethod::Parkinson
-        | RealizedVarMethod::GarmanKlass
-        | RealizedVarMethod::RogersSatchell => 0,
-    };
+    // Standalone closing levels define intervals between successive observations.
+    let anchor = usize::from(matches!(method, RealizedVarMethod::CloseToClose));
     let total = dates.len().saturating_sub(anchor);
     let realized = dates
         .iter()

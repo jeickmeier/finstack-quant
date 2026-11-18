@@ -98,6 +98,7 @@ fn create_test_tranches() -> TrancheStructure {
         TrancheSeniority::Senior,
         Money::new(135_000_000.0, Currency::USD).expect("valid money fixture"),
         RateSpec::Floating(finstack_quant_cashflows::builder::FloatingRateSpec {
+            index_id: "SOFR-3M".into(),
             forward_curve_id: finstack_quant_core::types::CurveId::new("SOFR-3M".to_string()),
             spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"),
             gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),

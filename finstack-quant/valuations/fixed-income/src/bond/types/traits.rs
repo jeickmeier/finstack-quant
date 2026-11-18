@@ -110,7 +110,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for Bond {
         if let Some(rate_spec) = self.cashflow_spec.floating_rate_spec() {
             deps.add_forward_curve(rate_spec.forward_curve_id.clone());
             deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
-                rate_spec.forward_curve_id.as_str(),
+                rate_spec.index_id.as_str(),
             ));
         }
         if let Some(call_put) = &self.call_put {
@@ -403,7 +403,7 @@ mod dependency_tests {
             unreachable!("floating example must have a floating coupon");
         };
         let expected = finstack_quant_core::market_data::fixings::fixing_series_id(
-            spec.rate_spec.forward_curve_id.as_str(),
+            spec.rate_spec.index_id.as_str(),
         );
 
         let deps =

@@ -45,6 +45,7 @@
           "discount_curve_id": "USD-OIS",
           "end": "2028-04-30",
           "fixing_calendar_id": "weekends_only",
+          "index_id": "USD-TERM-1Y",
           "forward_curve_id": "USD-TERM-1Y",
           "frequency": {
             "count": 12,

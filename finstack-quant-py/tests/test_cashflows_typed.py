@@ -241,6 +241,7 @@ class TestBuilderSpecs:
         from finstack_quant.cashflows.builder import FloatingRateSpec
 
         spec = FloatingRateSpec(
+            index_id="USD-SOFR-3M",
             forward_curve_id="USD-SOFR-3M",
             spread_bp=Decimal("200"),
             reset_frequency=Tenor.parse("3M"),
@@ -249,6 +250,7 @@ class TestBuilderSpecs:
         spec.validate()
         with pytest.raises(ValueError, match="index_floor_bp"):
             FloatingRateSpec(
+                index_id="USD-SOFR-3M",
                 forward_curve_id="USD-SOFR-3M",
                 spread_bp=Decimal("200"),
                 reset_frequency=Tenor.parse("3M"),
@@ -384,6 +386,7 @@ class TestBuilderSpecs:
             .floating_cf(
                 FloatingCouponSpec(
                     rate_spec=FloatingRateSpec(
+                        index_id="USD-SOFR-3M",
                         forward_curve_id="USD-SOFR-3M",
                         spread_bp=Decimal("150"),
                         reset_frequency=Tenor.parse("3M"),
@@ -408,6 +411,7 @@ class TestBuilderSpecs:
                     "kind": "floating",
                     "spec": {
                         "rate_spec": {
+                            "index_id": "USD-SOFR-3M",
                             "forward_curve_id": "USD-SOFR-3M",
                             "spread_bp": "150",
                             "reset_frequency": {"count": 3, "unit": "months"},
@@ -471,6 +475,7 @@ class TestBuilderSpecs:
             if overnight_index_constraints is not None:
                 kwargs["overnight_index_constraints"] = overnight_index_constraints
             rate_spec = FloatingRateSpec(
+                index_id="USD-SOFR-3M",
                 forward_curve_id="USD-SOFR-3M",
                 spread_bp=Decimal("0"),
                 reset_frequency=Tenor.parse("3M"),
@@ -507,6 +512,7 @@ class TestBuilderSpecs:
                     "kind": "floating",
                     "spec": {
                         "rate_spec": {
+                            "index_id": "USD-SOFR-3M",
                             "forward_curve_id": "USD-SOFR-3M",
                             "spread_bp": "0",
                             "reset_frequency": {"count": 3, "unit": "months"},
@@ -565,6 +571,7 @@ class TestBuilderSpecs:
             .floating_cf(
                 FloatingCouponSpec(
                     rate_spec=FloatingRateSpec(
+                        index_id="USD-SOFR-3M",
                         forward_curve_id="USD-SOFR-3M",
                         spread_bp=Decimal("150"),
                         reset_frequency=Tenor.parse("3M"),
@@ -590,6 +597,7 @@ class TestBuilderSpecs:
                     "kind": "floating",
                     "spec": {
                         "rate_spec": {
+                            "index_id": "USD-SOFR-3M",
                             "forward_curve_id": "USD-SOFR-3M",
                             "spread_bp": "150",
                             "reset_frequency": {"count": 3, "unit": "months"},
@@ -707,7 +715,10 @@ class TestCashFlowBuilder:
 
         spec = FloatingCouponSpec(
             rate_spec=FloatingRateSpec(
-                forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("200"), reset_frequency=Tenor.parse("3M")
+                index_id="USD-SOFR-3M",
+                forward_curve_id="USD-SOFR-3M",
+                spread_bp=Decimal("200"),
+                reset_frequency=Tenor.parse("3M"),
             ),
             schedule=ScheduleParams.quarterly_act360(),
         )
@@ -739,7 +750,10 @@ class TestCashFlowBuilder:
         market = MarketContext().insert(curve)
         spec = FloatingCouponSpec(
             rate_spec=FloatingRateSpec(
-                forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("0"), reset_frequency=Tenor.parse("3M")
+                index_id="USD-SOFR-3M",
+                forward_curve_id="USD-SOFR-3M",
+                spread_bp=Decimal("0"),
+                reset_frequency=Tenor.parse("3M"),
             ),
             schedule=ScheduleParams.quarterly_act360(),
         )
@@ -769,6 +783,7 @@ class TestCashFlowBuilder:
 
         floating = FloatingCouponSpec(
             rate_spec=FloatingRateSpec(
+                index_id="USD-SOFR-3M",
                 forward_curve_id="USD-SOFR-3M",
                 spread_bp=Decimal("200"),
                 reset_frequency=Tenor.parse("3M"),
@@ -805,6 +820,7 @@ class TestCashFlowBuilder:
 
         spec = FloatingCouponSpec(
             rate_spec=FloatingRateSpec(
+                index_id="USD-SOFR-3M",
                 forward_curve_id="USD-SOFR-3M",
                 spread_bp=Decimal("200"),
                 reset_frequency=Tenor.parse("3M"),
@@ -1677,7 +1693,10 @@ def test_build_as_of_uses_fixings_after_curve_anchor() -> None:
     market = MarketContext().insert(ForwardCurve.flat("USD-SOFR-3M", dt.date(2025, 1, 1), 0.04, "act_360"))
     spec = FloatingCouponSpec(
         rate_spec=FloatingRateSpec(
-            forward_curve_id="USD-SOFR-3M", spread_bp=Decimal("0"), reset_frequency=Tenor.parse("3M")
+            index_id="USD-SOFR-3M",
+            forward_curve_id="USD-SOFR-3M",
+            spread_bp=Decimal("0"),
+            reset_frequency=Tenor.parse("3M"),
         ),
         schedule=ScheduleParams.quarterly_act360(),
     )
@@ -1737,9 +1756,13 @@ def test_floating_rate_constructor_and_json_reject_invalid_fields(fields: dict[s
     from finstack_quant.cashflows.builder import FloatingRateSpec
 
     with pytest.raises(ValueError, match=message):
-        FloatingRateSpec(forward_curve_id="USD-SOFR", spread_bp="0", reset_frequency=Tenor.parse("3M"), **fields)
+        FloatingRateSpec(
+            index_id="USD-SOFR", forward_curve_id="USD-SOFR", spread_bp="0", reset_frequency=Tenor.parse("3M"), **fields
+        )
     payload = json.loads(
-        FloatingRateSpec(forward_curve_id="USD-SOFR", spread_bp="0", reset_frequency=Tenor.parse("3M")).to_json()
+        FloatingRateSpec(
+            index_id="USD-SOFR", forward_curve_id="USD-SOFR", spread_bp="0", reset_frequency=Tenor.parse("3M")
+        ).to_json()
     )
     payload.update(fields)
     with pytest.raises(ValueError, match=message):
@@ -1752,6 +1775,7 @@ def test_floating_rate_valid_equal_bounds_preserve_json_and_pickle() -> None:
     from finstack_quant.cashflows.builder import FloatingRateSpec
 
     spec = FloatingRateSpec(
+        index_id="USD-SOFR",
         forward_curve_id="USD-SOFR",
         spread_bp="0",
         reset_frequency=Tenor.parse("3M"),

@@ -193,6 +193,10 @@ export type Id4 = string;
  */
 export type Decimal6 = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id5 = string;
+/**
  * Day-count convention.
  */
 export type DayCount2 =
@@ -228,7 +232,7 @@ export type BusinessDayConvention2 =
 /**
  * Opaque string identifier.
  */
-export type Id5 = string;
+export type Id6 = string;
 /**
  * Day-count convention.
  */
@@ -359,11 +363,11 @@ export type Date8 = string;
 /**
  * Opaque string identifier.
  */
-export type Id6 = string;
+export type Id7 = string;
 /**
  * Opaque string identifier.
  */
-export type Id7 = string;
+export type Id8 = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -652,11 +656,11 @@ export type Date12 = string;
 /**
  * Opaque string identifier.
  */
-export type Id8 = string;
+export type Id9 = string;
 /**
  * Opaque string identifier.
  */
-export type Id9 = string;
+export type Id10 = string;
 /**
  * Canonical schema marker for persisted instrument envelopes.
  */
@@ -764,14 +768,14 @@ export interface D_5D5C46A56F1A2114A2Ed {
    * conditional stock drift includes the hazard compensator.
    */
   credit_curve_id?: Id3 | null;
-  discount_curve_id: Id6;
+  discount_curve_id: Id7;
   /**
    * Optional unitless continuous dividend-yield scalar id (decimal,
    * 0.02 = 2%). `None` means a zero dividend yield; a configured id must
    * resolve.
    */
   div_yield_id?: Id3 | null;
-  id: Id7;
+  id: Id8;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   issue_date: Date9;
   maturity: Date10;
@@ -819,8 +823,8 @@ export interface D_5D5C46A56F1A2114A2Ed {
    * k-of-n-days observation window; the realized path is not tracked.
    */
   soft_call_trigger?: D_51885E17C080D760Db74 | null;
-  spot_id: Id8;
-  vol_surface_id: Id9;
+  spot_id: Id9;
+  vol_surface_id: Id10;
 }
 /**
  * Attributes for scenario selection and tagging
@@ -1170,6 +1174,7 @@ export interface D_14E8725A09F7B41C7021 {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: Decimal5 | null;
+  index_id: Id5;
   /**
    * Expected term-index tenor, checked against the resolved forward curve.
    *
@@ -1300,7 +1305,7 @@ export interface DAb47B22B96D81A7D172A {
    */
   adjust_accrual_dates?: boolean;
   business_day_convention: BusinessDayConvention2;
-  calendar_id: Id5;
+  calendar_id: Id6;
   /**
    * Coupon type (Cash/PIK/Split).
    */
@@ -1937,6 +1942,10 @@ export interface D_572Ad1Befb7D94914652 {
    * this forward curve instead of using a discount-curve par-rate proxy.
    */
   asw_forward_curve_id?: D_94Cb251104De5Cf587B6 | null;
+  /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: D_94Cb251104De5Cf587B6 | null;
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).

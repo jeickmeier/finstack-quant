@@ -297,6 +297,7 @@ fn test_expired_swap_handling() {
         },
         float_leg: FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -379,6 +380,7 @@ fn test_very_short_swap_1_month() {
         },
         float_leg: FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::monthly(),

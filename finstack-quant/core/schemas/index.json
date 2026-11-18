@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/dates/1/period_plan.schema.json",
-      "bytes": 3645,
+      "bytes": 3668,
       "kind": "output",
       "path": "schemas/dates/1/period_plan.schema.json",
       "summary": "Ordered reporting periods with their calendar bounds and actual/forecast flags.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
-      "bytes": 135804,
+      "bytes": 139171,
       "kind": "input",
       "path": "schemas/market_data/1/market_context_state.schema.json",
       "summary": "Curves, surfaces, prices, series and FX for one valuation date; the market input to every pricing, scenario and attribution call.",

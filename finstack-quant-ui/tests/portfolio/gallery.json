@@ -93,6 +93,7 @@
               "end_of_month": false
             },
             "float_leg": {
+              "index_id": "USD-SOFR-3M",
               "discount_curve_id": "USD-OIS",
               "forward_curve_id": "USD-SOFR-3M",
               "spread_bp": "0",

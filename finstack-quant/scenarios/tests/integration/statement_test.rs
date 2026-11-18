@@ -21,7 +21,7 @@ fn test_statement_forecast_percent() {
 
     // Setup model with explicit values
     let period_plan = build_periods("2025Q1..Q4", None).unwrap();
-    let periods = period_plan.periods;
+    let periods = period_plan.into_periods();
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     let mut model = FinancialModelSpec::new(
@@ -109,7 +109,7 @@ fn test_statement_forecast_assign() {
 
     // Setup model with explicit values
     let period_plan = build_periods("2025Q1..Q2", None).unwrap();
-    let periods = period_plan.periods;
+    let periods = period_plan.into_periods();
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     let mut model = FinancialModelSpec::new(
@@ -178,7 +178,7 @@ fn test_statement_forecast_assign() {
 fn forecast_assignment_preserves_currency_and_actual_values() {
     let periods = build_periods("2025Q1..Q2", Some("2025Q1"))
         .expect("periods")
-        .periods;
+        .into_periods();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
 
     for currency in [Currency::USD, Currency::EUR] {
@@ -252,7 +252,7 @@ fn forecast_assignment_preserves_currency_and_actual_values() {
 fn invalid_rate_conversion_reports_failure_without_mutating_forecasts() {
     let periods = build_periods("2025Q1..Q2", Some("2025Q1"))
         .expect("periods")
-        .periods;
+        .into_periods();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
 
     // The first curve has a valid quarterly growth factor that overflows the
@@ -346,7 +346,7 @@ fn invalid_rate_conversion_reports_failure_without_mutating_forecasts() {
 fn rate_binding_rejects_monetary_nodes_without_mutating_values() {
     let periods = build_periods("2025Q1..Q2", Some("2025Q1"))
         .expect("periods")
-        .periods;
+        .into_periods();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
     let initial_values = IndexMap::from([
         (

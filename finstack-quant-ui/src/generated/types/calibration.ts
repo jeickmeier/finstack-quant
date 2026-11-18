@@ -476,6 +476,7 @@ export type D_826Db27Dbb673D9F5F86 =
        * Strictly ascending canonical monthly fixing observations.
        */
       observations: D_0B2Cf6C063Ea8082C33E[];
+      series?: DAf96800Aab5249199D14 | null;
     }
   | {
       /**
@@ -4397,7 +4398,7 @@ export type DE988Ea453181Acf6E6F1 =
       transform?: D_44550D6839F96Bb19179 | null;
     }
   | {
-      base: Date32;
+      base: Date33;
       /**
        * Registered holiday calendar id of the business-day time axis.
        */
@@ -4438,7 +4439,7 @@ export type DE988Ea453181Acf6E6F1 =
       transform?: DFb5D44C23C59Cc156917 | null;
     }
   | {
-      base: Date34;
+      base: Date35;
       /**
        * Registered holiday calendar id of the business-day time axis.
        */
@@ -4483,7 +4484,7 @@ export type DE988Ea453181Acf6E6F1 =
       source?: DCee80Fbbfb572F341766 | null;
     }
   | {
-      base_date: Date37;
+      base_date: Date38;
       /**
        * Optional registered holiday calendar identifier (`"brbd"`, `"usny+target2"`, etc.).
        */
@@ -4506,6 +4507,7 @@ export type DE988Ea453181Acf6E6F1 =
        * Strictly increasing `(time_years, cpi_level)` pillars starting at `0.0`.
        */
       knot_points: [number, number][];
+      series?: DAf96800Aab5249199D14 | null;
     }
   | {
       correlations: number[];
@@ -4518,7 +4520,7 @@ export type DE988Ea453181Acf6E6F1 =
        * Accumulated continuous-zero shock adjustment on the source clock.
        */
       adjustment?: DF1A590578006650Bb43D2 | null;
-      base_date: Date38;
+      base_date: Date39;
       /**
        * Registered holiday calendar id for Bus/252.
        */
@@ -4555,7 +4557,7 @@ export type DE988Ea453181Acf6E6F1 =
       source_base_date?: Date | null;
     }
   | {
-      base: Date39;
+      base: Date40;
       day_count: DayCount9;
       /**
        * Extrapolation policy
@@ -4584,7 +4586,7 @@ export type DE988Ea453181Acf6E6F1 =
       spot_price?: number | null;
     }
   | {
-      base: Date40;
+      base: Date41;
       day_count: DayCount10;
       /**
        * Extrapolation policy
@@ -4857,6 +4859,10 @@ export type DayCount4 =
   | "act_act_afb"
   | "bus_252";
 /**
+ * ISO 8601 calendar date string.
+ */
+export type Date30 = string;
+/**
  * OIS floating-leg compounding convention used during calibration.
  */
 export type D_93B6682133Ee0E52Fa12 =
@@ -4947,7 +4953,7 @@ export type D_35C617761984E0696394 =
          * Optional pre-computed convexity adjustment.
          */
         convexity_adjustment?: number | null;
-        expiry: Date30;
+        expiry: Date31;
         /**
          * Quoted futures price.
          */
@@ -5011,7 +5017,7 @@ export type Id24 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date30 = string;
+export type Date31 = string;
 /**
  * Opaque string identifier.
  */
@@ -5031,11 +5037,11 @@ export type Id28 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date31 = string;
+export type Date32 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date32 = string;
+export type Date33 = string;
 /**
  * Day-count convention.
  */
@@ -5057,11 +5063,11 @@ export type DayCount5 =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date33 = string;
+export type Date34 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date34 = string;
+export type Date35 = string;
 /**
  * Day-count convention.
  */
@@ -5083,7 +5089,7 @@ export type DayCount6 =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date35 = string;
+export type Date36 = string;
 /**
  * Seniority level for credit exposures.
  *
@@ -5095,11 +5101,11 @@ export type DA299B05259471B8097A2 = "senior_secured" | "senior" | "subordinated"
 /**
  * ISO 8601 calendar date string.
  */
-export type Date36 = string;
+export type Date37 = string;
 /**
  * ISO 8601 calendar date string.
  */
-export type Date37 = string;
+export type Date38 = string;
 /**
  * Day-count convention.
  */
@@ -5121,7 +5127,7 @@ export type DayCount7 =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date38 = string;
+export type Date39 = string;
 /**
  * Day-count convention.
  */
@@ -5143,7 +5149,7 @@ export type DayCount8 =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date39 = string;
+export type Date40 = string;
 /**
  * Day-count convention.
  */
@@ -5165,7 +5171,7 @@ export type DayCount9 =
 /**
  * ISO 8601 calendar date string.
  */
-export type Date40 = string;
+export type Date41 = string;
 /**
  * Day-count convention.
  */
@@ -5475,6 +5481,23 @@ export interface D_0B2Cf6C063Ea8082C33E {
    * Published finite, strictly positive index level.
    */
   value: number;
+}
+/**
+ * Publication identity and units of an observed or projected inflation level.
+ */
+export interface DAf96800Aab5249199D14 {
+  /**
+   * Published reference period and index scale, for example `1982-84=100`.
+   */
+  reference_base: string;
+  /**
+   * True for seasonally adjusted levels and false for unadjusted levels.
+   */
+  seasonally_adjusted: boolean;
+  /**
+   * Publisher-qualified identifier of the statistical series.
+   */
+  series_id: string;
 }
 /**
  * Explicit day-count clock translating calendar expiry dates into year fractions
@@ -6112,11 +6135,15 @@ export interface D_5F0B38036294B8235C6A2 {
   ois_compounding?: D_9F40E937966E31F97B30 | null;
 }
 /**
- * Typed conventions required to replay a rate-curve calibration.
+ * Benchmark conventions and quotes associated with a rate curve.
  */
 export interface D_1Da7F2B6C0211Ad55Af2 {
   currency: Currency16;
   curve_day_count: DayCount4;
+  /**
+   * Original execution evidence. A transcribed benchmark list has no qualified replay.
+   */
+  execution?: DF1527Fa0Defa05Fce4D2 | null;
   /**
    * Numerical calibration method.
    */
@@ -6157,6 +6184,45 @@ export interface D_1Da7F2B6C0211Ad55Af2 {
       };
 }
 /**
+ * Executed evaluator, resolved instruments and original outcome of a rate calibration.
+ */
+export interface DF1527Fa0Defa05Fce4D2 {
+  /**
+   * Whether the original fit passed its recorded acceptance policy.
+   */
+  accepted: boolean;
+  /**
+   * Resolved quote identities and maturities, in input order.
+   */
+  bindings: DE94F4B8B51127617865D[];
+  /**
+   * Solver controls and residual acceptance thresholds used by the evaluator.
+   */
+  calibration_config: {
+    [k: string]: unknown;
+  };
+  /**
+   * Discount or projection evaluator parameters, including pricing dependencies.
+   */
+  step_params: {
+    [k: string]: unknown;
+  };
+}
+/**
+ * Identity and resolved maturity of a quote in its original evaluator.
+ */
+export interface DE94F4B8B51127617865D {
+  pillar_date: Date30;
+  /**
+   * Curve-clock year fraction at the resolved maturity.
+   */
+  pillar_time: number;
+  /**
+   * Original stable market quote identifier.
+   */
+  quote_id: string;
+}
+/**
  * Source interpolation and a single accumulated transformation, never a chain
  * of nested curves. The adjustment is stored as its piecewise-linear derivative
  * so evaluating beyond a completed triangular shock does not subtract large
@@ -6164,7 +6230,7 @@ export interface D_1Da7F2B6C0211Ad55Af2 {
  */
 export interface D_44550D6839F96Bb19179 {
   adjustment: DF1A590578006650Bb43D;
-  source_base_date: Date31;
+  source_base_date: Date32;
   /**
    * Original, untransformed interpolation pillars.
    */
@@ -6205,7 +6271,7 @@ export interface D_1A0C0B834C9E63A93Be3 {
  */
 export interface DFb5D44C23C59Cc156917 {
   adjustment: DF1A590578006650Bb43D1;
-  source_base_date: Date33;
+  source_base_date: Date34;
   /**
    * Original, untransformed interpolation pillars.
    */
@@ -6259,7 +6325,7 @@ export interface DCf02F1E5E1Bb843Fa7A7 {
  * One atomic quote binding retained for hazard calibration replay.
  */
 export interface D_6B0044A7Dc5Fa1F3E1De {
-  pillar_date: Date35;
+  pillar_date: Date36;
   /**
    * Frozen year-fraction pillar time used by the original solve.
    */
@@ -6277,7 +6343,7 @@ export interface D_6B0044A7Dc5Fa1F3E1De {
  * integrates directly on the retained source timeline.
  */
 export interface DCee80Fbbfb572F341766 {
-  base_date: Date36;
+  base_date: Date37;
   /**
    * Original `(time_years, hazard_rate)` pillars from `base_date`.
    */

@@ -86,7 +86,7 @@ def floating_bond(idx: int) -> tuple[str, dict]:
                     "payment_lag_days": 0,
                     "end_of_month": False,
                     "rate_spec": {
-                        "forward_curve_id": "USD-SOFR-3M",
+                        "index_id": "USD-SOFR-3M", "forward_curve_id": "USD-SOFR-3M",
                         "spread_bp": str(spread),
                         "gearing": "1",
                         "gearing_includes_spread": True,
@@ -126,7 +126,7 @@ def term_loan(idx: int) -> tuple[str, dict]:
             "discount_curve_id": "USD-OIS",
             "rate": {
                 "floating": {
-                    "forward_curve_id": "USD-SOFR-3M",
+                    "index_id": "USD-SOFR-3M", "forward_curve_id": "USD-SOFR-3M",
                     "spread_bp": str(spread),
                     "gearing": "1",
                     "gearing_includes_spread": True,
@@ -176,7 +176,7 @@ def revolver(idx: int) -> tuple[str, dict]:
             "recovery_rate": 0.70,
             "rate": {
                 "floating": {
-                    "forward_curve_id": "USD-SOFR-3M",
+                    "index_id": "USD-SOFR-3M", "forward_curve_id": "USD-SOFR-3M",
                     "spread_bp": str(spread),
                     "gearing": "1",
                     "gearing_includes_spread": True,
@@ -456,7 +456,7 @@ def irs(idx: int) -> tuple[str, dict]:
             },
             "float_leg": {
                 "discount_curve_id": "USD-OIS",
-                "forward_curve_id": "USD-SOFR-3M",
+                "index_id": "USD-SOFR-3M", "forward_curve_id": "USD-SOFR-3M",
                 "spread_bp": "0",
                 "frequency": {"count": 3, "unit": "months"},
                 "day_count": "act_360",
@@ -505,7 +505,7 @@ def swaption(idx: int) -> tuple[str, dict]:
             },
             "underlying_float_leg": {
                 "discount_curve_id": "USD-OIS",
-                "forward_curve_id": "USD-SOFR-3M",
+                "index_id": "USD-SOFR-3M", "forward_curve_id": "USD-SOFR-3M",
                 "spread_bp": "0",
                 "frequency": {"count": 3, "unit": "months"},
                 "day_count": "act_360",

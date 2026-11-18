@@ -198,3 +198,55 @@ test('discrete barrier cannot use the continuous analytical engine', () => {
   s.monitoring = { type: 'discrete', observation_dates: [s.expiry] };
   assert.throws(() => value(f, '2024-01-02', 'barrier_bs_continuous'), /continuous monitoring/);
 });
+
+test('fixed NDF exports signed settlement cash without principal', () => {
+  const f = fixture('ndf');
+  f.instrument.instrument.spec.observed_fixing = 7.3;
+  const asOf = '2025-03-14';
+  const result = valuations.instruments.instrumentCashflows(
+    JSON.stringify(f.instrument),
+    JSON.stringify(f.market),
+    asOf,
+    'discounting'
+  );
+  assert.equal(result.flows.length, 1);
+  const [row] = result.flows;
+  assert.equal(row.kind, 'derivative_settlement');
+  assert.equal(row.currency, 'USD');
+  assert.ok(Math.abs(row.amount - 10000000 * (1 / 7.3 - 1 / 7.25)) < 1e-8);
+  assert.equal(row.principal_delta, undefined);
+  assert.equal(row.principal_date, undefined);
+  assert.ok(Math.abs(row.native_pv - value(f, asOf)) < 1e-8);
+});
+
+test('variance swap settles every target bar including the first overnight gap', () => {
+  const f = fixture('variance_swap');
+  const spec = f.instrument.instrument.spec;
+  Object.assign(spec, {
+    start_date: '2025-01-06',
+    maturity: '2025-01-08',
+    previous_close_date: '2025-01-03',
+    realized_var_method: 'yang_zhang',
+    open_series_id: 'bars',
+    high_series_id: 'bars',
+    low_series_id: 'bars',
+    close_series_id: 'bars',
+  });
+  f.market.series = [
+    {
+      id: 'bars',
+      interpolation: 'step',
+      extrapolation: 'error',
+      observations: [
+        ['2025-01-03', 100],
+        ['2025-01-06', 110],
+        ['2025-01-07', 110],
+        ['2025-01-08', 110],
+      ],
+    },
+  ];
+  const expected = 1000000 * ((252 * Math.log(1.1) ** 2) / 3 - 0.04);
+  assert.ok(Math.abs(value(f, spec.maturity) - expected) < 1e-7);
+  delete spec.previous_close_date;
+  assert.throws(() => value(f, spec.maturity), /previous_close_date/);
+});

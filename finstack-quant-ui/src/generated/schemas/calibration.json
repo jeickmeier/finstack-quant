@@ -1363,7 +1363,7 @@
     },
     "d_1da7f2b6c0211ad55af2": {
       "additionalProperties": false,
-      "description": "Typed conventions required to replay a rate-curve calibration.",
+      "description": "Benchmark conventions and quotes associated with a rate curve.",
       "properties": {
         "currency": {
           "$ref": "#/$defs/d_be98333e68c25ab5ae57",
@@ -1372,6 +1372,17 @@
         "curve_day_count": {
           "$ref": "#/$defs/d_c0401254ec268b317b65",
           "description": "Day count used for the curve's time axis."
+        },
+        "execution": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_f1527fa0defa05fce4d2"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original execution evidence. A transcribed benchmark list has no qualified replay."
         },
         "method": {
           "$ref": "#/$defs/d_527f8d62bb34fa268010",
@@ -3417,6 +3428,16 @@
                 "$ref": "#/$defs/d_0b2cf6c063ea8082c33e"
               },
               "type": "array"
+            },
+            "series": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/d_af96800aab5249199d14"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
@@ -4940,6 +4961,30 @@
       },
       "type": "object"
     },
+    "d_af96800aab5249199d14": {
+      "additionalProperties": false,
+      "description": "Publication identity and units of an observed or projected inflation level.",
+      "properties": {
+        "reference_base": {
+          "description": "Published reference period and index scale, for example `1982-84=100`.",
+          "type": "string"
+        },
+        "seasonally_adjusted": {
+          "description": "True for seasonally adjusted levels and false for unadjusted levels.",
+          "type": "boolean"
+        },
+        "series_id": {
+          "description": "Publisher-qualified identifier of the statistical series.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "series_id",
+        "reference_base",
+        "seasonally_adjusted"
+      ],
+      "type": "object"
+    },
     "d_b7ebd05daecf38c26828": {
       "description": "Identifier for Swaption market conventions (e.g., \"USD\", \"EUR\").\n\nUsed to look up [`SwaptionConventions`](crate::market::conventions::SwaptionConventions)\nfrom the convention registry.",
       "type": "string"
@@ -6351,6 +6396,31 @@
         }
       ]
     },
+    "d_e94f4b8b51127617865d": {
+      "additionalProperties": false,
+      "description": "Identity and resolved maturity of a quote in its original evaluator.",
+      "properties": {
+        "pillar_date": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
+          "description": "Contractual maturity resolved using the instrument conventions."
+        },
+        "pillar_time": {
+          "description": "Curve-clock year fraction at the resolved maturity.",
+          "format": "double",
+          "type": "number"
+        },
+        "quote_id": {
+          "description": "Original stable market quote identifier.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "quote_id",
+        "pillar_date",
+        "pillar_time"
+      ],
+      "type": "object"
+    },
     "d_e98120a9ebcd8bce537a": {
       "description": "Canonical family-typed identifier for an addressable entry in\n[`MarketContext`](crate::market_data::context::MarketContext).\n\nIdentifiers in `MarketContext` are namespace-local: the same `CurveId` may\ncoexist across distinct stores (for example a `VolSurface` and a\n`ScalarTimeSeries`). `MarketDataTarget` pairs an exact [`CurveId`] with the\nexact store and subkind to select without multi-store probing.",
       "oneOf": [
@@ -6939,6 +7009,16 @@
                 "type": "array"
               },
               "type": "array"
+            },
+            "series": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/d_af96800aab5249199d14"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           },
           "required": [
@@ -7315,6 +7395,36 @@
           "type": "string"
         }
       ]
+    },
+    "d_f1527fa0defa05fce4d2": {
+      "additionalProperties": false,
+      "description": "Executed evaluator, resolved instruments and original outcome of a rate calibration.",
+      "properties": {
+        "accepted": {
+          "description": "Whether the original fit passed its recorded acceptance policy.",
+          "type": "boolean"
+        },
+        "bindings": {
+          "description": "Resolved quote identities and maturities, in input order.",
+          "items": {
+            "$ref": "#/$defs/d_e94f4b8b51127617865d"
+          },
+          "type": "array"
+        },
+        "calibration_config": {
+          "description": "Solver controls and residual acceptance thresholds used by the evaluator."
+        },
+        "step_params": {
+          "description": "Discount or projection evaluator parameters, including pricing dependencies."
+        }
+      },
+      "required": [
+        "bindings",
+        "step_params",
+        "calibration_config",
+        "accepted"
+      ],
+      "type": "object"
     },
     "d_f1a590578006650bb43d": {
       "additionalProperties": false,

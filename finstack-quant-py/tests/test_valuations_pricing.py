@@ -430,6 +430,7 @@ def _bermudan_swaption_json() -> str:
                 "calendar_id": None,
                 "fixing_calendar_id": None,
                 "discount_curve_id": "USD-OIS",
+                "index_id": "USD-OIS",
                 "forward_curve_id": "USD-OIS",
                 "compounding": "simple",
             },

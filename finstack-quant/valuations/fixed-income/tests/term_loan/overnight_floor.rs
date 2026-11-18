@@ -65,6 +65,7 @@ fn market() -> MarketContext {
 
 fn spec(application: OvernightIndexConstraintApplication) -> FloatingRateSpec {
     FloatingRateSpec {
+        index_id: "USD-SOFR-OIS".into(),
         forward_curve_id: "USD-SOFR-OIS".into(),
         spread_bp: Decimal::from(200),
         gearing: Decimal::ONE,

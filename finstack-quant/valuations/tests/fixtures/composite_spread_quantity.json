@@ -1,0 +1,90 @@
+{
+  "kind": "user_defined",
+  "required_metrics": [],
+  "quantity_expressions": {
+    "A": {
+      "node": {
+        "if_then_else": {
+          "condition": {
+            "node": {
+              "bin_op": {
+                "op": "gt",
+                "left": {
+                  "node": {
+                    "bin_op": {
+                      "op": "div",
+                      "left": {
+                        "node": {
+                          "bin_op": {
+                            "op": "sub",
+                            "left": {
+                              "node": {
+                                "column": "leg.A.value"
+                              }
+                            },
+                            "right": {
+                              "node": {
+                                "column": "leg.B.value"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "right": {
+                        "node": {
+                          "call": [
+                            "abs",
+                            [
+                              {
+                                "node": {
+                                  "bin_op": {
+                                    "op": "sub",
+                                    "left": {
+                                      "node": {
+                                        "column": "leg.A.value"
+                                      }
+                                    },
+                                    "right": {
+                                      "node": {
+                                        "column": "leg.B.value"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          ]
+                        }
+                      }
+                    }
+                  }
+                },
+                "right": {
+                  "node": {
+                    "literal": 0
+                  }
+                }
+              }
+            }
+          },
+          "then_expr": {
+            "node": {
+              "literal": 1
+            }
+          },
+          "else_expr": {
+            "node": {
+              "literal": -1
+            }
+          }
+        }
+      }
+    },
+    "B": {
+      "node": {
+        "literal": -1
+      }
+    }
+  },
+  "annualization_factor": 252
+}

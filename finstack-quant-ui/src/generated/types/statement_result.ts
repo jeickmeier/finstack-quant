@@ -294,7 +294,8 @@ export type D_76Adf23Abc095Fd56514 =
                 | "variation_margin_pay"
                 | "margin_interest"
                 | "collateral_substitution_in"
-                | "collateral_substitution_out";
+                | "collateral_substitution_out"
+                | "derivative_settlement";
               kind: "cashflow_ignored";
               [k: string]: unknown;
             }
@@ -2410,7 +2411,7 @@ export interface D_6F601764Dacadc213E87 {
         fiscal: DC44E4163513F1741Db76;
       };
   /**
-   * Ordered periods produced by the parser.
+   * Chronologically ordered reporting periods, with optional gaps.
    */
   periods: D_29936D53E5E53Cef8284[];
 }

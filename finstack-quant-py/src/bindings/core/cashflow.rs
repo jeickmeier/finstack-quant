@@ -66,6 +66,8 @@ cf_kind_classattrs! {
     FRONTING_FEE => FrontingFee,
     /// Principal exchange or notional flow.
     NOTIONAL => Notional,
+    /// Net contractual derivative payoff without a principal exchange.
+    DERIVATIVE_SETTLEMENT => DerivativeSettlement,
     /// Payment-in-kind interest capitalization.
     PIK => Pik,
     /// Scheduled amortization (principal repayment).

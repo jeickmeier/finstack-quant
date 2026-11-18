@@ -80,6 +80,7 @@ fn seasoned_ois_swap(start: Date) -> InterestRateSwap {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR".into(),
             forward_curve_id: "USD-SOFR".into(),
             frequency: Tenor::annual(),
             day_count: DayCount::Act360,

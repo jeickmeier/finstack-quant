@@ -163,10 +163,10 @@ fn project_mtm_cashflows(
     let fwd_c = context.get_forward(&constant_leg.leg.forward_curve_id)?;
     let fwd_r = context.get_forward(&resetting_leg.leg.forward_curve_id)?;
     let fixing_id_c = finstack_quant_core::market_data::fixings::fixing_series_id(
-        constant_leg.leg.forward_curve_id.as_str(),
+        constant_leg.leg.index_id.as_str(),
     );
     let fixing_id_r = finstack_quant_core::market_data::fixings::fixing_series_id(
-        resetting_leg.leg.forward_curve_id.as_str(),
+        resetting_leg.leg.index_id.as_str(),
     );
     let fixings_c = context.get_series(&fixing_id_c).ok();
     let fixings_r = context.get_series(&fixing_id_r).ok();

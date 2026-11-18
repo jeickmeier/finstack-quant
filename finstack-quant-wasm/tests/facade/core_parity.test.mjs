@@ -758,14 +758,14 @@ test('MarketContext.len counts the FX matrix', () => {
   assert.deepEqual([fxOnly.len(), fxOnly.isEmpty()], [1, false]);
 });
 
-test('CreditIndexData issuer accessors fall back to the index data', () => {
+test('CreditIndexData issuer accessors require a named pool member', () => {
   const hazard = core.HazardCurve.flat('CDX-IG-HZD', '2025-01-02', 0.01, 0.4, 'act_365f');
   const data = new core.CreditIndexData(4, 0.4, hazard, baseCorrelation());
   assert.equal(data.hasIssuerCurves(), false);
   assert.deepEqual(data.issuerIds(), []);
-  assert.equal(data.getIssuerCurve('A').id, 'CDX-IG-HZD');
-  assert.equal(data.getIssuerRecovery('A'), 0.4);
-  assert.equal(data.getIssuerWeight('A'), 0.25);
+  assert.equal(data.numConstituents, 4);
+  assert.equal(data.recoveryRate, 0.4);
+  assert.throws(() => data.getIssuerCurve('A'));
   assert.throws(() => data.getIssuerWeight(1), { name: 'TypeError' });
 
   const context = new core.MarketContext();
@@ -777,13 +777,15 @@ test('CreditIndexData issuer accessors fall back to the index data', () => {
   Object.assign(state.credit_indices[0], {
     issuer_credit_curve_ids: { A: 'A-HZD', B: 'CDX-IG-HZD' },
     issuer_recovery_rates: { A: 0.3 },
-    issuer_weights: { A: 0.25, B: 0.75 },
+    issuer_weights: { A: 0.9, B: 0.1 },
   });
   const loaded = core.MarketContext.fromJson(JSON.stringify(state)).getCreditIndex('CDX');
   assert.deepEqual(loaded.issuerIds(), ['A', 'B']);
   assert.equal(loaded.getIssuerCurve('A').id, 'A-HZD');
   assert.deepEqual([loaded.getIssuerRecovery('A'), loaded.getIssuerRecovery('B')], [0.3, 0.4]);
-  assert.deepEqual([loaded.getIssuerWeight('A'), loaded.getIssuerWeight('B')], [0.25, 0.75]);
+  assert.deepEqual([loaded.getIssuerWeight('A'), loaded.getIssuerWeight('B')], [0.9, 0.1]);
+  for (const method of ['getIssuerWeight', 'getIssuerCurve', 'getIssuerRecovery'])
+    assert.throws(() => loaded[method]('C'));
 });
 
 test('MarketContext inserts change the context in place and share curve data', () => {
@@ -876,4 +878,54 @@ test('following rolls respect exchange amendments and early closes', () => {
   ]) {
     assert.equal(iso(core.adjust(ep(start), 'following', calendar)), expected);
   }
+});
+
+test('market restoration retains the published CPI series and reference base', () => {
+  const series = {
+    series_id: 'BLS:CUUR0000SA0',
+    reference_base: '1982-84=100',
+    seasonally_adjusted: false,
+  };
+  const state = JSON.parse(new core.MarketContext().toJson());
+  state.inflation_indices = [
+    {
+      id: 'US-CPI',
+      currency: 'USD',
+      knowledge_date: '2025-02-12',
+      series,
+      observations: [{ reference_month: '2025-01-01', available_on: '2025-02-12', value: 105 }],
+    },
+  ];
+  const restored = core.MarketContext.fromJson(JSON.stringify(state));
+  assert.deepEqual(JSON.parse(restored.toJson()).inflation_indices[0].series, series);
+});
+
+test('hazard market restoration rejects a 10Y risk quote attached to the 5Y source', () => {
+  const market = new core.MarketContext();
+  market.insert(core.HazardCurve.flat('ACME-HZD', '2025-01-01', 0.02, 0.4, 'act_365f'));
+  const state = JSON.parse(market.toJson());
+  const input = {
+    quote: {
+      type: 'cds_par_spread',
+      id: 'ACME',
+      entity: 'ACME',
+      recovery_rate: 0.4,
+      convention: { currency: 'USD', doc_clause: 'isda_na' },
+      pillar: { date: '2030-01-01' },
+      spread_bp: 120,
+    },
+    pillar_date: '2030-01-01',
+    pillar_time: 5,
+  };
+  state.curves[0].hazard_calibration = {
+    hazard_params: { curve_id: 'ACME-HZD' },
+    calibration_config: {},
+    calibration_inputs: [input],
+    spread_risk_inputs: [structuredClone(input)],
+  };
+  assert.doesNotThrow(() => core.MarketContext.fromJson(JSON.stringify(state)));
+  const risk = state.curves[0].hazard_calibration.spread_risk_inputs[0];
+  risk.quote.pillar.date = risk.pillar_date = '2035-01-01';
+  risk.pillar_time = 10;
+  assert.throws(() => core.MarketContext.fromJson(JSON.stringify(state)));
 });

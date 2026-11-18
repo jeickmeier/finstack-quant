@@ -1080,20 +1080,22 @@ fn credit_rejects_invalid_serialized_closing_pillar() {
         -1.0,
     )]);
 
-    // Stored coordinates still match the opening quote, but the typed closing
-    // quote now resolves to another contractual date. Core storage validation
-    // cannot interpret the calibration-owned quote payload.
+    // Both closing quotes agree with each other but resolve to a different
+    // date from their stored pillar. Attribution must reject that binding.
     let closing_recipe = closing_curve.hazard_calibration().expect("closing recipe");
+    let mut calibration_inputs = closing_recipe.calibration_inputs().to_vec();
     let mut spread_risk_inputs = closing_recipe.spread_risk_inputs().to_vec();
-    spread_risk_inputs[0].quote["pillar"] =
-        serde_json::to_value(Pillar::Date(date!(2026 - 06 - 20))).expect("pillar payload");
+    for input in [&mut calibration_inputs[0], &mut spread_risk_inputs[0]] {
+        input.quote["pillar"] =
+            serde_json::to_value(Pillar::Date(date!(2026 - 06 - 20))).expect("pillar payload");
+    }
     let recipe = finstack_quant_core::market_data::term_structures::HazardCalibrationRecipe::new(
         closing_recipe.hazard_params().clone(),
-        closing_recipe.calibration_inputs().to_vec(),
+        calibration_inputs,
         spread_risk_inputs,
         closing_recipe.calibration_config().clone(),
     )
-    .expect("core stores the opaque payload");
+    .expect("matching closing contracts");
     let invalid_closing = HazardCurve::builder("HZ")
         .base_date(base)
         .day_count(closing_curve.day_count())

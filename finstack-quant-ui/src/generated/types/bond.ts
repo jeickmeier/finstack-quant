@@ -193,6 +193,10 @@ export type Id4 = string;
  */
 export type Decimal6 = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id5 = string;
+/**
  * Day-count convention.
  */
 export type DayCount2 =
@@ -228,7 +232,7 @@ export type BusinessDayConvention2 =
 /**
  * Opaque string identifier.
  */
-export type Id5 = string;
+export type Id6 = string;
 /**
  * Day-count convention.
  */
@@ -386,11 +390,11 @@ export type Date8 = string;
 /**
  * Opaque string identifier.
  */
-export type Id6 = string;
+export type Id7 = string;
 /**
  * Opaque string identifier.
  */
-export type Id7 = string;
+export type Id8 = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -805,7 +809,7 @@ export interface D_67C3F0Fee95F47938Ab4 {
    * generating cashflows from the cashflow_spec.
    */
   custom_cashflows?: D_7C4149870A1F77E1F644 | null;
-  discount_curve_id: Id6;
+  discount_curve_id: Id7;
   /**
    * Calendar identifier for ex-coupon day counting.
    */
@@ -814,7 +818,7 @@ export interface D_67C3F0Fee95F47938Ab4 {
    * Number of ex-coupon days before coupon date.
    */
   ex_coupon_days?: number;
-  id: Id7;
+  id: Id8;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   issue_date: Date9;
   maturity: Date10;
@@ -1199,6 +1203,7 @@ export interface DAfaff9B4B34177Ac633E {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: Decimal5 | null;
+  index_id: Id5;
   /**
    * Expected term-index tenor, checked against the resolved forward curve.
    *
@@ -1329,7 +1334,7 @@ export interface D_336250C98Cf023A4B5E2 {
    */
   adjust_accrual_dates?: boolean;
   business_day_convention: BusinessDayConvention2;
-  calendar_id: Id5;
+  calendar_id: Id6;
   /**
    * Coupon type (Cash/PIK/Split).
    */
@@ -1822,7 +1827,8 @@ export interface D_5Fdd6C8Cd626De8799Fe {
     | "variation_margin_pay"
     | "margin_interest"
     | "collateral_substitution_in"
-    | "collateral_substitution_out";
+    | "collateral_substitution_out"
+    | "derivative_settlement";
   /**
    * Economic date of the principal movement, independent of cash payment.
    * Required with `principal_delta` on every principal-like row and absent
@@ -2478,6 +2484,10 @@ export interface D_572Ad1Befb7D94914652 {
    * this forward curve instead of using a discount-curve par-rate proxy.
    */
   asw_forward_curve_id?: D_94Cb251104De5Cf587B6 | null;
+  /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: D_94Cb251104De5Cf587B6 | null;
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).

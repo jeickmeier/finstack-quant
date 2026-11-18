@@ -889,3 +889,23 @@ fn constructors_validate_actual_gregorian_bounds() {
     assert!(PeriodId::week(2026, 53).is_ok());
     assert!(PeriodId::week(2025, 53).is_err());
 }
+
+#[test]
+fn daily_plan_rejects_a_duplicate_substituted_for_january_second() {
+    let plan = build_periods("2025D001..D365", None).unwrap();
+    let mut wire = serde_json::to_value(&plan).unwrap();
+    wire["periods"][1] = wire["periods"][0].clone();
+    assert!(serde_json::from_value::<PeriodPlan>(wire).is_err());
+    let mut rows = plan.to_vec();
+    rows.remove(1);
+    let sparse = PeriodPlan::try_new(plan.get_calendar(), rows).unwrap();
+    let target = plan.last().unwrap().id;
+    let window = super::ltm_window(target, &sparse).unwrap();
+    assert_eq!((window.missing, window.slots.len()), (1, 364));
+    let mut rows = plan.to_vec();
+    rows.swap(0, 1);
+    assert!(PeriodPlan::try_new(plan.get_calendar(), rows).is_err());
+    let mut rows = plan.to_vec();
+    rows[1].end = rows[1].start;
+    assert!(PeriodPlan::try_new(plan.get_calendar(), rows).is_err());
+}

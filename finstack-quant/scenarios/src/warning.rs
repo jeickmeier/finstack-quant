@@ -154,12 +154,6 @@ pub enum Warning {
         detail: String,
     },
 
-    /// Bucket-correlation shock matched no detachment buckets.
-    BaseCorrBucketNoMatch {
-        /// Surface identifier.
-        surface_id: String,
-    },
-
     /// Vol-surface arbitrage warning detected post-shock.
     VolSurfaceArbitrage {
         /// Volatility-surface identifier.
@@ -247,9 +241,6 @@ impl fmt::Display for Warning {
                 instrument_id,
                 detail,
             } => write!(f, "Correlation bump for '{instrument_id}': {detail}"),
-            Warning::BaseCorrBucketNoMatch { surface_id } => {
-                write!(f, "BaseCorrBucketPts on {surface_id} matched no detachment buckets")
-            }
             Warning::VolSurfaceArbitrage {
                 vol_surface_id,
                 detail,

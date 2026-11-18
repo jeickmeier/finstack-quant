@@ -221,6 +221,7 @@ mod tests {
             .maturity(end)
             .rate(RateSpec::Floating(
                 finstack_quant_cashflows::builder::FloatingRateSpec {
+                    index_id: "USD-SOFR-3M".into(),
                     forward_curve_id: "USD-SOFR-3M".into(),
                     spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"),
                     gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),
@@ -259,6 +260,7 @@ mod tests {
             .maturity(end)
             .rate(RateSpec::Floating(
                 finstack_quant_cashflows::builder::FloatingRateSpec {
+                    index_id: "USD-SOFR-3M".into(),
                     forward_curve_id: "USD-SOFR-3M".into(),
                     spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"),
                     gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),

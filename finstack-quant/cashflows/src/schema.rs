@@ -242,7 +242,7 @@ fn period_aggregation_examples() -> finstack_quant_core::Result<Vec<serde_json::
         .collect();
     let plan = finstack_quant_core::dates::build_periods("2025Q1..2026Q1", None)?;
     serialize_example(
-        &crate::aggregation::aggregate_by_period(&flows, &plan.periods)?,
+        &crate::aggregation::aggregate_by_period(&flows, plan.get_periods())?,
         "period aggregation",
     )
 }
@@ -265,7 +265,7 @@ fn schedule_build_opts_examples() -> finstack_quant_core::Result<Vec<serde_json:
 fn floating_coupon_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>> {
     let spec: crate::builder::FloatingCouponSpec = serde_json::from_value(serde_json::json!({
         "rate_spec": {
-            "forward_curve_id": "USD-SOFR-3M",
+            "index_id": "USD-SOFR-3M", "forward_curve_id": "USD-SOFR-3M",
             "spread_bp": "150",
             "reset_frequency": {"count": 3, "unit": "months"}
         },

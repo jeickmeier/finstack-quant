@@ -45,7 +45,7 @@ fn fixed_coupon_spec_rejects_unknown_field() {
 fn floating_coupon_spec_rejects_misspelled_schedule_field() {
     let json = r#"{
         "rate_spec": {
-            "forward_curve_id": "SOFR",
+            "index_id": "SOFR", "forward_curve_id": "SOFR",
             "spread_bp": "10",
             "reset_frequency": {"count": 3, "unit": "months"},
             "reset_lag_days": 0,
@@ -67,7 +67,7 @@ fn floating_coupon_spec_rejects_misspelled_schedule_field() {
 fn floating_coupon_spec_rejects_pascal_case_fallback() {
     let json = r#"{
         "rate_spec": {
-            "forward_curve_id": "SOFR",
+            "index_id": "SOFR", "forward_curve_id": "SOFR",
             "spread_bp": "10",
             "reset_frequency": {"count": 3, "unit": "months"},
             "reset_lag_days": 0,

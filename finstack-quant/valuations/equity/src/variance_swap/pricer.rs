@@ -6,6 +6,7 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_models::closed_form::bs_price_unchecked;
 use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::variance_replication::carr_madan_forward_variance;
+use finstack_quant_valuations_core::instruments::pricing::variance_observations::preceding_close;
 
 type OhlcVecs = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
 use finstack_quant_core::{
@@ -35,26 +36,8 @@ pub(crate) fn compute_pv(
     }
 
     if as_of >= final_observation_date {
-        let realized_var = if inst.realized_var_method.requires_ohlc() {
-            let (open, high, low, close) = get_historical_ohlc(inst, curves, as_of)?;
-            if close.is_empty() {
-                return Ok(Money::from((0_i64, inst.notional.currency())));
-            }
-            finstack_quant_core::math::stats::realized_variance_ohlc(
-                &open,
-                &high,
-                &low,
-                &close,
-                Some(inst.realized_var_method),
-                Some(inst.annualization_factor()),
-            )?
-        } else {
-            let prices = inst.get_historical_prices(curves, as_of)?;
-            if prices.is_empty() {
-                return Ok(Money::from((0_i64, inst.notional.currency())));
-            }
-            realized_variance(&prices, Some(inst.annualization_factor()))?
-        };
+        let realized_var =
+            realized_variance_with_factor(inst, curves, as_of, inst.annualization_factor())?;
         let df = disc.as_ref().df_between_dates(as_of, settlement_date)?;
         return inst.payoff(realized_var)?.checked_mul_f64(df);
     }
@@ -94,6 +77,9 @@ impl VarianceSwap {
     /// * `as_of` - Valuation date; observations on this date count as realized.
     pub fn seasoned_expected_variance(&self, curves: &MarketContext, as_of: Date) -> Result<f64> {
         let w = self.realized_fraction_by_observations(as_of)?;
+        if w == 0.0 {
+            return self.remaining_forward_variance(curves, as_of);
+        }
         let realized = self.partial_realized_variance(curves, as_of)?;
         if w >= 1.0 {
             return Ok(realized);
@@ -283,10 +269,10 @@ impl VarianceSwap {
 /// Load aligned OHLC histories from the market context for OHLC-based estimators.
 ///
 /// Returns `Err(Validation)` if any required series ID is missing.
-pub(crate) fn get_historical_ohlc(
+fn get_historical_ohlc(
     inst: &VarianceSwap,
     context: &MarketContext,
-    as_of: Date,
+    dates: &[Date],
 ) -> Result<OhlcVecs> {
     let default_close = inst.close_series_id();
 
@@ -311,12 +297,6 @@ pub(crate) fn get_historical_ohlc(
              realized_var_method={method_label}. Set the corresponding *_series_id field."
         ))
     })?;
-
-    let dates: Vec<Date> = inst
-        .observation_dates()?
-        .into_iter()
-        .filter(|&d| d <= as_of)
-        .collect();
 
     if dates.is_empty() {
         return Ok((vec![], vec![], vec![], vec![]));
@@ -348,7 +328,19 @@ fn realized_variance_with_factor(
     annualization_factor: f64,
 ) -> Result<f64> {
     if inst.realized_var_method.requires_ohlc() {
-        let (open, high, low, close) = get_historical_ohlc(inst, context, as_of)?;
+        let dates = inst.observation_dates()?;
+        let observed = &dates[..dates.partition_point(|date| *date <= as_of)];
+        if observed.is_empty() {
+            return Ok(0.0);
+        }
+        let (open, high, low, close) = get_historical_ohlc(inst, context, observed)?;
+        let anchor = preceding_close(
+            inst.realized_var_method,
+            inst.previous_close_date,
+            &dates,
+            context,
+            inst.close_series_id(),
+        )?;
         return finstack_quant_core::math::stats::realized_variance_ohlc(
             &open,
             &high,
@@ -356,7 +348,13 @@ fn realized_variance_with_factor(
             &close,
             Some(inst.realized_var_method),
             Some(annualization_factor),
-        );
+            anchor,
+        )?
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "insufficient target bars for contractual realized variance".into(),
+            )
+        });
     }
     let prices = inst.get_historical_prices(context, as_of)?;
     if prices.len() < 2 {
@@ -554,6 +552,72 @@ mod tests {
             assert!(message.contains("SPX-VOL"), "{message}");
             assert!(message.contains(expected), "{message}");
         }
+    }
+
+    #[test]
+    fn three_target_bars_settle_the_full_overnight_gap() {
+        use finstack_quant_core::market_data::scalars::{
+            ScalarTimeSeries, SeriesExtrapolation, SeriesInterpolation,
+        };
+        let mut swap = VarianceSwap::example().unwrap();
+        swap.discount_curve_id = "USD-OIS".into();
+        swap.start_date = date!(2025 - 01 - 05);
+        swap.maturity = date!(2025 - 01 - 08);
+        swap.realized_var_method = finstack_quant_core::math::stats::RealizedVarMethod::YangZhang;
+        swap.open_series_id = Some("bars".into());
+        swap.high_series_id = Some("bars".into());
+        swap.low_series_id = Some("bars".into());
+        swap.close_series_id = Some("bars".into());
+        let previous = date!(2025 - 01 - 03);
+        swap.previous_close_date = Some(previous);
+        let mut prices = vec![(previous, 100.0)];
+        let days = swap.observation_dates().unwrap();
+        assert_eq!(days.len(), 3);
+        prices.extend(days.iter().map(|day| (*day, 110.0)));
+        let market = build_market(swap.maturity).insert_series(
+            ScalarTimeSeries::new(
+                "bars",
+                prices,
+                None,
+                SeriesInterpolation::Step,
+                SeriesExtrapolation::Error,
+            )
+            .unwrap(),
+        );
+        let expected = 252.0 * 1.1_f64.ln().powi(2) / 3.0;
+        assert!(
+            (swap
+                .seasoned_expected_variance(&market, swap.maturity)
+                .unwrap()
+                - expected)
+                .abs()
+                < 1e-12
+        );
+        let settlement = swap.effective_settlement_date().unwrap();
+        let discount = market
+            .get_discount("USD-OIS")
+            .unwrap()
+            .df_between_dates(swap.maturity, settlement)
+            .unwrap();
+        let expected_cash = swap.payoff(expected).unwrap().amount() * discount;
+        assert!(
+            (compute_pv(&swap, &market, swap.maturity).unwrap().amount() - expected_cash).abs()
+                < 1e-7
+        );
+        assert!(swap.partial_realized_variance(&market, days[0]).is_err());
+        swap.observation_business_day_convention =
+            finstack_quant_core::dates::BusinessDayConvention::Preceding;
+        assert_eq!(swap.observation_dates().unwrap()[0], previous);
+        let error = swap
+            .seasoned_expected_variance(&market, swap.maturity)
+            .expect_err("an anchor on the first adjusted bar double-counts that close");
+        assert!(error.to_string().contains("before the first target bar"));
+        swap.previous_close_date = None;
+        assert!(compute_pv(&swap, &market, swap.maturity).is_err());
+        assert!(
+            swap.seasoned_expected_variance(&market, swap.maturity)
+                .is_err()
+        );
     }
 
     #[test]

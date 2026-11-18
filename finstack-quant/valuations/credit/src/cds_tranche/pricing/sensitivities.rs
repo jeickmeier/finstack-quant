@@ -597,8 +597,8 @@ impl CdsTranchePricer {
             let mut sorted_ids: Vec<&str> = curves.keys().map(String::as_str).collect();
             sorted_ids.sort();
             for id in sorted_ids {
-                let individual_weight = index_data.get_issuer_weight(id);
-                let recovery = index_data.get_issuer_recovery(id);
+                let individual_weight = index_data.get_issuer_weight(id)?;
+                let recovery = index_data.get_issuer_recovery(id)?;
                 impacts.push(impact_of(individual_weight * (1.0 - recovery)));
             }
         } else {

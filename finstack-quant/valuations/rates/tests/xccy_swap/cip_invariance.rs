@@ -92,6 +92,7 @@ fn build_swap(notional_exchange: NotionalExchange, spread_bp: Decimal) -> XccySw
         notional: Money::new(N_EUR_INITIAL, Currency::EUR).expect("valid money fixture"),
         side: PayReceive::Receive,
         leg: FloatLegSpec {
+            index_id: "EUR-EURIBOR-3M".into(),
             forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
             discount_curve_id: CurveId::new("EUR-OIS"),
             start,
@@ -113,6 +114,7 @@ fn build_swap(notional_exchange: NotionalExchange, spread_bp: Decimal) -> XccySw
         notional: Money::new(N_USD, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Pay,
         leg: FloatLegSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,

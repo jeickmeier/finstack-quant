@@ -89,16 +89,21 @@ pub fn ltm_window(target: PeriodId, plan: &PeriodPlan) -> crate::Result<LtmWindo
         PeriodKind::Daily => {
             let end = target_period.end;
             let start = end.add_months(-12)?;
-            let slots: Vec<PeriodId> = plan
-                .periods
-                .iter()
-                .filter(|period| period.start >= start && period.start < end)
-                .map(|period| period.id)
-                .collect();
-            let required = (end - start).whole_days();
-            let missing = u32::try_from(required - slots.len() as i64).map_err(|_| {
-                crate::Error::Validation(format!("LTM window for {target} is out of range"))
-            })?;
+            let mut slots = Vec::new();
+            let mut missing = 0;
+            let mut day = start;
+            let mut row = plan.partition_point(|period| period.start < day);
+            while day < end {
+                if let Some(period) = plan.get(row).filter(|period| period.start == day) {
+                    slots.push(period.id);
+                    row += 1;
+                } else {
+                    missing += 1;
+                }
+                day = day.next_day().ok_or_else(|| {
+                    crate::Error::Validation("daily LTM window exceeds supported dates".into())
+                })?;
+            }
             Ok(LtmWindow { slots, missing })
         }
         kind => {

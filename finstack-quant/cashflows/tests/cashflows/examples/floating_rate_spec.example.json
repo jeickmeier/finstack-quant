@@ -1,7 +1,7 @@
 {
   "schema": "finstack_quant.cashflow/1",
   "floating_rate_spec": {
-    "forward_curve_id": "USD-SOFR-3M",
+    "index_id": "USD-SOFR-3M", "forward_curve_id": "USD-SOFR-3M",
     "spread_bp": "200",
     "gearing": "1",
     "gearing_includes_spread": true,

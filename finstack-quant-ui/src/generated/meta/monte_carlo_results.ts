@@ -830,6 +830,12 @@ export default [
     "description": "Collateral substitution outflow (original collateral returned).\n\nWhen a counterparty substitutes collateral, this represents the return\nof the original collateral being replaced."
   },
   {
+    "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/27",
+    "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/27",
+    "const": "derivative_settlement",
+    "description": "Net contractual derivative payoff settled in cash without exchanging principal."
+  },
+  {
     "path": "#/$defs/d_e1f6b932463a443f4d16/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_results.schema.json#/$defs/CFKind/oneOf/3",
     "const": "fee",

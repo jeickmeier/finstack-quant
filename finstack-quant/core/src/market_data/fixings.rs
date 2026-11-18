@@ -15,7 +15,12 @@ use crate::market_data::scalars::ScalarTimeSeries;
 /// Canonical prefix for fixing series stored in MarketContext.
 pub const FIXING_PREFIX: &str = "FIXING:";
 
-fn validate_fixing_index_id(index_id: &str) -> Result<&str> {
+/// Check the identifier of a contractual observed rate before constructing a fixing key.
+///
+/// # Arguments
+///
+/// * `index_id` - Trimmed, nonempty benchmark name without the reserved FIXING prefix.
+pub fn validate_fixing_index_id(index_id: &str) -> Result<&str> {
     if index_id.trim().is_empty() || index_id.trim() != index_id {
         return Err(crate::Error::Validation(
             "Fixing index identifier must be non-empty and trimmed".into(),

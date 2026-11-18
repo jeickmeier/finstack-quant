@@ -6,15 +6,11 @@
 #![allow(dead_code, clippy::unwrap_used, clippy::expect_used)]
 
 use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::dates::DateExt;
-use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{
-    DiscountCurve, HazardCurve, RateCalibrationCurveRole, RateCalibrationMethod,
-    RateCalibrationPillar, RateCalibrationQuote, RateCalibrationRecipe,
-};
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, IndexId};
 use finstack_quant_models::types::OptionType;
 pub use finstack_quant_test_utils::assert::relative_eq;
 use finstack_quant_valuations::constants::isda::STANDARD_RECOVERY_SENIOR;
@@ -26,46 +22,7 @@ use rust_decimal::Decimal;
 
 /// Standard flat discount curve for testing
 pub fn flat_discount(id: &str, base: Date, rate: f64) -> DiscountCurve {
-    let df1 = (-rate).exp();
-    let df5 = (-rate * 5.0).exp();
-    let df10 = (-rate * 10.0).exp();
-
-    DiscountCurve::builder(id)
-        .base_date(base)
-        .knots([(0.0, 1.0), (1.0, df1), (5.0, df5), (10.0, df10)])
-        .rate_calibration(RateCalibrationRecipe {
-            currency: Currency::USD,
-            method: RateCalibrationMethod::Bootstrap,
-            curve_day_count: DayCount::Act365F,
-            ois_compounding: None,
-            role: RateCalibrationCurveRole::Discount {
-                projection_curve_id: CurveId::new(id),
-            },
-            quotes: vec![
-                RateCalibrationQuote::Deposit {
-                    index_id: IndexId::new("USD-SOFR-OIS"),
-                    pillar: RateCalibrationPillar::Tenor("1Y".parse().unwrap()),
-                    rate,
-                },
-                RateCalibrationQuote::Swap {
-                    index_id: IndexId::new("USD-SOFR-OIS"),
-                    pillar: RateCalibrationPillar::Tenor("5Y".parse().unwrap()),
-                    rate,
-                    spread_decimal: None,
-                },
-                RateCalibrationQuote::Swap {
-                    index_id: IndexId::new("USD-SOFR-OIS"),
-                    pillar: RateCalibrationPillar::Tenor("10Y".parse().unwrap()),
-                    rate,
-                    spread_decimal: None,
-                },
-            ],
-        })
-        .day_count(finstack_quant_core::dates::DayCount::Act365F)
-        .interp(finstack_quant_core::math::interp::InterpStyle::MonotoneConvex)
-        .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
-        .build()
-        .unwrap()
+    super::super::common::calibrated_discount(id, base, rate)
 }
 
 /// Standard flat hazard curve for testing

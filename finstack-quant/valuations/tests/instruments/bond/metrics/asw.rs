@@ -200,16 +200,9 @@ fn test_asw_market_tightens_when_price_rises() {
     );
 }
 
-/// The discount-ratio fallback (no forward curve) must amortize the par-par
-/// upfront over the **floating-leg** annuity, not the fixed-leg annuity:
-/// `ASW_mkt = [(C - par_rate)·Ann_fixed + (1 - p)] / Ann_float`, where the
-/// floating leg is proxied on the fixed-leg schedule with the discount
-/// curve's day count.
-///
-/// This test constructs a case where the two annuities genuinely differ
-/// (fixed leg 30/360 vs discount curve Act/360) and asserts the metric
-/// matches the hand-derived formula — and would not match the old
-/// fixed-annuity amortization.
+/// The upfront payment is amortized over the quarterly ACT/360 floating
+/// annuity. The bond pays semiannually on 30/360 and the discount curve uses
+/// ACT/365F, so substituting either other annuity changes the spread.
 #[test]
 fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
     use finstack_quant_core::dates::Schedule;
@@ -227,11 +220,10 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
     bond.instrument_pricing_overrides =
         InstrumentPricingOverrides::default().with_quoted_clean_price_pct(clean_px);
 
-    // Discount curve on Act/360 so the floating-leg proxy annuity differs
-    // from the 30/360 fixed-leg annuity.
+    bond.instrument_pricing_overrides.model_config.asw_index_id = Some("USD-SOFR-3M".into());
     let disc = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)
-        .day_count(DayCount::Act360)
+        .day_count(DayCount::Act365F)
         .knots([(0.0, 1.0), (5.0, 0.9)])
         .interp(InterpStyle::LogLinear)
         .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
@@ -283,7 +275,7 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
         .unwrap()
         .grid(finstack_quant_core::dates::GridMode::Natural)
         .unadjusted()
-        .frequency(spec.schedule.frequency)
+        .frequency(finstack_quant_core::dates::Tenor::quarterly())
         .stub_rule(finstack_quant_core::dates::StubKind::ShortBack)
         .build()
         .unwrap();
@@ -302,8 +294,8 @@ fn test_asw_market_fallback_amortizes_upfront_over_float_annuity() {
         .collect();
     let float_ann = fixed_leg_annuity(
         &disc,
-        disc.day_count(),
-        Some(spec.schedule.frequency),
+        DayCount::Act360,
+        Some(finstack_quant_core::dates::Tenor::quarterly()),
         &float_dates,
     )
     .expect("float annuity");
@@ -438,7 +430,8 @@ fn test_asw_market_metric_rejects_matured_schedule() {
 #[test]
 fn test_asw_par_with_forward_day_count_override_changes_result() {
     let as_of = date!(2025 - 01 - 15);
-    let bond = simple_fixed_bond(as_of);
+    let mut bond = simple_fixed_bond(as_of);
+    bond.instrument_pricing_overrides.model_config.asw_index_id = Some("USD-SOFR-3M".into());
     let disc = simple_discount_curve("USD-OIS", as_of);
     let fwd = simple_forward_curve("USD-SOFR-3M", as_of);
     let market = MarketContext::new().insert(disc).insert(fwd);
@@ -478,7 +471,8 @@ fn test_asw_par_with_forward_day_count_override_changes_result() {
 #[test]
 fn test_asw_market_with_forward_requires_dirty_price() {
     let as_of = date!(2025 - 01 - 15);
-    let bond = simple_fixed_bond(as_of);
+    let mut bond = simple_fixed_bond(as_of);
+    bond.instrument_pricing_overrides.model_config.asw_index_id = Some("USD-SOFR-3M".into());
     let disc = simple_discount_curve("USD-OIS", as_of);
     let fwd = simple_forward_curve("USD-SOFR-3M", as_of);
     let market = MarketContext::new().insert(disc).insert(fwd);
@@ -504,7 +498,8 @@ fn test_asw_market_with_forward_requires_dirty_price() {
 #[test]
 fn test_asw_market_with_forward_moves_with_dirty_price() {
     let as_of = date!(2025 - 01 - 15);
-    let bond = simple_fixed_bond(as_of);
+    let mut bond = simple_fixed_bond(as_of);
+    bond.instrument_pricing_overrides.model_config.asw_index_id = Some("USD-SOFR-3M".into());
     let disc = simple_discount_curve("USD-OIS", as_of);
     let fwd = simple_forward_curve("USD-SOFR-3M", as_of);
     let market = MarketContext::new().insert(disc).insert(fwd);

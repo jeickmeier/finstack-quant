@@ -74,6 +74,7 @@ FIXED_SPEC = {
 }
 FLOATING_SPEC = {
     "rate_spec": {
+        "index_id": "USD-SOFR-3M",
         "forward_curve_id": "USD-SOFR-3M",
         "spread_bp": "150",
         "reset_frequency": {"count": 3, "unit": "months"},
@@ -381,7 +382,11 @@ def _coupon_type_wire(coupon_type: CouponType) -> Any:
 def _rate_spec_field(field: str, value: Any) -> Any:
     """Wire form of a floating-rate enum without ``to_json``, read back from a spec that embeds it."""
     spec = FloatingRateSpec(
-        forward_curve_id="USD-SOFR", spread_bp="0", reset_frequency=Tenor.parse("3M"), **{field: value}
+        index_id="USD-SOFR",
+        forward_curve_id="USD-SOFR",
+        spread_bp="0",
+        reset_frequency=Tenor.parse("3M"),
+        **{field: value},
     )
     return json.loads(spec.to_json())[field]
 
@@ -577,3 +582,32 @@ def test_annual_icma_coupon_retains_contractual_february_roll(end_of_month: bool
     assert dates == ["2024-02-29" if end_of_month else "2024-02-28", "2025-02-28", "2026-02-28"]
     assert stub["accrual"]["context"]["coupon_period"] is None
     assert float(stub["amount"]["amount"]) == pytest.approx(5_000_000 * (1 + 243 / nominal_days), rel=0, abs=0.005)
+
+
+def test_historical_coupon_uses_contractual_index_after_projection_curve_replacement() -> None:
+    from finstack_quant.core.market_data import ScalarTimeSeries
+
+    snapshot = json.loads(MARKET_JSON)
+    curve = next(item for item in snapshot["curves"] if item["type"] == "forward")
+    snapshot["curves"].append({**curve, "id": "PROXY"})
+    mkt = MarketContext.from_json(json.dumps(snapshot))
+    mkt.insert_series(ScalarTimeSeries("FIXING:PROXY", [(ISSUE, 0.05)], "step", "error"))
+
+    def coupon(projection: str) -> float:
+        spec = json.loads(json.dumps(FLOATING_SPEC))
+        spec["rate_spec"].update(index_id="CONTRACT", forward_curve_id=projection, spread_bp="0")
+        schedule = (
+            CashFlowSchedule
+            .builder()
+            .principal(usd(100_000_000), ISSUE, dt.date(2025, 4, 15))
+            .floating_cf(FloatingCouponSpec.from_json(json.dumps(spec)))
+            .build_as_of(mkt, dt.date(2025, 2, 1))
+        )
+        row = next(row for row in json.loads(schedule.to_json())["flows"] if row["kind"] == "floating")
+        return float(row["amount"]["amount"])
+
+    with pytest.raises(ValueError, match="CONTRACT"):
+        coupon("PROXY")
+    mkt.insert_series(ScalarTimeSeries("FIXING:CONTRACT", [(ISSUE, 0.04)], "step", "error"))
+    for projection in (curve["id"], "PROXY"):
+        assert coupon(projection) == 1_000_000

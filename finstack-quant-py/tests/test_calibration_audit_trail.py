@@ -13,8 +13,11 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from finstack_quant.calibration import CalibrationDiagnostics, CalibrationReport, calibrate
-from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, HazardCurve
+from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, HazardCurve, MarketContext
+from finstack_quant.valuations.instruments import price_instrument
 
 GOLDEN: dict[str, Any] = json.loads((Path(__file__).parent / "data" / "calibration_wasm_parity.json").read_text())
 
@@ -106,7 +109,47 @@ def test_calibrated_discount_curve_exposes_its_rate_calibration_recipe() -> None
     assert recipe is not None
     assert recipe == json.loads(curve.to_json())["rate_calibration"]
     assert recipe["currency"] == "USD"
+    quote_ids = GOLDEN["envelope"]["plan"]["quote_sets"]["USD-OIS"]
+    assert {binding["quote_id"] for binding in recipe["execution"]["bindings"]} == set(quote_ids)
+    assert all(binding["pillar_time"] > 0.0 for binding in recipe["execution"]["bindings"])
+    assert "solver" in recipe["execution"]["calibration_config"]
+    restored = MarketContext.from_json(MarketContext().insert(curve).to_json())
+    assert restored.get_discount("USD-OIS").rate_calibration == recipe
     assert len(recipe["quotes"]) == len(GOLDEN["envelope"]["plan"]["quote_sets"]["USD-OIS"])
+
+
+def test_cds_dv01_replays_the_restored_discount_curve() -> None:
+    fixture = (
+        Path(__file__).resolve().parents[2]
+        / "finstack-quant/valuations/tests/golden/data/pricing/quantlib/cds/cds_quantlib_flat_hazard_decomposition.json"
+    )
+    case = json.loads(fixture.read_text())
+    envelope = copy.deepcopy(GOLDEN["envelope"])
+    as_of = case["metadata"]["valuation_date"]
+    step = envelope["plan"]["steps"][0]
+    step.update(base_date=as_of, curve_id="USD-FLAT-2PCT", extrapolation="extend")
+    envelope["prior_market"] = [
+        item for item in case["market"]["envelope"]["prior_market"] if item["kind"] == "hazard_curve"
+    ]
+    state = json.loads(calibrate(envelope).market.to_json())
+
+    def dv01() -> float:
+        restored = MarketContext.from_json(json.dumps(state))
+        result = price_instrument(case["instrument"], restored, as_of, model=case["model"], metrics=["dv01"])
+        return result.metrics["dv01"]
+
+    def repriced(shift: float) -> float:
+        shocked = copy.deepcopy(envelope)
+        for quote in shocked["market_data"]:
+            quote["rate"] += shift
+        market = calibrate(shocked).market
+        return price_instrument(case["instrument"], market, as_of, model=case["model"]).price
+
+    assert dv01() == pytest.approx((repriced(0.0001) - repriced(-0.0001)) / 2.0, abs=1e-6)
+    discount = next(curve for curve in state["curves"] if curve["id"] == "USD-FLAT-2PCT")
+    discount["knot_points"][-1][1] *= 0.95
+    with pytest.raises((ValueError, RuntimeError), match="source factor"):
+        dv01()
 
 
 def test_directly_built_curves_have_no_calibration_recipe() -> None:
@@ -131,9 +174,17 @@ def test_hazard_curve_exposes_its_hazard_calibration_recipe() -> None:
         ).to_json()
     )
     quote_input = {
-        "quote": {"type": "cds_par_spread", "id": "CDS-5Y"},
-        "pillar_date": "2026-01-01",
-        "pillar_time": 1.0,
+        "quote": {
+            "type": "cds_par_spread",
+            "id": "CDS-5Y",
+            "entity": "ACME",
+            "convention": {"currency": "USD", "doc_clause": "isda_na"},
+            "pillar": {"date": "2030-01-01"},
+            "spread_bp": 120.0,
+            "recovery_rate": 0.4,
+        },
+        "pillar_date": "2030-01-01",
+        "pillar_time": 5.0,
     }
     wire["hazard_calibration"] = {
         "hazard_params": {"curve_id": "RECIPE"},
@@ -144,3 +195,11 @@ def test_hazard_curve_exposes_its_hazard_calibration_recipe() -> None:
     curve = HazardCurve.from_json(json.dumps(wire))
     assert curve.hazard_calibration == wire["hazard_calibration"]
     assert curve.hazard_calibration == json.loads(curve.to_json())["hazard_calibration"]
+    market = MarketContext()
+    market.insert(curve)
+    state = json.loads(market.to_json())
+    risk = state["curves"][0]["hazard_calibration"]["spread_risk_inputs"][0]
+    risk.update(pillar_date="2035-01-01", pillar_time=10.0)
+    risk["quote"]["pillar"] = {"date": "2035-01-01"}
+    with pytest.raises(ValueError, match=r"validation|pillar"):
+        MarketContext.from_json(json.dumps(state))

@@ -451,12 +451,15 @@ fn add_ohlc_series(
         .enumerate()
         .map(|(i, &d)| (d, base_close + step * i as f64 - 8.0))
         .collect();
-    let close_prices: Vec<(Date, f64)> = obs_dates
+    let mut close_prices: Vec<(Date, f64)> = obs_dates
         .iter()
         .enumerate()
         .map(|(i, &d)| (d, base_close + step * i as f64))
         .collect();
 
+    if let Some(anchor) = swap.previous_close_date {
+        close_prices.insert(0, (anchor, base_close));
+    }
     let mk_series = |id: &str, data: Vec<(Date, f64)>| {
         ScalarTimeSeries::new(
             id,
@@ -535,7 +538,10 @@ fn test_all_ohlc_estimators_produce_positive_variance() {
         RealizedVarMethod::RogersSatchell,
         RealizedVarMethod::YangZhang,
     ] {
-        let swap = ohlc_swap(method);
+        let mut swap = ohlc_swap(method);
+        if method == RealizedVarMethod::YangZhang {
+            swap.previous_close_date = swap.start_date.previous_day();
+        }
         let ctx = add_ohlc_series(base_context(), &swap, 5_000.0, 3.0);
 
         let rv = swap.partial_realized_variance(&ctx, as_of);

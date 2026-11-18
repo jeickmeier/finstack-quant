@@ -1428,10 +1428,13 @@ export interface CoreNamespace {
    * * `annualization_factor` - Bars per year (for example `252` for daily
    *   bars); omitted selects the Rust daily default (252).
    *
-   * @returns Annualized realized variance (decimal, not volatility).
+   * * `previous_close` - Positive finite close immediately preceding the first bar for Yang-Zhang and close-to-close. Range estimators require omission.
+   *
+   * @param previousClose - Closing price immediately before the first target bar, required for close-to-close and Yang-Zhang and omitted otherwise.
+   * @returns Annualized variance in decimal units, or `undefined` for a valid empty window or fewer than two Yang-Zhang bars.
    * @throws `TypeError` for a mistyped argument; `FinstackError` (kind
    * `validation`) for an unknown method, series of different lengths, an
-   * invalid bar, or a non-positive annualization factor.
+   * missing or inappropriate preceding close, invalid bar, or a non-positive annualization factor.
    * @param open - Opening prices, one per bar.
    * @param high - High prices, one per bar.
    * @param low - Low prices, one per bar.

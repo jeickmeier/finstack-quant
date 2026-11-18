@@ -233,6 +233,7 @@ export type DA33B682660A7Dfa1Ea09 =
        * Strictly increasing `(time_years, cpi_level)` pillars starting at `0.0`.
        */
       knot_points: [number, number][];
+      series?: DF411B3891Ba92Dd52290 | null;
       type: "inflation";
     }
   | {
@@ -958,7 +959,7 @@ export interface D_4Ad1B3E6968748946Cee {
   recovery_rate: number;
 }
 /**
- * Typed conventions required to replay a rate-curve calibration.
+ * Benchmark conventions and quotes associated with a rate curve.
  */
 export interface D_17Ffcd7842A3F40268B1 {
   /**
@@ -1145,6 +1146,10 @@ export interface D_17Ffcd7842A3F40268B1 {
     | "act_act_afb"
     | "bus_252";
   /**
+   * Original execution evidence. A transcribed benchmark list has no qualified replay.
+   */
+  execution?: D_6435Ec92A8Bbd1A2E4Bc | null;
+  /**
    * Numerical calibration method.
    */
   method:
@@ -1188,6 +1193,48 @@ export interface D_17Ffcd7842A3F40268B1 {
           [k: string]: unknown;
         };
       };
+}
+/**
+ * Executed evaluator, resolved instruments and original outcome of a rate calibration.
+ */
+export interface D_6435Ec92A8Bbd1A2E4Bc {
+  /**
+   * Whether the original fit passed its recorded acceptance policy.
+   */
+  accepted: boolean;
+  /**
+   * Resolved quote identities and maturities, in input order.
+   */
+  bindings: D_15E86D33B70E6065D029[];
+  /**
+   * Solver controls and residual acceptance thresholds used by the evaluator.
+   */
+  calibration_config: {
+    [k: string]: unknown;
+  };
+  /**
+   * Discount or projection evaluator parameters, including pricing dependencies.
+   */
+  step_params: {
+    [k: string]: unknown;
+  };
+}
+/**
+ * Identity and resolved maturity of a quote in its original evaluator.
+ */
+export interface D_15E86D33B70E6065D029 {
+  /**
+   * Contractual maturity resolved using the instrument conventions.
+   */
+  pillar_date: string;
+  /**
+   * Curve-clock year fraction at the resolved maturity.
+   */
+  pillar_time: number;
+  /**
+   * Original stable market quote identifier.
+   */
+  quote_id: string;
 }
 /**
  * A parsed tenor representing a time period.
@@ -1363,6 +1410,23 @@ export interface D_8C12E8F6A6Ead66335D4 {
    * Original `(time_years, hazard_rate)` pillars from `base_date`.
    */
   knot_points: [number, number][];
+}
+/**
+ * Publication identity and units of an observed or projected inflation level.
+ */
+export interface DF411B3891Ba92Dd52290 {
+  /**
+   * Published reference period and index scale, for example `1982-84=100`.
+   */
+  reference_base: string;
+  /**
+   * True for seasonally adjusted levels and false for unadjusted levels.
+   */
+  seasonally_adjusted: boolean;
+  /**
+   * Publisher-qualified identifier of the statistical series.
+   */
+  series_id: string;
 }
 /**
  * A flat function representation: repeated shocks merge on a breakpoint union
@@ -2444,6 +2508,7 @@ export interface DE771E792357014C84Cb9 {
    * Strictly ascending canonical monthly fixing observations.
    */
   observations: D_5C1Ce413Ed4344Df4437[];
+  series?: DF411B3891Ba92Dd52290 | null;
 }
 /**
  * One expected-release schedule assumption for a monthly CPI/RPI reference period.

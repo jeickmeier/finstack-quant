@@ -131,18 +131,30 @@ impl HazardCalibrationRecipe {
                 self.spread_risk_inputs.len()
             )));
         }
-        for (index, (calibration, risk)) in self
-            .calibration_inputs
-            .iter()
-            .zip(&self.spread_risk_inputs)
-            .enumerate()
-        {
-            if quote_id(&calibration.quote).is_empty()
-                || quote_id(&calibration.quote) != quote_id(&risk.quote)
+        let mut seen = std::collections::BTreeSet::new();
+        for (calibration, risk) in self.calibration_inputs.iter().zip(&self.spread_risk_inputs) {
+            let id = quote_id(&calibration.quote);
+            if id != quote_id(&risk.quote) || !seen.insert(id) {
+                return Err(crate::Error::Validation(format!(
+                    "hazard replay quote ID mismatch or duplicate: {id}"
+                )));
+            }
+            if calibration.pillar_date != risk.pillar_date
+                || calibration.pillar_time.total_cmp(&risk.pillar_time) != Ordering::Equal
             {
                 return Err(crate::Error::Validation(format!(
-                    "hazard replay quote ID mismatch at index {index}"
+                    "hazard replay pillar mismatch for '{id}'"
                 )));
+            }
+            for field in ["entity", "convention", "pillar", "recovery_rate"] {
+                let original = calibration.quote.get(field);
+                if original.is_none_or(serde_json::Value::is_null)
+                    || original != risk.quote.get(field)
+                {
+                    return Err(crate::Error::Validation(format!(
+                        "hazard replay contract mismatch or missing {field} for '{id}'"
+                    )));
+                }
             }
         }
         Ok(())
@@ -223,9 +235,40 @@ mod tests {
 
     fn input(id: &str, pillar_date: &str, pillar_time: f64) -> HazardCalibrationInput {
         HazardCalibrationInput {
-            quote: serde_json::json!({"id": id, "type": "cds_par_spread"}),
+            quote: serde_json::json!({"id": id, "type": "cds_par_spread", "entity":"ACME", "convention":{"currency":"USD","doc_clause":"isda_na"}, "recovery_rate":0.4, "spread_bp":120.0, "pillar":{"date":pillar_date}}),
             pillar_date: crate::dates::parse_iso_date(pillar_date).expect("valid pillar date"),
             pillar_time,
+        }
+    }
+
+    #[test]
+    fn spread_risk_quote_must_reference_the_same_cds_contract() {
+        let source = input("ACME", "2030-03-20", 5.0);
+        let mut longer = input("ACME", "2035-03-20", 10.0);
+        let recipe = |risk| {
+            HazardCalibrationRecipe::new(
+                serde_json::json!({"curve_id":"ACME-HZD"}),
+                vec![source.clone()],
+                vec![risk],
+                serde_json::json!({}),
+            )
+        };
+        assert!(recipe(source.clone()).is_ok());
+        assert!(recipe(longer.clone()).is_err());
+        longer.pillar_date = source.pillar_date;
+        longer.pillar_time = source.pillar_time;
+        assert!(recipe(longer).is_err());
+        for (field, value) in [
+            ("entity", serde_json::json!("OTHER")),
+            ("recovery_rate", serde_json::json!(0.2)),
+            (
+                "convention",
+                serde_json::json!({"currency":"EUR","doc_clause":"isda_na"}),
+            ),
+        ] {
+            let mut risk = source.clone();
+            risk.quote[field] = value;
+            assert!(recipe(risk).is_err());
         }
     }
 
@@ -263,24 +306,24 @@ mod tests {
             "hazard_params": {"curve_id": "ACME-HZD"},
             "calibration_inputs": [
                 {
-                    "quote": {"id": "CDS-1Y-A", "type": "cds_par_spread"},
+                    "quote": {"id": "CDS-1Y-A", "type": "cds_par_spread", "entity":"ACME", "convention":{"currency":"USD","doc_clause":"isda_na"}, "recovery_rate":0.4, "spread_bp":120.0, "pillar":{"date":"2026-03-20"}},
                     "pillar_date": "2026-03-20",
                     "pillar_time": 1.0
                 },
                 {
-                    "quote": {"id": "CDS-5Y", "type": "cds_par_spread"},
+                    "quote": {"id": "CDS-5Y", "type": "cds_par_spread", "entity":"ACME", "convention":{"currency":"USD","doc_clause":"isda_na"}, "recovery_rate":0.4, "spread_bp":120.0, "pillar":{"date":"2030-03-20"}},
                     "pillar_date": "2030-03-20",
                     "pillar_time": 5.0
                 }
             ],
             "spread_risk_inputs": [
                 {
-                    "quote": {"id": "CDS-1Y-A", "type": "cds_par_spread"},
+                    "quote": {"id": "CDS-1Y-A", "type": "cds_par_spread", "entity":"ACME", "convention":{"currency":"USD","doc_clause":"isda_na"}, "recovery_rate":0.4, "spread_bp":120.0, "pillar":{"date":"2026-03-20"}},
                     "pillar_date": "2026-03-20",
                     "pillar_time": 1.0
                 },
                 {
-                    "quote": {"id": "CDS-5Y", "type": "cds_par_spread"},
+                    "quote": {"id": "CDS-5Y", "type": "cds_par_spread", "entity":"ACME", "convention":{"currency":"USD","doc_clause":"isda_na"}, "recovery_rate":0.4, "spread_bp":120.0, "pillar":{"date":"2030-03-20"}},
                     "pillar_date": "2030-03-20",
                     "pillar_time": 5.0
                 }

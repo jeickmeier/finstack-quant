@@ -11,7 +11,9 @@ fn test_model_spec_add_node() {
     use finstack_quant_core::dates::build_periods;
     use finstack_quant_statements::types::{FinancialModelSpec, NodeSpec};
 
-    let periods = build_periods("2025Q1..2025Q2", None).unwrap().periods;
+    let periods = build_periods("2025Q1..2025Q2", None)
+        .unwrap()
+        .into_periods();
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -33,7 +35,9 @@ fn test_model_spec_get_node_mut() {
     use finstack_quant_core::dates::build_periods;
     use finstack_quant_statements::types::{FinancialModelSpec, NodeSpec};
 
-    let periods = build_periods("2025Q1..2025Q2", None).unwrap().periods;
+    let periods = build_periods("2025Q1..2025Q2", None)
+        .unwrap()
+        .into_periods();
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -62,7 +66,9 @@ fn test_model_spec_get_node_immutable() {
     use finstack_quant_core::dates::build_periods;
     use finstack_quant_statements::types::{FinancialModelSpec, NodeSpec};
 
-    let periods = build_periods("2025Q1..2025Q2", None).unwrap().periods;
+    let periods = build_periods("2025Q1..2025Q2", None)
+        .unwrap()
+        .into_periods();
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -85,7 +91,9 @@ fn test_model_spec_has_node() {
     use finstack_quant_core::dates::build_periods;
     use finstack_quant_statements::types::{FinancialModelSpec, NodeSpec};
 
-    let periods = build_periods("2025Q1..2025Q2", None).unwrap().periods;
+    let periods = build_periods("2025Q1..2025Q2", None)
+        .unwrap()
+        .into_periods();
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -109,7 +117,9 @@ fn test_model_spec_get_node_none() {
     use finstack_quant_core::dates::build_periods;
     use finstack_quant_statements::types::FinancialModelSpec;
 
-    let periods = build_periods("2025Q1..2025Q2", None).unwrap().periods;
+    let periods = build_periods("2025Q1..2025Q2", None)
+        .unwrap()
+        .into_periods();
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(
@@ -540,7 +550,9 @@ fn test_financial_model_nodes_keyed_by_node_id() {
     use finstack_quant_core::dates::build_periods;
     use finstack_quant_statements::types::{FinancialModelSpec, NodeId, NodeSpec, NodeType};
 
-    let periods = build_periods("2025Q1..2025Q1", None).unwrap().periods;
+    let periods = build_periods("2025Q1..2025Q1", None)
+        .unwrap()
+        .into_periods();
     let mut model = FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(

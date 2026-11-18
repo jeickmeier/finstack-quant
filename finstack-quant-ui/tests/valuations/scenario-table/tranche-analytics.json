@@ -4255,7 +4255,7 @@
     {
       "name": "floating",
       "source": "finstack-quant/valuations/tests/golden/data/pricing/regression_goldens/structured_credit/clo_mezzanine_base_case.json",
-      "sha256": "4ff2bac91fcad1aa63daf621a41d5df4d923b5a8e348f77b9cbe55997e0fa81b",
+      "sha256": "b30c2bf458569a09942f0fe751996febdfa81f64aa8503e7789db01f4c8104fe",
       "asOf": "2026-04-30",
       "trancheId": "SENIOR",
       "marketPricePct": 25,
@@ -4442,6 +4442,7 @@
                   },
                   "coupon": {
                     "floating": {
+                      "index_id": "SOFR-3M",
                       "forward_curve_id": "SOFR-3M",
                       "spread_bp": "150",
                       "gearing": "1",
@@ -4694,6 +4695,140 @@
             "interp_style": "log_linear",
             "extrapolation": "extend",
             "rate_calibration": {
+              "execution": {
+                "bindings": [
+                  {
+                    "quote_id": "USD-SOFR-3M-IRS-3M",
+                    "pillar_date": "2026-08-04",
+                    "pillar_time": 0.26301369863013696
+                  },
+                  {
+                    "quote_id": "USD-SOFR-3M-IRS-6M",
+                    "pillar_date": "2026-11-04",
+                    "pillar_time": 0.5150684931506849
+                  },
+                  {
+                    "quote_id": "USD-SOFR-3M-IRS-1Y",
+                    "pillar_date": "2027-05-04",
+                    "pillar_time": 1.010958904109589
+                  },
+                  {
+                    "quote_id": "USD-SOFR-3M-IRS-2Y",
+                    "pillar_date": "2028-05-04",
+                    "pillar_time": 2.0136986301369864
+                  },
+                  {
+                    "quote_id": "USD-SOFR-3M-IRS-3Y",
+                    "pillar_date": "2029-05-04",
+                    "pillar_time": 3.0136986301369864
+                  },
+                  {
+                    "quote_id": "USD-SOFR-3M-IRS-5Y",
+                    "pillar_date": "2031-05-05",
+                    "pillar_time": 5.016438356164383
+                  },
+                  {
+                    "quote_id": "USD-SOFR-3M-IRS-7Y",
+                    "pillar_date": "2033-05-04",
+                    "pillar_time": 7.016438356164383
+                  },
+                  {
+                    "quote_id": "USD-SOFR-3M-IRS-10Y",
+                    "pillar_date": "2036-05-05",
+                    "pillar_time": 10.021917808219179
+                  }
+                ],
+                "step_params": {
+                  "base_date": "2026-04-30",
+                  "conventions": {
+                    "curve_day_count": "act_365f",
+                    "ois_compounding": null
+                  },
+                  "currency": "USD",
+                  "curve_id": "SOFR-3M",
+                  "discount_curve_id": "USD-SOFR-DISC",
+                  "extrapolation": "extend",
+                  "index_tenor": {
+                    "count": 3,
+                    "unit": "months"
+                  },
+                  "interpolation": "log_linear",
+                  "kind": "forward",
+                  "method": {
+                    "global_solve": {
+                      "use_analytical_jacobian": false
+                    }
+                  }
+                },
+                "calibration_config": {
+                  "compute_diagnostics": false,
+                  "discount_curve": {
+                    "allow_non_monotonic_final": null,
+                    "bootstrap_seed_global_solve": true,
+                    "df_hard_max": 1000000,
+                    "df_hard_min": 1e-12,
+                    "jacobian_step_size": 0.000001,
+                    "min_scan_grid_points": 20,
+                    "scan_grid_points": 48,
+                    "scan_grid_step": 0.0001,
+                    "validation_tolerance": 1e-8,
+                    "weighting_scheme": "sqrt_time"
+                  },
+                  "fail_on_bad_fit": true,
+                  "forward_curve": {
+                    "validation_tolerance": 1e-8,
+                    "weighting_scheme": "sqrt_time"
+                  },
+                  "fx": {
+                    "cache_capacity": 256,
+                    "pivot_currency": "USD"
+                  },
+                  "hazard_curve": {
+                    "hazard_hard_max": 10,
+                    "hazard_hard_min": 0,
+                    "validation_tolerance": 1e-8,
+                    "weighting_scheme": "sqrt_time"
+                  },
+                  "inflation_curve": {
+                    "cpi_hard_max": 10000,
+                    "cpi_hard_min": 1,
+                    "validation_tolerance": 1e-8,
+                    "weighting_scheme": "sqrt_time"
+                  },
+                  "rate_bounds": {
+                    "max_rate": 0.5,
+                    "min_rate": -0.02
+                  },
+                  "rate_bounds_policy": "auto_currency",
+                  "solver": {
+                    "max_iterations": 100,
+                    "tolerance": 1e-12
+                  },
+                  "use_parallel": false,
+                  "validation": {
+                    "allow_negative_rates": false,
+                    "check_arbitrage": true,
+                    "check_forward_positivity": true,
+                    "check_monotonicity": true,
+                    "max_cpi_growth": 0.5,
+                    "max_forward_rate": 0.5,
+                    "max_fwd_inflation": 0.5,
+                    "max_hazard_rate": 0.5,
+                    "max_volatility": 5,
+                    "min_cpi_growth": -0.1,
+                    "min_forward_rate": -0.01,
+                    "min_fwd_inflation": -0.2,
+                    "minimum_lgd_for_hazard_guess": 0.000001,
+                    "recovery_rate_abs_tolerance": 1e-12,
+                    "tolerance": 1e-10
+                  },
+                  "validation_mode": "error",
+                  "vol_surface": {
+                    "validation_tolerance": 0.001
+                  }
+                },
+                "accepted": true
+              },
               "currency": "USD",
               "method": {
                 "global_solve": {
@@ -4839,6 +4974,157 @@
             "interp_style": "log_linear",
             "extrapolation": "extend",
             "rate_calibration": {
+              "execution": {
+                "bindings": [
+                  {
+                    "quote_id": "USD-SOFR-OIS-DEP-1W",
+                    "pillar_date": "2026-05-11",
+                    "pillar_time": 0.030136986301369864
+                  },
+                  {
+                    "quote_id": "USD-SOFR-OIS-DEP-2W",
+                    "pillar_date": "2026-05-18",
+                    "pillar_time": 0.049315068493150684
+                  },
+                  {
+                    "quote_id": "USD-SOFR-OIS-DEP-3W",
+                    "pillar_date": "2026-05-26",
+                    "pillar_time": 0.07123287671232877
+                  },
+                  {
+                    "quote_id": "USD-SOFR-OIS-SWP-1M",
+                    "pillar_date": "2026-06-08",
+                    "pillar_time": 0.10684931506849316
+                  },
+                  {
+                    "quote_id": "USD-SOFR-OIS-SWP-3M",
+                    "pillar_date": "2026-08-06",
+                    "pillar_time": 0.2684931506849315
+                  },
+                  {
+                    "quote_id": "USD-SOFR-OIS-SWP-6M",
+                    "pillar_date": "2026-11-06",
+                    "pillar_time": 0.5205479452054794
+                  },
+                  {
+                    "quote_id": "USD-SOFR-OIS-SWP-1Y",
+                    "pillar_date": "2027-05-06",
+                    "pillar_time": 1.0164383561643835
+                  },
+                  {
+                    "quote_id": "USD-SOFR-OIS-SWP-2Y",
+                    "pillar_date": "2028-05-08",
+                    "pillar_time": 2.0246575342465754
+                  },
+                  {
+                    "quote_id": "USD-SOFR-OIS-SWP-3Y",
+                    "pillar_date": "2029-05-08",
+                    "pillar_time": 3.0246575342465754
+                  },
+                  {
+                    "quote_id": "USD-SOFR-OIS-SWP-5Y",
+                    "pillar_date": "2031-05-07",
+                    "pillar_time": 5.021917808219178
+                  },
+                  {
+                    "quote_id": "USD-SOFR-OIS-SWP-7Y",
+                    "pillar_date": "2033-05-06",
+                    "pillar_time": 7.021917808219178
+                  },
+                  {
+                    "quote_id": "USD-SOFR-OIS-SWP-10Y",
+                    "pillar_date": "2036-05-07",
+                    "pillar_time": 10.027397260273972
+                  }
+                ],
+                "step_params": {
+                  "base_date": "2026-04-30",
+                  "conventions": {
+                    "curve_day_count": "act_365f",
+                    "ois_compounding": {
+                      "compounded_with_rate_cutoff": {
+                        "cutoff_days": 1
+                      }
+                    }
+                  },
+                  "currency": "USD",
+                  "curve_id": "USD-SOFR-DISC",
+                  "extrapolation": "extend",
+                  "interpolation": "log_linear",
+                  "kind": "discount",
+                  "method": "bootstrap",
+                  "pricing_discount_id": null,
+                  "pricing_forward_id": null
+                },
+                "calibration_config": {
+                  "compute_diagnostics": false,
+                  "discount_curve": {
+                    "allow_non_monotonic_final": null,
+                    "bootstrap_seed_global_solve": true,
+                    "df_hard_max": 1000000,
+                    "df_hard_min": 1e-12,
+                    "jacobian_step_size": 0.000001,
+                    "min_scan_grid_points": 20,
+                    "scan_grid_points": 48,
+                    "scan_grid_step": 0.0001,
+                    "validation_tolerance": 1e-8,
+                    "weighting_scheme": "sqrt_time"
+                  },
+                  "fail_on_bad_fit": true,
+                  "forward_curve": {
+                    "validation_tolerance": 1e-8,
+                    "weighting_scheme": "sqrt_time"
+                  },
+                  "fx": {
+                    "cache_capacity": 256,
+                    "pivot_currency": "USD"
+                  },
+                  "hazard_curve": {
+                    "hazard_hard_max": 10,
+                    "hazard_hard_min": 0,
+                    "validation_tolerance": 1e-8,
+                    "weighting_scheme": "sqrt_time"
+                  },
+                  "inflation_curve": {
+                    "cpi_hard_max": 10000,
+                    "cpi_hard_min": 1,
+                    "validation_tolerance": 1e-8,
+                    "weighting_scheme": "sqrt_time"
+                  },
+                  "rate_bounds": {
+                    "max_rate": 0.5,
+                    "min_rate": -0.02
+                  },
+                  "rate_bounds_policy": "auto_currency",
+                  "solver": {
+                    "max_iterations": 100,
+                    "tolerance": 1e-12
+                  },
+                  "use_parallel": false,
+                  "validation": {
+                    "allow_negative_rates": false,
+                    "check_arbitrage": true,
+                    "check_forward_positivity": true,
+                    "check_monotonicity": true,
+                    "max_cpi_growth": 0.5,
+                    "max_forward_rate": 0.5,
+                    "max_fwd_inflation": 0.5,
+                    "max_hazard_rate": 0.5,
+                    "max_volatility": 5,
+                    "min_cpi_growth": -0.1,
+                    "min_forward_rate": -0.01,
+                    "min_fwd_inflation": -0.2,
+                    "minimum_lgd_for_hazard_guess": 0.000001,
+                    "recovery_rate_abs_tolerance": 1e-12,
+                    "tolerance": 1e-10
+                  },
+                  "validation_mode": "error",
+                  "vol_surface": {
+                    "validation_tolerance": 0.001
+                  }
+                },
+                "accepted": true
+              },
               "currency": "USD",
               "method": "bootstrap",
               "curve_day_count": "act_365f",

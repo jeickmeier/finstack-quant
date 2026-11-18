@@ -707,12 +707,6 @@ impl PyCorrelatedBernoulli {
         self.inner.correlation()
     }
 
-    #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.requested_correlation")]
-    #[getter]
-    fn requested_correlation(&self) -> f64 {
-        self.inner.requested_correlation()
-    }
-
     #[doc = pydoc!("finstack_quant.models.correlation", "CorrelatedBernoulli.joint_p11")]
     #[getter]
     fn joint_p11(&self) -> f64 {

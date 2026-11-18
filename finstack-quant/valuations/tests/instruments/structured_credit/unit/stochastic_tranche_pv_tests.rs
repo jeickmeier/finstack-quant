@@ -69,6 +69,7 @@ fn pool(balance: f64) -> AssetPool {
 fn two_tranches(floating_senior: bool) -> TrancheStructure {
     let senior_coupon = if floating_senior {
         RateSpec::Floating(FloatingRateSpec {
+            index_id: "SOFR-3M".into(),
             forward_curve_id: CurveId::new("SOFR-3M"),
             spread_bp: rust_decimal_macros::dec!(150),
             gearing: rust_decimal_macros::dec!(1),

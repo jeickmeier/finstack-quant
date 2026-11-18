@@ -65,7 +65,7 @@ impl VolSource {
                 tenor,
             )?,
             Self::Cube(cube) => {
-                let (params, _, _) = cube_params(cube, expiry, tenor);
+                let (params, _, _) = cube_params(cube, expiry, tenor)?;
                 params.quote_convention()
             }
             Self::FxDelta(_) => VolatilityConvention::Lognormal,
@@ -560,25 +560,32 @@ fn interpolate_surface(
     }
 }
 
-fn cube_params(cube: &VolCube, expiry: f64, tenor: f64) -> (SabrParameters, f64, f64) {
+fn cube_params(cube: &VolCube, expiry: f64, tenor: f64) -> Result<(SabrParameters, f64, f64)> {
     let expiry = expiry.clamp(
         cube.expiries()[0],
         cube.expiries()[cube.expiries().len() - 1],
     );
     let tenor = tenor.clamp(cube.tenors()[0], cube.tenors()[cube.tenors().len() - 1]);
-    let (e0, e1, t) = segment(cube.expiries(), expiry).unwrap_or((0, 0, 0.0));
-    let (n0, n1, u) = segment(cube.tenors(), tenor).unwrap_or((0, 0, 0.0));
+    let (e0, e1, t) = segment(cube.expiries(), expiry)?;
+    let (n0, n1, u) = segment(cube.tenors(), tenor)?;
     let columns = cube.tenors().len();
     let index = |e: usize, n: usize| e * columns + n;
     let p00 = &cube.params()[index(e0, n0)];
     let p10 = &cube.params()[index(e1, n0)];
     let p01 = &cube.params()[index(e0, n1)];
     let p11 = &cube.params()[index(e1, n1)];
-    let nearest = index(
-        if t <= 0.5 { e0 } else { e1 },
-        if u <= 0.5 { n0 } else { n1 },
-    );
-    let nearest_params = &cube.params()[nearest];
+    // segment collapses exact coordinates to one index, so these corners
+    // reference only the nodes that contribute at this expiry and tenor.
+    let beta = p00.beta();
+    if [p10, p01, p11]
+        .iter()
+        .any(|node| node.beta().partial_cmp(&beta) != Some(std::cmp::Ordering::Equal))
+    {
+        return Err(Error::Validation(format!(
+            "SABR cube '{}' cannot interpolate different beta values at expiry {expiry}, tenor {tenor}",
+            cube.id()
+        )));
+    }
     let shifts = [p00.shift(), p10.shift(), p01.shift(), p11.shift()];
     let shift = shifts.iter().any(Option::is_some).then(|| {
         bilinear(
@@ -591,10 +598,10 @@ fn cube_params(cube: &VolCube, expiry: f64, tenor: f64) -> (SabrParameters, f64,
         )
     });
     let params = SabrParameters {
-        alpha: bilinear(p00.alpha(), p10.alpha(), p01.alpha(), p11.alpha(), t, u).max(1e-8),
-        beta: nearest_params.beta().clamp(0.0, 1.0),
+        alpha: bilinear(p00.alpha(), p10.alpha(), p01.alpha(), p11.alpha(), t, u),
+        beta,
         nu: bilinear(p00.nu(), p10.nu(), p01.nu(), p11.nu(), t, u),
-        rho: bilinear(p00.rho(), p10.rho(), p01.rho(), p11.rho(), t, u).clamp(-0.9999, 0.9999),
+        rho: bilinear(p00.rho(), p10.rho(), p01.rho(), p11.rho(), t, u),
         shift,
     };
     let forward = bilinear(
@@ -605,7 +612,7 @@ fn cube_params(cube: &VolCube, expiry: f64, tenor: f64) -> (SabrParameters, f64,
         t,
         u,
     );
-    (params, forward, expiry)
+    Ok((params, forward, expiry))
 }
 
 fn cube_vol(cube: &VolCube, expiry: f64, tenor: f64, strike: f64, normal: bool) -> Result<f64> {
@@ -614,7 +621,7 @@ fn cube_vol(cube: &VolCube, expiry: f64, tenor: f64, strike: f64, normal: bool) 
             "strike must be finite".to_string(),
         ));
     }
-    let (params, forward, model_expiry) = cube_params(cube, expiry, tenor);
+    let (params, forward, model_expiry) = cube_params(cube, expiry, tenor)?;
     if normal {
         params.implied_vol_normal(forward, strike, model_expiry)
     } else {
@@ -703,7 +710,9 @@ pub fn get_cube_vol_clamped(
     );
     let tenor = tenor.clamp(cube.tenors()[0], cube.tenors()[cube.tenors().len() - 1]);
     if normal {
-        let (params, forward, _) = cube_params(cube, expiry, tenor);
+        let Ok((params, forward, _)) = cube_params(cube, expiry, tenor) else {
+            return f64::NAN;
+        };
         let shift = params.shift.unwrap_or(0.0);
         if params.quote_convention() != VolatilityConvention::Normal
             && (forward + shift <= 0.0 || strike + shift <= 0.0)
@@ -795,8 +804,8 @@ fn materialize_cube_tenor_slice_with_convention(
     let shifts: Vec<Option<f64>> = cube
         .expiries()
         .iter()
-        .map(|&expiry| cube_params(cube, expiry, tenor).0.shift)
-        .collect();
+        .map(|&expiry| cube_params(cube, expiry, tenor).map(|(params, _, _)| params.shift))
+        .collect::<Result<_>>()?;
     let displacements = shifts.iter().any(Option::is_some).then(|| {
         shifts
             .iter()
@@ -880,8 +889,8 @@ fn materialize_cube_expiry_slice_with_convention(
     let shifts: Vec<Option<f64>> = cube
         .tenors()
         .iter()
-        .map(|&tenor| cube_params(cube, expiry, tenor).0.shift)
-        .collect();
+        .map(|&tenor| cube_params(cube, expiry, tenor).map(|(params, _, _)| params.shift))
+        .collect::<Result<_>>()?;
     let displacements = (!normal && shifts.iter().any(Option::is_some)).then(|| {
         shifts
             .into_iter()
@@ -972,6 +981,9 @@ fn cube_total_variance(
     normal: bool,
 ) -> Result<f64> {
     let (e0, e1, weight) = segment(cube.expiries(), expiry)?;
+    if e0 != e1 {
+        cube_params(cube, expiry, tenor)?;
+    }
     let t0 = cube.expiries()[e0];
     let t1 = cube.expiries()[e1];
     let v0 = cube_vol(cube, t0, tenor, strike, normal)?;

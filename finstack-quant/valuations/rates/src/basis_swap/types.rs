@@ -62,6 +62,7 @@ use finstack_quant_valuations_core::instruments::FloatLegSpec;
 /// let end = Date::from_calendar_date(2025, Month::January, 3).expect("valid date");
 ///
 /// let primary_leg = FloatLegSpec {
+///     index_id: "3M-SOFR".into(),
 ///     forward_curve_id: CurveId::new("3M-SOFR"),
 ///     discount_curve_id: CurveId::new("OIS"),
 ///     start,
@@ -80,6 +81,7 @@ use finstack_quant_valuations_core::instruments::FloatLegSpec;
 /// };
 ///
 /// let reference_leg = FloatLegSpec {
+///     index_id: "6M-SOFR".into(),
 ///     forward_curve_id: CurveId::new("6M-SOFR"),
 ///     discount_curve_id: CurveId::new("OIS"),
 ///     start,
@@ -247,11 +249,11 @@ impl BasisSwap {
         self.resolve_leg_calendar("primary", &self.primary_leg)?;
         self.resolve_leg_calendar("reference", &self.reference_leg)?;
         finstack_quant_valuations_core::instruments::pricing::overnight_conventions::reject_simple_overnight(
-            self.primary_leg.forward_curve_id.as_str(),
+            self.primary_leg.index_id.as_str(),
             &self.primary_leg.compounding,
         )?;
         finstack_quant_valuations_core::instruments::pricing::overnight_conventions::reject_simple_overnight(
-            self.reference_leg.forward_curve_id.as_str(),
+            self.reference_leg.index_id.as_str(),
             &self.reference_leg.compounding,
         )?;
         Ok(())
@@ -277,6 +279,7 @@ impl BasisSwap {
         let primary_leg = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -295,6 +298,7 @@ impl BasisSwap {
         let reference_leg = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-1M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -436,7 +440,7 @@ impl BasisSwap {
 
         let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
             market,
-            leg.forward_curve_id.as_str(),
+            leg.index_id.as_str(),
         )
         .ok();
 
@@ -455,7 +459,7 @@ impl BasisSwap {
                 finstack_quant_cashflows::builder::observed_index_fixing(
                     reset_date,
                     fixings,
-                    leg.forward_curve_id.as_str(),
+                    leg.index_id.as_str(),
                     as_of,
                 )? {
                 fixing
@@ -526,7 +530,7 @@ impl BasisSwap {
         let overnight_fixings = if overnight {
             finstack_quant_core::market_data::fixings::get_fixing_series(
                 market,
-                leg.forward_curve_id.as_str(),
+                leg.index_id.as_str(),
             )
             .ok()
         } else {
@@ -617,7 +621,7 @@ impl BasisSwap {
         let fwd = market.get_forward(&leg.forward_curve_id)?;
         let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
             market,
-            leg.forward_curve_id.as_str(),
+            leg.index_id.as_str(),
         )
         .ok();
         let spread_bp = leg.spread_bp.as_f64();
@@ -641,7 +645,7 @@ impl BasisSwap {
             };
             projected_fixings.extend(projection.observation_exposures.iter().map(|observation| {
                 finstack_quant_cashflows::fixings::ProjectedFixing {
-                    series_id: fixing_series_id(leg.forward_curve_id.as_str()),
+                    series_id: fixing_series_id(leg.index_id.as_str()),
                     date: observation.observation_start,
                     value: Some(observation.projected_rate),
                 }
@@ -719,7 +723,7 @@ fn project_overnight_period(
     project_overnight_coupon(OvernightCouponProjectionInput {
         curve: OvernightProjectionCurve::Forward(fwd),
         fixings,
-        fixing_id: leg.forward_curve_id.as_str(),
+        fixing_id: leg.index_id.as_str(),
         as_of,
         accrual_start,
         accrual_end,
@@ -758,10 +762,10 @@ impl finstack_quant_valuations_core::instruments::Instrument for BasisSwap {
         deps.add_forward_curve(self.primary_leg.forward_curve_id.clone());
         deps.add_forward_curve(self.reference_leg.forward_curve_id.clone());
         deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
-            self.primary_leg.forward_curve_id.as_str(),
+            self.primary_leg.index_id.as_str(),
         ));
         deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
-            self.reference_leg.forward_curve_id.as_str(),
+            self.reference_leg.index_id.as_str(),
         ));
         Ok(deps)
     }
@@ -870,6 +874,7 @@ mod tests {
         let primary_leg = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "3M-SOFR".into(),
             forward_curve_id: CurveId::new("3M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: start_date,
@@ -888,6 +893,7 @@ mod tests {
         let reference_leg = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "6M-SOFR".into(),
             forward_curve_id: CurveId::new("6M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: start_date,
@@ -963,6 +969,7 @@ mod tests {
         let primary_leg = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "3M-SOFR".into(),
             forward_curve_id: CurveId::new("3M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: start_date,
@@ -980,6 +987,7 @@ mod tests {
         let reference_leg = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "6M-SOFR".into(),
             forward_curve_id: CurveId::new("6M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: start_date,
@@ -1051,6 +1059,7 @@ mod tests {
         let primary_leg_no_lag = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "3M-SOFR".into(),
             forward_curve_id: CurveId::new("3M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: start_date,
@@ -1073,6 +1082,7 @@ mod tests {
         let reference_leg = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "6M-SOFR".into(),
             forward_curve_id: CurveId::new("6M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: start_date,
@@ -1124,6 +1134,7 @@ mod tests {
         let base_leg = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "3M-SOFR".into(),
             forward_curve_id: CurveId::new("3M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: date(2024, 1, 3),
@@ -1146,6 +1157,7 @@ mod tests {
             ..base_leg.clone()
         };
         let reference_eq = FloatLegSpec {
+            index_id: "6M-SOFR".into(),
             forward_curve_id: CurveId::new("6M-SOFR"),
             ..primary_eq.clone()
         };
@@ -1168,6 +1180,7 @@ mod tests {
             ..base_leg
         };
         let reference_inv = FloatLegSpec {
+            index_id: "6M-SOFR".into(),
             forward_curve_id: CurveId::new("6M-SOFR"),
             ..primary_inv.clone()
         };
@@ -1189,6 +1202,7 @@ mod tests {
         let leg = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("OIS"),
             start: date(2024, 1, 3),
@@ -1246,6 +1260,7 @@ mod tests {
         let leg = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("OIS"),
             start: date(2024, 1, 3),
@@ -1337,6 +1352,7 @@ mod tests {
         let primary_leg = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "3M-SOFR".into(),
             forward_curve_id: CurveId::new("3M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: start_date,
@@ -1355,6 +1371,7 @@ mod tests {
         let reference_leg = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "6M-SOFR".into(),
             forward_curve_id: CurveId::new("6M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: start_date,
@@ -1426,6 +1443,7 @@ mod tests {
         let valid_leg = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "3M-SOFR".into(),
             forward_curve_id: CurveId::new("3M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: date(2024, 1, 3),
@@ -1441,6 +1459,7 @@ mod tests {
             compounding: Default::default(),
         };
         let reference_leg = FloatLegSpec {
+            index_id: "6M-SOFR".into(),
             forward_curve_id: CurveId::new("6M-SOFR"),
             ..valid_leg.clone()
         };
@@ -1553,6 +1572,7 @@ mod tests {
         let primary_leg = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "3M-SOFR".into(),
             forward_curve_id: CurveId::new("3M-SOFR"),
             discount_curve_id: CurveId::new("OIS"),
             start: start_date,
@@ -1568,6 +1588,7 @@ mod tests {
             compounding: Default::default(),
         };
         let reference_leg = FloatLegSpec {
+            index_id: "6M-SOFR".into(),
             forward_curve_id: CurveId::new("6M-SOFR"),
             frequency: Tenor::semi_annual(),
             ..primary_leg.clone()
@@ -1631,6 +1652,7 @@ mod tests {
         let primary = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-OIS".into(),
             forward_curve_id: CurveId::new("USD-SOFR-OIS"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -1646,6 +1668,7 @@ mod tests {
             compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         };
         let reference = FloatLegSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             compounding: FloatingLegCompounding::Simple,
             ..primary.clone()
@@ -1761,6 +1784,7 @@ mod tests {
         let primary = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: Some("weekends_only".into()),
+            index_id: "USD-SOFR-OIS".into(),
             forward_curve_id: CurveId::new("USD-SOFR-OIS"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -1776,6 +1800,7 @@ mod tests {
             compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         };
         let reference = FloatLegSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             compounding: FloatingLegCompounding::Simple,
             ..primary.clone()
@@ -1881,6 +1906,7 @@ mod tests {
         let primary = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-OIS".into(),
             forward_curve_id: CurveId::new("USD-SOFR-OIS"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -1896,6 +1922,7 @@ mod tests {
             compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         };
         let reference = FloatLegSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             compounding: FloatingLegCompounding::Simple,
             ..primary.clone()
@@ -1989,6 +2016,7 @@ mod tests {
         let overnight = FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-OIS".into(),
             forward_curve_id: CurveId::new("USD-SOFR-OIS"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -2004,6 +2032,7 @@ mod tests {
             compounding: finstack_quant_cashflows::builder::FloatingLegCompounding::Simple,
         };
         let term = FloatLegSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             ..overnight.clone()
         };

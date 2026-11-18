@@ -139,7 +139,8 @@ export type CFKind =
   | "variation_margin_pay"
   | "margin_interest"
   | "collateral_substitution_in"
-  | "collateral_substitution_out";
+  | "collateral_substitution_out"
+  | "derivative_settlement";
 /**
  * Meaning of the emitted schedule relative to pricing and waterfall policy.
  */
@@ -375,7 +376,7 @@ export type FloatingLegCompounding =
  *
  * The cashflow builder consults it whenever projecting a floating coupon
  * fails: a missing forward curve, a pre-cutoff observation with no
- * `FIXING:{forward_curve_id}` series supplied, a reset before the curve base
+ * `FIXING:{index_id}` series supplied, a reset before the curve base
  * date, or an overnight or day-count projection error. It never fills a gap
  * in recorded history: when a curve and a fixing series are both supplied, a
  * missing pre-cutoff observation is an error under every policy.
@@ -1166,7 +1167,7 @@ export interface FloatingCouponSpec {
  * # Seasoned Instruments (Historical Fixings)
  *
  * Historical fixings **are supported** via the `MarketContext`: store a
- * `ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see
+ * `ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see
  * `finstack_quant_core::market_data::fixings`) containing realized index
  * observations. Observation dates strictly before the valuation cutoff then
  * resolve from that series instead of the curve. The cutoff is the forward
@@ -1264,6 +1265,10 @@ export interface FloatingRateSpec {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: valuations.DecimalWire | null;
+  /**
+   * Contractual rate index used for historical observations in FIXING series.
+   */
+  index_id: valuations.Id;
   /**
    * Expected term-index tenor, checked against the resolved forward curve.
    *

@@ -317,6 +317,7 @@ fn basis_swap(id: &str, end: Date) -> BasisSwap {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,
@@ -334,6 +335,7 @@ fn basis_swap(id: &str, end: Date) -> BasisSwap {
         FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-1M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-1M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start,

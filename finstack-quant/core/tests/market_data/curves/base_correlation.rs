@@ -53,14 +53,15 @@ fn builder_rejects_correlation_outside_unit_interval() {
 }
 
 #[test]
-fn bucket_bump_filters_and_clamps_correlations() {
+fn bucket_bump_applies_exact_changes_or_fails() {
     let curve = BaseCorrelationCurve::builder("CDX")
         .knots([(3.0, 0.25), (7.0, 0.45), (10.0, 0.60)])
         .build()
         .unwrap();
 
+    assert!(curve.apply_bucket_bump(Some(&[7.0]), 0.75).is_err());
     let bumped = curve
-        .apply_bucket_bump(Some(&[7.0]), 0.75)
+        .apply_bucket_bump(Some(&[7.0]), 0.55)
         .expect("filtered bucket bump should rebuild the curve");
 
     assert_eq!(bumped.correlations()[0], 0.25);
@@ -99,7 +100,7 @@ fn bucket_stress_survives_serde_and_identity_bumps() {
         .knots([(3.0, 0.25), (7.0, 0.45), (10.0, 0.60)])
         .build()
         .unwrap();
-    let stressed = curve.apply_bucket_bump(Some(&[7.0]), 0.75).unwrap();
+    let stressed = curve.apply_bucket_bump(Some(&[7.0]), 0.55).unwrap();
     let restored: BaseCorrelationCurve =
         serde_json::from_str(&serde_json::to_string(&stressed).unwrap()).unwrap();
     let identity = stressed.apply_bump(BumpSpec::multiplier(1.0)).unwrap();
@@ -127,9 +128,11 @@ fn correlation_boundaries_are_supported_by_construction_bumps_and_serde() {
     let restored: BaseCorrelationCurve =
         serde_json::from_str(&serde_json::to_string(&curve).unwrap()).unwrap();
     assert_eq!(restored.correlations(), &[0.0, 0.0, 1.0]);
-    let all_zero = curve.apply_bucket_bump(None, -1.0).unwrap();
+    assert!(curve.apply_bucket_bump(None, -1.0).is_err());
+    let all_zero = curve.apply_bucket_bump(Some(&[100.0]), -1.0).unwrap();
     assert_eq!(all_zero.correlations(), &[0.0, 0.0, 0.0]);
-    let all_one = curve.apply_bucket_bump(None, 1.0).unwrap();
+    assert!(curve.apply_bucket_bump(None, 1.0).is_err());
+    let all_one = curve.apply_bucket_bump(Some(&[0.0, 3.0]), 1.0).unwrap();
     assert_eq!(all_one.correlations(), &[1.0, 1.0, 1.0]);
 }
 

@@ -28,7 +28,7 @@ use finstack_quant_core::math::ZERO_TOLERANCE;
 /// calendar is an error, not a missing value.
 pub(crate) fn offset_period(context: &EvaluationContext, offset: i32) -> Result<Option<PeriodId>> {
     let period = context.period_id;
-    let calendar = context.history.model_plan()?.calendar;
+    let calendar = context.history.model_plan()?.get_calendar();
     period.shift(0, calendar)?;
     Ok(period.shift(offset, calendar).ok())
 }

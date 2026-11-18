@@ -568,3 +568,26 @@ test('computeHorizonReturn returns the Rust summary and matches Python', () => {
     /HorizonAnalysis/
   );
 });
+
+test('700 bp selects the 7 percent detachment and invalid shocks preserve the market', () => {
+  const curve = {
+    type: 'base_correlation',
+    id: 'CDX',
+    detachment_points: [0.07, 3, 7, 10],
+    correlations: [0.2, 0.25, 0.45, 0.98],
+  };
+  const market = { ...OIS_MARKET, curves: [curve] };
+  const apply = (detachment_bp, points) =>
+    scenarios.applyScenario(
+      {
+        id: 'shock',
+        operations: [{ kind: 'base_corr_bucket_pts', surface_id: 'CDX', detachment_bp, points }],
+      },
+      market,
+      AS_OF
+    );
+  assert.deepEqual(apply([700], 0.05).market.curves[0].correlations, [0.2, 0.25, 0.5, 0.98]);
+  assert.throws(() => apply([700, 800], 0.01));
+  assert.throws(() => apply([1000], 0.1));
+  assert.deepEqual(curve.correlations, [0.2, 0.25, 0.45, 0.98]);
+});

@@ -485,6 +485,7 @@
         },
         "float_leg": {
           "discount_curve_id": "USD-SOFR",
+          "index_id": "USD-SOFR",
           "forward_curve_id": "USD-SOFR",
           "spread_bp": "0",
           "frequency": {

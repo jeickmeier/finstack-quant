@@ -324,3 +324,24 @@ test('SABR parameters, smile and calibrator expose the Rust members', () => {
     [1e-8, 77, 0.01, true]
   );
 });
+
+test('mixed-beta SABR interpolation preserves the two observed endpoint quotes', () => {
+  const cube = new facade.core.VolCube(
+    'MIXED',
+    [1],
+    [5, 10],
+    [
+      { alpha: 0.04, beta: 0.5, rho: 0, nu: 0 },
+      { alpha: 0.2, beta: 1, rho: 0, nu: 0 },
+    ],
+    [0.04, 0.04]
+  );
+  try {
+    const vol = (tenor) => facade.models.volatility.getCubeVol(cube, 1, tenor, 0.04, 'lognormal');
+    assert.ok(Math.abs(vol(5) - 0.20008333333333) < 1e-12);
+    assert.ok(Math.abs(vol(10) - 0.2) < 1e-12);
+    for (const tenor of [7.5, 7.50000001]) assert.throws(() => vol(tenor), /different beta/);
+  } finally {
+    cube.free();
+  }
+});

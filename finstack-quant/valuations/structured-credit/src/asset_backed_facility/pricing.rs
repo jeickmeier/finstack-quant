@@ -479,7 +479,7 @@ impl Instrument for AssetBackedFacility {
         deps.add_discount_curve(self.discount_curve_id.clone());
         if let RateSpec::Floating(spec) = &self.rate {
             deps.add_forward_curve(spec.forward_curve_id.clone());
-            deps.add_series_id(fixing_series_id(spec.forward_curve_id.as_str()));
+            deps.add_series_id(fixing_series_id(spec.index_id.as_str()));
         }
         let pool = self.collateral.normalized(self.closing_date)?;
         for forward_curve_id in pool

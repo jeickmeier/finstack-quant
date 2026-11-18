@@ -234,27 +234,15 @@ fn named_capital_structure_formulas_keep_native_instrument_currency() {
 
 #[test]
 fn model_period_intervals_must_be_positive_and_disjoint() {
-    let mut empty = forecast_model();
-    empty.periods.periods[0].end = empty.periods.periods[0].start;
-    assert!(
-        empty
-            .validate_semantics()
-            .unwrap_err()
-            .to_string()
-            .contains("start before end")
-    );
-
-    let mut overlapping = forecast_model();
-    overlapping.periods.periods[1].start = date!(2025 - 03 - 31);
-    assert!(
-        overlapping
-            .validate_semantics()
-            .unwrap_err()
-            .to_string()
-            .contains("must not overlap")
-    );
-
-    let mut sparse = forecast_model();
-    sparse.periods.periods[1].start = date!(2025 - 05 - 01);
-    assert!(sparse.validate_semantics().is_ok(), "gaps remain supported");
+    let model = forecast_model();
+    let calendar = model.periods.get_calendar();
+    let mut rows = model.periods.to_vec();
+    rows[0].end = rows[0].start;
+    assert!(finstack_quant_core::dates::PeriodPlan::try_new(calendar, rows).is_err());
+    let mut rows = model.periods.to_vec();
+    rows[1].start = date!(2025 - 03 - 31);
+    assert!(finstack_quant_core::dates::PeriodPlan::try_new(calendar, rows).is_err());
+    let mut rows = model.periods.to_vec();
+    rows.remove(1);
+    assert!(finstack_quant_core::dates::PeriodPlan::try_new(calendar, rows).is_ok());
 }

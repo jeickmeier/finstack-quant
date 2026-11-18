@@ -135,6 +135,7 @@ mod tests {
         };
         let float = FloatLegSpec {
             discount_curve_id: CurveId::new("USD_OIS"),
+            index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: CurveId::new("USD_LIBOR_3M"),
             spread_bp: rust_decimal::Decimal::ZERO,
             frequency: Tenor::quarterly(),

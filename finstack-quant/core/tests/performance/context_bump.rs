@@ -778,6 +778,7 @@ fn credit_records() -> Vec<Value> {
         let idx_sp = index.index_credit_curve().sp(time).expect("index sp");
         let idx_issuer_sp = index
             .get_issuer_curve("Issuer")
+            .expect("known pool member")
             .sp(time)
             .expect("idx issuer sp");
         assert_float(hazard_rate, 0.02 + 9.0 * 1e-4);

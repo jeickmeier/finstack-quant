@@ -100,6 +100,7 @@ fn test_compounding_lookback_sensitivity() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
+            index_id: "FWD".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::annual(),
             day_count: DayCount::Act360,
@@ -186,6 +187,7 @@ fn test_rate_cutoff_uses_business_day_lockout_over_weekend() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
+            index_id: "FWD".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::monthly(),
             day_count: DayCount::Act360,
@@ -263,6 +265,7 @@ fn test_payment_delay_sensitivity() {
     let mut irs = InterestRateSwap::example().unwrap();
     irs.fixed_leg.discount_curve_id = "DISC".into();
     irs.float_leg.discount_curve_id = "DISC".into();
+    irs.float_leg.index_id = "FWD".into();
     irs.float_leg.forward_curve_id = "FWD".into();
     irs.float_leg.compounding = FloatingLegCompounding::Simple; // Standard swap
 
@@ -320,6 +323,7 @@ fn test_seasoned_compounded_swap_requires_fixings() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
+            index_id: "FWD".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::annual(),
             day_count: DayCount::Act360,
@@ -405,6 +409,7 @@ fn test_seasoned_compounded_swap_with_fixings_prices() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
+            index_id: "FWD".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::annual(),
             day_count: DayCount::Act360,
@@ -473,6 +478,7 @@ fn test_compounded_swap_with_spread_near_zero_rates() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
+            index_id: "FWD".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::annual(),
             day_count: DayCount::Act360,
@@ -555,6 +561,7 @@ fn test_compounded_swap_with_spread_negative_rates() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
+            index_id: "FWD".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::annual(),
             day_count: DayCount::Act360,
@@ -657,6 +664,7 @@ fn test_observation_shift_before_curve_base_date() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "DISC".into(),
+            index_id: "FWD".into(),
             forward_curve_id: "FWD".into(),
             frequency: Tenor::monthly(),
             day_count: DayCount::Act360,

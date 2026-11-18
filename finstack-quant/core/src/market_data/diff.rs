@@ -843,6 +843,16 @@ impl MeasuredDiffValue for InflationCpiDiffRow {
     }
 }
 
+fn require_matching_inflation_series(
+    earlier: Option<&crate::market_data::scalars::InflationSeries>,
+    later: Option<&crate::market_data::scalars::InflationSeries>,
+) -> Result<()> {
+    match (earlier, later) {
+        (Some(a), Some(b)) if a == b => Ok(()),
+        _ => Err(Error::Validation("CPI comparison requires matching published series, reference base and seasonal adjustment on both snapshots".into())),
+    }
+}
+
 /// Measure projected CPI level differences `I₁(d) - I₀(d)` directly on
 /// [`InflationCurve`](crate::market_data::term_structures::InflationCurve)s.
 ///
@@ -870,6 +880,7 @@ pub fn measure_inflation_cpi_level_diff(
     }
     let c0 = market_t0.get_inflation_curve(query.source_t0.as_str())?;
     let c1 = market_t1.get_inflation_curve(query.source_t1.as_str())?;
+    require_matching_inflation_series(c0.get_series(), c1.get_series())?;
     let mut rows = Vec::with_capacity(query.dates.len());
     let mut prev_date: Option<Date> = None;
 
@@ -1027,6 +1038,7 @@ pub fn measure_inflation_annual_growth_diff(
     }
     let c0 = market_t0.get_inflation_curve(query.source_t0.as_str())?;
     let c1 = market_t1.get_inflation_curve(query.source_t1.as_str())?;
+    require_matching_inflation_series(c0.get_series(), c1.get_series())?;
     if c0.day_count() != c1.day_count() {
         return Err(Error::Validation(format!(
             "inflation curves have incompatible day counts ({} vs {})",
@@ -1303,6 +1315,7 @@ pub fn measure_inflation_observation_diff(
         });
     }
 
+    require_matching_inflation_series(idx0.get_series(), idx1.get_series())?;
     let mut seen = BTreeSet::new();
     let mut rows = Vec::with_capacity(query.periods.len());
     for &pair in query.periods {
@@ -1910,12 +1923,65 @@ mod tests {
         assert!(measure_hazard_intensity_diff(&bad_order, &m0, &m1).is_err());
     }
 
+    fn cpi_series() -> crate::market_data::scalars::InflationSeries {
+        crate::market_data::scalars::InflationSeries {
+            series_id: "BLS:CUUR0000SA0".into(),
+            reference_base: "1982-84=100".into(),
+            seasonally_adjusted: false,
+        }
+    }
+
+    #[test]
+    fn monthly_revision_requires_common_series_base_and_seasonal_status() {
+        use crate::market_data::scalars::InflationObservation;
+        let cutoff = date!(2025 - 02 - 12);
+        let market = |value, series| {
+            let obs = InflationObservation {
+                value,
+                reference_month: date!(2025 - 01 - 01),
+                available_on: cutoff,
+            };
+            let index = InflationIndex::new("USD-CPI", vec![obs], Currency::USD, cutoff)
+                .unwrap()
+                .with_series(series)
+                .unwrap();
+            MarketContext::new().insert_inflation_index(index)
+        };
+        let periods = [InflationPeriodPair::same(2025, Month::January)];
+        let query = InflationObservationDiffQuery::new(
+            "USD-CPI",
+            &periods,
+            cutoff,
+            cutoff,
+            ObservationDiffScale::NativePoints,
+        );
+        let opening = market(105.0, cpi_series());
+        let compare = |value, series| {
+            measure_inflation_observation_diff(&query, &opening, &market(value, series))
+        };
+        let mut rebased = cpi_series();
+        rebased.reference_base = "2015=100".into();
+        assert!(compare(210.0, rebased).is_err());
+        let mut adjusted = cpi_series();
+        adjusted.seasonally_adjusted = true;
+        assert!(compare(105.0, adjusted).is_err());
+        let mut other = cpi_series();
+        other.series_id = "BLS:OTHER".into();
+        assert!(compare(105.0, other).is_err());
+        assert_eq!(
+            compare(210.0 / 2.0, cpi_series()).unwrap().rows()[0].diff,
+            0.0
+        );
+        assert_eq!(compare(105.5, cpi_series()).unwrap().rows()[0].diff, 0.5);
+    }
+
     #[test]
     fn inflation_cpi_and_annual_growth_diffs() {
         use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 
         let base = date!(2025 - 01 - 01);
         let c0 = InflationCurve::builder("US-CPI")
+            .series(Some(cpi_series()))
             .base_date(base)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 100.0), (1.0, 102.0), (5.0, 110.408_080_32)])
@@ -1924,6 +1990,7 @@ mod tests {
             .build()
             .unwrap();
         let c1 = InflationCurve::builder("US-CPI")
+            .series(Some(cpi_series()))
             .base_date(base)
             .day_count(DayCount::Act365F)
             .knots([(0.0, 100.0), (1.0, 103.0), (5.0, 115.927_407_43)])
@@ -1983,8 +2050,10 @@ mod tests {
         )
         .unwrap();
 
-        let m0 = MarketContext::new().insert_inflation_index(idx0);
-        let m1 = MarketContext::new().insert_inflation_index(idx1);
+        let m0 =
+            MarketContext::new().insert_inflation_index(idx0.with_series(cpi_series()).unwrap());
+        let m1 =
+            MarketContext::new().insert_inflation_index(idx1.with_series(cpi_series()).unwrap());
         let periods = [InflationPeriodPair::same(2025, Month::January)];
 
         // Knowledge cutoff before publication date fails closed.

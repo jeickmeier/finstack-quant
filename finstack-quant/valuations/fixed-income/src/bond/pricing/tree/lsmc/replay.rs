@@ -785,15 +785,10 @@ impl ReplayTemplate {
                 )
             } else {
                 let forward = market.get_forward(&spec.rate_spec.forward_curve_id).ok();
-                let fixing_id = fixing_series_id(spec.rate_spec.forward_curve_id.as_str());
+                let fixing_id = fixing_series_id(spec.rate_spec.index_id.as_str());
                 let fixings = market.get_series(&fixing_id).ok();
                 let known_reset = !matches!(
-                    observed_index_fixing(
-                        reset,
-                        fixings,
-                        spec.rate_spec.forward_curve_id.as_str(),
-                        as_of,
-                    ),
+                    observed_index_fixing(reset, fixings, spec.rate_spec.index_id.as_str(), as_of,),
                     Ok(None)
                 );
                 let source = match forward.as_ref() {

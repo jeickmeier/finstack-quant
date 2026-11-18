@@ -280,7 +280,7 @@ impl PyCreditIndexData {
         })
     }
 
-    /// Hazard curve of one issuer, falling back to the index curve.
+    /// Hazard curve of a named pool member.
     ///
     /// Parameters
     /// ----------
@@ -290,11 +290,20 @@ impl PyCreditIndexData {
     /// Returns
     /// -------
     /// HazardCurve
-    ///     The issuer's curve, or ``index_credit_curve`` when the bundle has
-    ///     no curve for ``issuer_id`` (homogeneous assumption).
+    ///     The hazard curve of the named member.
+    ///
+    /// Raises
+    /// ------
+    /// KeyError
+    ///     If the pool has no named roster or the issuer is absent.
     #[pyo3(text_signature = "(self, issuer_id)")]
-    fn get_issuer_curve(&self, issuer_id: &str) -> PyHazardCurve {
-        PyHazardCurve::from_inner(Arc::new(self.inner.get_issuer_curve(issuer_id).clone()))
+    fn get_issuer_curve(&self, issuer_id: &str) -> PyResult<PyHazardCurve> {
+        Ok(PyHazardCurve::from_inner(Arc::new(
+            self.inner
+                .get_issuer_curve(issuer_id)
+                .map_err(core_to_py)?
+                .clone(),
+        )))
     }
 
     /// Whether issuer-level curves are present (heterogeneous pricing mode).
@@ -330,9 +339,16 @@ impl PyCreditIndexData {
     /// float
     ///     The issuer's recovery as a decimal, or ``recovery_rate`` when none
     ///     was supplied for ``issuer_id``.
+    ///
+    /// Raises
+    /// ------
+    /// KeyError
+    ///     If the pool has no named roster or the issuer is absent.
     #[pyo3(text_signature = "(self, issuer_id)")]
-    fn get_issuer_recovery(&self, issuer_id: &str) -> f64 {
-        self.inner.get_issuer_recovery(issuer_id)
+    fn get_issuer_recovery(&self, issuer_id: &str) -> PyResult<f64> {
+        self.inner
+            .get_issuer_recovery(issuer_id)
+            .map_err(core_to_py)
     }
 
     /// Notional weight of one issuer, falling back to equal weighting.
@@ -347,9 +363,14 @@ impl PyCreditIndexData {
     /// float
     ///     The issuer's weight as a decimal fraction, or
     ///     ``1 / num_constituents`` when none was supplied for ``issuer_id``.
+    ///
+    /// Raises
+    /// ------
+    /// KeyError
+    ///     If the pool has no named roster or the issuer is absent.
     #[pyo3(text_signature = "(self, issuer_id)")]
-    fn get_issuer_weight(&self, issuer_id: &str) -> f64 {
-        self.inner.get_issuer_weight(issuer_id)
+    fn get_issuer_weight(&self, issuer_id: &str) -> PyResult<f64> {
+        self.inner.get_issuer_weight(issuer_id).map_err(core_to_py)
     }
 
     /// Number of constituents in the credit index.

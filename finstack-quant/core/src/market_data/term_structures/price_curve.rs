@@ -613,6 +613,7 @@ impl PriceCurveBuilder {
     /// zero-time knot, or the selected
     /// interpolation/extrapolation combination rejects the grid.
     pub fn build(self) -> crate::Result<PriceCurve> {
+        self.day_count.validate_annualized_clock()?;
         let base = self
             .base
             .ok_or_else(|| crate::Error::Validation("PriceCurve requires base_date".to_string()))?;

@@ -79,6 +79,7 @@ def _fixed_leg(**overrides: object) -> FixedLegSpec:
 def _float_leg(**overrides: object) -> FloatLegSpec:
     kwargs: dict[str, object] = {
         "discount_curve_id": "USD-OIS",
+        "index_id": "USD-SOFR-3M",
         "forward_curve_id": "USD-SOFR-3M",
         "spread_bp": "0",
         "frequency": Tenor.quarterly(),

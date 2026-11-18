@@ -428,6 +428,11 @@ export interface D_85Bc3Ccea16Ecaa23151 {
    */
   open_series_id?: string | null;
   /**
+   * Contractual closing fixing immediately before the first Yang–Zhang target bar.
+   * Resolved exactly in the same close series as the target bars.
+   */
+  previous_close_date?: Date1 | null;
+  /**
    * Corporate-action policy applied to all historical price series.
    *
    * The selected policy is declarative: input series must already conform to
@@ -577,6 +582,10 @@ export interface D_572Ad1Befb7D94914652 {
    * this forward curve instead of using a discount-curve par-rate proxy.
    */
   asw_forward_curve_id?: D_94Cb251104De5Cf587B6 | null;
+  /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: D_94Cb251104De5Cf587B6 | null;
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).

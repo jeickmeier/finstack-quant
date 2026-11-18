@@ -96,6 +96,7 @@ proptest! {
                 end_of_month: false,            })
             .float_leg(FloatLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
                 frequency: Tenor::quarterly(),
@@ -131,6 +132,7 @@ proptest! {
                 end_of_month: false,            })
             .float_leg(FloatLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
                 frequency: Tenor::quarterly(),
@@ -196,6 +198,7 @@ proptest! {
                 end_of_month: false,            })
             .float_leg(FloatLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
                 frequency: Tenor::quarterly(),
@@ -231,6 +234,7 @@ proptest! {
                 end_of_month: false,            })
             .float_leg(FloatLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
                 frequency: Tenor::quarterly(),
@@ -319,6 +323,7 @@ proptest! {
                 end_of_month: false,            })
             .float_leg(FloatLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
                 frequency: Tenor::quarterly(),

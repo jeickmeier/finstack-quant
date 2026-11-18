@@ -1089,3 +1089,29 @@ fn cube_convention_and_vol_lookups_are_bit_stable() {
         "vol-cube lookups moved off the macOS and Linux libm pins: {got:?}"
     );
 }
+
+#[test]
+fn mixed_beta_nodes_preserve_endpoints_and_reject_midpoint_queries() {
+    use finstack_quant_models::volatility::{VolatilityConvention, get_cube_vol};
+    let left = SabrParameterData::new(0.04, 0.5, 0.0, 0.0, None).unwrap();
+    let right = SabrParameterData::new(0.2, 1.0, 0.0, 0.0, None).unwrap();
+    let cube =
+        VolCube::from_grid("MIXED", &[1.0], &[5.0, 10.0], &[left, right], &[0.04; 2]).unwrap();
+    let vol = |tenor| get_cube_vol(&cube, 1.0, tenor, 0.04, VolatilityConvention::Lognormal);
+    assert!((vol(5.0).unwrap() - 0.20008333333333).abs() < 1e-12);
+    assert!((vol(10.0).unwrap() - 0.20).abs() < 1e-12);
+    for tenor in [7.5, 7.50000001] {
+        assert!(
+            vol(tenor)
+                .unwrap_err()
+                .to_string()
+                .contains("different beta")
+        );
+    }
+    let right = SabrParameterData::new(0.08, 0.5, 0.0, 0.0, None).unwrap();
+    let cube =
+        VolCube::from_grid("COMMON", &[1.0], &[5.0, 10.0], &[left, right], &[0.04; 2]).unwrap();
+    let vol =
+        |tenor| get_cube_vol(&cube, 1.0, tenor, 0.04, VolatilityConvention::Lognormal).unwrap();
+    assert!((vol(7.5) - vol(7.50000001)).abs() < 1e-8);
+}

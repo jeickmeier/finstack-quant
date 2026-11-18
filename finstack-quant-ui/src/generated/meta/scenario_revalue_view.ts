@@ -3385,32 +3385,32 @@ export default [
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/16",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/16",
-    "description": "Bucket-correlation shock matched no detachment buckets."
+    "description": "Vol-surface arbitrage warning detected post-shock."
+  },
+  {
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/16/properties/detail",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/16/properties/detail",
+    "description": "Free-text from `ArbitrageViolation` Display."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/16/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/16/properties/kind",
-    "const": "base_corr_bucket_no_match"
+    "const": "vol_surface_arbitrage"
   },
   {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/16/properties/surface_id",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/16/properties/surface_id",
-    "description": "Surface identifier."
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/16/properties/vol_surface_id",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/16/properties/vol_surface_id",
+    "description": "Volatility-surface identifier."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/17",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/17",
-    "description": "Vol-surface arbitrage warning detected post-shock."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/17/properties/detail",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/17/properties/detail",
-    "description": "Free-text from `ArbitrageViolation` Display."
+    "description": "Vol-surface bucket shock selected zero grid points (no-op)."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/17/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/17/properties/kind",
-    "const": "vol_surface_arbitrage"
+    "const": "vol_surface_bucket_empty_selection"
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/17/properties/vol_surface_id",
@@ -3420,12 +3420,23 @@ export default [
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/18",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/18",
-    "description": "Vol-surface bucket shock selected zero grid points (no-op)."
+    "description": "Vol-surface negative bucket shock that may produce non-positive vols."
+  },
+  {
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/18/properties/bucket",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/18/properties/bucket",
+    "description": "Whether this was a parallel (`false`) or bucket (`true`) shock."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/18/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/18/properties/kind",
-    "const": "vol_surface_bucket_empty_selection"
+    "const": "vol_surface_large_negative_shock"
+  },
+  {
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/18/properties/pct",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/18/properties/pct",
+    "description": "Percent shock value.",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/18/properties/vol_surface_id",
@@ -3435,28 +3446,22 @@ export default [
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/19",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/19",
-    "description": "Vol-surface negative bucket shock that may produce non-positive vols."
+    "description": "An instrument's valuation failed while computing carry during a\n`TimeRollForward` operation. The instrument is excluded from the\nroll-forward carry aggregation but the roll itself proceeds."
   },
   {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/19/properties/bucket",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/19/properties/bucket",
-    "description": "Whether this was a parallel (`false`) or bucket (`true`) shock."
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/19/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/19/properties/instrument_id",
+    "description": "Instrument identifier."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/19/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/19/properties/kind",
-    "const": "vol_surface_large_negative_shock"
+    "const": "time_roll_instrument_failed"
   },
   {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/19/properties/pct",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/19/properties/pct",
-    "description": "Percent shock value.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/19/properties/vol_surface_id",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/19/properties/vol_surface_id",
-    "description": "Volatility-surface identifier."
+    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/19/properties/reason",
+    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/19/properties/reason",
+    "description": "Underlying valuation error message."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/2",
@@ -3472,26 +3477,6 @@ export default [
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/2/properties/kind",
     "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/2/properties/kind",
     "const": "equity_not_found"
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/20",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/20",
-    "description": "An instrument's valuation failed while computing carry during a\n`TimeRollForward` operation. The instrument is excluded from the\nroll-forward carry aggregation but the roll itself proceeds."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/20/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/20/properties/instrument_id",
-    "description": "Instrument identifier."
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/20/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/20/properties/kind",
-    "const": "time_roll_instrument_failed"
-  },
-  {
-    "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/20/properties/reason",
-    "source": "https://finstack_quant.dev/schemas/portfolio/1/scenario_revalue_view.schema.json#/$defs/Warning/oneOf/20/properties/reason",
-    "description": "Underlying valuation error message."
   },
   {
     "path": "#/$defs/d_b3a70f30000c75370aed/oneOf/3",

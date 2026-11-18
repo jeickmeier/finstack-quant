@@ -5,7 +5,6 @@ use crate::api::schema::ForwardCurveParams;
 use crate::build::prepared::PreparedQuote;
 use crate::config::CalibrationConfig;
 use crate::config::CalibrationMethod;
-use crate::quotes::ExtractQuotes;
 use crate::quotes::MarketQuote;
 use crate::quotes::RateQuote;
 use crate::solver::global;
@@ -20,7 +19,9 @@ use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{ForwardCurve, RateCalibrationCurveRole};
+use finstack_quant_core::market_data::term_structures::ForwardCurve;
+#[cfg(test)]
+use finstack_quant_core::market_data::term_structures::RateCalibrationCurveRole;
 use finstack_quant_core::math::Compounding;
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::CurveId;
@@ -101,17 +102,6 @@ impl ForwardCurveTarget {
         )?;
         let prepared_quotes = prepared.quotes;
         let curve_day_count = prepared.curve_day_count;
-        let rate_quotes: Vec<RateQuote> = quotes.extract_quotes();
-        let rate_calibration = rate_calibration_recipe(
-            params.currency,
-            &params.method,
-            curve_day_count,
-            params.conventions.ois_compounding.as_ref(),
-            RateCalibrationCurveRole::Projection {
-                discount_curve_id: params.discount_curve_id.clone(),
-            },
-            &rate_quotes,
-        )?;
 
         let config = global_config.clone();
 
@@ -154,6 +144,13 @@ impl ForwardCurveTarget {
                     use_analytical_jacobian: true
                 }
             ),
+        )?;
+        let rate_calibration = rate_calibration_recipe(
+            crate::api::schema::StepParams::Forward(params.clone()),
+            curve_day_count,
+            &prepared_quotes,
+            global_config,
+            &report,
         )?;
         let curve = curve
             .to_builder_with_id(curve.id().clone())

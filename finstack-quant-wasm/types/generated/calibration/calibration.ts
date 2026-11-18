@@ -590,6 +590,7 @@ export type MarketDatum =
        * Strictly ascending canonical monthly fixing observations.
        */
       observations: InflationObservation[];
+      series?: InflationSeries | null;
     }
   | {
       /**
@@ -1942,6 +1943,7 @@ export type PriorMarketObject =
        * Strictly increasing `(time_years, cpi_level)` pillars starting at `0.0`.
        */
       knot_points: [number, number][];
+      series?: InflationSeries | null;
     }
   | {
       correlations: number[];
@@ -2580,6 +2582,7 @@ export type CurveState =
        * Strictly increasing `(time_years, cpi_level)` pillars starting at `0.0`.
        */
       knot_points: [number, number][];
+      series?: InflationSeries | null;
       type: "inflation";
     }
   | {
@@ -4928,6 +4931,23 @@ export interface InflationObservation {
   value: number;
 }
 /**
+ * Publication identity and units of an observed or projected inflation level.
+ */
+export interface InflationSeries {
+  /**
+   * Published reference period and index scale, for example `1982-84=100`.
+   */
+  reference_base: string;
+  /**
+   * True for seasonally adjusted levels and false for unadjusted levels.
+   */
+  seasonally_adjusted: boolean;
+  /**
+   * Publisher-qualified identifier of the statistical series.
+   */
+  series_id: string;
+}
+/**
  * Explicit day-count clock translating calendar expiry dates into year fractions
  * relative to a surface or cube reference date.
  *
@@ -5096,7 +5116,7 @@ export interface RatesStepConventions {
   ois_compounding?: FloatingLegCompounding | null;
 }
 /**
- * Typed conventions required to replay a rate-curve calibration.
+ * Benchmark conventions and quotes associated with a rate curve.
  */
 export interface RateCalibrationRecipe {
   /**
@@ -5107,6 +5127,10 @@ export interface RateCalibrationRecipe {
    * Day count used for the curve's time axis.
    */
   curve_day_count: valuations.DayCount;
+  /**
+   * Original execution evidence. A transcribed benchmark list has no qualified replay.
+   */
+  execution?: RateCalibrationExecution | null;
   /**
    * Numerical calibration method.
    */
@@ -5123,6 +5147,48 @@ export interface RateCalibrationRecipe {
    * Discount/projection role and linked curve identifier.
    */
   role: RateCalibrationCurveRole;
+}
+/**
+ * Executed evaluator, resolved instruments and original outcome of a rate calibration.
+ */
+export interface RateCalibrationExecution {
+  /**
+   * Whether the original fit passed its recorded acceptance policy.
+   */
+  accepted: boolean;
+  /**
+   * Resolved quote identities and maturities, in input order.
+   */
+  bindings: RateQuoteBinding[];
+  /**
+   * Solver controls and residual acceptance thresholds used by the evaluator.
+   */
+  calibration_config: {
+    [k: string]: unknown;
+  };
+  /**
+   * Discount or projection evaluator parameters, including pricing dependencies.
+   */
+  step_params: {
+    [k: string]: unknown;
+  };
+}
+/**
+ * Identity and resolved maturity of a quote in its original evaluator.
+ */
+export interface RateQuoteBinding {
+  /**
+   * Contractual maturity resolved using the instrument conventions.
+   */
+  pillar_date: valuations.DateWire;
+  /**
+   * Curve-clock year fraction at the resolved maturity.
+   */
+  pillar_time: number;
+  /**
+   * Original stable market quote identifier.
+   */
+  quote_id: string;
 }
 /**
  * Source interpolation and a single accumulated transformation, never a chain
@@ -5870,6 +5936,7 @@ export interface InflationIndex {
    * Strictly ascending canonical monthly fixing observations.
    */
   observations: InflationObservation[];
+  series?: InflationSeries | null;
 }
 /**
  * Date-indexed time series with flexible interpolation.

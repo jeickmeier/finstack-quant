@@ -65,6 +65,7 @@ class CFKind:
     FACILITY_FEE: CFKind
     LC_FEE: CFKind
     FRONTING_FEE: CFKind
+    DERIVATIVE_SETTLEMENT: CFKind
     NOTIONAL: CFKind
     PIK: CFKind
     AMORTIZATION: CFKind

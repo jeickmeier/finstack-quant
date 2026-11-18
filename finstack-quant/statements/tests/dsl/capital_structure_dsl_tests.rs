@@ -456,7 +456,9 @@ fn test_aggregate_period_flows() {
         indexmap::IndexMap::new();
     instruments.insert("BOND-001".to_string(), Arc::new(bond));
 
-    let periods = build_periods("2025Q1..2025Q4", None).unwrap().periods;
+    let periods = build_periods("2025Q1..2025Q4", None)
+        .unwrap()
+        .into_periods();
     let market_ctx = MarketContext::new();
 
     let cashflows =

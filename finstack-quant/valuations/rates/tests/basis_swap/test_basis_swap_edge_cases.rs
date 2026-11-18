@@ -139,6 +139,7 @@ fn make_leg(forward_curve: &str, start: Date, end: Date, spread_bp: Decimal) -> 
     FloatLegSpec {
         end_of_month: false,
         fixing_calendar_id: None,
+        index_id: forward_curve.into(),
         forward_curve_id: CurveId::new(forward_curve),
         discount_curve_id: CurveId::new("USD-OIS"),
         start,
@@ -197,6 +198,7 @@ fn adjusted_payment_dates_control_simple_leg_pv_and_settlement() {
         primary.business_day_convention = bdc;
         primary.payment_lag_days = lag;
         let mut reference = primary.clone();
+        reference.index_id = "USD-SOFR-1M".into();
         reference.forward_curve_id = CurveId::new("USD-SOFR-1M");
         let swap = BasisSwap::new(
             "PAYMENT-DATE",
@@ -567,6 +569,7 @@ fn identical_forward_curves() {
         .reference_leg(FloatLegSpec {
             end_of_month: false,
             fixing_calendar_id: None,
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             discount_curve_id: CurveId::new("USD-OIS"),
             start: d(2025, 1, 2),

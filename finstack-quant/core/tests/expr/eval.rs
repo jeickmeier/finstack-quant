@@ -116,7 +116,7 @@ fn binop_div() {
 }
 
 #[test]
-fn binop_division_by_zero_returns_nan() {
+fn binop_division_by_zero_rejects_the_call() {
     let ctx = SimpleContext::new(["num", "den"]).expect("unique columns");
     let num = vec![1.0, -2.0, 0.0, 4.0];
     let den = vec![0.0, 0.0, 0.0, 2.0];
@@ -128,12 +128,9 @@ fn binop_division_by_zero_returns_nan() {
         Expr::column("den"),
     ))
     .expect("elementwise expression compiles");
-    let result = div.eval(&ctx, &cols).unwrap();
-
-    assert!(result[0].is_nan());
-    assert!(result[1].is_nan());
-    assert!(result[2].is_nan());
-    assert_eq!(result[3], 2.0);
+    let err = div.eval(&ctx, &cols).unwrap_err();
+    assert!(err.to_string().contains("row 0"), "{err}");
+    assert!(err.to_string().contains("by zero"), "{err}");
 }
 
 #[test]
@@ -197,7 +194,8 @@ fn unary_not_maps_zero_to_true_and_non_zero_to_false() {
         .expect("elementwise expression compiles");
     let result = expr.eval(&ctx, &cols).unwrap();
 
-    assert_eq!(result, vec![1.0, 0.0, 0.0, 0.0]);
+    assert_eq!(&result[..3], &[1.0, 0.0, 0.0]);
+    assert!(result[3].is_nan());
 }
 
 #[test]

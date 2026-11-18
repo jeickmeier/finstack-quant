@@ -84,6 +84,7 @@ def _swap() -> InterestRateSwap:
     )
     floating = FloatLegSpec(
         discount_curve_id="USD-OIS",
+        index_id="USD-SOFR-3M",
         forward_curve_id="USD-SOFR-3M",
         spread_bp="0",
         frequency=Tenor.quarterly(),
@@ -256,6 +257,7 @@ def test_validation_failure_raises_value_error() -> None:
         .float_leg(
             FloatLegSpec(
                 discount_curve_id="USD-OIS",
+                index_id="USD-SOFR-3M",
                 forward_curve_id="USD-SOFR-3M",
                 spread_bp="0",
                 frequency=Tenor.quarterly(),

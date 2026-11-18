@@ -418,7 +418,7 @@ impl TermLoanDiscountingPricer {
 
         let fixing_series = finstack_quant_core::market_data::fixings::get_fixing_series(
             market,
-            float_spec.forward_curve_id.as_str(),
+            float_spec.index_id.as_str(),
         )?;
 
         // Margin events are effective from the start of the contractual accrual
@@ -459,7 +459,7 @@ impl TermLoanDiscountingPricer {
 
             let raw_fixing = finstack_quant_core::market_data::fixings::require_fixing_value_exact(
                 Some(fixing_series),
-                float_spec.forward_curve_id.as_str(),
+                float_spec.index_id.as_str(),
                 reset_date,
             )?;
             let accrual_start = flow
@@ -596,6 +596,7 @@ mod tests {
     /// SOFR + 300 bp, 0% index floor, no amortization.
     fn floating_loan_for_fixings() -> TermLoan {
         let floating_rate = FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             spread_bp: Decimal::new(300, 0),
             gearing: Decimal::ONE,

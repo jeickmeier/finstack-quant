@@ -8,6 +8,7 @@ the Rust crates, so both hosts must agree exactly.
 from __future__ import annotations
 
 import datetime as dt
+import math
 
 import pytest
 
@@ -26,7 +27,9 @@ CLOSE = [101.0, 99.5, 100.2, 100.6]
 def test_realized_variance_defaults_are_rust_owned() -> None:
     assert realized_variance(PRICES) == 0.04341008921510013
     assert realized_variance(PRICES, 52.0) == 0.008957637457084153
-    assert realized_variance_ohlc(OPEN, HIGH, LOW, CLOSE) == 0.04489594471070698
+    assert (
+        realized_variance_ohlc(OPEN[1:], HIGH[1:], LOW[1:], CLOSE[1:], previous_close=CLOSE[0]) == 0.04489594471070698
+    )
     assert realized_variance_ohlc(OPEN, HIGH, LOW, CLOSE, "parkinson") == 0.04439216444474536
 
 
@@ -93,3 +96,13 @@ def test_hazard_curve_json_round_trip() -> None:
     assert curve.knot_points == [(1.0, 0.02), (5.0, 0.03)]
     assert curve.day_count == "act_365f"
     assert curve.calendar_id is None
+
+
+def test_realized_variance_includes_the_opening_gap() -> None:
+    bars = [110.0] * 3
+    for method in ["yang_zhang", "close_to_close"]:
+        actual = realized_variance_ohlc(bars, bars, bars, bars, method, 252.0, 100.0)
+        assert actual == pytest.approx(252 * math.log(1.1) ** 2 / 3)
+        with pytest.raises(ValueError, match="previous_close"):
+            realized_variance_ohlc(bars, bars, bars, bars, method, 252.0)
+    assert realized_variance_ohlc([110.0], [110.0], [110.0], [110.0], "yang_zhang", 252.0, 100.0) is None

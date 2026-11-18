@@ -72,11 +72,13 @@ impl Pool {
         };
         if let Some(curves) = index.issuer_credit_curves() {
             for (id, curve) in curves {
-                let weight = index.get_issuer_weight(id);
+                let weight = index.get_issuer_weight(id).expect("known pool member");
                 if weight > 0.0 {
                     result.ids.push(id.clone());
                     result.weights.push(weight);
-                    result.recoveries.push(index.get_issuer_recovery(id));
+                    result
+                        .recoveries
+                        .push(index.get_issuer_recovery(id).expect("known pool member"));
                     result.pds.push(
                         (1.0 - curve.sp_on_date(date).expect("issuer survival")).clamp(0.0, 1.0),
                     );

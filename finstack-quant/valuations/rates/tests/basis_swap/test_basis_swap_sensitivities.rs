@@ -112,6 +112,7 @@ fn make_leg(forward_curve: &str, start: Date, end: Date, spread_bp: Decimal) -> 
     FloatLegSpec {
         end_of_month: false,
         fixing_calendar_id: None,
+        index_id: forward_curve.into(),
         forward_curve_id: CurveId::new(forward_curve),
         discount_curve_id: CurveId::new("USD-OIS"),
         start,

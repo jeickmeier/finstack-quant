@@ -711,7 +711,7 @@ export type FloatingLegCompounding =
  *
  * The cashflow builder consults it whenever projecting a floating coupon
  * fails: a missing forward curve, a pre-cutoff observation with no
- * `FIXING:{forward_curve_id}` series supplied, a reset before the curve base
+ * `FIXING:{index_id}` series supplied, a reset before the curve base
  * date, or an overnight or day-count projection error. It never fills a gap
  * in recorded history: when a curve and a fixing series are both supplied, a
  * missing pre-cutoff observation is an error under every policy.
@@ -807,7 +807,8 @@ export type CFKind =
   | "variation_margin_pay"
   | "margin_interest"
   | "collateral_substitution_in"
-  | "collateral_substitution_out";
+  | "collateral_substitution_out"
+  | "derivative_settlement";
 /**
  * Meaning of the emitted schedule relative to pricing and waterfall policy.
  */
@@ -2739,7 +2740,7 @@ export interface FloatingCouponSpec {
  * # Seasoned Instruments (Historical Fixings)
  *
  * Historical fixings **are supported** via the `MarketContext`: store a
- * `ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see
+ * `ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see
  * `finstack_quant_core::market_data::fixings`) containing realized index
  * observations. Observation dates strictly before the valuation cutoff then
  * resolve from that series instead of the curve. The cutoff is the forward
@@ -2837,6 +2838,10 @@ export interface FloatingRateSpec {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: DecimalWire | null;
+  /**
+   * Contractual rate index used for historical observations in FIXING series.
+   */
+  index_id: Id;
   /**
    * Expected term-index tenor, checked against the resolved forward curve.
    *
@@ -3359,6 +3364,10 @@ export interface ModelConfig {
    * this forward curve instead of using a discount-curve par-rate proxy.
    */
   asw_forward_curve_id?: Id | null;
+  /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: Id | null;
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
@@ -6154,6 +6163,10 @@ export interface FloatLegSpec {
    */
   frequency: Tenor;
   /**
+   * Contractual observed index identifying historical rate publications.
+   */
+  index_id: Id;
+  /**
    * Payment lag in business days after period end (default: 0).
    *
    * Bloomberg OIS swaps typically use 2 business days payment lag.
@@ -7302,7 +7315,7 @@ export interface PeriodPlan {
    */
   calendar: PeriodCalendar;
   /**
-   * Ordered periods produced by the parser.
+   * Chronologically ordered reporting periods, with optional gaps.
    */
   periods: Period[];
 }

@@ -91,25 +91,17 @@ fn generate_effects(
             nodes,
             match_mode,
         } => adapters::curves::vol_index_node_effects(curve_id, nodes, *match_mode, ctx),
-        OperationSpec::BaseCorrParallelPts { surface_id, points } => {
-            Ok(adapters::basecorr::base_corr_effects(
-                "BaseCorrParallelPts",
-                surface_id,
-                None,
-                *points,
-                ctx,
-            ))
-        }
+        OperationSpec::BaseCorrParallelPts { surface_id, points } => Ok(
+            adapters::basecorr::base_corr_effects(surface_id, None, *points),
+        ),
         OperationSpec::BaseCorrBucketPts {
             surface_id,
             detachment_bp,
             points,
         } => Ok(adapters::basecorr::base_corr_effects(
-            "BaseCorrBucketPts",
             surface_id,
             detachment_bp.as_deref(),
             *points,
-            ctx,
         )),
         OperationSpec::VolSurfaceParallelPct {
             vol_surface_id,

@@ -101,6 +101,7 @@ fn create_monthly_swap(tenor_years: i32) -> InterestRateSwap {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: disc_id,
+            index_id: fwd_id.as_str().into(),
             forward_curve_id: fwd_id,
             spread_bp: dec!(0.0),
             frequency: Tenor::new(1, TenorUnit::Months).expect("valid tenor fixture"), // Monthly float
@@ -150,6 +151,7 @@ fn create_ois_swap(tenor_years: i32) -> InterestRateSwap {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: disc_id.clone(),
+            index_id: disc_id.as_str().into(),
             forward_curve_id: disc_id, // Single-curve OIS
             spread_bp: dec!(0.0),
             frequency: Tenor::new(1, TenorUnit::Years).expect("valid tenor fixture"), // Annual payment with daily compounding

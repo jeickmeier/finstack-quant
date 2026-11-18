@@ -610,7 +610,7 @@ fn newly_funded_balance_closes_on_economic_principal_dates() {
     use finstack_quant_statements::capital_structure::calculate_period_flows;
     let periods = finstack_quant_core::dates::build_periods("2025Q1..2025Q2", None)
         .expect("valid periods")
-        .periods;
+        .into_periods();
     let market = MarketContext::new();
     for (economic, payment, expected_close) in [
         // Amortized in the quarter, settled after it: the balance is already lower.

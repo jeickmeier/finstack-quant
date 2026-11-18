@@ -30,9 +30,28 @@ test('realizedVariance and realizedVarianceOhlc take the Rust defaults', () => {
   assert.equal(core.realizedVariance(PRICES, 52), 0.008957637457084153);
   const { open, high, low, close } = OHLC;
   // The OHLC default estimator is Yang-Zhang (RealizedVarMethod::OHLC_DEFAULT).
-  assert.equal(core.realizedVarianceOhlc(open, high, low, close), 0.04489594471070698);
   assert.equal(
-    core.realizedVarianceOhlc(open, high, low, close, 'yang_zhang'),
+    core.realizedVarianceOhlc(
+      open.slice(1),
+      high.slice(1),
+      low.slice(1),
+      close.slice(1),
+      undefined,
+      undefined,
+      close[0]
+    ),
+    0.04489594471070698
+  );
+  assert.equal(
+    core.realizedVarianceOhlc(
+      open.slice(1),
+      high.slice(1),
+      low.slice(1),
+      close.slice(1),
+      'yang_zhang',
+      252,
+      close[0]
+    ),
     0.04489594471070698
   );
   assert.equal(core.realizedVarianceOhlc(open, high, low, close, 'parkinson'), 0.04439216444474536);
@@ -212,5 +231,38 @@ test('FxRateResult round trips its JSON', () => {
   assert.throws(
     () => core.FxRateResult.fromJson('{"rate":1.1}'),
     (error) => error.kind === 'validation'
+  );
+});
+
+test('one-one cannot be used as an annualized curve or volatility clock', () => {
+  assert.throws(() => core.DiscountCurve.flat('USD', '2025-01-01', 0.05, 'one_one'), /annualized/);
+  assert.throws(
+    () => core.VolatilityClock.fromJson('{"reference_date":"2025-01-01","day_count":"one_one"}'),
+    /annualized/
+  );
+  const curve = core.DiscountCurve.flat('USD', '2025-01-01', 0.05, 'act_365f');
+  try {
+    for (const day of ['2025-01-02', '2026-01-01', '2035-01-01']) {
+      const years = (Date.parse(day) - Date.parse('2025-01-01')) / (86400000 * 365);
+      assert.ok(Math.abs(curve.df(day) - Math.exp(-0.05 * years)) < 1e-12);
+    }
+  } finally {
+    curve.free();
+  }
+});
+
+test('all OHLC target bars contribute to the opening-gap variance', () => {
+  const bars = [110, 110, 110];
+  for (const method of ['close_to_close', 'yang_zhang']) {
+    const actual = core.realizedVarianceOhlc(bars, bars, bars, bars, method, 252, 100);
+    assert.ok(Math.abs(actual - (252 * Math.log(1.1) ** 2) / 3) < 1e-12);
+    assert.throws(
+      () => core.realizedVarianceOhlc(bars, bars, bars, bars, method, 252),
+      /previous_close/
+    );
+  }
+  assert.equal(
+    core.realizedVarianceOhlc([110], [110], [110], [110], 'yang_zhang', 252, 100),
+    undefined
   );
 });

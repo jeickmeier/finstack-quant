@@ -37,6 +37,7 @@ const fixedSpec = {
 };
 const floatingSpec = {
   rate_spec: {
+    index_id: 'USD-SOFR-3M',
     forward_curve_id: 'USD-SOFR-3M',
     spread_bp: '150',
     reset_frequency: { count: 3, unit: 'months' },
@@ -865,4 +866,30 @@ test('annual ICMA stub respects the contractual February roll', () => {
     assert.equal(stub.accrual.context.coupon_period, null);
     assert.ok(Math.abs(Number(stub.amount.amount) - 5000000 * (1 + 243 / nominalDays)) < 0.005);
   }
+});
+
+test('historical coupons retain the contractual index across projection curves', () => {
+  const snapshot = JSON.parse(MARKET_JSON);
+  const curve = snapshot.curves.find((item) => item.type === 'forward');
+  snapshot.curves.push({ ...curve, id: 'PROXY' });
+  const market = core.MarketContext.fromJson(JSON.stringify(snapshot));
+  const fixing = (id, rate) =>
+    new core.ScalarTimeSeries(`FIXING:${id}`, [[ISSUE, rate]], 'step', 'error');
+  market.insertSeries(fixing('PROXY', 0.05));
+  const coupon = (projection) => {
+    const terms = structuredClone(floatingSpec);
+    Object.assign(terms.rate_spec, {
+      index_id: 'CONTRACT',
+      forward_curve_id: projection,
+      spread_bp: '0',
+    });
+    const schedule = cashflows.CashFlowSchedule.builder()
+      .principal(usd('100000000'), ISSUE, '2025-04-15')
+      .floatingCf(terms)
+      .buildAsOf(market, '2025-02-01');
+    return json(schedule).flows.find((row) => row.kind === 'floating');
+  };
+  assert.throws(() => coupon('PROXY'), /CONTRACT/);
+  market.insertSeries(fixing('CONTRACT', 0.04));
+  for (const id of [curve.id, 'PROXY']) assert.equal(Number(coupon(id).amount.amount), 1000000);
 });

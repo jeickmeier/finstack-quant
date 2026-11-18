@@ -864,6 +864,7 @@ mod excess_spread_tests {
 
     fn floating_senior_spec() -> FloatingRateSpec {
         FloatingRateSpec {
+            index_id: "SOFR-3M".into(),
             forward_curve_id: CurveId::new("SOFR-3M"),
             spread_bp: rust_decimal_macros::dec!(100),
             gearing: rust_decimal_macros::dec!(1),

@@ -3,7 +3,7 @@
 use crate::bond::Bond;
 use crate::bond::CashflowSpec;
 use crate::bond::pricing::quote_conversions::{
-    asset_swap_forward_components, asw_leg_schedule, fixed_leg_annuity,
+    asset_swap_forward_components, asw_index_conventions, asw_leg_schedule, fixed_leg_annuity,
     floating_leg_pv_and_annuity, par_rate_and_annuity_from_discount, settlement_asw_components,
 };
 use crate::bond::pricing::settlement::QuoteDateContext;
@@ -13,7 +13,7 @@ use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, StubKind, Tenor, calendar_by_id_strict,
 };
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_valuations_core::metrics::{MetricCalculator, MetricContext, MetricId};
 use rust_decimal::prelude::ToPrimitive;
 
@@ -120,25 +120,6 @@ fn asw_effective_date(
     Ok(previous.min(quote_date))
 }
 
-/// Floating-leg day count and roll frequency for the workout asset swap:
-/// SOFR pays annual ACT/360, EURIBOR-6M semi-annual ACT/360, and any other
-/// index follows its forward curve's day count and index tenor.
-fn asw_float_leg_conventions(fwd: &ForwardCurve) -> finstack_quant_core::Result<(DayCount, Tenor)> {
-    let id = fwd.id().as_str().to_ascii_uppercase();
-    if id.contains("SOFRRATE") || id.contains("SOFR") {
-        Ok((DayCount::Act360, Tenor::annual()))
-    } else if id.contains("EURIBOR-6M") || id.contains("EURIBOR6M") {
-        Ok((DayCount::Act360, Tenor::semi_annual()))
-    } else if let Some(tenor) = fwd.index_tenor() {
-        Ok((fwd.day_count(), tenor))
-    } else {
-        Err(finstack_quant_core::Error::Validation(format!(
-            "Forward curve '{}' requires explicit index_tenor metadata for asset-swap float leg conventions",
-            fwd.id()
-        )))
-    }
-}
-
 /// PV of coupon-only leg from a custom schedule (excludes amortization and principal).
 fn pv_coupon_from_custom_schedule(
     disc: &DiscountCurve,
@@ -206,9 +187,11 @@ fn forward_par_asw(
             "ASW forward {calc} calculation is undefined for near-zero fixed-leg annuity"
         )));
     }
+    let (_, float_day_count, _) = asw_index_conventions(bond)?;
     let (float_pv, fixed_ann, float_ann) = asset_swap_forward_components(
         disc.as_ref(),
         fwd.as_ref(),
+        float_day_count,
         fixed_day_count,
         fixed_frequency,
         &sched,
@@ -399,6 +382,7 @@ impl MetricCalculator for AssetSwapParCalculator {
             Some(asset_swap_forward_components(
                 disc.as_ref(),
                 fwd.as_ref(),
+                asw_index_conventions(bond)?.1,
                 dc_fixed,
                 Some(frequency),
                 &sched,
@@ -547,7 +531,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                 let df_settlement = disc.df_on_date(quote_ctx.quote_date)?;
                 if let Some(fwd_id) = asw_forward_curve_id.as_ref() {
                     let fwd = context.curves.get_forward(fwd_id)?;
-                    let (float_day_count, float_frequency) = asw_float_leg_conventions(&fwd)?;
+                    let (index, float_day_count, float_frequency) = asw_index_conventions(bond)?;
                     let float_schedule = asw_leg_schedule(
                         effective_date,
                         workout_maturity,
@@ -569,7 +553,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                         float_day_count,
                         &float_schedule,
                         0.0,
-                        Some((context.curves.as_ref(), context.as_of)),
+                        Some((context.curves.as_ref(), context.as_of, index)),
                     )?;
                     let (float_pv, float_ann) =
                         (float_pv / df_settlement, float_ann / df_settlement);
@@ -594,12 +578,28 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                                 .to_string(),
                         ));
                     }
-                    // Upfront is amortized over the floating-leg annuity
-                    // (par-par derivation), proxied on the same schedule
-                    // with the discount curve's day count.
-                    let float_ann =
-                        fixed_leg_annuity(disc.as_ref(), disc.day_count(), None, &fixed_schedule)?
-                            / df_settlement;
+                    let float_ann = if bond
+                        .instrument_pricing_overrides
+                        .model_config
+                        .asw_index_id
+                        .is_some()
+                    {
+                        let (_, basis, frequency) = asw_index_conventions(bond)?;
+                        let schedule = asw_leg_schedule(
+                            effective_date,
+                            workout_maturity,
+                            frequency,
+                            StubKind::ShortBack,
+                            Some((
+                                params.business_day_convention,
+                                calendar_by_id_strict(&params.calendar_id)?,
+                            )),
+                        )?;
+                        fixed_leg_annuity(disc.as_ref(), basis, Some(frequency), &schedule)?
+                            / df_settlement
+                    } else {
+                        ann
+                    };
                     if float_ann.abs() < 1e-12 {
                         return Err(finstack_quant_core::Error::Validation(
                                 "ASW market calculation is undefined for near-zero floating-leg annuity"

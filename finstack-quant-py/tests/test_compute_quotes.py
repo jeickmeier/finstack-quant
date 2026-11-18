@@ -8,7 +8,7 @@ import math
 
 import pytest
 
-from finstack_quant.core.market_data import DiscountCurve, MarketContext
+from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext
 from finstack_quant.valuations.instruments import Bond, BondQuoteSet, compute_quotes, price_instrument
 
 AS_OF = datetime.date(2025, 1, 15)
@@ -101,3 +101,18 @@ def test_a_failed_metric_fails_the_whole_set() -> None:
     bond = Bond.example_callable()
     with pytest.raises(ValueError, match="bond quote metric 'oas'"):
         compute_quotes(bond, MARKET, AS_OF, {"clean_price_pct": 100.0})
+
+
+def test_asset_swap_quote_uses_index_accrual_across_projection_clocks() -> None:
+    state = json.loads(Bond.example().to_json())
+    state["instrument"]["spec"].setdefault("instrument_pricing_overrides", {}).setdefault("model_config", {}).update(
+        asw_forward_curve_id="PROJECTION", asw_index_id="USD-SOFR-3M"
+    )
+    bond = Bond.from_json(json.dumps(state))
+    prices = []
+    for clock in ("act_360", "act_365f"):
+        market = MARKET.insert(ForwardCurve.flat("PROJECTION", AS_OF, 0.0, clock))
+        prices.append(compute_quotes(bond, market, AS_OF, {"asw_market": 0.05}).clean_price_pct)
+        quoted = compute_quotes(bond, market, AS_OF, {"clean_price_pct": prices[-1]})
+        assert quoted.asw_market == pytest.approx(0.05, abs=1e-10)
+    assert prices[0] == pytest.approx(prices[1], abs=1e-10)

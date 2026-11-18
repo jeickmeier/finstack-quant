@@ -546,12 +546,12 @@ impl<'a> CashflowEngine<'a> {
                             let fixing_rate =
                                 finstack_quant_core::market_data::fixings::require_fixing_value_exact(
                                     self.fixing_series,
-                                    spec.forward_curve_id.as_ref(),
+                                    spec.index_id.as_ref(),
                                     fixing_date,
                                 )?;
                             projected_fixings.push(
                                 finstack_quant_cashflows::fixings::ProjectedFixing {
-                                    series_id: fixing_series_id(spec.forward_curve_id.as_str()),
+                                    series_id: fixing_series_id(spec.index_id.as_str()),
                                     date: fixing_date,
                                     value: Some(fixing_rate),
                                 },
@@ -577,7 +577,7 @@ impl<'a> CashflowEngine<'a> {
                             )?;
                             projected_fixings.push(
                                 finstack_quant_cashflows::fixings::ProjectedFixing {
-                                    series_id: fixing_series_id(spec.forward_curve_id.as_str()),
+                                    series_id: fixing_series_id(spec.index_id.as_str()),
                                     date: fixing_date,
                                     value: Some(index_rate),
                                 },
@@ -996,7 +996,7 @@ impl<'a> CashflowEngine<'a> {
                             let base_rate = if fixing_date < self.as_of {
                                 finstack_quant_core::market_data::fixings::require_fixing_value_exact(
                                     self.fixing_series,
-                                    spec.forward_curve_id.as_ref(),
+                                    spec.index_id.as_ref(),
                                     fixing_date,
                                 )?
                             } else {
@@ -1387,6 +1387,7 @@ mod tests {
         let step = date!(2025 - 02 - 14);
         let end = date!(2025 - 04 - 02);
         let spec: FloatingRateSpec = serde_json::from_value(serde_json::json!({
+            "index_id":"TERM",
             "forward_curve_id":"TERM", "spread_bp":"0",
             "reset_frequency":{"count":3,"unit":"months"}, "reset_lag_days":0
         }))
@@ -1563,6 +1564,7 @@ mod tests {
                 let rate = if floating {
                     RateSpec::Floating(
                         serde_json::from_value::<FloatingRateSpec>(serde_json::json!({
+                            "index_id":"TERM",
                             "forward_curve_id":"TERM", "spread_bp":"0",
                             "reset_frequency":{"count":1,"unit":"months"}, "reset_lag_days":0
                         }))
