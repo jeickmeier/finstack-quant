@@ -134,7 +134,8 @@
 
 - Preferred flow: Audit/Review → Plan → Implement (in that order)
 - When a plan file exists: do NOT edit the plan file; do not recreate todos that already exist; mark todos as `in_progress` when starting each one
-- During a plan, validate each completed task with scoped checks for the crate(s) touched:
+- Make most code changes in large, coherent batches before running expensive builds and heavy test suites. Use lightweight, targeted checks during implementation when needed; do not rerun heavy suites after every small edit or task.
+- During a plan, validate each completed batch with scoped checks for the crate(s) touched:
   - `mise run rust-lint-crate -- <package>` and `mise run rust-test-crate` / `rust-test-integration` / `rust-test-filter`
   - Before committing a slice, run `mise run slice-gate`; it selects the cross-language stages the diff needs
   - Run `mise run all` (full workspace) only once at the very end, after the slice gates are clean
