@@ -129,16 +129,25 @@ impl CreditIndexData {
         validate_issuer_weights(&self.issuer_credit_curves, &self.issuer_weights)
     }
 
-    /// Get the credit curve for a specific issuer.
+    /// Resolve the hazard curve of an identified pool member.
     ///
-    /// Returns the issuer-specific curve if available, otherwise falls back
-    /// to the index curve (homogeneous portfolio assumption).
-    pub fn get_issuer_curve(&self, issuer_id: &str) -> &HazardCurve {
+    /// # Arguments
+    ///
+    /// * `issuer_id` - Exact, case-sensitive issuer key in the named pool roster.
+    ///
+    /// # Errors
+    ///
+    /// Returns a lookup error for an unknown issuer or a pool without a named roster.
+    pub fn get_issuer_curve(&self, issuer_id: &str) -> crate::Result<&HazardCurve> {
         self.issuer_credit_curves
             .as_ref()
             .and_then(|curves| curves.get(issuer_id))
-            .map(|arc| arc.as_ref())
-            .unwrap_or(self.index_credit_curve.as_ref())
+            .map(AsRef::as_ref)
+            .ok_or_else(|| {
+                crate::Error::Input(crate::InputError::NotFound {
+                    id: format!("credit index member '{issuer_id}'"),
+                })
+            })
     }
 
     /// Check if heterogeneous pricing mode is available.
@@ -164,22 +173,42 @@ impl CreditIndexData {
     ///
     /// Returns the issuer-specific recovery rate if available, otherwise falls back
     /// to the index recovery rate (homogeneous portfolio assumption).
-    pub fn get_issuer_recovery(&self, issuer_id: &str) -> f64 {
-        self.issuer_recovery_rates
+    ///
+    /// # Arguments
+    ///
+    /// * `issuer_id` - Exact, case-sensitive issuer key in the named pool roster.
+    ///
+    /// # Errors
+    ///
+    /// Returns a lookup error for an unknown issuer or a pool without a named roster.
+    pub fn get_issuer_recovery(&self, issuer_id: &str) -> crate::Result<f64> {
+        self.get_issuer_curve(issuer_id)?;
+        Ok(self
+            .issuer_recovery_rates
             .as_ref()
             .and_then(|m| m.get(issuer_id).copied())
-            .unwrap_or(self.recovery_rate)
+            .unwrap_or(self.recovery_rate))
     }
 
     /// Get the weight for a specific issuer.
     ///
     /// Returns the issuer-specific weight if available, otherwise falls back
     /// to equal weighting (1/N).
-    pub fn get_issuer_weight(&self, issuer_id: &str) -> f64 {
-        self.issuer_weights
+    ///
+    /// # Arguments
+    ///
+    /// * `issuer_id` - Exact, case-sensitive issuer key in the named pool roster.
+    ///
+    /// # Errors
+    ///
+    /// Returns a lookup error for an unknown issuer or a pool without a named roster.
+    pub fn get_issuer_weight(&self, issuer_id: &str) -> crate::Result<f64> {
+        self.get_issuer_curve(issuer_id)?;
+        Ok(self
+            .issuer_weights
             .as_ref()
             .and_then(|m| m.get(issuer_id).copied())
-            .unwrap_or(1.0 / self.num_constituents as f64)
+            .unwrap_or(1.0 / self.num_constituents as f64))
     }
 }
 

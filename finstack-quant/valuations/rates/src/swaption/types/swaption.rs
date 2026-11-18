@@ -174,6 +174,7 @@ pub(super) fn vanilla_underlier(
         .unwrap_or(FloatingLegCompounding::Simple);
     let float = FloatLegSpec {
         discount_curve_id: underlier.discount_curve_id,
+        index_id: underlier.forward_curve_id.as_str().into(),
         forward_curve_id: underlier.forward_curve_id,
         spread_bp: Decimal::ZERO,
         frequency: underlier.float_frequency,
@@ -676,7 +677,7 @@ impl Swaption {
     ) -> Result<Vec<finstack_quant_cashflows::builder::SchedulePeriod>> {
         let fixed = resolve_fixed_leg(
             &self.underlying_fixed_leg,
-            &self.underlying_float_leg.forward_curve_id,
+            &self.underlying_float_leg.index_id,
             &format_args!("Swaption '{}'", self.id),
         )?;
         finstack_quant_cashflows::builder::build_periods(fixed.schedule_params(false))

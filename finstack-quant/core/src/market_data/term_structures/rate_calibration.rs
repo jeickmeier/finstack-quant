@@ -139,11 +139,43 @@ pub enum RateCalibrationQuote {
     },
 }
 
-/// Typed conventions required to replay a rate-curve calibration.
+/// Identity and resolved maturity of a quote in its original evaluator.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct RateQuoteBinding {
+    /// Original stable market quote identifier.
+    pub quote_id: String,
+    /// Contractual maturity resolved using the instrument conventions.
+    #[cfg_attr(feature = "json-schema", schemars(with = "crate::wire::DateWire"))]
+    pub pillar_date: Date,
+    /// Curve-clock year fraction at the resolved maturity.
+    pub pillar_time: f64,
+}
+
+/// Executed evaluator, resolved instruments and original outcome of a rate calibration.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct RateCalibrationExecution {
+    /// Resolved quote identities and maturities, in input order.
+    pub bindings: Vec<RateQuoteBinding>,
+    /// Discount or projection evaluator parameters, including pricing dependencies.
+    pub step_params: serde_json::Value,
+    /// Solver controls and residual acceptance thresholds used by the evaluator.
+    pub calibration_config: serde_json::Value,
+    /// Whether the original fit passed its recorded acceptance policy.
+    pub accepted: bool,
+}
+
+/// Benchmark conventions and quotes associated with a rate curve.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct RateCalibrationRecipe {
+    /// Original execution evidence. A transcribed benchmark list has no qualified replay.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution: Option<RateCalibrationExecution>,
     /// Currency of the calibrated curve.
     pub currency: Currency,
     /// Numerical calibration method.

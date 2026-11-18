@@ -193,6 +193,10 @@ export type Id4 = string;
  */
 export type Decimal6 = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id5 = string;
+/**
  * Day-count convention.
  */
 export type DayCount2 =
@@ -228,7 +232,7 @@ export type BusinessDayConvention2 =
 /**
  * Opaque string identifier.
  */
-export type Id5 = string;
+export type Id6 = string;
 /**
  * Day-count convention.
  */
@@ -386,11 +390,11 @@ export type Date8 = string;
 /**
  * Opaque string identifier.
  */
-export type Id6 = string;
+export type Id7 = string;
 /**
  * Opaque string identifier.
  */
-export type Id7 = string;
+export type Id8 = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -679,7 +683,7 @@ export type Date12 = string;
 /**
  * Opaque string identifier.
  */
-export type Id8 = string;
+export type Id9 = string;
 /**
  * ISO 8601 calendar date string.
  */
@@ -687,11 +691,11 @@ export type Date13 = string;
 /**
  * Opaque string identifier.
  */
-export type Id9 = string;
+export type Id10 = string;
 /**
  * Opaque string identifier.
  */
-export type Id10 = string;
+export type Id11 = string;
 /**
  * Currency in which variation margin is paid.
  */
@@ -961,8 +965,8 @@ export interface DD7F0Aa83744A0794Bfe5 {
    */
   deliverable_basket: [D_83D45912Dd5Fd6Adb40F, ...D_83D45912Dd5Fd6Adb40F[]];
   delivery_start: Date13;
-  discount_curve_id: Id9;
-  id: Id10;
+  discount_curve_id: Id10;
+  id: Id11;
   instrument_pricing_overrides?: InstrumentPricingOverrides1;
   metric_pricing_overrides?: MetricPricingOverrides1;
   /**
@@ -1126,7 +1130,7 @@ export interface D_0E4F6595F5E014Bbb86A {
    * generating cashflows from the cashflow_spec.
    */
   custom_cashflows?: D_610217A060F73Ced8379 | null;
-  discount_curve_id: Id6;
+  discount_curve_id: Id7;
   /**
    * Calendar identifier for ex-coupon day counting.
    */
@@ -1135,7 +1139,7 @@ export interface D_0E4F6595F5E014Bbb86A {
    * Number of ex-coupon days before coupon date.
    */
   ex_coupon_days?: number;
-  id: Id7;
+  id: Id8;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   issue_date: Date9;
   maturity: Date10;
@@ -1520,6 +1524,7 @@ export interface D_0067Baa6B86C47F45A9E {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: Decimal5 | null;
+  index_id: Id5;
   /**
    * Expected term-index tenor, checked against the resolved forward curve.
    *
@@ -1650,7 +1655,7 @@ export interface D_7Fdd8D325754C89E8272 {
    */
   adjust_accrual_dates?: boolean;
   business_day_convention: BusinessDayConvention2;
-  calendar_id: Id5;
+  calendar_id: Id6;
   /**
    * Coupon type (Cash/PIK/Split).
    */
@@ -2143,7 +2148,8 @@ export interface D_26255163Cf9C21445D19 {
     | "variation_margin_pay"
     | "margin_interest"
     | "collateral_substitution_in"
-    | "collateral_substitution_out";
+    | "collateral_substitution_out"
+    | "derivative_settlement";
   /**
    * Economic date of the principal movement, independent of cash payment.
    * Required with `principal_delta` on every principal-like row and absent
@@ -2184,6 +2190,10 @@ export interface D_7658F074507Acce0D3Be {
   context: DB6E0E2B400C3317Cb7Fe;
   day_count: DayCount5;
   end: Date5;
+  /**
+   * Consecutive nominal boundaries for a coupon spanning multiple ICMA reference periods.
+   */
+  nominal_dates?: Date2[];
   /**
    * Projected index rate before spread, gearing, caps, or floors.
    * Serialization rejects non-finite rates instead of encoding them as absent.
@@ -2795,6 +2805,10 @@ export interface D_572Ad1Befb7D94914652 {
    * this forward curve instead of using a discount-curve par-rate proxy.
    */
   asw_forward_curve_id?: D_94Cb251104De5Cf587B6 | null;
+  /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: D_94Cb251104De5Cf587B6 | null;
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
@@ -4008,7 +4022,7 @@ export interface ScenarioPricingOverrides {
  * factor and store the result here.
  */
 export interface D_83D45912Dd5Fd6Adb40F {
-  bond_id: Id8;
+  bond_id: Id9;
   /**
    * Positive conversion factor consumed by the model-price calculation.
    */

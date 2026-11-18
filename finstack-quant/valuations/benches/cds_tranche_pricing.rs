@@ -264,8 +264,8 @@ fn capture_case(
             .into_iter()
             .flat_map(|curves| curves.iter())
             .map(|(id, curve)| {
-                let weight = index.get_issuer_weight(id);
-                let recovery = index.get_issuer_recovery(id);
+                let weight = index.get_issuer_weight(id).expect("known pool member");
+                let recovery = index.get_issuer_recovery(id).expect("known pool member");
                 let pd = (1.0 - curve.sp_on_date(tranche.maturity).expect("issuer survival"))
                     .clamp(0.0, 1.0);
                 if weight > 0.0 {
@@ -1025,8 +1025,11 @@ fn bench_cds_tranche_p5_controls(c: &mut Criterion) {
                 let positive: Vec<_> = curves
                     .keys()
                     .filter_map(|id| {
-                        let weight = index.get_issuer_weight(id);
-                        (weight > 0.0).then_some((weight, index.get_issuer_recovery(id)))
+                        let weight = index.get_issuer_weight(id).expect("known pool member");
+                        (weight > 0.0).then_some((
+                            weight,
+                            index.get_issuer_recovery(id).expect("known pool member"),
+                        ))
                     })
                     .collect();
                 assert_eq!(positive.len(), control.names);

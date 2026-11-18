@@ -464,7 +464,7 @@ fn overnight_spec() -> Value {
         .expect("coupon")
         .remove("rate");
     value["coupon_program"][0]["spec"]["rate_spec"] = json!({
-        "forward_curve_id": "RFR", "spread_bp": "0",
+        "index_id": "RFR", "forward_curve_id": "RFR", "spread_bp": "0",
         "reset_frequency": {"count": 3, "unit": "months"}, "reset_lag_days": 0,
         "compounding": {"compounded_in_arrears": {"lookback_days": 0}},
         "overnight_index_constraints": "period"

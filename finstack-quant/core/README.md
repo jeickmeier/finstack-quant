@@ -68,7 +68,7 @@ Full item documentation is in the rustdoc (`cargo doc -p finstack-quant-core
 | `market_data::term_structures` | `DiscountCurve`, `ForwardCurve`, `HazardCurve`, `InflationCurve`, `BaseCorrelationCurve`, `PriceCurve` (signed prices or, via `PriceCurveKind::VolIndex`, non-negative volatility-index levels), `ParametricCurve` (Nelson-Siegel / Svensson), `ForwardVarianceCurve`, `CreditIndexData`, plus builders and rate-calibration helpers. |
 | `market_data::surfaces` | `VolSurface`, `VolCube`, `FxDeltaVolSurface` (validated ATM / risk-reversal / butterfly quotes; conversion lives in `finstack-quant-models::volatility`). |
 | `market_data::scalars` | `MarketScalar`, `ScalarTimeSeries`, `SeriesInterpolation`, plus `InflationIndex` with its `InflationLag` convention. |
-| `market_data::dividends` | `DividendEvent`, `DividendKind`, `DividendSchedule`. |
+| `market_data::dividends` | `DividendEvent`, `DividendSchedule`. |
 | `market_data::bumps` | `BumpSpec`, `BumpType`, `BumpUnits`, `BumpMode`, `MarketBump`, and the `Bumpable` trait — the scenario/greeks perturbation vocabulary. |
 | `market_data::diff` | Curve and scalar shift measurements between two contexts; volatility-surface evaluation and shift measurement live in models. |
 | `market_data::hierarchy` | Tree of tagged nodes referencing `CurveId`s, for scenario targeting and factor scoping. |

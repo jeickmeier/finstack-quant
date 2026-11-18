@@ -304,6 +304,7 @@ pub fn create_floating_convertible() -> ConvertibleBond {
 
     let floating = FloatingCouponSpec {
         rate_spec: FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),

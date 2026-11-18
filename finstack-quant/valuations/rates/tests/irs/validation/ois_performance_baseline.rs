@@ -74,6 +74,7 @@ fn benchmark_swap(tenor: i32) -> InterestRateSwap {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-OIS".into(),
             forward_curve_id: "USD-OIS".into(),
             spread_bp: dec!(0.0),
             frequency: Tenor::annual(),

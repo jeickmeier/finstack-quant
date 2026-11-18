@@ -5,7 +5,7 @@ use crate::builder::orchestrator::BuildState;
 use finstack_quant_core::InputError;
 use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual, CashFlowParams};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::fixings::fixing_series_id;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
@@ -89,7 +89,7 @@ fn add_pik_flow_if_nonzero(
 /// carry the same `(rate, days)` weighting in the compounding product.
 ///
 /// - `obs_date < as_of`: realized fixing, resolved exactly from the
-///   `FIXING:{forward_curve_id}` series. Weekend/holiday carry is represented by the
+///   `FIXING:{index_id}` series. Weekend/holiday carry is represented by the
 ///   observation day weight, so a missing business-day publication is an
 ///   error rather than permission to reuse an arbitrarily old rate. Missing
 ///   history diagnostics identify the observation and valuation dates. An incomplete
@@ -104,10 +104,10 @@ fn observed_overnight_rate(
     day_count_basis: f64,
     fwd: &ForwardCurve,
     fixings: Option<&ScalarTimeSeries>,
-    forward_curve_id: &str,
+    index_id: &str,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
-    if let Some(fixing) = observed_index_fixing(obs_date, fixings, forward_curve_id, as_of)? {
+    if let Some(fixing) = observed_index_fixing(obs_date, fixings, index_id, as_of)? {
         return Ok(fixing);
     }
     project_overnight_rate(fwd, obs_date, day_count_basis)
@@ -123,7 +123,7 @@ fn require_supplied_historical_fixings(
     observation_date: Option<Date>,
     curve: Option<&ForwardCurve>,
     fixings: Option<&ScalarTimeSeries>,
-    forward_curve_id: &str,
+    index_id: &str,
 ) -> finstack_quant_core::Result<()> {
     let (Some(fixings), Some(as_of)) = (
         fixings,
@@ -132,7 +132,7 @@ fn require_supplied_historical_fixings(
         return Ok(());
     };
     let require_historical =
-        |date| observed_index_fixing(date, Some(fixings), forward_curve_id, as_of).map(drop);
+        |date| observed_index_fixing(date, Some(fixings), index_id, as_of).map(drop);
     match observation {
         FloatingRateObservation::Term { reset_date, .. } => require_historical(*reset_date),
         FloatingRateObservation::Overnight { schedule, .. } => schedule
@@ -244,17 +244,75 @@ pub(crate) fn emit_fixed_coupons_on(
                 let day_count_ctx = crate::builder::periods::period_day_count_context(
                     period,
                     calendar,
-                    crate::builder::periods::AccrualConventions::from_schedule(&spec.schedule),
+                    crate::builder::periods::AccrualConventions {
+                        grid_anchor: (spec.schedule.day_count == DayCount::ActActIsma)
+                            .then_some(schedule.grid_anchor),
+                        ..crate::builder::periods::AccrualConventions::from_schedule(&spec.schedule)
+                    },
                     is_termination_date,
                 )?;
                 let coupon_period = day_count_ctx.coupon_period;
-                let yf = crate::builder::periods::contractual_accrual(
-                    spec.schedule.day_count,
-                    (period.accrual_start, period.accrual_end),
-                    accrual_start,
-                    accrual_end,
-                    day_count_ctx,
+                let is_icma = spec.schedule.day_count == DayCount::ActActIsma;
+                let mut nominal_dates = Vec::new();
+                let mut reference = coupon_period;
+                if is_icma
+                    && coupon_period.is_some_and(|(lo, hi)| accrual_start < lo || accrual_end > hi)
+                {
+                    crate::builder::date_generation::visit_icma_periods(
+                        accrual_start,
+                        accrual_end,
+                        day_count_ctx,
+                        Some(spec.schedule.end_of_month),
+                        Some(schedule.grid_anchor),
+                        |lo, hi| {
+                            if nominal_dates.is_empty() {
+                                nominal_dates.push(lo);
+                            }
+                            nominal_dates.push(hi);
+                            Ok(())
+                        },
+                    )?;
+                    reference = match nominal_dates.as_slice() {
+                        [lo, hi] => Some((*lo, *hi)),
+                        _ => None,
+                    };
+                }
+                let context = finstack_quant_core::dates::DayCountContextState::try_new(
+                    Some(spec.schedule.calendar_id.to_string()),
+                    is_icma.then_some(spec.schedule.frequency),
+                    None,
+                    reference,
+                    Some(is_termination_date),
                 )?;
+                let accrual = if nominal_dates.len() > 2 {
+                    CashFlowAccrual::from_nominal_dates(
+                        accrual_start,
+                        accrual_end,
+                        None,
+                        context,
+                        nominal_dates,
+                    )
+                } else {
+                    CashFlowAccrual::new(
+                        accrual_start,
+                        accrual_end,
+                        spec.schedule.day_count,
+                        None,
+                        context,
+                    )
+                }?;
+
+                let yf = if is_icma {
+                    accrual.year_fraction()
+                } else {
+                    crate::builder::periods::contractual_accrual(
+                        spec.schedule.day_count,
+                        (period.accrual_start, period.accrual_end),
+                        accrual_start,
+                        accrual_end,
+                        day_count_ctx,
+                    )
+                }?;
 
                 let yf_dec = f64_to_decimal(yf)?;
                 let coupon_total_dec = base_out
@@ -291,22 +349,6 @@ pub(crate) fn emit_fixed_coupons_on(
                 };
 
                 let rate_f64 = spec.rate.as_f64();
-                let accrual = CashFlowAccrual::new(
-                    accrual_start,
-                    accrual_end,
-                    spec.schedule.day_count,
-                    None,
-                    finstack_quant_core::dates::DayCountContextState::try_new(
-                        Some(spec.schedule.calendar_id.to_string()),
-                        (spec.schedule.day_count
-                            == finstack_quant_core::dates::DayCount::ActActIsma)
-                            .then_some(spec.schedule.frequency),
-                        None,
-                        coupon_period,
-                        Some(is_termination_date),
-                    )?,
-                )?;
-
                 // Gate on cash split, not amount sign, so negative-rate coupons emit.
                 if cash_fraction > Decimal::ZERO {
                     let kind = if is_stub { CFKind::Stub } else { CFKind::Fixed };
@@ -351,14 +393,14 @@ pub(crate) fn emit_fixed_coupons_on(
 ///
 /// Both slices are aligned index-for-index with the builder's float
 /// schedules; entries are `None` when the `MarketContext` lacks the
-/// corresponding curve or `FIXING:{forward_curve_id}` series.
+/// corresponding curve or `FIXING:{index_id}` series.
 #[derive(Clone, Copy)]
 pub(crate) struct ResolvedFloatMarket<'a> {
     /// Explicit observation cutoff; absent for curve-base projection builds.
     pub(crate) observation_date: Option<Date>,
     /// Forward curves, one per float schedule.
     pub(crate) curves: &'a [Option<std::sync::Arc<ForwardCurve>>],
-    /// Historical fixing series (`FIXING:{forward_curve_id}`), one per float schedule.
+    /// Historical fixing series (`FIXING:{index_id}`), one per float schedule.
     pub(crate) fixings: &'a [Option<&'a ScalarTimeSeries>],
 }
 
@@ -410,7 +452,8 @@ fn project_segment_indices(
 ) -> finstack_quant_core::Result<Vec<(f64, f64)>> {
     let (curve, fixings) = resolved;
     let forward_curve_id = schedule.spec.rate_spec.forward_curve_id.as_str();
-    let series_id = fixing_series_id(forward_curve_id);
+    let index_id = schedule.spec.rate_spec.index_id.as_str();
+    let series_id = fixing_series_id(index_id);
     let curve = curve.ok_or_else(|| {
         finstack_quant_core::Error::Input(InputError::NotFound {
             id: format!(
@@ -423,7 +466,7 @@ fn project_segment_indices(
     match observation {
         FloatingRateObservation::Term { reset_date, .. } => {
             let index_rate = if let Some(fixing) =
-                observed_index_fixing(*reset_date, fixings, forward_curve_id, as_of)?
+                observed_index_fixing(*reset_date, fixings, index_id, as_of)?
             {
                 fixing
             } else {
@@ -464,7 +507,7 @@ fn project_segment_indices(
                     *day_count_basis,
                     curve,
                     fixings,
-                    forward_curve_id,
+                    index_id,
                     as_of,
                 )?;
                 raw_fixings.insert(slice.observation_date, rate);
@@ -542,7 +585,7 @@ fn project_segment_indices(
 ///
 /// Seasoned coupons (observation dates before the valuation cutoff) resolve
 /// realized index fixings from `market.fixings`, the per-schedule
-/// `FIXING:{forward_curve_id}` series aligned with `market.curves` (exact-date
+/// `FIXING:{index_id}` series aligned with `market.curves` (exact-date
 /// observations for both overnight and term resets). The cutoff is the curve
 /// base date under `build` and `as_of` under `build_as_of`. A failed
 /// projection, including pre-cutoff observations with no series, routes the
@@ -651,7 +694,7 @@ pub(crate) fn emit_float_coupons_on(
             } else {
                 FloatingRateObservation::Term { reset_date }
             };
-            let series_id = fixing_series_id(spec.rate_spec.forward_curve_id.as_str());
+            let series_id = fixing_series_id(spec.rate_spec.index_id.as_str());
             match &observation {
                 FloatingRateObservation::Term { reset_date, .. } => {
                     projected_fixings.push(crate::fixings::ProjectedFixing {
@@ -695,7 +738,7 @@ pub(crate) fn emit_float_coupons_on(
                         market.observation_date,
                         resolved_curve.as_deref(),
                         *resolved_fixing,
-                        spec.rate_spec.forward_curve_id.as_str(),
+                        spec.rate_spec.index_id.as_str(),
                     )?;
                     if !is_absent_market_source(
                         &observation,

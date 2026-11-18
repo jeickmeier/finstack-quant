@@ -190,6 +190,7 @@ fn test_floating_rate_term_loan_yield_and_dm() {
         .issue_date(as_of)
         .maturity(maturity)
         .rate(RateSpec::Floating(FloatingRateSpec {
+            index_id: "USD-SOFR".into(),
             forward_curve_id: CurveId::from("USD-SOFR"),
             spread_bp: Decimal::from(250),
             gearing: Decimal::from(1),

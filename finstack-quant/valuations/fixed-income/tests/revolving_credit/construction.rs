@@ -14,6 +14,7 @@ use time::macros::date;
 
 fn floating_rate_spec(forward_curve_id: &str, spread_bp: f64) -> FloatingRateSpec {
     FloatingRateSpec {
+        index_id: forward_curve_id.into(),
         forward_curve_id: CurveId::new(forward_curve_id),
         spread_bp: Decimal::try_from(spread_bp).expect("valid literal"),
         gearing: Decimal::ONE,

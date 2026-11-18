@@ -873,6 +873,7 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
         };
         let float = finstack_quant_valuations::instruments::FloatLegSpec {
             discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: finstack_quant_core::types::CurveId::new("USD-SOFR-3M"),
             spread_bp: rust_decimal::Decimal::ZERO,
             frequency: Tenor::quarterly(),

@@ -1434,7 +1434,7 @@ export type FloatingLegCompounding =
  *
  * The cashflow builder consults it whenever projecting a floating coupon
  * fails: a missing forward curve, a pre-cutoff observation with no
- * `FIXING:{forward_curve_id}` series supplied, a reset before the curve base
+ * `FIXING:{index_id}` series supplied, a reset before the curve base
  * date, or an overnight or day-count projection error. It never fills a gap
  * in recorded history: when a curve and a fixing series are both supplied, a
  * missing pre-cutoff observation is an error under every policy.
@@ -1530,7 +1530,8 @@ export type CFKind =
   | "variation_margin_pay"
   | "margin_interest"
   | "collateral_substitution_in"
-  | "collateral_substitution_out";
+  | "collateral_substitution_out"
+  | "derivative_settlement";
 /**
  * Meaning of the emitted schedule relative to pricing and waterfall policy.
  */
@@ -4516,6 +4517,7 @@ export type CurveState =
        * Strictly increasing `(time_years, cpi_level)` pillars starting at `0.0`.
        */
       knot_points: [number, number][];
+      series?: InflationSeries | null;
       type: "inflation";
     }
   | {
@@ -4823,34 +4825,6 @@ export type NelsonSiegelModel =
       tau1: number;
       tau2: number;
       variant: "nss";
-    };
-/**
- * Type of dividend event.
- *
- * Distinguishes between cash payments, stock distributions, and continuous
- * yield approximations used in different pricing models.
- *
- * # Variants
- *
- * - **Cash**: Actual dividend payment (quarterly, semi-annual, etc.)
- * - **Stock**: Share distribution (less common, complicates option pricing)
- * - **Yield**: Continuous approximation for analytical models
- */
-export type DividendKind =
-  | {
-      cash: Money;
-    }
-  | {
-      yield: number;
-    }
-  | {
-      stock: {
-        /**
-         * Stock distribution ratio; 0.05 corresponds to a 5% stock dividend.
-         */
-        ratio: number;
-        [k: string]: unknown;
-      };
     };
 /**
  * At-the-money strike convention on [`FxDeltaVolSurface`].
@@ -5530,6 +5504,10 @@ export interface ModelConfig {
    * this forward curve instead of using a discount-curve par-rate proxy.
    */
   asw_forward_curve_id?: Id | null;
+  /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: Id | null;
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
@@ -7634,7 +7612,7 @@ export interface FloatingCouponSpec {
  * # Seasoned Instruments (Historical Fixings)
  *
  * Historical fixings **are supported** via the `MarketContext`: store a
- * `ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see
+ * `ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see
  * `finstack_quant_core::market_data::fixings`) containing realized index
  * observations. Observation dates strictly before the valuation cutoff then
  * resolve from that series instead of the curve. The cutoff is the forward
@@ -7732,6 +7710,10 @@ export interface FloatingRateSpec {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: DecimalWire | null;
+  /**
+   * Contractual rate index used for historical observations in FIXING series.
+   */
+  index_id: Id;
   /**
    * Expected term-index tenor, checked against the resolved forward curve.
    *
@@ -7999,6 +7981,10 @@ export interface CashFlowAccrual {
    * Contractual accrual-period end date.
    */
   end: DateWire;
+  /**
+   * Consecutive nominal boundaries for a coupon spanning multiple ICMA reference periods.
+   */
+  nominal_dates?: DateWire[];
   /**
    * Projected index rate before spread, gearing, caps, or floors.
    * Serialization rejects non-finite rates instead of encoding them as absent.
@@ -11078,6 +11064,10 @@ export interface FloatLegSpec {
    * Payment frequency
    */
   frequency: Tenor;
+  /**
+   * Contractual observed index identifying historical rate publications.
+   */
+  index_id: Id;
   /**
    * Payment lag in business days after period end (default: 0).
    *
@@ -14307,6 +14297,11 @@ export interface VarianceSwap {
    */
   open_series_id?: string | null;
   /**
+   * Contractual closing fixing immediately before the first Yang–Zhang target bar.
+   * Resolved exactly in the same close series as the target bars.
+   */
+  previous_close_date?: DateWire | null;
+  /**
    * Corporate-action policy applied to all historical price series.
    *
    * The selected policy is declarative: input series must already conform to
@@ -15337,6 +15332,11 @@ export interface FxVarianceSwap {
    * Defaults to `spot_id` (or currency-pair string) when absent.
    */
   open_series_id?: string | null;
+  /**
+   * Contractual closing fixing immediately before the first Yang–Zhang target bar.
+   * Resolved exactly in the same close series as the target bars.
+   */
+  previous_close_date?: DateWire | null;
   /**
    * Quote-currency calendar used in the joint observation calendar.
    */
@@ -19822,7 +19822,7 @@ export interface CreditIndexState {
   recovery_rate: number;
 }
 /**
- * Typed conventions required to replay a rate-curve calibration.
+ * Benchmark conventions and quotes associated with a rate curve.
  */
 export interface RateCalibrationRecipe {
   /**
@@ -19833,6 +19833,10 @@ export interface RateCalibrationRecipe {
    * Day count used for the curve's time axis.
    */
   curve_day_count: DayCount;
+  /**
+   * Original execution evidence. A transcribed benchmark list has no qualified replay.
+   */
+  execution?: RateCalibrationExecution | null;
   /**
    * Numerical calibration method.
    */
@@ -19849,6 +19853,48 @@ export interface RateCalibrationRecipe {
    * Discount/projection role and linked curve identifier.
    */
   role: RateCalibrationCurveRole;
+}
+/**
+ * Executed evaluator, resolved instruments and original outcome of a rate calibration.
+ */
+export interface RateCalibrationExecution {
+  /**
+   * Whether the original fit passed its recorded acceptance policy.
+   */
+  accepted: boolean;
+  /**
+   * Resolved quote identities and maturities, in input order.
+   */
+  bindings: RateQuoteBinding[];
+  /**
+   * Solver controls and residual acceptance thresholds used by the evaluator.
+   */
+  calibration_config: {
+    [k: string]: unknown;
+  };
+  /**
+   * Discount or projection evaluator parameters, including pricing dependencies.
+   */
+  step_params: {
+    [k: string]: unknown;
+  };
+}
+/**
+ * Identity and resolved maturity of a quote in its original evaluator.
+ */
+export interface RateQuoteBinding {
+  /**
+   * Contractual maturity resolved using the instrument conventions.
+   */
+  pillar_date: DateWire;
+  /**
+   * Curve-clock year fraction at the resolved maturity.
+   */
+  pillar_time: number;
+  /**
+   * Original stable market quote identifier.
+   */
+  quote_id: string;
 }
 /**
  * Source interpolation and a single accumulated transformation, never a chain
@@ -19984,50 +20030,40 @@ export interface HazardConditionSource {
   knot_points: [number, number][];
 }
 /**
- * Dividend schedule for an equity or ETF underlying.
- *
- * Contains a time-ordered sequence of dividend events used for pricing equity
- * derivatives and calculating total return. The schedule can be referenced by
- * multiple instruments via its [`CurveId`] in the market context.
- *
- * # Usage in Pricing
- *
- * - **Discrete dividends**: Subtract PV of future dividends from spot for option pricing
- * - **Ex-dividend adjustments**: Reduce forward price by dividend amount
- * - **Dividend futures**: Sum dividends in contract period
- * - **Total return**: Include dividend reinvestment in performance
+ * Publication identity and units of an observed or projected inflation level.
  */
-export interface DividendSchedule {
+export interface InflationSeries {
   /**
-   * Quote currency for cash dividends (optional metadata).
+   * Published reference period and index scale, for example `1982-84=100`.
    */
-  currency?: Currency | null;
+  reference_base: string;
   /**
-   * Sorted events by date (ascending).
+   * True for seasonally adjusted levels and false for unadjusted levels.
    */
-  events: DividendEvent[];
+  seasonally_adjusted: boolean;
   /**
-   * Unique identifier of this schedule in the market context.
+   * Publisher-qualified identifier of the statistical series.
    */
-  id: Id;
-  /**
-   * Optional display symbol/ticker for convenience.
-   */
-  underlying?: string | null;
+  series_id: string;
 }
 /**
- * A dated dividend event.
+ * Validated distributions for one security, share basis and currency.
+ */
+export interface DividendSchedule {
+  currency: Currency;
+  events: DividendEvent[];
+  id: Id;
+  share_basis: string;
+  underlying: Id;
+}
+/**
+ * One gross cash distribution per entitled share on its schedule's share basis.
  */
 export interface DividendEvent {
-  /**
-   * Ex-dividend date.
-   */
-  date: DateWire;
-  /**
-   * Event kind.
-   */
-  kind: DividendKind;
-  [k: string]: unknown;
+  amount: Money;
+  event_id: string;
+  ex_date: DateWire;
+  pay_date: DateWire;
 }
 /**
  * Serializable state of an FxMatrix.
@@ -20272,6 +20308,7 @@ export interface InflationIndex {
    * Strictly ascending canonical monthly fixing observations.
    */
   observations: InflationObservation[];
+  series?: InflationSeries | null;
 }
 /**
  * One expected-release schedule assumption for a monthly CPI/RPI reference period.

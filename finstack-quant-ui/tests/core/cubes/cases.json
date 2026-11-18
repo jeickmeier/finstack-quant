@@ -21,6 +21,119 @@
         "interp_style": "linear",
         "extrapolation": "extend",
         "rate_calibration": {
+          "execution": {
+            "bindings": [
+              {
+                "quote_id": "USD-SOFR-DEP-1M",
+                "pillar_date": "2026-06-12",
+                "pillar_time": 0.0958904109589041
+              },
+              {
+                "quote_id": "USD-SOFR-DEP-3M",
+                "pillar_date": "2026-08-12",
+                "pillar_time": 0.26301369863013696
+              },
+              {
+                "quote_id": "USD-OIS-SWAP-1Y",
+                "pillar_date": "2027-05-14",
+                "pillar_time": 1.0164383561643835
+              },
+              {
+                "quote_id": "USD-OIS-SWAP-2Y",
+                "pillar_date": "2028-05-16",
+                "pillar_time": 2.0246575342465754
+              },
+              {
+                "quote_id": "USD-OIS-SWAP-5Y",
+                "pillar_date": "2031-05-14",
+                "pillar_time": 5.019178082191781
+              },
+              {
+                "quote_id": "USD-OIS-SWAP-10Y",
+                "pillar_date": "2036-05-14",
+                "pillar_time": 10.024657534246575
+              }
+            ],
+            "step_params": {
+              "base_date": "2026-05-08",
+              "conventions": {
+                "curve_day_count": null,
+                "ois_compounding": null
+              },
+              "currency": "USD",
+              "curve_id": "USD-OIS",
+              "extrapolation": "extend",
+              "interpolation": "linear",
+              "kind": "discount",
+              "method": "bootstrap",
+              "pricing_discount_id": null,
+              "pricing_forward_id": null
+            },
+            "calibration_config": {
+              "compute_diagnostics": false,
+              "discount_curve": {
+                "allow_non_monotonic_final": null,
+                "bootstrap_seed_global_solve": true,
+                "df_hard_max": 1000000,
+                "df_hard_min": 1e-12,
+                "jacobian_step_size": 0.000001,
+                "min_scan_grid_points": 20,
+                "scan_grid_points": 48,
+                "scan_grid_step": 0.0001,
+                "validation_tolerance": 1e-8,
+                "weighting_scheme": "sqrt_time"
+              },
+              "fail_on_bad_fit": true,
+              "forward_curve": {
+                "validation_tolerance": 1e-8,
+                "weighting_scheme": "sqrt_time"
+              },
+              "hazard_curve": {
+                "hazard_hard_max": 10,
+                "hazard_hard_min": 0,
+                "validation_tolerance": 1e-8,
+                "weighting_scheme": "sqrt_time"
+              },
+              "inflation_curve": {
+                "cpi_hard_max": 10000,
+                "cpi_hard_min": 1,
+                "validation_tolerance": 1e-8,
+                "weighting_scheme": "sqrt_time"
+              },
+              "rate_bounds": {
+                "max_rate": 0.5,
+                "min_rate": -0.02
+              },
+              "rate_bounds_policy": "auto_currency",
+              "solver": {
+                "max_iterations": 100,
+                "tolerance": 1e-12
+              },
+              "use_parallel": false,
+              "validation": {
+                "allow_negative_rates": false,
+                "check_arbitrage": true,
+                "check_forward_positivity": true,
+                "check_monotonicity": true,
+                "max_cpi_growth": 0.5,
+                "max_forward_rate": 0.5,
+                "max_fwd_inflation": 0.5,
+                "max_hazard_rate": 0.5,
+                "max_volatility": 5,
+                "min_cpi_growth": -0.1,
+                "min_forward_rate": -0.01,
+                "min_fwd_inflation": -0.2,
+                "minimum_lgd_for_hazard_guess": 0.000001,
+                "recovery_rate_abs_tolerance": 1e-12,
+                "tolerance": 1e-10
+              },
+              "validation_mode": "error",
+              "vol_surface": {
+                "validation_tolerance": 0.001
+              }
+            },
+            "accepted": true
+          },
           "currency": "USD",
           "method": "bootstrap",
           "curve_day_count": "act_365f",
@@ -131,6 +244,121 @@
         "interp_style": "linear",
         "extrapolation": "extend",
         "rate_calibration": {
+          "execution": {
+            "bindings": [
+              {
+                "quote_id": "FRA-SOFR-3M-0X3",
+                "pillar_date": "2026-08-10",
+                "pillar_time": 0.2611111111111111
+              },
+              {
+                "quote_id": "FRA-SOFR-3M-3X6",
+                "pillar_date": "2026-11-09",
+                "pillar_time": 0.5138888888888888
+              },
+              {
+                "quote_id": "FRA-SOFR-3M-6X9",
+                "pillar_date": "2027-02-08",
+                "pillar_time": 0.7666666666666667
+              },
+              {
+                "quote_id": "FRA-SOFR-3M-9X12",
+                "pillar_date": "2027-05-10",
+                "pillar_time": 1.0194444444444444
+              },
+              {
+                "quote_id": "FRA-SOFR-3M-12X18",
+                "pillar_date": "2027-11-08",
+                "pillar_time": 1.525
+              }
+            ],
+            "step_params": {
+              "base_date": "2026-05-08",
+              "conventions": {
+                "curve_day_count": null,
+                "ois_compounding": null
+              },
+              "currency": "USD",
+              "curve_id": "USD-SOFR-3M",
+              "discount_curve_id": "USD-OIS",
+              "extrapolation": "extend",
+              "index_tenor": {
+                "count": 3,
+                "unit": "months"
+              },
+              "interpolation": "linear",
+              "kind": "forward",
+              "method": {
+                "global_solve": {
+                  "use_analytical_jacobian": false
+                }
+              }
+            },
+            "calibration_config": {
+              "compute_diagnostics": false,
+              "discount_curve": {
+                "allow_non_monotonic_final": null,
+                "bootstrap_seed_global_solve": true,
+                "df_hard_max": 1000000,
+                "df_hard_min": 1e-12,
+                "jacobian_step_size": 0.000001,
+                "min_scan_grid_points": 20,
+                "scan_grid_points": 48,
+                "scan_grid_step": 0.0001,
+                "validation_tolerance": 1e-8,
+                "weighting_scheme": "sqrt_time"
+              },
+              "fail_on_bad_fit": true,
+              "forward_curve": {
+                "validation_tolerance": 1e-8,
+                "weighting_scheme": "sqrt_time"
+              },
+              "hazard_curve": {
+                "hazard_hard_max": 10,
+                "hazard_hard_min": 0,
+                "validation_tolerance": 1e-8,
+                "weighting_scheme": "sqrt_time"
+              },
+              "inflation_curve": {
+                "cpi_hard_max": 10000,
+                "cpi_hard_min": 1,
+                "validation_tolerance": 1e-8,
+                "weighting_scheme": "sqrt_time"
+              },
+              "rate_bounds": {
+                "max_rate": 0.5,
+                "min_rate": -0.02
+              },
+              "rate_bounds_policy": "auto_currency",
+              "solver": {
+                "max_iterations": 100,
+                "tolerance": 1e-12
+              },
+              "use_parallel": false,
+              "validation": {
+                "allow_negative_rates": false,
+                "check_arbitrage": true,
+                "check_forward_positivity": true,
+                "check_monotonicity": true,
+                "max_cpi_growth": 0.5,
+                "max_forward_rate": 0.5,
+                "max_fwd_inflation": 0.5,
+                "max_hazard_rate": 0.5,
+                "max_volatility": 5,
+                "min_cpi_growth": -0.1,
+                "min_forward_rate": -0.01,
+                "min_fwd_inflation": -0.2,
+                "minimum_lgd_for_hazard_guess": 0.000001,
+                "recovery_rate_abs_tolerance": 1e-12,
+                "tolerance": 1e-10
+              },
+              "validation_mode": "error",
+              "vol_surface": {
+                "validation_tolerance": 0.001
+              }
+            },
+            "accepted": true
+          },
           "currency": "USD",
           "method": {
             "global_solve": {

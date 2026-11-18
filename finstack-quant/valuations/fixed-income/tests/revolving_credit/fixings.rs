@@ -71,6 +71,7 @@ fn build_seasoned_floating_facility(
         .issue_date(issue_date)
         .maturity(maturity_date)
         .rate(RateSpec::Floating(FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"), // +200 bp
             gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),
@@ -235,6 +236,7 @@ fn test_fixings_respect_floor() {
         .issue_date(issue_date)
         .maturity(maturity_date)
         .rate(RateSpec::Floating(FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"), // +200 bp
             gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),

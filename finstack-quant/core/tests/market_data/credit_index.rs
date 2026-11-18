@@ -49,12 +49,10 @@ fn credit_index_builder_supports_issuer_curves() {
     assert_eq!(data.issuer_ids(), vec!["IssuerA".to_string()]);
 
     // Test that we get the right curves - compare IDs since we can't directly compare references
-    let issuer_curve = data.get_issuer_curve("IssuerA");
+    let issuer_curve = data.get_issuer_curve("IssuerA").unwrap();
     assert_eq!(issuer_curve.id().as_str(), "IssuerA");
 
-    // Unknown issuer should fall back to index curve
-    let unknown_curve = data.get_issuer_curve("Unknown");
-    assert_eq!(unknown_curve.id().as_str(), "CDX");
+    assert!(data.get_issuer_curve("Unknown").is_err());
 }
 
 #[test]
@@ -237,11 +235,10 @@ fn test_credit_index_issuer_recovery_rates() {
         .expect("issuer recovery rates should work");
 
     // Should return issuer-specific rates
-    assert_eq!(data.get_issuer_recovery("IssuerA"), 0.30);
-    assert_eq!(data.get_issuer_recovery("IssuerB"), 0.50);
+    assert_eq!(data.get_issuer_recovery("IssuerA").unwrap(), 0.30);
+    assert_eq!(data.get_issuer_recovery("IssuerB").unwrap(), 0.50);
 
-    // Unknown issuer should return default
-    assert_eq!(data.get_issuer_recovery("Unknown"), 0.40);
+    assert!(data.get_issuer_recovery("Unknown").is_err());
 }
 
 #[test]
@@ -260,8 +257,8 @@ fn test_credit_index_issuer_weights() {
     );
 
     let mut weights = FxHashMap::default();
-    weights.insert("IssuerA".to_string(), 0.60);
-    weights.insert("IssuerB".to_string(), 0.40);
+    weights.insert("IssuerA".to_string(), 0.90);
+    weights.insert("IssuerB".to_string(), 0.10);
 
     let data = CreditIndexData::builder()
         .num_constituents(2)
@@ -274,16 +271,17 @@ fn test_credit_index_issuer_weights() {
         .expect("issuer weights should work");
 
     // Should return issuer-specific weights
-    assert_eq!(data.get_issuer_weight("IssuerA"), 0.60);
-    assert_eq!(data.get_issuer_weight("IssuerB"), 0.40);
+    assert_eq!(data.get_issuer_weight("IssuerA").unwrap(), 0.90);
+    assert_eq!(data.get_issuer_weight("IssuerB").unwrap(), 0.10);
 
-    // Unknown issuer should return equal weight (1/N)
-    assert_eq!(data.get_issuer_weight("Unknown"), 0.50); // 1/2
+    assert!(data.get_issuer_weight("Unknown").is_err());
+    assert!(data.get_issuer_recovery("C").is_err());
+    assert!(data.get_issuer_curve("C").is_err());
+    assert!(data.get_issuer_weight("C").is_err());
 }
 
 #[test]
-fn test_credit_index_equal_weighting_fallback() {
-    // Test that unknown issuers get equal weight (1/N) when no weights specified
+fn homogeneous_pool_has_count_and_no_named_members() {
     let hazard = Arc::new(sample_hazard_curve("CDX"));
     let base_corr = Arc::new(sample_base_correlation_curve("CDX-BC"));
 
@@ -295,9 +293,8 @@ fn test_credit_index_equal_weighting_fallback() {
         .build()
         .expect("default weighting should work");
 
-    // All issuers should get equal weight
-    let expected_weight = 1.0 / 125.0;
-    assert_eq!(data.get_issuer_weight("AnyIssuer"), expected_weight);
+    assert!(data.get_issuer_weight("AnyIssuer").is_err());
+    assert_eq!(data.num_constituents(), 125);
 }
 
 #[test]

@@ -704,6 +704,7 @@ fn b3_shifted_swaption_prices_shifted_positive_rates() {
     };
     let float = FloatLegSpec {
         discount_curve_id: CurveId::new("DISC"),
+        index_id: "FWD".into(),
         forward_curve_id: CurveId::new("FWD"),
         spread_bp: Decimal::ZERO,
         frequency: Tenor::quarterly(),

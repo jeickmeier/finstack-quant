@@ -179,6 +179,8 @@ impl FixedLegSpec {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FloatLegSpec {
+    /// Contractual observed index identifying historical rate publications.
+    pub index_id: finstack_quant_core::types::IndexId,
     /// Discount curve identifier for pricing
     pub discount_curve_id: CurveId,
     /// Forward curve identifier for rate projections
@@ -336,6 +338,9 @@ impl FloatLegSpec {
     /// Returns an error stating both dates when `start >= end`, and when
     /// `compounding` is `simple_average`, which swap legs do not implement.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        finstack_quant_core::market_data::fixings::validate_fixing_index_id(
+            self.index_id.as_str(),
+        )?;
         if self.compounding
             == finstack_quant_cashflows::builder::FloatingLegCompounding::SimpleAverage
         {
@@ -631,6 +636,7 @@ mod tests {
     fn float_leg(start: Date, end: Date) -> FloatLegSpec {
         FloatLegSpec {
             discount_curve_id: CurveId::new("USD-OIS"),
+            index_id: "USD-SOFR".into(),
             forward_curve_id: CurveId::new("USD-SOFR"),
             spread_bp: Decimal::ZERO,
             frequency: Tenor::quarterly(),
@@ -695,6 +701,7 @@ mod tests {
         // accrual start (0), never on a negative registry sentinel.
         let json = r#"{
             "discount_curve_id": "USD-OIS",
+            "index_id": "USD-SOFR-3M",
             "forward_curve_id": "USD-SOFR-3M",
             "spread_bp": "0",
             "frequency": {"count": 3, "unit": "months"},

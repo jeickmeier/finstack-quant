@@ -157,7 +157,7 @@ pub use inflation::{InflationCurve, InflationCurveBuilder};
 pub use parametric_curve::{NelsonSiegelModel, NsVariant, ParametricCurve, ParametricCurveBuilder};
 pub use price_curve::{PriceCurve, PriceCurveBuilder, PriceCurveKind};
 pub use rate_calibration::{
-    RateCalibrationCurveRole, RateCalibrationFutureContractId, RateCalibrationMethod,
-    RateCalibrationOisCompounding, RateCalibrationPillar, RateCalibrationQuote,
-    RateCalibrationRecipe,
+    RateCalibrationCurveRole, RateCalibrationExecution, RateCalibrationFutureContractId,
+    RateCalibrationMethod, RateCalibrationOisCompounding, RateCalibrationPillar,
+    RateCalibrationQuote, RateCalibrationRecipe, RateQuoteBinding,
 };

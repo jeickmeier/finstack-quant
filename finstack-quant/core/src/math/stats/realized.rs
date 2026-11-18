@@ -146,13 +146,14 @@ pub fn realized_variance(prices: &[f64], annualization_factor: Option<f64>) -> c
 /// Calculate realized variance from OHLC data using advanced estimators.
 ///
 /// All five methods are supported. For `CloseToClose`, only the `close` slice
-/// is used; the other three legs may be the same slice as `close` or empty.
+/// enters its return calculation. All supplied bars are validated.
 ///
 /// # Arguments
 /// * `open` - Opening prices (required for `GarmanKlass`, `RogersSatchell`, `YangZhang`)
 /// * `high` - High prices (required for `Parkinson`, `GarmanKlass`, `RogersSatchell`, `YangZhang`)
 /// * `low` - Low prices (required for `Parkinson`, `GarmanKlass`, `RogersSatchell`, `YangZhang`)
 /// * `close` - Closing prices (required for all methods)
+/// * `previous_close` - Finite positive close immediately preceding the first target bar for close-to-close and Yang–Zhang. Other estimators require `None`.
 /// * `method` - Estimator to use. `None` selects
 ///   [`RealizedVarMethod::OHLC_DEFAULT`] (Yang-Zhang).
 /// * `annualization_factor` - Bars per year used to annualize the per-bar
@@ -169,8 +170,7 @@ pub fn realized_variance(prices: &[f64], annualization_factor: Option<f64>) -> c
 /// # Returns
 /// Annualized realized variance. Parkinson, Garman-Klass, and Rogers-Satchell
 /// use each complete OHLC bar, including a single bar. Close-to-close requires
-/// two closing levels, and Yang-Zhang requires three bars; shorter samples
-/// return zero.
+/// one target bar and Yang–Zhang requires two. Shorter samples return `None`.
 pub fn realized_variance_ohlc(
     open: &[f64],
     high: &[f64],
@@ -178,7 +178,8 @@ pub fn realized_variance_ohlc(
     close: &[f64],
     method: Option<RealizedVarMethod>,
     annualization_factor: Option<f64>,
-) -> crate::Result<f64> {
+    previous_close: Option<f64>,
+) -> crate::Result<Option<f64>> {
     let method = method.unwrap_or(RealizedVarMethod::OHLC_DEFAULT);
     let annualization_factor = annualization_factor.unwrap_or_else(default_annualization_factor);
     let n = close.len();
@@ -218,12 +219,28 @@ pub fn realized_variance_ohlc(
             )));
         }
     }
-    if n == 0 {
-        return Ok(0.0);
+    let anchored = matches!(
+        method,
+        RealizedVarMethod::CloseToClose | RealizedVarMethod::YangZhang
+    );
+    if anchored != previous_close.is_some()
+        || previous_close.is_some_and(|p| !p.is_finite() || p <= 0.0)
+    {
+        return Err(crate::Error::Validation(format!(
+            "previous_close must be finite and positive for close-to-close and Yang-Zhang, and absent for range estimators (method {method:?})"
+        )));
+    }
+    if n == 0 || (method == RealizedVarMethod::YangZhang && n < 2) {
+        return Ok(None);
     }
 
     let result = match method {
-        RealizedVarMethod::CloseToClose => realized_variance(close, Some(annualization_factor)),
+        RealizedVarMethod::CloseToClose => {
+            let mut levels = Vec::with_capacity(n + 1);
+            levels.extend(previous_close);
+            levels.extend_from_slice(close);
+            realized_variance(&levels, Some(annualization_factor))
+        }
         RealizedVarMethod::Parkinson => {
             // Parkinson (1980) high-low range estimator
             // More efficient than close-to-close, using intraday range information
@@ -285,10 +302,6 @@ pub fn realized_variance_ohlc(
             Ok((sum / n as f64) * annualization_factor)
         }
         RealizedVarMethod::YangZhang => {
-            // Yang-Zhang needs at least 3 OHLC bars (2 overnight returns for variance)
-            if n < 3 {
-                return Ok(0.0);
-            }
             // Yang-Zhang (2000) estimator: includes overnight jumps and opening gaps
             // Combines overnight variance with Rogers-Satchell intraday variance
             // using optimal weighting to minimize bias and variance of the estimator.
@@ -302,13 +315,22 @@ pub fn realized_variance_ohlc(
             /// Yang-Zhang optimal weight denominator base adjustment
             const YANG_ZHANG_K_DENOMINATOR_BASE: f64 = 1.34;
 
-            let mut overnight_returns = Vec::with_capacity(n.saturating_sub(1));
-            let mut open_close_returns = Vec::with_capacity(n.saturating_sub(1));
+            let mut overnight_returns = Vec::with_capacity(n);
+            let mut open_close_returns = Vec::with_capacity(n);
             let mut sum_rs = 0.0;
 
-            for i in 1..n {
-                // Overnight component
-                let overnight = (open[i] / close[i - 1]).ln();
+            for (i, previous) in previous_close
+                .into_iter()
+                .chain(close.iter().copied())
+                .take(n)
+                .enumerate()
+            {
+                let ratio = open[i] / previous;
+                let overnight = if ratio.is_finite() && ratio > 0.0 {
+                    ratio.ln()
+                } else {
+                    open[i].ln() - previous.ln()
+                };
                 overnight_returns.push(overnight);
 
                 // Open-to-close component
@@ -323,12 +345,7 @@ pub fn realized_variance_ohlc(
                 sum_rs += hc * ho + lc * lo;
             }
 
-            // Number of return observations (periods): n bars yield n−1
-            // overnight/open-close/RS observations (bar 0 has no previous
-            // close). Yang & Zhang (2000), Eq. (10), define
-            // k = 0.34 / (1.34 + (n+1)/(n−1)) in terms of the number of
-            // *periods* in the estimator, so we use m = n−1 here.
-            let m = n - 1;
+            let m = n;
             let k = YANG_ZHANG_K_NUMERATOR
                 / (YANG_ZHANG_K_DENOMINATOR_BASE + (m + 1) as f64 / (m - 1) as f64);
             let var_overnight = variance(&overnight_returns)?.ok_or_else(|| {
@@ -341,10 +358,6 @@ pub fn realized_variance_ohlc(
                     "realized_variance_ohlc requires at least two open-close returns".into(),
                 )
             })?;
-            // RS component averages over the same m = n−1 periods that
-            // contribute overnight and open-close returns (Yang & Zhang 2000,
-            // Eq. (4)); dividing by the bar count n would bias it down by
-            // (n−1)/n.
             let var_rs = sum_rs / m as f64;
 
             Ok((var_overnight + k * var_open_close + (1.0 - k) * var_rs) * annualization_factor)
@@ -355,5 +368,5 @@ pub fn realized_variance_ohlc(
             "realized_variance_ohlc produced invalid variance {result}"
         )));
     }
-    Ok(result.max(0.0))
+    Ok(Some(result.max(0.0)))
 }

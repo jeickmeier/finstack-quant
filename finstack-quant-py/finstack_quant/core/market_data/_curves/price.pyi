@@ -151,7 +151,8 @@ class PriceCurve:
         Raises
         ------
         ValueError
-            If a date precedes ``base_date``.
+            If the time or price is non-finite, extrapolation is forbidden, a date
+            precedes the earliest pillar, or the evaluated volatility-index level is negative.
         """
         ...
 

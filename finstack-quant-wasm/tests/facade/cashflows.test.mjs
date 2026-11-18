@@ -236,6 +236,7 @@ test('cashflows facade builds fixed-to-float and preserves Rust window errors', 
   };
   const floating = {
     rate_spec: {
+      index_id: 'TEST-INDEX',
       forward_curve_id: 'TEST-INDEX',
       spread_bp: '150',
       reset_frequency: { count: 3, unit: 'months' },
@@ -378,6 +379,7 @@ test('cashflows nonbinding overnight period cap preserves changing-balance inter
     business_day_convention: 'unadjusted',
     stub: 'short_back',
     rate_spec: {
+      index_id: 'RFR',
       forward_curve_id: 'RFR',
       spread_bp: '0',
       reset_frequency: { count: 3, unit: 'months' },
@@ -670,6 +672,7 @@ test('buildCashflowSchedule and buildCashflowScheduleJson accept asOf cutoff ove
         kind: 'floating',
         spec: {
           rate_spec: {
+            index_id: 'USD-SOFR-3M',
             forward_curve_id: 'USD-SOFR-3M',
             spread_bp: '150',
             reset_frequency: { count: 3, unit: 'months' },

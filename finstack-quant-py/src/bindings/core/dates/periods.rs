@@ -338,14 +338,13 @@ impl PyPeriodPlan {
     /// ``{"fiscal": {"start_month": m, "start_day": d}}``.
     #[getter]
     fn calendar<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.calendar)
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.get_calendar())
     }
 
     /// List of periods in ascending order.
     #[getter]
     fn periods(&self) -> Vec<PyPeriod> {
         self.inner
-            .periods
             .iter()
             .map(|p| PyPeriod::from_inner(p.clone()))
             .collect()
@@ -355,17 +354,12 @@ impl PyPeriodPlan {
     /// ``is_actual`` (``start``/``end`` as ``datetime64``).
     #[pyo3(text_signature = "(self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let ids: Vec<String> = self
-            .inner
-            .periods
-            .iter()
-            .map(|p| p.id.to_string())
-            .collect();
+        let ids: Vec<String> = self.inner.iter().map(|p| p.id.to_string()).collect();
         let starts: Vec<finstack_quant_core::dates::Date> =
-            self.inner.periods.iter().map(|p| p.start).collect();
+            self.inner.iter().map(|p| p.start).collect();
         let ends: Vec<finstack_quant_core::dates::Date> =
-            self.inner.periods.iter().map(|p| p.end).collect();
-        let actual: Vec<bool> = self.inner.periods.iter().map(|p| p.is_actual).collect();
+            self.inner.iter().map(|p| p.end).collect();
+        let actual: Vec<bool> = self.inner.iter().map(|p| p.is_actual).collect();
         let columns = PyDict::new(py);
         columns.set_item("id", ids)?;
         columns.set_item(
@@ -387,16 +381,16 @@ impl PyPeriodPlan {
 
     /// Number of periods.
     fn __len__(&self) -> usize {
-        self.inner.periods.len()
+        self.inner.len()
     }
 
     fn __repr__(&self) -> String {
-        match (self.inner.periods.first(), self.inner.periods.last()) {
+        match (self.inner.first(), self.inner.last()) {
             (Some(first), Some(last)) => format!(
                 "PeriodPlan('{}'..'{}', len={})",
                 first.id,
                 last.id,
-                self.inner.periods.len()
+                self.inner.len()
             ),
             _ => "PeriodPlan(len=0)".to_string(),
         }

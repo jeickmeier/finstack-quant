@@ -115,7 +115,7 @@
       "market_data": [
         {
           "kind": "fixing_series",
-          "id": "FIXING:USD-SOFRRATE",
+          "id": "FIXING:USD-SOFR-OIS",
           "currency": null,
           "observations": [
             [
@@ -1544,6 +1544,7 @@
           },
           "model_config": {
             "asw_forward_curve_id": "USD-SOFRRATE",
+            "asw_index_id": "USD-SOFR-OIS",
             "tree_steps": 200,
             "tree_model": "black_derman_toy",
             "bdt_sigma": 0.2223,

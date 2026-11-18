@@ -257,7 +257,7 @@ fn test_asw_market_uses_configured_forward_curve() {
     .unwrap();
     bond.instrument_pricing_overrides = InstrumentPricingOverrides::default()
         .with_quoted_clean_price_pct(98.0)
-        .with_asw_forward_curve_id("USD-SOFR-6M");
+        .with_asw_forward("USD-SOFR-6M", "USD-SOFR-OIS");
 
     let discount_curve = DiscountCurve::builder("USD-OIS")
         .base_date(as_of)

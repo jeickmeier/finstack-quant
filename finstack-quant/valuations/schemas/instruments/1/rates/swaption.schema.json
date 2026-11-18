@@ -172,6 +172,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
           "description": "Payment frequency"
         },
+        "index_id": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Contractual observed index identifying historical rate publications."
+        },
         "payment_lag_days": {
           "default": 0,
           "description": "Payment lag in business days after period end (default: 0).\n\nBloomberg OIS swaps typically use 2 business days payment lag.\nThe actual payment date is adjusted from the period end date by\nthis many business days using the leg's calendar.",
@@ -199,6 +203,7 @@
         }
       },
       "required": [
+        "index_id",
         "discount_curve_id",
         "forward_curve_id",
         "spread_bp",
@@ -592,6 +597,7 @@
               "count": 3,
               "unit": "months"
             },
+            "index_id": "USD-OIS",
             "payment_lag_days": 0,
             "reset_lag_days": 0,
             "spread_bp": "0",

@@ -297,6 +297,7 @@ fn test_rolled_discount_curve_near_zero_pillar_round_trips_and_clears_calibratio
     use finstack_quant_core::types::{CurveId, IndexId};
 
     let recipe = RateCalibrationRecipe {
+        execution: None,
         currency: Currency::USD,
         method: RateCalibrationMethod::Bootstrap,
         curve_day_count: DayCount::Act365F,

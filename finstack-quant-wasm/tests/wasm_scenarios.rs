@@ -20,7 +20,7 @@ fn empty_market_json() -> String {
 fn empty_model_json() -> String {
     let periods = finstack_quant_core::dates::build_periods("2024Q1..Q1", None)
         .unwrap()
-        .periods;
+        .into_periods();
     let model = finstack_quant_statements::types::FinancialModelSpec::new(
         "test",
         finstack_quant_core::dates::PeriodPlan::try_new(

@@ -33,10 +33,6 @@
 //! - Lancaster, H. O. (1957). "Some properties of the bivariate normal distribution."
 //! - Demarta, S., & McNeil, A. J. (2005). "The t Copula and Related Copulas." `docs/REFERENCES.md#demarta-mcneil-2005-t-copula` `docs/REFERENCES.md#mcneil-frey-embrechts-qrm`
 
-/// Variance threshold below which a Bernoulli variable is treated as degenerate
-/// (i.e., probability is effectively 0 or 1, making correlation meaningless).
-const DEGENERATE_VARIANCE_THRESHOLD: f64 = 1e-10;
-
 /// Correlated Bernoulli distribution for scenario generation.
 ///
 /// Provides methods for working with correlated binary outcomes,
@@ -45,7 +41,6 @@ const DEGENERATE_VARIANCE_THRESHOLD: f64 = 1e-10;
 pub struct CorrelatedBernoulli {
     p1: f64,
     p2: f64,
-    requested_correlation: f64,
     correlation: f64,
     // Precomputed joint probabilities
     p11: f64,
@@ -57,26 +52,15 @@ pub struct CorrelatedBernoulli {
 impl CorrelatedBernoulli {
     /// Create a correlated Bernoulli distribution.
     ///
-    /// The correlation is automatically clamped to the Fréchet-Hoeffding bounds
-    /// for the given marginal probabilities to ensure valid joint probabilities.
-    ///
     /// # Arguments
-    /// * `p1` - Finite marginal probability of first event in [0, 1]
-    /// * `p2` - Finite marginal probability of second event in [0, 1]
-    /// * `correlation` - Finite correlation in [-1, 1], clamped to feasible bounds
-    ///
-    /// [`correlation`](Self::correlation) exposes the effective correlation
-    /// after Fréchet-Hoeffding clamping, while
-    /// [`requested_correlation`](Self::requested_correlation) preserves the
-    /// caller input for audit/reporting. Degenerate marginals use the
-    /// independent coupling and report effective correlation `0.0`.
+    /// * `p1` - Finite probability of the first event in [0, 1].
+    /// * `p2` - Finite probability of the second event in [0, 1].
+    /// * `correlation` - Pearson correlation within the attainable bounds of the marginals.
+    ///   For deterministic marginals supply zero.
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::Validation`] if either marginal is non-finite or
-    /// outside `[0, 1]`, or correlation is non-finite or outside `[-1, 1]`.
-    /// A correlation that is in `[-1, 1]` but infeasible for `p1` and `p2`
-    /// is clamped to the attainable interval.
+    /// Returns a validation error for nonfinite or infeasible inputs.
     ///
     /// # Examples
     ///
@@ -91,37 +75,45 @@ impl CorrelatedBernoulli {
     /// ```
     #[must_use = "construction validation errors must be handled"]
     pub fn new(p1: f64, p2: f64, correlation: f64) -> crate::Result<Self> {
-        validate_inputs(p1, p2, Some(correlation))?;
-        let requested_correlation = correlation;
-        let var1 = p1 * (1.0 - p1);
-        let var2 = p2 * (1.0 - p2);
-
-        if var1 < DEGENERATE_VARIANCE_THRESHOLD || var2 < DEGENERATE_VARIANCE_THRESHOLD {
-            return Ok(Self {
-                p1,
-                p2,
-                requested_correlation,
-                correlation: 0.0,
-                p11: p1 * p2,
-                p10: p1 * (1.0 - p2),
-                p01: (1.0 - p1) * p2,
-                p00: (1.0 - p1) * (1.0 - p2),
-            });
+        if !(-1.0..=1.0).contains(&correlation) {
+            return Err(crate::Error::Validation(format!(
+                "Bernoulli correlation must be finite and in [-1, 1], got {correlation}"
+            )));
         }
-
-        let (rho_min, rho_max) = correlation_bounds(p1, p2)?;
-        let effective_correlation = requested_correlation.clamp(rho_min, rho_max);
-        let cov = effective_correlation * (var1 * var2).sqrt();
-        let p11 = p1 * p2 + cov;
-        let p10 = p1 * (1.0 - p2) - cov;
-        let p01 = (1.0 - p1) * p2 - cov;
-        let p00 = (1.0 - p1) * (1.0 - p2) + cov;
-
+        let q1 = 1.0 - p1;
+        let q2 = 1.0 - p2;
+        let (lo, hi) = correlation_bounds(p1, p2)?;
+        if !(lo..=hi).contains(&correlation) {
+            return Err(crate::Error::Validation(format!(
+                "infeasible Bernoulli correlation {correlation} outside [{lo}, {hi}]"
+            )));
+        }
+        let independent = [p1 * p2, p1 * q2, q1 * p2, q1 * q2];
+        // At fixed marginals each joint cell is linear in correlation. Interpolate
+        // between independence and the exact Fréchet table to keep zero cells
+        // nonnegative at the attainable endpoints.
+        let [p11, p10, p01, p00] = if correlation == 0.0 {
+            independent
+        } else {
+            let (weight, endpoint) = if correlation > 0.0 {
+                let joint = p1.min(p2);
+                (
+                    correlation / hi,
+                    [joint, p1 - joint, p2 - joint, q1.min(q2)],
+                )
+            } else {
+                let excess = p1.min(p2) - (1.0 - p1.max(p2));
+                (
+                    correlation / lo,
+                    [excess.max(0.0), p1.min(q2), p2.min(q1), (-excess).max(0.0)],
+                )
+            };
+            std::array::from_fn(|i| weight.mul_add(endpoint[i], (1.0 - weight) * independent[i]))
+        };
         Ok(Self {
             p1,
             p2,
-            requested_correlation,
-            correlation: effective_correlation,
+            correlation,
             p11,
             p10,
             p01,
@@ -179,11 +171,6 @@ impl CorrelatedBernoulli {
         self.correlation
     }
 
-    /// Get the caller-requested correlation before Fréchet clamping.
-    pub fn requested_correlation(&self) -> f64 {
-        self.requested_correlation
-    }
-
     /// Get the joint probability P(X₁=1, X₂=1).
     pub fn joint_p11(&self) -> f64 {
         self.p11
@@ -206,7 +193,7 @@ impl CorrelatedBernoulli {
 
     /// Get the conditional probability P(X₂=1 | X₁=1).
     pub fn conditional_p2_given_x1(&self) -> f64 {
-        if self.p1 > 0.0 {
+        if self.p1 > 0.0 && self.correlation != 0.0 {
             self.p11 / self.p1
         } else {
             self.p2
@@ -215,7 +202,7 @@ impl CorrelatedBernoulli {
 
     /// Get the conditional probability P(X₁=1 | X₂=1).
     pub fn conditional_p1_given_x2(&self) -> f64 {
-        if self.p2 > 0.0 {
+        if self.p2 > 0.0 && self.correlation != 0.0 {
             self.p11 / self.p2
         } else {
             self.p1
@@ -254,47 +241,38 @@ impl CorrelatedBernoulli {
 /// never clamps one.
 #[must_use = "correlation-bound validation errors must be handled"]
 pub fn correlation_bounds(p1: f64, p2: f64) -> crate::Result<(f64, f64)> {
-    validate_inputs(p1, p2, None)?;
-    let var1 = p1 * (1.0 - p1);
-    let var2 = p2 * (1.0 - p2);
-
-    if var1 < DEGENERATE_VARIANCE_THRESHOLD || var2 < DEGENERATE_VARIANCE_THRESHOLD {
+    for (name, p) in [("p1", p1), ("p2", p2)] {
+        if !(0.0..=1.0).contains(&p) {
+            return Err(crate::Error::Validation(format!(
+                "Bernoulli marginal {name} must be finite and in [0, 1], got {p}"
+            )));
+        }
+    }
+    let m = p1.min(p2);
+    let big = p1.max(p2);
+    if m == 0.0 || big >= 1.0 {
         return Ok((0.0, 0.0));
     }
-
-    let std_prod = (var1 * var2).sqrt();
-
-    // Maximum covariance: min(p1, p2) - p1*p2 = min(p1, p2)(1 - max(p1, p2)/min(p1, p2))
-    let cov_max = p1.min(p2) - p1 * p2;
-
-    // Minimum covariance: max(p1 + p2 - 1, 0) - p1*p2
-    let cov_min = (p1 + p2 - 1.0).max(0.0) - p1 * p2;
-
-    let rho_max = cov_max / std_prod;
-    let rho_min = cov_min / std_prod;
-
-    Ok((rho_min.clamp(-1.0, 1.0), rho_max.clamp(-1.0, 1.0)))
-}
-
-fn validate_inputs(p1: f64, p2: f64, correlation: Option<f64>) -> crate::Result<()> {
-    if !p1.is_finite() || !(0.0..=1.0).contains(&p1) {
-        return Err(crate::Error::Validation(format!(
-            "Bernoulli marginal p1 must be finite and in [0, 1], got {p1}"
-        )));
-    }
-    if !p2.is_finite() || !(0.0..=1.0).contains(&p2) {
-        return Err(crate::Error::Validation(format!(
-            "Bernoulli marginal p2 must be finite and in [0, 1], got {p2}"
-        )));
-    }
-    if let Some(rho) = correlation
-        && (!rho.is_finite() || !(-1.0..=1.0).contains(&rho))
-    {
-        return Err(crate::Error::Validation(format!(
-            "Bernoulli correlation must be finite and in [-1, 1], got {rho}"
-        )));
-    }
-    Ok(())
+    let upper = (m / big).sqrt() * ((1.0 - big) / (1.0 - m)).sqrt();
+    let lower = if m <= 1.0 - big {
+        -(m / (1.0 - big)).sqrt() * (big / (1.0 - m)).sqrt()
+    } else {
+        -((1.0 - big) / m).sqrt() * ((1.0 - m) / big).sqrt()
+    };
+    // A rounded bound can reach unity for adjacent but distinct marginals.
+    // Perfect correlation requires identical events, and perfect negative
+    // correlation requires exactly complementary marginals.
+    let upper = if m < big {
+        upper.min(1.0_f64.next_down())
+    } else {
+        1.0
+    };
+    let lower = if (m - (1.0 - big)) == 0.0 {
+        -1.0
+    } else {
+        lower.max((-1.0_f64).next_up())
+    };
+    Ok((lower, upper))
 }
 
 #[cfg(test)]
@@ -333,7 +311,7 @@ mod tests {
             (0.6, 0.4, 0.3),
             (0.5, 0.5, 0.8),
             (0.1, 0.9, -0.2),
-            (0.3, 0.7, 0.5),
+            (0.3, 0.7, 0.4),
             (0.8, 0.2, -0.5),
         ];
 
@@ -368,15 +346,14 @@ mod tests {
             assert!(p01 >= 0.0, "p01 must be non-negative");
             assert!(p00 >= 0.0, "p00 must be non-negative");
 
-            // Sum must be exactly 1
-            let _ = p00;
+            assert!((p11 + p10 + p01 + p00 - 1.0).abs() <= 2.0 * f64::EPSILON);
         }
     }
 
     #[test]
     fn test_joint_probabilities_extreme_correlations() {
-        // Test that extreme correlations are clamped to feasible bounds
-        let (p1, p2) = (0.3, 0.7);
+        // Equal interior marginals admit both perfect endpoints at one half.
+        let (p1, p2) = (0.5, 0.5);
         let (rho_min, rho_max) = correlation_bounds(p1, p2).expect("valid marginals");
 
         // Correlations outside the mathematical [-1, 1] domain are rejected.
@@ -393,6 +370,32 @@ mod tests {
             .expect("lower feasible bound")
             .joint_probabilities();
         assert!((p11 + p10 - p1).abs() < 1e-10);
+    }
+
+    #[test]
+    fn unequal_marginals_accept_both_reported_bounds() {
+        for (p, q) in [
+            (0.2, 0.6),
+            (0.12, 0.03),
+            (0.8, 0.9),
+            (0.5, 0.5_f64.next_up()),
+        ] {
+            let (low, high) = correlation_bounds(p, q).unwrap();
+            for rho in [low, low.next_up(), high.next_down(), high] {
+                let (both, first, second, neither) = CorrelatedBernoulli::new(p, q, rho)
+                    .unwrap()
+                    .joint_probabilities();
+                assert!(
+                    [both, first, second, neither]
+                        .iter()
+                        .all(|cell| (0.0..=1.0).contains(cell))
+                );
+                assert!((both + first - p).abs() <= f64::EPSILON);
+                assert!((both + second - q).abs() <= f64::EPSILON);
+            }
+            assert!(CorrelatedBernoulli::new(p, q, low.next_down()).is_err());
+            assert!(CorrelatedBernoulli::new(p, q, high.next_up()).is_err());
+        }
     }
 
     #[test]
@@ -414,8 +417,8 @@ mod tests {
             "p00 {} should equal (1-p1)*(1-p2)",
             p00
         );
-        let _ = p10;
-        let _ = p01;
+        assert!((p10 - p1 * (1.0 - p2)).abs() <= f64::EPSILON);
+        assert!((p01 - (1.0 - p1) * p2).abs() <= f64::EPSILON);
     }
 
     #[test]
@@ -442,13 +445,21 @@ mod tests {
         assert!((dist.p1() - 0.5).abs() < 1e-10);
         assert!((dist.p2() - 0.5).abs() < 1e-10);
         assert!((dist.correlation() - 0.5).abs() < 1e-10);
-        assert!((dist.requested_correlation() - 0.5).abs() < 1e-10);
     }
 
     #[test]
-    fn test_correlated_bernoulli_reports_effective_correlation() {
-        let dist = CorrelatedBernoulli::new(0.05, 0.95, 0.9).expect("valid distribution");
-        assert!(dist.requested_correlation() > dist.correlation());
+    fn rare_marginals_preserve_feasible_dependence() {
+        for p in [2.0_f64.powi(-35), 2.0_f64.powi(-40)] {
+            let perfect = CorrelatedBernoulli::new(p, p, 1.0).expect("equal marginals");
+            assert_eq!(perfect.joint_p11(), p);
+            assert_eq!(perfect.conditional_p2_given_x1(), 1.0);
+            assert_eq!(
+                CorrelatedBernoulli::new(p, p, 0.0).unwrap().joint_p11(),
+                p * p
+            );
+            assert!(CorrelatedBernoulli::new(p, p, -1.0).is_err());
+        }
+        assert!(CorrelatedBernoulli::new(0.05, 0.95, 0.9).is_err());
     }
 
     #[test]

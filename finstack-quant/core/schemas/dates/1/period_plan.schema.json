@@ -111,7 +111,7 @@
       "description": "Calendar context of every period in the plan, retained once."
     },
     "periods": {
-      "description": "Ordered periods produced by the parser.",
+      "description": "Chronologically ordered reporting periods, with optional gaps.",
       "items": {
         "$ref": "#/$defs/Period"
       },

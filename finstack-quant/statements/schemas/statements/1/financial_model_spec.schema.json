@@ -942,6 +942,11 @@
           "const": "collateral_substitution_out",
           "description": "Collateral substitution outflow (original collateral returned).\n\nWhen a counterparty substitutes collateral, this represents the return\nof the original collateral being replaced.",
           "type": "string"
+        },
+        {
+          "const": "derivative_settlement",
+          "description": "Net contractual derivative payoff settled in cash without exchanging principal.",
+          "type": "string"
         }
       ]
     },
@@ -1351,6 +1356,13 @@
         "end": {
           "$ref": "#/$defs/DateWire",
           "description": "Contractual accrual-period end date."
+        },
+        "nominal_dates": {
+          "description": "Consecutive nominal boundaries for a coupon spanning multiple ICMA reference periods.",
+          "items": {
+            "$ref": "#/$defs/DateWire"
+          },
+          "type": "array"
         },
         "projected_index_rate": {
           "description": "Projected index rate before spread, gearing, caps, or floors.\nSerialization rejects non-finite rates instead of encoding them as absent.",
@@ -4217,6 +4229,10 @@
           "$ref": "#/$defs/Tenor",
           "description": "Payment frequency"
         },
+        "index_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Contractual observed index identifying historical rate publications."
+        },
         "payment_lag_days": {
           "default": 0,
           "description": "Payment lag in business days after period end (default: 0).\n\nBloomberg OIS swaps typically use 2 business days payment lag.\nThe actual payment date is adjusted from the period end date by\nthis many business days using the leg's calendar.",
@@ -4244,6 +4260,7 @@
         }
       },
       "required": [
+        "index_id",
         "discount_curve_id",
         "forward_curve_id",
         "spread_bp",
@@ -4411,7 +4428,7 @@
       ]
     },
     "FloatingRateFallback": {
-      "description": "Policy for handling floating rate projection failures.\n\nThe cashflow builder consults it whenever projecting a floating coupon\nfails: a missing forward curve, a pre-cutoff observation with no\n`FIXING:{forward_curve_id}` series supplied, a reset before the curve base\ndate, or an overnight or day-count projection error. It never fills a gap\nin recorded history: when a curve and a fixing series are both supplied, a\nmissing pre-cutoff observation is an error under every policy.\n\nA non-`Error` policy replaces the index for the whole coupon (every\novernight observation of the period, not only a failing one), logs\n`warn!`, and the coupon still records the substituted index as its\n`projected_index_rate`. The default (`Error`) surfaces failures\nexplicitly; the other variants are explicit opt-in degradation modes. The\nbond LSMC pricer applies the policy per overnight observation instead.\n\n# References\n\n- `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`\n- `docs/REFERENCES.md#hull-options-futures`",
+      "description": "Policy for handling floating rate projection failures.\n\nThe cashflow builder consults it whenever projecting a floating coupon\nfails: a missing forward curve, a pre-cutoff observation with no\n`FIXING:{index_id}` series supplied, a reset before the curve base\ndate, or an overnight or day-count projection error. It never fills a gap\nin recorded history: when a curve and a fixing series are both supplied, a\nmissing pre-cutoff observation is an error under every policy.\n\nA non-`Error` policy replaces the index for the whole coupon (every\novernight observation of the period, not only a failing one), logs\n`warn!`, and the coupon still records the substituted index as its\n`projected_index_rate`. The default (`Error`) surfaces failures\nexplicitly; the other variants are explicit opt-in degradation modes. The\nbond LSMC pricer applies the policy per overnight observation instead.\n\n# References\n\n- `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`\n- `docs/REFERENCES.md#hull-options-futures`",
       "oneOf": [
         {
           "const": "error",
@@ -4440,7 +4457,7 @@
     },
     "FloatingRateSpec": {
       "additionalProperties": false,
-      "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` / `index_cap_bp` to the index rate (if specified),\n   BEFORE adding spread\n3. Combine with `spread_bp` and `gearing`: `(index + spread) * gearing` by\n   default, `index * gearing + spread` when `gearing_includes_spread` is false\n4. Apply `all_in_floor_bp` / `all_in_cap_bp` to the result (if specified),\n   AFTER spread and gearing\n\nDefault formula: `all_in_bounds(gearing * (index_bounds(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the valuation cutoff then\nresolve from that series instead of the curve. The cutoff is the forward\ncurve base date under `build` and the valuation date under `build_as_of`:\n\n- **Overnight observations** (compounded/averaged paths) use exact-date\n  lookup on the index's fixing business days. Weekend and holiday carry\n  comes from each observation's accrual-day weight, so a missing required\n  business-day fixing is an error rather than reuse of an older fixing.\n  A partially seasoned compounding window mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the cutoff prefers a published same-day fixing\nwhen the series has one, otherwise projects on the curve clock.\n\nThe [`FloatingRateFallback`] policy applies when projection fails and never\nfills a gap in a supplied fixing series (see its doc): `Error` (the\ndefault) fails the build with a descriptive message naming the date,\nindex, and expected series id; `FixedRate(r)` uses `r` as the index rate\nfor the whole coupon; `SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
+      "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `forward_curve_id` curve for the accrual period\n2. Apply `index_floor_bp` / `index_cap_bp` to the index rate (if specified),\n   BEFORE adding spread\n3. Combine with `spread_bp` and `gearing`: `(index + spread) * gearing` by\n   default, `index * gearing + spread` when `gearing_includes_spread` is false\n4. Apply `all_in_floor_bp` / `all_in_cap_bp` to the result (if specified),\n   AFTER spread and gearing\n\nDefault formula: `all_in_bounds(gearing * (index_bounds(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the valuation cutoff then\nresolve from that series instead of the curve. The cutoff is the forward\ncurve base date under `build` and the valuation date under `build_as_of`:\n\n- **Overnight observations** (compounded/averaged paths) use exact-date\n  lookup on the index's fixing business days. Weekend and holiday carry\n  comes from each observation's accrual-day weight, so a missing required\n  business-day fixing is an error rather than reuse of an older fixing.\n  A partially seasoned compounding window mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the cutoff prefers a published same-day fixing\nwhen the series has one, otherwise projects on the curve clock.\n\nThe [`FloatingRateFallback`] policy applies when projection fails and never\nfills a gap in a supplied fixing series (see its doc): `Error` (the\ndefault) fails the build with a descriptive message naming the date,\nindex, and expected series id; `FixedRate(r)` uses `r` as the index rate\nfor the whole coupon; `SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::Tenor;\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    index_id: \"USD-SOFR-3M\".into(),\n    forward_curve_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_frequency: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    fixing_calendar_id: None,\n    compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
       "properties": {
         "all_in_cap_bp": {
           "anyOf": [
@@ -4531,6 +4548,10 @@
           "default": null,
           "description": "Floor on index rate in basis points (applied to index component).\n\nExample: index_floor_bp = Some(0.0) ensures index rate >= 0%."
         },
+        "index_id": {
+          "$ref": "#/$defs/Id",
+          "description": "Contractual rate index used for historical observations in FIXING series."
+        },
         "index_tenor": {
           "anyOf": [
             {
@@ -4573,6 +4594,7 @@
         }
       },
       "required": [
+        "index_id",
         "forward_curve_id",
         "spread_bp",
         "reset_frequency"
@@ -5770,6 +5792,17 @@
           ],
           "description": "Optional forward curve identifier for asset-swap spread metrics.\n\nWhen set, ASW par/market metrics project the floating receiver leg from\nthis forward curve instead of using a discount-curve par-rate proxy."
         },
+        "asw_index_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual floating index used for asset-swap accruals and historical resets."
+        },
         "bdt_sigma": {
           "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
           "format": "double",
@@ -6558,7 +6591,7 @@
           "description": "Calendar context of every period in the plan, retained once."
         },
         "periods": {
-          "description": "Ordered periods produced by the parser.",
+          "description": "Chronologically ordered reporting periods, with optional gaps.",
           "items": {
             "$ref": "#/$defs/Period"
           },

@@ -107,7 +107,8 @@ export type DCf776B61125046D84B45 =
                 | "variation_margin_pay"
                 | "margin_interest"
                 | "collateral_substitution_in"
-                | "collateral_substitution_out";
+                | "collateral_substitution_out"
+                | "derivative_settlement";
               kind: "cashflow_ignored";
               [k: string]: unknown;
             }

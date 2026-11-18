@@ -452,7 +452,15 @@ test('dividend schedules use direct market-datum fields', () => {
     id: 'AAPL-DIVS',
     underlying: 'AAPL',
     currency: 'USD',
-    events: [{ date: '2026-08-15', kind: { cash: { amount: '0.25', currency: 'USD' } } }],
+    share_basis: 'AAPL',
+    events: [
+      {
+        event_id: 'Q1',
+        ex_date: '2026-08-15',
+        pay_date: '2026-08-15',
+        amount: { amount: '0.25', currency: 'USD' },
+      },
+    ],
   };
   const envelope = {
     schema: 'finstack_quant.calibration/1',

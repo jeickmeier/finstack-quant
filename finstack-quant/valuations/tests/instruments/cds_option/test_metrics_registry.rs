@@ -2,14 +2,11 @@
 
 use super::common::*;
 use finstack_quant_calibration::recalibration::bump_discount_curve_from_rate_calibration;
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
-    DiscountCurve, HazardCurve, RateCalibrationCurveRole, RateCalibrationMethod,
-    RateCalibrationPillar, RateCalibrationQuote, RateCalibrationRecipe,
+    DiscountCurve, HazardCurve, RateCalibrationRecipe,
 };
-use finstack_quant_core::types::{CurveId, IndexId};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::{MetricContext, MetricId};
 use finstack_quant_valuations::pricer::STANDARD;
@@ -19,35 +16,6 @@ use time::macros::date;
 
 fn quote_calibrated_discount(rate: f64, as_of: finstack_quant_core::dates::Date) -> DiscountCurve {
     flat_discount("USD-OIS", as_of, rate)
-        .to_builder_with_id("USD-OIS")
-        .rate_calibration(RateCalibrationRecipe {
-            currency: Currency::USD,
-            method: RateCalibrationMethod::Bootstrap,
-            curve_day_count: DayCount::Act365F,
-            ois_compounding: None,
-            role: RateCalibrationCurveRole::Discount {
-                projection_curve_id: CurveId::new("USD-OIS"),
-            },
-            quotes: vec![
-                RateCalibrationQuote::Deposit {
-                    index_id: IndexId::new("USD-SOFR-1M"),
-                    pillar: RateCalibrationPillar::Tenor("1Y".parse().unwrap()),
-                    rate,
-                },
-                RateCalibrationQuote::Deposit {
-                    index_id: IndexId::new("USD-SOFR-1M"),
-                    pillar: RateCalibrationPillar::Tenor("5Y".parse().unwrap()),
-                    rate,
-                },
-                RateCalibrationQuote::Deposit {
-                    index_id: IndexId::new("USD-SOFR-1M"),
-                    pillar: RateCalibrationPillar::Tenor("10Y".parse().unwrap()),
-                    rate,
-                },
-            ],
-        })
-        .build()
-        .unwrap()
 }
 
 fn bump_quote_calibrated_discount(

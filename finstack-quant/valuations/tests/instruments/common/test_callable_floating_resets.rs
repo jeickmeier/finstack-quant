@@ -306,6 +306,7 @@ fn floating_credit_loan(coupon_type: CouponType) -> TermLoan {
         .issue_date(as_of())
         .maturity(date!(2030 - 01 - 01))
         .rate(RateSpec::Floating(FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             spread_bp: Decimal::new(400, 0),
             gearing: Decimal::ONE,

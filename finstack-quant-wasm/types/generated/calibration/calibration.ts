@@ -538,23 +538,12 @@ export type MarketDatum =
       scalar: MarketScalar;
     }
   | {
-      /**
-       * Quote currency for cash dividends (optional metadata).
-       */
-      currency?: valuations.Currency | null;
-      /**
-       * Sorted events by date (ascending).
-       */
+      currency: valuations.Currency;
       events: DividendEvent[];
-      /**
-       * Unique identifier of this schedule in the market context.
-       */
       id: valuations.Id;
       kind: "dividend_schedule";
-      /**
-       * Optional display symbol/ticker for convenience.
-       */
-      underlying?: string | null;
+      share_basis: string;
+      underlying: valuations.Id;
     }
   | {
       /**
@@ -601,6 +590,7 @@ export type MarketDatum =
        * Strictly ascending canonical monthly fixing observations.
        */
       observations: InflationObservation[];
+      series?: InflationSeries | null;
     }
   | {
       /**
@@ -824,34 +814,6 @@ export type MarketScalar =
     }
   | {
       price: valuations.Money;
-    };
-/**
- * Type of dividend event.
- *
- * Distinguishes between cash payments, stock distributions, and continuous
- * yield approximations used in different pricing models.
- *
- * # Variants
- *
- * - **Cash**: Actual dividend payment (quarterly, semi-annual, etc.)
- * - **Stock**: Share distribution (less common, complicates option pricing)
- * - **Yield**: Continuous approximation for analytical models
- */
-export type DividendKind =
-  | {
-      cash: valuations.Money;
-    }
-  | {
-      yield: number;
-    }
-  | {
-      stock: {
-        /**
-         * Stock distribution ratio; 0.05 corresponds to a 5% stock dividend.
-         */
-        ratio: number;
-        [k: string]: unknown;
-      };
     };
 /**
  * Right-tail extrapolation policy for [`ScalarTimeSeries`].
@@ -1981,6 +1943,7 @@ export type PriorMarketObject =
        * Strictly increasing `(time_years, cpi_level)` pillars starting at `0.0`.
        */
       knot_points: [number, number][];
+      series?: InflationSeries | null;
     }
   | {
       correlations: number[];
@@ -2619,6 +2582,7 @@ export type CurveState =
        * Strictly increasing `(time_years, cpi_level)` pillars starting at `0.0`.
        */
       knot_points: [number, number][];
+      series?: InflationSeries | null;
       type: "inflation";
     }
   | {
@@ -4924,18 +4888,13 @@ export interface CdsConventionKey {
   [k: string]: unknown;
 }
 /**
- * A dated dividend event.
+ * One gross cash distribution per entitled share on its schedule's share basis.
  */
 export interface DividendEvent {
-  /**
-   * Ex-dividend date.
-   */
-  date: valuations.DateWire;
-  /**
-   * Event kind.
-   */
-  kind: DividendKind;
-  [k: string]: unknown;
+  amount: valuations.Money;
+  event_id: string;
+  ex_date: valuations.DateWire;
+  pay_date: valuations.DateWire;
 }
 /**
  * One expected-release schedule assumption for a monthly CPI/RPI reference period.
@@ -4970,6 +4929,23 @@ export interface InflationObservation {
    * Published finite, strictly positive index level.
    */
   value: number;
+}
+/**
+ * Publication identity and units of an observed or projected inflation level.
+ */
+export interface InflationSeries {
+  /**
+   * Published reference period and index scale, for example `1982-84=100`.
+   */
+  reference_base: string;
+  /**
+   * True for seasonally adjusted levels and false for unadjusted levels.
+   */
+  seasonally_adjusted: boolean;
+  /**
+   * Publisher-qualified identifier of the statistical series.
+   */
+  series_id: string;
 }
 /**
  * Explicit day-count clock translating calendar expiry dates into year fractions
@@ -5140,7 +5116,7 @@ export interface RatesStepConventions {
   ois_compounding?: FloatingLegCompounding | null;
 }
 /**
- * Typed conventions required to replay a rate-curve calibration.
+ * Benchmark conventions and quotes associated with a rate curve.
  */
 export interface RateCalibrationRecipe {
   /**
@@ -5151,6 +5127,10 @@ export interface RateCalibrationRecipe {
    * Day count used for the curve's time axis.
    */
   curve_day_count: valuations.DayCount;
+  /**
+   * Original execution evidence. A transcribed benchmark list has no qualified replay.
+   */
+  execution?: RateCalibrationExecution | null;
   /**
    * Numerical calibration method.
    */
@@ -5167,6 +5147,48 @@ export interface RateCalibrationRecipe {
    * Discount/projection role and linked curve identifier.
    */
   role: RateCalibrationCurveRole;
+}
+/**
+ * Executed evaluator, resolved instruments and original outcome of a rate calibration.
+ */
+export interface RateCalibrationExecution {
+  /**
+   * Whether the original fit passed its recorded acceptance policy.
+   */
+  accepted: boolean;
+  /**
+   * Resolved quote identities and maturities, in input order.
+   */
+  bindings: RateQuoteBinding[];
+  /**
+   * Solver controls and residual acceptance thresholds used by the evaluator.
+   */
+  calibration_config: {
+    [k: string]: unknown;
+  };
+  /**
+   * Discount or projection evaluator parameters, including pricing dependencies.
+   */
+  step_params: {
+    [k: string]: unknown;
+  };
+}
+/**
+ * Identity and resolved maturity of a quote in its original evaluator.
+ */
+export interface RateQuoteBinding {
+  /**
+   * Contractual maturity resolved using the instrument conventions.
+   */
+  pillar_date: valuations.DateWire;
+  /**
+   * Curve-clock year fraction at the resolved maturity.
+   */
+  pillar_time: number;
+  /**
+   * Original stable market quote identifier.
+   */
+  quote_id: string;
 }
 /**
  * Source interpolation and a single accumulated transformation, never a chain
@@ -5776,36 +5798,14 @@ export interface CreditIndexState {
   recovery_rate: number;
 }
 /**
- * Dividend schedule for an equity or ETF underlying.
- *
- * Contains a time-ordered sequence of dividend events used for pricing equity
- * derivatives and calculating total return. The schedule can be referenced by
- * multiple instruments via its [`CurveId`] in the market context.
- *
- * # Usage in Pricing
- *
- * - **Discrete dividends**: Subtract PV of future dividends from spot for option pricing
- * - **Ex-dividend adjustments**: Reduce forward price by dividend amount
- * - **Dividend futures**: Sum dividends in contract period
- * - **Total return**: Include dividend reinvestment in performance
+ * Validated distributions for one security, share basis and currency.
  */
 export interface DividendSchedule {
-  /**
-   * Quote currency for cash dividends (optional metadata).
-   */
-  currency?: valuations.Currency | null;
-  /**
-   * Sorted events by date (ascending).
-   */
+  currency: valuations.Currency;
   events: DividendEvent[];
-  /**
-   * Unique identifier of this schedule in the market context.
-   */
   id: valuations.Id;
-  /**
-   * Optional display symbol/ticker for convenience.
-   */
-  underlying?: string | null;
+  share_basis: string;
+  underlying: valuations.Id;
 }
 /**
  * Serializable state of an FxMatrix.
@@ -5936,6 +5936,7 @@ export interface InflationIndex {
    * Strictly ascending canonical monthly fixing observations.
    */
   observations: InflationObservation[];
+  series?: InflationSeries | null;
 }
 /**
  * Date-indexed time series with flexible interpolation.

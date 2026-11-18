@@ -1389,3 +1389,13 @@ def test_slice2_cholesky_error_kind_split() -> None:
             linalg.cholesky_decomposition(non_spd)
         assert not isinstance(excinfo.value, linalg.CholeskyError)
         assert not isinstance(excinfo.value, ValueError)
+
+
+def test_market_preserves_inflation_series_basis() -> None:
+    series = {"series_id": "BLS:CUUR0000SA0", "reference_base": "1982-84=100", "seasonally_adjusted": False}
+    index = InflationIndex("US-CPI", [InflationObservation("2025-01-01", 105, "2025-02-12")], "USD", "2025-02-12")
+    payload = json.loads(index.to_json())
+    payload["series"] = series
+    market = MarketContext().insert_inflation_index(InflationIndex.from_json(json.dumps(payload)))
+    restored = MarketContext.from_json(market.to_json()).get_inflation_index("US-CPI")
+    assert json.loads(restored.to_json())["series"] == series

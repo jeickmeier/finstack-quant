@@ -185,7 +185,7 @@ impl CompiledExpr {
             Operation::BinOp(op) => {
                 let left = env.dep_slice(node.dependencies[0]);
                 let right = env.dep_slice(node.dependencies[1]);
-                Self::eval_bin_op_into(*op, left, right, out);
+                Self::eval_bin_op_into(node.id, *op, left, right, out)?;
             }
             Operation::UnaryOp(op) => {
                 let operand = env.dep_slice(node.dependencies[0]);
@@ -203,94 +203,52 @@ impl CompiledExpr {
 
     /// Evaluate a binary operation element-wise into a provided output slice.
     #[inline]
-    fn eval_bin_op_into(op: super::ast::BinOp, left: &[f64], right: &[f64], out: &mut [f64]) {
-        use super::ast::BinOp;
-        let len = out.len();
-
-        for (i, out_val) in out.iter_mut().enumerate().take(len) {
-            let (Some(&l), Some(&r)) = (left.get(i), right.get(i)) else {
-                *out_val = f64::NAN;
-                continue;
-            };
-
-            *out_val = match op {
-                // Arithmetic
+    fn eval_bin_op_into(
+        node: u64,
+        op: BinOp,
+        left: &[f64],
+        right: &[f64],
+        out: &mut [f64],
+    ) -> crate::Result<()> {
+        for (row, result) in out.iter_mut().enumerate() {
+            let l = left.get(row).copied().unwrap_or(f64::NAN);
+            let r = right.get(row).copied().unwrap_or(f64::NAN);
+            // A known false conjunction or true disjunction decides the result
+            // even when the other operand is missing.
+            *result = match op {
+                BinOp::And if l == 0.0 || r == 0.0 => 0.0,
+                BinOp::Or if (!l.is_nan() && l != 0.0) || (!r.is_nan() && r != 0.0) => 1.0,
+                _ if l.is_nan() || r.is_nan() => f64::NAN,
+                BinOp::Div | BinOp::Mod if r == 0.0 => {
+                    return Err(crate::Error::ExpressionEvaluation {
+                        node,
+                        row,
+                        message: format!("{op:?} by zero"),
+                    });
+                }
                 BinOp::Add => l + r,
                 BinOp::Sub => l - r,
                 BinOp::Mul => l * r,
-                BinOp::Div => {
-                    if r == 0.0 {
-                        f64::NAN
-                    } else {
-                        l / r
-                    }
-                }
+                BinOp::Div => l / r,
                 BinOp::Mod => l % r,
-
-                // Comparison (return 1.0 for true, 0.0 for false)
-                // Exact equality semantics for expression-language operators.
-                #[allow(clippy::float_cmp)]
-                BinOp::Eq => {
-                    if l == r {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
-                #[allow(clippy::float_cmp)]
-                BinOp::Ne => {
-                    if l != r {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
-                BinOp::Lt => {
-                    if l < r {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
-                BinOp::Le => {
-                    if l <= r {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
-                BinOp::Gt => {
-                    if l > r {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
-                BinOp::Ge => {
-                    if l >= r {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
-
-                // Logical (treat non-zero as true, 0.0 as false)
-                BinOp::And => {
-                    if l != 0.0 && r != 0.0 {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
-                BinOp::Or => {
-                    if l != 0.0 || r != 0.0 {
-                        1.0
-                    } else {
-                        0.0
-                    }
-                }
+                BinOp::Eq => f64::from(l.partial_cmp(&r) == Some(std::cmp::Ordering::Equal)),
+                BinOp::Ne => f64::from(l.partial_cmp(&r) != Some(std::cmp::Ordering::Equal)),
+                BinOp::Lt => f64::from(l < r),
+                BinOp::Le => f64::from(l <= r),
+                BinOp::Gt => f64::from(l > r),
+                BinOp::Ge => f64::from(l >= r),
+                BinOp::And => 1.0,
+                BinOp::Or => 0.0,
             };
+            if result.is_infinite() {
+                return Err(crate::Error::ExpressionEvaluation {
+                    node,
+                    row,
+                    message: format!("{op:?} produced a nonfinite value"),
+                });
+            }
         }
+        Ok(())
     }
 
     /// Evaluate a binary operation element-wise.
@@ -301,6 +259,7 @@ impl CompiledExpr {
         for i in 0..len {
             out[i] = match op {
                 UnaryOp::Neg => -operand[i],
+                UnaryOp::Not if operand[i].is_nan() => f64::NAN,
                 UnaryOp::Not => {
                     if operand[i] == 0.0 {
                         1.0
@@ -393,6 +352,57 @@ mod tests {
         let ctx = SimpleContext::new(["x", "y"]).expect("unique columns");
         let data = vec![vec![0.2, 0.5, 3.0, 4.0], vec![0.5, 1.5, 2.5, 3.5]];
         (ctx, data)
+    }
+
+    #[test]
+    fn undefined_spread_and_missing_logical_inputs_remain_distinct() {
+        let ctx = SimpleContext::new(["spread"]).unwrap();
+        let spread = Expr::column("spread");
+        let ratio = Expr::bin_op(
+            BinOp::Div,
+            spread.clone(),
+            Expr::call(Function::Abs, vec![spread.clone()]),
+        );
+        let expr = Expr::if_then_else(
+            Expr::bin_op(BinOp::Gt, ratio, Expr::literal(0.0)),
+            Expr::literal(1.0),
+            Expr::literal(-1.0),
+        );
+        let compiled = CompiledExpr::new(expr).unwrap();
+        assert!(
+            compiled
+                .eval(&ctx, &[&[0.0]])
+                .unwrap_err()
+                .to_string()
+                .contains("by zero")
+        );
+        assert_eq!(
+            compiled.eval(&ctx, &[&[1.0, -2.0]]).unwrap(),
+            vec![1.0, -1.0]
+        );
+        for op in [
+            BinOp::Eq,
+            BinOp::Ne,
+            BinOp::Lt,
+            BinOp::Le,
+            BinOp::Gt,
+            BinOp::Ge,
+        ] {
+            let comparison =
+                CompiledExpr::new(Expr::bin_op(op, spread.clone(), Expr::literal(0.0))).unwrap();
+            assert!(comparison.eval(&ctx, &[&[f64::NAN]]).unwrap()[0].is_nan());
+        }
+        for (op, other, expected) in [
+            (BinOp::And, 0.0, 0.0),
+            (BinOp::And, 1.0, f64::NAN),
+            (BinOp::Or, 1.0, 1.0),
+            (BinOp::Or, 0.0, f64::NAN),
+        ] {
+            let expression =
+                CompiledExpr::new(Expr::bin_op(op, spread.clone(), Expr::literal(other))).unwrap();
+            let actual = expression.eval(&ctx, &[&[f64::NAN]]).unwrap()[0];
+            assert_eq!(actual.to_bits(), expected.to_bits());
+        }
     }
 
     #[test]

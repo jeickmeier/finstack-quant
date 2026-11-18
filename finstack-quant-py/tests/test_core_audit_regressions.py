@@ -175,7 +175,9 @@ def test_market_context_len_and_bool_count_fx_collateral_and_dividends() -> None
     assert (fx_only or MarketContext()) is fx_only
 
     state = json.loads(MarketContext().to_json())
-    state["dividends"] = [{"id": "AAPL-DIV", "underlying": None, "events": [], "currency": None}]
+    state["dividends"] = [
+        {"id": "AAPL-DIV", "underlying": "AAPL", "share_basis": "AAPL", "events": [], "currency": "USD"}
+    ]
     dividends_only = MarketContext.from_json(json.dumps(state))
     assert (len(dividends_only), dividends_only.is_empty(), bool(dividends_only)) == (1, False, True)
 
@@ -191,8 +193,10 @@ def test_credit_index_data_issuer_curves_recoveries_and_weights() -> None:
     homogeneous = CreditIndexData(2, 0.4, index_curve, base_corr)
     assert not homogeneous.has_issuer_curves()
     assert homogeneous.issuer_ids() == []
-    assert homogeneous.get_issuer_weight("A") == 0.5
-    assert homogeneous.get_issuer_curve("A").id == "CDX-IG"
+    assert homogeneous.num_constituents == 2
+    assert homogeneous.recovery_rate == 0.4
+    with pytest.raises(KeyError, match="A"):
+        homogeneous.get_issuer_curve("A")
 
     data = CreditIndexData(
         2,
@@ -201,14 +205,16 @@ def test_credit_index_data_issuer_curves_recoveries_and_weights() -> None:
         base_corr,
         issuer_curves={"A": issuer_a, "B": index_curve},
         issuer_recovery_rates={"A": 0.3},
-        issuer_weights={"A": 0.25, "B": 0.75},
+        issuer_weights={"A": 0.9, "B": 0.1},
     )
     assert data.has_issuer_curves()
     assert data.issuer_ids() == ["A", "B"]
     assert data.get_issuer_curve("A").id == "A-HZD"
-    assert data.get_issuer_curve("unknown").id == "CDX-IG"
+    for lookup in (data.get_issuer_curve, data.get_issuer_weight, data.get_issuer_recovery):
+        with pytest.raises(KeyError, match="C"):
+            lookup("C")
     assert (data.get_issuer_recovery("A"), data.get_issuer_recovery("B")) == (0.3, 0.4)
-    assert (data.get_issuer_weight("A"), data.get_issuer_weight("B")) == (0.25, 0.75)
+    assert (data.get_issuer_weight("A"), data.get_issuer_weight("B")) == (0.9, 0.1)
 
     ctx = MarketContext().insert(index_curve).insert(issuer_a).insert(base_corr)
     ctx = ctx.insert_credit_index("CDX-IG", data)
@@ -245,3 +251,35 @@ def test_slice9_curve_contract_regressions() -> None:
 
     conditioned = MarketContext().insert(hz).condition(date(2030, 1, 1))
     assert conditioned.get_hazard("HZ-MULTI").hazard_rate(0.5) == pytest.approx(0.03, rel=1e-12)
+
+
+def test_dividend_snapshot_preserves_entitlement_payment_and_currency() -> None:
+    state = json.loads(MarketContext().to_json())
+    event = {
+        "event_id": "Q1",
+        "ex_date": "2025-04-01",
+        "pay_date": "2025-07-01",
+        "amount": {"amount": "10", "currency": "USD"},
+    }
+    state["dividends"] = [
+        {"id": "EQ-DIV", "underlying": "EQ", "share_basis": "EQ", "currency": "USD", "events": [event]}
+    ]
+    restored = json.loads(MarketContext.from_json(json.dumps(state)).to_json())
+    assert restored["dividends"] == state["dividends"]
+    event["amount"]["currency"] = "JPY"
+    with pytest.raises(ValueError, match="validation failed"):
+        MarketContext.from_json(json.dumps(state))
+
+
+def test_one_one_is_rejected_for_annualized_market_clocks() -> None:
+    from finstack_quant.core.dates import VolatilityClock
+
+    with pytest.raises(ValueError, match="annualized"):
+        DiscountCurve.flat("USD", "2025-01-01", 0.05, "one_one")
+    with pytest.raises(ValueError, match="annualized"):
+        VolatilityClock.from_json('{"reference_date":"2025-01-01","day_count":"one_one"}')
+
+    curve = DiscountCurve.flat("USD", "2025-01-01", 0.05, "act_365f")
+    for target in [date(2025, 1, 2), date(2026, 1, 1), date(2035, 1, 1)]:
+        years = (target - date(2025, 1, 1)).days / 365
+        assert curve.df(target) == pytest.approx(math.exp(-0.05 * years))

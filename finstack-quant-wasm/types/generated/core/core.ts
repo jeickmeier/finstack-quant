@@ -356,6 +356,7 @@ export type CurveState =
        * Strictly increasing `(time_years, cpi_level)` pillars starting at `0.0`.
        */
       knot_points: [number, number][];
+      series?: InflationSeries | null;
       type: "inflation";
     }
   | {
@@ -844,34 +845,6 @@ export type NelsonSiegelModel =
  */
 export type DecimalWire = string;
 /**
- * Type of dividend event.
- *
- * Distinguishes between cash payments, stock distributions, and continuous
- * yield approximations used in different pricing models.
- *
- * # Variants
- *
- * - **Cash**: Actual dividend payment (quarterly, semi-annual, etc.)
- * - **Stock**: Share distribution (less common, complicates option pricing)
- * - **Yield**: Continuous approximation for analytical models
- */
-export type DividendKind =
-  | {
-      cash: Money;
-    }
-  | {
-      yield: number;
-    }
-  | {
-      stock: {
-        /**
-         * Stock distribution ratio; 0.05 corresponds to a 5% stock dividend.
-         */
-        ratio: number;
-        [k: string]: unknown;
-      };
-    };
-/**
  * At-the-money strike convention on [`FxDeltaVolSurface`].
  */
 export type FxAtmConvention = "delta_neutral_straddle";
@@ -1240,7 +1213,7 @@ export interface CurveAdjustmentSegment {
   value: number;
 }
 /**
- * Typed conventions required to replay a rate-curve calibration.
+ * Benchmark conventions and quotes associated with a rate curve.
  */
 export interface RateCalibrationRecipe {
   /**
@@ -1251,6 +1224,10 @@ export interface RateCalibrationRecipe {
    * Day count used for the curve's time axis.
    */
   curve_day_count: DayCount;
+  /**
+   * Original execution evidence. A transcribed benchmark list has no qualified replay.
+   */
+  execution?: RateCalibrationExecution | null;
   /**
    * Numerical calibration method.
    */
@@ -1267,6 +1244,48 @@ export interface RateCalibrationRecipe {
    * Discount/projection role and linked curve identifier.
    */
   role: RateCalibrationCurveRole;
+}
+/**
+ * Executed evaluator, resolved instruments and original outcome of a rate calibration.
+ */
+export interface RateCalibrationExecution {
+  /**
+   * Whether the original fit passed its recorded acceptance policy.
+   */
+  accepted: boolean;
+  /**
+   * Resolved quote identities and maturities, in input order.
+   */
+  bindings: RateQuoteBinding[];
+  /**
+   * Solver controls and residual acceptance thresholds used by the evaluator.
+   */
+  calibration_config: {
+    [k: string]: unknown;
+  };
+  /**
+   * Discount or projection evaluator parameters, including pricing dependencies.
+   */
+  step_params: {
+    [k: string]: unknown;
+  };
+}
+/**
+ * Identity and resolved maturity of a quote in its original evaluator.
+ */
+export interface RateQuoteBinding {
+  /**
+   * Contractual maturity resolved using the instrument conventions.
+   */
+  pillar_date: DateWire;
+  /**
+   * Curve-clock year fraction at the resolved maturity.
+   */
+  pillar_time: number;
+  /**
+   * Original stable market quote identifier.
+   */
+  quote_id: string;
 }
 /**
  * A parsed tenor representing a time period.
@@ -1406,6 +1425,23 @@ export interface HazardConditionSource {
   knot_points: [number, number][];
 }
 /**
+ * Publication identity and units of an observed or projected inflation level.
+ */
+export interface InflationSeries {
+  /**
+   * Published reference period and index scale, for example `1982-84=100`.
+   */
+  reference_base: string;
+  /**
+   * True for seasonally adjusted levels and false for unadjusted levels.
+   */
+  seasonally_adjusted: boolean;
+  /**
+   * Publisher-qualified identifier of the statistical series.
+   */
+  series_id: string;
+}
+/**
  * Serializable snapshot of [`DayCountContext`] state for persistence and interchange.
  *
  * This struct captures the optional context parameters (calendar, frequency, business-day basis)
@@ -1446,18 +1482,13 @@ export interface DayCountContextState {
   frequency?: Tenor | null;
 }
 /**
- * A dated dividend event.
+ * One gross cash distribution per entitled share on its schedule's share basis.
  */
 export interface DividendEvent {
-  /**
-   * Ex-dividend date.
-   */
-  date: DateWire;
-  /**
-   * Event kind.
-   */
-  kind: DividendKind;
-  [k: string]: unknown;
+  amount: Money;
+  event_id: string;
+  ex_date: DateWire;
+  pay_date: DateWire;
 }
 /**
  * Currency-tagged monetary amount with safe arithmetic.
@@ -1481,36 +1512,14 @@ export interface Money {
   currency: Currency;
 }
 /**
- * Dividend schedule for an equity or ETF underlying.
- *
- * Contains a time-ordered sequence of dividend events used for pricing equity
- * derivatives and calculating total return. The schedule can be referenced by
- * multiple instruments via its [`CurveId`] in the market context.
- *
- * # Usage in Pricing
- *
- * - **Discrete dividends**: Subtract PV of future dividends from spot for option pricing
- * - **Ex-dividend adjustments**: Reduce forward price by dividend amount
- * - **Dividend futures**: Sum dividends in contract period
- * - **Total return**: Include dividend reinvestment in performance
+ * Validated distributions for one security, share basis and currency.
  */
 export interface DividendSchedule {
-  /**
-   * Quote currency for cash dividends (optional metadata).
-   */
-  currency?: Currency | null;
-  /**
-   * Sorted events by date (ascending).
-   */
+  currency: Currency;
   events: DividendEvent[];
-  /**
-   * Unique identifier of this schedule in the market context.
-   */
   id: Id;
-  /**
-   * Optional display symbol/ticker for convenience.
-   */
-  underlying?: string | null;
+  share_basis: string;
+  underlying: Id;
 }
 /**
  * Configuration for fiscal year periods.
@@ -1749,6 +1758,7 @@ export interface InflationIndex {
    * Strictly ascending canonical monthly fixing observations.
    */
   observations: InflationObservation[];
+  series?: InflationSeries | null;
 }
 /**
  * One published monthly CPI/RPI fixing record inside an [`InflationIndex`] snapshot.
@@ -2024,7 +2034,7 @@ export interface PeriodPlan {
    */
   calendar: PeriodCalendar;
   /**
-   * Ordered periods produced by the parser.
+   * Chronologically ordered reporting periods, with optional gaps.
    */
   periods: Period[];
 }

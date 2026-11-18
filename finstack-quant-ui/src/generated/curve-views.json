@@ -85,13 +85,14 @@
       "id",
       "interp_style",
       "knot_points",
+      "series",
       "type"
     ],
     "source": {
       "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
       "pointer": "#/$defs/CurveState/oneOf/3",
       "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-      "sha256": "b5475e8c950043c94f8a5f8ea42b9f1006f40244b43746bfda38484183be893d",
+      "sha256": "79fc4c5735a0405b86c16aa053a9b83558f48a509c7a0593fbff788251db1387",
       "description": "Inflation curve state"
     }
   },

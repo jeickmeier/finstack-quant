@@ -525,6 +525,17 @@ pub enum DayCount {
 }
 
 impl DayCount {
+    /// Check that the convention can measure elapsed annualized time.
+    pub(crate) fn validate_annualized_clock(self) -> crate::Result<()> {
+        if self == Self::OneOne {
+            return Err(crate::Error::Validation(
+                "one_one is a contractual coupon convention and cannot measure annualized time"
+                    .into(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Compute the year fraction between `start` and `end` per this convention.
     ///
     /// Provide any required context via [`DayCountContext`]:

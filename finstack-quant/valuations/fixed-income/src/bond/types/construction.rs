@@ -858,6 +858,7 @@ impl Bond {
 
         let cashflow_spec = CashflowSpec::Floating(FloatingCouponSpec {
             rate_spec: FloatingRateSpec {
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 spread_bp: Decimal::new(150, 0),
                 gearing: Decimal::ONE,

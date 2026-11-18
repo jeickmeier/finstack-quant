@@ -28,6 +28,7 @@
               "count": 3,
               "unit": "months"
             },
+            "index_id": "USD-SOFR-3M",
             "payment_lag_days": 0,
             "reset_lag_days": 0,
             "spread_bp": "5",
@@ -48,6 +49,7 @@
               "count": 1,
               "unit": "months"
             },
+            "index_id": "USD-SOFR-1M",
             "payment_lag_days": 0,
             "reset_lag_days": 0,
             "spread_bp": "0",
@@ -923,6 +925,17 @@
             }
           ],
           "description": "Optional forward curve identifier for asset-swap spread metrics.\n\nWhen set, ASW par/market metrics project the floating receiver leg from\nthis forward curve instead of using a discount-curve par-rate proxy."
+        },
+        "asw_index_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/d_94cb251104de5cf587b6"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Contractual floating index used for asset-swap accruals and historical resets."
         },
         "bdt_sigma": {
           "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
@@ -3416,6 +3429,10 @@
           "$ref": "#/$defs/d_47e5e74524615b78a19f",
           "description": "Payment frequency"
         },
+        "index_id": {
+          "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
+          "description": "Contractual observed index identifying historical rate publications."
+        },
         "payment_lag_days": {
           "default": 0,
           "description": "Payment lag in business days after period end (default: 0).\n\nBloomberg OIS swaps typically use 2 business days payment lag.\nThe actual payment date is adjusted from the period end date by\nthis many business days using the leg's calendar.",
@@ -3443,6 +3460,7 @@
         }
       },
       "required": [
+        "index_id",
         "discount_curve_id",
         "forward_curve_id",
         "spread_bp",
@@ -3971,7 +3989,7 @@
     },
     "d_f2becfb3409f67ce2d6f": {
       "additionalProperties": false,
-      "description": "Basis swap instrument that exchanges two floating rate payments with different tenors.\n\nA basis swap allows parties to exchange floating rate payments based on different\nreference rates (e.g., 3M SOFR vs 6M SOFR) plus an optional spread on one leg.\nThe primary leg typically receives the spread, while the reference leg pays flat.\n\nEach leg owns its own dates, discount curve, calendar, and stub conventions,\nfollowing the IRS leg-centric pattern.\n\n# Cross-Currency (XCCY) Basis Swaps\n\n**Important**: This implementation supports **single-currency** basis swaps only.\nFor cross-currency basis swaps, use `XccySwap` instead.\n\n# Examples\n```rust\nuse finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};\nuse finstack_quant_valuations_rates::basis_swap::BasisSwap;\nuse finstack_quant_valuations_core::instruments::FloatLegSpec;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2024, Month::January, 3).expect(\"valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 3).expect(\"valid date\");\n\nlet primary_leg = FloatLegSpec {\n    forward_curve_id: CurveId::new(\"3M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::quarterly(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::from(5),\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet reference_leg = FloatLegSpec {\n    forward_curve_id: CurveId::new(\"6M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::semi_annual(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::ZERO,\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet swap = BasisSwap::builder()\n    .id(\"BASIS_SWAP_001\".into())\n    .notional(Money::from((1_000_000_i64, Currency::USD)))\n    .primary_leg(primary_leg)\n    .reference_leg(reference_leg)\n    .allow_calendar_fallback(true)\n    .attributes(Default::default())\n    .build().expect(\"valid basis swap\");\n```",
+      "description": "Basis swap instrument that exchanges two floating rate payments with different tenors.\n\nA basis swap allows parties to exchange floating rate payments based on different\nreference rates (e.g., 3M SOFR vs 6M SOFR) plus an optional spread on one leg.\nThe primary leg typically receives the spread, while the reference leg pays flat.\n\nEach leg owns its own dates, discount curve, calendar, and stub conventions,\nfollowing the IRS leg-centric pattern.\n\n# Cross-Currency (XCCY) Basis Swaps\n\n**Important**: This implementation supports **single-currency** basis swaps only.\nFor cross-currency basis swaps, use `XccySwap` instead.\n\n# Examples\n```rust\nuse finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};\nuse finstack_quant_valuations_rates::basis_swap::BasisSwap;\nuse finstack_quant_valuations_core::instruments::FloatLegSpec;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2024, Month::January, 3).expect(\"valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 3).expect(\"valid date\");\n\nlet primary_leg = FloatLegSpec {\n    index_id: \"3M-SOFR\".into(),\n    forward_curve_id: CurveId::new(\"3M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::quarterly(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::from(5),\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet reference_leg = FloatLegSpec {\n    index_id: \"6M-SOFR\".into(),\n    forward_curve_id: CurveId::new(\"6M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::semi_annual(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::ZERO,\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet swap = BasisSwap::builder()\n    .id(\"BASIS_SWAP_001\".into())\n    .notional(Money::from((1_000_000_i64, Currency::USD)))\n    .primary_leg(primary_leg)\n    .reference_leg(reference_leg)\n    .allow_calendar_fallback(true)\n    .attributes(Default::default())\n    .build().expect(\"valid basis swap\");\n```",
       "properties": {
         "allow_calendar_fallback": {
           "default": false,

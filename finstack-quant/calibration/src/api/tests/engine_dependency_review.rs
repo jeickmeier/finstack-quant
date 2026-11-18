@@ -242,10 +242,10 @@ fn equity_cash_dividends() -> std::result::Result<MarketDatum, Box<dyn std::erro
         "kind": "dividend_schedule",
         "id": "PAYMENTS-42",
         "underlying": "AAPL",
+        "share_basis": "AAPL",
         "currency": "USD",
         "events": [{
-            "date": "2025-07-02",
-            "kind": {"cash": {"amount": "0.25", "currency": "USD"}}
+            "event_id": "Q1", "ex_date": "2025-07-02", "pay_date": "2025-07-02", "amount": {"amount": "0.25", "currency": "USD"}
         }]
     }))?)
 }

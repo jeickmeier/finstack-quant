@@ -99,6 +99,7 @@ pub fn create_standard_payer_swaption(
     };
     let float = FloatLegSpec {
         discount_curve_id: CurveId::new("USD_OIS"),
+        index_id: "USD_LIBOR_3M".into(),
         forward_curve_id: CurveId::new("USD_LIBOR_3M"),
         spread_bp: Decimal::ZERO,
         frequency: Tenor::quarterly(),

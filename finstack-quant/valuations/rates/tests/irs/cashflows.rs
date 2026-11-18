@@ -147,6 +147,7 @@ fn test_irs_fixed_leg_quarterly_schedule() {
         })
         .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
+            index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::ZERO,
             frequency: Tenor::quarterly(),
@@ -200,6 +201,7 @@ fn test_irs_fixed_leg_semiannual_schedule() {
         })
         .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
+            index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -324,6 +326,7 @@ fn test_irs_stub_front() {
         })
         .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
+            index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -373,6 +376,7 @@ fn test_irs_stub_back() {
         })
         .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
+            index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -509,6 +513,7 @@ fn test_regular_short_front_schedule_does_not_tag_first_coupon_as_stub() {
         })
         .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
+            index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::ZERO,
             frequency: Tenor::quarterly(),
@@ -566,6 +571,7 @@ fn test_genuine_front_stub_fixed_coupon_is_tagged_as_stub() {
         })
         .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
+            index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::ZERO,
             frequency: Tenor::quarterly(),
@@ -620,6 +626,7 @@ fn test_regular_holiday_end_coupon_under_stub_rule_is_not_tagged_stub() {
         })
         .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
+            index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::ZERO,
             frequency: Tenor::semi_annual(),
@@ -677,6 +684,7 @@ fn test_regular_eom_schedule_under_stub_rule_is_not_tagged_stub() {
         })
         .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
+            index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::ZERO,
             frequency: Tenor::monthly(),
@@ -735,6 +743,7 @@ fn test_irs_different_frequencies() {
         })
         .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
+            index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -785,6 +794,7 @@ fn test_irs_calendar_adjustments() {
         })
         .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
+            index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -837,6 +847,7 @@ fn test_irs_explicit_zero_payment_delay_preserved() {
         })
         .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-OIS".into(),
             forward_curve_id: "USD-OIS".into(),
             spread_bp: rust_decimal::Decimal::ZERO,
             frequency: Tenor::annual(),
@@ -917,6 +928,7 @@ fn test_irs_explicit_zero_reset_lag_preserved() {
         })
         .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::ZERO,
             frequency: Tenor::quarterly(),
@@ -1068,6 +1080,7 @@ fn test_irs_npv_parity_at_par_rate() {
         })
         .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
             discount_curve_id: "USD_OIS".into(),
+            index_id: "USD_LIBOR_3M".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::ZERO,
             frequency: Tenor::quarterly(),

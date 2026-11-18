@@ -215,6 +215,7 @@ impl XccySwap {
             side: PayReceive::Receive,
             leg: FloatLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 spread_bp: Decimal::ZERO,
                 frequency: Tenor::quarterly(),
@@ -237,6 +238,7 @@ impl XccySwap {
             side: PayReceive::Pay,
             leg: FloatLegSpec {
                 discount_curve_id: CurveId::new("EUR-OIS"),
+                index_id: "EUR-EURIBOR-3M".into(),
                 forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
                 spread_bp: Decimal::from(10),
                 frequency: Tenor::quarterly(),
@@ -319,11 +321,11 @@ impl XccySwap {
         // MtM notional exchanges require aligned contractual start/end dates;
         // coupon schedules remain leg-specific.
         finstack_quant_valuations_core::instruments::pricing::overnight_conventions::reject_simple_overnight(
-            self.leg1.leg.forward_curve_id.as_str(),
+            self.leg1.leg.index_id.as_str(),
             &self.leg1.leg.compounding,
         )?;
         finstack_quant_valuations_core::instruments::pricing::overnight_conventions::reject_simple_overnight(
-            self.leg2.leg.forward_curve_id.as_str(),
+            self.leg2.leg.index_id.as_str(),
             &self.leg2.leg.compounding,
         )?;
 
@@ -585,7 +587,7 @@ impl XccySwap {
                 let projection = project_overnight_coupon(OvernightCouponProjectionInput {
                     curve: OvernightProjectionCurve::Forward(fwd),
                     fixings,
-                    fixing_id: leg.leg.forward_curve_id.as_str(),
+                    fixing_id: leg.leg.index_id.as_str(),
                     as_of,
                     accrual_start,
                     accrual_end,
@@ -601,7 +603,7 @@ impl XccySwap {
                 if let Some(out) = projected_fixings {
                     out.extend(projection.observation_exposures.iter().map(|observation| {
                         finstack_quant_cashflows::fixings::ProjectedFixing {
-                            series_id: fixing_series_id(leg.leg.forward_curve_id.as_str()),
+                            series_id: fixing_series_id(leg.leg.index_id.as_str()),
                             date: observation.observation_start,
                             value: Some(observation.projected_rate),
                         }
@@ -631,7 +633,7 @@ impl XccySwap {
             };
             if let Some(out) = projected_fixings {
                 out.push(finstack_quant_cashflows::fixings::ProjectedFixing {
-                    series_id: fixing_series_id(leg.leg.forward_curve_id.as_str()),
+                    series_id: fixing_series_id(leg.leg.index_id.as_str()),
                     date: fixing_date,
                     value: Some(forward_rate),
                 });
@@ -666,9 +668,8 @@ impl XccySwap {
         let calendar_id = self.resolve_leg_calendar_id(leg)?;
         let periods = self.leg_build_periods(leg, calendar_id)?;
         let fwd = market.get_forward(&leg.leg.forward_curve_id)?;
-        let fixing_series_id = finstack_quant_core::market_data::fixings::fixing_series_id(
-            leg.leg.forward_curve_id.as_str(),
-        );
+        let fixing_series_id =
+            finstack_quant_core::market_data::fixings::fixing_series_id(leg.leg.index_id.as_str());
         let fixings = market.get_series(&fixing_series_id).ok();
         let spread = leg.leg.spread_bp.as_f64() / 10_000.0;
 
@@ -807,9 +808,8 @@ impl XccySwap {
 
         let disc = context.get_discount(&leg.leg.discount_curve_id)?;
         let fwd = context.get_forward(&leg.leg.forward_curve_id)?;
-        let fixing_series_id = finstack_quant_core::market_data::fixings::fixing_series_id(
-            leg.leg.forward_curve_id.as_str(),
-        );
+        let fixing_series_id =
+            finstack_quant_core::market_data::fixings::fixing_series_id(leg.leg.index_id.as_str());
         let fixings = context.get_series(&fixing_series_id).ok();
         let fx = context.fx();
 
@@ -973,10 +973,10 @@ impl finstack_quant_valuations_core::instruments::Instrument for XccySwap {
             deps.add_fx_pair(self.leg2.notional.currency(), self.reporting_currency);
         }
         deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
-            self.leg1.leg.forward_curve_id.as_str(),
+            self.leg1.leg.index_id.as_str(),
         ));
         deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
-            self.leg2.leg.forward_curve_id.as_str(),
+            self.leg2.leg.index_id.as_str(),
         ));
         if let NotionalExchange::MtmResetting { resetting_side } = self.notional_exchange {
             let (constant_leg, resetting_leg) = self.partition_legs(resetting_side)?;
@@ -1152,6 +1152,7 @@ mod tests {
                 notional: Money::from((1_000_000_i64, Currency::USD)),
                 side: PayReceive::Receive,
                 leg: FloatLegSpec {
+                    index_id: "USD-SOFR-3M".into(),
                     forward_curve_id: CurveId::new("USD-SOFR-3M"),
                     discount_curve_id: CurveId::new("USD-OIS"),
                     start,
@@ -1173,6 +1174,7 @@ mod tests {
                 notional: Money::from((900_000_i64, Currency::EUR)),
                 side: PayReceive::Pay,
                 leg: FloatLegSpec {
+                    index_id: "EUR-EURIBOR-3M".into(),
                     forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
                     discount_curve_id: CurveId::new("EUR-OIS"),
                     start,
@@ -1270,6 +1272,7 @@ mod tests {
                 notional: Money::from((1_000_000_i64, Currency::USD)),
                 side: PayReceive::Receive,
                 leg: FloatLegSpec {
+                    index_id: "USD-SOFR-3M".into(),
                     forward_curve_id: CurveId::new("USD-SOFR-3M"),
                     discount_curve_id: CurveId::new("USD-OIS"),
                     start,
@@ -1291,6 +1294,7 @@ mod tests {
                 notional: Money::from((900_000_i64, Currency::EUR)),
                 side: PayReceive::Pay,
                 leg: FloatLegSpec {
+                    index_id: "EUR-EURIBOR-3M".into(),
                     forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
                     discount_curve_id: CurveId::new("EUR-OIS"),
                     start,
@@ -1415,6 +1419,7 @@ mod tests {
             notional: Money::from((9_200_000_i64, Currency::EUR)),
             side: PayReceive::Receive,
             leg: FloatLegSpec {
+                index_id: "EUR-EURIBOR-3M".into(),
                 forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
                 discount_curve_id: CurveId::new("EUR-OIS"),
                 start,
@@ -1466,6 +1471,7 @@ mod tests {
             notional: Money::from((9_200_000_i64, Currency::EUR)),
             side: PayReceive::Receive,
             leg: FloatLegSpec {
+                index_id: "EUR-EURIBOR-3M".into(),
                 forward_curve_id: CurveId::new("EUR-EURIBOR-3M"),
                 discount_curve_id: CurveId::new("EUR-OIS"),
                 start,
@@ -1703,6 +1709,7 @@ mod tests {
             notional: Money::from((1_000_000_i64, Currency::EUR)),
             side: PayReceive::Pay,
             leg: FloatLegSpec {
+                index_id: "EUR-ESTR-OIS".into(),
                 forward_curve_id: CurveId::new("EUR-ESTR-OIS"),
                 discount_curve_id: CurveId::new("EUR-OIS"),
                 start,
@@ -1789,6 +1796,7 @@ mod tests {
             notional: Money::from((1_000_000_i64, Currency::EUR)),
             side: PayReceive::Pay,
             leg: FloatLegSpec {
+                index_id: "EUR-ESTR-OIS".into(),
                 forward_curve_id: CurveId::new("EUR-ESTR-OIS"),
                 discount_curve_id: CurveId::new("EUR-OIS"),
                 start,
@@ -1849,6 +1857,7 @@ mod tests {
     #[test]
     fn validate_rejects_simple_compounding_on_overnight_index() {
         let mut swap = XccySwap::example().expect("example");
+        swap.leg1.leg.index_id = "USD-SOFR-OIS".into();
         swap.leg1.leg.forward_curve_id = CurveId::new("USD-SOFR-OIS");
         swap.leg1.leg.compounding =
             finstack_quant_cashflows::builder::FloatingLegCompounding::Simple;

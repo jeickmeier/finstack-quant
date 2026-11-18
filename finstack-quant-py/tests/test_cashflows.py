@@ -103,6 +103,7 @@ def _floating_cashflow_spec() -> str:
                 "kind": "floating",
                 "spec": {
                     "rate_spec": {
+                        "index_id": "USD-SOFR-3M",
                         "forward_curve_id": "USD-SOFR-3M",
                         "spread_bp": "150.0",
                         "gearing": "1.0",

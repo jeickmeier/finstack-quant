@@ -80,6 +80,10 @@ export type Date2 = string;
  */
 export type Id3 = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id4 = string;
+/**
  * Spread in basis points added to the forward rate
  */
 export type Decimal1 = string;
@@ -90,7 +94,7 @@ export type Date3 = string;
 /**
  * Opaque string identifier.
  */
-export type Id4 = string;
+export type Id5 = string;
 /**
  * A phantom-typed identifier that prevents mixing different kinds of IDs.
  *
@@ -355,7 +359,7 @@ export type Currency =
 /**
  * Opaque string identifier.
  */
-export type Id5 = string;
+export type Id6 = string;
 /**
  * Explicit ISDA SIMM credit risk-class and bucket assignment.
  *
@@ -645,7 +649,7 @@ export interface DBbf36E9Ad6Eb27Fdf758 {
   attributes: Attributes;
   fixed_leg: DDccff34D4D8A7A8Ae68B;
   float_leg: D_02A84814797C76E9A7Fc;
-  id: Id4;
+  id: Id5;
   instrument_pricing_overrides?: InstrumentPricingOverrides;
   /**
    * Optional OTC margin specification for VM/IM.
@@ -812,6 +816,7 @@ export interface D_02A84814797C76E9A7Fc {
   fixing_calendar_id?: Id | null;
   forward_curve_id: Id3;
   frequency: Tenor1;
+  index_id: Id4;
   /**
    * Payment lag in business days after period end (default: 0).
    *
@@ -948,6 +953,10 @@ export interface D_572Ad1Befb7D94914652 {
    * this forward curve instead of using a discount-curve par-rate proxy.
    */
   asw_forward_curve_id?: D_94Cb251104De5Cf587B6 | null;
+  /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: D_94Cb251104De5Cf587B6 | null;
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
@@ -1689,7 +1698,7 @@ export interface D_3033Bb5742989B033D53 {
    */
   calendar_id: string;
   call_timing: D_7E8Bc23E1C90F0E6Cc3A;
-  collateral_curve_id: Id5;
+  collateral_curve_id: Id6;
   eligible_collateral: D_2918C129Fb87F8E8Ee6C;
   /**
    * CSA identifier (e.g., "USD-CSA-STANDARD", "COUNTERPARTY-XYZ-CSA")

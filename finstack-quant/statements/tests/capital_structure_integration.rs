@@ -76,7 +76,7 @@ fn test_reporting_totals_sum_without_fx_when_same_currency() {
     let market_ctx = MarketContext::new();
     let periods = build_periods("2025M1..M1", None)
         .expect("valid periods")
-        .periods;
+        .into_periods();
 
     let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
     let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid date");

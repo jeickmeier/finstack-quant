@@ -179,7 +179,7 @@ fn asset_swap_forward_paths_use_discount_factor_implied_rates() {
         .expect("discount curve should build");
     let fwd = ForwardCurve::builder("USD-3M")
         .base_date(base)
-        .day_count(finstack_quant_core::dates::DayCount::Act360)
+        .day_count(finstack_quant_core::dates::DayCount::Act365F)
         .knots([
             (0.0, 1.0),
             (0.125, 0.997191451372845),
@@ -214,15 +214,25 @@ fn asset_swap_forward_paths_use_discount_factor_implied_rates() {
         expected_float_pv += fwd.rate_between(t1, t2, yf).expect("valid term forward") * yf * df;
     }
 
-    let (float_pv, _, _) = asset_swap_forward_components(
+    let (float_pv, _, float_annuity) = asset_swap_forward_components(
         &disc,
         &fwd,
+        finstack_quant_core::dates::DayCount::Act360,
         finstack_quant_core::dates::DayCount::Act360,
         None,
         &schedule,
         0.0,
     )
     .expect("asset-swap components should succeed");
+    let contractual_annuity: f64 = schedule
+        .windows(2)
+        .map(|period| {
+            f64::from(i32::try_from((period[1] - period[0]).whole_days()).unwrap()) / 360.0
+                * disc.df_on_date(period[1]).unwrap()
+        })
+        .sum();
+    let numerator = 0.05 * contractual_annuity;
+    assert!((10_000.0 * numerator / float_annuity - 500.0).abs() < 1e-10);
 
     assert!((float_pv - expected_float_pv).abs() < 1e-14);
 }
@@ -268,6 +278,7 @@ fn overnight_asset_swap_forward_paths_use_observation_average() {
     let (float_pv, _, _) = asset_swap_forward_components(
         &disc,
         &fwd,
+        finstack_quant_core::dates::DayCount::Act360,
         finstack_quant_core::dates::DayCount::Act360,
         None,
         &schedule,

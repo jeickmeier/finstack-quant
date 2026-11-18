@@ -82,8 +82,21 @@ fn realized_variance_ohlc_estimators_behave() {
         RealizedVarMethod::RogersSatchell,
         RealizedVarMethod::YangZhang,
     ] {
-        let value = realized_variance_ohlc(&open, &high, &low, &close, Some(method), Some(252.0))
-            .expect("realized_variance_ohlc should succeed for valid OHLC input");
+        let value = realized_variance_ohlc(
+            &open,
+            &high,
+            &low,
+            &close,
+            Some(method),
+            Some(252.0),
+            matches!(
+                method,
+                RealizedVarMethod::YangZhang | RealizedVarMethod::CloseToClose
+            )
+            .then_some(100.0),
+        )
+        .expect("realized_variance_ohlc should succeed for valid OHLC input")
+        .expect("sufficient target bars");
         assert!(value.is_finite() && value >= 0.0);
     }
 }
@@ -97,6 +110,7 @@ fn realized_variance_ohlc_rejects_mismatched_lengths() {
         &[101.0, 102.0],
         Some(RealizedVarMethod::Parkinson),
         Some(252.0),
+        None,
     )
     .expect_err("mismatched OHLC vectors should be rejected");
 

@@ -42,7 +42,7 @@
       "schema": "finstack_quant.calibration/1",
       "plan": {
         "id": "cds_5y_par_spread_market",
-        "description": "Calibrate a replayable flat IBM senior quote curve centered on the Bloomberg deal spread; this replaces the prior manual hazard proxy while preserving quote-space CS01 semantics.",
+        "description": "Bootstrap S531 from the supplied USD deposit and swap quotes, then calibrate IBM senior hazard rates to the CDS spreads. DV01 and CS01 reprice these executed calibrations.",
         "quote_sets": {
           "ibm_cds": [
             "IBM-CDS-6M",
@@ -53,9 +53,44 @@
             "IBM-CDS-5Y",
             "IBM-CDS-7Y",
             "IBM-CDS-10Y"
+          ],
+          "usd_s531_rates": [
+            "USD-S531-SWAP-DEPOSIT-1M",
+            "USD-S531-SWAP-DEPOSIT-2M",
+            "USD-S531-SWAP-DEPOSIT-3M",
+            "USD-S531-SWAP-DEPOSIT-6M",
+            "USD-S531-SWAP-SWAP-1Y",
+            "USD-S531-SWAP-SWAP-2Y",
+            "USD-S531-SWAP-SWAP-3Y",
+            "USD-S531-SWAP-SWAP-4Y",
+            "USD-S531-SWAP-SWAP-5Y",
+            "USD-S531-SWAP-SWAP-6Y",
+            "USD-S531-SWAP-SWAP-7Y",
+            "USD-S531-SWAP-SWAP-8Y",
+            "USD-S531-SWAP-SWAP-9Y",
+            "USD-S531-SWAP-SWAP-10Y",
+            "USD-S531-SWAP-SWAP-12Y",
+            "USD-S531-SWAP-SWAP-15Y",
+            "USD-S531-SWAP-SWAP-20Y",
+            "USD-S531-SWAP-SWAP-25Y",
+            "USD-S531-SWAP-SWAP-30Y"
           ]
         },
         "steps": [
+          {
+            "id": "USD-S531-SWAP",
+            "quote_set": "usd_s531_rates",
+            "kind": "discount",
+            "curve_id": "USD-S531-SWAP",
+            "currency": "USD",
+            "base_date": "2026-05-02",
+            "method": "bootstrap",
+            "interpolation": "log_linear",
+            "extrapolation": "extend",
+            "conventions": {
+              "curve_day_count": "act_365f"
+            }
+          },
           {
             "id": "IBM-USD-SENIOR",
             "quote_set": "ibm_cds",
@@ -80,6 +115,268 @@
         }
       },
       "market_data": [
+        {
+          "kind": "rate_quote",
+          "type": "deposit",
+          "id": "USD-S531-SWAP-DEPOSIT-1M",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 1,
+              "unit": "months"
+            }
+          },
+          "rate": 0.03644
+        },
+        {
+          "kind": "rate_quote",
+          "type": "deposit",
+          "id": "USD-S531-SWAP-DEPOSIT-2M",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 2,
+              "unit": "months"
+            }
+          },
+          "rate": 0.036528
+        },
+        {
+          "kind": "rate_quote",
+          "type": "deposit",
+          "id": "USD-S531-SWAP-DEPOSIT-3M",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 3,
+              "unit": "months"
+            }
+          },
+          "rate": 0.036583
+        },
+        {
+          "kind": "rate_quote",
+          "type": "deposit",
+          "id": "USD-S531-SWAP-DEPOSIT-6M",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 6,
+              "unit": "months"
+            }
+          },
+          "rate": 0.03672
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-SWAP-1Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 1,
+              "unit": "years"
+            }
+          },
+          "rate": 0.037255,
+          "spread_decimal": null
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-SWAP-2Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 2,
+              "unit": "years"
+            }
+          },
+          "rate": 0.037125,
+          "spread_decimal": null
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-SWAP-3Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 3,
+              "unit": "years"
+            }
+          },
+          "rate": 0.03681,
+          "spread_decimal": null
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-SWAP-4Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 4,
+              "unit": "years"
+            }
+          },
+          "rate": 0.036840000000000005,
+          "spread_decimal": null
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-SWAP-5Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 5,
+              "unit": "years"
+            }
+          },
+          "rate": 0.037115,
+          "spread_decimal": null
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-SWAP-6Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 6,
+              "unit": "years"
+            }
+          },
+          "rate": 0.037555,
+          "spread_decimal": null
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-SWAP-7Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 7,
+              "unit": "years"
+            }
+          },
+          "rate": 0.038045,
+          "spread_decimal": null
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-SWAP-8Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 8,
+              "unit": "years"
+            }
+          },
+          "rate": 0.038505,
+          "spread_decimal": null
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-SWAP-9Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 9,
+              "unit": "years"
+            }
+          },
+          "rate": 0.03894,
+          "spread_decimal": null
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-SWAP-10Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 10,
+              "unit": "years"
+            }
+          },
+          "rate": 0.039369999999999995,
+          "spread_decimal": null
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-SWAP-12Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 12,
+              "unit": "years"
+            }
+          },
+          "rate": 0.040235,
+          "spread_decimal": null
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-SWAP-15Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 15,
+              "unit": "years"
+            }
+          },
+          "rate": 0.04133,
+          "spread_decimal": null
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-SWAP-20Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 20,
+              "unit": "years"
+            }
+          },
+          "rate": 0.04221,
+          "spread_decimal": null
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-SWAP-25Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 25,
+              "unit": "years"
+            }
+          },
+          "rate": 0.042265,
+          "spread_decimal": null
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-SWAP-30Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 30,
+              "unit": "years"
+            }
+          },
+          "rate": 0.041935,
+          "spread_decimal": null
+        },
         {
           "kind": "cds_quote",
           "type": "cds_par_spread",
@@ -225,363 +522,7 @@
           "recovery_rate": 0.4
         }
       ],
-      "prior_market": [
-        {
-          "kind": "discount_curve",
-          "id": "USD-S531-SWAP",
-          "base": "2026-05-02",
-          "day_count": "act_365f",
-          "knot_points": [
-            [
-              0.0,
-              1.0
-            ],
-            [
-              0.13972602739726028,
-              0.9948564304744848
-            ],
-            [
-              0.38904109589041097,
-              0.98574857
-            ],
-            [
-              0.6383561643835617,
-              0.97668173
-            ],
-            [
-              0.8876712328767123,
-              0.96764815
-            ],
-            [
-              1.1369863013698631,
-              0.95875431
-            ],
-            [
-              1.3863013698630138,
-              0.94999432
-            ],
-            [
-              1.6356164383561644,
-              0.94131437
-            ],
-            [
-              1.884931506849315,
-              0.93271373
-            ],
-            [
-              2.136986301369863,
-              0.92419467
-            ],
-            [
-              2.389041095890411,
-              0.91584876
-            ],
-            [
-              2.638356164383562,
-              0.9076677
-            ],
-            [
-              2.884931506849315,
-              0.89964844
-            ],
-            [
-              3.136986301369863,
-              0.8914406
-            ],
-            [
-              3.389041095890411,
-              0.88321729
-            ],
-            [
-              3.638356164383562,
-              0.87515799
-            ],
-            [
-              3.884931506849315,
-              0.86725959
-            ],
-            [
-              4.136986301369863,
-              0.85911547
-            ],
-            [
-              4.389041095890411,
-              0.85089899
-            ],
-            [
-              4.638356164383562,
-              0.84284912
-            ],
-            [
-              4.884931506849315,
-              0.83496263
-            ],
-            [
-              5.136986301369863,
-              0.82680571
-            ]
-          ],
-          "interp_style": "log_linear",
-          "extrapolation": "extend",
-          "rate_calibration": {
-            "currency": "USD",
-            "method": "bootstrap",
-            "curve_day_count": "act_365f",
-            "ois_compounding": null,
-            "role": {
-              "discount": {
-                "projection_curve_id": "USD-S531-SWAP"
-              }
-            },
-            "quotes": [
-              {
-                "deposit": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 1,
-                      "unit": "months"
-                    }
-                  },
-                  "rate": 0.03644
-                }
-              },
-              {
-                "deposit": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 2,
-                      "unit": "months"
-                    }
-                  },
-                  "rate": 0.036528
-                }
-              },
-              {
-                "deposit": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 3,
-                      "unit": "months"
-                    }
-                  },
-                  "rate": 0.036583
-                }
-              },
-              {
-                "deposit": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 6,
-                      "unit": "months"
-                    }
-                  },
-                  "rate": 0.03672
-                }
-              },
-              {
-                "swap": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 1,
-                      "unit": "years"
-                    }
-                  },
-                  "rate": 0.037255,
-                  "spread_decimal": null
-                }
-              },
-              {
-                "swap": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 2,
-                      "unit": "years"
-                    }
-                  },
-                  "rate": 0.037125,
-                  "spread_decimal": null
-                }
-              },
-              {
-                "swap": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 3,
-                      "unit": "years"
-                    }
-                  },
-                  "rate": 0.03681,
-                  "spread_decimal": null
-                }
-              },
-              {
-                "swap": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 4,
-                      "unit": "years"
-                    }
-                  },
-                  "rate": 0.036840000000000005,
-                  "spread_decimal": null
-                }
-              },
-              {
-                "swap": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 5,
-                      "unit": "years"
-                    }
-                  },
-                  "rate": 0.037115,
-                  "spread_decimal": null
-                }
-              },
-              {
-                "swap": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 6,
-                      "unit": "years"
-                    }
-                  },
-                  "rate": 0.037555,
-                  "spread_decimal": null
-                }
-              },
-              {
-                "swap": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 7,
-                      "unit": "years"
-                    }
-                  },
-                  "rate": 0.038045,
-                  "spread_decimal": null
-                }
-              },
-              {
-                "swap": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 8,
-                      "unit": "years"
-                    }
-                  },
-                  "rate": 0.038505,
-                  "spread_decimal": null
-                }
-              },
-              {
-                "swap": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 9,
-                      "unit": "years"
-                    }
-                  },
-                  "rate": 0.03894,
-                  "spread_decimal": null
-                }
-              },
-              {
-                "swap": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 10,
-                      "unit": "years"
-                    }
-                  },
-                  "rate": 0.039369999999999995,
-                  "spread_decimal": null
-                }
-              },
-              {
-                "swap": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 12,
-                      "unit": "years"
-                    }
-                  },
-                  "rate": 0.040235,
-                  "spread_decimal": null
-                }
-              },
-              {
-                "swap": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 15,
-                      "unit": "years"
-                    }
-                  },
-                  "rate": 0.04133,
-                  "spread_decimal": null
-                }
-              },
-              {
-                "swap": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 20,
-                      "unit": "years"
-                    }
-                  },
-                  "rate": 0.04221,
-                  "spread_decimal": null
-                }
-              },
-              {
-                "swap": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 25,
-                      "unit": "years"
-                    }
-                  },
-                  "rate": 0.042265,
-                  "spread_decimal": null
-                }
-              },
-              {
-                "swap": {
-                  "index_id": "USD-SOFR-OIS",
-                  "pillar": {
-                    "tenor": {
-                      "count": 30,
-                      "unit": "years"
-                    }
-                  },
-                  "rate": 0.041935,
-                  "spread_decimal": null
-                }
-              }
-            ]
-          },
-          "fx_policy": null
-        }
-      ]
+      "prior_market": []
     }
   },
   "instrument": {

@@ -26,6 +26,7 @@ type Date = finstack_quant_core::dates::Date;
 fn make_float_spec(fallback: FloatingRateFallback, spread_bp: Decimal) -> FloatingCouponSpec {
     FloatingCouponSpec {
         rate_spec: FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp,
             gearing: Decimal::ONE,
@@ -1027,6 +1028,7 @@ fn make_overnight_float_spec(
 ) -> FloatingCouponSpec {
     FloatingCouponSpec {
         rate_spec: FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp,
             gearing: Decimal::ONE,
@@ -1596,6 +1598,7 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
 
     let make_spec = |business_day_convention| FloatingCouponSpec {
         rate_spec: FloatingRateSpec {
+            index_id: "USD-SOFR-ON".into(),
             forward_curve_id: "USD-SOFR-ON".into(),
             spread_bp: dec!(0),
             gearing: Decimal::ONE,
@@ -1704,6 +1707,7 @@ fn test_weekend_only_stub_requires_and_carries_preceding_fixing() {
 
     let spec = FloatingCouponSpec {
         rate_spec: FloatingRateSpec {
+            index_id: "USD-SOFR-ON".into(),
             forward_curve_id: "USD-SOFR-ON".into(),
             spread_bp: dec!(100),
             gearing: Decimal::ONE,

@@ -21,9 +21,7 @@ use finstack_quant_core::Result;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{
-    DiscountCurve, DiscountCurveBuilder, RateCalibrationCurveRole,
-};
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, DiscountCurveBuilder};
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::CurveId;
 
@@ -304,17 +302,6 @@ impl DiscountCurveTarget {
             .pricing_forward_id
             .as_ref()
             .unwrap_or(&params.curve_id);
-        let rate_calibration = rate_calibration_recipe(
-            params.currency,
-            &params.method,
-            curve_day_count,
-            params.conventions.ois_compounding.as_ref(),
-            RateCalibrationCurveRole::Discount {
-                projection_curve_id: forward_id.clone(),
-            },
-            &raw_rates_quotes,
-        )?;
-
         // Notional 1_000_000 keeps coupon-money construction off floating-point
         // rounding edges. The OIS-compounding override is threaded through so
         // bootstrap-internal swaps for OvernightRfr indices use the step-level
@@ -431,6 +418,13 @@ impl DiscountCurveTarget {
         }
 
         let id = curve.id().to_string();
+        let rate_calibration = rate_calibration_recipe(
+            crate::api::schema::StepParams::Discount(params.clone()),
+            curve_day_count,
+            &prepared_quotes,
+            global_config,
+            &report,
+        )?;
         let curve = curve
             .to_builder_with_id(id)
             .rate_calibration(rate_calibration)

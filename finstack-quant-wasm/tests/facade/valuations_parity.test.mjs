@@ -1073,3 +1073,43 @@ test('convertibleSpotLadder matches Python, the default grid included', () => {
     ]
   );
 });
+
+test('500 bp asset-swap round trip is independent of projection clock', () => {
+  const fixture = golden.compute_quotes;
+  const bondJson = JSON.parse(fixture.cases[0].bond);
+  const spec = bondJson.instrument.spec;
+  spec.instrument_pricing_overrides ??= {};
+  spec.instrument_pricing_overrides.model_config ??= {};
+  Object.assign(spec.instrument_pricing_overrides.model_config, {
+    asw_forward_curve_id: 'PROJECTION',
+    asw_index_id: 'USD-SOFR-3M',
+  });
+  const bond = instruments.Bond.fromJson(JSON.stringify(bondJson));
+  try {
+    const prices = ['act_360', 'act_365f'].map((clock) => {
+      const market = JSON.parse(fixture.market);
+      const forward = structuredClone(market.curves.find((curve) => curve.type === 'forward'));
+      Object.assign(forward, {
+        id: 'PROJECTION',
+        day_count: clock,
+        knot_points: [
+          [0, 1],
+          [1, 1],
+        ],
+      });
+      market.curves.push(forward);
+      const snapshot = JSON.stringify(market);
+      const px = instruments.computeQuotes(bond, snapshot, fixture.as_of, {
+        asw_market: 0.05,
+      }).clean_price_pct;
+      const spread = instruments.computeQuotes(bond, snapshot, fixture.as_of, {
+        clean_price_pct: px,
+      }).asw_market;
+      assert.ok(Math.abs(spread - 0.05) < 1e-10);
+      return px;
+    });
+    assert.ok(Math.abs(prices[0] - prices[1]) < 1e-10);
+  } finally {
+    bond.free();
+  }
+});

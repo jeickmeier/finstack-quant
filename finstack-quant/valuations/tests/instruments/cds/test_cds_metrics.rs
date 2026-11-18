@@ -11,11 +11,10 @@ use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
-    DiscountCurve, HazardCurve, RateCalibrationCurveRole, RateCalibrationMethod,
-    RateCalibrationPillar, RateCalibrationQuote, RateCalibrationRecipe,
+    DiscountCurve, HazardCurve, RateCalibrationRecipe,
 };
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, IndexId};
+use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_valuations::market::conventions::CdsValuationConvention;
@@ -59,36 +58,7 @@ fn build_test_discount(rate: f64, base: Date, id: &str) -> DiscountCurve {
 }
 
 fn build_quote_calibrated_discount(rate: f64, base: Date, id: &str) -> DiscountCurve {
-    build_test_discount(rate, base, id)
-        .to_builder_with_id(id)
-        .rate_calibration(RateCalibrationRecipe {
-            currency: Currency::USD,
-            method: RateCalibrationMethod::Bootstrap,
-            curve_day_count: DayCount::Act360,
-            ois_compounding: None,
-            role: RateCalibrationCurveRole::Discount {
-                projection_curve_id: CurveId::new(id),
-            },
-            quotes: vec![
-                RateCalibrationQuote::Deposit {
-                    index_id: IndexId::new("USD-SOFR-1M"),
-                    pillar: RateCalibrationPillar::Tenor("1Y".parse().unwrap()),
-                    rate,
-                },
-                RateCalibrationQuote::Deposit {
-                    index_id: IndexId::new("USD-SOFR-1M"),
-                    pillar: RateCalibrationPillar::Tenor("5Y".parse().unwrap()),
-                    rate,
-                },
-                RateCalibrationQuote::Deposit {
-                    index_id: IndexId::new("USD-SOFR-1M"),
-                    pillar: RateCalibrationPillar::Tenor("10Y".parse().unwrap()),
-                    rate,
-                },
-            ],
-        })
-        .build()
-        .unwrap()
+    super::super::common::calibrated_discount(id, base, rate)
 }
 
 fn bump_quote_calibrated_discount(

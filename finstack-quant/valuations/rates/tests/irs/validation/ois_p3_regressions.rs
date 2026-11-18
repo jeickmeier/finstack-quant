@@ -155,10 +155,10 @@ fn daily_grid(start: Date, end: Date, calendar_id: &str, denominator: f64) -> Ve
 fn raw_rate(
     market: &MarketContext,
     as_of: Date,
+    index_id: &str,
     forward_id: Option<&str>,
     observation: &Observation,
 ) -> f64 {
-    let index_id = forward_id.unwrap_or("USD-OIS");
     if observation.start < as_of {
         return market
             .get_series(format!("FIXING:{index_id}"))
@@ -200,6 +200,7 @@ fn raw_rate(
 fn product(
     market: &MarketContext,
     as_of: Date,
+    index_id: &str,
     forward_id: Option<&str>,
     observations: &[Observation],
     compounded_spread: f64,
@@ -207,11 +208,11 @@ fn product(
     let mut factor = 1.0;
     let mut fixings = Vec::new();
     for observation in observations {
-        let rate = raw_rate(market, as_of, forward_id, observation);
+        let rate = raw_rate(market, as_of, index_id, forward_id, observation);
         assert!(rate.is_finite());
         factor *= 1.0 + (rate + compounded_spread) * observation.factor_alpha;
         fixings.push(ProjectedFixing {
-            series_id: format!("FIXING:{}", forward_id.unwrap_or("USD-OIS")),
+            series_id: format!("FIXING:{index_id}"),
             date: observation.start,
             value: Some(rate),
         });
@@ -226,7 +227,14 @@ fn coupon_oracle(
     forward_id: Option<&str>,
     grid: CouponGrid,
 ) -> CouponOracle {
-    let (factor, fixings) = product(market, as_of, forward_id, &grid.observations, 0.0);
+    let (factor, fixings) = product(
+        market,
+        as_of,
+        swap.float_leg.index_id.as_str(),
+        forward_id,
+        &grid.observations,
+        0.0,
+    );
     let spread = swap.float_leg.spread_bp.to_f64().unwrap() * 1e-4;
     let curve = market.get_discount("USD-OIS").unwrap();
     let discount = curve.df_on_date(grid.payment).unwrap() / curve.df_on_date(as_of).unwrap();
@@ -512,7 +520,7 @@ fn history_market(
     }
     market.clone().insert_series(
         ScalarTimeSeries::new(
-            format!("FIXING:{}", float.forward_curve_id),
+            format!("FIXING:{}", float.index_id),
             observations.into_iter().collect(),
             None,
             finstack_quant_core::market_data::scalars::SeriesInterpolation::Step,
@@ -627,7 +635,15 @@ fn suffix_oracle(
             .iter()
             .take_while(|observation| observation.start < as_of);
         let mut factor = historical.fold(1.0, |product, observation| {
-            product * (1.0 + raw_rate(market, as_of, None, observation) * observation.factor_alpha)
+            product
+                * (1.0
+                    + raw_rate(
+                        market,
+                        as_of,
+                        swap.float_leg.index_id.as_str(),
+                        None,
+                        observation,
+                    ) * observation.factor_alpha)
         });
         if let Some(first_future) = coupon
             .grid
@@ -1013,8 +1029,14 @@ fn ois_control_compounded_spread_stays_on_daily_projection() {
     let swap = benchmark_swap(1);
     let oracle = full_oracle(&swap, &market, as_of, None, "usny", 360.0);
     let grid = &oracle.coupons[0].grid;
-    let (expected_factor, expected_fixings) =
-        product(&market, as_of, None, &grid.observations, 0.001);
+    let (expected_factor, expected_fixings) = product(
+        &market,
+        as_of,
+        swap.float_leg.index_id.as_str(),
+        None,
+        &grid.observations,
+        0.001,
+    );
     let expected_rate = (expected_factor - 1.0) / grid.alpha;
     let curve = market.get_discount("USD-OIS").unwrap();
     let calendar = calendar_by_id_strict("usny").unwrap();

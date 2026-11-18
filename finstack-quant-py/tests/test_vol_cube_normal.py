@@ -144,3 +144,14 @@ def test_normal_sabr_rejects_nonpositive_shifted_levels_for_positive_beta() -> N
     normal = [{"alpha": 0.01, "beta": 0.0, "rho": -0.2, "nu": 0.4}]
     normal_cube = VolCube("NORMAL", [1.0], [2.0], normal, [-0.01])
     assert math.isfinite(get_cube_vol(normal_cube, 1.0, 2.0, -0.02, "normal"))
+
+
+def test_mixed_beta_endpoints_and_interpolation() -> None:
+    params = [{"alpha": a, "beta": b, "rho": 0.0, "nu": 0.0} for a, b in [(0.04, 0.5), (0.2, 1.0)]]
+    cube = VolCube("MIXED", [1.0], [5.0, 10.0], params, [0.04, 0.04])
+    for tenor, expected in [(5.0, 0.20008333333333), (10.0, 0.2)]:
+        assert get_cube_vol(cube, 1.0, tenor, 0.04, "lognormal") == pytest.approx(expected, abs=1e-12)
+    for tenor in [7.5, 7.50000001]:
+        with pytest.raises(ValueError, match="different beta"):
+            get_cube_vol(cube, 1.0, tenor, 0.04, "lognormal")
+        assert math.isnan(get_cube_vol_clamped(cube, 1.0, tenor, 0.04, "lognormal"))

@@ -152,7 +152,7 @@ def test_growth_terminal_rejects_annual_identifier_with_stub_dates() -> None:
         "meta": {"currency": "USD"},
         "schema_version": 1,
     }
-    with pytest.raises(ValueError, match="complete contiguous history"):
+    with pytest.raises(ValueError, match="calendar bounds"):
         evaluate_dcf(
             json.dumps(model),
             {
@@ -163,7 +163,7 @@ def test_growth_terminal_rejects_annual_identifier_with_stub_dates() -> None:
         )
 
 
-def test_growth_terminal_uses_full_year_across_annual_stub_identifiers() -> None:
+def test_growth_terminal_requires_half_year_identifiers_for_half_year_dates() -> None:
     def terminal_pv(actual_id: str, forecast_id: str) -> float:
         model = {
             "id": "complete-year-review",
@@ -197,7 +197,9 @@ def test_growth_terminal_uses_full_year_across_annual_stub_identifiers() -> None
         )
         return result.terminal_value_pv.amount
 
-    assert terminal_pv("2024", "2025") == pytest.approx(terminal_pv("2024H2", "2025H1"))
+    assert terminal_pv("2024H2", "2025H1") > 0.0
+    with pytest.raises(ValueError, match="calendar bounds"):
+        terminal_pv("2024", "2025")
 
 
 def test_tornado_rejects_joint_scenarios_mislabeled_as_diagonal_json() -> None:

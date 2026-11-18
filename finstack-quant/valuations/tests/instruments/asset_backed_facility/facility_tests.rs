@@ -741,6 +741,7 @@ fn floating_facility_interest_is_tagged_floating() {
     let fixed = facility(60_000_000.0, 100_000_000.0);
     let mut floating = fixed.clone();
     floating.rate = RateSpec::Floating(finstack_quant_cashflows::builder::FloatingRateSpec {
+        index_id: "USD-SOFR-3M".into(),
         forward_curve_id: CurveId::new("USD-SOFR-3M".to_string()),
         spread_bp: rust_decimal::Decimal::from(250),
         gearing: rust_decimal::Decimal::ONE,

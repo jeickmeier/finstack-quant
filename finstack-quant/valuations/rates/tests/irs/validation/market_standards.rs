@@ -252,6 +252,7 @@ fn test_irs_receive_vs_pay_fixed() {
 
     let float_leg = FloatLegSpec {
         discount_curve_id: "USD-OIS".into(),
+        index_id: "USD-SOFR-3M".into(),
         forward_curve_id: "USD-SOFR-3M".into(),
         spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
         frequency: Tenor::quarterly(),
@@ -348,6 +349,7 @@ fn test_irs_rate_sensitivity() {
 
     let float_leg = FloatLegSpec {
         discount_curve_id: "USD-OIS".into(),
+        index_id: "USD-SOFR-3M".into(),
         forward_curve_id: "USD-SOFR-3M".into(),
         spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
         frequency: Tenor::quarterly(),
@@ -451,6 +453,7 @@ fn test_irs_leg_pvs_consistency() {
         },
         float_leg: FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -528,6 +531,7 @@ fn test_daycount_convention_impact_on_annuity() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -567,6 +571,7 @@ fn test_daycount_convention_impact_on_annuity() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -754,6 +759,7 @@ fn test_irs_t_minus_2_fixing_calendar_isda_standard() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -979,6 +985,7 @@ fn test_irs_forward_curve_daycount_used_for_projection() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-365".into(),
             forward_curve_id: "USD-SOFR-365".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -1017,6 +1024,7 @@ fn test_irs_forward_curve_daycount_used_for_projection() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: "USD-OIS".into(),
+            index_id: "USD-SOFR-360".into(),
             forward_curve_id: "USD-SOFR-360".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),
@@ -1154,6 +1162,7 @@ fn test_sofr_ois_par_rate_matches_quantlib_identity() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: curve_id.into(),
+            index_id: curve_id.into(),
             forward_curve_id: curve_id.into(),
             spread_bp: rust_decimal::Decimal::ZERO,
             frequency: Tenor::annual(),
@@ -1298,6 +1307,7 @@ fn test_eom_pricer_cashflow_consistency() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: CurveId::new("USD-OIS"),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             spread_bp: Decimal::ZERO,
             frequency: Tenor::quarterly(),
@@ -1337,6 +1347,7 @@ fn test_eom_pricer_cashflow_consistency() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: CurveId::new("USD-OIS"),
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             spread_bp: Decimal::ZERO,
             frequency: Tenor::quarterly(),
@@ -1466,6 +1477,7 @@ fn test_ois_identity_with_eom() {
         })
         .float_leg(FloatLegSpec {
             discount_curve_id: disc_id.clone(),
+            index_id: disc_id.as_str().into(),
             forward_curve_id: disc_id,
             spread_bp: Decimal::ZERO,
             frequency: Tenor::quarterly(),

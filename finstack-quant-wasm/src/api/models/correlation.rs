@@ -649,7 +649,7 @@ impl JsPortfolioLossResult {
 
 /// Two correlated Bernoulli default indicators with exact joint probabilities.
 ///
-/// The requested correlation is clamped to the Fréchet-Hoeffding bounds of the
+/// The requested correlation must satisfy the Fréchet-Hoeffding bounds of the
 /// two marginals; `correlation` reports the value actually achieved.
 ///
 /// @example
@@ -670,7 +670,7 @@ impl JsCorrelatedBernoulli {
     /// Joint distribution of two Bernoulli variables with a target correlation.
     /// @param p1 - First marginal probability from 0 through 1.
     /// @param p2 - Second marginal probability from 0 through 1.
-    /// @param correlation - Requested correlation from -1 through 1; clamped to the attainable Fréchet-Hoeffding range.
+    /// @param correlation - Finite correlation within the attainable Fréchet-Hoeffding range for these marginals.
     ///
     /// # Errors
     ///
@@ -703,16 +703,10 @@ impl JsCorrelatedBernoulli {
         self.inner.p2()
     }
 
-    /// Correlation actually achieved after clamping to the attainable range.
+    /// Feasible correlation supplied at construction.
     #[wasm_bindgen(getter)]
     pub fn correlation(&self) -> f64 {
         self.inner.correlation()
-    }
-
-    /// Correlation requested at construction, before clamping.
-    #[wasm_bindgen(getter, js_name = requestedCorrelation)]
-    pub fn requested_correlation(&self) -> f64 {
-        self.inner.requested_correlation()
     }
 
     /// Probability that both variables equal one.

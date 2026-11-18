@@ -144,3 +144,46 @@ test('XIRR ignores zero dated anchors and rejects rootless cashflows', () => {
     assert.throws(() => portfolio.mwrXirr(JSON.stringify([zero, ...rootless])));
   }
 });
+
+test('volatility-index queries reject negative extensions and forbidden tails', () => {
+  const params = { id: 'VIX', baseDate: '2025-01-01', knots: [0, 30, 0.25, 20] };
+  for (const extrapolation of ['extend', 'error']) {
+    const curve = new core.PriceCurve({ ...params, kind: 'vol_index', extrapolation });
+    try {
+      assert.equal(curve.price(0), 30);
+      assert.equal(curve.price(0.25), 20);
+      for (const query of [1, '2026-01-01']) assert.throws(() => curve.price(query));
+    } finally {
+      curve.free();
+    }
+  }
+  const commodity = new core.PriceCurve({ ...params, kind: 'price', extrapolation: 'extend' });
+  try {
+    assert.equal(commodity.price(1), -10);
+  } finally {
+    commodity.free();
+  }
+});
+
+test('dividend schedules round-trip entitlement and payment dates and reject mixed currency', () => {
+  const empty = new core.MarketContext();
+  const state = JSON.parse(empty.toJson());
+  empty.free();
+  const event = {
+    event_id: 'Q1',
+    ex_date: '2025-04-01',
+    pay_date: '2025-07-01',
+    amount: { amount: '10', currency: 'USD' },
+  };
+  state.dividends = [
+    { id: 'EQ-DIV', underlying: 'EQ', share_basis: 'EQ', currency: 'USD', events: [event] },
+  ];
+  const restored = core.MarketContext.fromJson(JSON.stringify(state));
+  try {
+    assert.deepEqual(JSON.parse(restored.toJson()).dividends, state.dividends);
+  } finally {
+    restored.free();
+  }
+  event.amount.currency = 'JPY';
+  assert.throws(() => core.MarketContext.fromJson(JSON.stringify(state)));
+});

@@ -435,7 +435,7 @@ impl CashFlowBuilder {
     /// floors and caps (see [`calculate_floating_rate`](crate::builder::calculate_floating_rate)).
     ///
     /// Without `as_of`, each forward curve's base date is the observation
-    /// cutoff: resets before it need exact fixings under `FIXING:{forward_curve_id}`.
+    /// cutoff: resets before it need exact fixings under `FIXING:{index_id}`.
     /// Use [`build_as_of`](Self::build_as_of) to set the cutoff explicitly.
     ///
     /// When a coupon cannot be projected (for example its forward curve is not
@@ -497,7 +497,7 @@ impl CashFlowBuilder {
     /// # Arguments
     ///
     /// * `curves` - Market context supplying projection curves and exact-date
-    ///   historical fixings under `FIXING:{forward_curve_id}`. Required floating
+    ///   historical fixings under `FIXING:{index_id}`. Required floating
     ///   inputs must be present unless the coupon explicitly configures a fallback.
     /// * `as_of` - Observation cutoff: resets before this date require historical
     ///   fixings; on this date an available fixing takes precedence over projection.

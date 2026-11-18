@@ -217,7 +217,7 @@ impl MarketContext {
     /// #     .expect("PriceCurve builder should succeed");
     /// # let ctx = MarketContext::new().insert(curve);
     /// let price_curve = ctx.get_price_curve("WTI-FORWARD").expect("Price curve should exist");
-    /// assert!(price_curve.price(0.25) > 0.0);
+    /// assert!(price_curve.price(0.25).expect("valid pillar") > 0.0);
     /// ```
     pub fn get_price_curve(&self, id: impl AsRef<str>) -> Result<Arc<PriceCurve>> {
         let id_str = id.as_ref();

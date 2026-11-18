@@ -224,6 +224,7 @@ def test_variance_units_ohlc_and_kirk_independent_mc(tracks: ModuleType) -> None
         tracks.AS_OF,
         metrics=["variance_expected", "variance_realized"],
     )
+    assert variance.metrics["variance_realized"] == 0.0
     df = market.get_discount("USD-OIS").df(1.0)
     assert variance.value.amount == pytest.approx(1e6 * df * (variance.metrics["variance_expected"] - 0.04), abs=0.01)
     assert variance.metrics["variance_expected"] == pytest.approx(0.04, abs=0.0005)

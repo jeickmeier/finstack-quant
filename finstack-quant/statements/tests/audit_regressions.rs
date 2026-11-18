@@ -60,10 +60,11 @@ fn sparse_periods_do_not_shorten_lags_or_fill_ttm() {
         model_builder.compute("previous_year", "lag(x,4)").unwrap();
         model_builder.build().unwrap()
     };
-    model
-        .periods
-        .periods
-        .retain(|period| period.id != q(2024, 2));
+    let mut rows = model.periods.to_vec();
+    rows.retain(|period| period.id != q(2024, 2));
+    model.periods =
+        finstack_quant_core::dates::PeriodPlan::try_new(model.periods.get_calendar(), rows)
+            .unwrap();
     model
         .nodes
         .get_mut("x")

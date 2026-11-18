@@ -311,7 +311,8 @@ def realized_variance_ohlc(
     close: Sequence[float] | npt.NDArray[np.float64],
     method: str | None = None,
     annualization_factor: float | None = None,
-) -> float:
+    previous_close: float | None = None,
+) -> float | None:
     """
     Annualized realized variance from OHLC bars.
 
@@ -329,6 +330,8 @@ def realized_variance_ohlc(
     close : Sequence[float] or numpy.ndarray
         Bar closing prices, same length and ordering as *open*; the
         close-to-close estimator uses only this series.
+    previous_close : float, optional
+        Positive finite close preceding the first target bar. Required for close-to-close and Yang-Zhang and omitted for range estimators.
     method : str or None
         ``"close_to_close"``, ``"parkinson"``, ``"garman_klass"``,
         ``"rogers_satchell"`` or ``"yang_zhang"``. ``None`` selects the
@@ -339,14 +342,14 @@ def realized_variance_ohlc(
 
     Returns
     -------
-    float
-        Annualized variance under the chosen estimator.
+    float or None
+        Annualized variance over every target bar. No value is available for an empty window or fewer than two Yang–Zhang bars.
 
     Raises
     ------
     ValueError
         If the four series differ in length, *method* is unknown, prices
-        are invalid, or *annualization_factor* is not positive.
+        are invalid, the preceding close is missing or inappropriate, or *annualization_factor* is not positive.
     TypeError
         If a series is not one-dimensional or contains values that cannot
         be converted to float.

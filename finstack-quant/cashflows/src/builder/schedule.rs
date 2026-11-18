@@ -131,6 +131,7 @@ fn compare_accrual(
             .get_start()
             .cmp(&right.get_start())
             .then_with(|| left.get_end().cmp(&right.get_end()))
+            .then_with(|| left.get_nominal_dates().cmp(right.get_nominal_dates()))
             .then_with(|| {
                 left.get_context()
                     .get_calendar_id()

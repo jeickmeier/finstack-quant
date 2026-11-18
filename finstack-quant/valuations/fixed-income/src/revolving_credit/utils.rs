@@ -29,7 +29,7 @@ pub(super) fn resolve_fixings<'a>(
     match &facility.rate {
         RateSpec::Floating(spec) => finstack_quant_core::market_data::fixings::get_fixing_series(
             market,
-            spec.forward_curve_id.as_ref(),
+            spec.index_id.as_ref(),
         )
         .ok(),
         RateSpec::Fixed { .. } => None,
@@ -418,7 +418,7 @@ pub(super) fn project_revolver_floating_rate(
     let projection = project_overnight_coupon(OvernightCouponProjectionInput {
         curve: OvernightProjectionCurve::Forward(input.fwd),
         fixings: input.fixings,
-        fixing_id: input.spec.forward_curve_id.as_str(),
+        fixing_id: input.spec.index_id.as_str(),
         as_of: input.as_of,
         accrual_start,
         accrual_end,
@@ -434,7 +434,7 @@ pub(super) fn project_revolver_floating_rate(
     if let Some(out) = projected_fixings {
         out.extend(projection.observation_exposures.iter().map(|observation| {
             finstack_quant_cashflows::fixings::ProjectedFixing {
-                series_id: fixing_series_id(input.spec.forward_curve_id.as_str()),
+                series_id: fixing_series_id(input.spec.index_id.as_str()),
                 date: observation.observation_start,
                 value: Some(observation.projected_rate),
             }
@@ -637,6 +637,7 @@ mod tests {
             end,
             Tenor::quarterly(),
             RateSpec::Floating(finstack_quant_cashflows::builder::FloatingRateSpec {
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: "USD-SOFR-3M".into(),
                 spread_bp: rust_decimal::Decimal::try_from(200.0).expect("valid"),
                 gearing: rust_decimal::Decimal::ONE,
@@ -671,6 +672,7 @@ mod tests {
 
         let reset = Date::from_calendar_date(2025, Month::January, 2).expect("date");
         let spec = finstack_quant_cashflows::builder::FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
             forward_curve_id: "USD-SOFR-3M".into(),
             spread_bp: Decimal::from(100),
             gearing: Decimal::new(5, 1),
@@ -721,6 +723,7 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 2).expect("date");
         let end = Date::from_calendar_date(2025, Month::April, 2).expect("date");
         let spec = finstack_quant_cashflows::builder::FloatingRateSpec {
+            index_id: "USD-SOFR-OIS".into(),
             forward_curve_id: "USD-SOFR-OIS".into(),
             spread_bp: Decimal::ZERO,
             gearing: Decimal::ONE,
@@ -803,6 +806,7 @@ mod tests {
         let coupon_end = date!(2024 - 03 - 01);
         let split = date!(2023 - 06 - 01);
         let spec = finstack_quant_cashflows::builder::FloatingRateSpec {
+            index_id: "USD-SOFR-OIS".into(),
             forward_curve_id: "USD-SOFR-OIS".into(),
             spread_bp: Decimal::ZERO,
             gearing: Decimal::ONE,
@@ -927,6 +931,7 @@ mod tests {
         .expect("forward curve");
         let rate = |application: OvernightIndexConstraintApplication| -> f64 {
             let spec = finstack_quant_cashflows::builder::FloatingRateSpec {
+                index_id: "USD-SOFR-OIS".into(),
                 forward_curve_id: "USD-SOFR-OIS".into(),
                 spread_bp: Decimal::ZERO,
                 gearing: Decimal::ONE,

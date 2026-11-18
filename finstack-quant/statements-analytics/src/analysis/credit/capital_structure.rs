@@ -780,7 +780,9 @@ mod tests {
     }
 
     fn periods(range: &str) -> Vec<Period> {
-        build_periods(range, None).expect("valid range").periods
+        build_periods(range, None)
+            .expect("valid range")
+            .into_periods()
     }
 
     fn bond(maturity: Date) -> FinancialStatementInstrument {
@@ -998,12 +1000,12 @@ mod tests {
             vec![("TLA", term_loan(date!(2029 - 06 - 30)))],
             vec![class("1L", 0, &["TLA"])],
         );
-        model.periods.periods.clear();
+        let mut reporting_days = Vec::new();
         let mut day = date!(2024 - 01 - 01);
         while day <= date!(2025 - 12 - 31) {
             if day.weekday().number_days_from_monday() < 5 {
                 let id = PeriodId::from_date(day, PeriodKind::Daily, None).expect("day");
-                model.periods.periods.push(Period {
+                reporting_days.push(Period {
                     id,
                     start: day,
                     end: day.next_day().expect("next day"),
@@ -1012,6 +1014,11 @@ mod tests {
             }
             day = day.next_day().expect("next day");
         }
+        model.periods = finstack_quant_core::dates::PeriodPlan::try_new(
+            model.periods.get_calendar(),
+            reporting_days,
+        )
+        .expect("business days");
         let days: Vec<PeriodId> = model.periods.iter().map(|p| p.id).collect();
         let mut cashflows = CapitalStructureCashflows::new();
         cashflows
@@ -1040,6 +1047,38 @@ mod tests {
         assert_eq!(summary.ltm_ebitda, None);
         assert_eq!(summary.total_leverage, None);
         assert_eq!(summary.tranches[0].ltm_interest, None);
+    }
+
+    #[test]
+    fn missing_second_day_prevents_trailing_leverage() {
+        let (mut results, mut model, _) = business_day_fixture();
+        let full = finstack_quant_core::dates::build_periods("2025D001..D365", None).unwrap();
+        let ids: Vec<_> = full.iter().map(|row| row.id).collect();
+        let target = *ids.last().unwrap();
+        results
+            .cs_cashflows
+            .as_mut()
+            .unwrap()
+            .by_instrument
+            .insert("TLA".into(), rows(&ids, 261.0, 0.1, 0.0));
+        results.nodes.insert(
+            "ebitda".into(),
+            ids.iter().map(|id| (*id, f64::from(id.index()))).collect(),
+        );
+        model.periods = full;
+        let complete = capital_structure_summary(&results, &model, &config(target, None)).unwrap();
+        let earnings = 365.0 * 366.0 / 2.0;
+        assert_eq!(complete.ltm_ebitda, Some(usd(earnings)));
+        assert_close(complete.total_leverage, 261.0 / earnings);
+        let mut rows = model.periods.to_vec();
+        rows.remove(1);
+        model.periods =
+            finstack_quant_core::dates::PeriodPlan::try_new(model.periods.get_calendar(), rows)
+                .unwrap();
+        let sparse = capital_structure_summary(&results, &model, &config(target, None)).unwrap();
+        assert_eq!(sparse.ltm_periods_found, 364);
+        assert_eq!(sparse.ltm_ebitda, None);
+        assert_eq!(sparse.total_leverage, None);
     }
 
     #[test]
@@ -1162,8 +1201,12 @@ mod tests {
         let (results, mut model) = fixture();
         // Four periods before 2026Q1 exist, but 2025Q4 is missing from the model:
         // the last four model periods span five quarters, which `ttm` also refuses.
-        model.periods.periods.retain(|period| period.id != q(4));
-        model.periods.periods.extend(periods("2026Q1..2026Q1"));
+        let mut rows = model.periods.to_vec();
+        rows.retain(|period| period.id != q(4));
+        rows.extend(periods("2026Q1..2026Q1"));
+        model.periods =
+            finstack_quant_core::dates::PeriodPlan::try_new(model.periods.get_calendar(), rows)
+                .unwrap();
         let period = PeriodId::quarter(2026, 1).expect("valid quarter");
         let mut results = results;
         for instrument_rows in results

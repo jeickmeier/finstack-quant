@@ -195,6 +195,7 @@ pub(super) fn fixture(case: Case, as_of: Date) -> Fixture {
     let spec = FloatingCouponSpec {
         coupon_type: CouponType::Cash,
         rate_spec: FloatingRateSpec {
+            index_id: case.leg.index().into(),
             forward_curve_id: case.leg.index().into(),
             spread_bp: dec!(200),
             gearing: dec!(1),

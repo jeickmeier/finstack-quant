@@ -12,26 +12,37 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::context::MarketContextState;
-use finstack_quant_core::market_data::dividends::DividendSchedule;
+use finstack_quant_core::market_data::dividends::{DividendEvent, DividendSchedule};
 
 #[test]
 fn dividend_schedule_restoration_uses_validated_builder() {
     let mut wire = serde_json::json!({
         "id": "AAPL-DIVS",
         "underlying": "AAPL",
+        "share_basis": "AAPL",
         "currency": "USD",
         "events": [
-            {"date": "2025-06-15", "kind": {"cash": {"amount": "0.25", "currency": "USD"}}},
-            {"date": "2025-03-15", "kind": {"cash": {"amount": "0.24", "currency": "USD"}}}
+            {"event_id": "Q1", "ex_date": "2025-03-15", "pay_date": "2025-04-01", "amount": {"amount": "0.24", "currency": "USD"}},
+            {"event_id": "Q2", "ex_date": "2025-06-15", "pay_date": "2025-07-01", "amount": {"amount": "0.25", "currency": "USD"}}
         ]
     });
     let schedule: DividendSchedule = serde_json::from_value(wire.clone()).expect("valid schedule");
-    assert!(schedule.get_events()[0].date < schedule.get_events()[1].date);
+    assert!(schedule.get_events()[0].get_ex_date() < schedule.get_events()[1].get_ex_date());
     let restored: DividendSchedule =
         serde_json::from_value(serde_json::to_value(&schedule).expect("serialize schedule"))
             .expect("restore schedule");
     assert_eq!(restored.get_events(), schedule.get_events());
-    wire["events"][0]["kind"]["cash"]["amount"] = serde_json::json!("-0.25");
+    let mut malformed = wire.clone();
+    malformed["events"].as_array_mut().unwrap().reverse();
+    assert!(serde_json::from_value::<DividendSchedule>(malformed).is_err());
+    let mut malformed = wire.clone();
+    malformed["events"][1]["event_id"] = serde_json::json!("Q1");
+    assert!(serde_json::from_value::<DividendSchedule>(malformed).is_err());
+    let mut malformed = wire.clone();
+    malformed["events"][0]["amount"]["currency"] = serde_json::json!("JPY");
+    assert!(serde_json::from_value::<DividendSchedule>(malformed).is_err());
+
+    wire["events"][0]["amount"]["amount"] = serde_json::json!("-0.25");
     assert!(serde_json::from_value::<DividendSchedule>(wire).is_err());
 }
 use finstack_quant_core::market_data::bumps::MarketDataTarget;
@@ -251,13 +262,22 @@ fn market_context_roundtrip() {
             .unwrap()
     };
 
-    let dividends = DividendSchedule::builder("AAPL-DIVS")
-        .cash(
-            test_date(),
-            Money::new(1.0, Currency::USD).expect("valid money fixture"),
-        )
-        .build()
-        .expect("valid dividend schedule");
+    let dividends = DividendSchedule::new(
+        "AAPL-DIVS",
+        "AAPL",
+        "AAPL",
+        Currency::USD,
+        vec![
+            DividendEvent::new(
+                "distribution-1",
+                test_date(),
+                test_date(),
+                Money::new(1.0, Currency::USD).expect("valid money fixture"),
+            )
+            .unwrap(),
+        ],
+    )
+    .expect("valid dividend schedule");
 
     let fx_provider = Arc::new(SimpleFxProvider::new());
     fx_provider
@@ -536,13 +556,22 @@ fn semantic_restore_fixture() -> MarketContextState {
         Date::from_calendar_date(2025, Month::February, 15).unwrap(),
     )
     .expect("inflation index");
-    let dividends = DividendSchedule::builder("EQ-DIVIDENDS")
-        .cash(
-            test_date(),
-            Money::new(1.0, Currency::USD).expect("valid money fixture"),
-        )
-        .build()
-        .expect("valid dividend schedule");
+    let dividends = DividendSchedule::new(
+        "EQ-DIVIDENDS",
+        "EQ",
+        "EQ",
+        Currency::USD,
+        vec![
+            DividendEvent::new(
+                "distribution-1",
+                test_date(),
+                test_date(),
+                Money::new(1.0, Currency::USD).expect("valid money fixture"),
+            )
+            .unwrap(),
+        ],
+    )
+    .expect("valid dividend schedule");
     let fx_delta_vol = {
         use finstack_quant_core::market_data::surfaces::{
             FxAtmConvention, FxButterflyConvention, FxDeltaConvention, FxDeltaVolSurface,

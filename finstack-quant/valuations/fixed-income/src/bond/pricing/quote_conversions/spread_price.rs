@@ -162,8 +162,8 @@ pub fn price_from_dm(
 ///
 /// where `price_pct = dirty / notional` and both the fixed-annuity-weighted
 /// running term and the upfront are amortized over the floating-leg annuity
-/// (par-par derivation). Without a forward curve the floating leg is proxied
-/// on the fixed-leg schedule with the discount curve's day count. Inverting:
+/// (par-par derivation). The contractual index supplies the floating accrual
+/// basis and frequency. Without a separate index the bond schedule supplies both. Inverting:
 ///
 /// `price_pct = 1.0 + (coupon - par_rate) * fixed_annuity - ASW_mkt * float_annuity`.
 ///

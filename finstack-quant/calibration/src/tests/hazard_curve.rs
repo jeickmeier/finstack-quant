@@ -199,12 +199,14 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
         recipe.spread_risk_inputs()[0].pillar_time
     );
 
+    let mut mismatched_cal = recipe.calibration_inputs().to_vec();
     let mut mismatched_risk = recipe.spread_risk_inputs().to_vec();
+    mismatched_cal[0].pillar_time += 0.25;
     mismatched_risk[0].pillar_time += 0.25;
     let mismatched_recipe =
         finstack_quant_core::market_data::term_structures::HazardCalibrationRecipe::new(
             recipe.hazard_params().clone(),
-            recipe.calibration_inputs().to_vec(),
+            mismatched_cal,
             mismatched_risk,
             recipe.calibration_config().clone(),
         )

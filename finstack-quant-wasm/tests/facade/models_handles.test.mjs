@@ -305,7 +305,22 @@ test('correlation handles expose their accessors and reject bad input', () => {
   const pair = new correlation.CorrelatedBernoulli(0.1, 0.2, 0.3);
   assert.equal(pair.p1, 0.1);
   assert.equal(pair.p2, 0.2);
-  assert.equal(pair.requestedCorrelation, 0.3);
+  const [low, high] = correlation.correlationBounds(0.2, 0.6);
+  for (const [rho, joint] of [
+    [low, 0],
+    [high, 0.2],
+  ]) {
+    const endpoint = new correlation.CorrelatedBernoulli(0.2, 0.6, rho);
+    assert.equal(endpoint.jointP11, joint);
+    endpoint.free();
+  }
+  for (const p of [2 ** -35, 2 ** -40]) {
+    const rare = new models.correlation.CorrelatedBernoulli(p, p, 1);
+    assert.equal(rare.jointP11, p);
+    assert.equal(rare.conditionalP2GivenX1(), 1);
+    assert.equal(new models.correlation.CorrelatedBernoulli(p, p, 0).jointP11, p * p);
+    assert.throws(() => new models.correlation.CorrelatedBernoulli(p, p, -1), /infeasible/);
+  }
   assert.ok(Math.abs(pair.jointP11 + pair.jointP10 + pair.jointP01 + pair.jointP00 - 1) < 1e-15);
   assert.ok(pair.sampleFromUniform(0.5) instanceof Uint8Array);
   assert.throws(() => pair.sampleFromUniform(2), kind('validation'));

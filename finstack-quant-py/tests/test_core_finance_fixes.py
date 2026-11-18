@@ -117,3 +117,15 @@ def test_rootless_xirr_is_rejected_with_earlier_zero(amounts: tuple[float, float
     flows = [("2030-01-01", amounts[0]), ("2031-01-01", amounts[1]), ("2032-01-01", amounts[2])]
     with pytest.raises(ValueError, match="exactly one sign change"):
         mwr_xirr([("2025-01-01", 0.0), *flows])
+
+
+@pytest.mark.parametrize("policy", ["extend", "error"])
+def test_vol_index_price_rejects_invalid_tail(policy: str) -> None:
+    knots = [(0.0, 30.0), (0.25, 20.0)]
+    curve = PriceCurve("VIX", "2025-01-01", knots, kind="vol_index", extrapolation=policy)
+    assert [curve.price(0), curve.price(0.25)] == [30, 20]
+    for query in (1.0, "2026-01-01"):
+        with pytest.raises(ValueError, match="Invalid vol_index level" if policy == "extend" else "maximum knot"):
+            curve.price(query)
+    commodity = PriceCurve("OIL", "2025-01-01", knots, extrapolation="extend")
+    assert commodity.price(1) == pytest.approx(-10)

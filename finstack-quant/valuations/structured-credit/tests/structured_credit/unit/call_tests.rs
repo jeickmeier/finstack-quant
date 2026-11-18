@@ -43,6 +43,7 @@ fn maturity() -> Date {
 fn floating(spread_bp: f64) -> FloatingRateSpec {
     let dec = |value: f64| rust_decimal::Decimal::try_from(value).expect("decimal");
     FloatingRateSpec {
+        index_id: INDEX.into(),
         forward_curve_id: CurveId::new(INDEX),
         spread_bp: dec(spread_bp),
         gearing: dec(1.0),

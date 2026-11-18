@@ -16,6 +16,7 @@ struct VarianceInputs {
     low: Vec<f64>,
     close: Vec<f64>,
     annualization_factor: f64,
+    previous_close: Option<f64>,
     method: String,
 }
 
@@ -60,8 +61,10 @@ fn test_realized_variance_golden() {
             &case.inputs.close,
             Some(method),
             Some(case.inputs.annualization_factor),
+            case.inputs.previous_close,
         )
-        .expect("realized_variance_ohlc should succeed for certified golden cases");
+        .expect("realized_variance_ohlc should succeed for certified golden cases")
+        .expect("sufficient target bars");
 
         let assert = GoldenAssert::new(&suite.meta, &case.id);
         assert

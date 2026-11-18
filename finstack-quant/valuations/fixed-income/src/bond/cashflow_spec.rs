@@ -123,6 +123,7 @@ impl CashflowSpec {
             .unwrap_or_else(|| "weekends_only".to_string());
         Self::Floating(FloatingCouponSpec {
             rate_spec: FloatingRateSpec {
+                index_id: forward_curve_id.as_str().into(),
                 forward_curve_id,
                 spread_bp,
                 gearing: Decimal::ONE,

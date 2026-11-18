@@ -249,8 +249,9 @@ mod tests {
             "kind": "dividend_schedule",
             "id": "AAPL-DIVS",
             "underlying": "AAPL",
+            "share_basis": "AAPL",
             "currency": "USD",
-            "events": [{"date": "2026-08-15", "kind": {"cash": {"amount": "0.25", "currency": "USD"}}}]
+            "events": [{"event_id": "Q1", "ex_date": "2026-08-15", "pay_date": "2026-08-15", "amount": {"amount": "0.25", "currency": "USD"}}]
         });
         let datum: MarketDatum =
             serde_json::from_value(wire.clone()).expect("valid direct schedule");

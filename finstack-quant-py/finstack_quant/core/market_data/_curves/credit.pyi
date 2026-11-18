@@ -369,7 +369,7 @@ class CreditIndexData:
 
     def get_issuer_curve(self, issuer_id: str) -> HazardCurve:
         """
-        Hazard curve of one issuer, falling back to the index curve.
+        Hazard curve of a named pool member.
 
         Parameters
         ----------
@@ -379,12 +379,12 @@ class CreditIndexData:
         Returns
         -------
         HazardCurve
-            The issuer's curve, or ``index_credit_curve`` when the bundle has
-            no curve for ``issuer_id`` (homogeneous assumption).
+            The member’s hazard curve.
 
-        Notes
-        -----
-        This method does not raise for an unknown issuer.
+        Raises
+        ------
+        KeyError
+            If the pool has no named roster or the issuer is absent.
 
         Examples
         --------
@@ -400,7 +400,7 @@ class CreditIndexData:
         ...     issuer_recovery_rates={"A": 0.3},
         ...     issuer_weights={"A": 0.25, "B": 0.75},
         ... )
-        >>> data.get_issuer_curve("A").id, data.get_issuer_curve("Z").id
+        >>> data.get_issuer_curve("A").id, data.get_issuer_curve("B").id
         ('A', 'CDX-IG')
         """
         ...
@@ -484,9 +484,10 @@ class CreditIndexData:
             The issuer's recovery as a decimal, or ``recovery_rate`` when none
             was supplied for ``issuer_id``.
 
-        Notes
-        -----
-        This method does not raise for an unknown issuer.
+        Raises
+        ------
+        KeyError
+            If the pool has no named roster or the issuer is absent.
 
         Examples
         --------
@@ -522,9 +523,10 @@ class CreditIndexData:
             The issuer's weight as a decimal fraction, or
             ``1 / num_constituents`` when none was supplied for ``issuer_id``.
 
-        Notes
-        -----
-        This method does not raise for an unknown issuer.
+        Raises
+        ------
+        KeyError
+            If the pool has no named roster or the issuer is absent.
 
         Examples
         --------

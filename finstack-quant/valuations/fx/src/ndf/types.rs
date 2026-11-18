@@ -787,32 +787,17 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
         let settlement_amount = self.settlement_amount(market, as_of)?;
         let ccy = self.settlement_currency;
         let schedule = finstack_quant_cashflows::schedule_from_classified_flows(
-            vec![(
-                self.maturity,
-                Money::from_model_value(settlement_amount, ccy)?,
-            )]
-            .into_iter()
-            .map(
-                |(date, cash): (
-                    finstack_quant_core::dates::Date,
-                    finstack_quant_core::money::Money,
-                )| {
-                    // The exchanged amount is the principal movement (record
-                    // CORE-CONVENTIONS-015 #4).
-                    finstack_quant_core::cashflow::CashFlowParams::new(
-                        date,
-                        None,
-                        cash,
-                        CFKind::Notional,
-                        0.0,
-                        None,
-                    )
-                    .with_principal_delta(cash.checked_neg())
-                    .with_principal_date(date)
-                    .build()
-                },
-            )
-            .collect::<finstack_quant_core::Result<Vec<_>>>()?,
+            vec![
+                finstack_quant_core::cashflow::CashFlowParams::new(
+                    self.maturity,
+                    None,
+                    Money::from_model_value(settlement_amount, ccy)?,
+                    CFKind::DerivativeSettlement,
+                    0.0,
+                    None,
+                )
+                .build()?,
+            ],
             finstack_quant_core::dates::DayCount::Act365F,
             finstack_quant_cashflows::ScheduleBuildOpts {
                 notional_hint: Some(Money::from((0_i64, ccy))),
@@ -1174,6 +1159,18 @@ mod tests {
         assert_eq!(flows.len(), 1, "fixed NDF should emit one settlement flow");
         assert_eq!(flows[0].0, maturity);
         assert_eq!(flows[0].1.currency(), Currency::USD);
+        let schedule = ndf.cashflow_schedule(&market, as_of).unwrap();
+        let cash = &schedule.get_flows()[0];
+        assert_eq!(cash.get_kind(), CFKind::DerivativeSettlement);
+        assert!(cash.get_kind().is_cash_settlement());
+        assert!(!cash.get_kind().is_principal_like());
+        assert_eq!(cash.get_principal_delta(), None);
+        assert_eq!(cash.get_balance_date(), None);
+        assert_eq!(
+            schedule.outstanding_at_dates(&[maturity]).unwrap()[0].amount(),
+            0.0
+        );
+        assert_eq!(schedule.wal(as_of).unwrap(), 0.0);
         // CNY weakens: the long-CNY settlement loses 10m * (1/7.30 - 1/7.25) USD.
         assert!((flows[0].1.amount() + 500_000.0 / 52.925).abs() < 1e-8);
     }

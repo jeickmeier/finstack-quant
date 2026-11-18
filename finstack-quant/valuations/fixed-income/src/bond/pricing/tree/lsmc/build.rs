@@ -52,7 +52,8 @@ pub(super) fn build_overnight_coupon(
         index_cap_bp: spec.rate_spec.index_cap_bp.map(|d| d.as_f64()),
     };
     let forward_curve_id = spec.rate_spec.forward_curve_id.as_str();
-    let fixing_id = fixing_series_id(forward_curve_id);
+    let index_id = spec.rate_spec.index_id.as_str();
+    let fixing_id = fixing_series_id(index_id);
     let fixings = market.get_series(&fixing_id).ok();
     let forward = market.get_forward(forward_curve_id).ok();
     let mut sources = BTreeMap::new();
@@ -63,11 +64,10 @@ pub(super) fn build_overnight_coupon(
             continue;
         }
         let observation_date = observation.observation_date;
-        let observed =
-            match observed_index_fixing(observation_date, fixings, forward_curve_id, as_of) {
-                Ok(rate) => rate,
-                Err(error) => Some(spec.rate_spec.fallback.index_rate(error)?),
-            };
+        let observed = match observed_index_fixing(observation_date, fixings, index_id, as_of) {
+            Ok(rate) => rate,
+            Err(error) => Some(spec.rate_spec.fallback.index_rate(error)?),
+        };
         let source = if let Some(rate) = observed {
             OvernightRateSource::Fixed(rate)
         } else if let Some(forward) = forward.as_ref() {

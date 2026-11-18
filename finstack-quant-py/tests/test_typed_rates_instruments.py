@@ -118,6 +118,7 @@ def _payer_swap_hand_written_json() -> str:
                 },
                 "float_leg": {
                     "discount_curve_id": "USD-OIS",
+                    "index_id": "USD-SOFR-3M",
                     "forward_curve_id": "USD-SOFR-3M",
                     "spread_bp": "0",
                     "frequency": {"count": 3, "unit": "months"},
@@ -199,6 +200,7 @@ class TestInterestRateSwapTyped:
         )
         float_leg = FloatLegSpec(
             discount_curve_id="USD-OIS",
+            index_id="USD-SOFR-3M",
             forward_curve_id="USD-SOFR-3M",
             spread_bp="0",
             frequency=Tenor.quarterly(),
@@ -272,6 +274,7 @@ class TestFloatLegSpecTyped:
         """Every value in the `business_day_convention` stub Literal must be a real accepted wire value."""
         leg = FloatLegSpec(
             discount_curve_id="USD-OIS",
+            index_id="USD-SOFR-3M",
             forward_curve_id="USD-SOFR-3M",
             spread_bp="0",
             frequency=Tenor.quarterly(),
@@ -287,6 +290,7 @@ class TestFloatLegSpecTyped:
         """Every value in the `stub` Literal (including `"none"`) must be a real accepted wire value."""
         leg = FloatLegSpec(
             discount_curve_id="USD-OIS",
+            index_id="USD-SOFR-3M",
             forward_curve_id="USD-SOFR-3M",
             spread_bp="0",
             frequency=Tenor.quarterly(),
@@ -301,6 +305,7 @@ class TestFloatLegSpecTyped:
         """Every keyword-only parameter name must match its text_signature."""
         leg = FloatLegSpec(
             discount_curve_id="USD-OIS",
+            index_id="USD-SOFR-3M",
             forward_curve_id="USD-SOFR-3M",
             spread_bp="0",
             frequency=Tenor.quarterly(),

@@ -694,6 +694,10 @@ export type Id4 = string;
  */
 export type Decimal7 = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id5 = string;
+/**
  * Day-count convention.
  */
 export type DayCount1 =
@@ -2392,6 +2396,10 @@ export interface D_572Ad1Befb7D94914652 {
    */
   asw_forward_curve_id?: D_94Cb251104De5Cf587B6 | null;
   /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: D_94Cb251104De5Cf587B6 | null;
+  /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
    *
@@ -3445,7 +3453,7 @@ export interface DE805C3231C7C576C5303 {
  * # Seasoned Instruments (Historical Fixings)
  *
  * Historical fixings **are supported** via the `MarketContext`: store a
- * `ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see
+ * `ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see
  * `finstack_quant_core::market_data::fixings`) containing realized index
  * observations. Observation dates strictly before the valuation cutoff then
  * resolve from that series instead of the curve. The cutoff is the forward
@@ -3480,6 +3488,7 @@ export interface DE805C3231C7C576C5303 {
  *
  * // 3M SOFR + 200bps with 0% floor
  * let spec = FloatingRateSpec {
+ *     index_id: "USD-SOFR-3M".into(),
  *     forward_curve_id: "USD-SOFR-3M".into(),
  *     spread_bp: dec!(200.0),
  *     gearing: dec!(1.0),
@@ -3561,6 +3570,7 @@ export interface D_082C9Df57E6F2F432594 {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: Decimal5 | null;
+  index_id: Id5;
   /**
    * Expected term-index tenor, checked against the resolved forward curve.
    *

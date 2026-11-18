@@ -363,7 +363,7 @@ impl CommoditySpotOption {
                         exercise.settlement_date,
                         DayCountContext::default(),
                     )?;
-                    let delivery_forward = curve.price(t);
+                    let delivery_forward = curve.price(t)?;
                     let sign = if self.option_type == OptionType::Call {
                         1.0
                     } else {

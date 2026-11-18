@@ -155,7 +155,7 @@ impl PyPriceCurve {
     #[pyo3(text_signature = "(self, t)")]
     fn price(&self, t: &Bound<'_, PyAny>) -> PyResult<f64> {
         match extract_time_point(t)? {
-            TimePoint::Years(t) => Ok(self.inner.price(t)),
+            TimePoint::Years(t) => self.inner.price(t).map_err(core_to_py),
             TimePoint::Date(d) => self.inner.price_on_date(d).map_err(core_to_py),
         }
     }

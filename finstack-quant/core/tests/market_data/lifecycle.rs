@@ -43,13 +43,18 @@ fn signed_price_shocks_preserve_zero_identity_and_native_units() {
         .unwrap();
     for t in [0.0, 0.25, 1.0, 1.5, 2.0] {
         for bumped in [curve.apply_bump(par(0.0)), curve.apply_bump(pct(0.0))] {
-            assert_eq!(bumped.unwrap().price(t), curve.price(t));
+            assert_eq!(bumped.unwrap().price(t).unwrap(), curve.price(t).unwrap());
         }
         assert!(
-            (curve.apply_bump(par(-2.0)).unwrap().price(t) - (curve.price(t) - 2.0)).abs() < 1e-12
+            (curve.apply_bump(par(-2.0)).unwrap().price(t).unwrap()
+                - (curve.price(t).unwrap() - 2.0))
+                .abs()
+                < 1e-12
         );
         assert!(
-            (curve.apply_bump(pct(0.1)).unwrap().price(t) - curve.price(t) * 1.1).abs() < 1e-12
+            (curve.apply_bump(pct(0.1)).unwrap().price(t).unwrap() - curve.price(t).unwrap() * 1.1)
+                .abs()
+                < 1e-12
         );
     }
     for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
@@ -95,7 +100,7 @@ fn price_and_cpi_condition_keeps_original_clocks_and_levels() {
         assert_eq!(kept_price.base_date(), price.base_date());
         assert_eq!(kept_cpi.base_date(), cpi.base_date());
         for t in [0.0, 1e-8, 0.1, 0.25, 1.5] {
-            assert!((kept_price.price(t) - price.price(t)).abs() < 1e-12);
+            assert!((kept_price.price(t).unwrap() - price.price(t).unwrap()).abs() < 1e-12);
             assert!((kept_cpi.cpi(t).unwrap() - cpi.cpi(t).unwrap()).abs() < 1e-12);
         }
     }

@@ -233,6 +233,7 @@ export type DA33B682660A7Dfa1Ea09 =
        * Strictly increasing `(time_years, cpi_level)` pillars starting at `0.0`.
        */
       knot_points: [number, number][];
+      series?: DF411B3891Ba92Dd52290 | null;
       type: "inflation";
     }
   | {
@@ -958,7 +959,7 @@ export interface D_4Ad1B3E6968748946Cee {
   recovery_rate: number;
 }
 /**
- * Typed conventions required to replay a rate-curve calibration.
+ * Benchmark conventions and quotes associated with a rate curve.
  */
 export interface D_17Ffcd7842A3F40268B1 {
   /**
@@ -1145,6 +1146,10 @@ export interface D_17Ffcd7842A3F40268B1 {
     | "act_act_afb"
     | "bus_252";
   /**
+   * Original execution evidence. A transcribed benchmark list has no qualified replay.
+   */
+  execution?: D_6435Ec92A8Bbd1A2E4Bc | null;
+  /**
    * Numerical calibration method.
    */
   method:
@@ -1188,6 +1193,48 @@ export interface D_17Ffcd7842A3F40268B1 {
           [k: string]: unknown;
         };
       };
+}
+/**
+ * Executed evaluator, resolved instruments and original outcome of a rate calibration.
+ */
+export interface D_6435Ec92A8Bbd1A2E4Bc {
+  /**
+   * Whether the original fit passed its recorded acceptance policy.
+   */
+  accepted: boolean;
+  /**
+   * Resolved quote identities and maturities, in input order.
+   */
+  bindings: D_15E86D33B70E6065D029[];
+  /**
+   * Solver controls and residual acceptance thresholds used by the evaluator.
+   */
+  calibration_config: {
+    [k: string]: unknown;
+  };
+  /**
+   * Discount or projection evaluator parameters, including pricing dependencies.
+   */
+  step_params: {
+    [k: string]: unknown;
+  };
+}
+/**
+ * Identity and resolved maturity of a quote in its original evaluator.
+ */
+export interface D_15E86D33B70E6065D029 {
+  /**
+   * Contractual maturity resolved using the instrument conventions.
+   */
+  pillar_date: string;
+  /**
+   * Curve-clock year fraction at the resolved maturity.
+   */
+  pillar_time: number;
+  /**
+   * Original stable market quote identifier.
+   */
+  quote_id: string;
 }
 /**
  * A parsed tenor representing a time period.
@@ -1365,6 +1412,23 @@ export interface D_8C12E8F6A6Ead66335D4 {
   knot_points: [number, number][];
 }
 /**
+ * Publication identity and units of an observed or projected inflation level.
+ */
+export interface DF411B3891Ba92Dd52290 {
+  /**
+   * Published reference period and index scale, for example `1982-84=100`.
+   */
+  reference_base: string;
+  /**
+   * True for seasonally adjusted levels and false for unadjusted levels.
+   */
+  seasonally_adjusted: boolean;
+  /**
+   * Publisher-qualified identifier of the statistical series.
+   */
+  series_id: string;
+}
+/**
  * A flat function representation: repeated shocks merge on a breakpoint union
  * rather than forming a recursively nested transformation history.
  */
@@ -1379,122 +1443,23 @@ export interface D_2A71F59Be0C75Aa6F4272 {
   segments: D_683Ec38B8D36Db5534Bc[];
 }
 /**
- * Dividend schedule for an equity or ETF underlying.
- *
- * Contains a time-ordered sequence of dividend events used for pricing equity
- * derivatives and calculating total return. The schedule can be referenced by
- * multiple instruments via its [`CurveId`] in the market context.
- *
- * # Usage in Pricing
- *
- * - **Discrete dividends**: Subtract PV of future dividends from spot for option pricing
- * - **Ex-dividend adjustments**: Reduce forward price by dividend amount
- * - **Dividend futures**: Sum dividends in contract period
- * - **Total return**: Include dividend reinvestment in performance
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::market_data::dividends::DividendSchedule;
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- * use finstack_quant_core::dates::Date;
- * use time::Month;
- *
- * let schedule = DividendSchedule::builder("AAPL-DIVS")
- *     .underlying("AAPL")
- *     .currency(Currency::USD)
- *     .cash(
- *         Date::from_calendar_date(2025, Month::March, 15).expect("Valid date"),
- *         Money::new(0.24, Currency::USD).expect("valid money fixture")
- *     ).build().expect("Valid dividends");
- *
- * assert_eq!(schedule.get_events().len(), 1);
- * ```
+ * Validated distributions for one security, share basis and currency.
  */
 export interface D_1C77A48708B4A54D6160 {
-  /**
-   * Quote currency for cash dividends (optional metadata).
-   */
-  currency?: DB6A74Bd737Ef1567B144 | null;
-  /**
-   * Sorted events by date (ascending).
-   */
+  currency: DB6A74Bd737Ef1567B144;
   events: D_07856C27D945226B86Ed[];
-  /**
-   * A phantom-typed identifier that prevents mixing different kinds of IDs.
-   *
-   * This type wraps a string identifier with a phantom type parameter to ensure
-   * type safety at compile time. Different `Id<T>` types with different `T`
-   * cannot be compared or mixed accidentally, preventing entire classes of bugs.
-   *
-   * # Type Parameters
-   *
-   * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
-   *
-   * # Invariants
-   *
-   * - Storage uses `Arc<str>` for efficient cloning
-   * - The phantom marker has zero size and runtime cost
-   * - Two `Id<T>` values are equal if their string values are equal
-   * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
-   *
-   * # Examples
-   *
-   * ```rust
-   * use finstack_quant_core::types::{CurveId, InstrumentId};
-   *
-   * // Create IDs with different type tags
-   * let curve = CurveId::from("USD-SOFR");
-   * let bond = InstrumentId::from("ISIN:US912828XG60");
-   *
-   * // Can compare IDs of the same type
-   * assert_eq!(curve, CurveId::from("USD-SOFR"));
-   * assert_ne!(curve, CurveId::from("EUR-ESTR"));
-   *
-   * // Cannot compare IDs of different types (compile error):
-   * // let _ = curve == bond;  // Error: mismatched types
-   * ```
-   *
-   * # Thread Safety
-   *
-   * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
-   * safely share and clone IDs with minimal synchronization overhead.
-   */
-  id: string;
-  /**
-   * Optional display symbol/ticker for convenience.
-   */
-  underlying?: string | null;
+  id: D_33Ee2F2E4664717E30Ef;
+  share_basis: string;
+  underlying: D_33Ee2F2E4664717E30Ef;
 }
 /**
- * A dated dividend event.
+ * One gross cash distribution per entitled share on its schedule's share basis.
  */
 export interface D_07856C27D945226B86Ed {
-  /**
-   * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
-   */
-  date: string;
-  /**
-   * Event kind.
-   */
-  kind:
-    | {
-        cash: DD99050870612E8Bfc3D3;
-      }
-    | {
-        yield: number;
-      }
-    | {
-        stock: {
-          /**
-           * Stock distribution ratio; 0.05 corresponds to a 5% stock dividend.
-           */
-          ratio: number;
-          [k: string]: unknown;
-        };
-      };
-  [k: string]: unknown;
+  amount: DD99050870612E8Bfc3D3;
+  event_id: string;
+  ex_date: D_42Ed66Bb80D77E9Fa456;
+  pay_date: D_42Ed66Bb80D77E9Fa456;
 }
 /**
  * Currency-tagged monetary amount with safe arithmetic.
@@ -2543,6 +2508,7 @@ export interface DE771E792357014C84Cb9 {
    * Strictly ascending canonical monthly fixing observations.
    */
   observations: D_5C1Ce413Ed4344Df4437[];
+  series?: DF411B3891Ba92Dd52290 | null;
 }
 /**
  * One expected-release schedule assumption for a monthly CPI/RPI reference period.

@@ -120,33 +120,95 @@ impl From<&RateQuote> for RateCalibrationQuote {
 ///
 /// # Arguments
 ///
-/// * `currency` - Curve currency recorded on the recipe.
-/// * `method` - Calibration method the curve was solved with.
-/// * `curve_day_count` - Day count of the curve's time axis.
-/// * `ois_compounding` - Step-level OIS compounding override, when set.
-/// * `role` - Discount (with its projection curve) or projection (with its
-///   discount curve) role of the curve.
+/// * `step` - Executed discount or projection evaluator, including its pricing curve identifiers.
+/// * `curve_day_count` - Resolved clock used to place calibration instruments.
 /// * `quotes` - Rate quotes the curve was calibrated to.
+/// * `config` - Executed numerical solver settings and residual acceptance policy.
+/// * `report` - Fit outcome for the curve actually adopted by the target.
 ///
 /// # Errors
 ///
 /// Returns `Error::Validation` if the OIS compounding override cannot be
 /// replayed.
 pub(crate) fn rate_calibration_recipe(
-    currency: finstack_quant_core::currency::Currency,
-    method: &CalibrationMethod,
+    step: crate::api::schema::StepParams,
     curve_day_count: finstack_quant_core::dates::DayCount,
-    ois_compounding: Option<&FloatingLegCompounding>,
-    role: finstack_quant_core::market_data::term_structures::RateCalibrationCurveRole,
-    quotes: &[RateQuote],
+    quotes: &[crate::build::prepared::PreparedQuote<RateQuote>],
+    config: &crate::CalibrationConfig,
+    report: &crate::CalibrationReport,
 ) -> Result<RateCalibrationRecipe> {
+    use crate::api::schema::StepParams;
+    use finstack_quant_core::market_data::term_structures::RateCalibrationCurveRole;
+    let (currency, method, conventions, role) = match &step {
+        StepParams::Discount(params) => (
+            params.currency,
+            &params.method,
+            &params.conventions,
+            RateCalibrationCurveRole::Discount {
+                projection_curve_id: params
+                    .pricing_forward_id
+                    .as_ref()
+                    .unwrap_or(&params.curve_id)
+                    .clone(),
+            },
+        ),
+        StepParams::Forward(params) => (
+            params.currency,
+            &params.method,
+            &params.conventions,
+            RateCalibrationCurveRole::Projection {
+                discount_curve_id: params.discount_curve_id.clone(),
+            },
+        ),
+        _ => {
+            return Err(finstack_quant_core::Error::Validation(
+                "expected a discount or forward rate calibration step".into(),
+            ));
+        }
+    };
+    // This recipe replays one curve. Scheduling independent plan steps does
+    // not affect its evaluator and must not change the curve's identity.
+    let mut replay_config = config.clone();
+    replay_config.use_parallel = false;
     Ok(RateCalibrationRecipe {
+        execution: Some(
+            finstack_quant_core::market_data::term_structures::RateCalibrationExecution {
+                accepted: report.success,
+                step_params: serde_json::to_value(&step).map_err(|error| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "cannot record executed rates evaluator: {error}"
+                    ))
+                })?,
+                bindings: quotes
+                    .iter()
+                    .map(|prepared| {
+                        finstack_quant_core::market_data::term_structures::RateQuoteBinding {
+                            quote_id: prepared.quote.id().as_str().to_owned(),
+                            pillar_date: prepared.pillar_date,
+                            pillar_time: prepared.pillar_time,
+                        }
+                    })
+                    .collect(),
+                calibration_config: serde_json::to_value(replay_config).map_err(|error| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "cannot record rates calibration configuration: {error}"
+                    ))
+                })?,
+            },
+        ),
         currency,
         method: method.into(),
         curve_day_count,
-        ois_compounding: ois_compounding.map(recipe_ois_compounding).transpose()?,
+        ois_compounding: conventions
+            .ois_compounding
+            .as_ref()
+            .map(recipe_ois_compounding)
+            .transpose()?,
         role,
-        quotes: quotes.iter().map(Into::into).collect(),
+        quotes: quotes
+            .iter()
+            .map(|prepared| prepared.quote.as_ref().into())
+            .collect(),
     })
 }
 
@@ -187,32 +249,20 @@ pub(crate) fn recipe_ois_compounding(
     }
 }
 
-/// Inverse of [`recipe_ois_compounding`].
-///
-/// # Arguments
-///
-/// * `compounding` - Recipe OIS compounding convention stored on the curve.
-pub(crate) fn ois_compounding_from_recipe(
-    compounding: &RateCalibrationOisCompounding,
-) -> FloatingLegCompounding {
-    match compounding {
-        RateCalibrationOisCompounding::Simple => FloatingLegCompounding::Simple,
-        RateCalibrationOisCompounding::CompoundedInArrears { lookback_days } => {
-            FloatingLegCompounding::CompoundedInArrears {
-                lookback_days: *lookback_days,
-            }
-        }
-        RateCalibrationOisCompounding::CompoundedWithObservationShift { shift_days } => {
-            FloatingLegCompounding::CompoundedWithObservationShift {
-                shift_days: *shift_days,
-            }
-        }
-        RateCalibrationOisCompounding::CompoundedWithRateCutoff { cutoff_days } => {
-            FloatingLegCompounding::CompoundedWithRateCutoff {
-                cutoff_days: *cutoff_days,
-            }
-        }
-    }
+pub(crate) fn original_execution(
+    recipe: &RateCalibrationRecipe,
+) -> finstack_quant_core::Result<
+    &finstack_quant_core::market_data::term_structures::RateCalibrationExecution,
+> {
+    recipe
+        .execution
+        .as_ref()
+        .filter(|execution| execution.accepted)
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "rate quote replay requires an accepted source calibration".into(),
+            )
+        })
 }
 
 /// Rebuild the typed rate quotes a curve was calibrated from.
@@ -220,8 +270,7 @@ pub(crate) fn ois_compounding_from_recipe(
 /// # Arguments
 ///
 /// * `recipe` - Persisted calibration recipe read off the curve.
-/// * `curve_id` - Curve identifier, used to mint deterministic replay quote
-///   ids of the form `{curve_id}-REPLAY-{index}`.
+/// * `curve_id` - Source curve identifier used to report invalid quote bindings.
 ///
 /// # Errors
 ///
@@ -231,12 +280,23 @@ pub(crate) fn rate_quotes_from_recipe(
     recipe: &RateCalibrationRecipe,
     curve_id: &CurveId,
 ) -> Result<Vec<RateQuote>> {
+    let execution = original_execution(recipe)?;
+    let mut identifiers = std::collections::HashSet::new();
+    if execution.bindings.len() != recipe.quotes.len()
+        || execution.bindings.iter().any(|binding| {
+            binding.quote_id.trim().is_empty() || !identifiers.insert(&binding.quote_id)
+        })
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "curve {curve_id} has missing or duplicate rate quote bindings"
+        )));
+    }
     recipe
         .quotes
         .iter()
-        .enumerate()
-        .map(|(index, quote)| {
-            let id = QuoteId::new(format!("{curve_id}-REPLAY-{index}"));
+        .zip(&execution.bindings)
+        .map(|(quote, binding)| {
+            let id = QuoteId::new(binding.quote_id.as_str());
             Ok(match quote {
                 RateCalibrationQuote::Deposit {
                     index_id,

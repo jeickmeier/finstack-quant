@@ -1151,7 +1151,7 @@ mod tests {
         // Q1 and Q2 are actuals, Q3 is a forecast period.
         let periods = finstack_quant_core::dates::build_periods("2025Q1..Q3", Some("2025Q2"))
             .expect("periods")
-            .periods;
+            .into_periods();
         let mut model = FinancialModelSpec::new(
             "cell-sources",
             finstack_quant_core::dates::PeriodPlan::try_new(
@@ -1268,7 +1268,7 @@ mod tests {
         // No period is flagged actual.
         let periods = finstack_quant_core::dates::build_periods("2025Q1..Q2", None)
             .expect("periods")
-            .periods;
+            .into_periods();
         let evaluate = |q2_available_on: Option<Date>| {
             let mut model = FinancialModelSpec::new(
                 "as-of-policy",
@@ -1306,7 +1306,7 @@ mod tests {
     fn as_of_hides_future_actual_values() {
         let periods = finstack_quant_core::dates::build_periods("2025Q1..Q2", Some("2025Q2"))
             .expect("periods")
-            .periods;
+            .into_periods();
         let mut model = FinancialModelSpec::new(
             "as-of-policy",
             finstack_quant_core::dates::PeriodPlan::try_new(

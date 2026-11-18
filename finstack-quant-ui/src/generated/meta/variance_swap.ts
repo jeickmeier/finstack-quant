@@ -853,6 +853,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/asw_forward_curve_id/anyOf/1"
   },
   {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/asw_index_id",
+    "description": "Contractual floating index used for asset-swap accruals and historical resets."
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/asw_index_id/anyOf/0",
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Id"
+  },
+  {
+    "path": "#/$defs/d_572ad1befb7d94914652/properties/asw_index_id/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/asw_index_id/anyOf/1"
+  },
+  {
     "path": "#/$defs/d_572ad1befb7d94914652/properties/bdt_sigma",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/ModelConfig/properties/bdt_sigma",
     "description": "Black-Derman-Toy lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_derman_toy` selects\nBDT for a bond with embedded exercise rights, where it is required.\nIt is a relative (lognormal) volatility, unlike the absolute\n[`Self::hw1f_sigma`]; typical values are 0.10–0.40. The BDT lattice has\nno mean reversion. Must be finite and non-negative; `0.0` prices on the\ndeterministic curve.",
@@ -1407,6 +1422,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json#/$defs/VarianceSwap/properties/open_series_id",
     "default": null,
     "description": "Series ID for open prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang)."
+  },
+  {
+    "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/previous_close_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json#/$defs/VarianceSwap/properties/previous_close_date",
+    "description": "Contractual closing fixing immediately before the first Yang–Zhang target bar.\nResolved exactly in the same close series as the target bars."
+  },
+  {
+    "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/previous_close_date/anyOf/0",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json#/$defs/VarianceSwap/properties/previous_close_date/anyOf/0",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/previous_close_date/anyOf/1",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/variance_swap.schema.json#/$defs/VarianceSwap/properties/previous_close_date/anyOf/1"
   },
   {
     "path": "#/$defs/d_85bc3ccea16ecaa23151/properties/price_series_policy",

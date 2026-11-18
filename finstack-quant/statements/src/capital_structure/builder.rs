@@ -327,6 +327,7 @@ impl ModelBuilder {
 
         let float = FloatLegSpec {
             discount_curve_id,
+            index_id: forward_curve_id.as_str().into(),
             forward_curve_id,
             spread_bp: Decimal::ZERO,
             frequency: float_frequency,

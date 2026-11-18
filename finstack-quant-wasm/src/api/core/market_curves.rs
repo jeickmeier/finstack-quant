@@ -389,7 +389,8 @@ impl JsPriceCurve {
     /// @returns The interpolated forward price (or index level).
     /// @throws `TypeError` if `t` is neither a number nor a string;
     /// `FinstackError` (kind `validation`) for a malformed date or a year
-    /// fraction that cannot be computed.
+    /// fraction that cannot be computed, forbidden extrapolation, a non-finite
+    /// result or a negative volatility-index level.
     /// @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
     #[wasm_bindgen(js_name = price)]
     pub fn price(
@@ -397,7 +398,7 @@ impl JsPriceCurve {
         #[wasm_bindgen(unchecked_param_type = "number | string")] t: JsValue,
     ) -> Result<f64, JsValue> {
         match js_time_point(&t, "t")? {
-            TimePoint::Years(t) => Ok(self.inner.price(t)),
+            TimePoint::Years(t) => self.inner.price(t).map_err(to_js_err),
             TimePoint::Date(d) => self.inner.price_on_date(d).map_err(to_js_err),
         }
     }
@@ -690,9 +691,8 @@ impl JsCreditIndexData {
     /// * `issuer_id` - Issuer identifier as stored in the index data (ticker,
     ///   CUSIP, ...).
     ///
-    /// @returns The issuer's `HazardCurve`, or `indexCreditCurve` when the
-    /// data has no curve for `issuerId` (homogeneous assumption).
-    /// @throws `TypeError` if `issuerId` is not a string.
+    /// @returns The hazard curve of the named pool member.
+    /// @throws `TypeError` if `issuerId` is not a string. A lookup error is thrown when the named roster does not contain the issuer.
     /// @param issuerId - Issuer identifier as stored in the index data (ticker, CUSIP, ...).
     #[wasm_bindgen(js_name = getIssuerCurve)]
     pub fn get_issuer_curve(
@@ -701,7 +701,12 @@ impl JsCreditIndexData {
     ) -> Result<JsHazardCurve, JsValue> {
         let issuer_id = js_string(&issuer_id, "issuerId")?;
         Ok(JsHazardCurve {
-            inner: Arc::new(self.inner.get_issuer_curve(&issuer_id).clone()),
+            inner: Arc::new(
+                self.inner
+                    .get_issuer_curve(&issuer_id)
+                    .map_err(to_js_err)?
+                    .clone(),
+            ),
         })
     }
 
@@ -729,7 +734,7 @@ impl JsCreditIndexData {
     ///
     /// @returns The issuer's recovery as a decimal, or `recoveryRate` when
     /// none was supplied for `issuerId`.
-    /// @throws `TypeError` if `issuerId` is not a string.
+    /// @throws `TypeError` if `issuerId` is not a string. A lookup error is thrown when the named roster does not contain the issuer.
     /// @param issuerId - Issuer identifier as stored in the index data.
     #[wasm_bindgen(js_name = getIssuerRecovery)]
     pub fn get_issuer_recovery(
@@ -737,7 +742,9 @@ impl JsCreditIndexData {
         #[wasm_bindgen(js_name = "issuerId", unchecked_param_type = "string")] issuer_id: JsValue,
     ) -> Result<f64, JsValue> {
         let issuer_id = js_string(&issuer_id, "issuerId")?;
-        Ok(self.inner.get_issuer_recovery(&issuer_id))
+        self.inner
+            .get_issuer_recovery(&issuer_id)
+            .map_err(to_js_err)
     }
 
     /// Notional weight of one issuer (Rust `CreditIndexData::get_issuer_weight`).
@@ -748,7 +755,7 @@ impl JsCreditIndexData {
     ///
     /// @returns The issuer's weight as a decimal fraction, or
     /// `1 / numConstituents` when none was supplied for `issuerId`.
-    /// @throws `TypeError` if `issuerId` is not a string.
+    /// @throws `TypeError` if `issuerId` is not a string. A lookup error is thrown when the named roster does not contain the issuer.
     /// @param issuerId - Issuer identifier as stored in the index data.
     #[wasm_bindgen(js_name = getIssuerWeight)]
     pub fn get_issuer_weight(
@@ -756,6 +763,6 @@ impl JsCreditIndexData {
         #[wasm_bindgen(js_name = "issuerId", unchecked_param_type = "string")] issuer_id: JsValue,
     ) -> Result<f64, JsValue> {
         let issuer_id = js_string(&issuer_id, "issuerId")?;
-        Ok(self.inner.get_issuer_weight(&issuer_id))
+        self.inner.get_issuer_weight(&issuer_id).map_err(to_js_err)
     }
 }

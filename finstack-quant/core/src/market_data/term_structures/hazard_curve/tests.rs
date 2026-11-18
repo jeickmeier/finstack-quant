@@ -8,7 +8,7 @@ fn test_hazard_recipe(base: Date) -> HazardCalibrationRecipe {
     let input = HazardCalibrationInput {
         quote: serde_json::json!({
             "type": "cds_par_spread",
-            "id": "CDS-5Y"
+            "id": "CDS-1Y", "entity":"ACME", "convention":{"currency":"USD","doc_clause":"isda_na"}, "recovery_rate":0.4, "spread_bp":120.0, "pillar":{"date":base + Duration::days(365)}
         }),
         pillar_date: base + Duration::days(365),
         pillar_time: 1.0,

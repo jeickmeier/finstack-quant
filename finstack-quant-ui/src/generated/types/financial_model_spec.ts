@@ -1815,6 +1815,47 @@ export interface D_7Af15F20A258D1Def9Dd {
    */
   index_floor_bp?: DB375E274438Ab847F1Fc | null;
   /**
+   * A phantom-typed identifier that prevents mixing different kinds of IDs.
+   *
+   * This type wraps a string identifier with a phantom type parameter to ensure
+   * type safety at compile time. Different `Id<T>` types with different `T`
+   * cannot be compared or mixed accidentally, preventing entire classes of bugs.
+   *
+   * # Type Parameters
+   *
+   * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
+   *
+   * # Invariants
+   *
+   * - Storage uses `Arc<str>` for efficient cloning
+   * - The phantom marker has zero size and runtime cost
+   * - Two `Id<T>` values are equal if their string values are equal
+   * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
+   *
+   * # Examples
+   *
+   * ```rust
+   * use finstack_quant_core::types::{CurveId, InstrumentId};
+   *
+   * // Create IDs with different type tags
+   * let curve = CurveId::from("USD-SOFR");
+   * let bond = InstrumentId::from("ISIN:US912828XG60");
+   *
+   * // Can compare IDs of the same type
+   * assert_eq!(curve, CurveId::from("USD-SOFR"));
+   * assert_ne!(curve, CurveId::from("EUR-ESTR"));
+   *
+   * // Cannot compare IDs of different types (compile error):
+   * // let _ = curve == bond;  // Error: mismatched types
+   * ```
+   *
+   * # Thread Safety
+   *
+   * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
+   * safely share and clone IDs with minimal synchronization overhead.
+   */
+  index_id: string;
+  /**
    * Expected term-index tenor, checked against the resolved forward curve.
    *
    * The named forward curve is already the term index (for example a 3M
@@ -3018,7 +3059,8 @@ export interface DCe740Ebb40B6A9A3Bc22 {
     | "variation_margin_pay"
     | "margin_interest"
     | "collateral_substitution_in"
-    | "collateral_substitution_out";
+    | "collateral_substitution_out"
+    | "derivative_settlement";
   /**
    * Economic date of the principal movement, independent of cash payment.
    * Required with `principal_delta` on every principal-like row and absent
@@ -3270,6 +3312,10 @@ export interface D_63Aec3D47748D9F3D86A {
    * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */
   end: string;
+  /**
+   * Consecutive nominal boundaries for a coupon spanning multiple ICMA reference periods.
+   */
+  nominal_dates?: D_2331411247Fb4Fdd46Dd[];
   /**
    * Projected index rate before spread, gearing, caps, or floors.
    * Serialization rejects non-finite rates instead of encoding them as absent.
@@ -3931,6 +3977,10 @@ export interface D_65B0652Ed08913529246 {
    * this forward curve instead of using a discount-curve par-rate proxy.
    */
   asw_forward_curve_id?: D_557De6D70142Abc041E8 | null;
+  /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: D_557De6D70142Abc041E8 | null;
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
@@ -8651,7 +8701,7 @@ export interface D_3B1170Fe3280Aa725Fb4 {
  * # Seasoned Instruments (Historical Fixings)
  *
  * Historical fixings **are supported** via the `MarketContext`: store a
- * `ScalarTimeSeries` under the canonical id `FIXING:{forward_curve_id}` (see
+ * `ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see
  * `finstack_quant_core::market_data::fixings`) containing realized index
  * observations. Observation dates strictly before the valuation cutoff then
  * resolve from that series instead of the curve. The cutoff is the forward
@@ -8686,6 +8736,7 @@ export interface D_3B1170Fe3280Aa725Fb4 {
  *
  * // 3M SOFR + 200bps with 0% floor
  * let spec = FloatingRateSpec {
+ *     index_id: "USD-SOFR-3M".into(),
  *     forward_curve_id: "USD-SOFR-3M".into(),
  *     spread_bp: dec!(200.0),
  *     gearing: dec!(1.0),
@@ -8816,6 +8867,47 @@ export interface D_7Af15F20A258D1Def9Dd1 {
    * Example: index_floor_bp = Some(0.0) ensures index rate >= 0%.
    */
   index_floor_bp?: DB375E274438Ab847F1Fc | null;
+  /**
+   * A phantom-typed identifier that prevents mixing different kinds of IDs.
+   *
+   * This type wraps a string identifier with a phantom type parameter to ensure
+   * type safety at compile time. Different `Id<T>` types with different `T`
+   * cannot be compared or mixed accidentally, preventing entire classes of bugs.
+   *
+   * # Type Parameters
+   *
+   * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
+   *
+   * # Invariants
+   *
+   * - Storage uses `Arc<str>` for efficient cloning
+   * - The phantom marker has zero size and runtime cost
+   * - Two `Id<T>` values are equal if their string values are equal
+   * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
+   *
+   * # Examples
+   *
+   * ```rust
+   * use finstack_quant_core::types::{CurveId, InstrumentId};
+   *
+   * // Create IDs with different type tags
+   * let curve = CurveId::from("USD-SOFR");
+   * let bond = InstrumentId::from("ISIN:US912828XG60");
+   *
+   * // Can compare IDs of the same type
+   * assert_eq!(curve, CurveId::from("USD-SOFR"));
+   * assert_ne!(curve, CurveId::from("EUR-ESTR"));
+   *
+   * // Cannot compare IDs of different types (compile error):
+   * // let _ = curve == bond;  // Error: mismatched types
+   * ```
+   *
+   * # Thread Safety
+   *
+   * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
+   * safely share and clone IDs with minimal synchronization overhead.
+   */
+  index_id: string;
   /**
    * Expected term-index tenor, checked against the resolved forward curve.
    *
@@ -11804,6 +11896,47 @@ export interface D_450829Dac3A74A5C8761 {
    */
   forward_curve_id: string;
   frequency: DCc937Fbaa12E32D4187E8;
+  /**
+   * A phantom-typed identifier that prevents mixing different kinds of IDs.
+   *
+   * This type wraps a string identifier with a phantom type parameter to ensure
+   * type safety at compile time. Different `Id<T>` types with different `T`
+   * cannot be compared or mixed accidentally, preventing entire classes of bugs.
+   *
+   * # Type Parameters
+   *
+   * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
+   *
+   * # Invariants
+   *
+   * - Storage uses `Arc<str>` for efficient cloning
+   * - The phantom marker has zero size and runtime cost
+   * - Two `Id<T>` values are equal if their string values are equal
+   * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
+   *
+   * # Examples
+   *
+   * ```rust
+   * use finstack_quant_core::types::{CurveId, InstrumentId};
+   *
+   * // Create IDs with different type tags
+   * let curve = CurveId::from("USD-SOFR");
+   * let bond = InstrumentId::from("ISIN:US912828XG60");
+   *
+   * // Can compare IDs of the same type
+   * assert_eq!(curve, CurveId::from("USD-SOFR"));
+   * assert_ne!(curve, CurveId::from("EUR-ESTR"));
+   *
+   * // Cannot compare IDs of different types (compile error):
+   * // let _ = curve == bond;  // Error: mismatched types
+   * ```
+   *
+   * # Thread Safety
+   *
+   * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
+   * safely share and clone IDs with minimal synchronization overhead.
+   */
+  index_id: string;
   /**
    * Payment lag in business days after period end (default: 0).
    *
@@ -15818,6 +15951,47 @@ export interface D_450829Dac3A74A5C87611 {
   forward_curve_id: string;
   frequency: DCc937Fbaa12E32D4187E8;
   /**
+   * A phantom-typed identifier that prevents mixing different kinds of IDs.
+   *
+   * This type wraps a string identifier with a phantom type parameter to ensure
+   * type safety at compile time. Different `Id<T>` types with different `T`
+   * cannot be compared or mixed accidentally, preventing entire classes of bugs.
+   *
+   * # Type Parameters
+   *
+   * * `T` - Phantom type tag that distinguishes this ID from IDs with different tags
+   *
+   * # Invariants
+   *
+   * - Storage uses `Arc<str>` for efficient cloning
+   * - The phantom marker has zero size and runtime cost
+   * - Two `Id<T>` values are equal if their string values are equal
+   * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
+   *
+   * # Examples
+   *
+   * ```rust
+   * use finstack_quant_core::types::{CurveId, InstrumentId};
+   *
+   * // Create IDs with different type tags
+   * let curve = CurveId::from("USD-SOFR");
+   * let bond = InstrumentId::from("ISIN:US912828XG60");
+   *
+   * // Can compare IDs of the same type
+   * assert_eq!(curve, CurveId::from("USD-SOFR"));
+   * assert_ne!(curve, CurveId::from("EUR-ESTR"));
+   *
+   * // Cannot compare IDs of different types (compile error):
+   * // let _ = curve == bond;  // Error: mismatched types
+   * ```
+   *
+   * # Thread Safety
+   *
+   * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
+   * safely share and clone IDs with minimal synchronization overhead.
+   */
+  index_id: string;
+  /**
    * Payment lag in business days after period end (default: 0).
    *
    * Bloomberg OIS swaps typically use 2 business days payment lag.
@@ -16402,7 +16576,7 @@ export interface D_867Bd30E1E9B7Fc46878 {
         fiscal: DD9478A234Ddbf6C327A0;
       };
   /**
-   * Ordered periods produced by the parser.
+   * Chronologically ordered reporting periods, with optional gaps.
    */
   periods: D_4672B5Faf94Cbb3De83D[];
 }

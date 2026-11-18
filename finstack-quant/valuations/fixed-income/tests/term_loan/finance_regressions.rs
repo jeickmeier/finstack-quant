@@ -65,6 +65,7 @@ fn overnight_loan(mode: FloatingLegCompounding) -> (TermLoan, MarketContext, Dat
     loan.frequency = Tenor::quarterly();
     loan.day_count = DayCount::Act360;
     let mut spec = FloatingRateSpec::sofr(0.into());
+    spec.index_id = "TEST-ON".into();
     spec.forward_curve_id = "TEST-ON".into();
     spec.reset_frequency = Tenor::quarterly();
     spec.compounding = Some(mode);

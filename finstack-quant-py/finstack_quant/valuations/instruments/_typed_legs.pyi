@@ -389,6 +389,7 @@ class FloatLegSpec:
     >>> from finstack_quant.valuations.instruments import FloatLegSpec
     >>> leg = FloatLegSpec(
     ...     discount_curve_id="USD-OIS",
+    ...     index_id="USD-SOFR-3M",
     ...     forward_curve_id="USD-SOFR-3M",
     ...     spread_bp="0",
     ...     frequency=Tenor.quarterly(),
@@ -404,6 +405,7 @@ class FloatLegSpec:
         self,
         *,
         discount_curve_id: str,
+        index_id: str,
         forward_curve_id: str,
         spread_bp: Decimal | str,
         frequency: Tenor,
@@ -430,6 +432,8 @@ class FloatLegSpec:
         ----------
         discount_curve_id : str
             Discount curve identifier for pricing this leg.
+        index_id : str
+            Contractual index identifying historical rate publications.
         forward_curve_id : str
             Forward curve identifier for rate projections.
         spread_bp : decimal.Decimal | str
@@ -487,6 +491,7 @@ class FloatLegSpec:
         >>> from finstack_quant.valuations.instruments import FloatLegSpec
         >>> ois = FloatLegSpec(
         ...     discount_curve_id="USD-OIS",
+        ...     index_id="USD-SOFR",
         ...     forward_curve_id="USD-SOFR",
         ...     spread_bp="0",
         ...     frequency=Tenor.annual(),
@@ -527,6 +532,7 @@ class FloatLegSpec:
         >>> from finstack_quant.valuations.instruments import FloatLegSpec
         >>> leg = FloatLegSpec(
         ...     discount_curve_id="USD-OIS",
+        ...     index_id="USD-SOFR-3M",
         ...     forward_curve_id="USD-SOFR-3M",
         ...     spread_bp="0",
         ...     frequency=Tenor.quarterly(),
@@ -703,6 +709,17 @@ class FloatLegSpec:
         This accessor does not raise; it returns the stored value.
         """
         ...
+    @property
+    def index_id(self) -> str:
+        """Return the contractual fixing index for this floating leg.
+
+        Returns
+        -------
+        str
+            Historical benchmark identifier without its FIXING prefix. Access does not raise domain errors.
+        """
+        ...
+
     @property
     def forward_curve_id(self) -> str:
         """

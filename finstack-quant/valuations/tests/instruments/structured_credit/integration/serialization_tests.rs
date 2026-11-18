@@ -302,6 +302,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         .with_meta("desk", "alts");
 
     let floating_coupon = finstack_quant_cashflows::builder::FloatingRateSpec {
+        index_id: "SOFR-3M".into(),
         forward_curve_id: CurveId::new("SOFR-3M"),
         spread_bp: rust_decimal::Decimal::try_from(150.0).expect("valid"),
         gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),

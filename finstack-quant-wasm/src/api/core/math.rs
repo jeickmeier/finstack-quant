@@ -239,10 +239,13 @@ pub fn realized_variance(
 /// * `annualization_factor` - Bars per year (for example `252` for daily
 ///   bars); omitted selects the Rust daily default (252).
 ///
-/// @returns Annualized realized variance (decimal, not volatility).
+/// * `previous_close` - Positive finite close immediately preceding the first bar for Yang-Zhang and close-to-close. Range estimators require omission.
+///
+/// @param previousClose - Closing price immediately before the first target bar, required for close-to-close and Yang-Zhang and omitted otherwise.
+/// @returns Annualized variance in decimal units, or `undefined` for a valid empty window or fewer than two Yang-Zhang bars.
 /// @throws `TypeError` for a mistyped argument; `FinstackError` (kind
 /// `validation`) for an unknown method, series of different lengths, an
-/// invalid bar, or a non-positive annualization factor.
+/// missing or inappropriate preceding close, invalid bar, or a non-positive annualization factor.
 /// @param open - Opening prices, one per bar.
 /// @param high - High prices, one per bar.
 /// @param low - Low prices, one per bar.
@@ -261,15 +264,29 @@ pub fn realized_variance_ohlc(
         unchecked_optional_param_type = "number | null"
     )]
     annualization_factor: Option<JsValue>,
-) -> Result<f64, JsValue> {
+    #[wasm_bindgen(
+        js_name = "previousClose",
+        unchecked_optional_param_type = "number | null"
+    )]
+    previous_close: Option<JsValue>,
+) -> Result<Option<f64>, JsValue> {
     let open: &[f64] = &js_f64_seq(&open, "open")?;
     let high: &[f64] = &js_f64_seq(&high, "high")?;
     let low: &[f64] = &js_f64_seq(&low, "low")?;
     let close: &[f64] = &js_f64_seq(&close, "close")?;
     let method = realized_var_method(method)?;
     let annualization_factor = js_opt_f64(annualization_factor.as_ref(), "annualizationFactor")?;
-    stats::realized_variance_ohlc(open, high, low, close, method, annualization_factor)
-        .map_err(to_js_err)
+    let previous_close = js_opt_f64(previous_close.as_ref(), "previousClose")?;
+    stats::realized_variance_ohlc(
+        open,
+        high,
+        low,
+        close,
+        method,
+        annualization_factor,
+        previous_close,
+    )
+    .map_err(to_js_err)
 }
 
 /// Parse an optional `RealizedVarMethod` from its serde name.

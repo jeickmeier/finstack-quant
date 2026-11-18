@@ -402,16 +402,11 @@ fn add_equity_carry_reads(
         reads.push(scalar_id);
         return;
     }
-    let fallback_id = format!("{ticker}-DIVS");
     let schedules: Vec<String> = envelope
         .market_data
         .iter()
         .filter_map(|datum| match datum {
-            MarketDatum::DividendSchedule(datum)
-                if datum.get_underlying() == Some(ticker)
-                    || datum.get_id().as_str() == ticker
-                    || datum.get_id().as_str() == fallback_id =>
-            {
+            MarketDatum::DividendSchedule(datum) if datum.get_underlying().as_str() == ticker => {
                 Some(datum.get_id().to_string())
             }
             _ => None,

@@ -196,6 +196,7 @@ impl CashFlowBuilder {
     ///     .floating_cf(FloatingCouponSpec {
     ///         coupon_type: CouponType::Cash,
     ///         rate_spec: FloatingRateSpec {
+    ///             index_id: "USD-SOFR-3M".into(),
     ///             forward_curve_id: CurveId::new("USD-SOFR-3M"),
     ///             spread_bp: dec!(200),
     ///             gearing: dec!(1),
@@ -481,6 +482,7 @@ impl CashFlowBuilder {
     /// let base = FloatingCouponSpec {
     ///     coupon_type: CouponType::Cash,
     ///     rate_spec: FloatingRateSpec {
+    ///         index_id: "USD-SOFR".into(),
     ///         forward_curve_id: CurveId::new("USD-SOFR"),
     ///         spread_bp: dec!(100),
     ///         gearing: dec!(1),
@@ -575,6 +577,7 @@ impl CashFlowBuilder {
     /// let floating = FloatingCouponSpec {
     ///     coupon_type: CouponType::Cash,
     ///     rate_spec: FloatingRateSpec {
+    ///         index_id: "USD-SOFR".into(),
     ///         forward_curve_id: CurveId::new("USD-SOFR"),
     ///         spread_bp: dec!(250),
     ///         gearing: dec!(1),

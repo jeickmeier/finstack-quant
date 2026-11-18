@@ -203,11 +203,15 @@ pub(crate) fn rebuild_residual_interest(
             context.coupon_period = context
                 .coupon_period
                 .or(Some((accrual.get_start(), accrual.get_end())));
-            let total = accrual.get_day_count().year_fraction(
-                accrual.get_start(),
-                accrual.get_end(),
-                context,
-            )?;
+            let total = if accrual.get_nominal_dates().is_empty() {
+                accrual.get_day_count().year_fraction(
+                    accrual.get_start(),
+                    accrual.get_end(),
+                    context,
+                )?
+            } else {
+                accrual.year_fraction()?
+            };
             // Canonical coupons are emitted in constant-principal accrual
             // segments. `rate` on a split cash/PIK row is the full coupon
             // rate, so its amount and dated principal own the component's
@@ -248,17 +252,21 @@ pub(crate) fn rebuild_residual_interest(
             boundaries.push(accrual.get_end());
             replacement.clear();
             for bounds in boundaries.windows(2) {
-                let fraction = accrual.get_day_count().year_fraction(
-                    bounds[0],
-                    bounds[1],
-                    DayCountContext {
-                        end_is_termination_date: accrual
-                            .get_context()
-                            .get_end_is_termination_date()
-                            .map(|termination| termination && bounds[1] == accrual.get_end()),
-                        ..context
-                    },
-                )? / total;
+                let segment = accrual.subperiod(bounds[0], bounds[1])?;
+                let fraction = if accrual.get_nominal_dates().is_empty() {
+                    accrual.get_day_count().year_fraction(
+                        bounds[0],
+                        bounds[1],
+                        DayCountContext {
+                            end_is_termination_date: segment
+                                .get_context()
+                                .get_end_is_termination_date(),
+                            ..context
+                        },
+                    )?
+                } else {
+                    segment.year_fraction()?
+                } / total;
                 let balance_delta: f64 = changes.range(..=bounds[0]).map(|(_, delta)| delta).sum();
                 let factor = original.get_accrual_factor() * fraction;
                 let value = original_value * fraction + balance_delta * rate * factor;
@@ -277,22 +285,7 @@ pub(crate) fn rebuild_residual_interest(
                 // unsplit rate from a zero principal denominator.
                 flow.rate = Some(rate);
                 flow.accrual_factor = factor;
-                let accrual_ctx = accrual.get_context();
-                flow.accrual = Some(CashFlowAccrual::new(
-                    bounds[0],
-                    bounds[1],
-                    accrual.get_day_count(),
-                    accrual.get_projected_index_rate(),
-                    finstack_quant_core::dates::DayCountContextState::try_new(
-                        accrual_ctx.get_calendar_id().map(str::to_owned),
-                        accrual_ctx.get_frequency(),
-                        accrual_ctx.get_bus_basis(),
-                        accrual_ctx.get_coupon_period(),
-                        accrual_ctx
-                            .get_end_is_termination_date()
-                            .map(|termination| termination && bounds[1] == accrual.get_end()),
-                    )?,
-                )?);
+                flow.accrual = Some(segment);
                 // A PIK row capitalizes exactly its reprojected interest; any
                 // other explicit delta splits with the reprojected cash.
                 if original.get_kind() == CFKind::Pik {

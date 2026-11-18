@@ -7,6 +7,7 @@ use finstack_quant_models::types::OptionType;
 use finstack_quant_models::volatility::variance_replication::carr_madan_forward_variance;
 use finstack_quant_valuations_core::instruments::Instrument;
 use finstack_quant_valuations_core::instruments::common_impl::helpers::zero_rate_from_df;
+use finstack_quant_valuations_core::instruments::pricing::variance_observations::preceding_close;
 
 type OhlcVecs = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
 use finstack_quant_core::{
@@ -177,11 +178,23 @@ fn partial_realized_variance_with_dates(
 ) -> Result<f64> {
     let annualization_factor = annualization_factor(inst);
     if inst.realized_var_method.requires_ohlc() {
-        let (open, high, low, close) =
-            get_historical_ohlc_with_dates(inst, context, as_of, obs_dates)?;
-        if close.is_empty() {
+        if obs_dates.first().is_some_and(|first| as_of < *first) {
             return Ok(0.0);
         }
+        let (open, high, low, close) =
+            get_historical_ohlc_with_dates(inst, context, as_of, obs_dates)?;
+
+        let close_id = inst
+            .close_series_id
+            .clone()
+            .unwrap_or_else(|| inst.series_id());
+        let anchor = preceding_close(
+            inst.realized_var_method,
+            inst.previous_close_date,
+            obs_dates,
+            context,
+            &close_id,
+        )?;
         return finstack_quant_core::math::stats::realized_variance_ohlc(
             &open,
             &high,
@@ -189,7 +202,13 @@ fn partial_realized_variance_with_dates(
             &close,
             Some(inst.realized_var_method),
             Some(annualization_factor),
-        );
+            anchor,
+        )?
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "insufficient target bars for contractual realized variance".into(),
+            )
+        });
     }
     let prices = get_historical_prices_with_dates(inst, context, as_of, obs_dates)?;
     if prices.len() < 2 {
@@ -756,10 +775,7 @@ mod tests {
             RealizedVarMethod::RogersSatchell,
         ] {
             swap.realized_var_method = method;
-            let anchored = matches!(
-                method,
-                RealizedVarMethod::CloseToClose | RealizedVarMethod::YangZhang
-            );
+            let anchored = method == RealizedVarMethod::CloseToClose;
             for (index, &date) in dates.iter().enumerate() {
                 let expected = if anchored {
                     index as f64 / 5.0
@@ -834,11 +850,14 @@ mod tests {
             ("HIGH", 1.2, 1.01),
             ("LOW", 0.8, 0.99),
         ] {
-            let observations = dates
+            let mut observations: Vec<_> = dates
                 .iter()
                 .enumerate()
                 .map(|(i, &date)| (date, if i == 0 { first } else { later }))
                 .collect();
+            if id == "EURUSD" {
+                observations.insert(0, (date!(2025 - 01 - 03), 1.0));
+            }
             market = market.insert_series(
                 ScalarTimeSeries::new(
                     id,
@@ -864,13 +883,15 @@ mod tests {
                 RealizedVarMethod::RogersSatchell,
                 (rs_first + 3.0 * rs_later) / 4.0,
             ),
-            // Three return periods; Yang-Zhang excludes the first anchor bar.
+            // Four target bars follow the separately observed Friday close.
             (
                 RealizedVarMethod::YangZhang,
-                (1.0 - 0.34 / (1.34 + 4.0 / 2.0)) * rs_later,
+                (1.0 - 0.34 / (1.34 + 5.0 / 3.0)) * (rs_first + 3.0 * rs_later) / 4.0,
             ),
         ] {
             swap.realized_var_method = method;
+            swap.previous_close_date =
+                (method == RealizedVarMethod::YangZhang).then_some(date!(2025 - 01 - 03));
             let expected = annualization_factor(&swap) * per_period;
             let actual =
                 expected_variance(&swap, &market, swap.maturity).expect("settlement variance");

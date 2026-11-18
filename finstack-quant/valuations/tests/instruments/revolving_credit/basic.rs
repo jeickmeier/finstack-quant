@@ -533,6 +533,7 @@ fn test_term_forward_with_floor() {
         .maturity(maturity_date)
         .rate(RateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: "USD-SOFR-3M".into(),
                 spread_bp: rust_decimal::Decimal::try_from(500.0).expect("valid"), // +500 bp margin = +5%
                 gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),
@@ -571,6 +572,7 @@ fn test_term_forward_with_floor() {
         .maturity(maturity_date)
         .rate(RateSpec::Floating(
             finstack_quant_cashflows::builder::FloatingRateSpec {
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: "USD-SOFR-3M".into(),
                 spread_bp: rust_decimal::Decimal::try_from(500.0).expect("valid"), // +500 bp margin = +5%
                 gearing: rust_decimal::Decimal::try_from(1.0).expect("valid"),

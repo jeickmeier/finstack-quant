@@ -38,6 +38,7 @@ pub(crate) fn validate_curve_clock(
     day_count: DayCount,
     calendar_id: Option<&str>,
 ) -> crate::Result<Option<CurveCalendar>> {
+    day_count.validate_annualized_clock()?;
     if matches!(
         day_count,
         DayCount::ActActIsma | DayCount::Act365L | DayCount::ThirtyE360Isda

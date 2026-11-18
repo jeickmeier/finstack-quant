@@ -187,7 +187,7 @@ impl Instrument for StructuredCredit {
         for tranche in &self.tranches.tranches {
             if let RateSpec::Floating(spec) = &tranche.coupon {
                 deps.add_forward_curve(spec.forward_curve_id.clone());
-                deps.add_series_id(fixing_series_id(spec.forward_curve_id.as_str()));
+                deps.add_series_id(fixing_series_id(spec.index_id.as_str()));
             }
         }
         Ok(deps)

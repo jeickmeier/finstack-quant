@@ -364,6 +364,10 @@ export type Date3 = string;
  */
 export type Id4 = string;
 /**
+ * Opaque string identifier.
+ */
+export type Id5 = string;
+/**
  * Spread in basis points added to the forward rate
  */
 export type Decimal1 = string;
@@ -374,7 +378,7 @@ export type Date4 = string;
 /**
  * Opaque string identifier.
  */
-export type Id5 = string;
+export type Id6 = string;
 /**
  * Canonical schema marker for persisted instrument envelopes.
  */
@@ -438,7 +442,7 @@ export interface D_818134538Ec82F6D27C9 {
    * Volatility model (Black or Normal)
    */
   vol_model: "black" | "normal";
-  vol_surface_id: Id5;
+  vol_surface_id: Id6;
 }
 /**
  * Attributes for scenario selection and grouping
@@ -546,6 +550,10 @@ export interface D_572Ad1Befb7D94914652 {
    * this forward curve instead of using a discount-curve par-rate proxy.
    */
   asw_forward_curve_id?: D_94Cb251104De5Cf587B6 | null;
+  /**
+   * Contractual floating index used for asset-swap accruals and historical resets.
+   */
+  asw_index_id?: D_94Cb251104De5Cf587B6 | null;
   /**
    * Black-Derman-Toy lognormal short-rate volatility (σ), as an annual
    * decimal proportion of the short rate (`0.20` = 20%).
@@ -1738,6 +1746,7 @@ export interface D_173Bb13D95B6E8Cec0D7 {
   fixing_calendar_id?: Id1 | null;
   forward_curve_id: Id4;
   frequency: Tenor1;
+  index_id: Id5;
   /**
    * Payment lag in business days after period end (default: 0).
    *

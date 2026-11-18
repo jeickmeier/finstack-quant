@@ -82,7 +82,7 @@ test('growth terminals require a full year even for annual period identifiers', 
         'ufcf',
         0
       ),
-    /complete contiguous history/
+    /calendar bounds/
   );
 });
 

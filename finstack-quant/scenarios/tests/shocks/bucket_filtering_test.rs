@@ -261,9 +261,10 @@ fn test_basecorr_bucket_filtering() {
     // Create base correlation curve
     let basecorr = BaseCorrelationCurve::builder("CDX_IG")
         .knots(vec![
-            (0.03, 0.25), // 3% detachment
-            (0.07, 0.45), // 7% detachment
-            (0.10, 0.60), // 10% detachment
+            (0.07, 0.20),
+            (3.0, 0.25),  // 3% detachment
+            (7.0, 0.45),  // 7% detachment
+            (10.0, 0.60), // 10% detachment
         ])
         .build()
         .unwrap();
@@ -285,7 +286,7 @@ fn test_basecorr_bucket_filtering() {
         description: None,
         operations: vec![OperationSpec::BaseCorrBucketPts {
             surface_id: "CDX_IG".into(),
-            detachment_bp: Some(vec![700]), // 7% = 700bp. Adapter converts 700 -> 0.07
+            detachment_bp: Some(vec![700]), // 7% = 700bp. Adapter converts 700 -> 7.0
             points: 0.05,
         }],
         priority: 0,
@@ -310,8 +311,9 @@ fn test_basecorr_bucket_filtering() {
     let shocked_curve = market.get_base_correlation("CDX_IG").unwrap();
 
     // 7% should be shocked
-    let shocked_7 = shocked_curve.correlation(0.07);
-    let expected = (0.45_f64 + 0.05).min(1.0); // Clamped to [0, 1]
+    let shocked_7 = shocked_curve.correlation(7.0);
+    assert_eq!(shocked_curve.correlations(), &[0.20, 0.25, 0.50, 0.60]);
+    let expected = 0.50;
     assert!(
         (shocked_7 - expected).abs() < 1e-6,
         "Expected 7% shock: {}, got {}",
@@ -320,7 +322,7 @@ fn test_basecorr_bucket_filtering() {
     );
 
     // 3% should be unchanged
-    let unchanged_3 = shocked_curve.correlation(0.03);
+    let unchanged_3 = shocked_curve.correlation(3.0);
     assert!(
         (unchanged_3 - 0.25).abs() < 1e-6,
         "3% should be unchanged: expected 0.25, got {}",
@@ -332,9 +334,9 @@ fn test_basecorr_bucket_filtering() {
 fn test_basecorr_bucket_filtering_uses_tight_detachment_match() {
     let basecorr = BaseCorrelationCurve::builder("CDX_IG")
         .knots(vec![
-            (0.03, 0.25),   // 3% detachment
-            (0.0375, 0.30), // 3.75% detachment
-            (0.07, 0.45),   // 7% detachment
+            (3.0, 0.25),  // 3% detachment
+            (3.75, 0.30), // 3.75% detachment
+            (7.0, 0.45),  // 7% detachment
         ])
         .build()
         .unwrap();
@@ -377,17 +379,17 @@ fn test_basecorr_bucket_filtering_uses_tight_detachment_match() {
     assert_eq!(report.operations_applied, 1);
 
     let shocked_curve = market.get_base_correlation("CDX_IG").unwrap();
-    assert!((shocked_curve.correlation(0.03) - 0.30).abs() < 1e-6);
+    assert!((shocked_curve.correlation(3.0) - 0.30).abs() < 1e-6);
     assert!(
-        (shocked_curve.correlation(0.0375) - 0.30).abs() < 1e-6,
+        (shocked_curve.correlation(3.75) - 0.30).abs() < 1e-6,
         "3.75% bucket must not be shocked by a 3% detachment request"
     );
 }
 
 #[test]
-fn test_basecorr_bucket_filtering_reports_clamp_and_no_match() {
+fn test_basecorr_bucket_filtering_rejects_excessive_and_unmatched_shocks() {
     let basecorr = BaseCorrelationCurve::builder("CDX_IG")
-        .knots(vec![(0.03, 0.98), (0.07, 0.99)])
+        .knots(vec![(3.0, 0.98), (7.0, 0.99)])
         .build()
         .unwrap();
 
@@ -424,15 +426,7 @@ fn test_basecorr_bucket_filtering_reports_clamp_and_no_match() {
         calendar: None,
         as_of: base_date,
     };
-    let clamp_report = engine.apply(&clamp_scenario, &mut ctx).unwrap();
-    assert!(
-        clamp_report
-            .warnings
-            .iter()
-            .any(|warning| warning.to_string().contains("clamped")),
-        "expected clamp warning, got {:?}",
-        clamp_report.warnings
-    );
+    assert!(engine.apply(&clamp_scenario, &mut ctx).is_err());
 
     let no_match_scenario = ScenarioSpec {
         id: "basecorr_no_match".into(),
@@ -440,20 +434,19 @@ fn test_basecorr_bucket_filtering_reports_clamp_and_no_match() {
         description: None,
         operations: vec![OperationSpec::BaseCorrBucketPts {
             surface_id: "CDX_IG".into(),
-            detachment_bp: Some(vec![500]),
+            detachment_bp: Some(vec![300, 500]),
             points: 0.02,
         }],
         priority: 0,
         resolution_mode: Default::default(),
     };
 
-    let no_match_report = engine.apply(&no_match_scenario, &mut ctx).unwrap();
-    assert!(
-        no_match_report
-            .warnings
-            .iter()
-            .any(|warning| warning.to_string().contains("matched no detachment")),
-        "expected no-match warning, got {:?}",
-        no_match_report.warnings
+    assert!(engine.apply(&no_match_scenario, &mut ctx).is_err());
+    assert_eq!(
+        ctx.market
+            .get_base_correlation("CDX_IG")
+            .unwrap()
+            .correlations(),
+        &[0.98, 0.99]
     );
 }

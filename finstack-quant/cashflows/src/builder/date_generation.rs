@@ -235,6 +235,36 @@ pub(crate) fn icma_sliced_year_fraction(
     end_of_month_override: Option<bool>,
     grid_anchor_override: Option<Date>,
 ) -> finstack_quant_core::Result<f64> {
+    let mut total = finstack_quant_core::math::summation::NeumaierAccumulator::new();
+    visit_icma_periods(
+        start,
+        end,
+        context,
+        end_of_month_override,
+        grid_anchor_override,
+        |lo, hi| {
+            total.add(DayCount::ActActIsma.year_fraction(
+                start.max(lo),
+                end.min(hi),
+                finstack_quant_core::dates::DayCountContext {
+                    coupon_period: Some((lo, hi)),
+                    ..context
+                },
+            )?)
+        },
+    )?;
+    total.get_total()
+}
+
+/// Visit the nominal reference periods intersecting an actual coupon interval in date order.
+pub(crate) fn visit_icma_periods(
+    start: Date,
+    end: Date,
+    context: finstack_quant_core::dates::DayCountContext<'_>,
+    end_of_month_override: Option<bool>,
+    grid_anchor_override: Option<Date>,
+    mut visit: impl FnMut(Date, Date) -> finstack_quant_core::Result<()>,
+) -> finstack_quant_core::Result<()> {
     if start > end {
         return Err(finstack_quant_core::InputError::InvalidDateRange.into());
     }
@@ -243,10 +273,10 @@ pub(crate) fn icma_sliced_year_fraction(
         .coupon_period
         .ok_or(finstack_quant_core::InputError::MissingCouponPeriodForActActIsma)?;
     if ref_start <= start && end <= ref_end {
-        return DayCount::ActActIsma.year_fraction(start, end, context);
+        return visit(ref_start, ref_end);
     }
     if start == end {
-        return Ok(0.0);
+        return Ok(());
     }
 
     let frequency = context
@@ -279,19 +309,12 @@ pub(crate) fn icma_sliced_year_fraction(
         k += 1;
     }
 
-    let mut total = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     loop {
         let p_start = step_nominal_grid(anchor, period_months, k, preserve_eom)?;
         let p_end = step_nominal_grid(anchor, period_months, k + 1, preserve_eom)?;
-        let slice_start = start.max(p_start);
-        let slice_end = end.min(p_end);
-        let slice_ctx = finstack_quant_core::dates::DayCountContext {
-            coupon_period: Some((p_start, p_end)),
-            ..context
-        };
-        total.add(DayCount::ActActIsma.year_fraction(slice_start, slice_end, slice_ctx)?)?;
+        visit(p_start, p_end)?;
         if end <= p_end {
-            return total.get_total();
+            return Ok(());
         }
         k += 1;
     }

@@ -27,10 +27,22 @@
         "notes": "Two-day data with H/L ratios of 1.1 and 1.2. Formula: σ² = [1/(4·ln(2))] · (1/n) · Σ[ln(H/L)]²"
       },
       "inputs": {
-        "open": [100.0, 100.0],
-        "high": [110.0, 120.0],
-        "low": [100.0, 100.0],
-        "close": [105.0, 110.0],
+        "open": [
+          100.0,
+          100.0
+        ],
+        "high": [
+          110.0,
+          120.0
+        ],
+        "low": [
+          100.0,
+          100.0
+        ],
+        "close": [
+          105.0,
+          110.0
+        ],
         "annualization_factor": 252.0,
         "method": "parkinson"
       },
@@ -51,10 +63,22 @@
         "notes": "Two-day data. Formula: σ² = (1/n) · Σ[0.5·[ln(H/L)]² - (2·ln(2) - 1)·[ln(C/O)]²]"
       },
       "inputs": {
-        "open": [100.0, 105.0],
-        "high": [110.0, 115.0],
-        "low": [95.0, 100.0],
-        "close": [105.0, 110.0],
+        "open": [
+          100.0,
+          105.0
+        ],
+        "high": [
+          110.0,
+          115.0
+        ],
+        "low": [
+          95.0,
+          100.0
+        ],
+        "close": [
+          105.0,
+          110.0
+        ],
         "annualization_factor": 252.0,
         "method": "garman_klass"
       },
@@ -75,10 +99,22 @@
         "notes": "Two-day data. Formula: σ² = (1/n) · Σ[ln(H/C)·ln(H/O) + ln(L/C)·ln(L/O)]. Drift-independent estimator."
       },
       "inputs": {
-        "open": [100.0, 105.0],
-        "high": [110.0, 115.0],
-        "low": [95.0, 100.0],
-        "close": [105.0, 110.0],
+        "open": [
+          100.0,
+          105.0
+        ],
+        "high": [
+          110.0,
+          115.0
+        ],
+        "low": [
+          95.0,
+          100.0
+        ],
+        "close": [
+          105.0,
+          110.0
+        ],
         "annualization_factor": 252.0,
         "method": "rogers_satchell"
       },
@@ -99,12 +135,29 @@
         "notes": "Four-day data (minimum for stable YZ estimate). Combines overnight, open-close, and Rogers-Satchell components."
       },
       "inputs": {
-        "open": [100.0, 105.0, 95.0, 110.0],
-        "high": [102.0, 108.0, 98.0, 112.0],
-        "low": [99.0, 103.0, 93.0, 108.0],
-        "close": [101.0, 104.0, 97.0, 111.0],
+        "open": [
+          105.0,
+          95.0,
+          110.0
+        ],
+        "high": [
+          108.0,
+          98.0,
+          112.0
+        ],
+        "low": [
+          103.0,
+          93.0,
+          108.0
+        ],
+        "close": [
+          104.0,
+          97.0,
+          111.0
+        ],
         "annualization_factor": 252.0,
-        "method": "yang_zhang"
+        "method": "yang_zhang",
+        "previous_close": 101.0
       },
       "expected": {
         "annualized_variance": {

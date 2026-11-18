@@ -272,6 +272,7 @@ impl InterestRateSwap {
             })
             .float_leg(FloatLegSpec {
                 discount_curve_id,
+                index_id,
                 forward_curve_id,
                 spread_bp: Decimal::ZERO,
                 frequency: conv.float_frequency,
@@ -314,13 +315,12 @@ const MAX_RATE_MAGNITUDE: f64 = 100.0;
 /// returns `Err` only if the registry itself isn't initialized. Callers that need
 /// to RESOLVE a sentinel value MUST treat the `None` case as a hard error.
 fn rate_index_conventions(
-    forward_curve_id: &CurveId,
+    index_id: &IndexId,
 ) -> finstack_quant_core::Result<
     Option<finstack_quant_valuations_core::market::conventions::RateIndexConventions>,
 > {
     let registry = ConventionRegistry::try_global()?;
-    let idx = IndexId::new(forward_curve_id.as_str());
-    Ok(registry.require_rate_index(&idx).ok().cloned())
+    Ok(registry.require_rate_index(index_id).ok().cloned())
 }
 
 /// Resolve a swap fixed leg, applying convention defaults for sentinel values.
@@ -334,12 +334,11 @@ fn rate_index_conventions(
 /// # Arguments
 ///
 /// * `fixed` - Fixed leg as specified on the instrument.
-/// * `index_curve_id` - Forward curve of the float leg, naming the rate index
-///   whose conventions supply the defaults.
+/// * `index_id` - Contractual rate index whose conventions supply the fixed-leg defaults.
 /// * `owner` - Instrument label prefixing error messages (e.g. `IRS 'X'`).
 pub(crate) fn resolve_fixed_leg(
     fixed: &FixedLegSpec,
-    index_curve_id: &CurveId,
+    index_id: &IndexId,
     owner: &dyn std::fmt::Display,
 ) -> finstack_quant_core::Result<FixedLegSpec> {
     let mut fixed = fixed.clone();
@@ -351,10 +350,10 @@ pub(crate) fn resolve_fixed_leg(
     // case (lags resolved at construction time) should not pay for a registry lookup
     // and `RateIndexConventions` clone.
     if fixed.payment_lag_days < 0 {
-        let conv = rate_index_conventions(index_curve_id)?.ok_or_else(|| {
+        let conv = rate_index_conventions(index_id)?.ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
                 "{owner}: fixed-leg payment_lag_days sentinel {} requires resolution \
-                 but rate index '{index_curve_id}' is not registered in the convention registry",
+                 but rate index '{index_id}' is not registered in the convention registry",
                 fixed.payment_lag_days
             ))
         })?;
@@ -382,11 +381,11 @@ pub(crate) fn resolve_float_leg(
         float.end_of_month = true;
     }
     if float.reset_lag_days < 0 || float.payment_lag_days < 0 {
-        let conv = rate_index_conventions(&float.forward_curve_id)?.ok_or_else(|| {
+        let conv = rate_index_conventions(&float.index_id)?.ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
                 "{owner}: float-leg sentinel(s) (reset_lag={}, payment_lag={}) require \
                  resolution but rate index '{}' is not registered in the convention registry",
-                float.reset_lag_days, float.payment_lag_days, float.forward_curve_id
+                float.reset_lag_days, float.payment_lag_days, float.index_id
             ))
         })?;
         if float.reset_lag_days < 0 {
@@ -404,7 +403,7 @@ impl InterestRateSwap {
     pub(crate) fn resolved_fixed_leg(&self) -> finstack_quant_core::Result<FixedLegSpec> {
         resolve_fixed_leg(
             &self.fixed_leg,
-            &self.float_leg.forward_curve_id,
+            &self.float_leg.index_id,
             &format_args!("IRS '{}'", self.id),
         )
     }
@@ -462,7 +461,7 @@ impl InterestRateSwap {
             ));
         }
         overnight_conventions::reject_simple_overnight(
-            self.float_leg.forward_curve_id.as_str(),
+            self.float_leg.index_id.as_str(),
             &self.float_leg.compounding,
         )?;
         if let FloatingLegCompounding::CompoundedWithObservationShift { shift_days } =
@@ -579,6 +578,7 @@ impl InterestRateSwap {
             })
             .float_leg(finstack_quant_valuations_core::instruments::FloatLegSpec {
                 discount_curve_id: CurveId::new("USD-OIS"),
+                index_id: "USD-SOFR-3M".into(),
                 forward_curve_id: CurveId::new("USD-SOFR-3M"),
                 spread_bp: Decimal::ZERO,
                 frequency: Tenor::quarterly(),
@@ -681,7 +681,7 @@ impl finstack_quant_valuations_core::instruments::Instrument for InterestRateSwa
             deps.add_forward_curve(self.float_leg.forward_curve_id.clone());
         }
         deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
-            self.float_leg.forward_curve_id.as_str(),
+            self.float_leg.index_id.as_str(),
         ));
         Ok(deps)
     }
@@ -770,7 +770,7 @@ mod tests {
         assert_eq!(
             deps.series_ids,
             vec![finstack_quant_core::market_data::fixings::fixing_series_id(
-                swap.float_leg.forward_curve_id.as_str()
+                swap.float_leg.index_id.as_str()
             )]
         );
     }
@@ -877,6 +877,7 @@ mod tests {
     #[test]
     fn validate_rejects_simple_compounding_on_overnight_index() {
         let mut swap = InterestRateSwap::example().expect("example swap");
+        swap.float_leg.index_id = "USD-SOFR-OIS".into();
         swap.float_leg.forward_curve_id = CurveId::new("USD-SOFR-OIS");
         swap.float_leg.compounding = FloatingLegCompounding::Simple;
         let err = swap

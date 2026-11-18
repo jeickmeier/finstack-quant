@@ -32,6 +32,7 @@
         },
         "underlying_float_leg": {
           "discount_curve_id": "USD-OIS",
+          "index_id": "USD-OIS",
           "forward_curve_id": "USD-OIS",
           "spread_bp": "100",
           "frequency": {

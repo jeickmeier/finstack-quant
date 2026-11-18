@@ -73,23 +73,6 @@ use crate::market_data::bumps::{BumpSpec, Bumpable};
 use crate::math::interp::{ExtrapolationPolicy, Interp, InterpStyle};
 use crate::types::CurveId;
 
-/// Absolute detachment tolerance for bucket shocks.
-///
-/// Scenario detachment filters are already normalized to the same unit as
-/// curve detachments before they reach the curve, so bucket matching should be
-/// exact apart from floating-point roundoff.
-const BASE_CORR_DETACHMENT_MATCH_TOLERANCE: f64 = 1.0e-10;
-
-/// Whether a bucket filter selects the knot at `detachment`: every knot when
-/// the filter is `None`, else knots within the match tolerance of a request.
-fn bucket_selects(detachment_filter: Option<&[f64]>, detachment: f64) -> bool {
-    detachment_filter.is_none_or(|requested| {
-        requested
-            .iter()
-            .any(|d| (d - detachment).abs() <= BASE_CORR_DETACHMENT_MATCH_TOLERANCE)
-    })
-}
-
 /// Shape diagnostics for a base correlation curve.
 ///
 /// Reports decreases in quoted correlation and warnings near its boundaries.
@@ -322,34 +305,14 @@ impl BaseCorrelationCurve {
         )
     }
 
-    /// Knots `(detachment, correlation)` selected by a bucket-bump filter.
-    ///
-    /// These are exactly the knots [`Self::apply_bucket_bump`] shifts.
-    ///
-    /// # Arguments
-    ///
-    /// * `detachment_filter` - Optional detachment points in percent of portfolio
-    ///   notional; `None` selects every knot. A requested point matches a knot
-    ///   within `1e-10`; finite off-grid values match nothing.
-    pub fn bucket_knots<'a>(
-        &'a self,
-        detachment_filter: Option<&'a [f64]>,
-    ) -> impl Iterator<Item = (f64, f64)> + 'a {
-        self.detachment_points
-            .iter()
-            .copied()
-            .zip(self.correlations.iter().copied())
-            .filter(move |&(det, _)| bucket_selects(detachment_filter, det))
-    }
-
     /// Apply a filtered additive bump to matching detachment points.
     ///
     /// # Arguments
     ///
     /// * `detachment_filter` - Optional detachment points in percent of portfolio
-    ///   notional; `None` selects every knot. Finite off-grid values match nothing.
+    ///   notional; `None` selects every knot. Each supplied coordinate must identify a unique, exact knot.
     /// * `points` - Finite additive decimal correlation change, such as `0.01`
-    ///   for one correlation point. Bumped correlations are clamped to `[0, 1]`.
+    ///   for one correlation point. The complete bump must stay in `[0, 1]`.
     ///
     /// # Errors
     ///
@@ -367,21 +330,30 @@ impl BaseCorrelationCurve {
                 "base correlation bump and detachment filter must be finite".to_string(),
             ));
         }
-        let new_points: Vec<(f64, f64)> = self
+        let mut selected = vec![detachment_filter.is_none(); self.len()];
+        for target in detachment_filter.unwrap_or_default() {
+            let index = self
+                .detachment_points
+                .binary_search_by(|point| point.total_cmp(target))
+                .map_err(|_| {
+                    crate::Error::Validation(format!("unknown detachment {target}% on {}", self.id))
+                })?;
+            if selected[index] {
+                return Err(crate::Error::Validation(format!(
+                    "duplicate detachment {target}% on {}",
+                    self.id
+                )));
+            }
+            selected[index] = true;
+        }
+        let knots = self
             .detachment_points
             .iter()
-            .copied()
-            .zip(self.correlations.iter().copied())
-            .map(|(det, corr)| {
-                if bucket_selects(detachment_filter, det) {
-                    (det, (corr + points).clamp(0.0, 1.0))
-                } else {
-                    (det, corr)
-                }
-            })
-            .collect();
+            .zip(&self.correlations)
+            .zip(selected)
+            .map(|((&det, &corr), selected)| (det, if selected { corr + points } else { corr }));
         BaseCorrelationCurve::builder(self.id.clone())
-            .knots(new_points)
+            .knots(knots)
             .build()
     }
 
@@ -541,7 +513,7 @@ impl Bumpable for BaseCorrelationCurve {
             .iter()
             .zip(self.correlations().iter())
         {
-            bumped_points.push((d, (c * mul + add).clamp(0.0, 1.0)));
+            bumped_points.push((d, c * mul + add));
         }
 
         BaseCorrelationCurve::builder(bumped_id)

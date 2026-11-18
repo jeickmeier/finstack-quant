@@ -224,6 +224,7 @@ fn short_builder(
     fallback: FloatingRateFallback,
 ) -> CashFlowBuilder {
     let mut rate_spec = FloatingRateSpec::sofr(dec!(0));
+    rate_spec.index_id = "CCM-SHORT".into();
     rate_spec.forward_curve_id = "CCM-SHORT".into();
     rate_spec.fixing_calendar_id = Some("weekends_only".into());
     rate_spec.compounding = Some(method);
