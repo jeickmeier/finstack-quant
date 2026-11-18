@@ -133,7 +133,7 @@ fn ensure_run(
         return Ok(());
     }
     let peer = match &node_spec.forecast {
-        Some(forecast) => forecast::statistical::active_correlation(forecast)?,
+        Some(forecast) => forecast::statistical::active_correlation(forecast),
         None => None,
     };
     let mut run = None;
@@ -233,7 +233,7 @@ fn generate_run(
         // At exactly zero correlation the node takes the uncorrelated path
         // and draws the same stream as a node without a peer.
         let correlation = if mc_z_cache.is_some() {
-            forecast::statistical::active_correlation(parameters)?
+            forecast::statistical::active_correlation(parameters)
         } else {
             None
         };
@@ -277,6 +277,6 @@ fn generate_run(
         )?
     };
     let mut published = raw.clone();
-    forecast::apply_bounds(parameters, &mut published)?;
+    forecast::apply_bounds(parameters, &mut published);
     Ok(ForecastRun::Series { raw, published })
 }

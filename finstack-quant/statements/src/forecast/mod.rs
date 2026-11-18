@@ -84,12 +84,8 @@ use finstack_quant_core::dates::PeriodId;
 type ForecastSeries = indexmap::IndexMap<PeriodId, f64>;
 /// Apply a forecast for a specific node in single-run (non-Monte-Carlo) mode.
 ///
-/// Runs the method of `parameters` and applies its `min`/`max` bounds,
-/// mixing a stable hash of `node_id` into the seed of statistical methods
-/// (Normal, LogNormal, MeanReverting, Bootstrap), matching Monte Carlo mode.
-/// Without this mix, two stochastic nodes configured with the same `seed`
-/// would receive identical shock paths within a single evaluation run.
-/// Deterministic methods are unaffected.
+/// Runs the method of `parameters` on the node's own single-run stream and
+/// applies its `min`/`max` bounds.
 #[cfg(test)]
 pub(crate) fn apply_forecast_for_node(
     parameters: &ForecastSpec,
@@ -97,20 +93,8 @@ pub(crate) fn apply_forecast_for_node(
     forecast_periods: &[PeriodId],
     node_id: &str,
 ) -> Result<ForecastSeries> {
-    // Correlation (`correlation_with`) is a Monte Carlo-only feature; the
-    // single-run path produces independent draws. Warn loudly so a configured
-    // correlation is not silently ignored (which would make a one-run sanity
-    // check disagree with the MC output).
-    if let Some((peer, _rho)) = statistical::correlation(parameters)? {
-        tracing::warn!(
-            node = node_id,
-            peer,
-            "`correlation_with` is set but single-run evaluation ignores correlation \
-             (only Monte Carlo honors it); this node's draws are independent here"
-        );
-    }
     let mut results = apply_forecast_unbounded(parameters, base_value, forecast_periods, node_id)?;
-    apply_bounds(parameters, &mut results)?;
+    apply_bounds(parameters, &mut results);
     Ok(results)
 }
 
@@ -222,33 +206,12 @@ pub(crate) fn apply_forecast(
 ///
 /// * `parameters` - Forecast parameters; reads the optional `min` and `max`
 ///   bounds, each a finite number in the node's own units
+///   with `min <= max`, as validated with the model
 /// * `results` - Generated per-period values, clamped in place
-///
-/// # Errors
-///
-/// Returns an error when `min` or `max` is present but not finite, or when
-/// both are present with `min > max`.
-pub(crate) fn apply_bounds(parameters: &ForecastSpec, results: &mut ForecastSeries) -> Result<()> {
+pub(crate) fn apply_bounds(parameters: &ForecastSpec, results: &mut ForecastSeries) {
     let (min, max) = parameters.bounds();
-    for (key, bound) in [("min", min), ("max", max)] {
-        if let Some(bound) = bound
-            && !bound.is_finite()
-        {
-            return Err(crate::error::Error::forecast(format!(
-                "Forecast bound '{key}' must be a finite number, got {bound}"
-            )));
-        }
-    }
-
-    if let (Some(lo), Some(hi)) = (min, max)
-        && lo > hi
-    {
-        return Err(crate::error::Error::forecast(format!(
-            "Forecast bounds require min <= max, got min = {lo} and max = {hi}"
-        )));
-    }
     if min.is_none() && max.is_none() {
-        return Ok(());
+        return;
     }
 
     for value in results.values_mut() {
@@ -264,7 +227,6 @@ pub(crate) fn apply_bounds(parameters: &ForecastSpec, results: &mut ForecastSeri
             *value = value.min(hi);
         }
     }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -347,12 +309,11 @@ mod tests {
 
     #[test]
     fn bounds_reject_inverted_range() {
-        let periods = quarters(1);
         let mut spec = ForecastSpec::forward_fill();
         spec = spec.clone().with_param("min", json!(10.0)).unwrap();
         spec = spec.clone().with_param("max", json!(-10.0)).unwrap();
-        let err = run(&spec, 100.0, &periods).expect_err("min > max");
-        assert!(err.to_string().contains("min <= max"), "{err}");
+        let err = spec.validate().expect_err("min > max");
+        assert!(err.to_string().contains("above 'max'"), "{err}");
     }
 
     #[test]

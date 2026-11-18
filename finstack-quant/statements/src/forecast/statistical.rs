@@ -15,61 +15,30 @@ use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
 use indexmap::IndexMap;
 
-/// Optional Monte Carlo correlation pair: `(peer_node_id, rho)` in `[-1, 1]`.
+/// Optional Monte Carlo correlation pair: `(peer_node_id, rho)`.
 ///
 /// When both `correlation_with` and `correlation` are set on a Normal,
 /// LogNormal or MeanReverting forecast, Monte Carlo evaluation samples shocks
 /// correlated with the peer node's standard normal shocks (same forecast
-/// period). The peer node must be evaluated earlier in the dependency order so
-/// its Z-scores are available. Other methods carry no correlation.
-pub(crate) fn correlation(parameters: &ForecastSpec) -> Result<Option<(&str, f64)>> {
+/// period); the peer's run is generated on demand. Other methods carry no
+/// correlation. [`ForecastSpec::validate`] has already required the pair to
+/// be given together with `rho` in `[-1, 1]`.
+pub(crate) fn correlation(parameters: &ForecastSpec) -> Option<(&str, f64)> {
     let (with, rho) = match parameters {
         ForecastSpec::Normal(p) | ForecastSpec::LogNormal(p) => {
             (p.correlation_with.as_deref(), p.correlation)
         }
         ForecastSpec::MeanReverting(p) => (p.correlation_with.as_deref(), p.correlation),
-        _ => return Ok(None),
+        _ => return None,
     };
-
-    match (with, rho) {
-        (None, None) => Ok(None),
-        (Some(peer), Some(rho)) => {
-            if !rho.is_finite() || !(-1.0..=1.0).contains(&rho) {
-                return Err(Error::forecast(format!(
-                    "Monte Carlo 'correlation' must be finite and in [-1, 1], got {rho}"
-                )));
-            }
-            Ok(Some((peer, rho)))
-        }
-        (None, Some(_)) | (Some(_), None) => Err(Error::forecast(
-            "Monte Carlo correlation requires both 'correlation_with' (string) and \
-             'correlation' (number in [-1, 1])"
-                .to_string(),
-        )),
-    }
+    with.zip(rho)
 }
 
 /// The correlation pair of `parameters` when it is active: a peer with a
 /// non-zero coefficient. At exactly zero a node is uncorrelated: it draws
 /// its own stream and has no dependency on the peer.
-pub(crate) fn active_correlation(parameters: &ForecastSpec) -> Result<Option<(&str, f64)>> {
-    Ok(correlation(parameters)?.filter(|(_, rho)| *rho != 0.0))
-}
-
-/// Check that a distribution's mean and standard deviation are usable.
-fn validate_distribution(p: &DistributionParams, method_name: &str) -> Result<()> {
-    if p.std_dev < 0.0 {
-        return Err(Error::forecast(format!(
-            "Standard deviation must be non-negative, got {}",
-            p.std_dev
-        )));
-    }
-    if !p.mean.is_finite() || !p.std_dev.is_finite() {
-        return Err(Error::forecast(format!(
-            "{method_name} forecast requires finite mean and std_dev"
-        )));
-    }
-    Ok(())
+pub(crate) fn active_correlation(parameters: &ForecastSpec) -> Option<(&str, f64)> {
+    correlation(parameters).filter(|(_, rho)| *rho != 0.0)
 }
 
 /// Normal distribution forecast (deterministic with seed).
@@ -97,8 +66,8 @@ fn validate_distribution(p: &DistributionParams, method_name: &str) -> Result<()
 ///
 /// # Errors
 ///
-/// Returns an error if `mean` or `std_dev` is non-finite, if `std_dev` is
-/// negative, or if simulation produces a non-finite value.
+/// Returns an error if simulation produces a non-finite value. The
+/// parameters were validated with the model.
 ///
 /// # References
 ///
@@ -110,8 +79,6 @@ pub(crate) fn normal_forecast_with_stream(
     p: &DistributionParams,
     rng: &mut Pcg64Rng,
 ) -> Result<(IndexMap<PeriodId, f64>, IndexMap<PeriodId, f64>)> {
-    validate_distribution(p, "Normal")?;
-
     let mut results = IndexMap::new();
     let mut shocks = IndexMap::new();
     let mut prev = base_value;
@@ -210,9 +177,9 @@ fn validate_lognormal_base(base_value: f64, context: &str) -> Result<()> {
 ///
 /// # Errors
 ///
-/// Returns an error if `mean` or `std_dev` is non-finite, `base_value` is not
-/// finite and strictly positive, `std_dev` is negative, or exponentiation
-/// produces a non-finite value.
+/// Returns an error if `base_value` is not finite and strictly positive, or
+/// exponentiation produces a non-finite value. The parameters were validated
+/// with the model.
 ///
 /// # References
 ///
@@ -224,8 +191,6 @@ pub(crate) fn lognormal_forecast_with_stream(
     p: &DistributionParams,
     rng: &mut Pcg64Rng,
 ) -> Result<(IndexMap<PeriodId, f64>, IndexMap<PeriodId, f64>)> {
-    validate_distribution(p, "LogNormal")?;
-
     validate_lognormal_base(base_value, "LogNormal forecast")?;
 
     let mut results = IndexMap::new();
@@ -245,33 +210,6 @@ pub(crate) fn lognormal_forecast_with_stream(
     }
 
     Ok((results, shocks))
-}
-
-/// Check that mean-reverting AR(1) parameters are in range.
-fn validate_mean_reverting(p: &MeanRevertingParams) -> Result<()> {
-    let MeanRevertingParams {
-        long_run_mean,
-        reversion_speed,
-        std_dev,
-        ..
-    } = *p;
-    if !long_run_mean.is_finite() {
-        return Err(Error::forecast(format!(
-            "MeanReverting 'long_run_mean' must be finite, got {long_run_mean}"
-        )));
-    }
-    if !reversion_speed.is_finite() || reversion_speed <= 0.0 || reversion_speed > 1.0 {
-        return Err(Error::forecast(format!(
-            "MeanReverting 'reversion_speed' must be in (0, 1], got {reversion_speed}. \
-             1.0 reverts fully to the long-run mean each period; values near 0 revert slowly."
-        )));
-    }
-    if !std_dev.is_finite() || std_dev < 0.0 {
-        return Err(Error::forecast(format!(
-            "MeanReverting 'std_dev' must be a non-negative finite number, got {std_dev}"
-        )));
-    }
-    Ok(())
 }
 
 /// Mean-reverting AR(1) forecast (deterministic with seed).
@@ -302,8 +240,8 @@ fn validate_mean_reverting(p: &MeanRevertingParams) -> Result<()> {
 ///
 /// # Errors
 ///
-/// Returns an error if a parameter is out of range, if
-/// `base_value` is non-finite, or if simulation produces a non-finite value.
+/// Returns an error if `base_value` is non-finite or simulation produces a
+/// non-finite value. The parameters were validated with the model.
 ///
 /// # References
 ///
@@ -314,8 +252,6 @@ pub(crate) fn mean_reverting_forecast_with_stream(
     p: &MeanRevertingParams,
     rng: &mut Pcg64Rng,
 ) -> Result<(IndexMap<PeriodId, f64>, IndexMap<PeriodId, f64>)> {
-    validate_mean_reverting(p)?;
-
     if !base_value.is_finite() {
         return Err(Error::forecast(format!(
             "MeanReverting forecast requires a finite base_value, got {base_value}"
@@ -343,37 +279,15 @@ pub(crate) fn mean_reverting_forecast_with_stream(
     Ok((results, shocks))
 }
 
-/// Per-step increments of a bootstrap's history: growth rates or level diffs.
-fn bootstrap_increments(p: &BootstrapParams) -> Result<Vec<f64>> {
+/// Per-step increments of a bootstrap's history: growth rates or level
+/// diffs. [`ForecastSpec::validate`] has already required at least two finite
+/// levels, strictly positive in growth mode.
+fn bootstrap_increments(p: &BootstrapParams) -> Vec<f64> {
     let hist = &p.historical;
-    if hist.len() < 2 {
-        return Err(Error::forecast(format!(
-            "Bootstrap forecast needs at least 2 historical values to derive increments, \
-             got {}. Provide more history in the 'historical' parameter.",
-            hist.len()
-        )));
-    }
-    if let Some(idx) = hist.iter().position(|value| !value.is_finite()) {
-        return Err(Error::forecast(format!(
-            "Bootstrap historical value at index {idx} must be a finite number, got {}",
-            hist[idx]
-        )));
-    }
-
-    Ok(match p.mode {
-        ForecastBootstrapMode::Growth => {
-            if hist.iter().any(|&h| h <= 0.0) {
-                return Err(Error::forecast(
-                    "Bootstrap growth mode requires strictly positive historical values \
-                     (growth rates are derived from consecutive ratios). Use mode = \"diff\" \
-                     for series that touch zero or change sign."
-                        .to_string(),
-                ));
-            }
-            hist.windows(2).map(|w| w[1] / w[0] - 1.0).collect()
-        }
+    match p.mode {
+        ForecastBootstrapMode::Growth => hist.windows(2).map(|w| w[1] / w[0] - 1.0).collect(),
         ForecastBootstrapMode::Diff => hist.windows(2).map(|w| w[1] - w[0]).collect(),
-    })
+    }
 }
 
 /// Historical bootstrap forecast (deterministic with seed).
@@ -407,15 +321,15 @@ fn bootstrap_increments(p: &BootstrapParams) -> Result<Vec<f64>> {
 ///
 /// # Errors
 ///
-/// Returns an error if the history is too short or non-finite, if growth mode is requested with
-/// non-positive history, or if the path produces a non-finite value.
+/// Returns an error if the path produces a non-finite value. The history
+/// was validated with the model.
 pub(crate) fn bootstrap_forecast_with_stream(
     base_value: f64,
     forecast_periods: &[PeriodId],
     p: &BootstrapParams,
     rng: &mut Pcg64Rng,
 ) -> Result<IndexMap<PeriodId, f64>> {
-    let increments = bootstrap_increments(p)?;
+    let increments = bootstrap_increments(p);
 
     if !base_value.is_finite() {
         return Err(Error::forecast(format!(
@@ -551,16 +465,9 @@ pub(crate) fn monte_carlo_correlated_series(
     }
 
     let (kernel, seed, sigma, method_name) = match parameters {
-        ForecastSpec::Normal(p) => {
-            validate_distribution(p, "Normal")?;
-            (Kernel::Normal(p), p.seed, p.std_dev, "Normal")
-        }
-        ForecastSpec::LogNormal(p) => {
-            validate_distribution(p, "LogNormal")?;
-            (Kernel::LogNormal(p), p.seed, p.std_dev, "LogNormal")
-        }
+        ForecastSpec::Normal(p) => (Kernel::Normal(p), p.seed, p.std_dev, "Normal"),
+        ForecastSpec::LogNormal(p) => (Kernel::LogNormal(p), p.seed, p.std_dev, "LogNormal"),
         ForecastSpec::MeanReverting(p) => {
-            validate_mean_reverting(p)?;
             (Kernel::MeanReverting(p), p.seed, p.std_dev, "MeanReverting")
         }
         _ => {
@@ -781,22 +688,19 @@ mod tests {
             .with_param("correlation", serde_json::json!(0.5))
             .unwrap();
         let parameters = spec;
-        assert_eq!(
-            correlation(&parameters).expect("valid pair"),
-            Some(("peer", 0.5))
-        );
+        assert_eq!(correlation(&parameters), Some(("peer", 0.5)));
     }
 
     #[test]
     fn correlation_requires_both_keys_and_a_valid_rho() {
         let mut half = lognormal_params();
         half.correlation = Some(0.5);
-        assert!(correlation(&ForecastSpec::Normal(half)).is_err());
+        assert!(ForecastSpec::Normal(half).validate().is_err());
 
         let mut out_of_range = lognormal_params();
         out_of_range.correlation_with = Some("peer".into());
         out_of_range.correlation = Some(1.5);
-        assert!(correlation(&ForecastSpec::Normal(out_of_range)).is_err());
+        assert!(ForecastSpec::Normal(out_of_range).validate().is_err());
     }
 
     /// A non-finite base must fail the same strict-positive validation as zero
@@ -933,13 +837,13 @@ mod tests {
 
     #[test]
     fn mean_reverting_rejects_out_of_range_reversion_speed() {
-        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         for speed in [0.0, -0.5, 1.5, f64::NAN] {
             let params = MeanRevertingParams {
                 reversion_speed: speed,
                 ..mean_reverting_params()
             };
-            let err = mean_reverting_forecast(0.10, &periods, &params)
+            let err = ForecastSpec::MeanReverting(params)
+                .validate()
                 .expect_err("out-of-range reversion_speed");
             assert!(err.to_string().contains("reversion_speed"), "{err}");
         }
@@ -1116,25 +1020,23 @@ mod tests {
 
     #[test]
     fn bootstrap_growth_mode_rejects_non_positive_history() {
-        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
         let params = BootstrapParams {
             historical: vec![100.0, 0.0, 50.0],
             ..bootstrap_params()
         };
-        let err = bootstrap_forecast(100.0, &periods, &params)
+        let err = ForecastSpec::Bootstrap(params)
+            .validate()
             .expect_err("non-positive history in growth mode");
-        assert!(err.to_string().contains("diff"), "{err}");
+        assert!(err.to_string().contains("strictly positive"), "{err}");
     }
 
     #[test]
     fn bootstrap_rejects_short_history_bad_mode_and_missing_seed() {
-        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
-
         let params = BootstrapParams {
             historical: vec![100.0],
             ..bootstrap_params()
         };
-        assert!(bootstrap_forecast(100.0, &periods, &params).is_err());
+        assert!(ForecastSpec::Bootstrap(params).validate().is_err());
 
         let spec = crate::types::ForecastSpec::bootstrap(
             vec![100.0, 105.0],
@@ -1186,9 +1088,9 @@ mod tests {
 
     #[test]
     fn test_normal_forecast_rejects_invalid_parameters() {
-        let periods = vec![PeriodId::quarter(2025, 1).expect("valid period fixture")];
-        assert!(normal_forecast(0.0, &periods, &distribution(0.0, -1.0, 42)).is_err());
-        assert!(normal_forecast(0.0, &periods, &distribution(f64::NAN, 1.0, 42)).is_err());
+        for invalid in [distribution(0.0, -1.0, 42), distribution(f64::NAN, 1.0, 42)] {
+            assert!(ForecastSpec::Normal(invalid).validate().is_err());
+        }
 
         for missing in ["mean", "std_dev", "seed"] {
             let spec = crate::types::ForecastSpec::normal(100_000.0, 15_000.0, 42);
