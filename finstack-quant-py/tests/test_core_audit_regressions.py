@@ -175,7 +175,9 @@ def test_market_context_len_and_bool_count_fx_collateral_and_dividends() -> None
     assert (fx_only or MarketContext()) is fx_only
 
     state = json.loads(MarketContext().to_json())
-    state["dividends"] = [{"id": "AAPL-DIV", "underlying": None, "events": [], "currency": None}]
+    state["dividends"] = [
+        {"id": "AAPL-DIV", "underlying": "AAPL", "share_basis": "AAPL", "events": [], "currency": "USD"}
+    ]
     dividends_only = MarketContext.from_json(json.dumps(state))
     assert (len(dividends_only), dividends_only.is_empty(), bool(dividends_only)) == (1, False, True)
 
@@ -245,3 +247,21 @@ def test_slice9_curve_contract_regressions() -> None:
 
     conditioned = MarketContext().insert(hz).condition(date(2030, 1, 1))
     assert conditioned.get_hazard("HZ-MULTI").hazard_rate(0.5) == pytest.approx(0.03, rel=1e-12)
+
+
+def test_dividend_snapshot_preserves_entitlement_payment_and_currency() -> None:
+    state = json.loads(MarketContext().to_json())
+    event = {
+        "event_id": "Q1",
+        "ex_date": "2025-04-01",
+        "pay_date": "2025-07-01",
+        "amount": {"amount": "10", "currency": "USD"},
+    }
+    state["dividends"] = [
+        {"id": "EQ-DIV", "underlying": "EQ", "share_basis": "EQ", "currency": "USD", "events": [event]}
+    ]
+    restored = json.loads(MarketContext.from_json(json.dumps(state)).to_json())
+    assert restored["dividends"] == state["dividends"]
+    event["amount"]["currency"] = "JPY"
+    with pytest.raises(ValueError, match="validation failed"):
+        MarketContext.from_json(json.dumps(state))

@@ -44,21 +44,29 @@ export default [
   {
     "path": "#/$defs/d_07856c27d945226b86ed",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendEvent",
-    "description": "A dated dividend event."
+    "description": "One gross cash distribution per entitled share on its schedule's share basis."
   },
   {
-    "path": "#/$defs/d_07856c27d945226b86ed/properties/date",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendEvent/properties/date",
-    "description": "Ex-dividend date.",
+    "path": "#/$defs/d_07856c27d945226b86ed/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendEvent/properties/amount",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_07856c27d945226b86ed/properties/event_id",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendEvent/properties/event_id"
+  },
+  {
+    "path": "#/$defs/d_07856c27d945226b86ed/properties/ex_date",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendEvent/properties/ex_date",
     "ref": "#/$defs/DateWire",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
   },
   {
-    "path": "#/$defs/d_07856c27d945226b86ed/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendEvent/properties/kind",
-    "description": "Event kind.",
-    "ref": "#/$defs/DividendKind",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind"
+    "path": "#/$defs/d_07856c27d945226b86ed/properties/pay_date",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendEvent/properties/pay_date",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DateWire"
   },
   {
     "path": "#/$defs/d_14c856f170a7fa5ec480",
@@ -155,47 +163,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationCurveRole"
   },
   {
-    "path": "#/$defs/d_1975b7627eb8a20fd7c3",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind",
-    "description": "Type of dividend event.\n\nDistinguishes between cash payments, stock distributions, and continuous\nyield approximations used in different pricing models.\n\n# Variants\n\n- **Cash**: Actual dividend payment (quarterly, semi-annual, etc.)\n- **Stock**: Share distribution (less common, complicates option pricing)\n- **Yield**: Continuous approximation for analytical models"
-  },
-  {
-    "path": "#/$defs/d_1975b7627eb8a20fd7c3/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind/oneOf/0",
-    "description": "Cash dividend payment.\n\nMost common type. Ex-dividend date reduces stock price by dividend amount."
-  },
-  {
-    "path": "#/$defs/d_1975b7627eb8a20fd7c3/oneOf/0/properties/cash",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind/oneOf/0/properties/cash",
-    "ref": "#/$defs/Money",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Money"
-  },
-  {
-    "path": "#/$defs/d_1975b7627eb8a20fd7c3/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind/oneOf/1",
-    "description": "Continuous dividend yield (annualized fraction).\n\nUsed in analytical models (Black-Scholes with dividends) that assume\ncontinuous payout rather than discrete payments."
-  },
-  {
-    "path": "#/$defs/d_1975b7627eb8a20fd7c3/oneOf/1/properties/yield",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind/oneOf/1/properties/yield",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_1975b7627eb8a20fd7c3/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind/oneOf/2",
-    "description": "Stock dividend (share distribution).\n\nIncreases share count proportionally. For example, 5% stock dividend\nmeans each shareholder receives 0.05 additional shares per share held."
-  },
-  {
-    "path": "#/$defs/d_1975b7627eb8a20fd7c3/oneOf/2/properties/stock",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind/oneOf/2/properties/stock"
-  },
-  {
-    "path": "#/$defs/d_1975b7627eb8a20fd7c3/oneOf/2/properties/stock/properties/ratio",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendKind/oneOf/2/properties/stock/properties/ratio",
-    "description": "Stock distribution ratio; 0.05 corresponds to a 5% stock dividend.",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_1a06a0fdbb3b25f44f0d",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/RateCalibrationPillar",
     "description": "Typed maturity specification retained from an original market quote."
@@ -225,27 +192,17 @@ export default [
   {
     "path": "#/$defs/d_1c77a48708b4a54d6160",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendSchedule",
-    "description": "Dividend schedule for an equity or ETF underlying.\n\nContains a time-ordered sequence of dividend events used for pricing equity\nderivatives and calculating total return. The schedule can be referenced by\nmultiple instruments via its [`CurveId`] in the market context.\n\n# Usage in Pricing\n\n- **Discrete dividends**: Subtract PV of future dividends from spot for option pricing\n- **Ex-dividend adjustments**: Reduce forward price by dividend amount\n- **Dividend futures**: Sum dividends in contract period\n- **Total return**: Include dividend reinvestment in performance\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::dividends::DividendSchedule;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::dates::Date;\nuse time::Month;\n\nlet schedule = DividendSchedule::builder(\"AAPL-DIVS\")\n    .underlying(\"AAPL\")\n    .currency(Currency::USD)\n    .cash(\n        Date::from_calendar_date(2025, Month::March, 15).expect(\"Valid date\"),\n        Money::new(0.24, Currency::USD).expect(\"valid money fixture\")\n    ).build().expect(\"Valid dividends\");\n\nassert_eq!(schedule.get_events().len(), 1);\n```"
+    "description": "Validated distributions for one security, share basis and currency."
   },
   {
     "path": "#/$defs/d_1c77a48708b4a54d6160/properties/currency",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendSchedule/properties/currency",
-    "description": "Quote currency for cash dividends (optional metadata)."
-  },
-  {
-    "path": "#/$defs/d_1c77a48708b4a54d6160/properties/currency/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendSchedule/properties/currency/anyOf/0",
     "ref": "#/$defs/Currency",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Currency"
   },
   {
-    "path": "#/$defs/d_1c77a48708b4a54d6160/properties/currency/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendSchedule/properties/currency/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_1c77a48708b4a54d6160/properties/events",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendSchedule/properties/events",
-    "description": "Sorted events by date (ascending)."
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendSchedule/properties/events"
   },
   {
     "path": "#/$defs/d_1c77a48708b4a54d6160/properties/events/items",
@@ -256,14 +213,18 @@ export default [
   {
     "path": "#/$defs/d_1c77a48708b4a54d6160/properties/id",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendSchedule/properties/id",
-    "description": "Unique identifier of this schedule in the market context.",
     "ref": "#/$defs/Id",
     "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
   },
   {
+    "path": "#/$defs/d_1c77a48708b4a54d6160/properties/share_basis",
+    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendSchedule/properties/share_basis"
+  },
+  {
     "path": "#/$defs/d_1c77a48708b4a54d6160/properties/underlying",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/DividendSchedule/properties/underlying",
-    "description": "Optional display symbol/ticker for convenience."
+    "ref": "#/$defs/Id",
+    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/Id"
   },
   {
     "path": "#/$defs/d_1ec33fbdab11dd6751bf",

@@ -1324,61 +1324,6 @@
         }
       ]
     },
-    "d_196499daa6e4b8649607": {
-      "description": "Type of dividend event.\n\nDistinguishes between cash payments, stock distributions, and continuous\nyield approximations used in different pricing models.\n\n# Variants\n\n- **Cash**: Actual dividend payment (quarterly, semi-annual, etc.)\n- **Stock**: Share distribution (less common, complicates option pricing)\n- **Yield**: Continuous approximation for analytical models",
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "description": "Cash dividend payment.\n\nMost common type. Ex-dividend date reduces stock price by dividend amount.",
-          "properties": {
-            "cash": {
-              "$ref": "#/$defs/d_4ba43030fede59fe5993"
-            }
-          },
-          "required": [
-            "cash"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Continuous dividend yield (annualized fraction).\n\nUsed in analytical models (Black-Scholes with dividends) that assume\ncontinuous payout rather than discrete payments.",
-          "properties": {
-            "yield": {
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "yield"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Stock dividend (share distribution).\n\nIncreases share count proportionally. For example, 5% stock dividend\nmeans each shareholder receives 0.05 additional shares per share held.",
-          "properties": {
-            "stock": {
-              "properties": {
-                "ratio": {
-                  "description": "Stock distribution ratio; 0.05 corresponds to a 5% stock dividend.",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "ratio"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "stock"
-          ],
-          "type": "object"
-        }
-      ]
-    },
     "d_1a0c0b834c9e63a93be3": {
       "additionalProperties": false,
       "properties": {
@@ -2273,20 +2218,27 @@
       "type": "object"
     },
     "d_63a8cdf0b3369d8089a3": {
-      "description": "A dated dividend event.",
+      "additionalProperties": false,
+      "description": "One gross cash distribution per entitled share on its schedule's share basis.",
       "properties": {
-        "date": {
-          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
-          "description": "Ex-dividend date."
+        "amount": {
+          "$ref": "#/$defs/d_4ba43030fede59fe5993"
         },
-        "kind": {
-          "$ref": "#/$defs/d_196499daa6e4b8649607",
-          "description": "Event kind."
+        "event_id": {
+          "type": "string"
+        },
+        "ex_date": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
+        },
+        "pay_date": {
+          "$ref": "#/$defs/d_1b2ccb88c9229e7463e8"
         }
       },
       "required": [
-        "date",
-        "kind"
+        "event_id",
+        "ex_date",
+        "pay_date",
+        "amount"
       ],
       "type": "object"
     },
@@ -3341,42 +3293,34 @@
           "description": "Dividend schedule for an underlier.",
           "properties": {
             "currency": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/d_be98333e68c25ab5ae57"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Quote currency for cash dividends (optional metadata)."
+              "$ref": "#/$defs/d_be98333e68c25ab5ae57"
             },
             "events": {
-              "description": "Sorted events by date (ascending).",
               "items": {
                 "$ref": "#/$defs/d_63a8cdf0b3369d8089a3"
               },
               "type": "array"
             },
             "id": {
-              "$ref": "#/$defs/d_9c3fc047c6fea21344ad",
-              "description": "Unique identifier of this schedule in the market context."
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
             },
             "kind": {
               "const": "dividend_schedule",
               "type": "string"
             },
+            "share_basis": {
+              "type": "string"
+            },
             "underlying": {
-              "description": "Optional display symbol/ticker for convenience.",
-              "type": [
-                "string",
-                "null"
-              ]
+              "$ref": "#/$defs/d_9c3fc047c6fea21344ad"
             }
           },
           "required": [
             "kind",
             "id",
+            "underlying",
+            "share_basis",
+            "currency",
             "events"
           ],
           "type": "object"

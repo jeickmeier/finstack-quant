@@ -844,34 +844,6 @@ export type NelsonSiegelModel =
  */
 export type DecimalWire = string;
 /**
- * Type of dividend event.
- *
- * Distinguishes between cash payments, stock distributions, and continuous
- * yield approximations used in different pricing models.
- *
- * # Variants
- *
- * - **Cash**: Actual dividend payment (quarterly, semi-annual, etc.)
- * - **Stock**: Share distribution (less common, complicates option pricing)
- * - **Yield**: Continuous approximation for analytical models
- */
-export type DividendKind =
-  | {
-      cash: Money;
-    }
-  | {
-      yield: number;
-    }
-  | {
-      stock: {
-        /**
-         * Stock distribution ratio; 0.05 corresponds to a 5% stock dividend.
-         */
-        ratio: number;
-        [k: string]: unknown;
-      };
-    };
-/**
  * At-the-money strike convention on [`FxDeltaVolSurface`].
  */
 export type FxAtmConvention = "delta_neutral_straddle";
@@ -1446,18 +1418,13 @@ export interface DayCountContextState {
   frequency?: Tenor | null;
 }
 /**
- * A dated dividend event.
+ * One gross cash distribution per entitled share on its schedule's share basis.
  */
 export interface DividendEvent {
-  /**
-   * Ex-dividend date.
-   */
-  date: DateWire;
-  /**
-   * Event kind.
-   */
-  kind: DividendKind;
-  [k: string]: unknown;
+  amount: Money;
+  event_id: string;
+  ex_date: DateWire;
+  pay_date: DateWire;
 }
 /**
  * Currency-tagged monetary amount with safe arithmetic.
@@ -1481,36 +1448,14 @@ export interface Money {
   currency: Currency;
 }
 /**
- * Dividend schedule for an equity or ETF underlying.
- *
- * Contains a time-ordered sequence of dividend events used for pricing equity
- * derivatives and calculating total return. The schedule can be referenced by
- * multiple instruments via its [`CurveId`] in the market context.
- *
- * # Usage in Pricing
- *
- * - **Discrete dividends**: Subtract PV of future dividends from spot for option pricing
- * - **Ex-dividend adjustments**: Reduce forward price by dividend amount
- * - **Dividend futures**: Sum dividends in contract period
- * - **Total return**: Include dividend reinvestment in performance
+ * Validated distributions for one security, share basis and currency.
  */
 export interface DividendSchedule {
-  /**
-   * Quote currency for cash dividends (optional metadata).
-   */
-  currency?: Currency | null;
-  /**
-   * Sorted events by date (ascending).
-   */
+  currency: Currency;
   events: DividendEvent[];
-  /**
-   * Unique identifier of this schedule in the market context.
-   */
   id: Id;
-  /**
-   * Optional display symbol/ticker for convenience.
-   */
-  underlying?: string | null;
+  share_basis: string;
+  underlying: Id;
 }
 /**
  * Configuration for fiscal year periods.

@@ -1708,7 +1708,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/calibration/cases.json",
-      "sha256": "703b38b7ab998e813d3300cdd9138c1e7d274833b114b04ab20be03c54b039a9"
+      "sha256": "f0f6e3f2fa759051a0176e36dcb863b620c1b2d351481695d49abc59cecd7455"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/cases.json",

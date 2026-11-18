@@ -6385,7 +6385,7 @@
   },
   {
     "source": "finstack-quant/calibration/examples/market_bootstrap/08_equity_vol_surface.json",
-    "sha256": "ae604e64ee6511fcf9952996786e14ec1b48d74659285ff14c1683a11d3be487",
+    "sha256": "d1e5fd27dd7cd3929f5991697b44f77df4103438a9d75cc41902ba6661feb1b7",
     "input": {
       "$schema": "../../schemas/calibration/1/calibration.schema.json",
       "schema": "finstack_quant.calibration/1",
@@ -6707,45 +6707,46 @@
           "kind": "dividend_schedule",
           "id": "AAPL-DIVS",
           "underlying": "AAPL",
+          "share_basis": "AAPL",
+          "currency": "USD",
           "events": [
             {
-              "date": "2026-08-15",
-              "kind": {
-                "cash": {
-                  "amount": "0.25",
-                  "currency": "USD"
-                }
+              "event_id": "distribution-2026-08-15",
+              "ex_date": "2026-08-15",
+              "pay_date": "2026-08-15",
+              "amount": {
+                "amount": "0.25",
+                "currency": "USD"
               }
             },
             {
-              "date": "2026-11-15",
-              "kind": {
-                "cash": {
-                  "amount": "0.25",
-                  "currency": "USD"
-                }
+              "event_id": "distribution-2026-11-15",
+              "ex_date": "2026-11-15",
+              "pay_date": "2026-11-15",
+              "amount": {
+                "amount": "0.25",
+                "currency": "USD"
               }
             },
             {
-              "date": "2027-02-15",
-              "kind": {
-                "cash": {
-                  "amount": "0.25",
-                  "currency": "USD"
-                }
+              "event_id": "distribution-2027-02-15",
+              "ex_date": "2027-02-15",
+              "pay_date": "2027-02-15",
+              "amount": {
+                "amount": "0.25",
+                "currency": "USD"
               }
             },
             {
-              "date": "2027-05-15",
-              "kind": {
-                "cash": {
-                  "amount": "0.25",
-                  "currency": "USD"
-                }
+              "event_id": "distribution-2027-05-15",
+              "ex_date": "2027-05-15",
+              "pay_date": "2027-05-15",
+              "amount": {
+                "amount": "0.25",
+                "currency": "USD"
               }
             }
-          ],
-          "currency": "USD"
+          ]
         }
       ]
     },
@@ -6904,45 +6905,46 @@
             {
               "id": "AAPL-DIVS",
               "underlying": "AAPL",
+              "share_basis": "AAPL",
+              "currency": "USD",
               "events": [
                 {
-                  "date": "2026-08-15",
-                  "kind": {
-                    "cash": {
-                      "amount": "0.25",
-                      "currency": "USD"
-                    }
+                  "event_id": "distribution-2026-08-15",
+                  "ex_date": "2026-08-15",
+                  "pay_date": "2026-08-15",
+                  "amount": {
+                    "amount": "0.25",
+                    "currency": "USD"
                   }
                 },
                 {
-                  "date": "2026-11-15",
-                  "kind": {
-                    "cash": {
-                      "amount": "0.25",
-                      "currency": "USD"
-                    }
+                  "event_id": "distribution-2026-11-15",
+                  "ex_date": "2026-11-15",
+                  "pay_date": "2026-11-15",
+                  "amount": {
+                    "amount": "0.25",
+                    "currency": "USD"
                   }
                 },
                 {
-                  "date": "2027-02-15",
-                  "kind": {
-                    "cash": {
-                      "amount": "0.25",
-                      "currency": "USD"
-                    }
+                  "event_id": "distribution-2027-02-15",
+                  "ex_date": "2027-02-15",
+                  "pay_date": "2027-02-15",
+                  "amount": {
+                    "amount": "0.25",
+                    "currency": "USD"
                   }
                 },
                 {
-                  "date": "2027-05-15",
-                  "kind": {
-                    "cash": {
-                      "amount": "0.25",
-                      "currency": "USD"
-                    }
+                  "event_id": "distribution-2027-05-15",
+                  "ex_date": "2027-05-15",
+                  "pay_date": "2027-05-15",
+                  "amount": {
+                    "amount": "0.25",
+                    "currency": "USD"
                   }
                 }
-              ],
-              "currency": "USD"
+              ]
             }
           ],
           "credit_indices": [],
@@ -7559,7 +7561,7 @@
   },
   {
     "source": "finstack-quant/calibration/examples/market_bootstrap/11_equity_spots_dividends.json",
-    "sha256": "71c86cdd158a9f22a6caec1528622b7a3b00ed6ffe44cede004822578e33571b",
+    "sha256": "48b75e84be4dfbe1145111aaa9dadb30dcbc3ac22de6ffcfcf9bc8199efe3f86",
     "input": {
       "$schema": "../../schemas/calibration/1/calibration.schema.json",
       "schema": "finstack_quant.calibration/1",
@@ -7657,45 +7659,46 @@
           "kind": "dividend_schedule",
           "id": "AAPL-DIVS",
           "underlying": "AAPL",
+          "share_basis": "AAPL",
+          "currency": "USD",
           "events": [
             {
-              "date": "2026-08-15",
-              "kind": {
-                "cash": {
-                  "amount": "0.25",
-                  "currency": "USD"
-                }
+              "event_id": "distribution-2026-08-15",
+              "ex_date": "2026-08-15",
+              "pay_date": "2026-08-15",
+              "amount": {
+                "amount": "0.25",
+                "currency": "USD"
               }
             },
             {
-              "date": "2026-11-15",
-              "kind": {
-                "cash": {
-                  "amount": "0.25",
-                  "currency": "USD"
-                }
+              "event_id": "distribution-2026-11-15",
+              "ex_date": "2026-11-15",
+              "pay_date": "2026-11-15",
+              "amount": {
+                "amount": "0.25",
+                "currency": "USD"
               }
             },
             {
-              "date": "2027-02-15",
-              "kind": {
-                "cash": {
-                  "amount": "0.25",
-                  "currency": "USD"
-                }
+              "event_id": "distribution-2027-02-15",
+              "ex_date": "2027-02-15",
+              "pay_date": "2027-02-15",
+              "amount": {
+                "amount": "0.25",
+                "currency": "USD"
               }
             },
             {
-              "date": "2027-05-15",
-              "kind": {
-                "cash": {
-                  "amount": "0.25",
-                  "currency": "USD"
-                }
+              "event_id": "distribution-2027-05-15",
+              "ex_date": "2027-05-15",
+              "pay_date": "2027-05-15",
+              "amount": {
+                "amount": "0.25",
+                "currency": "USD"
               }
             }
-          ],
-          "currency": "USD"
+          ]
         }
       ]
     },
@@ -7727,45 +7730,46 @@
             {
               "id": "AAPL-DIVS",
               "underlying": "AAPL",
+              "share_basis": "AAPL",
+              "currency": "USD",
               "events": [
                 {
-                  "date": "2026-08-15",
-                  "kind": {
-                    "cash": {
-                      "amount": "0.25",
-                      "currency": "USD"
-                    }
+                  "event_id": "distribution-2026-08-15",
+                  "ex_date": "2026-08-15",
+                  "pay_date": "2026-08-15",
+                  "amount": {
+                    "amount": "0.25",
+                    "currency": "USD"
                   }
                 },
                 {
-                  "date": "2026-11-15",
-                  "kind": {
-                    "cash": {
-                      "amount": "0.25",
-                      "currency": "USD"
-                    }
+                  "event_id": "distribution-2026-11-15",
+                  "ex_date": "2026-11-15",
+                  "pay_date": "2026-11-15",
+                  "amount": {
+                    "amount": "0.25",
+                    "currency": "USD"
                   }
                 },
                 {
-                  "date": "2027-02-15",
-                  "kind": {
-                    "cash": {
-                      "amount": "0.25",
-                      "currency": "USD"
-                    }
+                  "event_id": "distribution-2027-02-15",
+                  "ex_date": "2027-02-15",
+                  "pay_date": "2027-02-15",
+                  "amount": {
+                    "amount": "0.25",
+                    "currency": "USD"
                   }
                 },
                 {
-                  "date": "2027-05-15",
-                  "kind": {
-                    "cash": {
-                      "amount": "0.25",
-                      "currency": "USD"
-                    }
+                  "event_id": "distribution-2027-05-15",
+                  "ex_date": "2027-05-15",
+                  "pay_date": "2027-05-15",
+                  "amount": {
+                    "amount": "0.25",
+                    "currency": "USD"
                   }
                 }
-              ],
-              "currency": "USD"
+              ]
             }
           ],
           "credit_indices": [],

@@ -164,3 +164,26 @@ test('volatility-index queries reject negative extensions and forbidden tails', 
     commodity.free();
   }
 });
+
+test('dividend schedules round-trip entitlement and payment dates and reject mixed currency', () => {
+  const empty = new core.MarketContext();
+  const state = JSON.parse(empty.toJson());
+  empty.free();
+  const event = {
+    event_id: 'Q1',
+    ex_date: '2025-04-01',
+    pay_date: '2025-07-01',
+    amount: { amount: '10', currency: 'USD' },
+  };
+  state.dividends = [
+    { id: 'EQ-DIV', underlying: 'EQ', share_basis: 'EQ', currency: 'USD', events: [event] },
+  ];
+  const restored = core.MarketContext.fromJson(JSON.stringify(state));
+  try {
+    assert.deepEqual(JSON.parse(restored.toJson()).dividends, state.dividends);
+  } finally {
+    restored.free();
+  }
+  event.amount.currency = 'JPY';
+  assert.throws(() => core.MarketContext.fromJson(JSON.stringify(state)));
+});

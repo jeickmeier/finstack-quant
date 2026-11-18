@@ -10,7 +10,7 @@ use finstack_quant_core::market_data::bumps::{
     BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
 };
 use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
-use finstack_quant_core::market_data::dividends::DividendSchedule;
+use finstack_quant_core::market_data::dividends::{DividendEvent, DividendSchedule};
 use finstack_quant_core::market_data::scalars::{
     InflationIndex, InflationObservation, MarketScalar, ScalarTimeSeries, SeriesExtrapolation,
     SeriesInterpolation,
@@ -209,13 +209,22 @@ fn market_context_manages_fx_and_scalars() {
     )
     .unwrap();
 
-    let dividends = DividendSchedule::builder("AAPL-DIVS")
-        .cash(
-            sample_base_date(),
-            Money::new(1.0, Currency::USD).expect("valid money fixture"),
-        )
-        .build()
-        .expect("valid dividend schedule");
+    let dividends = DividendSchedule::new(
+        "AAPL-DIVS",
+        "AAPL",
+        "AAPL",
+        Currency::USD,
+        vec![
+            DividendEvent::new(
+                "distribution-1",
+                sample_base_date(),
+                sample_base_date(),
+                Money::new(1.0, Currency::USD).expect("valid money fixture"),
+            )
+            .unwrap(),
+        ],
+    )
+    .expect("valid dividend schedule");
     let credit_index = CreditIndexData::builder()
         .num_constituents(1)
         .recovery_rate(0.4)
@@ -954,13 +963,22 @@ fn market_context_snapshot_restore_mutators_drop_and_replace_owned_families() {
         sample_base_date() + time::Duration::days(90),
     )
     .unwrap();
-    let divs = DividendSchedule::builder("DIVS")
-        .cash(
-            sample_base_date(),
-            Money::new(1.0, Currency::USD).expect("valid money fixture"),
-        )
-        .build()
-        .expect("valid dividend schedule");
+    let divs = DividendSchedule::new(
+        "DIVS",
+        "DIVS",
+        "DIVS",
+        Currency::USD,
+        vec![
+            DividendEvent::new(
+                "distribution-1",
+                sample_base_date(),
+                sample_base_date(),
+                Money::new(1.0, Currency::USD).expect("valid money fixture"),
+            )
+            .unwrap(),
+        ],
+    )
+    .expect("valid dividend schedule");
     let cube = VolCube::from_grid(
         "SWPT",
         &[1.0],
@@ -1102,13 +1120,22 @@ fn market_context_getters_type_mismatch_and_not_found() {
 fn market_context_surface_and_dividends_arc_variants_preserve_identity() {
     let surface = Arc::new(sample_vol_surface());
     let dividends = Arc::new(
-        DividendSchedule::builder("AAPL-DIVS")
-            .cash(
-                sample_base_date(),
-                Money::new(1.0, Currency::USD).expect("valid money fixture"),
-            )
-            .build()
-            .expect("valid dividend schedule"),
+        DividendSchedule::new(
+            "AAPL-DIVS",
+            "AAPL",
+            "AAPL",
+            Currency::USD,
+            vec![
+                DividendEvent::new(
+                    "distribution-1",
+                    sample_base_date(),
+                    sample_base_date(),
+                    Money::new(1.0, Currency::USD).expect("valid money fixture"),
+                )
+                .unwrap(),
+            ],
+        )
+        .expect("valid dividend schedule"),
     );
 
     let ctx = MarketContext::new()
@@ -1370,13 +1397,22 @@ fn market_context_insert_and_stats_setters_cover_remaining_paths() {
             .unwrap()
     };
 
-    let dividends_by_value = DividendSchedule::builder("MSFT-DIVS")
-        .cash(
-            date,
-            Money::new(0.5, Currency::USD).expect("valid money fixture"),
-        )
-        .build()
-        .expect("valid dividend schedule");
+    let dividends_by_value = DividendSchedule::new(
+        "MSFT-DIVS",
+        "MSFT",
+        "MSFT",
+        Currency::USD,
+        vec![
+            DividendEvent::new(
+                "distribution-1",
+                date,
+                date,
+                Money::new(0.5, Currency::USD).expect("valid money fixture"),
+            )
+            .unwrap(),
+        ],
+    )
+    .expect("valid dividend schedule");
 
     let hazard = Arc::new(sample_hazard_curve("CDX"));
     let base_corr = Arc::new(sample_base_correlation_curve("CDX-BC"));
@@ -1431,13 +1467,22 @@ fn market_context_insert_and_stats_setters_cover_remaining_paths() {
     ctx = ctx.insert_inflation_index(idx);
 
     let divs = Arc::new(
-        DividendSchedule::builder("AAPL-DIVS")
-            .cash(
-                date,
-                Money::new(1.0, Currency::USD).expect("valid money fixture"),
-            )
-            .build()
-            .expect("valid dividend schedule"),
+        DividendSchedule::new(
+            "AAPL-DIVS",
+            "AAPL",
+            "AAPL",
+            Currency::USD,
+            vec![
+                DividendEvent::new(
+                    "distribution-1",
+                    date,
+                    date,
+                    Money::new(1.0, Currency::USD).expect("valid money fixture"),
+                )
+                .unwrap(),
+            ],
+        )
+        .expect("valid dividend schedule"),
     );
     ctx = ctx.insert_dividends(divs);
 
@@ -1815,8 +1860,7 @@ fn market_context_len_counts_fx_and_dividends() {
     assert_eq!(fx_only.len(), 1);
     assert!(!fx_only.is_empty());
 
-    let dividends = DividendSchedule::builder("AAPL-DIVS")
-        .build()
+    let dividends = DividendSchedule::new("AAPL-DIVS", "AAPL", "AAPL", Currency::USD, vec![])
         .expect("empty dividend schedule");
     let dividends_only = MarketContext::new().insert_dividends(dividends);
     assert_eq!(dividends_only.len(), 1);

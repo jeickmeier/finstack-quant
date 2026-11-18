@@ -1653,77 +1653,29 @@
       "type": "object"
     },
     "DividendEvent": {
-      "description": "A dated dividend event.",
+      "additionalProperties": false,
+      "description": "One gross cash distribution per entitled share on its schedule's share basis.",
       "properties": {
-        "date": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-          "description": "Ex-dividend date."
+        "amount": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
         },
-        "kind": {
-          "$ref": "#/$defs/DividendKind",
-          "description": "Event kind."
+        "event_id": {
+          "type": "string"
+        },
+        "ex_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
+        },
+        "pay_date": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json"
         }
       },
       "required": [
-        "date",
-        "kind"
+        "event_id",
+        "ex_date",
+        "pay_date",
+        "amount"
       ],
       "type": "object"
-    },
-    "DividendKind": {
-      "description": "Type of dividend event.\n\nDistinguishes between cash payments, stock distributions, and continuous\nyield approximations used in different pricing models.\n\n# Variants\n\n- **Cash**: Actual dividend payment (quarterly, semi-annual, etc.)\n- **Stock**: Share distribution (less common, complicates option pricing)\n- **Yield**: Continuous approximation for analytical models",
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "description": "Cash dividend payment.\n\nMost common type. Ex-dividend date reduces stock price by dividend amount.",
-          "properties": {
-            "cash": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
-            }
-          },
-          "required": [
-            "cash"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Continuous dividend yield (annualized fraction).\n\nUsed in analytical models (Black-Scholes with dividends) that assume\ncontinuous payout rather than discrete payments.",
-          "properties": {
-            "yield": {
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "yield"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "description": "Stock dividend (share distribution).\n\nIncreases share count proportionally. For example, 5% stock dividend\nmeans each shareholder receives 0.05 additional shares per share held.",
-          "properties": {
-            "stock": {
-              "properties": {
-                "ratio": {
-                  "description": "Stock distribution ratio; 0.05 corresponds to a 5% stock dividend.",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "ratio"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "stock"
-          ],
-          "type": "object"
-        }
-      ]
     },
     "ExplainOpts": {
       "additionalProperties": false,
@@ -3216,42 +3168,34 @@
           "description": "Dividend schedule for an underlier.",
           "properties": {
             "currency": {
-              "anyOf": [
-                {
-                  "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Quote currency for cash dividends (optional metadata)."
+              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json"
             },
             "events": {
-              "description": "Sorted events by date (ascending).",
               "items": {
                 "$ref": "#/$defs/DividendEvent"
               },
               "type": "array"
             },
             "id": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-              "description": "Unique identifier of this schedule in the market context."
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
             },
             "kind": {
               "const": "dividend_schedule",
               "type": "string"
             },
+            "share_basis": {
+              "type": "string"
+            },
             "underlying": {
-              "description": "Optional display symbol/ticker for convenience.",
-              "type": [
-                "string",
-                "null"
-              ]
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
             }
           },
           "required": [
             "kind",
             "id",
+            "underlying",
+            "share_basis",
+            "currency",
             "events"
           ],
           "type": "object"

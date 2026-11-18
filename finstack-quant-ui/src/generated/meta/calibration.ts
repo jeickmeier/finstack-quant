@@ -1448,47 +1448,6 @@ export default [
     "description": "Return an error when querying strictly after the final observation date."
   },
   {
-    "path": "#/$defs/d_196499daa6e4b8649607",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendKind",
-    "description": "Type of dividend event.\n\nDistinguishes between cash payments, stock distributions, and continuous\nyield approximations used in different pricing models.\n\n# Variants\n\n- **Cash**: Actual dividend payment (quarterly, semi-annual, etc.)\n- **Stock**: Share distribution (less common, complicates option pricing)\n- **Yield**: Continuous approximation for analytical models"
-  },
-  {
-    "path": "#/$defs/d_196499daa6e4b8649607/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendKind/oneOf/0",
-    "description": "Cash dividend payment.\n\nMost common type. Ex-dividend date reduces stock price by dividend amount."
-  },
-  {
-    "path": "#/$defs/d_196499daa6e4b8649607/oneOf/0/properties/cash",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendKind/oneOf/0/properties/cash",
-    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
-  },
-  {
-    "path": "#/$defs/d_196499daa6e4b8649607/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendKind/oneOf/1",
-    "description": "Continuous dividend yield (annualized fraction).\n\nUsed in analytical models (Black-Scholes with dividends) that assume\ncontinuous payout rather than discrete payments."
-  },
-  {
-    "path": "#/$defs/d_196499daa6e4b8649607/oneOf/1/properties/yield",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendKind/oneOf/1/properties/yield",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_196499daa6e4b8649607/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendKind/oneOf/2",
-    "description": "Stock dividend (share distribution).\n\nIncreases share count proportionally. For example, 5% stock dividend\nmeans each shareholder receives 0.05 additional shares per share held."
-  },
-  {
-    "path": "#/$defs/d_196499daa6e4b8649607/oneOf/2/properties/stock",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendKind/oneOf/2/properties/stock"
-  },
-  {
-    "path": "#/$defs/d_196499daa6e4b8649607/oneOf/2/properties/stock/properties/ratio",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendKind/oneOf/2/properties/stock/properties/ratio",
-    "description": "Stock distribution ratio; 0.05 corresponds to a 5% stock dividend.",
-    "format": "double"
-  },
-  {
     "path": "#/$defs/d_1a0c0b834c9e63a93be3",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CurveAdjustmentSegment"
   },
@@ -2355,21 +2314,29 @@ export default [
   {
     "path": "#/$defs/d_63a8cdf0b3369d8089a3",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendEvent",
-    "description": "A dated dividend event."
+    "description": "One gross cash distribution per entitled share on its schedule's share basis."
   },
   {
-    "path": "#/$defs/d_63a8cdf0b3369d8089a3/properties/date",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendEvent/properties/date",
-    "description": "Ex-dividend date.",
+    "path": "#/$defs/d_63a8cdf0b3369d8089a3/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendEvent/properties/amount",
+    "ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/money.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_63a8cdf0b3369d8089a3/properties/event_id",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendEvent/properties/event_id"
+  },
+  {
+    "path": "#/$defs/d_63a8cdf0b3369d8089a3/properties/ex_date",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendEvent/properties/ex_date",
     "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
-    "path": "#/$defs/d_63a8cdf0b3369d8089a3/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendEvent/properties/kind",
-    "description": "Event kind.",
-    "ref": "#/$defs/DividendKind",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendKind"
+    "path": "#/$defs/d_63a8cdf0b3369d8089a3/properties/pay_date",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/DividendEvent/properties/pay_date",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/d_64f58200c6756dc5845d",
@@ -3730,22 +3697,12 @@ export default [
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/currency",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/currency",
-    "description": "Quote currency for cash dividends (optional metadata)."
-  },
-  {
-    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/currency/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/currency/anyOf/0",
     "ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/currency.schema.json#"
   },
   {
-    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/currency/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/currency/anyOf/1"
-  },
-  {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/events",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/events",
-    "description": "Sorted events by date (ascending)."
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/events"
   },
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/events/items",
@@ -3756,7 +3713,6 @@ export default [
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/id",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/id",
-    "description": "Unique identifier of this schedule in the market context.",
     "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
@@ -3766,9 +3722,14 @@ export default [
     "const": "dividend_schedule"
   },
   {
+    "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/share_basis",
+    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/share_basis"
+  },
+  {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/8/properties/underlying",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/MarketDatum/oneOf/8/properties/underlying",
-    "description": "Optional display symbol/ticker for convenience."
+    "ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
     "path": "#/$defs/d_826db27dbb673d9f5f86/oneOf/9",

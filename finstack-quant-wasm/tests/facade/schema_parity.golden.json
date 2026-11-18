@@ -205,7 +205,7 @@
             "$id": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
             "type_name": "MarketContextState",
             "kind": "input",
-            "bytes": 139223
+            "bytes": 135804
           },
           {
             "path": "schemas/market_data/1/vol_cube_expiry_slice.schema.json",
@@ -296,14 +296,14 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1274626
+            "bytes": 1271207
           },
           {
             "path": "schemas/attribution/1/attribution_inputs.schema.json",
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
             "type_name": "AttributionInputs",
             "kind": "input",
-            "bytes": 241401
+            "bytes": 237982
           },
           {
             "path": "schemas/attribution/1/attribution_result.schema.json",
@@ -518,7 +518,6 @@
           "DiscountedCashFlow",
           "DividendAdjustment",
           "DividendEvent",
-          "DividendKind",
           "DividendSchedule",
           "DollarRoll",
           "DrawEvent",
@@ -920,7 +919,6 @@
           "DiscountCurveTransform",
           "DividendAdjustment",
           "DividendEvent",
-          "DividendKind",
           "DividendSchedule",
           "ExecutionPolicy",
           "ExtrapolationPolicy",
@@ -1032,14 +1030,14 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 220915
+            "bytes": 218683
           },
           {
             "path": "schemas/calibration/1/calibration_result.schema.json",
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_result.schema.json",
             "type_name": "CalibrationResultEnvelope",
             "kind": "output",
-            "bytes": 140063
+            "bytes": 136736
           },
           {
             "path": "schemas/calibration/1/calibration_validation_report.schema.json",
@@ -1165,7 +1163,6 @@
           "DiscountCurveSolveConfig",
           "DiscountCurveTransform",
           "DividendEvent",
-          "DividendKind",
           "ExplainOpts",
           "ExtrapolationPolicy",
           "FloatingLegCompounding",
@@ -4157,7 +4154,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1274626
+            "bytes": 1271207
           },
           {
             "domain": "attribution",
@@ -4165,7 +4162,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
             "type_name": "AttributionInputs",
             "kind": "input",
-            "bytes": 241401
+            "bytes": 237982
           },
           {
             "domain": "attribution",
@@ -4189,7 +4186,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
             "type_name": "CalibrationEnvelope",
             "kind": "input",
-            "bytes": 220915
+            "bytes": 218683
           },
           {
             "domain": "calibration",
@@ -4197,7 +4194,7 @@
             "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_result.schema.json",
             "type_name": "CalibrationResultEnvelope",
             "kind": "output",
-            "bytes": 140063
+            "bytes": 136736
           },
           {
             "domain": "calibration",
@@ -4445,7 +4442,7 @@
             "$id": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
             "type_name": "MarketContextState",
             "kind": "input",
-            "bytes": 139223
+            "bytes": 135804
           },
           {
             "domain": "core",
