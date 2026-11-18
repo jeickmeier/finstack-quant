@@ -112,8 +112,8 @@ mod scalar_curve_invariants {
         let bumped_vc = vc.apply_bump(par(0.0)).unwrap();
 
         for t in [0.0, 0.25, 0.5, 1.0] {
-            assert!((bumped_pc.price(t) - pc.price(t)).abs() < TOL);
-            assert!((bumped_vc.price(t) - vc.price(t)).abs() < TOL);
+            assert!((bumped_pc.price(t).unwrap() - pc.price(t).unwrap()).abs() < TOL);
+            assert!((bumped_vc.price(t).unwrap() - vc.price(t).unwrap()).abs() < TOL);
         }
     }
 
@@ -136,8 +136,12 @@ mod scalar_curve_invariants {
         let single_bump_vc = vc.apply_bump(par(3.0)).unwrap();
 
         for t in [0.0, 0.25, 0.5, 1.0] {
-            assert!((double_bump_pc.price(t) - single_bump_pc.price(t)).abs() < TOL);
-            assert!((double_bump_vc.price(t) - single_bump_vc.price(t)).abs() < TOL);
+            assert!(
+                (double_bump_pc.price(t).unwrap() - single_bump_pc.price(t).unwrap()).abs() < TOL
+            );
+            assert!(
+                (double_bump_vc.price(t).unwrap() - single_bump_vc.price(t).unwrap()).abs() < TOL
+            );
         }
     }
 
@@ -214,7 +218,7 @@ mod scalar_curve_invariants {
             serde_json::from_str(&serde_json::to_string(&pc).unwrap()).unwrap();
 
         for t in [0.0, 0.25, 0.5, 1.0, 2.0] {
-            assert!((pc.price(t) - restored.price(t)).abs() < TOL);
+            assert!((pc.price(t).unwrap() - restored.price(t).unwrap()).abs() < TOL);
         }
     }
 
@@ -225,7 +229,7 @@ mod scalar_curve_invariants {
             serde_json::from_str(&serde_json::to_string(&vc).unwrap()).unwrap();
 
         for t in [0.0, 0.25, 0.5, 1.0, 2.0] {
-            assert!((vc.price(t) - restored.price(t)).abs() < TOL);
+            assert!((vc.price(t).unwrap() - restored.price(t).unwrap()).abs() < TOL);
         }
     }
 
@@ -245,7 +249,7 @@ mod scalar_curve_invariants {
 
         assert!((pc_inferred.spot_price() - 75.0).abs() < TOL);
         assert!((vc_inferred.spot_price() - 18.0).abs() < TOL);
-        assert!((pc_inferred.price(0.0) - pc_inferred.spot_price()).abs() < TOL);
-        assert!((vc_inferred.price(0.0) - vc_inferred.spot_price()).abs() < TOL);
+        assert!((pc_inferred.price(0.0).unwrap() - pc_inferred.spot_price()).abs() < TOL);
+        assert!((vc_inferred.price(0.0).unwrap() - vc_inferred.spot_price()).abs() < TOL);
     }
 }

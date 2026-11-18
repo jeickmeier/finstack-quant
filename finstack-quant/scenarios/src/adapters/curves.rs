@@ -425,7 +425,7 @@ fn preview_price_level(
         .zip(deltas)
         .map(|(&level, &delta)| bump(level, delta))
         .collect();
-    Ok(rebuild_price_levels(base, levels)?.price(t))
+    Ok(rebuild_price_levels(base, levels)?.price(t)?)
 }
 
 /// Typical percent-of-forward stress range for commodity price curves.
@@ -908,7 +908,7 @@ pub(crate) fn curve_node_effects(
                 &knots,
                 curve_id.as_str(),
                 |d, t| preview_price_level(&base_curve, d, t, |px, pct| px * (1.0 + pct / 100.0)),
-                |t, pct| Ok(base_curve.price(t) * (1.0 + pct / 100.0)),
+                |t, pct| Ok(base_curve.price(t)? * (1.0 + pct / 100.0)),
             )?;
 
             let mut prices: Vec<f64> = base_curve.prices().to_vec();
@@ -986,7 +986,7 @@ pub(crate) fn vol_index_node_effects(
         &knots,
         curve_id.as_str(),
         |deltas, t| preview_price_level(&base_curve, deltas, t, |level, pts| level + pts),
-        |t, points| Ok(base_curve.price(t) + points),
+        |t, points| Ok(base_curve.price(t)? + points),
     )?;
 
     let mut levels: Vec<f64> = base_curve.prices().to_vec();
@@ -1078,7 +1078,7 @@ mod tests {
             .get_vol_index_curve("VIX")
             .expect("vol index should exist");
         assert!((updated.spot_price() - 19.5).abs() < 1.0e-12);
-        assert!((updated.price(0.25) - 21.0).abs() < 1.0e-12);
+        assert!((updated.price(0.25).unwrap() - 21.0).abs() < 1.0e-12);
     }
 
     #[test]
@@ -1131,7 +1131,7 @@ mod tests {
             "front-knot +1.0 should move spot 18.5 → 19.5, got {}",
             bumped.spot_price()
         );
-        assert!((bumped.price(0.0) - 19.5).abs() < 1e-12);
+        assert!((bumped.price(0.0).unwrap() - 19.5).abs() < 1e-12);
     }
 
     #[test]
@@ -1527,9 +1527,9 @@ mod tests {
         assert!((bumped.spot_price() - 77.0).abs() < 1e-12);
         for (t, expected) in [(0.0, 77.0), (1.0, 79.2), (5.0, 82.5)] {
             assert!(
-                (bumped.price(t) - expected).abs() < 1e-12,
+                (bumped.price(t).unwrap() - expected).abs() < 1e-12,
                 "price({t}) should be {expected}, got {}",
-                bumped.price(t)
+                bumped.price(t).unwrap()
             );
         }
     }
@@ -1572,16 +1572,16 @@ mod tests {
                 _ => None,
             })
             .expect("price curve update");
-        assert!((bumped.price(1.0) - 79.2).abs() < 1e-12);
+        assert!((bumped.price(1.0).unwrap() - 79.2).abs() < 1e-12);
         assert!((bumped.spot_price() - 70.0).abs() < 1e-12);
-        assert!((bumped.price(5.0) - 75.0).abs() < 1e-12);
+        assert!((bumped.price(5.0).unwrap() - 75.0).abs() < 1e-12);
     }
 
     #[test]
     fn commodity_interpolated_node_hits_native_price_percent() {
         let as_of = date!(2025 - 01 - 01);
         let curve = wti_price_curve(as_of);
-        let base_px = curve.price(3.0);
+        let base_px = curve.price(3.0).unwrap();
         let mut market = MarketContext::new().insert(curve);
         let mut model = FinancialModelSpec::new(
             "test",
@@ -1619,9 +1619,9 @@ mod tests {
             .expect("price curve update");
         let expected = base_px * 1.10;
         assert!(
-            (bumped.price(3.0) - expected).abs() < 1e-10,
+            (bumped.price(3.0).unwrap() - expected).abs() < 1e-10,
             "price(3Y) should move +10%: got {} expected {expected}",
-            bumped.price(3.0)
+            bumped.price(3.0).unwrap()
         );
     }
 

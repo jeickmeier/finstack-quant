@@ -389,7 +389,8 @@ impl JsPriceCurve {
     /// @returns The interpolated forward price (or index level).
     /// @throws `TypeError` if `t` is neither a number nor a string;
     /// `FinstackError` (kind `validation`) for a malformed date or a year
-    /// fraction that cannot be computed.
+    /// fraction that cannot be computed, forbidden extrapolation, a non-finite
+    /// result or a negative volatility-index level.
     /// @param t - Time from the curve base date in years (`number`) or an ISO-8601 target date (`"YYYY-MM-DD"`, converted with the curve day count).
     #[wasm_bindgen(js_name = price)]
     pub fn price(
@@ -397,7 +398,7 @@ impl JsPriceCurve {
         #[wasm_bindgen(unchecked_param_type = "number | string")] t: JsValue,
     ) -> Result<f64, JsValue> {
         match js_time_point(&t, "t")? {
-            TimePoint::Years(t) => Ok(self.inner.price(t)),
+            TimePoint::Years(t) => self.inner.price(t).map_err(to_js_err),
             TimePoint::Date(d) => self.inner.price_on_date(d).map_err(to_js_err),
         }
     }

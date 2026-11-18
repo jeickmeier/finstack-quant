@@ -144,3 +144,23 @@ test('XIRR ignores zero dated anchors and rejects rootless cashflows', () => {
     assert.throws(() => portfolio.mwrXirr(JSON.stringify([zero, ...rootless])));
   }
 });
+
+test('volatility-index queries reject negative extensions and forbidden tails', () => {
+  const params = { id: 'VIX', baseDate: '2025-01-01', knots: [0, 30, 0.25, 20] };
+  for (const extrapolation of ['extend', 'error']) {
+    const curve = new core.PriceCurve({ ...params, kind: 'vol_index', extrapolation });
+    try {
+      assert.equal(curve.price(0), 30);
+      assert.equal(curve.price(0.25), 20);
+      for (const query of [1, '2026-01-01']) assert.throws(() => curve.price(query));
+    } finally {
+      curve.free();
+    }
+  }
+  const commodity = new core.PriceCurve({ ...params, kind: 'price', extrapolation: 'extend' });
+  try {
+    assert.equal(commodity.price(1), -10);
+  } finally {
+    commodity.free();
+  }
+});

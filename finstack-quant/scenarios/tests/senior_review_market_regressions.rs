@@ -373,14 +373,14 @@ fn vol_index_interpolated_shocks_deliver_all_overlapping_tenors_on_native_interp
             .expect("vol index remains");
         assert_eq!(shocked.interp_style(), interp);
         assert!(
-            (shocked.price(2.0) - 21.0).abs() < 1e-8,
+            (shocked.price(2.0).unwrap() - 21.0).abs() < 1e-8,
             "{interp:?}: 2Y {}",
-            shocked.price(2.0)
+            shocked.price(2.0).unwrap()
         );
         assert!(
-            (shocked.price(4.0) - 22.0).abs() < 1e-8,
+            (shocked.price(4.0).unwrap() - 22.0).abs() < 1e-8,
             "{interp:?}: 4Y {}",
-            shocked.price(4.0)
+            shocked.price(4.0).unwrap()
         );
     }
 }

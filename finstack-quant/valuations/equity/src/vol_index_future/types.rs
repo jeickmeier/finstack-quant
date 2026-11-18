@@ -212,15 +212,7 @@ impl VolatilityIndexFuture {
         // The curve's own base date anchors the time axis (see `as_of` above).
         let _ = as_of;
         let vol_curve = market.get_vol_index_curve(&self.vol_index_curve_id)?;
-        let t = vol_curve
-            .day_count()
-            .year_fraction(
-                vol_curve.base_date(),
-                self.terms.settlement_date,
-                finstack_quant_core::dates::DayCountContext::default(),
-            )?
-            .max(0.0);
-        Ok(vol_curve.price(t))
+        vol_curve.price_on_date(self.terms.settlement_date)
     }
 
     /// Resolve the live quote, model level, or official final settlement price.
@@ -384,6 +376,25 @@ mod tests {
             position,
         )
         .expect("terms")
+    }
+
+    #[test]
+    fn fair_price_rejects_negative_vol_index_extension() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+        let mut future = VolatilityIndexFuture::example().unwrap();
+        future.terms.settlement_date = Date::from_calendar_date(2026, Month::January, 1).unwrap();
+        let curve = PriceCurve::builder(future.vol_index_curve_id.clone())
+            .kind(PriceCurveKind::VolIndex)
+            .base_date(as_of)
+            .knots([(0.0, 30.0), (0.25, 20.0)])
+            .extrapolation(finstack_quant_core::math::interp::ExtrapolationPolicy::Extend)
+            .build()
+            .unwrap();
+        assert!(
+            future
+                .fair_price(&MarketContext::new().insert(curve), as_of)
+                .is_err()
+        );
     }
 
     #[test]

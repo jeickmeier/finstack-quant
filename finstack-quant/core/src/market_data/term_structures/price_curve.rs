@@ -69,7 +69,7 @@
 //!     .interp(InterpStyle::Linear)
 //!     .build()
 //!     .expect("PriceCurve builder should succeed");
-//! assert!(curve.price(0.25) > 0.0);
+//! assert!(curve.price(0.25).expect("valid pillar") > 0.0);
 //! ```
 //!
 //! # References
@@ -291,16 +291,30 @@ impl PriceCurve {
     ///
     /// # Returns
     /// The interpolated forward price at time `t`.
-    #[must_use]
+    ///
+    /// # Errors
+    /// Rejects non-finite times and levels, unsupported extrapolation and
+    /// negative volatility-index levels.
     #[inline]
-    pub fn price(&self, t: f64) -> f64 {
-        if t.is_nan() {
-            return f64::NAN;
+    pub fn price(&self, t: f64) -> crate::Result<f64> {
+        if !t.is_finite() {
+            return Err(crate::Error::Validation(format!(
+                "PriceCurve '{}' requires a finite time, got {t}",
+                self.id
+            )));
         }
-        if t == 0.0 {
-            return self.spot_price;
+        let price = if t == 0.0 {
+            self.spot_price
+        } else {
+            self.interp.interp(t)?
+        };
+        if !price.is_finite() || (self.kind == PriceCurveKind::VolIndex && price < 0.0) {
+            return Err(crate::Error::Validation(format!(
+                "Invalid {} level {price} at time {t} on curve '{}'",
+                self.kind, self.id
+            )));
         }
-        self.interp.interp(t).unwrap_or(f64::NAN)
+        Ok(price)
     }
 
     /// Earliest knot time supported by this curve.
@@ -316,7 +330,7 @@ impl PriceCurve {
     ///
     /// # Errors
     /// Returns an error if `date` precedes the earliest supported pillar on the
-    /// curve or if the interpolated forward price is non-finite.
+    /// curve or if evaluation fails under [`Self::price`].
     pub fn price_on_date(&self, date: Date) -> crate::Result<f64> {
         let t = self.day_count.signed_year_fraction(
             self.base,
@@ -330,14 +344,7 @@ impl PriceCurve {
                 date, self.base
             )));
         }
-        let price = self.price(t);
-        if !price.is_finite() {
-            return Err(crate::Error::Validation(format!(
-                "PriceCurve '{}' price on {date} (t={t:.6}) is non-finite: {price}",
-                self.id
-            )));
-        }
-        Ok(price)
+        self.price(t)
     }
 
     /// Current spot price (or spot index level for a vol-index curve).
@@ -506,7 +513,7 @@ impl PriceCurve {
 ///     .knots([(0.0, 75.0), (0.25, 76.5), (0.5, 77.2), (1.0, 78.0)])
 ///     .build()
 ///     .expect("PriceCurve builder should succeed");
-/// assert!(curve.price(0.5) > 75.0);
+/// assert!(curve.price(0.5).expect("valid pillar") > 75.0);
 /// ```
 pub struct PriceCurveBuilder {
     id: CurveId,
@@ -792,6 +799,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn negative_vol_index_extension_is_rejected_for_numeric_and_dated_queries() {
+        let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+        let expiry = Date::from_calendar_date(2026, time::Month::January, 1).unwrap();
+        for policy in [ExtrapolationPolicy::Extend, ExtrapolationPolicy::Error] {
+            let curve = PriceCurve::builder("VIX")
+                .kind(PriceCurveKind::VolIndex)
+                .base_date(base)
+                .knots([(0.0, 30.0), (0.25, 20.0)])
+                .extrapolation(policy)
+                .build()
+                .unwrap();
+            assert_eq!(curve.price(0.0).unwrap(), 30.0);
+            assert_eq!(curve.price(0.25).unwrap(), 20.0);
+            assert!(curve.price(1.0).is_err());
+            assert!(curve.price_on_date(expiry).is_err());
+        }
+    }
+
+    #[test]
     fn percentage_bucket_shocks_scale_local_signed_levels_and_preserve_spot() {
         for spot in [100.0, 0.0, -50.0] {
             let curve = PriceCurve::builder("LOCAL-PERCENT")
@@ -824,7 +850,7 @@ mod tests {
                 (1.5, -105.0),
                 (2.0, 300.0),
             ] {
-                assert!((bumped.price(time) - expected).abs() < 1e-12);
+                assert!((bumped.price(time).unwrap() - expected).abs() < 1e-12);
             }
         }
     }
@@ -844,16 +870,16 @@ mod tests {
     fn interpolates_forward_price() {
         let curve = sample_wti_curve();
         // At 0.25Y, should be 76.5
-        assert!((curve.price(0.25) - 76.5).abs() < 1e-10);
+        assert!((curve.price(0.25).unwrap() - 76.5).abs() < 1e-10);
         // At 0.125Y (midpoint of first segment), should be ~75.75
-        let mid = curve.price(0.125);
+        let mid = curve.price(0.125).unwrap();
         assert!((mid - 75.75).abs() < 0.01, "Expected ~75.75, got {}", mid);
     }
 
     #[test]
     fn spot_price_at_zero() {
         let curve = sample_wti_curve();
-        assert!((curve.price(0.0) - 75.0).abs() < 1e-10);
+        assert!((curve.price(0.0).unwrap() - 75.0).abs() < 1e-10);
         assert!((curve.spot_price() - 75.0).abs() < 1e-10);
     }
 
@@ -868,14 +894,14 @@ mod tests {
                 .build()
                 .unwrap();
             assert_eq!(curve.knots(), &[0.0, 1.0, 2.0]);
-            assert!((curve.price(0.5) - 77.5).abs() < 1e-12);
-            assert!((curve.price(1e-6) - 75.000005).abs() < 1e-12);
-            assert!((curve.price(1.0) - 80.0).abs() < 1e-12);
+            assert!((curve.price(0.5).unwrap() - 77.5).abs() < 1e-12);
+            assert!((curve.price(1e-6).unwrap() - 75.000005).abs() < 1e-12);
+            assert!((curve.price(1.0).unwrap() - 80.0).abs() < 1e-12);
 
             let restored: PriceCurve =
                 serde_json::from_str(&serde_json::to_string(&curve).unwrap()).unwrap();
             assert_eq!(restored.knots(), curve.knots());
-            assert_eq!(restored.price(0.5), curve.price(0.5));
+            assert_eq!(restored.price(0.5).unwrap(), curve.price(0.5).unwrap());
         }
     }
 
@@ -921,7 +947,7 @@ mod tests {
             })
             .expect("Bump should succeed");
         assert!((bumped.spot_price() - 77.0).abs() < 1e-10);
-        assert!((bumped.price(0.25) - 78.5).abs() < 1e-10);
+        assert!((bumped.price(0.25).unwrap() - 78.5).abs() < 1e-10);
     }
 
     #[test]
@@ -948,7 +974,7 @@ mod tests {
             .knots([(0.0, -10.0), (1.0, -20.0)])
             .build()
             .expect("finite signed prices are valid market data");
-        assert!((curve.price(0.5) + 15.0).abs() < 1e-12);
+        assert!((curve.price(0.5).unwrap() + 15.0).abs() < 1e-12);
     }
 
     #[test]
@@ -973,9 +999,9 @@ mod tests {
                     },
                 })
                 .unwrap();
-            assert_eq!(bumped.price(0.25), -5.0 + bump);
-            assert_eq!(bumped.price(0.5), -3.0);
-            assert_eq!(bumped.price(1.0), 5.0);
+            assert_eq!(bumped.price(0.25).unwrap(), -5.0 + bump);
+            assert_eq!(bumped.price(0.5).unwrap(), -3.0);
+            assert_eq!(bumped.price(1.0).unwrap(), 5.0);
             assert_eq!(bumped.kind(), PriceCurveKind::Price);
         }
     }
@@ -999,10 +1025,13 @@ mod tests {
                 assert_eq!(bumped.knots(), curve.knots());
                 assert_eq!(bumped.spot_price(), curve.spot_price());
                 assert_eq!(bumped.prices()[0], curve.spot_price());
-                assert_eq!(bumped.price(0.0), curve.spot_price());
-                assert!((bumped.price(1e-8) - curve.spot_price()).abs() < 1e-5);
-                assert_eq!(bumped.price(0.25), curve.price(0.25) + bump);
-                assert_eq!(bumped.price(0.5), curve.price(0.5));
+                assert_eq!(bumped.price(0.0).unwrap(), curve.spot_price());
+                assert!((bumped.price(1e-8).unwrap() - curve.spot_price()).abs() < 1e-5);
+                assert_eq!(
+                    bumped.price(0.25).unwrap(),
+                    curve.price(0.25).unwrap() + bump
+                );
+                assert_eq!(bumped.price(0.5).unwrap(), curve.price(0.5).unwrap());
             }
         }
         let bumped = sample_vix_curve()
@@ -1017,7 +1046,7 @@ mod tests {
                 },
             })
             .expect("zero delivery level is valid while spot stays unchanged");
-        assert_eq!(bumped.price(0.25), 0.0);
+        assert_eq!(bumped.price(0.25).unwrap(), 0.0);
         assert_eq!(bumped.prices()[0], 18.5);
     }
 
@@ -1094,7 +1123,7 @@ mod tests {
             serde_json::from_str(&json).expect("Deserialize should succeed");
         assert_eq!(curve.id(), recovered.id());
         assert!((curve.spot_price() - recovered.spot_price()).abs() < 1e-10);
-        assert!((curve.price(0.5) - recovered.price(0.5)).abs() < 1e-10);
+        assert!((curve.price(0.5).unwrap() - recovered.price(0.5).unwrap()).abs() < 1e-10);
     }
 
     fn sample_vix_curve() -> PriceCurve {
@@ -1136,7 +1165,7 @@ mod tests {
         let recovered: PriceCurve =
             serde_json::from_value(json).expect("Deserialize should succeed");
         assert_eq!(recovered.kind(), PriceCurveKind::VolIndex);
-        assert!((curve.price(0.5) - recovered.price(0.5)).abs() < 1e-10);
+        assert!((curve.price(0.5).unwrap() - recovered.price(0.5).unwrap()).abs() < 1e-10);
 
         let price_json = serde_json::to_value(sample_wti_curve()).unwrap();
         assert!(price_json.get("spot_level").is_none());
@@ -1172,7 +1201,7 @@ mod tests {
             .expect("Bump should succeed");
         assert_eq!(bumped.kind(), PriceCurveKind::VolIndex);
         assert!((bumped.spot_price() - 20.5).abs() < 1e-10);
-        assert!((bumped.price(0.25) - 22.0).abs() < 1e-10);
+        assert!((bumped.price(0.25).unwrap() - 22.0).abs() < 1e-10);
         let scaled = curve
             .apply_bump(BumpSpec {
                 mode: BumpMode::Additive,
@@ -1216,7 +1245,7 @@ mod tests {
             .extrapolation(ExtrapolationPolicy::Error)
             .build()
             .expect("pre-base price curve");
-        assert!((curve.price(-0.25) - 73.0).abs() < 1e-12);
-        assert!(curve.price(-1.0).is_nan());
+        assert!((curve.price(-0.25).unwrap() - 73.0).abs() < 1e-12);
+        assert!(curve.price(-1.0).is_err());
     }
 }
