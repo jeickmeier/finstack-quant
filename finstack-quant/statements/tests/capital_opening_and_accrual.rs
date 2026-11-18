@@ -349,3 +349,46 @@ fn principal_cash_and_face_are_reported_on_their_own_dates() {
     assert_eq!(april.principal_pending, Some(usd(0.0)));
     assert_eq!(april.principal_advance_reserve, Some(usd(0.0)));
 }
+
+/// A cash pool that reads its own waterfall's payment through an alias is
+/// rejected before any period runs (STATEMENTS-CAPITAL-006).
+#[test]
+fn a_pool_that_reads_its_own_payment_through_an_alias_is_rejected() {
+    let build = |paid_formula: &str| {
+        let mut builder = ModelBuilder::new("pool");
+        builder.periods("2025Q1..Q2", None).expect("periods");
+        let ebitda: Vec<(PeriodId, AmountOrScalar)> = (1..=2)
+            .map(|q| {
+                (
+                    PeriodId::quarter(2025, q).expect("quarter"),
+                    AmountOrScalar::amount(1_000_000.0, Currency::USD).expect("amount"),
+                )
+            })
+            .collect();
+        builder.value("ebitda", &ebitda);
+        builder.compute("paid", paid_formula).expect("formula");
+        builder.compute("net", "ebitda - paid").expect("formula");
+        builder.compute("cash", "net").expect("formula");
+        builder.add_debt("TL", term_loan());
+        builder.waterfall(WaterfallSpec {
+            available_cash_node: "cash".into(),
+            ..Default::default()
+        });
+        builder.build()
+    };
+
+    // The prior period's payment is committed and may fund the pool.
+    let lagged = build("coalesce(lag(cs.principal_payment.TL, 1), 0 * ebitda)").expect("model");
+    Evaluator::new().evaluate(&lagged).expect("lagged pool");
+
+    // The same period's payment is an output of the waterfall it would fund.
+    let error = match build("cs.interest_expense_cash.TL") {
+        Ok(model) => Evaluator::new()
+            .evaluate(&model)
+            .expect_err("pool reads its own payment"),
+        Err(error) => error,
+    }
+    .to_string();
+    assert!(error.contains("cs.interest_expense_cash.TL"), "{error}");
+    assert!(error.contains("cash -> net -> paid"), "{error}");
+}

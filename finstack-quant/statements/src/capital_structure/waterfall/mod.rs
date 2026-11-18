@@ -63,9 +63,7 @@ use crate::capital_structure::cashflows::{CashflowBreakdown, add_optional_money}
 use crate::capital_structure::state::CapitalStructureState;
 use crate::capital_structure::waterfall_spec::{PaymentPriority, WaterfallSpec};
 use crate::error::Result;
-use crate::evaluator::{
-    CapitalStructureClaimCategory, CapitalStructureWarning, EvalWarning, EvaluationContext,
-};
+use crate::evaluator::{CapitalStructureWarning, EvalWarning, EvaluationContext};
 use finstack_quant_core::money::Money;
 use indexmap::IndexMap;
 use std::collections::HashSet;
@@ -78,15 +76,6 @@ use excess_cash_flow::{EcfDeductions, calculate_ecf_sweep};
 use payment_in_kind::{apply_pik_transitions, evaluate_pik_toggle, is_pik_enabled};
 use payment_stack::waterfall_currency;
 
-/// Money comparison tolerance for waterfall allocation, in currency units.
-///
-/// Allocation math is done in `f64`, so pro-rata splits leave sub-cent
-/// rounding residue. This tolerance (1e-6 ≈ a millionth of a unit) is compared
-/// against dollar magnitudes to decide whether a residual/shortfall is real;
-/// `f64::EPSILON` (~2.2e-16) is far too tight for that — any float residue
-/// would register as a genuine claim and be carried forward.
-const MONEY_TOLERANCE: f64 = 1e-6;
-
 /// Result of executing the waterfall for a single period.
 #[derive(Debug, Clone)]
 pub(crate) struct WaterfallPeriodResult {
@@ -95,19 +84,22 @@ pub(crate) struct WaterfallPeriodResult {
     pub(crate) flows: IndexMap<String, CashflowBreakdown>,
     /// Structured warnings raised during allocation (e.g. cash shortfalls).
     pub(crate) warnings: Vec<EvalWarning>,
-    /// Post-waterfall residual cash distributed to equity.
-    ///
-    /// The cash remaining after fees, interest, and principal allocations, so
-    /// `fees + cash interest + principal + equity == available cash`.
-    /// `None` only when the period had no contractual flows at all, in which
-    /// case no waterfall ran and there is no currency to denominate it in.
+    /// Residual cash distributed to equity: the cash left after the payment
+    /// stack when `Equity` is its terminal priority, zero otherwise.
+    /// `None` only when no waterfall ran because there was neither a debt
+    /// instrument nor a pool currency to denominate it in.
     pub(crate) equity_distribution: Option<Money>,
+    /// Residual cash kept by the company: the cash left after the payment
+    /// stack when `Equity` is not a priority, zero otherwise. With the
+    /// allocations in `flows`,
+    /// `fees + cash interest + principal + equity + retained == available cash`
+    /// exactly. `None` as for `equity_distribution`.
+    pub(crate) retained_cash: Option<Money>,
     /// Cash the waterfall allocated from: the `available_cash_node` value
     /// floored at zero, in the waterfall's currency. With the allocations in
     /// `flows` it satisfies
-    /// `fees + cash interest + principal + equity == available cash`.
-    /// `None` only when the period had no contractual flows, as for
-    /// `equity_distribution`.
+    /// `fees + cash interest + principal + equity + retained == available cash`.
+    /// `None` as for `equity_distribution`.
     pub(crate) available_cash: Option<Money>,
 }
 
@@ -266,6 +258,7 @@ pub(crate) fn execute_waterfall(
     waterfall_spec: &WaterfallSpec,
     state: &mut CapitalStructureState,
     contractual_flows: &IndexMap<String, CashflowBreakdown>,
+    pool_currency: Option<finstack_quant_core::currency::Currency>,
 ) -> Result<WaterfallPeriodResult> {
     let mut staged_state = state.clone();
     let result = execute_waterfall_inner(
@@ -273,6 +266,7 @@ pub(crate) fn execute_waterfall(
         waterfall_spec,
         &mut staged_state,
         contractual_flows,
+        pool_currency,
     )?;
     *state = staged_state;
     Ok(result)
@@ -283,18 +277,44 @@ fn execute_waterfall_inner(
     waterfall_spec: &WaterfallSpec,
     state: &mut CapitalStructureState,
     contractual_flows: &IndexMap<String, CashflowBreakdown>,
+    pool_currency: Option<finstack_quant_core::currency::Currency>,
 ) -> Result<WaterfallPeriodResult> {
     waterfall_spec.validate()?;
+    // Equity receives the residual only when it is the terminal priority;
+    // otherwise the company retains it.
+    let terminal_equity =
+        waterfall_spec.priority_of_payments.last() == Some(&PaymentPriority::Equity);
+    let residual = |remaining: Money| {
+        let zero = Money::from((0_i64, remaining.currency()));
+        if terminal_equity {
+            (remaining, zero)
+        } else {
+            (zero, remaining)
+        }
+    };
 
-    // A configured waterfall over zero instruments is a no-op, not an error: a
-    // staged model (waterfall defined before instruments are added, or all
-    // instruments matured / pre-issuance) should pass through rather than fail.
+    // The waterfall is evaluated without debt claims too: the pool has no
+    // claim to pay and is all residual. Only a structure with neither an
+    // instrument nor a pool currency has nothing to denominate it in.
     if contractual_flows.is_empty() {
+        let Some(currency) = pool_currency else {
+            return Ok(WaterfallPeriodResult {
+                flows: IndexMap::new(),
+                warnings: Vec::new(),
+                equity_distribution: None,
+                retained_cash: None,
+                available_cash: None,
+            });
+        };
+        let mut warnings = Vec::new();
+        let available_cash = available_cash(context, waterfall_spec, currency, &mut warnings)?;
+        let (equity, retained) = residual(available_cash);
         return Ok(WaterfallPeriodResult {
             flows: IndexMap::new(),
-            warnings: Vec::new(),
-            equity_distribution: None,
-            available_cash: None,
+            warnings,
+            equity_distribution: Some(equity),
+            retained_cash: Some(retained),
+            available_cash: Some(available_cash),
         });
     }
 
@@ -376,31 +396,7 @@ fn execute_waterfall_inner(
     }
 
     // --- Step 2: Available cash ---
-    let available_cash = {
-        let available_cash_node = &waterfall_spec.available_cash_node;
-        let cash = eval_value_or_formula(context, available_cash_node, &mut warnings)?;
-        // A negative pool (operating shortfall) is floored to zero for
-        // allocation, but the shortfall itself must stay visible: without
-        // this warning the period simply shorts every creditor and the
-        // negative signal disappears.
-        if cash < 0.0 {
-            warnings.push(EvalWarning::CapitalStructure {
-                period: context.period_id,
-                warning: CapitalStructureWarning::NegativeAvailableCashFloored {
-                    node_id: available_cash_node.clone(),
-                    amount: cash,
-                },
-            });
-            tracing::warn!(
-                node = available_cash_node.as_str(),
-                cash,
-                period = context.period_id.to_string(),
-                "Available cash is negative; floored to zero for waterfall allocation. \
-                 The operating shortfall is surfaced as a warning."
-            );
-        }
-        money_from_expr(cash.max(0.0), cash_currency, available_cash_node)?
-    };
+    let available_cash = available_cash(context, waterfall_spec, cash_currency, &mut warnings)?;
 
     // --- Step 3: Build staged per-instrument state ---
     //
@@ -497,40 +493,31 @@ fn execute_waterfall_inner(
     // synthetic category prefixes such as `fees::` or `principal::`.
     let mut interest_shortfalls: IndexMap<String, Money> = IndexMap::new();
     let mut fee_shortfalls: IndexMap<String, Money> = IndexMap::new();
-    let equity_distribution: Option<Money>;
+    let equity_distribution: Money;
+    let retained_cash: Money;
     {
         let mut remaining_cash = available_cash;
-        // Snapshot planned interest and fees so unpaid amounts can be carried
-        // forward instead of silently evaporating when cash runs out.
-        let planned_interest: Vec<f64> = staged
+        // Snapshot planned interest and fees so every unpaid amount, however
+        // small, is carried forward instead of evaporating when cash runs out.
+        let planned_interest: Vec<Money> = staged
             .iter()
-            .map(|s| s.breakdown.interest_expense_cash.amount().max(0.0))
+            .map(|s| s.breakdown.interest_expense_cash)
             .collect();
-        let planned_fees: Vec<f64> = staged
-            .iter()
-            .map(|s| s.breakdown.fees.amount().max(0.0))
-            .collect();
+        let planned_fees: Vec<Money> = staged.iter().map(|s| s.breakdown.fees).collect();
         let mut paid = EcfDeductions::default();
         for priority in &waterfall_spec.priority_of_payments {
             match priority {
                 PaymentPriority::Fees => {
-                    apply_cash_cap_to_category(
-                        &mut staged,
-                        &mut remaining_cash,
-                        context.period_id,
-                        CapitalStructureClaimCategory::Fees,
-                        &mut warnings,
-                        |s| &mut s.breakdown.fees,
-                    )?;
+                    apply_cash_cap_to_category(&mut staged, &mut remaining_cash, "fee", |s| {
+                        &mut s.breakdown.fees
+                    })?;
                     paid.fees = staged.iter().map(|s| s.breakdown.fees.amount()).sum();
                 }
                 PaymentPriority::Interest => {
                     apply_cash_cap_to_category(
                         &mut staged,
                         &mut remaining_cash,
-                        context.period_id,
-                        CapitalStructureClaimCategory::Interest,
-                        &mut warnings,
+                        "cash interest",
                         |s| &mut s.breakdown.interest_expense_cash,
                     )?;
                     paid.cash_interest = staged
@@ -546,11 +533,10 @@ fn execute_waterfall_inner(
                         s.scheduled_principal = s.principal.get_scheduled_capacity()?;
                     }
                     let allocations = allocate_by_class(&mut staged, &mut remaining_cash, |s| {
-                        s.scheduled_principal.amount().max(0.0)
+                        Ok(s.scheduled_principal)
                     })?;
                     for (s, allocated) in staged.iter_mut().zip(allocations) {
-                        s.scheduled_principal =
-                            Money::new(allocated, s.scheduled_principal.currency())?;
+                        s.scheduled_principal = allocated;
                         s.principal.pay_scheduled(s.scheduled_principal)?;
                         s.breakdown.principal_payment = s
                             .breakdown
@@ -606,77 +592,68 @@ fn execute_waterfall_inner(
             }
         }
 
-        // Per-instrument shortfall: planned − allocated. Unpaid debt service
-        // does not evaporate — it is carried as a claim in the next period.
-        // Interest and fees are tracked in *separate* buckets so a fee arrears
-        // re-enters the fee category (not demoted into interest, which ranks
-        // one rung lower and would also misclassify the accrual).
+        // Per-instrument shortfall: planned − allocated, exactly. Unpaid debt
+        // service does not evaporate, whatever its size — it is carried as a
+        // claim in the next period. Interest and fees are tracked in
+        // *separate* buckets so a fee arrears re-enters the fee category (not
+        // demoted into interest, which ranks one rung lower).
         for (idx, s) in staged.iter().enumerate() {
             let unpaid_interest =
-                planned_interest[idx] - s.breakdown.interest_expense_cash.amount().max(0.0);
-            if unpaid_interest > MONEY_TOLERANCE {
-                let currency = s.breakdown.interest_expense_cash.currency();
-                interest_shortfalls.insert(
-                    s.instrument_id.clone(),
-                    Money::new(unpaid_interest, currency)?,
-                );
+                planned_interest[idx].checked_sub(s.breakdown.interest_expense_cash)?;
+            if unpaid_interest.amount_decimal() > rust_decimal::Decimal::ZERO {
+                interest_shortfalls.insert(s.instrument_id.clone(), unpaid_interest);
                 warnings.push(EvalWarning::CapitalStructure {
                     period: context.period_id,
                     warning: CapitalStructureWarning::InterestShortfall {
                         instrument_id: s.instrument_id.clone(),
-                        amount: unpaid_interest,
+                        amount: unpaid_interest.amount(),
                     },
                 });
-                tracing::warn!(
-                    instrument = s.instrument_id.as_str(),
-                    shortfall = unpaid_interest,
-                    period = context.period_id.to_string(),
-                    "Available cash insufficient for planned interest; \
-                     shortfall accrued and carried into the next period's interest claim."
-                );
             }
 
-            let unpaid_fees = planned_fees[idx] - s.breakdown.fees.amount().max(0.0);
-            if unpaid_fees > MONEY_TOLERANCE {
-                let currency = s.breakdown.fees.currency();
-                fee_shortfalls.insert(s.instrument_id.clone(), Money::new(unpaid_fees, currency)?);
+            let unpaid_fees = planned_fees[idx].checked_sub(s.breakdown.fees)?;
+            if unpaid_fees.amount_decimal() > rust_decimal::Decimal::ZERO {
+                fee_shortfalls.insert(s.instrument_id.clone(), unpaid_fees);
                 warnings.push(EvalWarning::CapitalStructure {
                     period: context.period_id,
                     warning: CapitalStructureWarning::FeeShortfall {
                         instrument_id: s.instrument_id.clone(),
-                        amount: unpaid_fees,
+                        amount: unpaid_fees.amount(),
                     },
                 });
-                tracing::warn!(
-                    instrument = s.instrument_id.as_str(),
-                    shortfall = unpaid_fees,
-                    period = context.period_id.to_string(),
-                    "Available cash insufficient for planned fees; \
-                     shortfall carried into the next period's fee claim."
-                );
             }
 
-            let unpaid_principal = s.principal.get_scheduled_capacity()?.amount();
-            if unpaid_principal > MONEY_TOLERANCE {
+            let unpaid_principal = s.principal.get_scheduled_capacity()?;
+            if unpaid_principal.amount_decimal() > rust_decimal::Decimal::ZERO {
                 warnings.push(EvalWarning::CapitalStructure {
                     period: context.period_id,
                     warning: CapitalStructureWarning::PrincipalShortfall {
                         instrument_id: s.instrument_id.clone(),
-                        amount: unpaid_principal,
+                        amount: unpaid_principal.amount(),
                     },
                 });
-                tracing::warn!(
-                    instrument = s.instrument_id.as_str(),
-                    shortfall = unpaid_principal,
-                    period = context.period_id.to_string(),
-                    "Available cash insufficient for planned scheduled principal; \
-                     shortfall carried into the next period's amortization claim."
-                );
             }
         }
 
-        // Whatever cash survives the priority stack flows to equity.
-        equity_distribution = Some(remaining_cash);
+        // Whatever cash survives the priority stack is the residual. The
+        // allocatable cash reconciles exactly to what was paid plus it.
+        let mut uses = remaining_cash;
+        for s in &staged {
+            uses = uses
+                .checked_add(s.breakdown.fees)?
+                .checked_add(s.breakdown.interest_expense_cash)?
+                .checked_add(s.breakdown.principal_payment)?;
+        }
+        if uses != available_cash {
+            return Err(crate::error::Error::capital_structure(format!(
+                "Waterfall cash does not reconcile in {}: {} {cash_currency} allocated and \
+                 retained against {} {cash_currency} available",
+                context.period_id,
+                uses.amount(),
+                available_cash.amount()
+            )));
+        }
+        (equity_distribution, retained_cash) = residual(remaining_cash);
     }
 
     // --- Step 6: Period close ---
@@ -783,9 +760,34 @@ fn execute_waterfall_inner(
     Ok(WaterfallPeriodResult {
         flows: result,
         warnings,
-        equity_distribution,
+        equity_distribution: Some(equity_distribution),
+        retained_cash: Some(retained_cash),
         available_cash: Some(available_cash),
     })
+}
+
+/// The period's allocatable cash: the pre-debt-service pool, with a negative
+/// pool reported as a funding shortfall and allocated as zero.
+fn available_cash(
+    context: &EvaluationContext,
+    waterfall_spec: &WaterfallSpec,
+    currency: finstack_quant_core::currency::Currency,
+    warnings: &mut Vec<EvalWarning>,
+) -> Result<Money> {
+    let node = &waterfall_spec.available_cash_node;
+    let cash = eval_value_or_formula(context, node, warnings)?;
+    // The shortfall itself must stay visible: without this warning the period
+    // simply shorts every creditor and the negative signal disappears.
+    if cash < 0.0 {
+        warnings.push(EvalWarning::CapitalStructure {
+            period: context.period_id,
+            warning: CapitalStructureWarning::NegativeAvailableCashFloored {
+                node_id: node.clone(),
+                amount: cash,
+            },
+        });
+    }
+    money_from_expr(cash.max(0.0), currency, node)
 }
 
 /// Test-only: run the waterfall for fixtures that state one aggregate
@@ -830,7 +832,7 @@ pub(crate) fn execute_waterfall_same_period(
         };
         staged.set_period_principal_flows(instrument_id.clone(), &period, claims)?;
     }
-    let result = execute_waterfall(context, waterfall_spec, &mut staged, &dated)?;
+    let result = execute_waterfall(context, waterfall_spec, &mut staged, &dated, None)?;
     *state = staged;
     Ok(result)
 }
@@ -1133,8 +1135,8 @@ mod tests {
                 .expect_err("deducting cs debt service from available cash must error");
         let msg = err.to_string();
         assert!(
-            msg.contains("pre-waterfall") && msg.contains("cs.interest_expense"),
-            "error must name the pre-waterfall contract: {msg}"
+            msg.contains("before debt service") && msg.contains("cs.interest_expense"),
+            "error must name the pre-debt-service contract: {msg}"
         );
 
         let allowed = WaterfallSpec {
@@ -1888,7 +1890,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ecf_negative_cash_interest_does_not_reduce_ecf() {
+    fn a_negative_interest_claim_is_rejected() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
         let context = build_context(
             period,
@@ -1927,14 +1929,15 @@ mod tests {
             ..Default::default()
         };
 
-        let results =
+        // A negative outflow claim is a sign error upstream: it is rejected,
+        // not read as zero, and the state is left untouched.
+        let error =
             execute_waterfall_same_period(&context, &waterfall, &mut state, &contractual_flows)
-                .expect("waterfall should execute");
-
-        // ECF = 1000 - 100 - 50 - max(0, -200) = 1000 - 100 - 50 - 0 = 850
-        // Sweep = 850 * 0.5 = 425
-        let tl = results.flows.get("TL-1").expect("TL-1");
-        assert_eq!(tl.principal_payment.amount(), 425.0);
+                .expect_err("negative cash interest claim")
+                .to_string();
+        assert!(error.contains("TL-1"), "{error}");
+        assert!(error.contains("negative cash interest claim"), "{error}");
+        assert!(state.closing_balances.is_empty());
     }
 
     /// Unpaid interest under an available-cash cap must not evaporate: it

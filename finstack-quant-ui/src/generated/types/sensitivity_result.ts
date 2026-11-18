@@ -283,22 +283,6 @@ export type D_76Adf23Abc095Fd56514 =
         warning:
           | {
               /**
-               * Negative claim amount in the waterfall currency.
-               */
-              amount: number;
-              /**
-               * Payment category containing the invalid negative claim.
-               */
-              category: "fees" | "interest";
-              /**
-               * Instrument whose claim was neutralized.
-               */
-              instrument_id: string;
-              kind: "negative_claim_neutralized";
-              [k: string]: unknown;
-            }
-          | {
-              /**
                * Negative amount that was floored, in the waterfall currency.
                */
               amount: number;
@@ -1196,7 +1180,7 @@ export interface DF840Db5F4C38222F7Ca7 {
    * Only populated for periods in which a waterfall ran; empty for models
    * without a waterfall and for JSON written before this field existed.
    * Reconciles the period's uses:
-   * `fees + cash interest + principal + equity_distribution == available_cash`.
+   * `fees + cash interest + principal + equity_distribution + retained_cash == available_cash`.
    */
   available_cash?: {
     [k: string]: D_1B5716Dde9957A614F3C1;
@@ -1222,12 +1206,14 @@ export interface DF840Db5F4C38222F7Ca7 {
     [k: string]: DB74Dc9Ca475664736351[];
   };
   /**
-   * Post-waterfall residual cash distributed to equity per period.
+   * Residual cash distributed to equity per period: the cash left after
+   * fees, interest and principal when `Equity` is the waterfall's terminal
+   * priority, and zero when it is not.
    *
-   * Only populated by waterfall evaluation when `available_cash_node` is
-   * configured: it is the cash remaining after fees, interest, and
-   * principal allocations. With the per-period allocations this satisfies
-   * `fees + cash interest + principal + equity == available cash`.
+   * Only populated for periods in which a waterfall ran. With the
+   * per-period allocations,
+   * `fees + cash interest + principal + equity + retained == available cash`
+   * exactly.
    */
   equity_distribution?: {
     [k: string]: D_1B5716Dde9957A614F3C1;
@@ -1236,6 +1222,15 @@ export interface DF840Db5F4C38222F7Ca7 {
    * Reporting currency used for `totals` (if populated)
    */
   reporting_currency?: D_9E50E1B9698Ebe0E1126 | null;
+  /**
+   * Residual cash the company retains per period: the cash left after the
+   * payment stack when `Equity` is not a priority, and zero when it is.
+   *
+   * Only populated for periods in which a waterfall ran.
+   */
+  retained_cash?: {
+    [k: string]: D_1B5716Dde9957A614F3C1;
+  };
   /**
    * Total cashflows across all instruments in the reporting currency (if available)
    */

@@ -323,7 +323,7 @@
           "additionalProperties": {
             "$ref": "#/$defs/Money"
           },
-          "description": "Cash the waterfall had to allocate in each period: the value of\n`WaterfallSpec.available_cash_node`, floored at zero (a negative pool\nis reported as a `NegativeAvailableCashFloored` warning), in the\nwaterfall's currency.\n\nOnly populated for periods in which a waterfall ran; empty for models\nwithout a waterfall and for JSON written before this field existed.\nReconciles the period's uses:\n`fees + cash interest + principal + equity_distribution == available_cash`.",
+          "description": "Cash the waterfall had to allocate in each period: the value of\n`WaterfallSpec.available_cash_node`, floored at zero (a negative pool\nis reported as a `NegativeAvailableCashFloored` warning), in the\nwaterfall's currency.\n\nOnly populated for periods in which a waterfall ran; empty for models\nwithout a waterfall and for JSON written before this field existed.\nReconciles the period's uses:\n`fees + cash interest + principal + equity_distribution + retained_cash == available_cash`.",
           "type": "object"
         },
         "by_instrument": {
@@ -350,7 +350,7 @@
           "additionalProperties": {
             "$ref": "#/$defs/Money"
           },
-          "description": "Post-waterfall residual cash distributed to equity per period.\n\nOnly populated by waterfall evaluation when `available_cash_node` is\nconfigured: it is the cash remaining after fees, interest, and\nprincipal allocations. With the per-period allocations this satisfies\n`fees + cash interest + principal + equity == available cash`.",
+          "description": "Residual cash distributed to equity per period: the cash left after\nfees, interest and principal when `Equity` is the waterfall's terminal\npriority, and zero when it is not.\n\nOnly populated for periods in which a waterfall ran. With the\nper-period allocations,\n`fees + cash interest + principal + equity + retained == available cash`\nexactly.",
           "type": "object"
         },
         "reporting_currency": {
@@ -363,6 +363,13 @@
             }
           ],
           "description": "Reporting currency used for `totals` (if populated)"
+        },
+        "retained_cash": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Money"
+          },
+          "description": "Residual cash the company retains per period: the cash left after the\npayment stack when `Equity` is not a priority, and zero when it is.\n\nOnly populated for periods in which a waterfall ran.",
+          "type": "object"
         },
         "totals": {
           "additionalProperties": {
@@ -387,53 +394,9 @@
       ],
       "type": "object"
     },
-    "CapitalStructureClaimCategory": {
-      "description": "Cash claim category affected by a capital-structure warning.",
-      "oneOf": [
-        {
-          "const": "fees",
-          "description": "Fee claims such as commitment or facility fees.",
-          "type": "string"
-        },
-        {
-          "const": "interest",
-          "description": "Cash-interest claims.",
-          "type": "string"
-        }
-      ]
-    },
     "CapitalStructureWarning": {
       "description": "Typed reason for a capital-structure evaluation warning.",
       "oneOf": [
-        {
-          "description": "A negative creditor claim was neutralized instead of reducing other claims.",
-          "properties": {
-            "amount": {
-              "description": "Negative claim amount in the waterfall currency.",
-              "format": "double",
-              "type": "number"
-            },
-            "category": {
-              "$ref": "#/$defs/CapitalStructureClaimCategory",
-              "description": "Payment category containing the invalid negative claim."
-            },
-            "instrument_id": {
-              "description": "Instrument whose claim was neutralized.",
-              "type": "string"
-            },
-            "kind": {
-              "const": "negative_claim_neutralized",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "category",
-            "instrument_id",
-            "amount"
-          ],
-          "type": "object"
-        },
         {
           "description": "A negative available-cash pool was floored to zero before allocation.",
           "properties": {

@@ -237,11 +237,25 @@ that order. Each prepayment requires an explicit payment priority and its
 matching sizing rule. A waterfall with any prepayment priority supports
 capital structures composed solely of term loans and revolvers.
 
-Known limits (also stated in the module rustdoc): waterfall allocation is
-pro-rata inside each payment class, walking class rank (empty
-`payment_classes` is one implicit class); loan residual schedules rebuild
-interest after outstanding changes; `available_cash_node` is the pre-waterfall
-cash pool and must not deduct `cs` debt-service tokens; omitted `fx_policy` converts
+Waterfall allocation is exact. Senior payment classes are paid first (empty
+`payment_classes` is one implicit class). Within a class, claims are paid in
+full when the cash covers them; otherwise each pro-rata quota is floored to the
+currency's minor unit and the cents left over go to the largest fractional
+remainders, ties by instrument id. Every unpaid amount is carried, however
+small, a negative fee or interest claim is rejected, and the period reconciles
+exactly: fees, cash interest, principal, the equity distribution and retained
+cash sum to the available cash. The residual is an equity distribution when
+`Equity` is the terminal priority and `retained_cash` when it is absent. A
+negative pool is a funding shortfall and allocates nothing, and the waterfall
+runs in a debt-free period too.
+
+`available_cash_node` is the cash pool before debt service. It may not depend
+on any same-period `cs` component, directly or through the formulas and masks
+of the nodes it names: every such component is an output of the waterfall the
+pool funds. Read a prior period with `lag(...)`.
+
+Known limits (also stated in the module rustdoc): loan residual schedules
+rebuild interest after outstanding changes; omitted `fx_policy` converts
 period-aggregated reporting totals on the inclusive period-end date
 (`PeriodEnd`); prepayment penalties, call premiums, and OID accretion are
 not modeled.

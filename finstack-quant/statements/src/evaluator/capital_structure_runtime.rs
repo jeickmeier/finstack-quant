@@ -48,6 +48,14 @@ impl Evaluator {
         let Some(cs_spec) = &model.capital_structure else {
             return Ok(None);
         };
+        // Once per run: the cash pool may not depend, through any chain of
+        // formulas and masks, on a same-period output of its own waterfall.
+        if let Some(waterfall) = &cs_spec.waterfall {
+            crate::capital_structure::reject_pool_output_dependence(
+                &model.nodes,
+                &waterfall.available_cash_node,
+            )?;
+        }
         let mut instruments = Instruments::new();
 
         for debt_spec in &cs_spec.debt_instruments {
@@ -124,23 +132,21 @@ impl Evaluator {
         let mut waterfall_replaced_flows = false;
         if let Some(cs_spec) = &model.capital_structure {
             if let Some(waterfall_spec) = &cs_spec.waterfall {
-                if let Some(node) = model.nodes.get(&crate::types::NodeId::new(
-                    &waterfall_spec.available_cash_node,
-                )) && let Some(formula) = &node.formula_text
-                {
-                    crate::capital_structure::reject_available_cash_debt_service(formula)?;
-                }
                 let waterfall_result = crate::capital_structure::waterfall::execute_waterfall(
                     &context,
                     waterfall_spec,
                     cs_state,
                     &contractual_flows,
+                    model.capital_structure_currency()?,
                 )?;
 
                 merge_updated_flows(&mut cs_cashflows, &waterfall_result.flows, period_id);
                 recompute_cs_totals(&mut cs_cashflows, period_id, fx_ctx.as_ref())?;
                 if let Some(equity) = waterfall_result.equity_distribution {
                     cs_cashflows.equity_distribution.insert(period_id, equity);
+                }
+                if let Some(retained) = waterfall_result.retained_cash {
+                    cs_cashflows.retained_cash.insert(period_id, retained);
                 }
                 if let Some(cash) = waterfall_result.available_cash {
                     cs_cashflows.available_cash.insert(period_id, cash);

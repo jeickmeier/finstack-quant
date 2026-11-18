@@ -1332,10 +1332,6 @@ export type SettlementType = "physical" | "cash";
  */
 export type CapFloorVolType = "lognormal" | "shifted_lognormal" | "normal" | "auto";
 /**
- * Cash claim category affected by a capital-structure warning.
- */
-export type CapitalStructureClaimCategory = "fees" | "interest";
-/**
  * Instruments supported by company financial statement capital structures.
  *
  * This intentionally smaller union keeps the financial statement schema
@@ -1791,22 +1787,6 @@ export type PaymentPriority =
  * Typed reason for a capital-structure evaluation warning.
  */
 export type CapitalStructureWarning =
-  | {
-      /**
-       * Negative claim amount in the waterfall currency.
-       */
-      amount: number;
-      /**
-       * Payment category containing the invalid negative claim.
-       */
-      category: CapitalStructureClaimCategory;
-      /**
-       * Instrument whose claim was neutralized.
-       */
-      instrument_id: string;
-      kind: "negative_claim_neutralized";
-      [k: string]: unknown;
-    }
   | {
       /**
        * Negative amount that was floored, in the waterfall currency.
@@ -4788,7 +4768,7 @@ export interface CapitalStructureCashflows {
    * Only populated for periods in which a waterfall ran; empty for models
    * without a waterfall and for JSON written before this field existed.
    * Reconciles the period's uses:
-   * `fees + cash interest + principal + equity_distribution == available_cash`.
+   * `fees + cash interest + principal + equity_distribution + retained_cash == available_cash`.
    */
   available_cash?: {
     [k: string]: Money;
@@ -4814,12 +4794,14 @@ export interface CapitalStructureCashflows {
     [k: string]: DistressCashflow[];
   };
   /**
-   * Post-waterfall residual cash distributed to equity per period.
+   * Residual cash distributed to equity per period: the cash left after
+   * fees, interest and principal when `Equity` is the waterfall's terminal
+   * priority, and zero when it is not.
    *
-   * Only populated by waterfall evaluation when `available_cash_node` is
-   * configured: it is the cash remaining after fees, interest, and
-   * principal allocations. With the per-period allocations this satisfies
-   * `fees + cash interest + principal + equity == available cash`.
+   * Only populated for periods in which a waterfall ran. With the
+   * per-period allocations,
+   * `fees + cash interest + principal + equity + retained == available cash`
+   * exactly.
    */
   equity_distribution?: {
     [k: string]: Money;
@@ -4828,6 +4810,15 @@ export interface CapitalStructureCashflows {
    * Reporting currency used for `totals` (if populated)
    */
   reporting_currency?: Currency | null;
+  /**
+   * Residual cash the company retains per period: the cash left after the
+   * payment stack when `Equity` is not a priority, and zero when it is.
+   *
+   * Only populated for periods in which a waterfall ran.
+   */
+  retained_cash?: {
+    [k: string]: Money;
+  };
   /**
    * Total cashflows across all instruments in the reporting currency (if available)
    */
@@ -6918,19 +6909,20 @@ export interface SabrParameters {
  */
 export interface WaterfallSpec {
   /**
-   * Formula or node reference for cash available to allocate in the waterfall.
+   * Formula or node reference for the cash available to allocate.
    *
-   * This is the **pre-waterfall** cash pool: cash before fees, interest,
-   * amortization, and prepays allocated by this waterfall. Point it at a
-   * standalone cash / FCF node (`cash`, `cash_available`, `free_cash_flow`).
-   * Do not deduct `cs.interest_expense`, `cs.interest_expense_cash`,
-   * `cs.principal_payment`, or `cs.fees` here — those are allocated by the
-   * waterfall, and subtracting them from the pool double-pays debt service.
+   * This is the cash pool **before debt service**: cash before the fees,
+   * interest, amortization and prepayments this waterfall allocates. Point
+   * it at a standalone cash or free-cash-flow node (`cash`,
+   * `cash_available`, `free_cash_flow`). It may not depend on any
+   * same-period `cs` component, directly or through the formulas and masks
+   * of the nodes it names: every such component is an output of this
+   * waterfall. A prior period read with `lag(...)` is allowed.
    *
-   * Required. Without a cash pool the waterfall reports every scheduled fee,
-   * coupon and amortization as paid in full regardless of whether the model
-   * generated the cash — uses exceed sources and no shortfall can ever be
-   * raised, so the structure cannot report insolvency.
+   * A negative pool is a funding shortfall: it is reported and nothing is
+   * allocated. The cash left after the payment stack is an equity
+   * distribution when `Equity` is the terminal priority and retained cash
+   * when `Equity` is absent.
    */
   available_cash_node: string;
   /**

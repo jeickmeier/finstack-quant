@@ -1,9 +1,7 @@
 //! Monte Carlo evaluation types and aggregation utilities.
 
 use crate::error::{Error, Result};
-use crate::evaluator::results::{
-    CapitalStructureClaimCategory, CapitalStructureWarning, EvalWarning,
-};
+use crate::evaluator::results::{CapitalStructureWarning, EvalWarning};
 use crate::types::FinancialModelSpec;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::stats::quantile_sorted;
@@ -350,7 +348,6 @@ enum WarningKey<'a> {
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 enum CapitalStructureKey<'a> {
-    NegativeClaimNeutralized(CapitalStructureClaimCategory, &'a str, u64),
     NegativeAvailableCashFloored(&'a str, u64),
     InterestShortfall(&'a str, u64),
     FeeShortfall(&'a str, u64),
@@ -391,11 +388,6 @@ impl<'a> WarningKey<'a> {
 impl<'a> CapitalStructureKey<'a> {
     fn of(warning: &'a CapitalStructureWarning) -> Self {
         match warning {
-            CapitalStructureWarning::NegativeClaimNeutralized {
-                category,
-                instrument_id,
-                amount,
-            } => Self::NegativeClaimNeutralized(*category, instrument_id, amount.to_bits()),
             CapitalStructureWarning::NegativeAvailableCashFloored { node_id, amount } => {
                 Self::NegativeAvailableCashFloored(node_id, amount.to_bits())
             }

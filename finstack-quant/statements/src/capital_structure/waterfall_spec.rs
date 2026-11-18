@@ -33,19 +33,20 @@ pub struct WaterfallSpec {
     #[serde(default = "default_priority_of_payments")]
     pub priority_of_payments: Vec<PaymentPriority>,
 
-    /// Formula or node reference for cash available to allocate in the waterfall.
+    /// Formula or node reference for the cash available to allocate.
     ///
-    /// This is the **pre-waterfall** cash pool: cash before fees, interest,
-    /// amortization, and prepays allocated by this waterfall. Point it at a
-    /// standalone cash / FCF node (`cash`, `cash_available`, `free_cash_flow`).
-    /// Do not deduct `cs.interest_expense`, `cs.interest_expense_cash`,
-    /// `cs.principal_payment`, or `cs.fees` here — those are allocated by the
-    /// waterfall, and subtracting them from the pool double-pays debt service.
+    /// This is the cash pool **before debt service**: cash before the fees,
+    /// interest, amortization and prepayments this waterfall allocates. Point
+    /// it at a standalone cash or free-cash-flow node (`cash`,
+    /// `cash_available`, `free_cash_flow`). It may not depend on any
+    /// same-period `cs` component, directly or through the formulas and masks
+    /// of the nodes it names: every such component is an output of this
+    /// waterfall. A prior period read with `lag(...)` is allowed.
     ///
-    /// Required. Without a cash pool the waterfall reports every scheduled fee,
-    /// coupon and amortization as paid in full regardless of whether the model
-    /// generated the cash — uses exceed sources and no shortfall can ever be
-    /// raised, so the structure cannot report insolvency.
+    /// A negative pool is a funding shortfall: it is reported and nothing is
+    /// allocated. The cash left after the payment stack is an equity
+    /// distribution when `Equity` is the terminal priority and retained cash
+    /// when `Equity` is absent.
     pub available_cash_node: String,
 
     /// Excess Cash Flow (ECF) sweep specification.
@@ -187,7 +188,7 @@ impl WaterfallSpec {
                  supplying the period's available cash.",
             ));
         }
-        reject_available_cash_debt_service(&self.available_cash_node)?;
+        reject_pool_output_dependence(&indexmap::IndexMap::new(), &self.available_cash_node)?;
         validate_payment_classes(&self.payment_classes)?;
         for (priority, node_name, node) in [
             (
@@ -253,28 +254,6 @@ impl WaterfallSpec {
     }
 }
 
-/// Tokens that mean the cash pool has already deducted waterfall debt service.
-const AVAILABLE_CASH_DEBT_SERVICE_TOKENS: &[&str] = &[
-    "cs.interest_expense",
-    "cs.interest_expense_cash",
-    "cs.principal_payment",
-    "cs.fees",
-];
-
-/// Reject an `available_cash_node` expression (or a named node's formula) that
-/// deducts capital-structure debt service from the pre-waterfall cash pool.
-///
-/// # Arguments
-///
-/// * `text` - Inline DSL formula or node `formula_text` to scan for
-///   `cs.interest_expense`, `cs.interest_expense_cash`, `cs.principal_payment`,
-///   or `cs.fees`. Those buckets are allocated by the waterfall; subtracting
-///   them here double-pays debt service.
-///
-/// # Errors
-///
-/// Returns a build error naming the pre-waterfall contract when `text`
-/// contains any of those `cs.*` debt-service identifiers.
 fn validate_payment_classes(classes: &[PaymentClassSpec]) -> Result<()> {
     if classes.is_empty() {
         return Ok(());
@@ -318,20 +297,78 @@ fn validate_payment_classes(classes: &[PaymentClassSpec]) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn reject_available_cash_debt_service(text: &str) -> Result<()> {
-    if let Some(token) = AVAILABLE_CASH_DEBT_SERVICE_TOKENS
-        .iter()
-        .copied()
-        .find(|token| text.contains(token))
-    {
-        return Err(Error::build(format!(
-            "WaterfallSpec: `available_cash_node` is the pre-waterfall cash pool \
-             (cash before fees, interest, amortization, and prepays allocated by \
-             this waterfall). The formula must not deduct `{token}` or other \
-             `cs.interest_expense` / `cs.interest_expense_cash` / \
-             `cs.principal_payment` / `cs.fees` terms; those are allocated by \
-             the waterfall and deducting them here double-pays debt service."
-        )));
+/// Reject a cash pool that depends, in the same period, on an output of the
+/// waterfall it funds.
+///
+/// The pool is cash before debt service. Every same-period capital-structure
+/// component (`cs.*`: interest, fees, principal, balances, accruals, arrears)
+/// is an output of the allocation, so the pool expression may not read one,
+/// directly or through the formulas and masks of the nodes it names. A lagged
+/// reference (`lag(cs.debt_balance.total, 1)`) reads a committed prior period
+/// and is allowed.
+///
+/// # Arguments
+///
+/// * `nodes` - The model's nodes, searched transitively through their
+///   formulas and `where` masks. Empty checks the expression alone.
+/// * `expression` - The pool: a node id or an inline formula.
+///
+/// # Errors
+///
+/// Returns a build error naming the `cs` component and the chain of nodes
+/// that reaches it, or a parse error for an invalid formula.
+pub(crate) fn reject_pool_output_dependence(
+    nodes: &indexmap::IndexMap<crate::types::NodeId, crate::types::NodeSpec>,
+    expression: &str,
+) -> Result<()> {
+    use crate::utils::formula::extract_direct_dependencies;
+    let same_period = |text: &str| -> Result<Vec<String>> {
+        Ok(
+            extract_direct_dependencies(&crate::dsl::parse_formula(text)?)
+                .into_iter()
+                .map(|id| id.as_str().to_string())
+                .collect(),
+        )
+    };
+    let mut pending: Vec<(String, Vec<String>)> = if nodes.contains_key(expression) {
+        vec![(expression.to_string(), Vec::new())]
+    } else {
+        same_period(expression)?
+            .into_iter()
+            .map(|id| (id, Vec::new()))
+            .collect()
+    };
+    let mut visited = HashSet::new();
+    while let Some((identifier, path)) = pending.pop() {
+        if identifier.starts_with("cs.") {
+            let via = if path.is_empty() {
+                String::new()
+            } else {
+                format!(" through {}", path.join(" -> "))
+            };
+            return Err(Error::build(format!(
+                "WaterfallSpec: `available_cash_node` is the cash pool before debt service, \
+                 but it reads `{identifier}`{via} in the same period. Every same-period \
+                 `cs` component is an output of the waterfall the pool funds; read a prior \
+                 period with `lag(...)` or name a pool that does not depend on it."
+            )));
+        }
+        if !visited.insert(identifier.clone()) {
+            continue;
+        }
+        let Some(node) = nodes.get(identifier.as_str()) else {
+            continue;
+        };
+        let mut chain = path;
+        chain.push(identifier);
+        for text in [node.formula_text.as_deref(), node.where_text.as_deref()]
+            .into_iter()
+            .flatten()
+        {
+            for dependency in same_period(text)? {
+                pending.push((dependency, chain.clone()));
+            }
+        }
     }
     Ok(())
 }
@@ -656,18 +693,60 @@ mod tests {
             .validate()
             .expect_err("deducting cs debt service from available cash must be rejected");
         assert!(
-            err.to_string().contains("pre-waterfall"),
-            "error must name the pre-waterfall contract: {err}"
+            err.to_string().contains("before debt service"),
+            "error must name the pre-debt-service contract: {err}"
         );
     }
 
     #[test]
-    fn reject_available_cash_debt_service_scans_named_node_formula() {
-        reject_available_cash_debt_service("cash_available")
-            .expect("a standalone cash node name is the pre-waterfall pool");
-        let err = reject_available_cash_debt_service("ebitda - cs.principal_payment.total")
-            .expect_err("a named node's formula that deducts cs principal must be rejected");
-        assert!(err.to_string().contains("pre-waterfall"));
+    fn the_pool_may_not_reach_a_same_period_cs_output_through_any_chain() {
+        use crate::types::{NodeId, NodeSpec, NodeType};
+        let node = |id: &str, formula: &str| {
+            (
+                NodeId::new(id),
+                NodeSpec::new(id, NodeType::Calculated).with_formula(formula),
+            )
+        };
+        let mut masked = NodeSpec::new("masked", NodeType::Calculated).with_formula("ebitda");
+        masked.where_text = Some("cs.debt_balance.total > 0 * cs.debt_balance.total".into());
+        let nodes: indexmap::IndexMap<NodeId, NodeSpec> = [
+            node("cash", "ebitda - capex"),
+            node("direct", "ebitda - cs.principal_payment.total"),
+            node("alias", "net_cash"),
+            node("net_cash", "ebitda - interest_paid"),
+            node("interest_paid", "cs.interest_expense_cash.total"),
+            node("accrual", "ebitda - cs.accrued_interest.total"),
+            node("lagged", "ebitda - lag(cs.debt_balance.total, 1)"),
+            (NodeId::new("masked"), masked),
+        ]
+        .into_iter()
+        .collect();
+
+        // A pool with no capital dependence, and one that reads a prior period.
+        for pool in ["cash", "lagged", "ebitda - capex"] {
+            reject_pool_output_dependence(&nodes, pool).expect(pool);
+        }
+        // Direct, aliased, masked and inline dependence, on any component.
+        for (pool, component) in [
+            ("direct", "cs.principal_payment.total"),
+            ("alias", "cs.interest_expense_cash.total"),
+            ("accrual", "cs.accrued_interest.total"),
+            ("masked", "cs.debt_balance.total"),
+            ("ebitda - cs.fees.total", "cs.fees.total"),
+        ] {
+            let error = reject_pool_output_dependence(&nodes, pool)
+                .expect_err(pool)
+                .to_string();
+            assert!(error.contains(component), "{pool}: {error}");
+        }
+        // The chain that reaches the output is named.
+        let error = reject_pool_output_dependence(&nodes, "alias")
+            .expect_err("alias")
+            .to_string();
+        assert!(
+            error.contains("alias -> net_cash -> interest_paid"),
+            "{error}"
+        );
     }
 
     #[test]

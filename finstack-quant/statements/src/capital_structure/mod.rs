@@ -126,7 +126,7 @@ pub use period_flows::{
 };
 pub(crate) use principal::PrincipalClaim;
 pub(crate) use state::CapitalStructureState;
-pub(crate) use waterfall_spec::reject_available_cash_debt_service;
+pub(crate) use waterfall_spec::reject_pool_output_dependence;
 pub use waterfall_spec::{
     EcfSweepSpec, PaymentClassSpec, PaymentPriority, PikToggleSpec, WaterfallSpec,
     default_priority_of_payments,

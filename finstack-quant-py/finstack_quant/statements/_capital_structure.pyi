@@ -883,16 +883,36 @@ class CapitalStructureCashflows:
         ...
 
     @property
-    def equity_distribution(self) -> dict[str, float]:
+    def equity_distribution(self) -> dict[str, Money]:
         """
-        Residual cash to equity, keyed by period id.
+        Residual cash distributed to equity, keyed by period id.
+
+        The cash left after fees, interest and principal when ``equity`` is
+        the waterfall's terminal priority, and zero when it is not.
 
         This property does not raise.
 
         Returns
         -------
-        dict[str, float]
-            Residual cash to equity, keyed by period id.
+        dict[str, Money]
+            Period id to ``Money``; empty unless a waterfall ran.
+        """
+        ...
+
+    @property
+    def retained_cash(self) -> dict[str, Money]:
+        """
+        Residual cash the company retains, keyed by period id.
+
+        The cash left after the payment stack when ``equity`` is not one of
+        the waterfall's priorities, and zero when it is.
+
+        This property does not raise.
+
+        Returns
+        -------
+        dict[str, Money]
+            Period id to ``Money``; empty unless a waterfall ran.
         """
         ...
 
@@ -901,10 +921,11 @@ class CapitalStructureCashflows:
         """
         Cash available to the waterfall, keyed by period id.
 
-        The value of the waterfall's ``available_cash_node`` floored at zero,
-        in the waterfall's currency. It reconciles the period's uses:
-        ``fees + cash interest + principal_payment + equity_distribution ==
-        available_cash``.
+        The value of the waterfall's ``available_cash_node``, in the
+        waterfall's currency; a negative pool is a funding shortfall and
+        allocates as zero. It reconciles the period's uses exactly:
+        ``fees + cash interest + principal_payment + equity_distribution +
+        retained_cash == available_cash``.
 
         This property does not raise.
 

@@ -1317,6 +1317,33 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements capital: waterfall allocation is exact; residual cash is equity or retained
+
+STATEMENTS-CAPITAL-006. **Breaking.**
+
+- **Whole minor units.** When a class's cash does not cover its claims, each
+  pro-rata quota is floored to the currency's minor unit and the units left
+  over go to the largest fractional remainders, ties by instrument id. Five
+  cents across three two-cent claims pay 2, 2 and 1. Allocation used
+  floating-point shares with the rounding residue on the last row.
+- **Every unpaid amount is carried.** The `1e-6` materiality threshold on
+  interest, fee and principal shortfalls is removed.
+- **Negative claims are rejected.** A negative fee or interest claim fails
+  the period. The `negative_claim_neutralized` warning and
+  `CapitalStructureClaimCategory` are removed.
+- **Retained cash.** The residual is an equity distribution only when
+  `Equity` is the terminal priority. Otherwise it is
+  `CapitalStructureCashflows.retained_cash` (Python `retained_cash`), and
+  `equity_distribution` is zero. It used to go to equity either way.
+- **Cash pool independence is transitive.** `available_cash_node` may not
+  reach any same-period `cs` component through the formulas and masks of the
+  nodes it names; the error names the chain. Only four components were
+  checked, and only in the pool's own text.
+- **Debt-free periods run.** With no debt claims the whole pool is residual,
+  in the model's capital currency.
+- **Exact conservation.** A period whose uses do not equal its available
+  cash exactly fails.
+
 ### Statements capital: principal follows effective dates; unpaid principal is arrears
 
 STATEMENTS-CAPITAL-004. **Breaking.**

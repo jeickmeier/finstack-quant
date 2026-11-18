@@ -104,15 +104,25 @@ pub struct CapitalStructureCashflows {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reporting_currency: Option<Currency>,
 
-    /// Post-waterfall residual cash distributed to equity per period.
+    /// Residual cash distributed to equity per period: the cash left after
+    /// fees, interest and principal when `Equity` is the waterfall's terminal
+    /// priority, and zero when it is not.
     ///
-    /// Only populated by waterfall evaluation when `available_cash_node` is
-    /// configured: it is the cash remaining after fees, interest, and
-    /// principal allocations. With the per-period allocations this satisfies
-    /// `fees + cash interest + principal + equity == available cash`.
+    /// Only populated for periods in which a waterfall ran. With the
+    /// per-period allocations,
+    /// `fees + cash interest + principal + equity + retained == available cash`
+    /// exactly.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[cfg_attr(feature = "json-schema", schemars(with = "IndexMap<String, Money>"))]
     pub equity_distribution: IndexMap<PeriodId, Money>,
+
+    /// Residual cash the company retains per period: the cash left after the
+    /// payment stack when `Equity` is not a priority, and zero when it is.
+    ///
+    /// Only populated for periods in which a waterfall ran.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "IndexMap<String, Money>"))]
+    pub retained_cash: IndexMap<PeriodId, Money>,
 
     /// Cash the waterfall had to allocate in each period: the value of
     /// `WaterfallSpec.available_cash_node`, floored at zero (a negative pool
@@ -122,7 +132,7 @@ pub struct CapitalStructureCashflows {
     /// Only populated for periods in which a waterfall ran; empty for models
     /// without a waterfall and for JSON written before this field existed.
     /// Reconciles the period's uses:
-    /// `fees + cash interest + principal + equity_distribution == available_cash`.
+    /// `fees + cash interest + principal + equity_distribution + retained_cash == available_cash`.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     #[cfg_attr(feature = "json-schema", schemars(with = "IndexMap<String, Money>"))]
     pub available_cash: IndexMap<PeriodId, Money>,
@@ -686,6 +696,9 @@ impl CapitalStructureCashflows {
         if let Some(equity) = self.equity_distribution.get(&period_id) {
             snapshot.equity_distribution.insert(period_id, *equity);
         }
+        if let Some(retained) = self.retained_cash.get(&period_id) {
+            snapshot.retained_cash.insert(period_id, *retained);
+        }
         if let Some(cash) = self.available_cash.get(&period_id) {
             snapshot.available_cash.insert(period_id, *cash);
         }
@@ -719,6 +732,9 @@ impl CapitalStructureCashflows {
         }
         for (pid, equity) in period_cs.equity_distribution {
             self.equity_distribution.insert(pid, equity);
+        }
+        for (pid, retained) in period_cs.retained_cash {
+            self.retained_cash.insert(pid, retained);
         }
         for (pid, cash) in period_cs.available_cash {
             self.available_cash.insert(pid, cash);

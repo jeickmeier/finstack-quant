@@ -68,23 +68,6 @@ export default [
     "minimum": 0
   },
   {
-    "path": "#/$defs/d_051db3e5118e3d934ba2",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureClaimCategory",
-    "description": "Cash claim category affected by a capital-structure warning."
-  },
-  {
-    "path": "#/$defs/d_051db3e5118e3d934ba2/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureClaimCategory/oneOf/0",
-    "const": "fees",
-    "description": "Fee claims such as commitment or facility fees."
-  },
-  {
-    "path": "#/$defs/d_051db3e5118e3d934ba2/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureClaimCategory/oneOf/1",
-    "const": "interest",
-    "description": "Cash-interest claims."
-  },
-  {
     "path": "#/$defs/d_07ccd5501efef381b26a",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/StatementNumericMode",
     "const": "float64",
@@ -2645,56 +2628,49 @@ export default [
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0",
-    "description": "A negative creditor claim was neutralized instead of reducing other claims."
+    "description": "A negative available-cash pool was floored to zero before allocation."
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/amount",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/amount",
-    "description": "Negative claim amount in the waterfall currency.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/category",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/category",
-    "description": "Payment category containing the invalid negative claim.",
-    "ref": "#/$defs/CapitalStructureClaimCategory",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureClaimCategory"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/instrument_id",
-    "description": "Instrument whose claim was neutralized."
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/kind",
-    "const": "negative_claim_neutralized"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1",
-    "description": "A negative available-cash pool was floored to zero before allocation."
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/amount",
     "description": "Negative amount that was floored, in the waterfall currency.",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/kind",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/kind",
     "const": "negative_available_cash_floored"
   },
   {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/node_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/node_id",
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/0/properties/node_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/0/properties/node_id",
     "description": "Statement node supplying the available-cash amount."
+  },
+  {
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1",
+    "description": "Available cash was insufficient to pay a cash-interest claim."
+  },
+  {
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/amount",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/amount",
+    "description": "Unpaid amount in the waterfall currency.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/instrument_id",
+    "description": "Instrument carrying the unpaid claim forward."
+  },
+  {
+    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/1/properties/kind",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/1/properties/kind",
+    "const": "interest_shortfall"
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2",
-    "description": "Available cash was insufficient to pay a cash-interest claim."
+    "description": "Available cash was insufficient to pay a fee claim."
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/amount",
@@ -2710,12 +2686,12 @@ export default [
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/2/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/2/properties/kind",
-    "const": "interest_shortfall"
+    "const": "fee_shortfall"
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/3",
-    "description": "Available cash was insufficient to pay a fee claim."
+    "description": "Available cash was insufficient to pay scheduled principal."
   },
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3/properties/amount",
@@ -2731,27 +2707,6 @@ export default [
   {
     "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/3/properties/kind",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/3/properties/kind",
-    "const": "fee_shortfall"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/4",
-    "description": "Available cash was insufficient to pay scheduled principal."
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/4/properties/amount",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/4/properties/amount",
-    "description": "Unpaid amount in the waterfall currency.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/4/properties/instrument_id",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/4/properties/instrument_id",
-    "description": "Instrument carrying the unpaid claim forward."
-  },
-  {
-    "path": "#/$defs/d_dcfe22859677d75effd4/oneOf/4/properties/kind",
-    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureWarning/oneOf/4/properties/kind",
     "const": "principal_shortfall"
   },
   {
@@ -3070,7 +3025,7 @@ export default [
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/available_cash",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/available_cash",
-    "description": "Cash the waterfall had to allocate in each period: the value of\n`WaterfallSpec.available_cash_node`, floored at zero (a negative pool\nis reported as a `NegativeAvailableCashFloored` warning), in the\nwaterfall's currency.\n\nOnly populated for periods in which a waterfall ran; empty for models\nwithout a waterfall and for JSON written before this field existed.\nReconciles the period's uses:\n`fees + cash interest + principal + equity_distribution == available_cash`."
+    "description": "Cash the waterfall had to allocate in each period: the value of\n`WaterfallSpec.available_cash_node`, floored at zero (a negative pool\nis reported as a `NegativeAvailableCashFloored` warning), in the\nwaterfall's currency.\n\nOnly populated for periods in which a waterfall ran; empty for models\nwithout a waterfall and for JSON written before this field existed.\nReconciles the period's uses:\n`fees + cash interest + principal + equity_distribution + retained_cash == available_cash`."
   },
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/available_cash/additionalProperties",
@@ -3111,7 +3066,7 @@ export default [
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/equity_distribution",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/equity_distribution",
-    "description": "Post-waterfall residual cash distributed to equity per period.\n\nOnly populated by waterfall evaluation when `available_cash_node` is\nconfigured: it is the cash remaining after fees, interest, and\nprincipal allocations. With the per-period allocations this satisfies\n`fees + cash interest + principal + equity == available cash`."
+    "description": "Residual cash distributed to equity per period: the cash left after\nfees, interest and principal when `Equity` is the waterfall's terminal\npriority, and zero when it is not.\n\nOnly populated for periods in which a waterfall ran. With the\nper-period allocations,\n`fees + cash interest + principal + equity + retained == available cash`\nexactly."
   },
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/equity_distribution/additionalProperties",
@@ -3133,6 +3088,17 @@ export default [
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/reporting_currency/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/reporting_currency/anyOf/1"
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/retained_cash",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/retained_cash",
+    "description": "Residual cash the company retains per period: the cash left after the\npayment stack when `Equity` is not a priority, and zero when it is.\n\nOnly populated for periods in which a waterfall ran."
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/retained_cash/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/retained_cash/additionalProperties",
+    "ref": "#/$defs/Money",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
   },
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/totals",

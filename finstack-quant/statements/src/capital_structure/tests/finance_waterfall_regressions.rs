@@ -909,9 +909,15 @@ fn scheduled_principal_needs_dated_claims_that_reconcile_exactly() {
     loan.principal_payment = usd(20);
     let context = context_for(april.id, &[("cash", 100.0)]);
 
-    let error = execute_waterfall(&context, &WaterfallSpec::default(), &mut state, &flows)
-        .expect_err("no dated claims")
-        .to_string();
+    let error = execute_waterfall(
+        &context,
+        &WaterfallSpec::default(),
+        &mut state,
+        &flows,
+        None,
+    )
+    .expect_err("no dated claims")
+    .to_string();
     assert!(error.contains("no dated principal claims"), "{error}");
 
     let short = Money::new(19.99, Currency::USD).expect("money");
@@ -926,9 +932,213 @@ fn scheduled_principal_needs_dated_claims_that_reconcile_exactly() {
             )],
         )
         .expect("claim");
-    let error = execute_waterfall(&context, &WaterfallSpec::default(), &mut state, &flows)
-        .expect_err("claims a cent short")
-        .to_string();
+    let error = execute_waterfall(
+        &context,
+        &WaterfallSpec::default(),
+        &mut state,
+        &flows,
+        None,
+    )
+    .expect_err("claims a cent short")
+    .to_string();
     assert!(error.contains("do not reconcile"), "{error}");
     assert!(state.closing_balances.is_empty());
+}
+
+// Exact allocation, residual treatment and conservation (STATEMENTS-CAPITAL-006)
+
+fn cents(value: i64) -> Money {
+    Money::from_decimal(rust_decimal::Decimal::new(value, 2), Currency::USD)
+}
+
+fn no_equity() -> WaterfallSpec {
+    WaterfallSpec {
+        priority_of_payments: vec![
+            PaymentPriority::Fees,
+            PaymentPriority::Interest,
+            PaymentPriority::Amortization,
+        ],
+        ..Default::default()
+    }
+}
+
+/// The record's example: five cents across three equal two-cent claims pay
+/// two, two and one by instrument id, whatever the row order, and the unpaid
+/// cent is carried.
+#[test]
+fn five_cents_across_three_claims_are_paid_in_whole_cents_by_stable_id() {
+    for order in [["a", "b", "c"], ["c", "a", "b"]] {
+        let (mut state, mut flows) = loans(&order, 100);
+        for flow in flows.values_mut() {
+            flow.interest_expense_cash = cents(2);
+        }
+        let result = execute_waterfall_same_period(
+            &context(&[("cash", 0.05)]),
+            &WaterfallSpec::default(),
+            &mut state,
+            &flows,
+        )
+        .expect("five cents");
+        let paid = |id: &str| result.flows[id].interest_expense_cash;
+        assert_eq!(
+            (paid("a"), paid("b"), paid("c")),
+            (cents(2), cents(2), cents(1))
+        );
+        assert_eq!(result.flows["c"].interest_arrears, Some(cents(1)));
+        assert_eq!(state.interest_shortfall["c"], cents(1));
+        assert_eq!(result.equity_distribution, Some(cents(0)));
+    }
+}
+
+/// Every unpaid amount is carried, however small: a claim below one cent
+/// that goes unpaid is not noise.
+#[test]
+fn a_subcent_claim_that_goes_unpaid_is_carried_exactly() {
+    let (mut state, mut flows) = loans(&["loan"], 100);
+    let tenth_of_a_cent = Money::from_decimal(rust_decimal::Decimal::new(1, 3), Currency::USD);
+    flows.get_mut("loan").expect("loan").interest_expense_cash = tenth_of_a_cent;
+    let result = execute_waterfall_same_period(
+        &context(&[("cash", 0.0)]),
+        &WaterfallSpec::default(),
+        &mut state,
+        &flows,
+    )
+    .expect("no cash");
+    assert_eq!(result.flows["loan"].interest_arrears, Some(tenth_of_a_cent));
+    assert_eq!(state.interest_shortfall["loan"], tenth_of_a_cent);
+    assert_eq!(result.warnings.len(), 1);
+}
+
+/// The record's example: a 15 residual is an equity distribution when
+/// Equity is the terminal priority and retained cash when it is absent.
+#[test]
+fn the_residual_goes_to_equity_only_when_equity_is_the_terminal_priority() {
+    for (spec, equity, retained) in [(WaterfallSpec::default(), 15, 0), (no_equity(), 0, 15)] {
+        let (mut state, mut flows) = loans(&["loan"], 100);
+        flows.get_mut("loan").expect("loan").interest_expense_cash = usd(5);
+        let result =
+            execute_waterfall_same_period(&context(&[("cash", 20.0)]), &spec, &mut state, &flows)
+                .expect("residual");
+        assert_eq!(result.equity_distribution, Some(usd(equity)));
+        assert_eq!(result.retained_cash, Some(usd(retained)));
+        assert_eq!(result.available_cash, Some(usd(20)));
+    }
+}
+
+/// A negative pool is a funding shortfall: nothing is allocated and every
+/// claim is carried.
+#[test]
+fn a_negative_pool_allocates_nothing_and_reports_the_shortfall() {
+    let (mut state, mut flows) = loans(&["loan"], 100);
+    let loan = flows.get_mut("loan").expect("loan");
+    loan.interest_expense_cash = usd(5);
+    loan.fees = usd(2);
+    let result = execute_waterfall_same_period(
+        &context(&[("cash", -10.0)]),
+        &WaterfallSpec::default(),
+        &mut state,
+        &flows,
+    )
+    .expect("negative pool");
+    assert_eq!(result.available_cash, Some(usd(0)));
+    assert_eq!(result.equity_distribution, Some(usd(0)));
+    assert_eq!(result.flows["loan"].interest_expense_cash, usd(0));
+    assert_eq!(state.interest_shortfall["loan"], usd(5));
+    assert_eq!(state.fee_shortfall["loan"], usd(2));
+    // The funding shortfall and the two unpaid claims are all reported.
+    assert_eq!(result.warnings.len(), 3);
+}
+
+/// The waterfall is evaluated without debt claims: the whole pool is
+/// residual. Only a structure with no currency at all has nothing to run.
+#[test]
+fn a_debt_free_period_still_evaluates_the_pool() {
+    use crate::capital_structure::waterfall::execute_waterfall;
+    let empty = IndexMap::new();
+    let context = context(&[("cash", 40.0)]);
+    let mut state = CapitalStructureState::new();
+
+    let with_equity = execute_waterfall(
+        &context,
+        &WaterfallSpec::default(),
+        &mut state,
+        &empty,
+        Some(Currency::USD),
+    )
+    .expect("debt-free");
+    assert_eq!(with_equity.available_cash, Some(usd(40)));
+    assert_eq!(with_equity.equity_distribution, Some(usd(40)));
+    assert_eq!(with_equity.retained_cash, Some(usd(0)));
+
+    let retained = execute_waterfall(
+        &context,
+        &no_equity(),
+        &mut state,
+        &empty,
+        Some(Currency::USD),
+    )
+    .expect("debt-free, no equity");
+    assert_eq!(retained.retained_cash, Some(usd(40)));
+
+    let nothing = execute_waterfall(
+        &context,
+        &WaterfallSpec::default(),
+        &mut state,
+        &empty,
+        None,
+    )
+    .expect("no currency");
+    assert!(nothing.available_cash.is_none() && nothing.equity_distribution.is_none());
+
+    // Zero claims on existing instruments run the same way.
+    let (mut state, flows) = loans(&["loan"], 100);
+    let result =
+        execute_waterfall_same_period(&context, &WaterfallSpec::default(), &mut state, &flows)
+            .expect("no claims");
+    assert_eq!(result.equity_distribution, Some(usd(40)));
+}
+
+/// Allocatable cash reconciles exactly to what was paid plus the residual,
+/// and each instrument's payment does not depend on the order of the rows.
+#[test]
+fn allocation_is_exact_and_independent_of_row_order() {
+    let claims = [
+        ("alpha", 94_892_500_i64),
+        ("beta", 14_753_112),
+        ("gamma", 333),
+    ];
+    let mut by_order = Vec::new();
+    for order in [[0, 1, 2], [2, 1, 0], [1, 2, 0]] {
+        let ids: Vec<&str> = order.iter().map(|index| claims[*index].0).collect();
+        let (mut state, mut flows) = loans(&ids, 1_000_000_000);
+        for (id, amount) in claims {
+            let flow = flows.get_mut(id).expect("loan");
+            flow.interest_expense_cash = cents(amount);
+            flow.fees = cents(amount / 7);
+        }
+        let result = execute_waterfall_same_period(
+            &context(&[("cash", 997_982.74)]),
+            &WaterfallSpec::default(),
+            &mut state,
+            &flows,
+        )
+        .expect("short cash");
+        let mut uses = result.equity_distribution.expect("equity");
+        for flow in result.flows.values() {
+            uses = uses
+                .checked_add(flow.fees)
+                .and_then(|sum| sum.checked_add(flow.interest_expense_cash))
+                .and_then(|sum| sum.checked_add(flow.principal_payment))
+                .expect("sum");
+        }
+        assert_eq!(Some(uses), result.available_cash);
+        by_order.push(claims.map(|(id, _)| {
+            (
+                result.flows[id].fees,
+                result.flows[id].interest_expense_cash,
+            )
+        }));
+    }
+    assert_eq!(by_order[0], by_order[1]);
+    assert_eq!(by_order[0], by_order[2]);
 }

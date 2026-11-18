@@ -891,40 +891,11 @@ impl StatementResult {
     }
 }
 
-/// Cash claim category affected by a capital-structure warning.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum CapitalStructureClaimCategory {
-    /// Fee claims such as commitment or facility fees.
-    Fees,
-    /// Cash-interest claims.
-    Interest,
-}
-
-impl std::fmt::Display for CapitalStructureClaimCategory {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(match self {
-            Self::Fees => "fees",
-            Self::Interest => "interest",
-        })
-    }
-}
-
 /// Typed reason for a capital-structure evaluation warning.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum CapitalStructureWarning {
-    /// A negative creditor claim was neutralized instead of reducing other claims.
-    NegativeClaimNeutralized {
-        /// Payment category containing the invalid negative claim.
-        category: CapitalStructureClaimCategory,
-        /// Instrument whose claim was neutralized.
-        instrument_id: String,
-        /// Negative claim amount in the waterfall currency.
-        amount: f64,
-    },
     /// A negative available-cash pool was floored to zero before allocation.
     NegativeAvailableCashFloored {
         /// Statement node supplying the available-cash amount.

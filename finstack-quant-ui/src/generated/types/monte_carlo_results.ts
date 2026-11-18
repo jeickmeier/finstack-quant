@@ -66,22 +66,6 @@ export type DCf776B61125046D84B45 =
         warning:
           | {
               /**
-               * Negative claim amount in the waterfall currency.
-               */
-              amount: number;
-              /**
-               * Payment category containing the invalid negative claim.
-               */
-              category: "fees" | "interest";
-              /**
-               * Instrument whose claim was neutralized.
-               */
-              instrument_id: string;
-              kind: "negative_claim_neutralized";
-              [k: string]: unknown;
-            }
-          | {
-              /**
                * Negative amount that was floored, in the waterfall currency.
                */
               amount: number;

@@ -15951,19 +15951,20 @@ export interface D_450829Dac3A74A5C87611 {
  */
 export interface D_7D9F94Bbd332B01035F6 {
   /**
-   * Formula or node reference for cash available to allocate in the waterfall.
+   * Formula or node reference for the cash available to allocate.
    *
-   * This is the **pre-waterfall** cash pool: cash before fees, interest,
-   * amortization, and prepays allocated by this waterfall. Point it at a
-   * standalone cash / FCF node (`cash`, `cash_available`, `free_cash_flow`).
-   * Do not deduct `cs.interest_expense`, `cs.interest_expense_cash`,
-   * `cs.principal_payment`, or `cs.fees` here — those are allocated by the
-   * waterfall, and subtracting them from the pool double-pays debt service.
+   * This is the cash pool **before debt service**: cash before the fees,
+   * interest, amortization and prepayments this waterfall allocates. Point
+   * it at a standalone cash or free-cash-flow node (`cash`,
+   * `cash_available`, `free_cash_flow`). It may not depend on any
+   * same-period `cs` component, directly or through the formulas and masks
+   * of the nodes it names: every such component is an output of this
+   * waterfall. A prior period read with `lag(...)` is allowed.
    *
-   * Required. Without a cash pool the waterfall reports every scheduled fee,
-   * coupon and amortization as paid in full regardless of whether the model
-   * generated the cash — uses exceed sources and no shortfall can ever be
-   * raised, so the structure cannot report insolvency.
+   * A negative pool is a funding shortfall: it is reported and nothing is
+   * allocated. The cash left after the payment stack is an equity
+   * distribution when `Equity` is the terminal priority and retained cash
+   * when `Equity` is absent.
    */
   available_cash_node: string;
   /**

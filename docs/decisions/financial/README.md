@@ -269,7 +269,8 @@ dated claims. Implementation and independent qualification remain pending.
 The Statements waterfall allocation and conservation contract was accepted on
 2026-11-15. It covers pre-debt-service cash, priority and seniority, exact or
 authorized-quantum payments, arrears, and terminal distributions or retained
-cash. Implementation and independent qualification remain pending.
+cash. It is implemented and qualified, with the currency minor unit as the
+payment quantum.
 [STATEMENTS-CAPITAL-006](statements-capital/06-priority-allocation.md#accepted-decision-for-waterfall-cash-allocation-and-conservation).
 
 The Statements prepayment and ECF sweep contract was accepted on 2026-11-15.

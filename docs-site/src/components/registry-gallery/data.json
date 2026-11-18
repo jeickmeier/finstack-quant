@@ -91787,23 +91787,57 @@
       "reporting_currency": "USD",
       "equity_distribution": {
         "2024Q1": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "2024Q2": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "2024Q3": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "2024Q4": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "2025Q1": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "2025Q2": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "2025Q3": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "2025Q4": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      },
+      "retained_cash": {
+        "2024Q1": {
           "amount": "86500000",
           "currency": "USD"
         },
         "2024Q2": {
-          "amount": "85716666.66666667",
+          "amount": "85716666.6666666666",
           "currency": "USD"
         },
         "2024Q3": {
-          "amount": "93333160.41666667",
+          "amount": "93333160.4166666666",
           "currency": "USD"
         },
         "2024Q4": {
-          "amount": "99766683.33333333",
+          "amount": "99766683.3333333334",
           "currency": "USD"
         },
         "2025Q1": {
-          "amount": "105083358.33333333",
+          "amount": "105083358.3333333334",
           "currency": "USD"
         },
         "2025Q2": {
@@ -91811,11 +91845,11 @@
           "currency": "USD"
         },
         "2025Q3": {
-          "amount": "105199135.41666667",
+          "amount": "105199135.4166666666",
           "currency": "USD"
         },
         "2025Q4": {
-          "amount": "105133383.33333333",
+          "amount": "105133383.3333333334",
           "currency": "USD"
         }
       },
@@ -96280,23 +96314,57 @@
               "reporting_currency": "USD",
               "equity_distribution": {
                 "2024Q1": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2024Q2": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2024Q3": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2024Q4": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2025Q1": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2025Q2": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2025Q3": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2025Q4": {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              },
+              "retained_cash": {
+                "2024Q1": {
                   "amount": "86500000",
                   "currency": "USD"
                 },
                 "2024Q2": {
-                  "amount": "85716666.66666667",
+                  "amount": "85716666.6666666666",
                   "currency": "USD"
                 },
                 "2024Q3": {
-                  "amount": "93333160.41666667",
+                  "amount": "93333160.4166666666",
                   "currency": "USD"
                 },
                 "2024Q4": {
-                  "amount": "99766683.33333333",
+                  "amount": "99766683.3333333334",
                   "currency": "USD"
                 },
                 "2025Q1": {
-                  "amount": "105083358.33333333",
+                  "amount": "105083358.3333333334",
                   "currency": "USD"
                 },
                 "2025Q2": {
@@ -96304,11 +96372,11 @@
                   "currency": "USD"
                 },
                 "2025Q3": {
-                  "amount": "105199135.41666667",
+                  "amount": "105199135.4166666666",
                   "currency": "USD"
                 },
                 "2025Q4": {
-                  "amount": "105133383.33333333",
+                  "amount": "105133383.3333333334",
                   "currency": "USD"
                 }
               },
@@ -100289,23 +100357,57 @@
               "reporting_currency": "USD",
               "equity_distribution": {
                 "2024Q1": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2024Q2": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2024Q3": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2024Q4": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2025Q1": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2025Q2": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2025Q3": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2025Q4": {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              },
+              "retained_cash": {
+                "2024Q1": {
                   "amount": "86500000",
                   "currency": "USD"
                 },
                 "2024Q2": {
-                  "amount": "85716666.66666667",
+                  "amount": "85716666.6666666666",
                   "currency": "USD"
                 },
                 "2024Q3": {
-                  "amount": "93333160.41666667",
+                  "amount": "93333160.4166666666",
                   "currency": "USD"
                 },
                 "2024Q4": {
-                  "amount": "99766683.33333333",
+                  "amount": "99766683.3333333334",
                   "currency": "USD"
                 },
                 "2025Q1": {
-                  "amount": "105083358.33333333",
+                  "amount": "105083358.3333333334",
                   "currency": "USD"
                 },
                 "2025Q2": {
@@ -100313,11 +100415,11 @@
                   "currency": "USD"
                 },
                 "2025Q3": {
-                  "amount": "105199135.41666667",
+                  "amount": "105199135.4166666666",
                   "currency": "USD"
                 },
                 "2025Q4": {
-                  "amount": "105133383.33333333",
+                  "amount": "105133383.3333333334",
                   "currency": "USD"
                 }
               },
@@ -104298,23 +104400,57 @@
               "reporting_currency": "USD",
               "equity_distribution": {
                 "2024Q1": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2024Q2": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2024Q3": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2024Q4": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2025Q1": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2025Q2": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2025Q3": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2025Q4": {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              },
+              "retained_cash": {
+                "2024Q1": {
                   "amount": "86500000",
                   "currency": "USD"
                 },
                 "2024Q2": {
-                  "amount": "85716666.66666667",
+                  "amount": "85716666.6666666666",
                   "currency": "USD"
                 },
                 "2024Q3": {
-                  "amount": "93333160.41666667",
+                  "amount": "93333160.4166666666",
                   "currency": "USD"
                 },
                 "2024Q4": {
-                  "amount": "99766683.33333333",
+                  "amount": "99766683.3333333334",
                   "currency": "USD"
                 },
                 "2025Q1": {
-                  "amount": "105083358.33333333",
+                  "amount": "105083358.3333333334",
                   "currency": "USD"
                 },
                 "2025Q2": {
@@ -104322,11 +104458,11 @@
                   "currency": "USD"
                 },
                 "2025Q3": {
-                  "amount": "105199135.41666667",
+                  "amount": "105199135.4166666666",
                   "currency": "USD"
                 },
                 "2025Q4": {
-                  "amount": "105133383.33333333",
+                  "amount": "105133383.3333333334",
                   "currency": "USD"
                 }
               },
@@ -108307,23 +108443,57 @@
               "reporting_currency": "USD",
               "equity_distribution": {
                 "2024Q1": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2024Q2": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2024Q3": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2024Q4": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2025Q1": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2025Q2": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2025Q3": {
+                  "amount": "0",
+                  "currency": "USD"
+                },
+                "2025Q4": {
+                  "amount": "0",
+                  "currency": "USD"
+                }
+              },
+              "retained_cash": {
+                "2024Q1": {
                   "amount": "86500000",
                   "currency": "USD"
                 },
                 "2024Q2": {
-                  "amount": "85716666.66666667",
+                  "amount": "85716666.6666666666",
                   "currency": "USD"
                 },
                 "2024Q3": {
-                  "amount": "93333160.41666667",
+                  "amount": "93333160.4166666666",
                   "currency": "USD"
                 },
                 "2024Q4": {
-                  "amount": "99766683.33333333",
+                  "amount": "99766683.3333333334",
                   "currency": "USD"
                 },
                 "2025Q1": {
-                  "amount": "105083358.33333333",
+                  "amount": "105083358.3333333334",
                   "currency": "USD"
                 },
                 "2025Q2": {
@@ -108331,11 +108501,11 @@
                   "currency": "USD"
                 },
                 "2025Q3": {
-                  "amount": "105199135.41666667",
+                  "amount": "105199135.4166666666",
                   "currency": "USD"
                 },
                 "2025Q4": {
-                  "amount": "105133383.33333333",
+                  "amount": "105133383.3333333334",
                   "currency": "USD"
                 }
               },
@@ -112313,23 +112483,57 @@
           "reporting_currency": "USD",
           "equity_distribution": {
             "2024Q1": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "2024Q2": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "2024Q3": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "2024Q4": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "2025Q1": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "2025Q2": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "2025Q3": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "2025Q4": {
+              "amount": "0",
+              "currency": "USD"
+            }
+          },
+          "retained_cash": {
+            "2024Q1": {
               "amount": "86500000",
               "currency": "USD"
             },
             "2024Q2": {
-              "amount": "85716666.66666667",
+              "amount": "85716666.6666666666",
               "currency": "USD"
             },
             "2024Q3": {
-              "amount": "93333160.41666667",
+              "amount": "93333160.4166666666",
               "currency": "USD"
             },
             "2024Q4": {
-              "amount": "99766683.33333333",
+              "amount": "99766683.3333333334",
               "currency": "USD"
             },
             "2025Q1": {
-              "amount": "105083358.33333333",
+              "amount": "105083358.3333333334",
               "currency": "USD"
             },
             "2025Q2": {
@@ -112337,11 +112541,11 @@
               "currency": "USD"
             },
             "2025Q3": {
-              "amount": "105199135.41666667",
+              "amount": "105199135.4166666666",
               "currency": "USD"
             },
             "2025Q4": {
-              "amount": "105133383.33333333",
+              "amount": "105133383.3333333334",
               "currency": "USD"
             }
           },
@@ -118482,6 +118686,24 @@
         },
         "reporting_currency": "USD",
         "equity_distribution": {
+          "2025Q1": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "2025Q2": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "2025Q3": {
+            "amount": "0",
+            "currency": "USD"
+          },
+          "2025Q4": {
+            "amount": "0",
+            "currency": "USD"
+          }
+        },
+        "retained_cash": {
           "2025Q1": {
             "amount": "130700",
             "currency": "USD"

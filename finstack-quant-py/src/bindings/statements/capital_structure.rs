@@ -662,13 +662,7 @@ impl PyCapitalStructureCashflows {
         Ok(out)
     }
 
-    /// Post-waterfall residual cash distributed to equity per period.
-    ///
-    /// Returns
-    /// -------
-    /// dict[str, Money]
-    ///     Period id to ``Money``; empty unless a waterfall with
-    ///     ``available_cash_node`` ran.
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "CapitalStructureCashflows.equity_distribution")]
     #[getter]
     fn equity_distribution<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
@@ -678,19 +672,17 @@ impl PyCapitalStructureCashflows {
         Ok(dict)
     }
 
-    /// Cash available to the waterfall per period.
-    ///
-    /// The value of the waterfall's ``available_cash_node`` floored at zero,
-    /// in the waterfall's currency. It reconciles the period's uses:
-    /// ``fees + cash interest + principal_payment + equity_distribution ==
-    /// available_cash``.
-    ///
-    /// Returns
-    /// -------
-    /// dict[str, Money]
-    ///     Period id to ``Money``; empty unless a waterfall ran.
-    ///
-    /// This property does not raise.
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "CapitalStructureCashflows.retained_cash")]
+    #[getter]
+    fn retained_cash<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let dict = PyDict::new(py);
+        for (period, money) in &self.inner.retained_cash {
+            dict.set_item(period.to_string(), PyMoney { inner: *money })?;
+        }
+        Ok(dict)
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "CapitalStructureCashflows.available_cash")]
     #[getter]
     fn available_cash<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);

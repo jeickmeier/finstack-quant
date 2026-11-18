@@ -1632,6 +1632,24 @@
       "reporting_currency": "USD",
       "equity_distribution": {
         "2025Q1": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "2025Q2": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "2025Q3": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "2025Q4": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      },
+      "retained_cash": {
+        "2025Q1": {
           "amount": "130700",
           "currency": "USD"
         },

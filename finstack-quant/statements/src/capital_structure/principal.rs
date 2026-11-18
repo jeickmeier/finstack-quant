@@ -345,7 +345,9 @@ fn validate_payment(amount: Money, capacity: Money) -> Result<()> {
             amount.currency(),
         ));
     }
-    if amount.amount() < 0.0 || amount.amount() > capacity.amount() + 1e-6 {
+    if amount.amount_decimal().is_sign_negative() && !amount.amount_decimal().is_zero()
+        || amount.amount_decimal() > capacity.amount_decimal()
+    {
         return Err(Error::capital_structure(
             "Principal payment exceeds its available capacity",
         ));
