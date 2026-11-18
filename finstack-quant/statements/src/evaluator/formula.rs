@@ -423,6 +423,9 @@ mod tests {
             sweep_prepayment: None,
             voluntary_prepayment: None,
             interest_arrears: None,
+            principal_pending: None,
+            principal_arrears: None,
+            principal_advance_reserve: None,
         };
         let mut totals = IndexMap::new();
         totals.insert(period, breakdown);

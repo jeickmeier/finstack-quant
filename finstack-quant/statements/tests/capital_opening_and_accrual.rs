@@ -277,3 +277,75 @@ fn new_funding_and_redraws_close_on_balance_dates_not_cash_dates() {
         assert!(error.contains(needle), "{needle}: {error}");
     }
 }
+
+/// The record's example on a dated schedule: a 20 reduction effective
+/// 31 March on a 100 instrument is due on 15 April, and 10 due on 20 March
+/// reduces the face on 10 April (STATEMENTS-CAPITAL-004).
+#[test]
+fn principal_cash_and_face_are_reported_on_their_own_dates() {
+    let repayment = |cash_date: Date, balance_date: Date, amount: f64| {
+        CashFlowParams::new(
+            cash_date,
+            None,
+            usd(amount),
+            CFKind::Amortization,
+            0.0,
+            None,
+        )
+        .with_principal_delta(usd(-amount))
+        .with_principal_date(balance_date)
+        .build()
+        .expect("valid repayment")
+    };
+    let schedule = CashFlowSchedule::from_flows(
+        vec![
+            repayment(
+                date(2025, Month::March, 20),
+                date(2025, Month::April, 10),
+                10.0,
+            ),
+            repayment(
+                date(2025, Month::April, 15),
+                date(2025, Month::March, 31),
+                20.0,
+            ),
+        ],
+        Notional::par(100.0, Currency::USD).expect("notional"),
+        DayCount::Act365F,
+        CashFlowMeta {
+            issue_date: Some(date(2024, Month::January, 1)),
+            ..Default::default()
+        },
+    );
+    let instrument = ScheduleInstrument::new(schedule);
+    let periods = build_periods("2025M3..M4", None).expect("periods").periods;
+    let market = MarketContext::new();
+    let read = |index: usize, opening: Money| {
+        calculate_period_flows(
+            &instrument,
+            &periods[index],
+            opening,
+            &market,
+            date(2025, Month::January, 1),
+            None,
+        )
+        .expect("period flows")
+    };
+
+    // March: the 20 reduction is effective, its cash is owed and not yet
+    // due; the 10 was paid ahead of its reduction and is reserved.
+    let (march, march_close, _, _) = read(0, usd(100.0));
+    assert_eq!(march_close.amount(), 80.0);
+    assert_eq!(march.principal_payment.amount(), 10.0);
+    assert_eq!(march.principal_pending, Some(usd(20.0)));
+    assert_eq!(march.principal_advance_reserve, Some(usd(10.0)));
+    assert_eq!(march.principal_arrears, Some(usd(0.0)));
+
+    // April: the 20 is paid without moving the balance again, and the 10
+    // reduction takes effect and releases its reserve.
+    let (april, april_close, _, _) = read(1, march_close);
+    assert_eq!(april_close.amount(), 70.0);
+    assert_eq!(april.principal_payment.amount(), 20.0);
+    assert_eq!(april.principal_pending, Some(usd(0.0)));
+    assert_eq!(april.principal_advance_reserve, Some(usd(0.0)));
+}

@@ -155,6 +155,9 @@ fn test_context_get_cs_value_interest_total() {
         sweep_prepayment: None,
         voluntary_prepayment: None,
         interest_arrears: None,
+        principal_pending: None,
+        principal_arrears: None,
+        principal_advance_reserve: None,
     };
     cs_cashflows.totals.insert(period_id, breakdown);
 
@@ -593,6 +596,9 @@ fn test_capital_structure_cashflows_accessors() {
         sweep_prepayment: None,
         voluntary_prepayment: None,
         interest_arrears: None,
+        principal_pending: None,
+        principal_arrears: None,
+        principal_advance_reserve: None,
     };
 
     let mut instrument_map = indexmap::IndexMap::new();

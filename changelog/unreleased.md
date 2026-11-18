@@ -1317,6 +1317,27 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements capital: principal follows effective dates; unpaid principal is arrears
+
+STATEMENTS-CAPITAL-004. **Breaking.**
+
+- **`debt_balance` is economic principal.** A scheduled reduction takes
+  effect on its contractual date whether or not its cash was paid. Unpaid
+  scheduled principal no longer stays in the balance and no longer rebuilds
+  interest on it; it is `principal_arrears`.
+- **Three new amounts** on `CashflowBreakdown`, as `cs.<component>` and as
+  rows of `flows`: `principal_pending` (cash owed for a reduction already
+  effective and not yet due), `principal_arrears` (cash due and unpaid) and
+  `principal_advance_reserve` (face paid for whose reduction is still to
+  come, excluded from prepayment capacity).
+- **A sweep cannot prepay scheduled principal.** Principal a scheduled
+  reduction removes in the period is not prepayable, so a sweep ordered ahead
+  of amortization goes to other debt.
+- **Dated claims are required.** A waterfall fails for an instrument without
+  dated principal claims; the aggregate same-period fallback is removed.
+  Claims must equal the contractual principal cash exactly, and scheduled
+  principal beyond the balance is rejected instead of clamped.
+
 ### Statements capital: the ledger must agree with its schedule; arrears are separate from accrued interest
 
 STATEMENTS-CAPITAL-003. **Breaking.**

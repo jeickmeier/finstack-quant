@@ -117,6 +117,9 @@ pub(crate) const CS_COMPONENTS: &[&str] = &[
     "fees",
     "accrued_interest",
     "interest_arrears",
+    "principal_pending",
+    "principal_arrears",
+    "principal_advance_reserve",
 ];
 
 impl FunctionSignature {

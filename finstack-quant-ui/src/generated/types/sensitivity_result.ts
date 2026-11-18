@@ -1160,6 +1160,9 @@ export interface D_033184211Bfcc772Ee94 {
  *         sweep_prepayment: None,
  *         voluntary_prepayment: None,
  *         interest_arrears: None,
+ *         principal_pending: None,
+ *         principal_arrears: None,
+ *         principal_advance_reserve: None,
  *     });
  * cs.totals.insert(period, CashflowBreakdown {
  *     interest_expense_cash: Money::from((10_000_i64, Currency::USD)),
@@ -1175,6 +1178,9 @@ export interface D_033184211Bfcc772Ee94 {
  *     sweep_prepayment: None,
  *     voluntary_prepayment: None,
  *     interest_arrears: None,
+ *     principal_pending: None,
+ *     principal_arrears: None,
+ *     principal_advance_reserve: None,
  * });
  *
  * assert_eq!(cs.get_component("interest_expense", "total", &period).unwrap(), 12_500.0);
@@ -1500,7 +1506,29 @@ export interface D_677810Bf9653Cfb0A467 {
    * hand-built breakdowns and on JSON written before this field existed.
    */
   opening_balance?: D_1B5716Dde9957A614F3C1 | null;
+  /**
+   * Face already paid for whose reduction takes effect after the period
+   * close. It is still part of `debt_balance` and is reserved from further
+   * prepayment until then. Positive amount in the breakdown's currency;
+   * `Some` on evaluator-produced breakdowns.
+   */
+  principal_advance_reserve?: D_1B5716Dde9957A614F3C1 | null;
+  /**
+   * Scheduled principal cash due and still unpaid at the period close,
+   * carried as a claim into the next period. It is a cash obligation
+   * separate from `debt_balance`, which follows the contract's effective
+   * dates whether or not the cash was paid. Positive amount in the
+   * breakdown's currency; `Some` on evaluator-produced breakdowns.
+   */
+  principal_arrears?: D_1B5716Dde9957A614F3C1 | null;
   principal_payment: D_1B5716Dde9957A614F3C7;
+  /**
+   * Scheduled principal cash whose face reduction is already effective
+   * and whose payment falls due after the period close: owed, not yet
+   * due. `debt_balance` is already net of that face. Positive amount in
+   * the breakdown's currency; `Some` on evaluator-produced breakdowns.
+   */
+  principal_pending?: D_1B5716Dde9957A614F3C1 | null;
   /**
    * Part of `principal_payment` paid against the instrument's own
    * contractual schedule: amortization, maturity redemption,

@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **632 review items across 33 source scopes with open items**
+This backlog consolidates **631 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -26,7 +26,7 @@ The labels distinguish the work required:
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (486): implementation and verification work against an
+- **Reconciliation** (485): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (38): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -67,7 +67,7 @@ product consequences remain in their product scope.
 | [Calibration: quotes and curve/smile targets](#calibration-quotes-and-curvesmile-targets) | 18 |
 | [Calibration: Hull–White and LMM](#calibration-hullwhite-and-lmm) | 18 |
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
-| [Statements: capital structure](#statements-capital-structure) | 10 |
+| [Statements: capital structure](#statements-capital-structure) | 9 |
 | [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 6 |
 | [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 5 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
@@ -961,8 +961,6 @@ product consequences remain in their product scope.
 - **Evidence — Residual coupons need independent debt-ledger reconciliation.** Qualify arbitrary cash/PIK shares, zeroed-coupon reactivation, irregular day counts and multiple dated advances/arrears against an independent schedule. Existing residual regressions primarily establish internal ledger invariants. Include tolerance scaling while preserving the established period-close balance-change and FX/date policy. Records: [STATEMENTS-CAPITAL-005](statements-capital/05-residual-coupons.md).
 
 - **Reconciliation — Fee rebates, funding proceeds and ledger qualification of capital cash classification.** Report fee rebates and repayment refunds as company receipts (today a fee or repayment row that is a company receipt is rejected, not read as a claim), report signed funding proceeds separately from the principal they establish, accept a company-perspective borrowing schedule (today a supplied borrowing schedule must be in the holder perspective and is rejected otherwise), and classify net derivative settlement cash on a hedge once the cashflow contract supplies that kind. Independently qualify source conversion, custom and rebuilt schedules, signed fee and distress cash, explicit liability changes and boundary dates against borrower and hedge ledgers, and carry distress cash into reporting-currency totals with the capital reporting scopes. Period validation before every schedule read, the stated schedule perspective with one signed conversion, native currency at zero, exhaustive kind classification with unclassified effects rejected, signed PIK, period coupon netting with separate expense and income totals, the Interest claim, and dated distress cash outside scheduled debt service are reconciled. [Accepted STATEMENTS-CAPITAL-002](statements-capital/02-cashflow-classification.md#accepted-decision-for-period-admission-and-cashflow-classification).
-
-- **Reconciliation — Dated principal claims, settlement arrears and advance reserves.** Require stable dated claims with separate cash and face, remove synthetic claims, and report economic principal, unsettled payments, arrears and paid advance reserves separately. Reconcile scheduled principal across seniority classes, eligible instrument claims and due dates. Qualify partial, early and late payments and exact native-currency balances with atomic state updates across periods. [Accepted STATEMENTS-CAPITAL-004](statements-capital/04-dated-principal.md#accepted-decision-for-dated-principal-claims).
 
 - **Reconciliation — Canonical residual coupon rebuilding.** Rebuild affected original coupon parents, remaining principal and balance-sensitive fees from authorized dated events and canonical product terms. Preserve settled cash, earned interest, locked observations, cash and PIK dates, and dated claim identity. Commit the schedule and debt ledger together after validation. [Accepted STATEMENTS-CAPITAL-005](statements-capital/05-residual-coupons.md#accepted-decision-for-residual-coupon-rebuilding).
 

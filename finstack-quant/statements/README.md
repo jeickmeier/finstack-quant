@@ -186,8 +186,9 @@ cs.<component>.total
 
 Valid components: `interest_expense` (cash + PIK), `interest_expense_cash`,
 `interest_expense_pik`, `interest_income`, `principal_payment`, `debt_balance`,
-`fees`, `accrued_interest`, `interest_arrears`. Unknown components are rejected
-at compile time.
+`fees`, `accrued_interest`, `interest_arrears`, `principal_pending`,
+`principal_arrears`, `principal_advance_reserve`. Unknown components are
+rejected at compile time.
 
 Cash interest follows the declared instrument kind: positive bond and loan
 coupons are issuer expenses, while negative debt coupons are income. Swaps use
@@ -203,6 +204,15 @@ accrual valuation is outside this contract. The debt ledger must open each
 period on the principal its dated schedule carries in: a disagreement is an
 error naming the instrument, period, currency and both amounts, and no amount
 is rescaled.
+
+`debt_balance` is outstanding economic principal: a scheduled reduction takes
+effect on its contractual date whether or not its cash was paid. The cash is a
+separate dated claim. `principal_pending` is cash owed for a reduction already
+effective and not yet due, `principal_arrears` is cash due and unpaid (paid
+oldest due first, and settling it never reduces the balance again), and
+`principal_advance_reserve` is face already paid for whose reduction is still
+to come, which cannot be prepaid a second time. A waterfall needs dated claims
+for every instrument; none is synthesized from an aggregate.
 Placeholder option schedules are rejected because their contingent payouts are
 not modeled.
 

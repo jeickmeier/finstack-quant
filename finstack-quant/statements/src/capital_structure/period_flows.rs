@@ -218,27 +218,75 @@ pub(crate) fn period_distress_cash(
         .collect()
 }
 
-/// Preserve the cash and economic dates of this period's principal claims.
+/// The face a repayment row removes: its explicit principal delta, or its
+/// cash when the row carries none.
+fn repayment_face(flow: &CashFlow) -> Money {
+    flow.get_principal_delta()
+        .unwrap_or_else(|| flow.get_amount())
+        .abs()
+}
+
+/// This period's scheduled principal claims, each with its due date, its
+/// economic effective date, its cash and the face that cash settles.
+///
+/// A claim's identity is its due date, effective date and ordinal among the
+/// rows that share both, so it is stable across reporting cadences.
 pub(crate) fn period_principal_claims(
     schedule: &CashFlowSchedule,
     period: &Period,
 ) -> Vec<crate::capital_structure::PrincipalClaim> {
+    let mut ordinals = std::collections::BTreeMap::<(Date, Date), usize>::new();
     schedule
         .get_flows()
         .iter()
-        .filter(|flow| flow.get_date() >= period.start && flow.get_date() < period.end)
         .filter(|flow| is_repayment_like(flow))
         .filter(|flow| flow.get_amount().amount() != 0.0)
         // A repayment row carries its explicit balance date.
-        .filter_map(|flow| {
-            flow.get_balance_date()
-                .map(|balance_date| crate::capital_structure::PrincipalClaim {
+        .filter_map(|flow| Some((flow, flow.get_balance_date()?)))
+        .filter_map(|(flow, balance_date)| {
+            let ordinal = ordinals.entry((flow.get_date(), balance_date)).or_default();
+            let id = format!("{}/{}/{}", flow.get_date(), balance_date, *ordinal);
+            *ordinal += 1;
+            (flow.get_date() >= period.start && flow.get_date() < period.end).then(|| {
+                crate::capital_structure::PrincipalClaim {
+                    id,
                     payment_date: flow.get_date(),
                     balance_date,
                     amount: flow.get_amount().abs(),
-                })
+                    face: repayment_face(flow),
+                    payments: Vec::new(),
+                }
+            })
         })
         .collect()
+}
+
+/// Scheduled principal at a period close whose cash and face fall on
+/// opposite sides of it: cash owed for a reduction already effective
+/// (`pending`), and face not yet reduced whose cash was already due
+/// (`advance`, a reserve when that cash was paid).
+fn principal_across_close(
+    schedule: &CashFlowSchedule,
+    snapshot: Date,
+    currency: finstack_quant_core::currency::Currency,
+) -> Result<(Money, Money)> {
+    let mut pending = Money::from((0_i64, currency));
+    let mut advance = Money::from((0_i64, currency));
+    for flow in schedule
+        .get_flows()
+        .iter()
+        .filter(|flow| is_repayment_like(flow))
+    {
+        let Some(balance_date) = flow.get_balance_date() else {
+            continue;
+        };
+        if balance_date <= snapshot && flow.get_date() > snapshot {
+            pending = pending.checked_add(flow.get_amount().abs())?;
+        } else if balance_date > snapshot && flow.get_date() <= snapshot {
+            advance = advance.checked_add(repayment_face(flow))?;
+        }
+    }
+    Ok((pending, advance))
 }
 
 /// Principal the dated schedule carries into a period that starts on
@@ -509,7 +557,8 @@ pub fn calculate_period_flows(
                         "is a receipt where the company pays; rebates and refunds are not reported yet",
                     ));
                 }
-                Ok(Money::new(-cash, currency)?)
+                // The row's own amount, exactly: no round trip through a float.
+                Ok(cf.get_amount().abs())
             };
 
             // Every kind is named: a new kind cannot be classified silently.
@@ -639,6 +688,17 @@ pub fn calculate_period_flows(
     // Audit detail: every contractual principal flow is scheduled principal.
     breakdown.opening_balance = Some(opening_balance);
     breakdown.mark_principal_as_scheduled();
+    // Principal whose cash and face fall on opposite sides of the close. On
+    // the contractual path every scheduled payment is made when due, so
+    // nothing is in arrears and cash paid ahead of its reduction is reserved.
+    let (pending, advance) = if is_debt {
+        principal_across_close(&full_schedule, snapshot_date, currency)?
+    } else {
+        let zero = Money::from((0_i64, currency));
+        (zero, zero)
+    };
+    breakdown.principal_pending = Some(pending);
+    breakdown.principal_advance_reserve = Some(advance);
 
     // `net_new_funding` (draws plus explicit or implicit issuance principal in
     // this period) is returned so the waterfall can recover the payable balance

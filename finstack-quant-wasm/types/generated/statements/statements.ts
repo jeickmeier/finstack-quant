@@ -4925,9 +4925,31 @@ export interface CashflowBreakdown {
    */
   opening_balance?: Money | null;
   /**
+   * Face already paid for whose reduction takes effect after the period
+   * close. It is still part of `debt_balance` and is reserved from further
+   * prepayment until then. Positive amount in the breakdown's currency;
+   * `Some` on evaluator-produced breakdowns.
+   */
+  principal_advance_reserve?: Money | null;
+  /**
+   * Scheduled principal cash due and still unpaid at the period close,
+   * carried as a claim into the next period. It is a cash obligation
+   * separate from `debt_balance`, which follows the contract's effective
+   * dates whether or not the cash was paid. Positive amount in the
+   * breakdown's currency; `Some` on evaluator-produced breakdowns.
+   */
+  principal_arrears?: Money | null;
+  /**
    * Principal repayments (amortization, maturity)
    */
   principal_payment: Money;
+  /**
+   * Scheduled principal cash whose face reduction is already effective
+   * and whose payment falls due after the period close: owed, not yet
+   * due. `debt_balance` is already net of that face. Positive amount in
+   * the breakdown's currency; `Some` on evaluator-produced breakdowns.
+   */
+  principal_pending?: Money | null;
   /**
    * Part of `principal_payment` paid against the instrument's own
    * contractual schedule: amortization, maturity redemption,

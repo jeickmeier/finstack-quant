@@ -182,7 +182,7 @@ fn test_ecf_sweep_basic() {
 // pipeline (contractual flow extraction → waterfall → state advance).
 
 mod period_flow_waterfall_integration {
-    use crate::capital_structure::waterfall::execute_waterfall;
+    use crate::capital_structure::waterfall::execute_waterfall_same_period;
     use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
     use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::cashflow::{CashFlow, CashFlowParams};
@@ -364,8 +364,8 @@ mod period_flow_waterfall_integration {
 
             // Liquidity below the threshold keeps PIK active every period.
             let ctx = context_with(period.id, &[("liquidity", 10.0)]);
-            let result =
-                execute_waterfall(&ctx, &waterfall, &mut state, &contractual).expect("waterfall");
+            let result = execute_waterfall_same_period(&ctx, &waterfall, &mut state, &contractual)
+                .expect("waterfall");
             last_pik = result.flows["TL-PIK"].interest_expense_pik.amount();
             let coupon = &instrument.schedule.get_flows()[i as usize];
             let start = if i == 0 {
@@ -504,7 +504,8 @@ mod period_flow_waterfall_integration {
         contractual.insert("TL-1".to_string(), breakdown);
         // ECF = 500k, sweep 100% → 500k extra principal after 20k cash interest.
         let ctx = context_with(q1.id, &[("sweep_cash", 520_000.0)]);
-        execute_waterfall(&ctx, &waterfall, &mut state, &contractual).expect("q1 waterfall");
+        execute_waterfall_same_period(&ctx, &waterfall, &mut state, &contractual)
+            .expect("q1 waterfall");
         state
             .rebuild_residuals(q1.end - time::Duration::days(1))
             .expect("rebuild after sweep");
@@ -620,8 +621,8 @@ mod period_flow_waterfall_integration {
 
         let available = 100_000.0;
         let ctx = context_with(period.id, &[("cash_available", available)]);
-        let result =
-            execute_waterfall(&ctx, &waterfall, &mut state, &contractual).expect("waterfall");
+        let result = execute_waterfall_same_period(&ctx, &waterfall, &mut state, &contractual)
+            .expect("waterfall");
 
         let tl = &result.flows["TL-1"];
         let equity = result

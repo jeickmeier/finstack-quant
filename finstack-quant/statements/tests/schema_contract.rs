@@ -188,6 +188,9 @@ fn representative_statement_result() -> StatementResult {
         sweep_prepayment: None,
         voluntary_prepayment: None,
         interest_arrears: None,
+        principal_pending: None,
+        principal_arrears: None,
+        principal_advance_reserve: None,
     };
     let mut cashflows = CapitalStructureCashflows::new();
     cashflows.by_instrument.insert(

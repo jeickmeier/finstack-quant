@@ -567,11 +567,11 @@ fn previously_paid_redemption_cannot_extinguish_later_pik_principal() {
     let mut state = state_with_balance(schedule, 110.0);
     state.principal_advance_payments.insert(
         INSTRUMENT.into(),
-        vec![PrincipalClaim {
+        vec![PrincipalClaim::at_par(
             payment_date,
-            balance_date: economic_date,
-            amount: usd(100.0),
-        }],
+            economic_date,
+            usd(100.0),
+        )],
     );
     state
         .rebuild_residuals(cutoff)

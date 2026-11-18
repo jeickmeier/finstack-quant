@@ -948,9 +948,13 @@ class CapitalStructureCashflows:
             One of ``interest_expense`` (cash plus PIK), ``interest_expense_cash``,
             ``interest_expense_pik``, ``interest_income``, ``principal_payment``,
             ``debt_balance``, ``fees``, ``accrued_interest`` (cash interest earned
-            and not yet due) or ``interest_arrears`` (cash interest due and
-            unpaid). Flows are positive
-            payment or receipt magnitudes; debt balance is closing principal.
+            and not yet due), ``interest_arrears`` (cash interest due and
+            unpaid), ``principal_pending`` (principal cash owed and not yet
+            due), ``principal_arrears`` (principal cash due and unpaid) or
+            ``principal_advance_reserve`` (face paid for and not yet
+            reduced). Flows are positive payment or receipt magnitudes; debt
+            balance is closing economic principal on the contract's effective
+            dates, whether or not the cash was paid.
             Rate hedges have zero debt balance and debt accrued interest.
         instrument_or_total : str
             Instrument identifier for a native-currency amount, or ``"total"``
@@ -1013,8 +1017,10 @@ class CapitalStructureCashflows:
             ``scheduled_principal``, ``mandatory_prepayment``,
             ``sweep_prepayment`` and ``voluntary_prepayment``. The four
             source rows sum to the ``principal_payment`` row, so do not add
-            them together. ``interest_arrears`` (cash interest due and
-            unpaid at the close) is the last evaluator-produced row.
+            them together. The last evaluator-produced rows are
+            ``interest_arrears`` (cash interest due and unpaid at the close),
+            ``principal_pending``, ``principal_arrears`` and
+            ``principal_advance_reserve``.
 
         Raises
         ------

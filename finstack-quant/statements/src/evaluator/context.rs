@@ -234,7 +234,8 @@ impl EvaluationContext {
     ///
     /// `component` accepts `interest_expense`, `interest_expense_cash`,
     /// `interest_expense_pik`, `principal_payment`, `debt_balance`, `fees`,
-    /// `accrued_interest` or `interest_arrears`. Pass an instrument identifier in
+    /// `accrued_interest`, `interest_arrears`, `principal_pending`,
+    /// `principal_arrears` or `principal_advance_reserve`. Pass an instrument identifier in
     /// `instrument_or_total` for its native-currency value, or `total` for the
     /// cashflow aggregate, which requires the reporting-currency invariant.
     ///
@@ -288,8 +289,9 @@ impl EvaluationContext {
     /// # }
     /// ```
     ///
-    /// The component names `fees`, `accrued_interest` and `interest_arrears`
-    /// are also supported.
+    /// The component names `fees`, `accrued_interest`, `interest_arrears`,
+    /// `principal_pending`, `principal_arrears` and
+    /// `principal_advance_reserve` are also supported.
     /// Per-instrument values use their native currencies; `total` values use
     /// the capital structure's reporting-currency aggregation convention.
     ///

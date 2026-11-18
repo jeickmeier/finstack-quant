@@ -261,15 +261,14 @@ fn compute_contractual_flows(
             .residual_schedules
             .get(instrument_id.as_str())
             .map(SuppliedSchedule::holder);
-        let (breakdown, closing_balance, net_new_funding, period_warnings) =
-            calculate_period_flows(
-                instrument.as_ref(),
-                period,
-                opening_balance,
-                market_ctx,
-                as_of,
-                residual,
-            )?;
+        let (breakdown, closing_balance, _, period_warnings) = calculate_period_flows(
+            instrument.as_ref(),
+            period,
+            opening_balance,
+            market_ctx,
+            as_of,
+            residual,
+        )?;
         let is_debt = is_debt_kind(instrument.key())?;
         let raw;
         let source = match residual {
@@ -286,21 +285,17 @@ fn compute_contractual_flows(
             period,
         )?);
         let residual = residual.map(|supplied| supplied.schedule);
-        let principal_claims = residual.map(|schedule| {
+        // Every instrument has dated principal claims for the period: a
+        // borrowing's scheduled repayments, and none for a hedge, whose
+        // notional is not borrowed principal.
+        let principal_claims = residual.map_or_else(Vec::new, |schedule| {
             crate::capital_structure::period_flows::period_principal_claims(schedule, period)
         });
-        if let Some(claims) = principal_claims {
-            cs_state.set_period_principal_flows(instrument_id.clone(), period, claims)?;
-        }
+        cs_state.set_period_principal_flows(instrument_id.clone(), period, principal_claims)?;
         warnings.extend(period_warnings);
 
         flows.insert(instrument_id.to_string(), breakdown.clone());
         cs_state.set_closing_balance(instrument_id.to_string(), closing_balance);
-        // Record the period's draws so the waterfall can recover the payable
-        // balance and draw-aware closing (overwritten each period).
-        cs_state
-            .period_new_funding
-            .insert(instrument_id.to_string(), net_new_funding);
     }
     Ok(ContractualFlows {
         flows,

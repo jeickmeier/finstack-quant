@@ -1,25 +1,67 @@
-//! Principal claims whose cash and economic dates can cross reporting periods.
+//! Dated principal claims whose cash and economic dates can cross reporting
+//! periods.
+//!
+//! Outstanding economic principal follows the contract's effective dates,
+//! independently of cash settlement. A scheduled principal payment is a
+//! separate cash obligation with its own due date: unpaid after its due date
+//! it is arrears, and paid before its face reduction takes effect it leaves a
+//! reserve that cannot be prepaid again.
 
 use super::CashflowBreakdown;
 use crate::error::{Error, Result};
 use finstack_quant_core::dates::{Date, Period};
 use finstack_quant_core::money::Money;
 
+/// One payment made against a principal claim.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct PrincipalPayment {
+    /// Modeled payment date: the due date when paid in its own period, the
+    /// first day of the paying period when paid late.
+    pub(crate) date: Date,
+    /// Cash paid, in the instrument's native currency.
+    pub(crate) amount: Money,
+}
+
 /// A scheduled principal cash claim with its independent economic date.
 ///
-/// Unpaid claims keep these dates when carried to another reporting period,
-/// so an advance payment cannot create debt before its principal movement and
-/// a delayed settlement cannot reduce outstanding a second time.
+/// The claim keeps its identity, dates and payment history when it is carried
+/// to another reporting period, so a delayed settlement cannot reduce
+/// outstanding principal a second time and an early one cannot be repaid.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct PrincipalClaim {
+    /// Stable identity within the instrument: due date, effective date and
+    /// ordinal of the schedule row.
+    pub(crate) id: String,
     /// Date on which this principal cash payment is contractually due.
     pub(crate) payment_date: Date,
     /// Date on which the contractual outstanding principal is reduced.
     pub(crate) balance_date: Date,
-    /// Nonnegative principal cash owed, in the instrument's native currency.
+    /// Nonnegative principal cash still owed, in the instrument's native
+    /// currency.
     pub(crate) amount: Money,
+    /// Nonnegative face reduction the cash still owed settles. It differs
+    /// from the cash when principal is redeemed above or below par.
+    pub(crate) face: Money,
+    /// Payments already made against the claim, oldest first.
+    pub(crate) payments: Vec<PrincipalPayment>,
 }
 
+impl PrincipalClaim {
+    /// An unpaid claim settled at par.
+    #[cfg(test)]
+    pub(crate) fn at_par(payment_date: Date, balance_date: Date, amount: Money) -> Self {
+        Self {
+            id: format!("{payment_date}/{balance_date}/0"),
+            payment_date,
+            balance_date,
+            amount,
+            face: amount,
+            payments: Vec::new(),
+        }
+    }
+}
+
+/// The dated principal cash claims that fall due in one reporting period.
 #[derive(Debug, Clone)]
 pub(crate) struct PeriodPrincipalFlows {
     pub start: Date,
@@ -40,7 +82,7 @@ impl PeriodPrincipalFlows {
                     "Current principal cash claims must settle inside the model period",
                 ));
             }
-            if claim.amount.amount() < 0.0 {
+            if claim.amount.amount() < 0.0 || claim.face.amount() < 0.0 {
                 return Err(Error::capital_structure(
                     "Principal cash claims cannot be negative",
                 ));
@@ -54,173 +96,113 @@ impl PeriodPrincipalFlows {
     }
 }
 
-struct AllocatedClaim {
-    claim: PrincipalClaim,
-    /// A newly due settlement whose principal already left an earlier period.
-    settlement_only: bool,
+/// The principal position of one instrument at a period close.
+pub(crate) struct PrincipalClose {
+    /// Outstanding economic principal: contractual principal at the close
+    /// less prepayments made in the period.
+    pub(crate) economic: Money,
+    /// Claims due and still unpaid, oldest due first.
+    pub(crate) arrears: Vec<PrincipalClaim>,
+    /// Paid claims whose face reduction is effective after the period.
+    pub(crate) advances: Vec<PrincipalClaim>,
+    /// Face of `advances`: principal paid for and reserved until effective.
+    pub(crate) reserve: Money,
 }
 
-/// Two principal capacities: debt that can be prepaid and settlements of
-/// principal already removed from an earlier period's outstanding balance.
+/// The principal ledger of one instrument for one reporting period.
+///
+/// Economic principal starts from the contractual close of the dated
+/// schedule, which already holds every reduction effective by then, and falls
+/// only by prepayments. Scheduled claims are cash obligations paid oldest due
+/// first; a claim whose face reduction is still in the future is limited to
+/// the principal that remains to be reduced.
 pub(crate) struct PrincipalAllocation {
     economic: Money,
-    settlements: Money,
-    future_paid: Money,
+    reserve: Money,
     advances: Vec<PrincipalClaim>,
+    start: Date,
     end: Date,
-    claims: Vec<AllocatedClaim>,
+    claims: Vec<PrincipalClaim>,
 }
 
 impl PrincipalAllocation {
     pub(crate) fn new(
-        period: Option<&PeriodPrincipalFlows>,
-        opening: Money,
-        funding: Money,
+        period: &PeriodPrincipalFlows,
         contractual: &CashflowBreakdown,
         mut carried: Vec<PrincipalClaim>,
         carried_advances: Vec<PrincipalClaim>,
     ) -> Result<Self> {
-        let currency = opening.currency();
+        let economic = contractual.debt_balance;
+        let currency = economic.currency();
         let zero = Money::from((0_i64, currency));
-        let mut economic;
-        let mut settlements = zero;
-        let mut future_paid = zero;
-        let mut advances = Vec::new();
-        let mut claims = Vec::new();
-        let end;
-        carried.sort_by_key(|claim| (claim.payment_date, claim.balance_date));
-        for claim in &carried_advances {
-            if claim.amount.currency() != currency {
-                return Err(Error::CurrencyMismatch(currency, claim.amount.currency()));
-            }
-            if claim.amount.amount() < 0.0 {
-                return Err(Error::capital_structure(
-                    "Principal advances cannot be negative",
-                ));
-            }
-        }
-        if let Some(period) = period {
-            end = period.end;
-            economic = contractual.debt_balance;
-            // Cash already settled against a future principal date cannot
-            // be prepaid again while its economic notional remains visible.
-            for claim in carried_advances {
-                if claim.balance_date >= period.end {
-                    economic = economic.checked_sub(claim.amount)?;
-                    future_paid = future_paid.checked_add(claim.amount)?;
-                    advances.push(claim);
-                }
-            }
-            // Old effective arrears are already part of opening and the
-            // residual path. Only this period's newly effective carried
-            // principal needs to be restored before allocating its cash.
-            for claim in &carried {
-                if claim.balance_date >= period.start && claim.balance_date < period.end {
-                    economic = economic.checked_add(claim.amount)?;
-                }
-            }
-            for claim in carried {
-                claims.push(AllocatedClaim {
-                    claim,
-                    settlement_only: false,
-                });
-            }
-            let mut current = period.claims.clone();
-            current.sort_by_key(|claim| (claim.payment_date, claim.balance_date));
-            let mut current_total = zero;
-            for claim in current {
-                current_total = current_total.checked_add(claim.amount)?;
-                let settlement_only = claim.balance_date < period.start;
-                if settlement_only {
-                    settlements = settlements.checked_add(claim.amount)?;
-                } else if claim.balance_date < period.end {
-                    economic = economic.checked_add(claim.amount)?;
-                }
-                claims.push(AllocatedClaim {
-                    claim,
-                    settlement_only,
-                });
-            }
-            if (current_total.amount() - contractual.principal_payment.amount()).abs() > 1e-6 {
-                return Err(Error::capital_structure(
-                    "Dated principal claims do not reconcile to contractual cash principal",
-                ));
-            }
-        } else {
-            // Aggregate-only callers supply no timing distinction: all cash
-            // and principal movements belong to this allocation period. The
-            // market-aware runtime always supplies the actual dated claims.
-            end = Date::MAX;
-            if !carried_advances.is_empty() {
-                return Err(Error::capital_structure(
-                    "Dated principal advances require exact period principal flows",
-                ));
-            }
-            economic = opening
-                .checked_add(funding)?
-                .checked_add(contractual.interest_expense_pik)?;
-            for claim in carried {
-                claims.push(AllocatedClaim {
-                    claim,
-                    settlement_only: false,
-                });
-            }
-            claims.push(AllocatedClaim {
-                claim: PrincipalClaim {
-                    payment_date: Date::MIN,
-                    balance_date: Date::MIN,
-                    amount: contractual.principal_payment,
-                },
-                settlement_only: false,
-            });
-        }
-        for claim in &claims {
-            if claim.claim.amount.currency() != currency {
-                return Err(Error::CurrencyMismatch(
-                    currency,
-                    claim.claim.amount.currency(),
-                ));
-            }
-            if claim.claim.amount.amount() < 0.0 {
-                return Err(Error::capital_structure(
-                    "Principal cash claims cannot be negative",
-                ));
-            }
-        }
-        if economic.currency() != currency || settlements.currency() != currency {
-            return Err(Error::capital_structure(
-                "Principal allocation currencies must match the instrument",
-            ));
-        }
-        if economic.amount() < -1e-6 {
+        if economic.amount() < 0.0 {
             return Err(Error::capital_structure(
                 "Economic principal cannot be negative before allocation",
             ));
         }
+        // Face already paid stays in economic principal until its reduction
+        // takes effect; until then it cannot be prepaid again. An advance
+        // that became effective is in the contractual close and is released.
+        let mut reserve = zero;
+        let mut advances = Vec::new();
+        for claim in carried_advances {
+            check(&claim, currency)?;
+            if claim.balance_date >= period.end {
+                reserve = reserve.checked_add(claim.face)?;
+                advances.push(claim);
+            }
+        }
+        carried.sort_by_key(|claim| (claim.payment_date, claim.balance_date));
+        let mut current = period.claims.clone();
+        current.sort_by_key(|claim| (claim.payment_date, claim.balance_date));
+        let mut current_total = zero;
+        for claim in &current {
+            check(claim, currency)?;
+            current_total = current_total.checked_add(claim.amount)?;
+        }
+        for claim in &carried {
+            check(claim, currency)?;
+        }
+        if current_total != contractual.principal_payment {
+            return Err(Error::capital_structure(format!(
+                "Dated principal claims ({} {currency}) do not reconcile to contractual cash \
+                 principal ({} {currency})",
+                current_total.amount(),
+                contractual.principal_payment.amount()
+            )));
+        }
+        // Carried claims are older and are paid first.
+        carried.extend(current);
         Ok(Self {
-            economic: Money::new(economic.amount().max(0.0), currency)?,
-            settlements,
-            future_paid,
+            economic,
+            reserve,
             advances,
-            end,
-            claims,
+            start: period.start,
+            end: period.end,
+            claims: carried,
         })
     }
 
+    /// Principal that can still be prepaid: economic principal less the face
+    /// already paid for.
     pub(crate) fn get_prepayment_capacity(&self) -> Money {
-        self.economic
+        let zero = Money::from((0_i64, self.economic.currency()));
+        match self.economic.checked_sub(self.reserve) {
+            Ok(capacity) if capacity.amount() > 0.0 => capacity,
+            _ => zero,
+        }
     }
 
     pub(crate) fn pay_prepayment(&mut self, amount: Money) -> Result<()> {
-        validate_payment(amount, self.economic)?;
+        validate_payment(amount, self.get_prepayment_capacity())?;
         self.economic = self.economic.checked_sub(amount)?;
         Ok(())
     }
 
     pub(crate) fn get_scheduled_capacity(&self) -> Result<Money> {
         let mut total = Money::from((0_i64, self.economic.currency()));
-        for claim in self.remaining_claims()? {
-            total = total.checked_add(claim.amount)?;
+        for (_, payable) in self.payable()? {
+            total = total.checked_add(payable)?;
         }
         Ok(total)
     }
@@ -228,83 +210,132 @@ impl PrincipalAllocation {
     pub(crate) fn pay_scheduled(&mut self, amount: Money) -> Result<()> {
         validate_payment(amount, self.get_scheduled_capacity()?)?;
         let mut budget = amount;
-        let mut economic_capacity = self.economic;
-        let mut settlement_capacity = self.settlements;
-        for allocated in &mut self.claims {
-            let claim_capacity = if allocated.settlement_only {
-                &mut settlement_capacity
+        let payable = self.payable()?;
+        for (index, payable) in payable {
+            let claim = &mut self.claims[index];
+            // A future reduction truncated by prepayments is no longer owed.
+            let unreachable = claim.amount.checked_sub(payable)?;
+            let paid = if budget.amount() < payable.amount() {
+                budget
             } else {
-                &mut economic_capacity
+                payable
             };
-            let owed = Money::new(
-                allocated
-                    .claim
-                    .amount
-                    .amount()
-                    .min(claim_capacity.amount())
-                    .max(0.0),
-                amount.currency(),
-            )?;
-            *claim_capacity = claim_capacity.checked_sub(owed)?;
-            let paid = Money::new(owed.amount().min(budget.amount()), amount.currency())?;
-            allocated.claim.amount = owed.checked_sub(paid)?;
-            budget = budget.checked_sub(paid)?;
-            if allocated.settlement_only {
-                self.settlements = self.settlements.checked_sub(paid)?;
+            let face_paid = if paid == claim.amount {
+                claim.face
+            } else if claim.amount.amount() > 0.0 {
+                Money::new(
+                    claim.face.amount() * paid.amount() / claim.amount.amount(),
+                    paid.currency(),
+                )?
             } else {
-                self.economic = self.economic.checked_sub(paid)?;
-                if allocated.claim.balance_date >= self.end {
-                    self.future_paid = self.future_paid.checked_add(paid)?;
-                    if paid.amount() > 0.0 {
-                        self.advances.push(PrincipalClaim {
-                            amount: paid,
-                            ..allocated.claim.clone()
-                        });
-                    }
+                Money::from((0_i64, paid.currency()))
+            };
+            let face_unreachable = if unreachable.amount() > 0.0 {
+                Money::new(
+                    claim.face.amount() * unreachable.amount() / claim.amount.amount(),
+                    paid.currency(),
+                )?
+            } else {
+                Money::from((0_i64, paid.currency()))
+            };
+            claim.amount = payable.checked_sub(paid)?;
+            claim.face = claim
+                .face
+                .checked_sub(face_paid)?
+                .checked_sub(face_unreachable)?;
+            budget = budget.checked_sub(paid)?;
+            if paid.amount() > 0.0 {
+                let payment = PrincipalPayment {
+                    date: claim.payment_date.max(self.start),
+                    amount: paid,
+                };
+                claim.payments.push(payment.clone());
+                if claim.balance_date >= self.end {
+                    self.reserve = self.reserve.checked_add(face_paid)?;
+                    self.advances.push(PrincipalClaim {
+                        amount: paid,
+                        face: face_paid,
+                        payments: vec![payment],
+                        ..claim.clone()
+                    });
                 }
             }
         }
         Ok(())
     }
 
-    pub(crate) fn finish(self) -> Result<(Money, Vec<PrincipalClaim>, Vec<PrincipalClaim>)> {
-        let remaining = self.remaining_claims()?;
-        let closing = self
-            .economic
-            .checked_add(self.settlements)?
-            .checked_add(self.future_paid)?;
-        Ok((closing, remaining, self.advances))
+    pub(crate) fn finish(self) -> Result<PrincipalClose> {
+        let arrears = self
+            .payable()?
+            .into_iter()
+            .filter(|(_, payable)| payable.amount() > 0.0)
+            .map(|(index, payable)| {
+                let claim = &self.claims[index];
+                let face = if payable == claim.amount {
+                    claim.face
+                } else {
+                    Money::new(
+                        claim.face.amount() * payable.amount() / claim.amount.amount(),
+                        payable.currency(),
+                    )?
+                };
+                Ok(PrincipalClaim {
+                    amount: payable,
+                    face,
+                    ..claim.clone()
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(PrincipalClose {
+            economic: self.economic,
+            arrears,
+            advances: self.advances,
+            reserve: self.reserve,
+        })
     }
 
-    fn remaining_claims(&self) -> Result<Vec<PrincipalClaim>> {
-        let mut economic = self.economic;
-        let mut settlements = self.settlements;
-        let mut remaining = Vec::new();
-        for allocated in &self.claims {
-            let capacity = if allocated.settlement_only {
-                &mut settlements
+    /// Cash still payable on each claim, by claim index, oldest due first.
+    ///
+    /// A claim whose face reduction is already in the contractual close is
+    /// owed in full. A claim whose reduction is still in the future is owed
+    /// only up to the principal that remains to be reduced after the face
+    /// already paid for and the older future claims.
+    fn payable(&self) -> Result<Vec<(usize, Money)>> {
+        let mut headroom = self.get_prepayment_capacity();
+        let mut payable = Vec::with_capacity(self.claims.len());
+        for (index, claim) in self.claims.iter().enumerate() {
+            let owed = if claim.balance_date < self.end {
+                claim.amount
+            } else if claim.face.amount() <= headroom.amount() {
+                headroom = headroom.checked_sub(claim.face)?;
+                claim.amount
             } else {
-                &mut economic
+                let share = if claim.face.amount() > 0.0 {
+                    headroom.amount() / claim.face.amount()
+                } else {
+                    0.0
+                };
+                headroom = Money::from((0_i64, headroom.currency()));
+                Money::new(claim.amount.amount() * share, claim.amount.currency())?
             };
-            let amount = Money::new(
-                allocated
-                    .claim
-                    .amount
-                    .amount()
-                    .min(capacity.amount())
-                    .max(0.0),
-                capacity.currency(),
-            )?;
-            *capacity = capacity.checked_sub(amount)?;
-            if amount.amount() > 0.0 {
-                remaining.push(PrincipalClaim {
-                    amount,
-                    ..allocated.claim.clone()
-                });
-            }
+            payable.push((index, owed));
         }
-        Ok(remaining)
+        Ok(payable)
     }
+}
+
+fn check(claim: &PrincipalClaim, currency: finstack_quant_core::currency::Currency) -> Result<()> {
+    for money in [claim.amount, claim.face] {
+        if money.currency() != currency {
+            return Err(Error::CurrencyMismatch(currency, money.currency()));
+        }
+        if money.amount() < 0.0 {
+            return Err(Error::capital_structure(
+                "Principal cash claims cannot be negative",
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn validate_payment(amount: Money, capacity: Money) -> Result<()> {

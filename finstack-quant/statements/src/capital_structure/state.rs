@@ -59,14 +59,6 @@ pub(crate) struct CapitalStructureState {
     /// are not demoted into the interest rung) and re-recorded if unpaid.
     pub(crate) fee_shortfall: IndexMap<String, Money>,
 
-    /// Newly funded principal (draws plus explicit or implicit issuance face) per
-    /// instrument for the *current* period, computed by
-    /// `calculate_period_flows`. Explicit principal deltas keep withheld OID
-    /// separate from cash proceeds. The waterfall consumes it to recover the
-    /// payable balance (`opening + funding`) and the draw-aware closing
-    /// balance. Overwritten each period; instruments with no draw record zero.
-    pub(crate) period_new_funding: IndexMap<String, Money>,
-
     /// Residual cashflow schedule per instrument, rebuilt after each period's
     /// outstanding change so the next coupon is `outstanding × rate ×
     /// accrual_factor` rather than a scale of the original schedule.
@@ -96,15 +88,6 @@ impl CapitalStructureState {
         self.closing_balances.insert(instrument_id, balance);
     }
 
-    /// Net new funding recorded for an instrument in the current period,
-    /// defaulting to zero if not present.
-    pub(crate) fn get_period_new_funding(&self, instrument_id: &str, currency: Currency) -> Money {
-        self.period_new_funding
-            .get(instrument_id)
-            .copied()
-            .unwrap_or_else(|| Money::from((0_i64, currency)))
-    }
-
     /// Advance state to next period: closing balances become opening balances.
     ///
     /// Closing balances are cleared after promotion so matured instruments
@@ -117,10 +100,10 @@ impl CapitalStructureState {
     /// Set dated principal claims for the current waterfall period.
     ///
     /// Market-aware evaluation supplies these from the residual schedule.
-    /// Aggregate-only `execute_waterfall` callers may omit this input only
-    /// when cash settlement and economic principal movements belong to the
-    /// same allocation period. When supplied, the contractual breakdown's
-    /// debt balance must be its economic closing balance before cash allocation.
+    /// Every instrument in a waterfall needs them, including an empty list
+    /// when nothing is due: no claim is synthesized from aggregate principal.
+    /// The contractual breakdown's debt balance must be its economic closing
+    /// balance before cash allocation.
     ///
     /// # Arguments
     ///
@@ -151,11 +134,19 @@ impl CapitalStructureState {
         instrument_id: &str,
         contractual: &CashflowBreakdown,
     ) -> Result<PrincipalAllocation> {
-        let currency = contractual.debt_balance.currency();
+        // Scheduled principal is always dated: no claim is synthesized from
+        // the period's aggregate principal.
+        let period = self
+            .period_principal_flows
+            .get(instrument_id)
+            .ok_or_else(|| {
+                crate::error::Error::capital_structure(format!(
+                    "instrument '{instrument_id}' has no dated principal claims for the period; \
+                 supply each scheduled principal payment with its due and effective dates"
+                ))
+            })?;
         let allocation = PrincipalAllocation::new(
-            self.period_principal_flows.get(instrument_id),
-            self.get_opening_balance(instrument_id, currency),
-            self.get_period_new_funding(instrument_id, currency),
+            period,
             contractual,
             self.principal_shortfall
                 .get(instrument_id)

@@ -256,7 +256,8 @@ arrears reported as `interest_arrears`. [STATEMENTS-CAPITAL-003](statements-capi
 The Statements dated principal contract was accepted on 2026-11-15. It covers
 stable dated claims, separate reporting of economic principal and unsettled
 payments, advance reserves, scheduled principal priority and exact atomic
-reconciliation. Implementation and independent qualification remain pending.
+reconciliation. It is implemented and qualified; exact payment sizing belongs
+to the waterfall allocation contract.
 [STATEMENTS-CAPITAL-004](statements-capital/04-dated-principal.md#accepted-decision-for-dated-principal-claims).
 
 The Statements residual coupon rebuilding contract was accepted on 2026-11-15.
