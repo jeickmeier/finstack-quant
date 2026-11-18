@@ -867,3 +867,13 @@ test('FinstackConfig extensions hold JSON values, not JSON text', () => {
   assert.deepEqual(cfg.ingestScaleOverrides(), { USD: 8 });
   assert.deepEqual(cfg.outputScaleOverrides(), {});
 });
+
+test('following rolls respect exchange amendments and early closes', () => {
+  for (const [calendar, start, expected] of [
+    ['nse', '2026-01-15', '2026-01-16'],
+    ['nyse', '2012-10-29', '2012-10-31'],
+    ['sifma', '2021-12-31', '2021-12-31'],
+  ]) {
+    assert.equal(iso(core.adjust(ep(start), 'following', calendar)), expected);
+  }
+});

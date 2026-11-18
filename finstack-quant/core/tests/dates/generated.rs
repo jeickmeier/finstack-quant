@@ -168,3 +168,19 @@ fn calendar_resolver_resolves_generated_calendars() {
     let jan1 = make_date(2025, 1, 1);
     assert!(target2.is_holiday(jan1).expect("calendar lookup"));
 }
+
+#[test]
+fn audit_calendar_session_rolls() {
+    use finstack_quant_core::dates::{BusinessDayConvention, adjust};
+    for (id, from, expected) in [
+        ("nse", make_date(2026, 1, 15), make_date(2026, 1, 16)),
+        ("nyse", make_date(2012, 10, 29), make_date(2012, 10, 31)),
+        ("sifma", make_date(2021, 12, 31), make_date(2021, 12, 31)),
+    ] {
+        assert_eq!(
+            adjust(from, BusinessDayConvention::Following, by_id(id)).expect("covered date"),
+            expected,
+            "{id} following {from}"
+        );
+    }
+}
