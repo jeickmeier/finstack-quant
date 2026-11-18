@@ -576,7 +576,10 @@ fn build_coupon_periods(
                 bucket,
             });
         }
-        prev = end;
+        // Slices of one coupon share a payment date and need not be in
+        // accrual order, so the next unannotated coupon starts at the latest
+        // accrual end seen, not at the last row's.
+        prev = prev.max(end);
     }
 
     Ok(periods)
@@ -1260,6 +1263,71 @@ mod tests {
             .expect("both legs accrue")
             .amount();
         let expected = 30_000.0 * 90.0 / 180.0 + 20_000.0 * 59.0 / 150.0;
+        assert!((accrued - expected).abs() < 1e-9, "{accrued} != {expected}");
+    }
+
+    /// Two slices of one coupon listed out of accrual order must not pull
+    /// the next, unannotated coupon's start back to the earlier slice's end.
+    #[test]
+    fn an_unannotated_coupon_starts_after_the_latest_slice_of_the_prior_coupon() {
+        let issue = make_date(2025, 1, 1);
+        let split = make_date(2025, 2, 15);
+        let first_payment = make_date(2025, 4, 1);
+        let slice = |start: Date, end: Date, amount: f64| {
+            CashFlowParams::new(
+                first_payment,
+                None,
+                Money::new(amount, Currency::USD).expect("amount"),
+                CFKind::Fixed,
+                45.0 / 360.0,
+                Some(0.08),
+            )
+            .with_accrual(
+                CashFlowAccrual::new(
+                    start,
+                    end,
+                    DayCount::Act360,
+                    None,
+                    finstack_quant_core::dates::DayCountContextState::try_new(
+                        None, None, None, None, None,
+                    )
+                    .expect("valid context"),
+                )
+                .expect("valid accrual"),
+            )
+            .build()
+            .expect("valid cashflow")
+        };
+        let schedule = CashFlowSchedule {
+            // The later slice is listed first, as an amount-ordered sort does.
+            flows: vec![
+                slice(split, first_payment, 0.6),
+                slice(issue, split, 1.0),
+                CashFlowParams::new(
+                    make_date(2025, 7, 1),
+                    None,
+                    Money::new(1.2, Currency::USD).expect("amount"),
+                    CFKind::Fixed,
+                    91.0 / 360.0,
+                    Some(0.08),
+                )
+                .build()
+                .expect("valid cashflow"),
+            ],
+            notional: Notional::par(100.0, Currency::USD).expect("valid notional fixture"),
+            day_count: DayCount::Act360,
+            meta: crate::builder::CashFlowMeta {
+                issue_date: Some(issue),
+                ..Default::default()
+            },
+        };
+        let accrued =
+            accrued_interest_amount(&schedule, make_date(2025, 3, 2), &AccrualConfig::default())
+                .expect("accrued interest")
+                .amount();
+        // The first slice in full and 15 of the second slice's 45 days;
+        // nothing of the coupon that starts on 1 April.
+        let expected = 1.0 + 0.6 * 15.0 / 45.0;
         assert!((accrued - expected).abs() < 1e-9, "{accrued} != {expected}");
     }
 

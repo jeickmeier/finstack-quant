@@ -248,7 +248,7 @@ fn a_swept_revolver_rebuilds_interest_and_balance_fees() {
     assert_close(usage_fee, 0.0025 * (100.0 * 45.0 + 60.0 * 45.0) / 360.0);
 
     // Interest earned before the posting is a row of its own with its own
-    // accrual dates, so it is not prorated again over the whole coupon.
+    // accrual dates, so accrued interest at a later date keeps it whole.
     let mut slices: Vec<_> = rebuilt
         .get_flows()
         .iter()
@@ -268,6 +268,22 @@ fn a_swept_revolver_rebuilds_interest_and_balance_fees() {
     assert_close(slices[0].2, 100.0 * 0.08 * 45.0 / 360.0);
     assert_eq!(slices[1].0, date!(2025 - 02 - 15));
     assert_close(slices[1].2, 60.0 * 0.08 * 45.0 / 360.0);
+    let terms =
+        finstack_quant_valuations_core::instruments::Instrument::contractual_accrual_config(
+            &facility,
+        )
+        .expect("earning terms");
+    let accrued = finstack_quant_cashflows::accrual::accrued_interest_amount(
+        &rebuilt,
+        date!(2025 - 03 - 02),
+        &terms,
+    )
+    .expect("accrued interest");
+    assert_close(
+        accrued.amount(),
+        0.08 * (100.0 * 45.0 + 60.0 * 15.0) / 360.0,
+    );
+
     // The posting is a zero-cash principal row and 60 is repaid at maturity.
     let row = rebuilt
         .get_flows()
