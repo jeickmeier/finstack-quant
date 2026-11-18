@@ -627,6 +627,14 @@ impl WaterfallSpec {
         if let Some(spec) = &self.ecf_sweep {
             expressions.extend(spec.expressions().map(|text| ("ecf_sweep", text)));
         }
+        // The election is decided before the period's cash is allocated, so
+        // its metric is an input of the stage like the pool and the sizing.
+        if let Some(spec) = &self.pik_toggle {
+            expressions.push((
+                "pik_toggle.liquidity_metric",
+                spec.liquidity_metric.as_str(),
+            ));
+        }
         expressions
     }
 }

@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **624 review items across 33 source scopes with open items**
+This backlog consolidates **623 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -26,7 +26,7 @@ The labels distinguish the work required:
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (480): implementation and verification work against an
+- **Reconciliation** (479): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (37): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -69,7 +69,7 @@ product consequences remain in their product scope.
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
 | [Statements: capital structure](#statements-capital-structure) | 5 |
 | [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 3 |
-| [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 5 |
+| [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 4 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
 | [Statements analytics: credit checks and impairment](#statements-analytics-credit-checks-and-impairment) | 18 |
 | [Scenarios](#scenarios) | 16 |
@@ -1037,8 +1037,6 @@ product consequences remain in their product scope.
 ## Statements: evaluation, forecasts and reporting
 
 [Scope inventory](statements-evaluation/README.md).
-
-- **Reconciliation — Capital-state orchestration, dependency validation and atomic period snapshots.** Establish dated obligations, enforce transitive input independence and allocate once per period. Finalize reporting with explicit period-close FX, then evaluate downstream formulas using the same forecast shocks and commit period data together. Independently qualify multi-period cash and debt bridges, issuance boundaries, downstream evaluation and replay. [Accepted STATEMENTS-EVALUATION-012](statements-evaluation/12-capital-state-orchestration.md#accepted-decision-for-capital-state-orchestration-and-period-snapshots).
 
 - **Reconciliation — Check suites over rolled-up results.** Evaluate a check suite against a rolled result at the target periods; today a suite accepts only a verified evaluation run, and a rolled result is not one, so target checks cannot run and source check reports stay on the source run. Explicit methods with no automatic sum, verified source runs, complete canonical coarser periods, exact money and compensated scalar sums, final-cell status for period-end, formula and mask re-evaluation at the target cadence and provenance to the source run, methods and source periods are reconciled. [Accepted STATEMENTS-EVALUATION-014](statements-evaluation/14-period-rollup.md#accepted-decision-for-period-rollup) · [Check suites](statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
 

@@ -96,10 +96,16 @@ impl Evaluator {
             market_ctx,
             as_of,
             instruments,
-            state: cs_state,
+            state: committed_state,
             affected_nodes: cs_affected_nodes,
         } = cs;
         let period_id = period.id;
+        // The period works on a staged copy of the debt state. It replaces
+        // the committed state only after the statement cells that read the
+        // final capital amounts have evaluated, so a period that fails
+        // anywhere leaves the state of the last committed period.
+        let mut staged_state = committed_state.clone();
+        let cs_state = &mut staged_state;
 
         // The period is validated before any schedule is read.
         crate::capital_structure::period_flows::validate_period(period)?;
@@ -203,6 +209,7 @@ impl Evaluator {
         let mut seen: HashSet<String> = HashSet::with_capacity(warnings.len());
         warnings.retain(|w| seen.insert(format!("{w:?}")));
         warnings.append(&mut contractual_warnings);
+        *committed_state = staged_state;
         Ok((values, row, warnings, period_cs_cashflows))
     }
 }

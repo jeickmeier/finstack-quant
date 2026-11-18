@@ -468,7 +468,7 @@ Implementation and independent qualification remain pending.
 The Statements capital-state orchestration contract was accepted on
 2026-11-15. It covers dated obligations, dependency validation, one waterfall
 allocation, native and consolidated reporting, and atomic period snapshots.
-Implementation and independent qualification remain pending.
+It is implemented and qualified.
 [STATEMENTS-EVALUATION-012](statements-evaluation/12-capital-state-orchestration.md#accepted-decision-for-capital-state-orchestration-and-period-snapshots).
 
 The Statements typed result and export contract was accepted on 2026-11-15.

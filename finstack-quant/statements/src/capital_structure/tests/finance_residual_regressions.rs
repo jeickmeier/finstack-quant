@@ -512,6 +512,31 @@ fn evaluate_2025_with(
     extra: &[(&str, f64)],
     market: &MarketContext,
 ) -> crate::Result<crate::evaluator::StatementResult> {
+    evaluate_2025_configured(
+        periods,
+        instrument,
+        waterfall,
+        cash,
+        request,
+        extra,
+        market,
+        &|_| {},
+    )
+}
+
+/// As [`evaluate_2025_with`], with `configure` adding formula nodes before
+/// the model is built.
+#[allow(clippy::too_many_arguments)]
+fn evaluate_2025_configured(
+    periods: &str,
+    instrument: FinancialStatementInstrument,
+    waterfall: WaterfallSpec,
+    cash: &dyn Fn(usize) -> f64,
+    request: &dyn Fn(usize) -> f64,
+    extra: &[(&str, f64)],
+    market: &MarketContext,
+    configure: &dyn Fn(&mut ModelBuilder),
+) -> crate::Result<crate::evaluator::StatementResult> {
     let mut builder = ModelBuilder::new("residual-rebuild");
     builder.periods(periods, None).expect("periods");
     let model_periods: Vec<PeriodId> = if periods.contains('M') {
@@ -541,6 +566,7 @@ fn evaluate_2025_with(
     };
     builder.add_debt(id, instrument);
     builder.waterfall(waterfall);
+    configure(&mut builder);
     let model = builder.build()?;
     Evaluator::new().evaluate_with_market(
         &model,
@@ -1039,4 +1065,180 @@ fn the_toggle_is_not_exercised_in_actual_periods() {
         assert_close(get("interest_expense_cash", period), 2.0);
     }
     assert_close(get("debt_balance", "2025Q4"), 100.0);
+}
+
+// Capital-state orchestration and period snapshots (STATEMENTS-EVALUATION-012)
+
+/// The record's example: 20 of cash interest is due and 12 of cash is
+/// eligible, so 12 is paid and 8 is in arrears. A lag in the next period
+/// reads the committed 12, and a formula that reads the final amount is
+/// evaluated once, after the allocation.
+#[test]
+fn a_short_paid_coupon_is_committed_and_read_by_the_next_period() {
+    let mut loan = quarterly_loan();
+    loan.notional_limit = usd(1_000.0);
+    let result = evaluate_2025_configured(
+        "2025Q1..2025Q4",
+        FinancialStatementInstrument::TermLoan(loan),
+        WaterfallSpec::default(),
+        &|index| if index == 1 { 12.0 } else { 1_000.0 },
+        &|_| 0.0,
+        &[],
+        &MarketContext::new(),
+        &|builder| {
+            builder
+                .compute("paid", "cs.interest_expense_cash.total")
+                .expect("post-allocation formula");
+            builder
+                .compute("paid_last_period", "lag(cs.interest_expense_cash.total, 1)")
+                .expect("lagged capital reference");
+            builder
+                .compute("arrears", "cs.interest_arrears.total")
+                .expect("arrears formula");
+        },
+    )
+    .expect("evaluation");
+    let quarter = |n: u8| PeriodId::quarter(2025, n).expect("quarter");
+    // The 20 coupon falls due on 1 April, in the second quarter.
+    assert_close(
+        component(&result, "scheduled_cash_interest_due", INSTRUMENT, "2025Q2"),
+        20.0,
+    );
+    assert_eq!(result.get_money("paid", &quarter(2)), Some(usd(12.0)));
+    assert_eq!(result.get_money("arrears", &quarter(2)), Some(usd(8.0)));
+    // The third quarter reads the committed snapshot of the second, and
+    // pays its own 20 coupon plus the 8 carried.
+    assert_close(
+        result.get("paid_last_period", &quarter(3)).expect("lag"),
+        12.0,
+    );
+    assert_eq!(result.get_money("paid", &quarter(3)), Some(usd(28.0)));
+    assert_eq!(result.get_money("arrears", &quarter(3)), Some(usd(0.0)));
+}
+
+/// A cash and debt bridge built by hand for an amortizing loan with a sweep:
+/// every period opens on the prior close, debt moves only by principal paid,
+/// and the pool is fully used. 10% on 100 with 10 of amortization a quarter,
+/// a sweep of 20 in the second quarter and a pool of 100 each quarter.
+#[test]
+fn the_cash_and_debt_bridge_reconciles_across_periods() {
+    let mut loan = quarterly_loan();
+    loan.issue_date = date!(2024 - 12 - 31);
+    loan.maturity = date!(2025 - 12 - 31);
+    loan.rate = RateSpec::Fixed { rate: 0.10 };
+    loan.amortization = AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.10 };
+    let evaluate = || {
+        evaluate_2025_with(
+            "2025Q1..2025Q4",
+            FinancialStatementInstrument::TermLoan(loan.clone()),
+            prepay_then_equity("request"),
+            &|_| 100.0,
+            &|index| if index == 1 { 20.0 } else { 0.0 },
+            &[],
+            &MarketContext::new(),
+        )
+        .expect("evaluation")
+    };
+    let result = evaluate();
+    let get = |name: &str, period: &str| component(&result, name, INSTRUMENT, period);
+    let cashflows = result.cs_cashflows.as_ref().expect("capital cash flows");
+    // (opening, interest, principal, closing, equity) by hand. Interest is a
+    // 30/360 quarter on the balance after the prior coupon date's
+    // amortization. The sweep is posted at the 30 June close and earns from
+    // 1 July, so the coupon period that starts on 30 June carries one day at
+    // the pre-sweep 80: 60 for 89 days and 80 for one.
+    let third = 0.10 * (60.0 * 89.0 + 80.0) / 360.0;
+    let ledger = [
+        ("2025Q1", 100.0, 2.5, 10.0, 90.0, 87.5),
+        ("2025Q2", 90.0, 2.25, 30.0, 60.0, 67.75),
+        ("2025Q3", 60.0, third, 10.0, 50.0, 90.0 - third),
+        ("2025Q4", 50.0, 1.25, 50.0, 0.0, 48.75),
+    ];
+    for (period, opening, interest, principal, closing, equity) in ledger {
+        assert_close(get("opening_balance", period), opening);
+        assert_close(get("interest_expense_cash", period), interest);
+        assert_close(get("principal_payment", period), principal);
+        assert_close(get("debt_balance", period), closing);
+        let id: PeriodId = period.parse().expect("period");
+        assert_close(cashflows.equity_distribution[&id].amount(), equity);
+        assert_eq!(cashflows.available_cash[&id], usd(100.0));
+        // Debt moves only by principal paid, and the pool is fully used.
+        assert_close(opening - principal, closing);
+        assert_close(interest + principal + equity, 100.0);
+    }
+
+    // The same model evaluated again gives the same result, cell for cell.
+    assert_eq!(
+        serde_json::to_value(&result).expect("serialize"),
+        serde_json::to_value(evaluate()).expect("serialize")
+    );
+}
+
+/// A loan issued on a period boundary belongs to the period it starts:
+/// nothing is outstanding before it, and its first coupon accrues from the
+/// boundary.
+#[test]
+fn a_loan_issued_on_a_period_boundary_starts_in_that_period() {
+    let mut loan = quarterly_loan();
+    loan.issue_date = date!(2025 - 04 - 01);
+    loan.maturity = date!(2026 - 04 - 01);
+    let result = evaluate_2025(
+        "2025Q1..2025Q4",
+        FinancialStatementInstrument::TermLoan(loan),
+        WaterfallSpec::default(),
+        0.0,
+        &[],
+    )
+    .expect("evaluation");
+    let get = |name: &str, period: &str| component(&result, name, INSTRUMENT, period);
+    assert_close(get("debt_balance", "2025Q1"), 0.0);
+    assert_close(get("interest_expense_cash", "2025Q1"), 0.0);
+    assert_close(get("opening_balance", "2025Q2"), 0.0);
+    assert_close(get("debt_balance", "2025Q2"), 100.0);
+    // The first coupon, for April to June, is paid on 1 July.
+    assert_close(get("interest_expense_cash", "2025Q2"), 0.0);
+    assert_close(get("interest_expense_cash", "2025Q3"), 2.0);
+    // The waterfall ran in the first quarter with no claim to pay.
+    let cashflows = result.cs_cashflows.as_ref().expect("capital cash flows");
+    assert_eq!(
+        cashflows.equity_distribution[&PeriodId::quarter(2025, 1).expect("quarter")],
+        usd(1_000.0)
+    );
+}
+
+/// The PIK metric is an input of the stage it decides: it may not read a
+/// same-period capital output, directly or through another node.
+#[test]
+fn a_pik_metric_may_not_read_this_periods_capital_outputs() {
+    let run = |metric: &str| {
+        let mut waterfall = pik_toggle(Decimal::ONE, 0);
+        waterfall
+            .pik_toggle
+            .as_mut()
+            .expect("toggle")
+            .liquidity_metric = metric.into();
+        evaluate_2025_configured(
+            "2025Q1..2025Q4",
+            FinancialStatementInstrument::TermLoan(quarterly_loan()),
+            waterfall,
+            &|_| 1_000.0,
+            &|_| 0.0,
+            &[],
+            &MarketContext::new(),
+            &|builder| {
+                builder
+                    .compute("interest_alias", "cs.interest_expense_cash.total")
+                    .expect("alias");
+            },
+        )
+    };
+    let error = run("interest_alias")
+        .expect_err("metric reads the stage output")
+        .to_string();
+    assert!(error.contains("pik_toggle.liquidity_metric"), "{error}");
+    assert!(error.contains("interest_alias"), "{error}");
+    // A prior period is committed; the first period has none, so the metric
+    // states its own fallback.
+    run("coalesce(lag(cs.interest_expense_cash.total, 1), 0)")
+        .expect("a prior period is committed");
 }

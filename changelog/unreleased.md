@@ -1317,6 +1317,20 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements capital: a period's debt state commits once, and the PIK metric is a traced input
+
+Breaking, with no compatibility path (STATEMENTS-EVALUATION-012).
+
+- `pik_toggle.liquidity_metric` may not depend on a same-period `cs` output,
+  directly or through other nodes; the run is rejected before it starts, like
+  the cash pool and the prepayment sizing inputs. Read a prior period with
+  `lag(...)` and state the first period's fallback (for example
+  `coalesce(lag(cs.debt_balance.total, 1), 0)`).
+- A period now works on a staged copy of the debt state. The ledger, the
+  coupon elections and the rebuilt schedules replace the committed state only
+  after the formulas that read final capital amounts have evaluated, so a
+  period that fails leaves the state of the last committed period.
+
 ### Statements metrics: bundled leverage and coverage use `ratio`, complete windows and due-date service
 
 Breaking, with no compatibility path (STATEMENTS-CONTRACTS-008).
