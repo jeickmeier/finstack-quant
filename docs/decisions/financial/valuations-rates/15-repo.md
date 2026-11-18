@@ -155,7 +155,7 @@
    close-out netting and XVA require their own qualified contracts
    and methods. Haircut and coverage supply no recovery law.
    [Accepted margin bridge](../valuations-framework/margin-bridge.md),
-   [repo margin cashflows](../margin-collateral-im/20-repo-margin-cashflows.md),
+   [repo margin cashflows](../margin-collateral-im/20-repo-margin-cashflows.md#accepted-decision-for-checked-repo-cash-margin-and-interest),
    [ICMA tri-party repo](https://www.icmagroup.org/market-practice-and-regulatory-policy/repo-and-collateral-markets/icma-ercc-publications/frequently-asked-questions-on-repo/24-what-is-tri-party-repo/)
    and [ICMA default process](https://www.icmagroup.org/market-practice-and-regulatory-policy/repo-and-collateral-markets/icma-ercc-publications/frequently-asked-questions-on-repo/26-what-happens-to-repo-in-a-default/).
 

@@ -1,14 +1,20 @@
 # FACTOR-004: Credit issuer matching and hierarchy factor identifiers
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17 for exact issuer selection, explicit proxies and canonical credit factor identity.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** Calibrated-row lookup and ordered hierarchy emissions are implemented. Explicit proxy admission, canonical path validation and full declared-universe checks remain pending.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** All 16 focused credit-matching tests passed on 2026-11-17 against current behavior. The accepted proxy rules, canonical identities and downstream coverage still need qualification.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Bind each credit dependency to its exact qualified issuer ID and use the calibrated row for a known issuer. Require a unique row, finite signed betas, and tags and beta-vector dimensions matching the admitted hierarchy. Emit the generic factor followed by nonzero hierarchy loadings in model order. Retain evidence distinguishing a zero loading from a folded level.
+2. Require explicit authorization for an unknown-issuer proxy. Without a permitted proxy, return a typed unmatched outcome. Strict fails required coverage and Warn reports it as incomplete. A permitted proxy names declared factors, supplies finite loadings and records its source. Runtime tags alone confer no loading. Preserve the exact calibrated row requirement where an attribution contract requires it. [Portfolio coverage](../portfolio-attribution/12-factor-assignment-and-credit-exposures.md#accepted-decision-for-checked-factor-assignment-and-credit-exposures) · [Credit attribution](../attribution/11-credit-factor-hierarchy.md#accepted-decision-for-checked-credit-hierarchy-and-spread-replay-allocation).
+3. Use one checked bucket identity across calibration, matching and snapshots. Validate the full dimension and value paths against the declared hierarchy. Reject blank or ambiguous path segments and reserved delimiters within segments, including `.` and `::`. Require every emitted factor to exist on the declared covariance axis.
+
+## Observed choice and rationale
 
 Map a credit dependency to a generic factor plus nonzero hierarchy betas. Known issuer rows take precedence over runtime attributes. Unknown issuers can use unit-beta runtime tags; generated calibration configs require an issuer-ID attribute.
 
@@ -34,7 +40,7 @@ Standalone matcher construction does not validate finite betas, duplicate issuer
 
 ## Alternatives and tradeoffs
 
-Rejecting unknown issuers gives a closed universe but precludes controlled onboarding. Mapping unknown issuers only to generic, or to the nearest existing bucket, would avoid dynamic factors but changes risk allocation. Unit beta is an observed fallback, not evidence of predictive accuracy.
+Explicit proxy selection supports controlled onboarding into the declared factor basis. Calibrated rows retain priority and proxy provenance identifies where input coverage depends on an elected substitute.
 
 ## Implementation and evidence
 
@@ -45,6 +51,5 @@ Rejecting unknown issuers gives a closed universe but precludes controlled onboa
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models).

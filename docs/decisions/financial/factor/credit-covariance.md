@@ -1,14 +1,20 @@
 # FACTOR-016: Credit covariance strategies and correlation repair
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** Four strategies and forecasting from stored covariance are implemented. Common-panel admission, explicit repair controls, and published covariance-derived measures require reconciliation.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** Exact arithmetic reproduced fixture shrinkage intensity 17/18 and annualized covariance with diagonal of 30 bp² and off-diagonal of −1 bp². The Rust fixture was inspected. Repair limits and held-out performance remain to be qualified.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Explicitly elect Diagonal, FullSampleRepaired, Ridge, or LedoitWolf. Use one complete aligned panel of bp changes with at least two observations. Diagonal uses elected Sample or EWMA marginal variances. FullSampleRepaired combines those marginals with sample Pearson correlation. Ridge adds a declared finite nonnegative amount in annualized bp² to each diagonal of the same construction. LedoitWolf supplies the full annualized systematic covariance through the core scaled-identity estimator. Sample or EWMA still governs issuer residual variance. [Variance estimators](credit-variance.md) · [Core shrinkage](../core-numerics/covariance-shrinkage.md).
+2. Require defined Pearson correlation between positive-variance factors. If estimated correlation fails PSD admission, FullSampleRepaired and Ridge may use the core nearest-correlation projection with explicit controls. Require a declared maximum repair distance and record the actual distance. Fail if projection exceeds the limit or final covariance fails validation. [Core projection](../core-numerics/nearest-correlation.md) · [Covariance admission](matrix-invariants.md).
+3. Use the stored annualized covariance for systematic risk and forecasts. Derive published systematic variances and correlations from it, with correlation undefined on zero-variance axes. If retained, label pre-ridge correlation and standalone Sample or EWMA estimates as diagnostics.
+
+## Observed choice and rationale
 
 Assemble systematic covariance by explicit Diagonal, Ridge, FullSampleRepaired or LedoitWolf strategy. The default is FullSampleRepaired. These are materially different estimators, not interchangeable serialization choices.
 
@@ -46,6 +52,5 @@ A coherent shrinkage model for both covariance and all variance state, weighted/
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and independent qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models).

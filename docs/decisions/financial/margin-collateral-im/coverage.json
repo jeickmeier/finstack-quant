@@ -70,12 +70,12 @@
     },
     {
       "id": "MARGIN-COLLATERAL-IM-014",
-      "title": "External CCP IM and conservative exposure proxy",
+      "title": "Reported CCP initial margin and indicative exposure proxy",
       "path": "14-ccp-external-and-proxy.md"
     },
     {
       "id": "MARGIN-COLLATERAL-IM-015",
-      "title": "Collateral eligibility and haircut initial margin",
+      "title": "Collateral eligibility and credited value",
       "path": "15-collateral-eligibility-and-haircuts.md"
     },
     {

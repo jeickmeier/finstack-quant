@@ -1,14 +1,21 @@
 # COVENANTS-02: Threshold schedules, windows and waivers
 
-**Decision status:** Draft — observed implementation; adoption pending for choices not already settled. Existing accepted decisions retain their scope.
+**Decision status:** Accepted 2026-11-17 for replacement windows, effective thresholds, waiver admission and effective-term reporting.
 
-**Implementation status:** Observed in the exact source paths identified below, including stated discrepancies and limitations.
+**Implementation status:** Replacement windows, inclusive dates and numeric threshold precedence are implemented. Waiver applicability checks, explicit waived status and effective-term reporting remain pending.
 
-**Validation status:** Source and identified test assertions inspected; tests, builds, numerical experiments and external benchmarks not executed. Test existence is not adoption or independent qualification.
+**Validation status:** The 115-test Covenants Rust baseline passed on 2026-11-17, including existing window, waiver, forecast and schedule-restoration tests. The accepted admission and reporting changes still need qualification.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See the [scope inventory and coverage ledger](README.md).
 
-## Ordered selection
+## Accepted decision
+
+1. Treat each inclusive window as a complete replacement of the base set. An empty window selects no tests. Resume the base set outside windows. Reject reversed or overlapping windows, including shared endpoints. Window input order has no effect on selection. Reuse an exact label across sets only for the same continuing obligation.
+2. Use the same resolution rules for assessment and forecast. For an applicable test, a full waiver suppresses evaluation and yields a waived outcome. Otherwise use the active amendment, the latest scheduled threshold effective on or before the test date, or the static threshold, in that priority order. Schedule dates are unique. An amendment applies through its inclusive expiry date, then ordinary threshold selection resumes.
+3. Require each waiver to name an exact label that appears in an effective set during at least part of the waiver interval. Reject overlapping waivers for that label, reversed date ranges and threshold amendments for nonnumeric tests. Treat an omitted expiry as open-ended. Select a waiver on dates when both its interval and the named obligation apply.
+4. Report the effective threshold and its source in assessments and forecasts. Descriptions must agree with the effective numeric terms shown. Preserve captured episode terms when resolving later test dates. [COVENANTS-05](05-breach-and-cure.md) owns the effect of later events on cure and breach history.
+
+## Observed selection
 
 1. Validate all top-level and window specifications, even inactive or currently unselected ones. A window requires `start <= end`; any inclusive intersection between two windows is rejected. Windows need not be stored chronologically despite `validate` rustdoc saying they are checked as ordered.
 2. On the test date, a matching inclusive `[start,end]` window replaces the complete top-level specification set. It does not append to it. An empty matching window means no tests; outside every window, top-level tests resume. Pairwise nonoverlap makes stored window order immaterial to selection.
@@ -28,9 +35,9 @@ Descriptions are produced from the static `CovenantType` before threshold resolu
 - Owning [schedule constructor/deserializer/lookup](../../../../finstack-quant/covenants/src/schedule.rs), [window and waiver terms](../../../../finstack-quant/covenants/src/engine/types.rs), [validation and resolution](../../../../finstack-quant/covenants/src/engine/covenant_engine.rs), and [forecast effective-term use](../../../../finstack-quant/covenants/src/forward.rs).
 - Inspected `threshold_schedule_deserialization_uses_constructor_validation` in [serialization tests](../../../../finstack-quant/covenants/tests/serialization.rs), `window_fallback_to_base_specs_is_explicit` in [engine conventions](../../../../finstack-quant/covenants/tests/engine_conventions.rs), and `forecasts_respect_windows_waivers_and_inactivity` / `window_breach_retains_cure_and_consequences_after_window_expires` in [audit regressions](../../../../finstack-quant/covenants/tests/audit_regressions.rs).
 
-Inspected tests establish intended examples only and were not run.
+These tests passed in the Rust baseline. They cover current behavior. The accepted waiver-applicability and effective-reporting cases remain to be tested.
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification are tracked
 in the [covenant follow-ups](../FOLLOW_UPS.md#covenants).

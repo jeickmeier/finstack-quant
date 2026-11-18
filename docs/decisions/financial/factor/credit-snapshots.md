@@ -1,14 +1,20 @@
 # FACTOR-017: Credit anchor and dated spread decomposition
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** The shared peel is implemented. Checked proxy and DTS admission, frozen model comparison, and population reporting require reconciliation.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** Exact arithmetic checked a bucket membership change and reconstruction. Current reconstruction and anchor parity fixtures were inspected. The accepted proxy, DTS, and population rules still require qualification.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Use one shared weighted peel for calibration anchors and dated snapshots. Validate the model and preserve its operative folds. Known issuers use their calibrated tags and loadings. New issuers require explicitly authorized proxies with canonical tags, finite loadings, and recorded sources. Every contributing DTS issuer requires sourced positive duration and a finite positive duration-times-current-spread weight. Fail on missing required inputs. [Panel and clock](credit-panel.md) · [Credit matching](credit-matching.md) · [Bucket folds](credit-buckets.md).
+2. Compare ordered snapshots on one frozen model basis. Require consistent loadings, tags, and folds for continuing issuers. Difference common issuer and bucket keys. Report issuer and bucket entries and exits explicitly and flag continuing buckets whose contributing membership changed.
+3. Report spread decomposition in basis points. With equal weights and an unchanged generic factor, replacing a 120 bp peer with a 160 bp peer raises the bucket by 20 bp in a two-issuer example. The continuing issuer's adder falls by 20 bp and reconciles its unchanged spread.
+
+## Observed choice and rationale
 
 Use one shared single-observation peel for calibration anchors and dated observed-spread snapshots, then difference only keys present at both dates. This supplies a reconstructable spread attribution in bp; it does not itself price P&L.
 
@@ -47,6 +53,5 @@ A frozen-anchor attribution, an equal-only new-issuer policy, caller-supplied ne
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and independent qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models).

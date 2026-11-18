@@ -1,14 +1,20 @@
 # FACTOR-005: Covariance factor-risk decomposition
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17 for covariance-based variance, volatility and signed normal tail-risk allocation.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** Covariance forms, risk transforms and signed component allocations are implemented. Checked scale-aware arithmetic, reconciliation and revised zero-risk fields remain pending.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** All 12 focused factor-risk Rust tests passed on 2026-11-17 against current behavior. An independent exact-rational case verified signed component conservation. The accepted extreme-scale and zero-risk behavior remains to be qualified.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Require the admitted factor basis, covariance horizon and reporting currency. Sum the already-weighted position sensitivities once to obtain `b`. Use `v = bᵀΣb` and volatility `sqrt(v)`. Use zero-drift normal VaR and ES on the signed P&L axis, with `-z sqrt(v)` and `-φ(z) sqrt(v)/(1-confidence)`, respectively. Variance is in reporting currency squared; volatility and both tail measures are in reporting currency. [Factor configuration](factor-configuration.md).
+2. Set `q = Σb`. Keep signed factor variance allocations `bⱼqⱼ`, position-factor allocations `deltaᵢⱼqⱼ` and the separate variance derivative `2qⱼ`. Apply the measure's common scale to factor and position-factor allocations for volatility, VaR and ES. With `b=[2,-1]` and covariance `[[1,0.8],[0.8,1]]`, allocations `+2.4` and `−0.6` sum to variance `1.8`.
+3. Use checked scale-aware arithmetic and retire the fixed absolute variance clamp. Return a computation error for unresolved negative variance or nonfinite results. Verify position-to-factor and factor-to-total conservation. At verified zero risk, allocations are zero, relative shares and transformed marginals are undefined, and the variance derivative remains defined.
+
+## Observed choice and rationale
 
 Allocate portfolio variance or its normal-distribution transforms using factor exposures and a common covariance matrix. Variance components are half-Euler allocations (summing to variance), while reported variance marginals retain the derivative factor of two.
 
@@ -42,10 +48,9 @@ Historical/scenario risk can capture supplied nonlinear P&L at greater data/comp
 - [src/risk/mod.rs](../../../../finstack-quant/factor/src/risk/mod.rs) — inspected implementation.
 - [src/risk/types.rs](../../../../finstack-quant/factor/src/risk/types.rs) — inspected implementation.
 
-[Meucci](../../../REFERENCES.md#meucci-risk-and-asset-allocation) and [Tasche](../../../REFERENCES.md#tasche-2008-capital-allocation) are conceptual references, not proofs of this implementation. [src/risk/parametric.rs](../../../../finstack-quant/factor/src/risk/parametric.rs) tests locate hand-structured two-factor component calculations, all measures, exact axes, rank-deficient PSD, nonfinite sensitivities and zero risk.
+The [focused Rust tests](../../../../finstack-quant/factor/src/risk/parametric.rs) passed for current measures, axes, rank-deficient PSD, nonfinite sensitivities and zero risk. Qualify cancellation, extreme scales, signed hedge contributions and finite-difference marginals under the accepted contract.
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models).

@@ -1,14 +1,21 @@
 # COVENANTS-03: Numeric compliance, denominator validity and headroom
 
-**Decision status:** Draft — observed implementation; adoption pending for choices not already settled. Existing accepted decisions retain their scope.
+**Decision status:** Accepted 2026-11-17 for numeric bounds, ratio validity and explicit headroom measures.
 
-**Implementation status:** Observed in the exact source paths identified below, including stated discrepancies and limitations.
+**Implementation status:** Inclusive comparisons are implemented for finite scalar inputs. Explicit denominators for all built-in ratios, typed contractual comparisons, indeterminate outcomes and separate headroom measures remain pending.
 
-**Validation status:** Source and identified test assertions inspected; tests, builds, numerical experiments and external benchmarks not executed. Test existence is not adoption or independent qualification.
+**Validation status:** The 115-test Covenants Rust baseline and all nine focused headroom tests passed on 2026-11-17 against current behavior. The accepted changes still need implementation and qualification.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See the [scope inventory and coverage ledger](README.md).
 
-## Computation
+## Accepted decision
+
+1. Require an explicit contract-defined denominator for each built-in leverage and coverage ratio. The producer supplies the ratio and denominator for the same reporting period. A nonpositive denominator or negative gross leverage yields an indeterminate assessment. Negative net leverage with positive earnings is valid. Missing observations and supplied nonfinite values retain their distinct input outcomes.
+2. Report an indeterminate result with its reason and omit numeric headroom and breach probability. Record a contractual breach from an indeterminate result only when the agreement explicitly elects that treatment. The contractual election leaves modeled probability unavailable.
+3. Compare valid values at contractual precision. A maximum passes at `value <= limit` and a minimum passes at `value >= floor`. Apply only rounding specified by the agreement and retain the [accepted monetary representation](../conventions/0020-numerical-representation-and-rounding.md). Basket tests compare supplied utilization with the limit.
+4. Report absolute and relative headroom separately. The signed absolute distance is `threshold - value` for a maximum and `value - threshold` for a minimum, in the metric's units. Relative headroom divides that distance by `abs(threshold)` and is undefined at zero. Report arithmetic overflow distinctly from indeterminate assessment and retain any representable headroom measure. At a maximum of 4.0× and an actual of 3.6×, the absolute cushion is 0.4× and the relative cushion is 10%.
+
+## Observed computation
 
 After activation and effective-term selection, read the selected raw metric and optional denominator. Missing inputs error; supplied NaN or infinity errors. For built-in gross maximum leverage (`MaxDebtToEbitda`, `MaxTotalLeverage`, `MaxSeniorLeverage`), a negative ratio is internally converted to NaN. Any supplied earnings denominator at or below zero also produces this internal sentinel. A net-cash negative net-debt/EBITDA value is allowed when its required denominator is positive. The engine never recomputes a ratio or verifies numerator/denominator consistency.
 
@@ -26,9 +33,9 @@ The documented ratio convention prevents a negative gross leverage result from a
 
 Owning [helpers](../../../../finstack-quant/covenants/src/engine/helpers.rs), [point-in-time evaluation](../../../../finstack-quant/covenants/src/engine/covenant_engine.rs), [spec validation](../../../../finstack-quant/covenants/src/engine/types.rs), and [forecast reuse](../../../../finstack-quant/covenants/src/forward.rs) share this convention. Inspected [engine convention tests](../../../../finstack-quant/covenants/tests/engine_conventions.rs) cover negative gross/custom values and negative-threshold headroom; [audit regressions](../../../../finstack-quant/covenants/tests/audit_regressions.rs) cover net cash versus zero/negative earnings. Inline engine tests cover exact equality and neighboring values.
 
-No numerical cases were executed.
+The Rust baseline covered exact bounds, negative gross and custom ratios, and net cash versus nonpositive earnings. The focused headroom tests exercised the existing shared helper. Independent boundary fixtures for the accepted denominator, outcome and headroom rules remain pending.
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification are tracked
 in the [covenant follow-ups](../FOLLOW_UPS.md#covenants).

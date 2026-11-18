@@ -1,14 +1,20 @@
 # FACTOR-007: Normal position VaR, ES, marginals, and removal risk
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17 for checked normal position risk, Euler allocations and removal VaR.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** Covariance-based VaR, ES and fixed-weight removal formulas are implemented. Explicit confidence, checked scale-aware arithmetic, both-measure reconciliation and revised zero-risk fields remain pending.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** All 37 position-risk tests passed on 2026-11-17 against current behavior. An independent exact calculation verified removal from a fully hedged rank-one book. Small-risk reconciliation and extreme-scale behavior remain to be qualified.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Use the admitted position covariance basis and horizon, exact ordered position IDs, finite signed weights or exposures, and explicit finite confidence in `(0.5, 1)`. Report zero-drift normal VaR and ES on the signed P&L axis. The supplied exposure basis determines whether results are returns or monetary P&L. [Matrix invariants](matrix-invariants.md) · [Normal factor-risk transform](factor-risk.md).
+2. Compute signed Euler components and separate marginals for both VaR and ES. Use checked scale-aware arithmetic and reconcile both measures at every representable positive risk level. Retire the fixed cutoff that zeros allocations on a small positive total. Verified zero risk gives zero components and undefined shares and marginals. Unresolved numerical failures produce computation errors.
+3. Define optional removal VaR as signed `VaR(full) − VaR(without position)`, using the original weights of the remaining positions and checked reduced variance. In an exact rank-one example, weights `[1,-1]` and unit covariance entries give zero full variance and unit variance after either removal. The positive removal difference equals the benefit of the hedge on the signed VaR axis.
+
+## Observed choice and rationale
 
 Compute normal one-period position risk with covariance Euler contributions and optional exact remove-one-position VaR changes. Confidence defaults to 0.95 and losses are negative.
 
@@ -43,10 +49,9 @@ A consistently scaled zero-risk policy or relative tolerance could preserve scal
 - [src/risk/mod.rs](../../../../finstack-quant/factor/src/risk/mod.rs) — inspected implementation.
 - [src/covariance.rs](../../../../finstack-quant/factor/src/covariance.rs) — inspected implementation.
 
-[src/risk/position.rs](../../../../finstack-quant/factor/src/risk/position.rs) tests include hand-structured covariance portfolios, rank deficiency, signed losses, Euler exhaustion, single/empty cases and removal-risk checks. [Tasche](../../../REFERENCES.md#tasche-2008-capital-allocation) and [Meucci](../../../REFERENCES.md#meucci-risk-and-asset-allocation) are theory anchors. Existing finite-input tests are not overflow evidence.
+[Position risk tests](../../../../finstack-quant/factor/src/risk/position.rs) passed for current normal and historical behavior, including rank deficiency, signed losses, Euler reconciliation, empty books and removal. Qualify the accepted checked arithmetic with extreme magnitudes, tiny positive risk, zero and hedged cases, and an independent reduced-portfolio calculation.
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models).

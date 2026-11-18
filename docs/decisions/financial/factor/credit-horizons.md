@@ -1,14 +1,20 @@
 # FACTOR-018: Annualized covariance and idiosyncratic horizon scaling
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** Fractional-year scaling exists. Explicit horizon admission and a consistent systematic and residual handoff require reconciliation.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** Exact arithmetic checked ten-day scaling. The portfolio handoff was traced in source. End-to-end and binding qualification remain pending.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Require one explicit finite nonnegative year fraction across Rust, Python, and WASM. Retire OneStep, NSteps, and Unconditional. Ten business days on a 252-day basis is 10/252 years.
+2. Apply the same year fraction exactly once to both the authoritative annual systematic covariance and validated annual issuer residual variance. Take the square root after scaling when returning volatility. Preserve Ridge and LedoitWolf adjustments. Both Sample and EWMA use a flat variance rate across the horizon. [Systematic covariance](credit-covariance.md) · [Portfolio residual risk](../portfolio-attribution/13-credit-residual-risk-and-reporting.md).
+3. Carry the horizon with the result and validate the forecast before handing it to portfolio risk. Reject invalid scales, missing required issuer state, and nonfinite results. A qualified zero horizon yields zero risk. For ten days on a 252-day basis, annual systematic variance of 252 bp² becomes 10 bp² and annual issuer variance of 100 bp² becomes 250/63 bp².
+
+## Observed choice and rationale
 
 Forecast by scaling the calibrated authoritative covariance linearly in a requested year horizon, preserving Ridge/LedoitWolf adjustments. Sample and EWMA states use flat variance forecasts; no new observations or mean reversion are processed.
 
@@ -44,6 +50,5 @@ Panel-frequency-relative horizons, actual day-count conversions, or mean-reverti
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and independent qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models).

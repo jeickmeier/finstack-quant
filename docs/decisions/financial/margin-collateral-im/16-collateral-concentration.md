@@ -1,14 +1,25 @@
 # MARGIN-COLLATERAL-IM-016 — Collateral concentration reporting
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17 for checked collateral pool concentration.
 
-**Implementation status:** Observed for the source scope below, including the stated limitations and discrepancies.
+**Implementation status:** Existing behavior is described below. Qualified pool inputs, value basis, complete grouping, checked results and host reconciliation with the accepted contract are pending.
 
-**Validation status:** Evidence inspected or specifically located; no tests/builds executed. Audit date **2026-11-05**; source revision `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` (scope and coverage in [README](README.md)).
+**Validation status:** Primary concentration references inspected. Independent arithmetic checked repeated-class aggregation, gross and credited bases, equality and a large-value comparison. Runtime and host qualification remain pending. Audit date **2026-11-05** and source revision `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` (scope and coverage in [README](README.md)).
+
+## Accepted decision for checked collateral pool concentration
+
+1. Bind one dated collateral pool to the agreement, account, side, margin purpose and valuation cut. Use qualified lot values in one account currency under record 015. Count each lot once. Report known ineligible holdings as exclusions and return a typed error when required evidence is missing. [Collateral valuation](15-collateral-eligibility-and-haircuts.md#accepted-decision-for-checked-collateral-eligibility-and-credited-value).
+2. Elect either gross market value before haircuts or credited value after haircuts. Use the same basis for each group and the eligible pool total. Include eligible cash and uncapped holdings in the denominator.
+3. Use immutable dated rules with explicit asset class, security, issuer or issuer-group scope and exact Decimal caps in `[0, 1]`. Sum all eligible holdings in each applicable group and evaluate overlapping rules independently. Retire the first-entry lookup and inherited 30% corporate cap. This operation covers fractional pool caps. Rules involving additional monetary thresholds require their own qualified calculation. [Basel MGN20.34](https://www.bis.org/committees/bcbs/basel-framework/standard/mgn/20/inforce/2019-12-15/published/2019-12-15) · [EU Article 8](https://eur-lex.europa.eu/legal-content/EN/ALL/?uri=CELEX%3A32016R2251).
+4. Compare `group value > limit × pool value` using checked exact arithmetic on admitted amounts before rounding. Equality passes. Report each group's share, limit and any excess in percentage points at the observed pool size. [Money arithmetic](../core-conventions/012-money-decimal-precision.md).
+5. For zero pool value report that the share is unavailable and give the reason. Distinguish an unevaluated share, an explicit election of no limits, an evaluated pass and an input error.
+6. Return one checked diagnostic report through Rust, Python and WASM. Preserve scope, cut, value basis, pool total, coverage, exclusions and each rule result. Allocation changes and transfers belong to their respective owners. [Contractual terms](17-csa-selection-and-im-terms.md) · [Result transport](22-wire-tables-and-provenance.md).
+
+Two USD 20 corporate lots and USD 60 cash give a 40% gross corporate share. An expressly elected 30% cap is breached by ten percentage points on that basis. If the corporate lots each receive USD 10 of credit and cash receives USD 60, the credited share is 25%.
 
 ## Choice and rationale
 
-Observed: concentration checking is a separate reporting helper; it neither changes haircut IM nor enforces collateral allocation. Proposed rationale: report contract-limit breaches separately from monetary valuation, but the intended aggregation level must be explicit.
+The observed concentration check evaluates each supplied row. The accepted report evaluates the full group defined by each elected cap and preserves the value basis used for the comparison.
 
 ## Input domain and conventions
 
@@ -27,7 +38,7 @@ Limits are decimal fractions. The corporate class convenience inherits30% from e
 
 ## Alternatives and tradeoffs
 
-Aggregate by class before checking when the legal constraint is class-wide; group by issuer/security when that is the actual constraint. Rejecting repeated keys would instead enforce a preaggregated input contract. Haircut adjustment or forced optimization upon breach are distinct downstream policies.
+The accepted report supports separate cap groups that can share members. A lot enters the pool total once. The chosen allocation and any corrective transfers belong to their respective owners.
 
 ## Source and validation evidence
 
@@ -39,5 +50,5 @@ Existing evidence: [src/types/collateral.rs](../../../../finstack-quant/margin/s
 
 ## Follow-up tracking
 
-Adoption, implementation reconciliation and qualification work is tracked in the
+Implementation reconciliation and qualification work is tracked in the
 [collateral and initial-margin register](../FOLLOW_UPS.md#margin-collateral-and-initial-margin).

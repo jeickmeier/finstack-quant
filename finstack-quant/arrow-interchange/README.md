@@ -76,19 +76,25 @@ are preserved. Column order and names are preserved exactly.
 | `finstack:metadata` | `METADATA_KEY` | Arrow field metadata | JSON object of per-column metadata (`IndexMap<String, Value>`) |
 | `finstack:metadata` | `METADATA_KEY` | Arrow schema metadata | JSON object of table-level metadata |
 
-Both keys are omitted when the source column has no role / no metadata, so
-absence is meaningful. Unknown `finstack:role` values are not produced by this
-crate; malformed metadata JSON returns `Error::Validation`.
+Fields omit `finstack:role` when the source column has no role. Fields and the
+schema omit `finstack:metadata` when their respective maps are empty. The
+exporter serializes these typed JSON values and carries embedded strings as text.
+Roles and metadata are advisory. Repeated exports preserve equivalent fields,
+values and annotations. IPC byte ordering is unspecified.
 
 ## Edge cases
 
 - Empty envelope (0 columns, 0 rows) exports as a zero-row, zero-column batch.
 - Zero rows with columns export with the schema preserved.
-- The row count is passed explicitly via `RecordBatchOptions::with_row_count`,
-  so column-less tables keep their declared `row_count`.
-- `TableEnvelope::new` already rejects mismatched column
-  lengths and duplicate column names, so a valid envelope cannot fail export on
-  shape; the exported batch row count matches `TableEnvelope::row_count`.
+- The exported batch receives the envelope's explicit row count. The core
+  table contract requires zero rows for a table with no columns.
+- `TableEnvelope::new` and envelope serde validate names and shape. Callers
+  passing a table assembled through public fields must validate it before
+  export until the adapter enforces core admission itself.
+- String columns use signed 32-bit offsets. Keep the total present UTF-8 bytes
+  in each column within `i32::MAX` to avoid an Arrow construction panic. The
+  accepted preflight and its column-specific validation error are tracked in
+  [ARROW-003](../../docs/decisions/financial/arrow-interchange/03-envelope-boundary-and-batch-assembly.md).
 
 ## Quick start
 

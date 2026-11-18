@@ -1,14 +1,20 @@
 # FEATURES-001: Panel ordering, timestamp keys and partition membership
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** Row ordering, alignment, and partitioning are implemented. Checked timestamp conversion and consistent native key-column admission require reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** Independent arithmetic checked a tied-key rolling example. Rust fixtures were inspected. Timestamp boundaries and host behavior still require qualification.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and actual selection
+## Accepted decision
+
+1. Keep each row as a separate observation. Within each entity, sort by exact order key and original input position, and return results in input order. Trailing windows include the current row and count missing rows toward membership. Each operation defines observation eligibility. Values 8, 2, and 4 at keys 02, 01, and 01 give two-row rolling means of 6, missing, and 3 in input order.
+2. Partition cross-sections by exact time key or exact time-key and group tuple. Repeated entities remain separate rows and contribute separately to the statistic.
+3. Treat caller-supplied strings as opaque lexical keys. When converting native values, require a single representation per key column. Normalize aware timestamps to UTC, preserve naive wall time, and format nine fractional digits. Check that timestamp years after applicable normalization are in 0001–9999. Reject offsets that cannot be represented exactly.
+
+## Observed scope and actual selection
 
 Every time-series path, including pairwise statistics and rolling regression, calls `sorted_indices`, then visits contiguous entity runs. Cross-sectional operations and neutralization partition by exact `time_key`; grouped cross-sectional operations partition by the actual `(time_key, groups)` tuple. No calendar, exchange session, currency, entity normalization or duplicate-row aggregation is supplied.
 

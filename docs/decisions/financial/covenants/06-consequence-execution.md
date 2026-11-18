@@ -1,14 +1,20 @@
 # COVENANTS-06: Consequence conversion, ordering and retry semantics
 
-**Decision status:** Draft — observed implementation; adoption pending for choices not already settled. Existing accepted decisions retain their scope.
+**Decision status:** Accepted 2026-11-17 for consequence ordering, per-action commits and retry reporting.
 
-**Implementation status:** Observed in the exact source paths identified below, including stated discrepancies and limitations.
+**Implementation status:** Eligibility checks, captured action order and successful-prefix retry are implemented. Stable episode identity, cross-episode conflict handling, dated application records and structured partial results remain pending.
 
-**Validation status:** Source and identified test assertions inspected; tests, builds, numerical experiments and external benchmarks not executed. Test existence is not adoption or independent qualification.
+**Validation status:** The 115-test Covenants Rust baseline and all seven focused consequence tests passed on 2026-11-17 against current behavior. Dated records and cross-episode conflicts need qualification.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See the [scope inventory and coverage ledger](README.md).
 
-## Execution algorithm
+## Accepted decision
+
+1. Resolve stable episode IDs against recorded history and preserve each episode's captured action order. Skip cured episodes, execution before breach and dates through the inclusive cure deadline. Process independent episodes oldest first with a stable episode ID tie-breaker. Require an agreement-specified resolution rule for competing terms before mutating the instrument.
+2. Commit each instrument action together with its application record. Record the episode ID, action position, instrument ID, application date and outcome. On partial failure, return the actions already committed and identify the failed action. Resume at the first outstanding action on retry. Keep external side effects outside this instrument mutation path.
+3. Preserve fractional basis points and pass sweep fractions in `[0,1]`. Acceleration must move maturity earlier and take effect on or after the execution date. A sweep, collateral requirement or default action that lacks required typed target inputs stays outstanding. Preserve contractual conversion precision under [ADR 0020](../conventions/0020-numerical-representation-and-rounding.md).
+
+## Observed execution
 
 `apply_consequences` validates the engine, resolves every supplied snapshot to a current history episode by `(covenant_id,breach_date)`, and errors before mutation if any key is unknown. Snapshot cure flags and consequence lists do not override history. It then visits episodes in caller-supplied order, skipping cured episodes, dates before breach, and dates on or before an inclusive cure deadline. Current windows, waivers and later term amendments do not cancel captured historical consequences.
 
@@ -24,13 +30,13 @@ The inspected [TermLoan adapter](../../../../finstack-quant/valuations/fixed-inc
 
 ## Rationale, alternatives and evidence
 
-The source deliberately retains immutable episode terms and a successful prefix for retry. Whole-batch rollback, cross-episode maximum-sweep resolution and a persistent dated action journal are different methodologies. Caller order can affect targets with setter-style sweeps, additive rates or competing maturity dates; no resolution convention is selected centrally.
+The successful prefix supports action-level retries. Dated records make partial success observable after the call returns. Agreement rules govern conflicts where setter-style sweeps, rates or competing maturity dates can change the result.
 
 Owning [execution implementation](../../../../finstack-quant/covenants/src/engine/covenant_engine.rs), [mutator interface](../../../../finstack-quant/covenants/src/engine/helpers.rs), and [consequence/history contracts](../../../../finstack-quant/covenants/src/engine/types.rs). Inspected `consequence_retry_commits_each_action_once_and_discards_failed_mutation`, `unsupported_collateral_remains_outstanding`, and `stale_breach_snapshot_cannot_override_cure_or_invent_history` in [audit regressions](../../../../finstack-quant/covenants/tests/audit_regressions.rs).
 
-No instrument consequences were executed during this audit.
+The focused Rust tests exercised current eligibility, partial commit and retry behavior on test instruments. Agreement-level conflict and dated application evidence remain pending.
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification are tracked
 in the [covenant follow-ups](../FOLLOW_UPS.md#covenants).

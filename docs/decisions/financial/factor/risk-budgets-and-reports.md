@@ -1,14 +1,21 @@
 # FACTOR-010: Signed VaR budgeting and report orchestration
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17 for exact VaR budgets, signed utilization and checked report assembly.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** Signed utilization and report dispatch are implemented. Exact target admission, explicit thresholds, zero-target outcomes and checked reconciliation remain pending.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** All 17 focused budget and report tests passed on 2026-11-17 against current behavior. Independent exact arithmetic verified the signed utilization example. The accepted admission, zero-target and reconciliation rules still need qualification.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Bind targets to exact position IDs. Use nonnegative decimal shares summing to exactly one for a nonempty book and require an explicit positive utilization threshold. Check that signed component VaR reconciles to portfolio VaR on the same risk basis.
+2. Negate the signed P&L allocation once to obtain budget consumption. Preserve hedge credits. With portfolio VaR `−100`, components `−80`, `−40` and `+20`, and shares `50%`, `40%` and `10%`, utilization is `160%`, `100%` and `−200%`. The first position exceeds its target by `30` and breaches a `120%` threshold.
+3. For a zero target, positive consumption breaches and negative consumption is a hedge with no breach. Zero consumption against zero target has undefined utilization and no breach. For positive targets, breach occurs strictly above the supplied threshold. Report the checked sum of positive excess above target separately from threshold breach status.
+4. Use one checked Rust report from the explicitly selected normal or historical source. Add fractional stress detail for historical results and evaluate any requested budget from the same VaR allocation. Carry method, confidence, horizon, units, and any applied targets and threshold. [Normal position risk](position-normal-risk.md) · [Historical risk](position-historical-risk.md) · [Historical stress](tail-stress.md).
+
+## Observed choice and rationale
 
 Evaluate budget consumption in the portfolio-loss direction so diversifiers retain negative utilization, then optionally attach the budget and historical stress view to a position risk report.
 
@@ -34,17 +41,16 @@ The budget does not require component sums to equal portfolio VaR and does not n
 
 ## Alternatives and tradeoffs
 
-Strictly normalized targets, gross-risk budgets, ES budgets and absolute component utilization would answer different policy questions; the last would incorrectly count hedges as consumers under the current signed model. A business-specific target-sum tolerance should be explicit.
+Exact shares allocate the entire portfolio VaR budget. Signed consumption preserves the contribution of diversifiers, and a separate alert threshold allows the caller to choose when excess becomes actionable.
 
 ## Implementation and evidence
 
 - [src/risk/budget.rs](../../../../finstack-quant/factor/src/risk/budget.rs) — inspected implementation.
 - [src/risk/report.rs](../../../../finstack-quant/factor/src/risk/report.rs) — inspected implementation.
 
-[src/risk/budget.rs](../../../../finstack-quant/factor/src/risk/budget.rs) tests locate diversifier signs, sentinels, zero targets, bad sums/IDs and wrapper agreement. [src/risk/report.rs](../../../../finstack-quant/factor/src/risk/report.rs) contains dispatch/report-shape checks. These verify budgeting arithmetic, not adequacy of targets or the 120% threshold.
+[Budget tests](../../../../finstack-quant/factor/src/risk/budget.rs) and [report tests](../../../../finstack-quant/factor/src/risk/report.rs) passed for the current signed utilization, input validation and dispatch. Qualify exact target closure, zero-target states, threshold equality, overflow and end-to-end report conservation.
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models).

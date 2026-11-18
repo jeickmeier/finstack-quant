@@ -2628,6 +2628,141 @@ directed USD shocks, exact unordered vega pairs, both-leg proxy weights and
 checked signed dependence and concentration.
 [MARGIN-COLLATERAL-IM-008](margin-collateral-im/08-simm-fx.md#accepted-decision-for-checked-simm-fx-delta-and-pair-vega).
 
+SIMM commodity delta and vega were accepted on 2026-11-16. The package covers
+qualified exposures in all 17 buckets, exact factor concentration, checked
+within-bucket dependence and signed cross-bucket aggregation.
+[MARGIN-COLLATERAL-IM-009](margin-collateral-im/09-simm-commodity.md#accepted-decision-for-checked-simm-commodity-delta-and-vega).
+
+SIMM expiry scaling and curvature aggregation were accepted on 2026-11-17.
+The package covers signed inputs, class-specific expiry grids, scaling before
+netting, squared dependence, separate residual charges and checked replay.
+[MARGIN-COLLATERAL-IM-010](margin-collateral-im/10-simm-curvature.md#accepted-decision-for-checked-simm-expiry-scaling-and-curvature-aggregation).
+
+SIMM total assembly and horizon selection were accepted on 2026-11-17.
+The package covers complete component coverage, separate product-class
+aggregation, the supported ten-business-day historical profile and checked
+results with provenance. [MARGIN-COLLATERAL-IM-011](margin-collateral-im/11-simm-total-and-mpor.md#accepted-decision-for-product-class-simm-assembly-and-supported-horizons).
+
+Gross schedule initial margin was accepted on 2026-11-17. The package
+requires a complete elected profile, qualified trade inputs, exact maturity
+cutoffs and checked Decimal amounts at the reference horizon.
+[MARGIN-COLLATERAL-IM-012](margin-collateral-im/12-schedule-notional.md#accepted-decision-for-checked-gross-schedule-initial-margin).
+
+Schedule netting was accepted on 2026-11-17. The package binds the eligible
+scope, applies one checked reduction and retains full gross IM when a
+nonempty set has zero gross replacement cost.
+[MARGIN-COLLATERAL-IM-013](margin-collateral-im/13-schedule-net-gross.md#accepted-decision-for-checked-schedule-netting-and-reduction).
+
+Cleared initial margin was accepted on 2026-11-17. Elect a qualified
+reported account requirement or a complete indicative exposure profile
+and preserve the selected scope, horizon and coverage.
+[MARGIN-COLLATERAL-IM-014](margin-collateral-im/14-ccp-external-and-proxy.md#accepted-decision-for-elected-cleared-initial-margin-routes).
+
+Collateral eligibility and credited value were accepted on 2026-11-17.
+The package binds one strict schedule, qualified asset evidence and
+governing FX terms, and applies a bounded additive haircut in checked Money.
+[MARGIN-COLLATERAL-IM-015](margin-collateral-im/15-collateral-eligibility-and-haircuts.md#accepted-decision-for-checked-collateral-eligibility-and-credited-value).
+
+Collateral pool concentration was accepted on 2026-11-17. Apply each
+elected cap to its complete group on the same value basis as the eligible
+pool and preserve coverage, exclusions and exact comparison results.
+[MARGIN-COLLATERAL-IM-016](margin-collateral-im/16-collateral-concentration.md#accepted-decision-for-checked-collateral-pool-concentration).
+
+CSA elections and one-way IM account terms were accepted on 2026-11-17.
+The package binds actual agreement terms, qualified account inputs, one
+threshold allocation, elected transfer boundaries and custody evidence.
+[MARGIN-COLLATERAL-IM-017](margin-collateral-im/17-csa-selection-and-im-terms.md#accepted-decision-for-checked-csa-elections-and-one-way-im-account-terms).
+
+Signed variation margin was accepted on 2026-11-17. The package uses
+explicit side thresholds and credited balances, tests the elected MTA
+before rounding and carries one signed transfer and its evidence.
+[MARGIN-COLLATERAL-IM-018](margin-collateral-im/18-variation-margin.md#accepted-decision-for-checked-signed-variation-margin-and-transfers).
+
+VM call schedules and settlement replay were accepted on 2026-11-17. Use
+explicit effective slots and calendars, event order and credited balances
+that reflect authorized agreements and confirmed settlements.
+[MARGIN-COLLATERAL-IM-019](margin-collateral-im/19-margin-dates-and-replay.md#accepted-decision-for-checked-vm-schedules-and-settlement-replay).
+
+Repo cash margin and interest were accepted on 2026-11-17. The cash-only
+route uses a dated collateral target, caps refunds by settled cash and
+keeps agreed transfers, actual settlements and margin interest distinct.
+[MARGIN-COLLATERAL-IM-020](margin-collateral-im/20-repo-margin-cashflows.md#accepted-decision-for-checked-repo-cash-margin-and-interest).
+
+Collateral metrics were accepted on 2026-11-17. The package uses exact
+adequacy comparisons, optional ratios, signed static funding cost and
+the reduction in credited collateral for an admissible one-basis-point step.
+[MARGIN-COLLATERAL-IM-021](margin-collateral-im/21-collateral-metrics.md#accepted-decision-for-checked-collateral-metrics).
+
+Margin tables, wire state and provenance were accepted on 2026-11-17,
+completing adoption of all 22 collateral and initial-margin records.
+The package requires typed bases, unique snapshots, checked restoration
+and explicit result source and qualification.
+[MARGIN-COLLATERAL-IM-022](margin-collateral-im/22-wire-tables-and-provenance.md#accepted-decision-for-checked-margin-tables-wire-state-and-provenance).
+
+FRTB sensitivity inputs and provenance were accepted on 2026-11-17.
+The package binds the selected profile, sensitivity units, full factor
+identity, reporting-currency basis, coverage and checked restoration.
+[MARGIN-REGULATORY-XVA-001](margin-regulatory-xva/01-frtb-inputs-and-wire.md#accepted-decision-for-checked-frtb-inputs-and-provenance).
+
+FRTB scenario aggregation was accepted on 2026-11-17. The package
+uses one binding full-capital scenario, separates selected SBA
+diagnostics and requires checked weighted reductions and retry evidence.
+[MARGIN-REGULATORY-XVA-002](margin-regulatory-xva/02-frtb-scenarios-and-aggregation.md#accepted-decision-for-checked-frtb-scenarios-and-aggregation).
+
+GIRR delta was accepted on 2026-11-17. The package preserves full
+yield, inflation and cross-currency basis factors, explicit weight
+relief, and the curve and scenario correlations within currency buckets.
+[MARGIN-REGULATORY-XVA-003](margin-regulatory-xva/03-frtb-girr-delta.md#accepted-decision-for-checked-girr-delta).
+
+Credit spread delta was accepted on 2026-11-17. The package uses
+class-specific factor and bucket identity, qualified index and covered-bond
+elections, and the prescribed dependence and other-sector aggregation.
+[MARGIN-REGULATORY-XVA-004](margin-regulatory-xva/04-frtb-credit-delta.md#accepted-decision-for-checked-credit-spread-delta).
+
+Equity spot and repo delta was accepted on 2026-11-17. The package uses
+exact factors and qualified name associations, dated bucket and index
+evidence, distinct weight scales and the prescribed other-sector treatment.
+[MARGIN-REGULATORY-XVA-005](margin-regulatory-xva/05-frtb-equity-delta.md#accepted-decision-for-checked-equity-spot-and-repo-delta).
+
+Commodity delta was accepted on 2026-11-17. The package uses qualified
+commodity and legal delivery-location identity, the full tenor grid with
+`0Y` for spot, and the prescribed weights and correlations for all 11
+buckets.
+[MARGIN-REGULATORY-XVA-006](margin-regulatory-xva/06-frtb-commodity-delta.md#accepted-decision-for-checked-commodity-delta).
+
+FX delta was accepted on 2026-11-17. The package uses canonical buckets
+against the reporting currency, complete relative-shock legs, explicit
+pair relief and the checked linear-time scenario norm.
+[MARGIN-REGULATORY-XVA-007](margin-regulatory-xva/07-frtb-fx-delta.md#accepted-decision-for-checked-fx-delta).
+
+GIRR vega was accepted on 2026-11-17. The package uses prepared
+volatility-scaled amounts, the prescribed five-point grids for ordinary
+vega, qualified expiry-only treatment and checked currency aggregation.
+[MARGIN-REGULATORY-XVA-008](margin-regulatory-xva/08-frtb-girr-vega.md#accepted-decision-for-checked-girr-vega).
+
+Credit, equity and commodity vega was accepted on 2026-11-17. The package
+uses qualified underliers and index treatment, five expiry vertices,
+pairwise tranche evidence, and class-specific weights and other-sector
+aggregation.
+[MARGIN-REGULATORY-XVA-009](margin-regulatory-xva/09-frtb-bucketed-vega.md#accepted-decision-for-checked-credit-equity-and-commodity-vega).
+
+FX vega was accepted on 2026-11-17. The package uses qualified option
+pairs, five expiry vertices, prepared volatility scaling, and distinct
+within-pair and cross-pair correlation rules.
+[MARGIN-REGULATORY-XVA-010](margin-regulatory-xva/10-frtb-fx-vega.md#accepted-decision-for-checked-fx-vega).
+
+FRTB curvature was accepted on 2026-11-17. The package uses prepared
+full-shock losses after removing delta, selects directions per bucket
+and scenario, and applies squared correlations to raw signed sums with
+the prescribed residual rules.
+[MARGIN-REGULATORY-XVA-011](margin-regulatory-xva/11-frtb-curvature.md#accepted-decision-for-checked-frtb-curvature).
+
+All 13 [Covenants methodology records](covenants/README.md) were accepted on
+2026-11-17. They cover explicit terms and metric bindings, assessment and
+breach history, consequence execution, forecast methods, and checked reporting
+and host contracts. The [Covenants follow-ups](FOLLOW_UPS.md#covenants) track
+implementation and qualification.
+
 The [ADR 0044 collateral-input representation package](conventions/0044-financial-perspectives-and-boundary-conversions.md#accepted-amendment-explicit-collateral-components)
 was accepted on 2026-11-07. Its explicit VM/NICA components supplement the
 accepted perspective/sign contracts; broader margin methodology retains its

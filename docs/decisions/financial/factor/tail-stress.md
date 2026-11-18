@@ -1,14 +1,20 @@
-# FACTOR-009: Whole-scenario tail stress attribution
+# FACTOR-009: Historical tail stress attribution
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17 for shared fractional tail attribution, scenario evidence and signed summaries.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** Whole-scenario stress details and summaries are implemented. Shared fractional weights, stable scenario identities and gain-tail semantics remain pending.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** All six focused stress tests passed on 2026-11-17 against current behavior. An exact example verified fractional tie weights and position closure. Shared weighting and revised gain-tail results remain to be qualified.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Share the [historical risk](position-historical-risk.md) admission and fractional tail selection, including explicit confidence, minimum tail mass and equal probability mass across exact boundary ties. List every scenario with positive tail weight. Retain its stable ID, signed portfolio and position P&L, and applied weight. Order by ascending portfolio P&L and then scenario ID.
+2. Reconcile weighted position P&L to the raw portfolio tail mean. Report each position's minimum P&L among selected scenarios. With tail mass `2.5`, two full observations and two tied boundary observations carry weights `1, 1, 0.25, 0.25`. Report four selected scenarios and tail mass `2.5`.
+3. Preserve signed scenario and mean P&L in gain, zero and loss tails. Report signed position loss shares only when aggregate tail mean is negative; shares are undefined for flat or positive means. Check finite arithmetic and closure before publication.
+
+## Observed choice and rationale
 
 Report the worst whole-number tail scenarios and their position P&Ls as an explanatory stress view. The observed method differs from fractional-mass historical ES and must not be presented as the same allocation.
 
@@ -34,17 +40,16 @@ For fractional tail mass and ties, averages can differ from historical ES compon
 
 ## Alternatives and tradeoffs
 
-Sharing the fractional ES weights would reconcile aggregate ES but would reduce the simplicity of a list of actual scenarios. Reporting all boundary ties would remove arbitrary selection but change count/weights. Both are different products and require an explicit choice.
+Shared fractional weights make the explanatory breakdown reconcile to the historical tail mean. Scenario P&L remains visible at its original value with a separate applied weight. Stable IDs distinguish scenario order from tail membership.
 
 ## Implementation and evidence
 
 - [src/risk/position.rs](../../../../finstack-quant/factor/src/risk/position.rs) — inspected implementation.
 - [src/risk/mod.rs](../../../../finstack-quant/factor/src/risk/mod.rs) — inspected implementation.
 
-[src/risk/position.rs](../../../../finstack-quant/factor/src/risk/position.rs) tests locate multi-scenario arithmetic averages, rational boundary snapping and underspecified-tail rejection. Historical ES tie tests do not establish stress tie invariance. No independent stress attribution reference is attached to the exact whole-count rule.
+[Stress tests](../../../../finstack-quant/factor/src/risk/position.rs) passed for current whole-scenario averages, boundary selection and underspecified tails. An exact fixture with portfolio P&Ls `−120`, `−80`, `−40`, `−40` at the accepted weights above yields raw ES `−88`; its position means `−56` and `−32` reconcile. Qualify stable tie output, raw tail closure and gain and zero tails in the accepted implementation.
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models).

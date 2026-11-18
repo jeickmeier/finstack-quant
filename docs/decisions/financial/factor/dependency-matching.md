@@ -1,14 +1,21 @@
 # FACTOR-003: Ordered mapping, hierarchy, and cascade dispatch
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17 for ordered matching, hierarchy and cascade dispatch.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** Authored rule order, deepest-node selection and cascade error propagation are implemented. Checked rulebook admission, traversal bounds and assignment provenance remain pending.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** All 45 focused matching tests passed on 2026-11-17 against current behavior. The accepted provenance, rulebook bounds and qualified dependency inventory coverage still need verification.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Select the first authored matching table rule. Combine supplied dependency and instrument-attribute predicates with AND. Match exact identifiers and preserve FX pair direction. Preserve authored priority for exact and wildcard rules. Record the selected rule and flag overlaps observed when qualifying the rulebook against its intended dependency inventory.
+2. Prune a hierarchy branch when a parent predicate fails. Select the deepest eligible factor-bearing node, with authored sibling order breaking ties. Retain the selected node's path in assignment evidence.
+3. Evaluate cascades in authored order. Continue after no match or an empty result; return the first nonempty result. Propagate errors immediately. Keep no-match distinct from structural zero. Apply Strict or Warn under the [accepted assignment coverage contract](../portfolio-attribution/12-factor-assignment-and-credit-exposures.md#accepted-decision-for-checked-factor-assignment-and-credit-exposures).
+4. Validate the declared factor references and enforce depth and size limits before recursive compilation or traversal of typed or restored rulebooks. [FACTOR-004](credit-matching.md) owns credit issuer selection and proxy policy.
+
+## Observed choice and rationale
 
 Select the first matching mapping rule, the deepest matching hierarchy node, or the first nonempty cascade result. This is observed deterministic dispatch, not an optimization or automatic economic classification.
 
@@ -33,7 +40,7 @@ Deep recursive hierarchy construction/traversal has no local explicit depth budg
 
 ## Alternatives and tradeoffs
 
-Priority/specificity scoring could remove order dependence but adds another policy; rejecting overlapping rules would strengthen control but require formal overlap semantics. The current ordered rule system is simple and explainable if rule order is preserved in persisted configs.
+Authored order makes precedence explicit, including intentional overlaps. Observed overlap diagnostics and selected-path evidence let rulebook owners verify coverage against the actual dependency inventory.
 
 ## Implementation and evidence
 
@@ -42,10 +49,9 @@ Priority/specificity scoring could remove order dependence but adds another poli
 - [src/matching/matchers.rs](../../../../finstack-quant/factor/src/matching/matchers.rs) — inspected implementation.
 - [src/primitives/dependency.rs](../../../../finstack-quant/factor/src/primitives/dependency.rs) — inspected implementation.
 
-[src/matching/matchers.rs](../../../../finstack-quant/factor/src/matching/matchers.rs) contains tests for wildcard/exact precedence, deepest hierarchy selection, sibling ties, cascade order and error behavior. [src/matching/filter.rs](../../../../finstack-quant/factor/src/matching/filter.rs) tests exact typed filters. These are dispatch-contract checks; independent financial evidence must establish that a given rulebook maps the intended risk.
+[Matcher](../../../../finstack-quant/factor/src/matching/matchers.rs) and [filter](../../../../finstack-quant/factor/src/matching/filter.rs) tests passed, including wildcard and exact precedence, hierarchy depth and ties, cascade order, and exact filters. Qualify bounded construction, preserved order on restore, evidence of the winning path and intended rulebook coverage.
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models).

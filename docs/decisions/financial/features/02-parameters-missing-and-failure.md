@@ -1,14 +1,20 @@
 # FEATURES-002: Operation selection, strict parameters, missing values and failure policies
 
-**Decision status:** Draft — observed implementation; adoption pending for this scoped choice. Existing accepted decisions retain their own scope.
+**Decision status:** Accepted 2026-11-17.
 
-**Implementation status:** Observed in the exact source paths and symbols below; discrepancies and limitations are stated explicitly.
+**Implementation status:** Canonical dispatch, parameter allowlists, missing-data helpers, and final finiteness checks are implemented. Explicit null rejection at all boundaries, portable integer limits, and intermediate arithmetic checks require reconciliation.
 
-**Validation status:** Source and the named test bodies inspected, not executed. This record does not certify numerical correctness or host parity.
+**Validation status:** Independent fill and mask examples checked absent values, NaN, infinities, and signed zero. Rust fixtures were inspected. Portable limits and numerical failures still need host qualification.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See [scope and source ledger](README.md).
 
-## Scope and actual selection
+## Accepted decision
+
+1. Validate requests before processing rows, including empty input. Use canonical operation names and operation-specific parameter allowlists. Parameters may be omitted. Reject explicit JSON null, unknown parameters, and incorrect types. Use explicit portable integer bounds across Rust, Python, and WASM. Keep window defaulting to 1 and min_periods to window. A valid window below an estimator's sample floor yields missing results.
+2. Treat absent observations, NaN, and infinities as missing. Preserve finite values and normalize signed zero. Each operation defines observation eligibility. FillMissing explicitly fills gaps, IsFinite marks finite rows, and NanMask marks missing rows, including infinities.
+3. Fail the whole call on numerical error, including an unrepresentable computed statistic. Detect invalid intermediate arithmetic even if a later step would produce a finite value. Reserve missing outputs for documented unavailable cases. [Missing and invalid data conventions](../conventions/0009-missing-and-invalid-data.md).
+
+## Observed scope and actual selection
 
 The three operation enums select 23 time-series, 16 cross-sectional and three pairwise operations. `FromStr` deserializes their canonical snake_case serde names; `ALL`, `names` and `param_keys` describe that surface. Public entry points receive typed selectors. Parameters remain optional JSON values, parsed and validated before any entity or partition is evaluated, including empty input.
 
@@ -24,7 +30,7 @@ Cross-sectional `fill_missing` emits the finite input or finite `value` (default
 
 ## Rationale, alternatives and limits
 
-Source comments explain strict parameters as protection against misspelled controls and output checks as preventing serialization from silently converting failures into missing values. The feature-specific exclusion of nonfinite inputs and zero-valued degeneracy conventions remain Draft. [ADR 0009](../conventions/0009-missing-and-invalid-data.md) requires explicit policies; its contiguous performance-panel rules are scoped to analytics and must not be silently imported here. Error, missing and zero are distinct outputs even where their numeric downstream effects may coincide.
+Strict parameters catch misspelled controls. Output checks prevent serialization from silently converting failures into missing values. Each operation's zero-valued degeneracy conventions are owned by its decision record. [ADR 0009](../conventions/0009-missing-and-invalid-data.md) scopes its contiguous performance-panel rules to analytics.
 
 Alternatives include rejecting nonfinite input, preserving its cause, or partition-local failure reporting. None is selected. Target `usize` width means the accepted maximum integer is not inherently cross-target identical. No general unit/rate/frequency validation exists because values are untyped f64 columns.
 
@@ -38,5 +44,5 @@ Evidence inspected here does not establish every host error mapping.
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification are tracked
 in the [feature follow-ups](../FOLLOW_UPS.md#features).

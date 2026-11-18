@@ -1,12 +1,19 @@
 # COVENANTS-01: Contract terms, identity and metric selection
 
-**Decision status:** Draft — observed implementation; adoption pending for choices not already settled. Existing accepted decisions retain their scope.
+**Decision status:** Accepted 2026-11-17 for explicit contract terms and metric bindings.
 
-**Implementation status:** Observed in the exact source paths identified below, including stated discrepancies and limitations.
+**Implementation status:** Exact label identity and explicit metric lookup are implemented. Removing implicit metric, denominator and contract-term defaults, aligning source validation and preserving contractual monetary precision remain pending.
 
-**Validation status:** Source and identified test assertions inspected; tests, builds, numerical experiments and external benchmarks not executed. Test existence is not adoption or independent qualification.
+**Validation status:** All 115 Covenants Rust tests passed on 2026-11-17 against the observed implementation. The accepted changes and host-entry parity still need qualification.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See the [scope inventory and coverage ledger](README.md).
+
+## Accepted decision
+
+1. Bind each numeric covenant to one explicit, exact metric ID for both assessment and forecast. Require an explicit denominator ID for net leverage. Remove implicit built-in, custom and basket metric lookup and the automatic `ebitda` denominator. A missing selected metric stays missing, even when the source supplies another conventional ID. [COVENANTS-03](03-comparison-and-headroom.md) owns other denominator requirements and ratio validity.
+2. Require operative scope, activation, test frequency and an explicit cure-period choice, including an explicit choice of no cure period. Retire the generic 30-calendar-day cure default. Keep the exact, nonblank covenant label as the instance identity in reports, waivers and breach history. Enforce unique labels within each effective set. [COVENANTS-05](05-breach-and-cure.md) owns cure mechanics and [COVENANTS-11](11-package-templates.md) owns named template terms.
+3. Reject blank metric IDs and duplicate keys at ingestion before collection can overwrite values. Reads for an applicable test distinguish a missing observation from an invalid nonfinite value. Construction, restoration, assessment and forecast share Rust validation for their applicable inputs after host type conversion.
+4. The producer supplies calculation-ready measures with the contract definition, adjustments, units, currency and reporting period. Preserve Decimal or `Money` precision wherever the agreement requires exact monetary comparison. The [statement adapter contract](../statements-analytics-credit/11-covenant-statement-adapter.md#accepted-decision-for-verified-statement-covenant-assessments) and [monetary precision convention](../conventions/0020-numerical-representation-and-rounding.md) govern these boundaries.
 
 ## Observed method and controls
 
@@ -20,7 +27,7 @@ Lookup precedence in `spec_metric_name` is exact explicit `metric_id`, then the 
 
 ## Rationale, alternatives and limitations
 
-The source documents separation of calculation-ready measures from contract tests and uses labels to prevent same-type report collisions. It does not establish that a particular supplied EBITDA, currency, cash-netting policy or reporting period matches a legal agreement. Explicit component construction with typed currency/period metadata would improve provenance but moves upstream accounting responsibility into this crate; that is an unadopted alternative. Accepted [units/signs](../conventions/0007-units-and-sign-conventions.md), [missing/invalid distinctions](../conventions/0009-missing-and-invalid-data.md), and [monetary boundaries](../conventions/0020-numerical-representation-and-rounding.md) remain applicable; a floating-point amount test is not certified contractual monetary arithmetic.
+The source separates calculation-ready measures from contract tests and uses labels to prevent same-type report collisions. Producers own EBITDA, currency, cash-netting and period definitions. The engine compares the supplied measure under the accepted [units and signs](../conventions/0007-units-and-sign-conventions.md), [missing and invalid distinctions](../conventions/0009-missing-and-invalid-data.md), and [monetary precision rules](../conventions/0020-numerical-representation-and-rounding.md).
 
 ## Evidence
 
@@ -31,5 +38,5 @@ No independent legal-contract or financial-input qualification was located in th
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
-in the [covenant follow-ups](../FOLLOW_UPS.md#covenants).
+Implementation reconciliation and qualification are tracked in the
+[covenant follow-ups](../FOLLOW_UPS.md#covenants).

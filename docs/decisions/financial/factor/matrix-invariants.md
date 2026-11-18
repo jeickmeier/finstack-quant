@@ -1,14 +1,20 @@
 # FACTOR-002: Covariance and sensitivity matrix invariants
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17 for checked covariance and sensitivity matrices.
 
-**Implementation status:** Observed for the stated source scope; limitations and discrepancies below remain open.
+**Implementation status:** Ordered storage and constructor and serde validation are implemented in part. Exact symmetry, mixed-scale PSD admission, checked mutation and revised lookup behavior remain pending.
 
-**Validation status:** Evidence inspected or located, not executed. No numerical qualification is implied.
+**Validation status:** All 343 Factor Rust tests and 30 focused matrix tests passed on 2026-11-17 against current behavior. The accepted admission, mutation and lookup rules still need qualification.
 
 **Audit date:** 2026-11-05. **Source revision:** `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-## Choice and rationale
+## Accepted decision
+
+1. Require exact, unique, nonblank factor and position IDs and preserve their declared order. Admit finite entries and valid empty shapes. Check dimensions and capacity before allocation. Reject invalid writes without changing matrix state. Apply the same validation to construction and restoration. [Factor basis contract](factor-configuration.md).
+2. Require exact numerical symmetry, nonnegative variances and zero covariance on each zero-variance axis. Check the positive-variance block on a unit-diagonal basis with the core PSD gate and zero pivot tolerance. Admit computed rank-deficient PSD inputs and reject computed indefiniteness. Retain the supplied covariance entries. Repair remains an estimator operation. [Core matrix contract](../core-numerics/matrix-factorization.md#accepted-decision-checked-matrix-factors-solves-and-correlation-admission).
+3. Use typed errors for unknown IDs and out-of-range indices. A known zero-variance factor has zero variance and covariance, with undefined correlation. Preserve that distinction through host access and restoration.
+
+## Observed choice and rationale
 
 Use dense row-major covariance and positions-by-factors sensitivities, with exact factor-axis checks before risk. Covariance construction accepts positive semidefinite matrices through the core pivoted-Cholesky kernel; it does not repair a submitted covariance.
 
@@ -34,17 +40,16 @@ PSD is judged with the core relative pivot tolerance, so tolerance-sized negativ
 
 ## Alternatives and tradeoffs
 
-Strict positive definiteness would reject legitimate rank-deficient factor universes. Explicit repair could permit noisy estimates but must disclose the distortion; repair is a separate calibration choice. Fallible missing-ID lookups and setters would strengthen boundaries at a public API cost.
+Zero pivot tolerance permits computed semidefinite structure. Finite-precision arithmetic can still reject a mathematically PSD input. Unit-diagonal admission avoids making a large variance axis the tolerance scale for unrelated small axes. The covariance values used by risk remain in their supplied coordinates.
 
 ## Implementation and evidence
 
 - [src/covariance.rs](../../../../finstack-quant/factor/src/covariance.rs) — inspected implementation.
 - [src/sensitivity_matrix.rs](../../../../finstack-quant/factor/src/sensitivity_matrix.rs) — inspected implementation.
 
-[src/covariance.rs](../../../../finstack-quant/factor/src/covariance.rs) tests locate PSD, asymmetric, duplicate-axis and serde checks. [src/sensitivity_matrix.rs](../../../../finstack-quant/factor/src/sensitivity_matrix.rs) tests include nonfinite rejection, ragged rows, zero-factor roundtrips and out-of-range access. Core numerical policy is recorded in [CORE-NUMERICS-07](../core-numerics/matrix-factorization.md); constructor/invariant evidence is not independent covariance-estimator evidence.
+[Covariance](../../../../finstack-quant/factor/src/covariance.rs) and [sensitivity matrix](../../../../finstack-quant/factor/src/sensitivity_matrix.rs) tests passed against current behavior. Qualify exact symmetry, mixed-scale and rank-deficient PSD cases, zero-axis couplings, empty dimensions, checked writes and missing-ID behavior under the accepted contract.
 
 ## Follow-up tracking
 
-Implementation, adoption and validation work is tracked in the
-[scope follow-ups](../FOLLOW_UPS.md#factor-models). This record does not
-authorize a runtime change or certify the observed method.
+Implementation reconciliation and qualification are tracked in the
+[scope follow-ups](../FOLLOW_UPS.md#factor-models).

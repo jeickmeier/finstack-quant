@@ -1,14 +1,25 @@
-# MARGIN-COLLATERAL-IM-014 — External CCP IM and conservative exposure proxy
+# MARGIN-COLLATERAL-IM-014 — Reported CCP initial margin and indicative exposure proxy
 
-**Decision status:** Draft — observed implementation; adoption pending.
+**Decision status:** Accepted 2026-11-17 for elected cleared IM routes and qualified scope.
 
-**Implementation status:** Observed for the source scope below, including the stated limitations and discrepancies.
+**Implementation status:** Existing behavior is described below. Route selection, source and profile admission, horizon and coverage checks, calculation and caller reconciliation with the accepted contract are pending.
 
-**Validation status:** Evidence inspected or specifically located; no tests/builds executed. Audit date **2026-11-05**; source revision `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` (scope and coverage in [README](README.md)).
+**Validation status:** Primary CCP disclosures and caller paths inspected. Independent Decimal arithmetic checked gross sizing of offsetting positions under a selected proxy rate. Runtime, portfolio, provider and host qualification remain pending. Audit date **2026-11-05** and source revision `7e82fd03ad98346727769e88dd5ac5d84b56e9fc` (scope and coverage in [README](README.md)).
+
+## Accepted decision for elected cleared initial margin routes
+
+1. Elect one route for the exact clearing entity, service, member or client account, covered position set, valuation cut and currency. Choose a qualified reported amount or a named indicative proxy. Retire substring routing, ambiguous aliases and automatic switching between routes. [Parameter and agreement election](01-registry-and-defaults.md#accepted-decision-for-explicit-margin-parameter-snapshots-and-contractual-terms) · [Portfolio scope](../portfolio-execution/16-margin-netting-and-initial-margin.md#accepted-decision-for-checked-portfolio-netting-and-initial-margin).
+2. Admit a single checked source record of the reported IM requirement. Require nonnegative Money, exact account and position coverage, source authority, effective time, availability at the information cut, currency and horizon basis. The reported requirement covers applicable IM add-ons. Keep VM, collateral balances and transfers as separate amounts. Accept an explicit zero. Return typed errors for missing, stale, invalid or mismatched data. Consume the account amount once with its original sizing and offsets. [Clearing model and add-ons](https://www.lseg.com/en/post-trade/clearing/lch-services/swapclear/risk-management).
+3. Retire the bundled venue-labelled rates and generic 5% default from calculation. An expressly elected local proxy requires a complete immutable profile with source, effective dates, eligible exposures, currency, reference horizon and an exact nonnegative Decimal multiplier. Admit custom and restored profiles through the same validation path. Label the result indicative and retire the conservative claim. [LCH risk methodology](https://www.lseg.com/en/post-trade/clearing/lch-services/swapclear/risk-management) · [CME SPAN 2 methodology](https://www.cmegroup.com/clearing/files/cme-span-2-margin-framework.pdf).
+4. Require a qualified nonnegative exposure base for each eligible proxy position. Apply absolute holding size once, multiply by the elected rate using checked Money arithmetic and sum gross charges in deterministic order without offsets. Missing required exposure makes the affected account result unavailable. [Money arithmetic](../core-conventions/012-money-decimal-precision.md).
+5. Preserve the source or profile horizon basis with its day unit and applicable calendar. A different required horizon needs a separately qualified amount or profile. Remove the provider's separate horizon override and portfolio square-root rescaling. [Published service and account horizons](https://www.lseg.com/en/post-trade/clearing/risk-management/ltd-risk-management).
+6. Return one checked result carrying native Money, source or profile, exact scope, cut, horizon, coverage and qualification. Distinguish reported requirements, indicative estimates, computed zero and unavailable amounts. Preserve the result through portfolio and its existing Python and WASM surfaces. Keep direct CCP providers and calculators Rust-only. Record 017 owns contractual collateral and transfers. Record 022 owns the wire format. [Contractual IM](17-csa-selection-and-im-terms.md) · [Result transport](22-wire-tables-and-provenance.md).
+
+An independent Decimal example with opposing two-lot positions, USD 1 million of qualified exposure per lot and an elected 3% rate gives USD 120,000 of indicative initial margin. A supplied account requirement enters the calculation once for the covered position set.
 
 ## Choice and rationale
 
-Observed: this calculator wraps a supplied CCP IM amount or computes a labelled approximation. It does not implement SPAN, historical simulation or a CCP VaR model. Proposed rationale: an explicit external amount can be used when available while making a fallback estimate's provenance visible.
+The observed calculator tries a supplied amount and otherwise uses an exposure-rate proxy. The accepted contract elects one route and binds the amount and horizon to the same clearing scope.
 
 ## Input domain and conventions
 
@@ -30,7 +41,7 @@ The name `ICE` selects ClearUS, while registry alias `ice` identifies ClearCredi
 
 ## Alternatives and tradeoffs
 
-A connected, dated CCP service or validated full methodology would remove reliance on the heuristic. Failing closed without external IM is stricter than the current explicit-exposure fallback. Name enums or exact IDs would avoid substring ambiguity but change caller input policy.
+The accepted source route preserves the qualified account requirement and its offsets. An elected local proxy gives a reproducible gross estimate from a documented exposure base.
 
 ## Source and validation evidence
 
@@ -42,5 +53,5 @@ Existing evidence: [src/calculators/im/clearing.rs](../../../../finstack-quant/m
 
 ## Follow-up tracking
 
-Adoption, implementation reconciliation and qualification work is tracked in the
+Implementation reconciliation and qualification work is tracked in the
 [collateral and initial-margin register](../FOLLOW_UPS.md#margin-collateral-and-initial-margin).

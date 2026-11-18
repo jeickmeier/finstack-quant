@@ -1,14 +1,20 @@
 # COVENANTS-11: Deal-package assembly and embedded consequence assumptions
 
-**Decision status:** Draft — observed implementation; adoption pending for choices not already settled. Existing accepted decisions retain their scope.
+**Decision status:** Accepted 2026-11-17 for named package assembly with explicit agreement terms.
 
-**Implementation status:** Observed in the exact source paths identified below, including stated discrepancies and limitations.
+**Implementation status:** Four named package builders are implemented. Explicit operative inputs, shared validation and the project-finance DSCR tier check remain pending.
 
-**Validation status:** Source and identified test assertions inspected; tests, builds, numerical experiments and external benchmarks not executed. Test existence is not adoption or independent qualification.
+**Validation status:** All three template tests and the project-finance lockup regression passed on 2026-11-17 against current behavior. Explicit terms and the accepted DSCR ordering remain to be qualified.
 
 **Audit date / revision:** 2026-11-05 / `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`. See the [scope inventory and coverage ledger](README.md).
 
-## Actual package construction
+## Accepted decision
+
+1. Keep LBO, cov-lite, real-estate and project-finance packages as assembly helpers. Require agreement-supplied thresholds, metric and denominator bindings, labels, scope, activation, cadence, cure choices and consequences, including an explicit choice of no consequence. Use the same Rust validation as individually assembled specs. Keep applicable cov-lite restrictions visible as requiring external assessment. [Explicit terms](01-terms-and-metric-selection.md) · [Assessment scope](04-activation-and-scope.md).
+2. In the named project-finance package, use a shared DSCR definition for the default and lockup tests and require the lockup floor to be strictly higher. With floors of 1.30× and 1.20× respectively, 1.25× breaches only lockup. Use individual specifications when definitions or tier structures differ. Total versus senior leverage threshold ordering follows the agreement.
+3. Require an explicit agreement rule for competing sweeps or other actions. Execution depends on typed target inputs and the [accepted consequence contract](06-consequence-execution.md).
+
+## Observed package construction
 
 `covenant_template` dispatches on four tagged variants and validates each input only as finite and nonnegative. Ratios are turns; debt yield and LTV are decimal fractions without an upper bound; capex/liquidity are untyped reporting-currency amounts. The constructors return ordered specs and do not infer a deal's governing documents.
 
@@ -23,19 +29,19 @@ Frequency remains metadata; the engine will test annual capex on any caller date
 
 ## Observed contract difference and limitations
 
-Project-finance documentation calls lockup DSCR the higher threshold, but implementation only validates its sign/finiteness; the inline valid-template test explicitly accepts default DSCR 1.2 with lockup DSCR 1.1. The asserted relationship is therefore not enforced. Total versus senior leverage thresholds likewise have no cross-input consistency check. The record does not infer that every such ordering must be prohibited; the intended contract must be settled.
+Project-finance documentation calls lockup DSCR the higher threshold. The current builder validates thresholds individually and its valid-template test accepts default DSCR 1.2 with lockup DSCR 1.1. Shared-measure ordering under the accepted package contract remains to be enforced. The current builder has no cross-input ordering check for total and senior leverage.
 
 CRE sweeps are separate setter actions in caller/history order, not a maximum-of-triggered-sweeps rule. Project default and CRE sweeps cannot simply be executed through the inspected TermLoan adapter without extra recovery/cash-flow inputs; see [COVENANTS-06](06-consequence-execution.md). A named package is not a market/legal standard certification. In particular, source phrases such as “Post-2015 ... standard” have no contract sample or empirical provenance in the inspected module.
 
 ## Rationale, alternatives and evidence
 
-The code documents convenience assembly, distinct instance keys and different default versus lockup consequences. Per-agreement explicit specs or externally versioned templates would allow provenance and differing cure/consequence conventions; neither is selected automatically here.
+Named assembly retains the package's test structure and keeps the agreement in control of operative terms. Distinct instance keys preserve separate lockup and default outcomes and their captured consequences.
 
 Owning [template definitions/builders/tests](../../../../finstack-quant/covenants/src/templates.rs), [constructor defaults](../../../../finstack-quant/covenants/src/engine/types.rs), and [execution semantics](../../../../finstack-quant/covenants/src/engine/covenant_engine.rs). Inspected `templates_accept_valid_thresholds`, invalid-input tests, kind-tagged strict serde tests, and [engine convention test](../../../../finstack-quant/covenants/tests/engine_conventions.rs) `project_finance_lockup_breach_blocks_distributions_without_default`.
 
-No template is adopted by this documentation.
+The current tests passed. Qualify explicit required inputs, package expansion parity with individually assembled specs, equal and inverted DSCR tiers, and agreement rules for competing sweeps.
 
 ## Follow-up tracking
 
-Pending choices, implementation reconciliation, and qualification work are tracked
+Implementation reconciliation and qualification are tracked
 in the [covenant follow-ups](../FOLLOW_UPS.md#covenants).

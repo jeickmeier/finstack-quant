@@ -1,10 +1,59 @@
 # MARGIN-REGULATORY-XVA-006: Commodity name, tenor and delivery-location delta aggregation
 
-- Decision status: **Draft — observed implementation; adoption pending.**
-- Implementation status: **Observed** in the stated source scope.
-- Validation status: **Evidence inspected/located, not executed.** Selected test bodies were read; no runtime test, build or numerical experiment was run.
+- Decision status: **Accepted 2026-11-17 for checked commodity delta.**
+- Implementation status: Existing behavior is described below. Qualified commodity and delivery-location identity, the commodity tenor grid and checked input and result paths remain pending.
+- Validation status: Primary references and both parameter schedules checked. Independent examples covered shock and weight scales, pair coefficients and mixed-sign bucket 11 aggregation. Runtime, schema, host and regulatory qualification remain pending.
 - Audit date: 2026-11-05. Source revision: `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 - Scope and hashes: [inventory](README.md), [coverage ledger](coverage.json).
+
+## Accepted decision for checked commodity delta
+
+1. **Require exact commodity and legal delivery-location identity.** Net
+   contributions only for the same qualified commodity, complete legal
+   delivery-location terms and maturity vertex. Location equality requires
+   the same contractual delivery choices. Distinguish WTI from Brent,
+   electricity by contractual delivery interval and production region, and
+   freight by type, route and delivery week. Decompose commodity spreads
+   into the individual underlying factor sensitivities.
+   [Basel MAR21.13 and MAR21.83–84](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23).
+2. **Admit all 11 prescribed commodity maturity vertices.** Use `0Y` for
+   spot positions. Also admit `0.25Y`, `0.5Y`, `1Y`, `2Y`, `3Y`, `5Y`,
+   `10Y`, `15Y`, `20Y` and `30Y`. Use current futures and forward marks
+   and their contract maturities, including qualified electricity forward
+   prices. The sensitivity producer documents the mapping to the prescribed
+   grid using linear interpolation or a method consistent with its pricing
+   model. The engine accepts the mapped vertices.
+   [Basel MAR21.13 and MAR21.8 FAQ 2](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23).
+3. **Use signed reporting-currency P&L for the prescribed relative shock.**
+   Reprice at `1.01 × q` for qualified quote `q`, holding the other factors
+   fixed. A negative quote becomes more negative. A zero quote produces an
+   evaluated zero when the source confirms a valid reprice. Missing or
+   unsupported reprices make the affected result unavailable. The producer
+   owns physical-unit normalization and dated FX conversion.
+   [FRTB input contract](01-frtb-inputs-and-wire.md#accepted-decision-for-checked-frtb-inputs-and-provenance) ·
+   [Basel MAR21.15–17 and MAR21.23](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23) ·
+   [Published shock formula](https://www.bis.org/bcbs/publ/d457_faq.pdf).
+4. **Require an evidenced Table 11 bucket and apply its weight once.**
+   Multiply the prepared P&L by `[30, 35, 60, 80, 40, 45, 20, 35, 25, 35, 50]`
+   for buckets 1–11. Bucket 11 requires a qualified other-commodity
+   assignment. An electricity shock P&L of `+3` yields `+180` after weighting.
+   [Basel MAR21.81–82](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23).
+5. **Multiply the three pair coefficients before applying the scenario.**
+   Each matching dimension contributes `1`. Different commodities use
+   `[0.55, 0.95, 0.40, 0.80, 0.60, 0.65, 0.55, 0.45, 0.15, 0.40, 0.15]`
+   by bucket. Different tenors contribute `0.99` and different delivery
+   locations contribute `0.999`. Apply the scenario once to the product.
+   A bucket 2 pair differing on all three axes has base correlation `0.9395595`.
+   [Basel MAR21.83–84](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23).
+6. **Use the ordinary quadratic for all buckets.** Bucket 11 applies the
+   `0.15` distinct-commodity coefficient before tenor and location
+   adjustments. Keep its `K²` in the cross-bucket root with zero
+   cross-correlation. Other distinct bucket pairs use `0.20` before the
+   scenario transformation. Apply the accepted conditional cap on signed
+   bucket sums. Preserve exact factors, weights, coverage and scenario
+   evidence through Rust, wire, Python and WASM.
+   [FRTB aggregation](02-frtb-scenarios-and-aggregation.md#accepted-decision-for-checked-frtb-scenarios-and-aggregation) ·
+   [Basel MAR21.83–85](https://www.bis.org/committees/bcbs/basel-framework/standard/mar/21/inforce/2023-01-01/published/2026-03-23).
 
 ## Choice and domain
 
@@ -21,7 +70,7 @@ Commodity delta uses explicit commodity name, bucket, tenor and delivery-locatio
 
 ## Selection and controls
 
-The commodity branch delegates to `csr_bucketed_delta` with class `Commodity`. Validation requires a nonblank delivery location and an exact recognized tenor, as well as a valid name/bucket and finite amount. Bucket identity and delivered-price normalization remain caller supplied.
+The commodity branch delegates to `csr_bucketed_delta` with class `Commodity`. Validation requires a nonblank delivery-location label, a valid name and bucket, a finite amount and a tenor admitted by the shared GIRR validator. That validator rejects `0Y`. Bucket identity and delivered-price normalization come from the caller.
 
 ## Limitations and failure behavior
 
@@ -29,10 +78,16 @@ The shared kernel's fourth string means delivery location here, bond/CDS basis f
 
 ## Alternatives and tradeoffs
 
-A security/delivery mapping layer could construct risk factors from contract schedules. Retaining the current externally classified input is smaller and transparent but places completeness and unit conversion on the caller.
+Contract-schedule mapping and conversion belong to the sensitivity producer. The accepted approach uses qualified, already-mapped inputs and validates factor identity and coverage when admitting them.
 
 ## Evidence and role
 
-Runtime: [src/regulatory/frtb/delta.rs](../../../../finstack-quant/margin/src/regulatory/frtb/delta.rs); exact weights: [src/regulatory/frtb/params/commodity.rs](../../../../finstack-quant/margin/src/regulatory/frtb/params/commodity.rs); name/inter-bucket rules: [src/regulatory/frtb/params/mod.rs](../../../../finstack-quant/margin/src/regulatory/frtb/params/mod.rs). [tests/frtb_sba_charges.rs](../../../../finstack-quant/margin/tests/frtb_sba_charges.rs) contains an inspected hand-written two-coal/one-power example and a high-correlation scenario maximum. Additional location/tenor and mixed-sign independent cases were not established. [FRTB reference index](../../../REFERENCES.md#bcbs-frtb-minimum-capital-requirements).
+Source evidence covers the kernel, tenor admission and parameter schedules. Inspected tests include a two-coal/one-power example and a high-correlation scenario maximum. Independent arithmetic checked the three-axis correlation and its Low transform, bucket 11 with opposite-signed weighted amounts, and the reprice and risk-weight scales. Runtime verification remains pending.
+[Runtime kernel](../../../../finstack-quant/margin/src/regulatory/frtb/delta.rs) ·
+[Input validation](../../../../finstack-quant/margin/src/regulatory/frtb/types.rs) ·
+[Weights](../../../../finstack-quant/margin/src/regulatory/frtb/params/commodity.rs) ·
+[Correlation rules](../../../../finstack-quant/margin/src/regulatory/frtb/params/mod.rs) ·
+[Commodity charge tests](../../../../finstack-quant/margin/tests/frtb_sba_charges.rs) ·
+[FRTB reference index](../../../REFERENCES.md#bcbs-frtb-minimum-capital-requirements).
 
-The implementation establishes observed behavior, not financial adoption or regulatory compliance. Actionable work is tracked in the [regulatory-margin/XVA follow-ups](../FOLLOW_UPS.md#margin-regulatory-capital-and-xva).
+Reconciliation and qualification work is tracked in the [regulatory-margin/XVA follow-ups](../FOLLOW_UPS.md#margin-regulatory-capital-and-xva).
