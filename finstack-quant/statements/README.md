@@ -174,21 +174,35 @@ Valuations APIs and attached with `add_debt`, plus a reporting currency,
 FX policy, and an optional `WaterfallSpec`. Formulas then reference aggregated
 instrument flows through the `cs.*` namespace.
 
-Named instrument references retain the instrument's native currency. `.total`
-references use the reporting currency. When `fx_policy` is omitted, totals
-convert each already-aggregated period bucket on the inclusive period-end date
-(`PeriodEnd`), rather than each contractual cashflow date.
+A capital reference names a component and one of three scopes:
 
 ```text
-cs.<component>.<instrument_id>
-cs.<component>.total
+cs.<component>.<instrument_id>   one instrument, in its native currency
+cs.<component>.total.<CCY>       every instrument of one native currency
+cs.<component>.total             the whole structure, in the reporting currency
 ```
 
-Valid components: `interest_expense` (cash + PIK), `interest_expense_cash`,
-`interest_expense_pik`, `interest_income`, `principal_payment`, `debt_balance`,
-`fees`, `accrued_interest`, `interest_arrears`, `principal_pending`,
-`principal_arrears`, `principal_advance_reserve`. Unknown components are
-rejected at compile time.
+Each evaluates to exact money in the scope's currency. An unknown component or
+malformed scope fails when the formula is parsed; an unknown instrument, a
+native currency no instrument uses, or a consolidated total that cannot be
+formed fails when the model is built. `total` cannot be an instrument id.
+
+Instruments in more than one currency consolidate only into an explicit
+`reporting_currency` with `fx_policy` set to `period_end`, the only policy:
+each period's native totals convert at the rate of the inclusive period-close
+date, and `CapitalStructureCashflows.fx_conversions` keeps the pair, rate, date
+and source. There is no default policy. When a quote is missing the period's
+consolidated total is unavailable (`consolidation_unavailable` gives the
+reason, and a formula reading it gets an unavailable cell); the per-instrument
+and native-currency values are unaffected.
+
+Components: `interest_expense` (cash + PIK), `interest_expense_cash`,
+`interest_expense_pik`, `interest_income`, `net_interest_expense_cash`,
+`principal_payment` and its parts `scheduled_principal`, `mandatory_prepayment`,
+`voluntary_prepayment` and `sweep_prepayment`, `fees`, `opening_balance`,
+`debt_balance`, `accrued_interest`, `interest_arrears`, `principal_pending`,
+`principal_arrears` and `principal_advance_reserve`. An amount a period does
+not record is an error, never zero.
 
 Cash interest follows the declared instrument kind: positive bond and loan
 coupons are issuer expenses, while negative debt coupons are income. Swaps use
@@ -283,10 +297,8 @@ terms: the elected share is zero cash and capitalizes once on the coupon date.
 Overdue cash interest and fees stay cash claims and are never capitalized.
 Actual periods are not exercised.
 
-Known limits (also stated in the module rustdoc): omitted `fx_policy` converts
-period-aggregated reporting totals on the inclusive period-end date
-(`PeriodEnd`); prepayment penalties, call premiums, and OID accretion are
-not modeled.
+Known limits (also stated in the module rustdoc): prepayment penalties, call
+premiums, and OID accretion are not modeled.
 
 ## Checks
 

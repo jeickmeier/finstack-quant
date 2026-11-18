@@ -1105,6 +1105,12 @@ export default [
     "description": "A correlated forecast needs the shocks of a peer whose forecast was\nitself unavailable on the path."
   },
   {
+    "path": "#/$defs/d_54b78745cfcb23fb39c0/oneOf/6",
+    "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/UnavailableReason/oneOf/6",
+    "const": "missing_fx_quote",
+    "description": "A consolidated capital-structure value needs a period-close FX quote\nthat the market does not hold. Native-currency values are unaffected."
+  },
+  {
     "path": "#/$defs/d_662416664db07cac434b",
     "source": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json#/$defs/AppliedAdjustment",
     "description": "One row of a normalization bridge."

@@ -239,7 +239,7 @@ fn test_mixed_currency_capital_structure_requires_reporting_fx() {
                 "EUR-OIS",
             ),
         );
-        model_builder.fx_policy(finstack_quant_core::money::fx::FxConversionPolicy::PeriodEnd);
+        model_builder.fx_policy(finstack_quant_statements::types::CapitalFxPolicy::PeriodEnd);
         model_builder.with_meta("currency", serde_json::json!("USD"));
         model_builder.build().expect("valid model")
     };
@@ -248,23 +248,27 @@ fn test_mixed_currency_capital_structure_requires_reporting_fx() {
         .insert(flat_discount_curve(0.05, as_of, "USD-OIS"))
         .insert(flat_discount_curve(0.03, as_of, "EUR-OIS"));
     let mut evaluator = Evaluator::new();
-    let error = evaluator
+    let result = evaluator
         .evaluate_with_market(
             &model,
             &market,
             as_of,
             finstack_quant_statements::evaluator::ObservationCutoff::FullSnapshot,
         )
-        .expect_err("USD reporting requires FX for the EUR debt");
-    // Reporting currency is explicit through metadata. Missing conversion inputs
-    // must return a typed error, without panicking or summing unlike currencies.
-    assert!(matches!(
-        error,
-        finstack_quant_statements::Error::CapitalStructure(ref message)
-            if message.contains("EUR")
-                && message.contains("USD")
-                && message.contains("no FX matrix present")
-    ));
+        .expect("native values do not need FX");
+    // Reporting currency is explicit through metadata. Without an FX matrix
+    // the consolidated total is unavailable, with its reason, and unlike
+    // currencies are never summed; each native total is still reported.
+    let cashflows = result.cs_cashflows.as_ref().expect("capital cash flows");
+    assert!(cashflows.totals.is_empty());
+    for quarter in 1..=2 {
+        let period = PeriodId::quarter(2025, quarter).expect("valid period fixture");
+        let reason = &cashflows.consolidation_unavailable[&period];
+        assert!(reason.contains("no FX matrix"), "{reason}");
+        assert!(reason.contains("EUR") && reason.contains("USD"), "{reason}");
+        assert!(cashflows.totals_by_currency[&Currency::EUR].contains_key(&period));
+        assert!(cashflows.totals_by_currency[&Currency::USD].contains_key(&period));
+    }
 }
 
 /// A fixed-rate bond from the canonical Valuations constructor (US corporate

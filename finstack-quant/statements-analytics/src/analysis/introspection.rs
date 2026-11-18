@@ -644,11 +644,8 @@ fn collect_additive_terms(
             terms.push((name.as_str().to_string(), positive));
             true
         }
-        StmtExpr::CsRef {
-            component,
-            instrument_or_total,
-        } => {
-            terms.push((format!("cs.{component}.{instrument_or_total}"), positive));
+        StmtExpr::CsRef { component, scope } => {
+            terms.push((format!("cs.{component}.{scope}"), positive));
             true
         }
         StmtExpr::BinOp {
@@ -1219,7 +1216,17 @@ mod tests {
             model_builder_1
                 .periods("2025Q1..Q1", None)
                 .expect("test should succeed");
-            model_builder_1.value("ebit", &[(period, AmountOrScalar::scalar(100.0))]);
+            model_builder_1.value_money("ebit", &[(period, Money::from((100_i64, Currency::USD)))]);
+            // A capital reference names an instrument of the model.
+            let mut loan =
+                finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan::example(
+                )
+                .expect("term loan");
+            loan.id = "TL".into();
+            model_builder_1.add_debt(
+                "TL",
+                finstack_quant_statements::types::FinancialStatementInstrument::TermLoan(loan),
+            );
             model_builder_1
                 .compute("pretax", "ebit - cs.interest_expense.TL")
                 .expect("test should succeed");

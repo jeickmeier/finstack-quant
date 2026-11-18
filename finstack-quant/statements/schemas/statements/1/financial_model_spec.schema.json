@@ -1284,6 +1284,11 @@
         }
       ]
     },
+    "CapitalFxPolicy": {
+      "const": "period_end",
+      "description": "How capital-structure totals are converted into the reporting currency.\n\nPeriod-close conversion is the only supported policy. It must still be\nchosen explicitly before instruments of more than one currency are\nconsolidated.",
+      "type": "string"
+    },
     "CapitalStructureSpec": {
       "additionalProperties": false,
       "description": "Capital structure specification.",
@@ -1298,13 +1303,13 @@
         "fx_policy": {
           "anyOf": [
             {
-              "$ref": "#/$defs/FxConversionPolicy"
+              "$ref": "#/$defs/CapitalFxPolicy"
             },
             {
               "type": "null"
             }
           ],
-          "description": "Optional FX conversion policy override.\n\nWhen omitted, `cs.*` cash items and balances convert on the inclusive\nperiod-end date (`FxConversionPolicy::PeriodEnd`). Conversion applies to\nthe already-aggregated period bucket, not per contractual cashflow date."
+          "description": "Optional FX conversion policy override.\n\nRequired to consolidate instruments of more than one currency: there\nis no default. `period_end` converts each period's native-currency\ntotals on the inclusive period-close date."
         },
         "meta": {
           "additionalProperties": true,
@@ -5139,21 +5144,6 @@
         {
           "const": "moving_average",
           "description": "Moving average; requires `window`.",
-          "type": "string"
-        }
-      ]
-    },
-    "FxConversionPolicy": {
-      "description": "Provider-selection purpose of a point-date FX query (record\nCORE-CONVENTIONS-013 #1/#2).\n\nThe policy tells a provider which source purpose the rate serves; it does\nnot calculate dates or choose spot versus forward. There is no default:\nevery query names its policy. Period averages are not point queries; an\nowner that needs one computes the oriented aggregate itself.",
-      "oneOf": [
-        {
-          "const": "cashflow_date",
-          "description": "The rate applicable on a cashflow's own date.",
-          "type": "string"
-        },
-        {
-          "const": "period_end",
-          "description": "The rate applicable on a reporting period's closing date.",
           "type": "string"
         }
       ]

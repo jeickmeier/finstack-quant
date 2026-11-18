@@ -22,7 +22,8 @@ export type D_54B78745Cfcb23Fb39C0 =
   | "missing_input"
   | "undefined_base"
   | "missing_forecast_base"
-  | "missing_peer_shock";
+  | "missing_peer_shock"
+  | "missing_fx_quote";
 
 /**
  * Per-period normalization outcome: base value, applied adjustments and final value.

@@ -17,12 +17,9 @@ fn test_parse_cs_interest_expense_total() {
     let ast = parse_formula("cs.interest_expense.total").unwrap();
 
     match ast {
-        StmtExpr::CsRef {
-            component,
-            instrument_or_total,
-        } => {
-            assert_eq!(component, "interest_expense");
-            assert_eq!(instrument_or_total, "total");
+        StmtExpr::CsRef { component, scope } => {
+            assert_eq!(component.as_str(), "interest_expense");
+            assert_eq!(scope.to_string(), "total");
         }
         _ => panic!("Expected CsRef, got {:?}", ast),
     }
@@ -33,12 +30,9 @@ fn test_parse_cs_principal_payment_instrument() {
     let ast = parse_formula("cs.principal_payment.BOND-001").unwrap();
 
     match ast {
-        StmtExpr::CsRef {
-            component,
-            instrument_or_total,
-        } => {
-            assert_eq!(component, "principal_payment");
-            assert_eq!(instrument_or_total, "BOND-001");
+        StmtExpr::CsRef { component, scope } => {
+            assert_eq!(component.as_str(), "principal_payment");
+            assert_eq!(scope.to_string(), "BOND-001");
         }
         _ => panic!("Expected CsRef, got {:?}", ast),
     }
@@ -49,12 +43,9 @@ fn test_parse_cs_debt_balance() {
     let ast = parse_formula("cs.debt_balance.SWAP-001").unwrap();
 
     match ast {
-        StmtExpr::CsRef {
-            component,
-            instrument_or_total,
-        } => {
-            assert_eq!(component, "debt_balance");
-            assert_eq!(instrument_or_total, "SWAP-001");
+        StmtExpr::CsRef { component, scope } => {
+            assert_eq!(component.as_str(), "debt_balance");
+            assert_eq!(scope.to_string(), "SWAP-001");
         }
         _ => panic!("Expected CsRef, got {:?}", ast),
     }

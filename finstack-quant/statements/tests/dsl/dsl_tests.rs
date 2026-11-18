@@ -553,16 +553,15 @@ fn caller_built_trees_are_preflighted() {
     for identifier in ["", "a..b", "a.", "1a", "a b", "cs.debt_balance.total"] {
         compile(&StmtExpr::node_ref(identifier)).expect_err(identifier);
     }
-    for (component, target) in [
-        ("debt_balance", ""),
-        ("debt_balance", "a b"),
-        ("nope", "total"),
+    // A capital reference is typed, so a malformed one cannot be built: its
+    // component and scope are rejected when their text is parsed.
+    for text in [
+        "cs.debt_balance.a b",
+        "cs.nope.total",
+        "cs.debt_balance.total.euro",
     ] {
-        let ast = StmtExpr::CsRef {
-            component: component.into(),
-            instrument_or_total: target.into(),
-        };
-        compile(&ast).expect_err("an invalid capital-structure reference is rejected");
+        finstack_quant_statements::dsl::parse_formula(text)
+            .expect_err("an invalid capital-structure reference is rejected");
     }
     compile(&StmtExpr::call("if", vec![StmtExpr::literal(1.0); 3]))
         .expect_err("`if` is a conditional, not a callable function");

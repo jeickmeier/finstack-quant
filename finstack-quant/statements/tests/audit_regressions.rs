@@ -350,7 +350,8 @@ fn single_currency_totals_are_converted_at_the_reporting_snapshot() {
     }
     let mut model = amortizing_loan_model("2025Q1..Q1", Currency::EUR);
     model.capital_structure.as_mut().unwrap().reporting_currency = Some(Currency::USD);
-    model.capital_structure.as_mut().unwrap().fx_policy = Some(FxConversionPolicy::PeriodEnd);
+    model.capital_structure.as_mut().unwrap().fx_policy =
+        Some(finstack_quant_statements::types::CapitalFxPolicy::PeriodEnd);
     // Changing the reporting currency also changes the declared total-node units.
     for node in model.nodes.values_mut() {
         node.value_type = Some(finstack_quant_statements::types::NodeValueType::Monetary {

@@ -650,6 +650,34 @@ impl FinancialModelSpec {
             instrument_currencies: &instrument_currencies,
             provisional: false,
         };
+        let has_capital_structure = self.capital_structure.is_some();
+        // Consolidating more than one native currency needs the conversion
+        // policy chosen explicitly, and `total` is the consolidated scope.
+        if let Some(cs) = &self.capital_structure {
+            if let Some(reserved) = cs
+                .debt_instruments
+                .iter()
+                .find(|debt| debt.id == crate::capital_structure::CsScope::TOTAL)
+            {
+                return Err(Error::build(format!(
+                    "capital structure: instrument id '{}' is reserved for the consolidated \
+                     total (`cs.<component>.total`)",
+                    reserved.id
+                )));
+            }
+            if let Some(reporting) = cs.reporting_currency
+                && cs.fx_policy.is_none()
+                && let Some((id, native)) = instrument_currencies
+                    .iter()
+                    .find(|(_, native)| **native != reporting)
+            {
+                return Err(Error::build(format!(
+                    "capital structure: instrument '{id}' is in {native} and the reporting \
+                     currency is {reporting}, but `fx_policy` is not set. Choose `period_end` \
+                     explicitly to consolidate at the period-close rate."
+                )));
+            }
+        }
         for (node_id, node) in &self.nodes {
             if node.formula_text.is_none() && node.value_type.is_none() {
                 return Err(Error::build(format!(
@@ -660,6 +688,10 @@ impl FinancialModelSpec {
             if let Some(formula) = &node.formula_text {
                 let ast = parse_cached(&mut parsed, formula).map_err(|e| {
                     Error::build(format!("Invalid formula on node '{}': {}", node_id, e))
+                })?;
+                crate::dsl::compiler::check_capital_references(ast, units, has_capital_structure)
+                    .map_err(|error| {
+                    Error::build(format!("Invalid formula on node '{node_id}': {error}"))
                 })?;
                 let inferred =
                     crate::dsl::compiler::infer_value_type(ast, units).map_err(|error| {
@@ -674,10 +706,6 @@ impl FinancialModelSpec {
                         )));
                     }
                     Some(_) => {}
-                    // A capital reference without a resolved currency is the
-                    // one unresolved unit a runnable model may still carry;
-                    // the capital reporting scopes close it.
-                    None if crate::dsl::compiler::has_unresolved_cs_reference(ast, units) => {}
                     None => {
                         return Err(Error::build(format!(
                             "Cannot resolve the units of formula node '{node_id}' ('{formula}'): \
@@ -694,6 +722,10 @@ impl FinancialModelSpec {
             if let Some(where_text) = &node.where_text {
                 let ast = parse_cached(&mut parsed, where_text).map_err(|e| {
                     Error::build(format!("Invalid where clause on node '{}': {}", node_id, e))
+                })?;
+                crate::dsl::compiler::check_capital_references(ast, units, has_capital_structure)
+                    .map_err(|error| {
+                    Error::build(format!("Invalid where clause on node '{node_id}': {error}"))
                 })?;
                 let boolean = crate::dsl::compiler::is_boolean(ast, units).map_err(|error| {
                     Error::build(format!("Invalid where clause on node '{node_id}': {error}"))
@@ -768,11 +800,11 @@ pub struct CapitalStructureSpec {
 
     /// Optional FX conversion policy override.
     ///
-    /// When omitted, `cs.*` cash items and balances convert on the inclusive
-    /// period-end date (`FxConversionPolicy::PeriodEnd`). Conversion applies to
-    /// the already-aggregated period bucket, not per contractual cashflow date.
+    /// Required to consolidate instruments of more than one currency: there
+    /// is no default. `period_end` converts each period's native-currency
+    /// totals on the inclusive period-close date.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub fx_policy: Option<finstack_quant_core::money::fx::FxConversionPolicy>,
+    pub fx_policy: Option<CapitalFxPolicy>,
 
     /// Optional waterfall specification for dynamic cash flow allocation
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -895,6 +927,39 @@ impl CapitalStructureSpec {
             }
         }
         Ok(())
+    }
+}
+
+/// How capital-structure totals are converted into the reporting currency.
+///
+/// Period-close conversion is the only supported policy. It must still be
+/// chosen explicitly before instruments of more than one currency are
+/// consolidated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum CapitalFxPolicy {
+    /// Convert each period's native-currency totals at the rate of the
+    /// inclusive period-close date.
+    PeriodEnd,
+}
+
+impl std::fmt::Display for CapitalFxPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("period_end")
+    }
+}
+
+impl std::str::FromStr for CapitalFxPolicy {
+    type Err = Error;
+
+    fn from_str(label: &str) -> Result<Self> {
+        match label {
+            "period_end" => Ok(Self::PeriodEnd),
+            other => Err(Error::build(format!(
+                "unknown capital-structure FX policy '{other}': the only policy is 'period_end'"
+            ))),
+        }
     }
 }
 

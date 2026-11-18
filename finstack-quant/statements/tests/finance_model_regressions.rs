@@ -331,6 +331,7 @@ fn named_capital_structure_formulas_keep_native_instrument_currency() {
             ),
         );
         model_builder.reporting_currency(Currency::USD);
+        model_builder.fx_policy(finstack_quant_statements::types::CapitalFxPolicy::PeriodEnd);
         model_builder.value_money(
             "expected_usd",
             &[(quarter(1), Money::from((25_i64, Currency::USD)))],
@@ -864,4 +865,173 @@ fn fixed_bond(
         )
         .expect("valid bond"),
     )
+}
+
+// Typed capital selectors and reporting scopes (STATEMENTS-CAPITAL-009)
+
+fn two_currency_builder(reporting: Option<Currency>) -> ModelBuilder {
+    let mut builder = ModelBuilder::new("capital-scopes");
+    builder.periods("2025Q1..Q1", None).unwrap();
+    for (id, currency, curve) in [
+        ("euro", Currency::EUR, "EUR-OIS"),
+        ("dollar", Currency::USD, "USD-OIS"),
+    ] {
+        builder.add_debt(
+            id,
+            fixed_bond(
+                id,
+                Money::from((1_000_i64, currency)),
+                0.05,
+                date!(2025 - 01 - 01),
+                date!(2030 - 01 - 01),
+                curve,
+            ),
+        );
+    }
+    if let Some(currency) = reporting {
+        builder.reporting_currency(currency);
+        builder.fx_policy(finstack_quant_statements::types::CapitalFxPolicy::PeriodEnd);
+    }
+    builder
+}
+
+/// Each selector parses, renders and compiles, and an unknown component,
+/// instrument or scope is rejected when the model is built.
+#[test]
+fn capital_selectors_are_validated_when_the_model_is_built() {
+    use finstack_quant_statements::dsl::{compile, parse_formula};
+    for text in [
+        "cs.debt_balance.euro",
+        "cs.debt_balance.total",
+        "cs.debt_balance.total.EUR",
+        "cs.scheduled_principal.total.USD",
+        "cs.net_interest_expense_cash.dollar",
+    ] {
+        let ast = parse_formula(text).expect("selector");
+        assert_eq!(ast.to_string(), text);
+        assert_eq!(parse_formula(&ast.to_string()).expect("round trip"), ast);
+        compile(&ast).expect("compiles");
+    }
+    let error = parse_formula("cs.coupon.euro").expect_err("unknown component");
+    assert!(
+        error
+            .to_string()
+            .contains("Unknown capital structure component"),
+        "{error}"
+    );
+
+    let build = |reporting: Option<Currency>, formula: &str| {
+        let mut builder = two_currency_builder(reporting);
+        builder.compute("probe", formula)?;
+        builder.build()
+    };
+    let rejected = |reporting: Option<Currency>, formula: &str| {
+        build(reporting, formula)
+            .expect_err("rejected selector")
+            .to_string()
+    };
+    let error = rejected(Some(Currency::USD), "cs.debt_balance.sterling");
+    assert!(error.contains("'sterling'"), "{error}");
+    let error = rejected(Some(Currency::USD), "cs.debt_balance.total.GBP");
+    assert!(error.contains("GBP"), "{error}");
+    // Two native currencies and no target: only native scopes exist.
+    let error = rejected(None, "cs.debt_balance.total");
+    assert!(error.contains("reporting currency"), "{error}");
+    let model = build(None, "cs.debt_balance.total.EUR").expect("native total");
+    assert_eq!(
+        model.nodes["probe"].value_type,
+        Some(NodeValueType::Monetary {
+            currency: Currency::EUR
+        })
+    );
+    // A model without a capital structure has nothing to read.
+    let mut bare = ModelBuilder::new("no-capital");
+    bare.periods("2025Q1..Q1", None).unwrap();
+    bare.compute("probe", "cs.debt_balance.total").unwrap();
+    let error = bare.build().expect_err("no capital structure").to_string();
+    assert!(error.contains("has none"), "{error}");
+
+    // Consolidating two currencies needs the policy chosen explicitly.
+    let mut builder = two_currency_builder(None);
+    builder.reporting_currency(Currency::USD);
+    let error = builder.build().expect_err("no FX policy").to_string();
+    assert!(error.contains("fx_policy"), "{error}");
+    assert!(
+        "cashflow_date"
+            .parse::<finstack_quant_statements::types::CapitalFxPolicy>()
+            .is_err()
+    );
+}
+
+/// Each scope evaluates to exact money in its own currency. With a missing
+/// period-close quote the consolidated cell is unavailable and the native
+/// cells keep their values.
+#[test]
+fn capital_scopes_evaluate_natively_and_consolidate_at_the_close() {
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
+    use finstack_quant_statements::evaluator::{ObservationCutoff, UnavailableReason};
+    use std::sync::Arc;
+
+    let mut builder = two_currency_builder(Some(Currency::USD));
+    for (node, formula) in [
+        ("euro_balance", "cs.debt_balance.euro"),
+        ("euro_total", "cs.debt_balance.total.EUR"),
+        ("dollar_total", "cs.debt_balance.total.USD"),
+        ("consolidated", "cs.debt_balance.total"),
+    ] {
+        builder.compute(node, formula).unwrap();
+    }
+    let model = builder.build().unwrap();
+    let evaluate = |quotes: &[(Currency, Currency, f64)]| {
+        let provider = SimpleFxProvider::new();
+        provider.set_quotes(quotes).unwrap();
+        let market =
+            MarketContext::new().insert_fx(Arc::new(FxMatrix::new(Arc::new(provider), None)));
+        Evaluator::new()
+            .evaluate_with_market(
+                &model,
+                &market,
+                date!(2025 - 01 - 01),
+                ObservationCutoff::FullSnapshot,
+            )
+            .expect("evaluation")
+    };
+
+    let result = evaluate(&[(Currency::EUR, Currency::USD, 1.2)]);
+    let money = |node: &str| result.get_money(node, &quarter(1)).expect("money cell");
+    assert_eq!(
+        money("euro_balance"),
+        Money::from((1_000_i64, Currency::EUR))
+    );
+    assert_eq!(money("euro_total"), Money::from((1_000_i64, Currency::EUR)));
+    assert_eq!(
+        money("dollar_total"),
+        Money::from((1_000_i64, Currency::USD))
+    );
+    assert_eq!(
+        money("consolidated"),
+        Money::from((2_200_i64, Currency::USD))
+    );
+    let cashflows = result.cs_cashflows.as_ref().expect("capital cash flows");
+    assert_eq!(cashflows.fx_conversions[&quarter(1)][0].rate, 1.2);
+    assert_eq!(
+        cashflows.fx_conversions[&quarter(1)][0].date,
+        date!(2025 - 03 - 31)
+    );
+
+    let result = evaluate(&[(Currency::GBP, Currency::USD, 1.3)]);
+    let cell = result.get_cell("consolidated", &quarter(1)).expect("cell");
+    assert_eq!(cell.value, None);
+    assert_eq!(cell.reason, Some(UnavailableReason::MissingFxQuote));
+    assert_eq!(
+        result.get_money("euro_total", &quarter(1)),
+        Some(Money::from((1_000_i64, Currency::EUR)))
+    );
+    let cashflows = result.cs_cashflows.as_ref().expect("capital cash flows");
+    assert!(
+        cashflows
+            .consolidation_unavailable
+            .contains_key(&quarter(1))
+    );
 }

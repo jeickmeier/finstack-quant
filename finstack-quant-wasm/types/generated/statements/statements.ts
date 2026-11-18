@@ -1332,6 +1332,14 @@ export type SettlementType = "physical" | "cash";
  */
 export type CapFloorVolType = "lognormal" | "shifted_lognormal" | "normal" | "auto";
 /**
+ * How capital-structure totals are converted into the reporting currency.
+ *
+ * Period-close conversion is the only supported policy. It must still be
+ * chosen explicitly before instruments of more than one currency are
+ * consolidated.
+ */
+export type CapitalFxPolicy = "period_end";
+/**
  * Payment priority levels in the waterfall.
  */
 export type PaymentPriority =
@@ -1774,16 +1782,6 @@ export type CorrelationWire = number;
  */
 export type VolatilityModel = "black" | "normal";
 /**
- * Provider-selection purpose of a point-date FX query (record
- * CORE-CONVENTIONS-013 #1/#2).
- *
- * The policy tells a provider which source purpose the rate serves; it does
- * not calculate dates or choose spot versus forward. There is no default:
- * every query names its policy. Period averages are not point queries; an
- * owner that needs one computes the oriented aggregate itself.
- */
-export type FxConversionPolicy = "cashflow_date" | "period_end";
-/**
  * One elected deduction from, or credit to, the excess-cash-flow measure.
  */
 export type EcfTerm =
@@ -1913,7 +1911,8 @@ export type UnavailableReason =
   | "missing_input"
   | "undefined_base"
   | "missing_forecast_base"
-  | "missing_peer_shock";
+  | "missing_peer_shock"
+  | "missing_fx_quote";
 /**
  * Identifier for a Gregorian period like `2025Q1` or a fiscal period like
  * `FY2025W53`.
@@ -4813,6 +4812,15 @@ export interface CapitalStructureCashflows {
     };
   };
   /**
+   * Why a period has no consolidated `totals`, when consolidation was
+   * requested and could not be completed (for example a missing FX quote).
+   * Per-instrument and native-currency values of the period are
+   * unaffected.
+   */
+  consolidation_unavailable?: {
+    [k: string]: string;
+  };
+  /**
    * Distress cash by period: recoveries, accrual paid on default and
    * protection payments, each with its instrument, native currency and
    * actual payment date, in schedule order.
@@ -4836,6 +4844,15 @@ export interface CapitalStructureCashflows {
    */
   equity_distribution?: {
     [k: string]: Money;
+  };
+  /**
+   * Every FX conversion applied to form the consolidated `totals`, by
+   * period: the currency pair, the rate, the date it was read on and how
+   * it was obtained. Empty when every instrument is in the reporting
+   * currency.
+   */
+  fx_conversions?: {
+    [k: string]: FxConversionRecord[];
   };
   /**
    * What each configured prepayment requested, paid and left unpaid in
@@ -5039,6 +5056,32 @@ export interface DistressCashflow {
   payment_date: DateWire;
 }
 /**
+ * One FX conversion applied to consolidate capital-structure totals.
+ */
+export interface FxConversionRecord {
+  /**
+   * Inclusive period-close date the rate was read on.
+   */
+  date: DateWire;
+  /**
+   * Native currency converted from.
+   */
+  from: Currency;
+  /**
+   * Units of `to` per unit of `from` (1.20 converts EUR 1 to USD 1.20).
+   */
+  rate: number;
+  /**
+   * How the rate was obtained: `direct` for a quoted pair, `triangulated`
+   * when it was built through the FX matrix's pivot currency.
+   */
+  source: string;
+  /**
+   * Reporting currency converted to.
+   */
+  to: Currency;
+}
+/**
  * What one prepayment priority requested and paid in a period.
  */
 export interface PrepaymentOutcome {
@@ -5073,11 +5116,11 @@ export interface CapitalStructureSpec {
   /**
    * Optional FX conversion policy override.
    *
-   * When omitted, `cs.*` cash items and balances convert on the inclusive
-   * period-end date (`FxConversionPolicy::PeriodEnd`). Conversion applies to
-   * the already-aggregated period bucket, not per contractual cashflow date.
+   * Required to consolidate instruments of more than one currency: there
+   * is no default. `period_end` converts each period's native-currency
+   * totals on the inclusive period-close date.
    */
-  fx_policy?: FxConversionPolicy | null;
+  fx_policy?: CapitalFxPolicy | null;
   /**
    * Additional metadata
    */

@@ -976,6 +976,11 @@
           "const": "missing_peer_shock",
           "description": "A correlated forecast needs the shocks of a peer whose forecast was\nitself unavailable on the path.",
           "type": "string"
+        },
+        {
+          "const": "missing_fx_quote",
+          "description": "A consolidated capital-structure value needs a period-close FX quote\nthat the market does not hold. Native-currency values are unaffected.",
+          "type": "string"
         }
       ]
     }

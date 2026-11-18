@@ -291,7 +291,8 @@ amendments and authorized capitalization of arrears remain open.
 The Statements capital reporting and FX contract was accepted on 2026-11-15.
 It covers native and consolidated views, explicit period-close FX, component
 totals, exact chronological exports and atomic period replacement.
-Implementation and independent qualification remain pending.
+It is implemented and qualified; exact-decimal table exports and typed host
+accessors remain open.
 [STATEMENTS-CAPITAL-009](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
 
 The Statements model timeline, explicit value and readiness contract was
@@ -316,14 +317,14 @@ qualified; JavaScript `bigint` seeds and the runtime horizon checks remain.
 The Statements formula grammar and dispatch contract was accepted on
 2026-11-15. It covers canonical syntax and rendering, shared identifiers,
 checked signatures and bounded validation of text and caller-built trees.
-These are implemented and qualified; the typed `cs` selectors remain pending.
+These are implemented and qualified, including the typed `cs` selectors.
 [STATEMENTS-CONTRACTS-004](statements-contracts/04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation).
 
 The Statements formula units and currency contract was accepted on
 2026-11-15. It covers resolved dimensions, monetary and scalar operations,
 decimal scales, the forecast boundary and capital reporting currencies.
-Unit resolution and the unit rules are implemented and qualified; capital
-reporting scopes and exact monetary results remain pending.
+Unit resolution, the unit rules and the capital reporting scopes are
+implemented and qualified; exact monetary arithmetic remains pending.
 [STATEMENTS-CONTRACTS-005](statements-contracts/05-currency-dimensions.md#accepted-decision-for-formula-units-and-currency).
 
 The Statements metric registry and model import contract was accepted on

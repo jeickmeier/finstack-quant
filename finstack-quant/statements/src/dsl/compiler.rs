@@ -2,7 +2,7 @@
 
 use crate::dsl::ast::StmtExpr;
 use crate::dsl::signatures::FunctionSignature;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::types::{NodeId, NodeValueType};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::expr::{BinOp, Expr, UnaryOp};
@@ -51,10 +51,10 @@ fn lower(ast: &StmtExpr) -> Result<Expr> {
     match ast {
         StmtExpr::Literal(val) => Ok(Expr::literal(*val)),
         StmtExpr::NodeRef(name) => Ok(Expr::column(name.as_str().to_string())),
-        StmtExpr::CsRef {
-            component,
-            instrument_or_total,
-        } => Ok(Expr::cs_ref(component.clone(), instrument_or_total.clone())),
+        StmtExpr::CsRef { component, scope } => Ok(Expr::cs_ref(
+            component.as_str().to_string(),
+            scope.to_string(),
+        )),
         StmtExpr::BinOp { op, left, right } => Ok(Expr::bin_op(*op, lower(left)?, lower(right)?)),
         StmtExpr::UnaryOp { op, operand } => Ok(Expr::unary_op(*op, lower(operand)?)),
         StmtExpr::Call { func, args } => {
@@ -125,27 +125,90 @@ pub(crate) fn is_boolean(ast: &StmtExpr, context: UnitContext<'_>) -> Result<boo
     Ok(context.infer(ast)? == Dimension::Boolean)
 }
 
-/// Whether `ast` reads a capital-structure reference whose currency is not
-/// resolved: a total without a reporting currency, or an unknown instrument.
-pub(crate) fn has_unresolved_cs_reference(ast: &StmtExpr, context: UnitContext<'_>) -> bool {
+/// Check every capital-structure reference of `ast` against the model's
+/// instruments and reporting scopes.
+///
+/// # Errors
+///
+/// Returns an evaluation error naming the reference when the model has no
+/// capital structure, the instrument is not one of its instruments, no
+/// instrument is in the native currency selected, or the consolidated total
+/// is selected while the instruments are in more than one currency and no
+/// reporting currency is set.
+pub(crate) fn check_capital_references(
+    ast: &StmtExpr,
+    context: UnitContext<'_>,
+    has_capital_structure: bool,
+) -> Result<()> {
+    use crate::capital_structure::CsScope;
     match ast {
-        StmtExpr::CsRef { .. } => matches!(context.infer(ast), Ok(Dimension::Unknown)),
-        StmtExpr::Literal(_) | StmtExpr::NodeRef(_) => false,
-        StmtExpr::UnaryOp { operand, .. } => has_unresolved_cs_reference(operand, context),
+        StmtExpr::CsRef { scope, .. } => {
+            if !has_capital_structure {
+                return Err(Error::eval(format!(
+                    "'{ast}' reads the capital structure, but the model has none"
+                )));
+            }
+            let currencies = || {
+                let mut codes: Vec<String> = context
+                    .instrument_currencies
+                    .values()
+                    .map(ToString::to_string)
+                    .collect();
+                codes.sort();
+                codes.dedup();
+                codes.join(", ")
+            };
+            match scope {
+                CsScope::Instrument(id) if !context.instrument_currencies.contains_key(id) => {
+                    Err(Error::eval(format!(
+                        "'{ast}' names instrument '{id}', which is not an instrument of the \
+                         capital structure"
+                    )))
+                }
+                CsScope::NativeTotal(currency)
+                    if !context
+                        .instrument_currencies
+                        .values()
+                        .any(|native| native == currency) =>
+                {
+                    Err(Error::eval(format!(
+                        "'{ast}' selects the {currency} total, but no instrument of the \
+                         capital structure is in {currency} (instrument currencies: {})",
+                        currencies()
+                    )))
+                }
+                CsScope::Consolidated if context.capital_structure_currency.is_none() => {
+                    Err(Error::eval(format!(
+                        "'{ast}' selects the consolidated total, but the instruments are in \
+                         more than one currency ({}) and no reporting currency is set. Set \
+                         `capital_structure.reporting_currency`, or select a native total \
+                         such as `total.<CCY>`",
+                        currencies()
+                    )))
+                }
+                _ => Ok(()),
+            }
+        }
+        StmtExpr::Literal(_) | StmtExpr::NodeRef(_) => Ok(()),
+        StmtExpr::UnaryOp { operand, .. } => {
+            check_capital_references(operand, context, has_capital_structure)
+        }
         StmtExpr::BinOp { left, right, .. } => {
-            has_unresolved_cs_reference(left, context)
-                || has_unresolved_cs_reference(right, context)
+            check_capital_references(left, context, has_capital_structure)?;
+            check_capital_references(right, context, has_capital_structure)
         }
         StmtExpr::Call { args, .. } => args
             .iter()
-            .any(|arg| has_unresolved_cs_reference(arg, context)),
+            .try_for_each(|arg| check_capital_references(arg, context, has_capital_structure)),
         StmtExpr::IfThenElse {
             condition,
             then_expr,
             else_expr,
         } => [condition, then_expr, else_expr]
             .into_iter()
-            .any(|branch| has_unresolved_cs_reference(branch, context)),
+            .try_for_each(|branch| {
+                check_capital_references(branch, context, has_capital_structure)
+            }),
     }
 }
 
@@ -158,14 +221,12 @@ impl UnitContext<'_> {
                 .get(name)
                 .map(node_value_type_to_dimension)
                 .unwrap_or(Dimension::Unknown)),
-            StmtExpr::CsRef {
-                instrument_or_total,
-                ..
-            } => {
-                let currency = if instrument_or_total == "total" {
-                    self.capital_structure_currency
-                } else {
-                    self.instrument_currencies.get(instrument_or_total).copied()
+            StmtExpr::CsRef { scope, .. } => {
+                use crate::capital_structure::CsScope;
+                let currency = match scope {
+                    CsScope::Instrument(id) => self.instrument_currencies.get(id).copied(),
+                    CsScope::NativeTotal(currency) => Some(*currency),
+                    CsScope::Consolidated => self.capital_structure_currency,
                 };
                 Ok(currency
                     .map(Dimension::Monetary)

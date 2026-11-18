@@ -538,12 +538,15 @@ class ModelBuilder:
 
     def fx_policy(self, policy: str) -> ModelBuilder:
         """
-        Set the FX policy (``cashflow_date``/``period_end``).
+        Choose how capital-structure totals are consolidated across currencies.
 
         Parameters
         ----------
         policy:
-            FX conversion policy label.
+            ``"period_end"``, the only policy: each period's native-currency
+            totals convert at the rate of the inclusive period-close date. It
+            must be set before instruments of more than one currency are
+            consolidated into the reporting currency; there is no default.
 
         Returns
         -------

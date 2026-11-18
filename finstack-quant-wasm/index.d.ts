@@ -10027,7 +10027,8 @@ export interface StatementsNamespace {
    *   debt balance is closing principal. Rate hedges have zero debt balance and
    *   debt accrued interest.
    * * `instrument_or_total` - Instrument identifier for native-currency amounts,
-   *   or `total` for reporting-currency aggregates. This lookup performs no FX.
+   *   `total` for the consolidated reporting-currency total, or `total.<CCY>`
+   *   for one native currency's total. This lookup performs no FX.
    * * `period_id` - Reporting-period label such as `2025Q1` present in the result.
    *
    * @returns Requested amount in major currency units; absent optional interest income is zero.
@@ -10035,11 +10036,12 @@ export interface StatementsNamespace {
    * # Errors
    *
    * Throws with kind `validation` for malformed inputs or period labels, and
-   * kind `computation` for unknown components, missing instrument/period data,
-   * unavailable multi-currency totals, or incompatible cash/PIK currencies.
+   * kind `computation` for an unknown component or malformed scope, a scope
+   * with no data for the period (including a consolidated total that could not
+   * be formed), or a component the breakdown does not record.
    * @param cashflowsJson - Capital-structure cashflows object or its serialized JSON.
-   * @param component - One of `interest_expense` (cash plus PIK), `interest_expense_cash`, `interest_expense_pik`, `interest_income`, `principal_payment`, `debt_balance`, `fees`, `accrued_interest` (cash interest earned and not yet due), `interest_arrears` (cash interest due and unpaid), `principal_pending` (principal cash owed and not yet due), `principal_arrears` (principal cash due and unpaid) or `principal_advance_reserve` (face paid for and not yet reduced). Flows are positive payment/receipt magnitudes; debt balance is closing economic principal on the contract's effective dates. Rate hedges have zero debt balance and debt accrued interest.
-   * @param instrumentOrTotal - Instrument identifier for native-currency amounts, or `total` for reporting-currency aggregates. This lookup performs no FX.
+   * @param component - One of `interest_expense` (cash plus PIK), `interest_expense_cash`, `interest_expense_pik`, `interest_income`, `net_interest_expense_cash`, `principal_payment` and its parts `scheduled_principal`, `mandatory_prepayment`, `voluntary_prepayment` and `sweep_prepayment`, `fees`, `opening_balance`, `debt_balance`, `accrued_interest`, `interest_arrears`, `principal_pending`, `principal_arrears` or `principal_advance_reserve`. Flows are positive magnitudes; balances are period-close economic principal.
+   * @param instrumentOrTotal - The scope: an instrument identifier for its native-currency amount, `total` for the consolidated total in the reporting currency, or `total.<CCY>` (for example `total.EUR`) for the total of the instruments in one native currency. This lookup performs no FX.
    * @param periodId - Reporting-period label such as `2025Q1` present in the result.
    */
   readonly capitalStructureCashflowsGetComponent: typeof wasm.capitalStructureCashflowsGetComponent;

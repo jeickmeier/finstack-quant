@@ -111,6 +111,7 @@ pub(crate) mod integration;
 pub(crate) mod period_flows;
 mod principal;
 pub(crate) mod residual_schedule;
+mod selector;
 mod state;
 pub(crate) mod waterfall;
 mod waterfall_spec;
@@ -118,14 +119,15 @@ mod waterfall_spec;
 // Curated public facade for capital-structure types.
 pub(crate) use cashflows::add_optional_money;
 pub use cashflows::{
-    CapitalStructureCashflows, CashflowBreakdown, DistressCashflow, PrepaymentOutcome,
-    TOTAL_ROW_LABEL,
+    CapitalStructureCashflows, CashflowBreakdown, DistressCashflow, FxConversionRecord,
+    PrepaymentOutcome, TOTAL_ROW_LABEL,
 };
 pub use integration::build_instrument_from_spec;
 pub use period_flows::{
     SchedulePerspective, SuppliedSchedule, calculate_period_flows, scheduled_opening_principal,
 };
 pub(crate) use principal::PrincipalClaim;
+pub use selector::{CsComponent, CsScope};
 pub(crate) use state::CapitalStructureState;
 pub(crate) use waterfall_spec::reject_pool_output_dependence;
 pub use waterfall_spec::{

@@ -92,15 +92,11 @@ impl ModelBuilder {
     ///
     /// # Arguments
     ///
-    /// * `policy` - Provider-selection purpose for each reporting-currency
-    ///   conversion of a period-aggregated `cs.*` bucket. Every conversion is
-    ///   queried on the inclusive period-end snapshot date; `period_end` is the
-    ///   period-close choice, and `cashflow_date` does not recover individual
-    ///   flow dates, which aggregation has already removed.
-    pub fn fx_policy(
-        &mut self,
-        policy: finstack_quant_core::money::fx::FxConversionPolicy,
-    ) -> &mut Self {
+    /// * `policy` - How each period's native-currency totals are converted
+    ///   into the reporting currency. `PeriodEnd`, the only policy, reads the
+    ///   rate of the inclusive period-close date. It must be set before
+    ///   instruments of more than one currency are consolidated.
+    pub fn fx_policy(&mut self, policy: crate::types::CapitalFxPolicy) -> &mut Self {
         ensure_capital_structure(&mut self.capital_structure).fx_policy = Some(policy);
         self
     }

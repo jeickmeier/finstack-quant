@@ -106,22 +106,6 @@ pub(crate) const FUNCTION_SIGNATURES: &[FunctionSignature] = &[
     between("ewm_var", Function::EwmVar, 2, 3),
 ];
 
-/// Capital-structure components a `cs.<component>.<target>` reference may name.
-pub(crate) const CS_COMPONENTS: &[&str] = &[
-    "interest_expense",
-    "interest_expense_cash",
-    "interest_expense_pik",
-    "interest_income",
-    "principal_payment",
-    "debt_balance",
-    "fees",
-    "accrued_interest",
-    "interest_arrears",
-    "principal_pending",
-    "principal_arrears",
-    "principal_advance_reserve",
-];
-
 impl FunctionSignature {
     /// Look up a function by its case-sensitive DSL name.
     pub(crate) fn lookup(name: &str) -> Option<&'static Self> {

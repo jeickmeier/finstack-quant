@@ -499,7 +499,7 @@ impl Evaluator {
                         mc_path.map(|path| (path, &mut mc_z_cache)),
                     )?;
 
-                    cs_cashflows_accum.set_period(period_cs);
+                    cs_cashflows_accum.set_period(period_cs)?;
                     has_cs = true;
 
                     (vals, row, warns)

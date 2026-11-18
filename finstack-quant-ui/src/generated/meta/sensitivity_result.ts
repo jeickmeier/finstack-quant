@@ -870,6 +870,12 @@ export default [
     "description": "A correlated forecast needs the shocks of a peer whose forecast was\nitself unavailable on the path."
   },
   {
+    "path": "#/$defs/d_6c08f5490eda9e343593/oneOf/6",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/UnavailableReason/oneOf/6",
+    "const": "missing_fx_quote",
+    "description": "A consolidated capital-structure value needs a period-close FX quote\nthat the market does not hold. Native-currency values are unaffected."
+  },
+  {
     "path": "#/$defs/d_6d88c3cd9765d62eaff0",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/NormalizationConfig",
     "description": "An ordered bridge from a reported metric to a separately named adjusted\nmetric (for example reported EBITDA to adjusted EBITDA)."
@@ -2447,6 +2453,43 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#"
   },
   {
+    "path": "#/$defs/d_c1b4ba8405b0bd5bf8d6",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FxConversionRecord",
+    "description": "One FX conversion applied to consolidate capital-structure totals."
+  },
+  {
+    "path": "#/$defs/d_c1b4ba8405b0bd5bf8d6/properties/date",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FxConversionRecord/properties/date",
+    "description": "Inclusive period-close date the rate was read on.",
+    "ref": "#/$defs/DateWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/DateWire"
+  },
+  {
+    "path": "#/$defs/d_c1b4ba8405b0bd5bf8d6/properties/from",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FxConversionRecord/properties/from",
+    "description": "Native currency converted from.",
+    "ref": "#/$defs/Currency",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Currency"
+  },
+  {
+    "path": "#/$defs/d_c1b4ba8405b0bd5bf8d6/properties/rate",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FxConversionRecord/properties/rate",
+    "description": "Units of `to` per unit of `from` (1.20 converts EUR 1 to USD 1.20).",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_c1b4ba8405b0bd5bf8d6/properties/source",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FxConversionRecord/properties/source",
+    "description": "How the rate was obtained: `direct` for a quoted pair, `triangulated`\nwhen it was built through the FX matrix's pivot currency."
+  },
+  {
+    "path": "#/$defs/d_c1b4ba8405b0bd5bf8d6/properties/to",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FxConversionRecord/properties/to",
+    "description": "Reporting currency converted to.",
+    "ref": "#/$defs/Currency",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Currency"
+  },
+  {
     "path": "#/$defs/d_c44e4163513f1741db76",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FiscalConfig",
     "description": "Configuration for fiscal year periods.\n\nAlways holds a start month in `1..=12` and a start day in `1..=31`;\ndeserialization applies the same validation as [`FiscalConfig::new`]."
@@ -3129,6 +3172,15 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CashflowBreakdown"
   },
   {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/consolidation_unavailable",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/consolidation_unavailable",
+    "description": "Why a period has no consolidated `totals`, when consolidation was\nrequested and could not be completed (for example a missing FX quote).\nPer-instrument and native-currency values of the period are\nunaffected."
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/consolidation_unavailable/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/consolidation_unavailable/additionalProperties"
+  },
+  {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/distress_cash",
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/distress_cash",
     "description": "Distress cash by period: recoveries, accrual paid on default and\nprotection payments, each with its instrument, native currency and\nactual payment date, in schedule order.\n\nThese amounts are outside scheduled debt service: they are in no\nbreakdown, total or waterfall claim, and they change no principal.\nOnly periods with a distress row have an entry."
@@ -3153,6 +3205,21 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/equity_distribution/additionalProperties",
     "ref": "#/$defs/Money",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/Money"
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/fx_conversions",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/fx_conversions",
+    "description": "Every FX conversion applied to form the consolidated `totals`, by\nperiod: the currency pair, the rate, the date it was read on and how\nit was obtained. Empty when every instrument is in the reporting\ncurrency."
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/fx_conversions/additionalProperties",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/fx_conversions/additionalProperties"
+  },
+  {
+    "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/fx_conversions/additionalProperties/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/CapitalStructureCashflows/properties/fx_conversions/additionalProperties/items",
+    "ref": "#/$defs/FxConversionRecord",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json#/$defs/FxConversionRecord"
   },
   {
     "path": "#/$defs/d_f840db5f4c38222f7ca7/properties/prepayments",

@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **627 review items across 33 source scopes with open items**
+This backlog consolidates **625 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -26,7 +26,7 @@ The labels distinguish the work required:
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (483): implementation and verification work against an
+- **Reconciliation** (481): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (37): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -68,7 +68,7 @@ product consequences remain in their product scope.
 | [Calibration: Hull–White and LMM](#calibration-hullwhite-and-lmm) | 18 |
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
 | [Statements: capital structure](#statements-capital-structure) | 5 |
-| [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 6 |
+| [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 4 |
 | [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 5 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
 | [Statements analytics: credit checks and impairment](#statements-analytics-credit-checks-and-impairment) | 18 |
@@ -962,7 +962,7 @@ product consequences remain in their product scope.
 
 - **Reconciliation — Dated PIK notices, amendments and authorized arrears capitalization.** The modeled exercise elects at the start of the next coupon period after the period that observes the metric. Implement separately elected observation, notice and election-effective dates, amendments on their authorized effective dates, capitalization of arrears through a separately authorized dated action, and qualified payoff terms for an earned coupon affected by a full payoff. Qualify them, and the metric's units against the threshold, with independent agreement examples. [Accepted STATEMENTS-CAPITAL-008](statements-capital/08-pik-and-carry-state.md#accepted-decision-for-contractual-pik-elections-and-carried-claims).
 
-- **Reconciliation — Capital reporting, period-close FX and atomic replacement.** Implement distinct currency scopes, explicit inclusive `PeriodEnd` FX with provenance and unavailable totals on missing quotes, complete component reconciliation with known-zero semantics, exact currency-tagged decimal exports and chronological reads. Replace whole periods atomically and reject reporting-currency conflicts. Qualify native and consolidated results independently across dated FX changes and stale-row replacement. [Accepted STATEMENTS-CAPITAL-009](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
+- **Reconciliation — Exact capital exports and typed host accessors.** The capital long tables export amounts as floats, and the host component accessors (`get_component` in Python and WASM) return a float. Export amounts as exact decimal strings tagged with their currency and give hosts the typed selector lookup. Qualify native and consolidated results against an independent ledger across dated FX changes. [Accepted STATEMENTS-CAPITAL-009](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
 
 - **Evidence — Capital and waterfall policy lacks independent contractual reconciliation.** Selected tests cover formulas, boundaries, routing, state and internal conservation, but no independent debt ledger, lender ECF definition, legal waterfall, accounting-standard or currency/FX qualification was established. Obtain evidence scoped to the adopted contracts rather than treating test names as compliance. Records: [STATEMENTS-CAPITAL-004](statements-capital/04-dated-principal.md), [STATEMENTS-CAPITAL-006](statements-capital/06-priority-allocation.md), [STATEMENTS-CAPITAL-007](statements-capital/07-prepayments-and-ecf.md), [STATEMENTS-CAPITAL-008](statements-capital/08-pik-and-carry-state.md), [STATEMENTS-CAPITAL-009](statements-capital/09-reporting-and-fx.md).
 
@@ -1028,11 +1028,7 @@ product consequences remain in their product scope.
 
 [Scope inventory](statements-contracts/README.md).
 
-- **Reconciliation — Typed capital selectors in Statements formulas.** Replace the `cs.<component>.<instrument or total>` reference form with the typed capital reporting components and selectors, including instrument, native-currency total and consolidated scopes, and qualify each selector through parsing, rendering, compilation and evaluation. The rest of the formula grammar, signature and AST-validation contract is reconciled. [Accepted STATEMENTS-CONTRACTS-004](statements-contracts/04-dsl-syntax-and-lowering.md#accepted-decision-for-formula-grammar-function-dispatch-and-ast-validation) · [Capital reporting and selectors](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
-
 - **Reconciliation — JavaScript `bigint` forecast seeds and evaluation-time forecast checks.** Accept a JavaScript `bigint` for a forecast seed at the WASM boundary; today a seed crosses as its decimal wire text, and a `bigint` is written as a bare JSON integer that the exact string codec rejects. Verify the actual horizon and the supplied history and the selected execution mode when each forecast method runs, with the forecast suffix and method slices. The one typed specification, explicit method choices, static validation at build and load and exact string seeds in Rust, Python and JSON are reconciled. [Accepted STATEMENTS-CONTRACTS-003](statements-contracts/03-forecast-parameter-contract.md#accepted-decision-for-typed-forecasts-and-validation-staging) · [Forecast suffix and anchoring](statements-evaluation/05-forecast-segments-and-bounds.md).
-
-- **Reconciliation — Capital reference units in Statements formulas.** Resolve `cs` references through the accepted instrument-native, native-currency total and consolidated reporting scopes, and delete the unresolved unit a formula may still carry when a capital reference has no resolved currency; a required missing quote makes consolidated reporting unavailable. Qualify missing required FX across hosts. The unit rules, monetary-variance rejection, resolution of every other unit before execution and exact currency-tagged monetary results are reconciled. [Accepted STATEMENTS-CONTRACTS-005](statements-contracts/05-currency-dimensions.md#accepted-decision-for-formula-units-and-currency) · [Capital reporting and FX](statements-capital/09-reporting-and-fx.md#accepted-decision-for-capital-reporting-and-fx).
 
 - **Reconciliation — Bounded Statements wire admission, schemas and errors.** Implement one loading path with exact version and numeric admission, shared limits and runnable validation before canonical content hashing. Retain separate evaluation provenance, validate canonical instrument eligibility and reconcile structured errors across hosts. Correct the empty schema fixture and ordering description, and independently qualify Rust, Python and WASM parity, boundaries and replay. [Accepted STATEMENTS-CONTRACTS-016](statements-contracts/16-wire-schema-and-errors.md#accepted-decision-for-statements-wire-admission-schemas-and-errors).
 

@@ -15,8 +15,8 @@ pub use forecast_params::{
 };
 pub(crate) use model::validated_explicit_value_type;
 pub use model::{
-    CapitalStructureSpec, DebtInstrumentSpec, FINANCIAL_MODEL_CONTRACT, FinancialModelSpec,
-    FinancialStatementInstrument,
+    CapitalFxPolicy, CapitalStructureSpec, DebtInstrumentSpec, FINANCIAL_MODEL_CONTRACT,
+    FinancialModelSpec, FinancialStatementInstrument,
 };
 pub use node::{
     ForecastMethod, NodeId, NodeSpec, NodeType, NodeValueType, RollupMethod, SeasonalMode,

@@ -14,7 +14,6 @@ use crate::bindings::date_utils::py_to_date;
 use crate::bindings::pydoc::pydoc;
 use crate::errors::{core_to_py, statements_to_py, value_error};
 use finstack_quant_core::dates::PeriodId;
-use finstack_quant_core::money::fx::FxConversionPolicy;
 use finstack_quant_statements::builder::{MixedNodeBuilder, ModelBuilder};
 use finstack_quant_statements::types::{
     AmountOrScalar, FinancialStatementInstrument, NodeId, RollupMethod,
@@ -441,12 +440,9 @@ impl PyModelBuilder {
     #[doc = pydoc!("finstack_quant.statements._builder", "ModelBuilder.fx_policy")]
     #[pyo3(text_signature = "($self, policy)")]
     fn fx_policy<'py>(mut slf: PyRefMut<'py, Self>, policy: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let parsed: FxConversionPolicy =
-            finstack_quant_core::wire::serde_parse(policy).map_err(|e| {
-                value_error(format!(
-                    "invalid fx_policy {policy:?}: {e}; expected one of cashflow_date, period_end"
-                ))
-            })?;
+        let parsed: finstack_quant_statements::types::CapitalFxPolicy = policy
+            .parse()
+            .map_err(|e| value_error(format!("invalid fx_policy {policy:?}: {e}")))?;
         slf.builder_mut()?.fx_policy(parsed);
         Ok(slf)
     }

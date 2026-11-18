@@ -566,6 +566,18 @@ impl PyCapitalStructureCashflows {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner.prepayments)
     }
 
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "CapitalStructureCashflows.fx_conversions")]
+    #[getter]
+    fn fx_conversions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.fx_conversions)
+    }
+
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "CapitalStructureCashflows.consolidation_unavailable")]
+    #[getter]
+    fn consolidation_unavailable<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.consolidation_unavailable)
+    }
+
     #[doc = pydoc!("finstack_quant.statements._capital_structure", "CapitalStructureCashflows.retained_cash")]
     #[getter]
     fn retained_cash<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {

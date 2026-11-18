@@ -535,7 +535,7 @@ fn build_fx_context<'a>(
 struct CsTotalsContext<'a> {
     reporting_currency: Option<finstack_quant_core::currency::Currency>,
     fx_matrix: Option<&'a std::sync::Arc<finstack_quant_core::money::fx::FxMatrix>>,
-    fx_policy: Option<finstack_quant_core::money::fx::FxConversionPolicy>,
+    fx_policy: Option<crate::types::CapitalFxPolicy>,
     snapshot_date: finstack_quant_core::dates::Date,
 }
 
@@ -544,7 +544,6 @@ fn recompute_cs_totals(
     period_id: PeriodId,
     fx_ctx: Option<&CsTotalsContext<'_>>,
 ) -> crate::error::Result<()> {
-    use crate::capital_structure::integration::convert_to_reporting;
     use finstack_quant_core::currency::Currency;
 
     let mut totals_by_currency: IndexMap<Currency, crate::capital_structure::CashflowBreakdown> =
@@ -580,17 +579,67 @@ fn recompute_cs_totals(
         return Ok(());
     }
 
-    if let Some(ctx) = fx_ctx
-        && let Some(rc) = ctx.reporting_currency
-    {
-        let mut converted_total = crate::capital_structure::CashflowBreakdown::with_currency(rc);
-        for breakdown in totals_by_currency.values() {
-            accumulate(&mut converted_total, breakdown, |money| {
-                convert_to_reporting(money, ctx.snapshot_date, rc, ctx.fx_matrix, ctx.fx_policy)
-            })?;
+    cashflows.fx_conversions.shift_remove(&period_id);
+    cashflows.consolidation_unavailable.shift_remove(&period_id);
+    let Some(ctx) = fx_ctx else {
+        return Ok(());
+    };
+    let Some(rc) = ctx.reporting_currency else {
+        // More than one native currency and no target currency: only the
+        // per-instrument and native-currency scopes exist.
+        cashflows.consolidation_unavailable.insert(
+            period_id,
+            "the instruments are in more than one currency and no reporting currency is set"
+                .to_string(),
+        );
+        return Ok(());
+    };
+    cashflows.reporting_currency = Some(rc);
+
+    // One period-close rate per native currency. A missing quote leaves the
+    // consolidated scope unavailable; the native scopes are already stored.
+    let mut rates: IndexMap<Currency, f64> = IndexMap::new();
+    let mut records = Vec::new();
+    for &currency in totals_by_currency.keys() {
+        if currency == rc {
+            continue;
         }
-        cashflows.reporting_currency = Some(rc);
-        cashflows.totals.insert(period_id, converted_total);
+        if ctx.fx_policy.is_none() {
+            return Err(crate::error::Error::capital_structure(format!(
+                "Cannot convert {currency} to reporting currency {rc}: \
+                 capital_structure.fx_policy is not set. Choose `period_end` explicitly."
+            )));
+        }
+        match crate::capital_structure::integration::period_close_rate(
+            currency,
+            rc,
+            ctx.snapshot_date,
+            ctx.fx_matrix,
+        ) {
+            Ok(record) => {
+                rates.insert(currency, record.rate);
+                records.push(record);
+            }
+            Err(reason) => {
+                cashflows
+                    .consolidation_unavailable
+                    .insert(period_id, reason);
+                return Ok(());
+            }
+        }
+    }
+    let mut converted_total = crate::capital_structure::CashflowBreakdown::with_currency(rc);
+    for (currency, breakdown) in &totals_by_currency {
+        match rates.get(currency) {
+            None => accumulate(&mut converted_total, breakdown, Ok)?,
+            Some(&rate) => accumulate(&mut converted_total, breakdown, |money| {
+                Ok(Money::new(money.amount() * rate, rc)?)
+            })?,
+        }
+    }
+    cashflows.totals.insert(period_id, converted_total);
+    if !records.is_empty() {
+        cashflows.fx_conversions.insert(period_id, records);
     }
 
     Ok(())
@@ -827,7 +876,6 @@ mod fx_policy_tests {
     use crate::types::{CapitalStructureSpec, FinancialModelSpec};
     use finstack_quant_core::dates::{Date, Period, PeriodId};
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::money::fx::FxConversionPolicy;
     use time::Month;
 
     #[test]
@@ -864,42 +912,6 @@ mod fx_policy_tests {
             ctx.fx_policy, None,
             "an omitted fx_policy is not replaced by PeriodEnd"
         );
-
-        // A cross-currency conversion then fails instead of inferring a policy;
-        // same-currency amounts still pass through.
-        let fx = std::sync::Arc::new(finstack_quant_core::money::fx::FxMatrix::new(
-            std::sync::Arc::new(finstack_quant_core::money::fx::SimpleFxProvider::new()),
-            None,
-        ));
-        let eur = finstack_quant_core::money::Money::from((
-            100_i64,
-            finstack_quant_core::currency::Currency::EUR,
-        ));
-        let usd = finstack_quant_core::currency::Currency::USD;
-        let error = crate::capital_structure::integration::convert_to_reporting(
-            eur,
-            ctx.snapshot_date,
-            usd,
-            Some(&fx),
-            ctx.fx_policy,
-        )
-        .expect_err("no policy for a cross-currency conversion");
-        assert!(
-            error.to_string().contains("fx_policy is not set"),
-            "{error}"
-        );
-        assert_eq!(
-            crate::capital_structure::integration::convert_to_reporting(
-                eur,
-                ctx.snapshot_date,
-                finstack_quant_core::currency::Currency::EUR,
-                Some(&fx),
-                ctx.fx_policy,
-            )
-            .expect("same currency"),
-            eur
-        );
-        let _ = FxConversionPolicy::PeriodEnd;
     }
 }
 
@@ -981,5 +993,199 @@ mod election_tests {
             settle(3, date!(2024 - 07 - 01), date!(2024 - 10 - 01), false),
             vec![pik, (date!(2024 - 10 - 01), CouponType::Cash)]
         );
+    }
+}
+
+#[cfg(test)]
+mod consolidation_tests {
+    use super::{CsTotalsContext, recompute_cs_totals};
+    use crate::capital_structure::{
+        CapitalStructureCashflows, CashflowBreakdown, CsComponent, CsScope,
+    };
+    use crate::types::CapitalFxPolicy;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::PeriodId;
+    use finstack_quant_core::money::Money;
+    use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
+    use std::sync::Arc;
+    use time::macros::date;
+
+    fn money(amount: i64, currency: Currency) -> Money {
+        Money::from((amount, currency))
+    }
+
+    /// EUR 40 of scheduled and EUR 10 of sweep principal on one loan, USD 20
+    /// of scheduled principal on another.
+    fn two_currency_period(period: PeriodId) -> CapitalStructureCashflows {
+        let mut cashflows = CapitalStructureCashflows::new();
+        let mut euro = CashflowBreakdown::with_currency(Currency::EUR);
+        euro.principal_payment = money(50, Currency::EUR);
+        euro.scheduled_principal = Some(money(40, Currency::EUR));
+        euro.sweep_prepayment = Some(money(10, Currency::EUR));
+        let mut dollar = CashflowBreakdown::with_currency(Currency::USD);
+        dollar.principal_payment = money(20, Currency::USD);
+        dollar.scheduled_principal = Some(money(20, Currency::USD));
+        dollar.sweep_prepayment = Some(money(0, Currency::USD));
+        for (id, breakdown) in [("EUR-TL", euro), ("USD-TL", dollar)] {
+            cashflows
+                .by_instrument
+                .entry(id.into())
+                .or_default()
+                .insert(period, breakdown);
+        }
+        cashflows
+    }
+
+    fn matrix(quotes: &[(Currency, Currency, f64)]) -> Arc<FxMatrix> {
+        let provider = SimpleFxProvider::new();
+        provider.set_quotes(quotes).expect("quotes");
+        Arc::new(FxMatrix::new(Arc::new(provider), None))
+    }
+
+    /// The record's example: at USD 1.20 per EUR the structure consolidates
+    /// to USD 80 of principal, USD 68 scheduled and USD 12 of sweep, and the
+    /// conversion is retained with its pair, rate, date and source.
+    #[test]
+    fn native_totals_consolidate_at_the_period_close_rate() {
+        let period = PeriodId::quarter(2025, 1).expect("quarter");
+        let close = date!(2025 - 03 - 31);
+        let fx = matrix(&[(Currency::EUR, Currency::USD, 1.2)]);
+        let mut cashflows = two_currency_period(period);
+        recompute_cs_totals(
+            &mut cashflows,
+            period,
+            Some(&CsTotalsContext {
+                reporting_currency: Some(Currency::USD),
+                fx_matrix: Some(&fx),
+                fx_policy: Some(CapitalFxPolicy::PeriodEnd),
+                snapshot_date: close,
+            }),
+        )
+        .expect("consolidation");
+
+        let read = |component, scope: CsScope| {
+            cashflows
+                .get_money(component, &scope, &period)
+                .expect("reported amount")
+        };
+        // Per-instrument and native-currency scopes are in their own currency.
+        assert_eq!(
+            read(
+                CsComponent::PrincipalPayment,
+                CsScope::Instrument("EUR-TL".into())
+            ),
+            money(50, Currency::EUR)
+        );
+        assert_eq!(
+            read(
+                CsComponent::SweepPrepayment,
+                CsScope::NativeTotal(Currency::EUR)
+            ),
+            money(10, Currency::EUR)
+        );
+        assert_eq!(
+            read(
+                CsComponent::PrincipalPayment,
+                CsScope::NativeTotal(Currency::USD)
+            ),
+            money(20, Currency::USD)
+        );
+        // The consolidated scope reconciles: 68 + 12 = 80.
+        assert_eq!(
+            read(CsComponent::PrincipalPayment, CsScope::Consolidated),
+            money(80, Currency::USD)
+        );
+        assert_eq!(
+            read(CsComponent::ScheduledPrincipal, CsScope::Consolidated),
+            money(68, Currency::USD)
+        );
+        assert_eq!(
+            read(CsComponent::SweepPrepayment, CsScope::Consolidated),
+            money(12, Currency::USD)
+        );
+        // A component no breakdown recorded is unknown, not zero.
+        assert!(
+            cashflows
+                .get_money(
+                    CsComponent::MandatoryPrepayment,
+                    &CsScope::Consolidated,
+                    &period
+                )
+                .is_err()
+        );
+        let records = &cashflows.fx_conversions[&period];
+        assert_eq!(records.len(), 1);
+        assert_eq!(
+            (
+                records[0].from,
+                records[0].to,
+                records[0].rate,
+                records[0].date
+            ),
+            (Currency::EUR, Currency::USD, 1.2, close)
+        );
+        assert_eq!(records[0].source, "direct");
+        assert!(cashflows.consolidation_unavailable.is_empty());
+    }
+
+    /// A missing quote leaves the consolidated scope unavailable, with the
+    /// reason, while the native scopes are reported as usual.
+    #[test]
+    fn a_missing_quote_makes_only_the_consolidated_scope_unavailable() {
+        let period = PeriodId::quarter(2025, 1).expect("quarter");
+        let fx = matrix(&[(Currency::GBP, Currency::USD, 1.3)]);
+        let mut cashflows = two_currency_period(period);
+        recompute_cs_totals(
+            &mut cashflows,
+            period,
+            Some(&CsTotalsContext {
+                reporting_currency: Some(Currency::USD),
+                fx_matrix: Some(&fx),
+                fx_policy: Some(CapitalFxPolicy::PeriodEnd),
+                snapshot_date: date!(2025 - 03 - 31),
+            }),
+        )
+        .expect("native totals still form");
+        assert!(cashflows.totals.is_empty());
+        assert!(cashflows.fx_conversions.is_empty());
+        assert_eq!(cashflows.reporting_currency, Some(Currency::USD));
+        let reason = &cashflows.consolidation_unavailable[&period];
+        assert!(reason.contains("EUR/USD"), "{reason}");
+        let error = cashflows
+            .get_money(
+                CsComponent::PrincipalPayment,
+                &CsScope::Consolidated,
+                &period,
+            )
+            .expect_err("unavailable consolidated total")
+            .to_string();
+        assert!(error.contains("unavailable"), "{error}");
+        assert_eq!(
+            cashflows
+                .get_money(
+                    CsComponent::PrincipalPayment,
+                    &CsScope::NativeTotal(Currency::EUR),
+                    &period
+                )
+                .expect("native total"),
+            money(50, Currency::EUR)
+        );
+
+        // Without an explicit policy a cross-currency consolidation is an
+        // error, never a default.
+        let mut cashflows = two_currency_period(period);
+        let error = recompute_cs_totals(
+            &mut cashflows,
+            period,
+            Some(&CsTotalsContext {
+                reporting_currency: Some(Currency::USD),
+                fx_matrix: Some(&fx),
+                fx_policy: None,
+                snapshot_date: date!(2025 - 03 - 31),
+            }),
+        )
+        .expect_err("no policy")
+        .to_string();
+        assert!(error.contains("fx_policy is not set"), "{error}");
     }
 }

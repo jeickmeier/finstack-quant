@@ -53,6 +53,9 @@ pub(crate) const MAX_FORMULA_TERMS: usize = 256;
 thread_local! {
     static PARSE_DEPTH: Cell<usize> = const { Cell::new(0) };
     static TERM_COUNT: Cell<usize> = const { Cell::new(0) };
+    /// The typed error of a malformed `cs.` reference, kept for the caller:
+    /// a combinator failure carries only a position.
+    static CS_ERROR: std::cell::RefCell<Option<Error>> = const { std::cell::RefCell::new(None) };
 }
 
 /// Parse a formula string into a [`StmtExpr`] AST.
@@ -75,7 +78,12 @@ thread_local! {
 pub fn parse_formula(input: &str) -> Result<StmtExpr> {
     PARSE_DEPTH.with(|depth| depth.set(0));
     TERM_COUNT.with(|count| count.set(0));
-    match expression(input) {
+    CS_ERROR.with(|slot| slot.borrow_mut().take());
+    let parsed = expression(input);
+    if let Some(error) = CS_ERROR.with(|slot| slot.borrow_mut().take()) {
+        return Err(error);
+    }
+    match parsed {
         Ok(("", expr)) => Ok(expr),
         Ok((remaining, _)) => {
             let (line, col) = offset_to_line_col(input, input.len() - remaining.len());
@@ -339,21 +347,27 @@ fn identifier(input: &str) -> IResult<&str, StmtExpr> {
         identifier_string(input)?
     };
 
-    if id_str.starts_with("cs.") {
-        let parts: Vec<&str> = id_str.split('.').collect();
-        if parts.len() == 3 {
-            return Ok((
-                input,
-                StmtExpr::CsRef {
-                    component: parts[1].to_string(),
-                    instrument_or_total: parts[2].to_string(),
-                },
-            ));
-        }
-        return Err(nom::Err::Failure(nom::error::Error::new(
-            input,
-            nom::error::ErrorKind::Verify,
-        )));
+    if let Some(reference) = id_str.strip_prefix("cs.") {
+        // `cs.<component>.<scope>`; the scope may itself be `total.<CCY>`.
+        let typed = reference
+            .split_once('.')
+            .ok_or_else(|| {
+                Error::formula_parse(format!(
+                    "'{id_str}' is not a capital-structure reference; use \
+                     cs.<component>.<instrument, total or total.CCY>"
+                ))
+            })
+            .and_then(|(component, scope)| Ok((component.parse()?, scope.parse()?)));
+        return match typed {
+            Ok((component, scope)) => Ok((input, StmtExpr::CsRef { component, scope })),
+            Err(error) => {
+                CS_ERROR.with(|slot| *slot.borrow_mut() = Some(error));
+                Err(nom::Err::Failure(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Verify,
+                )))
+            }
+        };
     }
 
     Ok((input, StmtExpr::NodeRef(NodeId::from(id_str.as_str()))))
@@ -386,6 +400,8 @@ fn cs_identifier_string(input: &str) -> IResult<&str, String> {
             take_while1(|c: char| c.is_alphanumeric() || c == '_'),
             char('.'),
             take_while1(|c: char| c.is_alphanumeric() || c == '_' || c == '-'),
+            // `total.<CCY>` selects one native currency's total.
+            opt((char('.'), take_while1(|c: char| c.is_ascii_alphabetic()))),
         )),
         |s: &str| s.to_string(),
     )

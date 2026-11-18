@@ -756,15 +756,13 @@ export type D_8Ef975540682A003034E =
  */
 export type D_1C91Cbdbb3238Adf0C02 = number;
 /**
- * Provider-selection purpose of a point-date FX query (record
- * CORE-CONVENTIONS-013 #1/#2).
+ * How capital-structure totals are converted into the reporting currency.
  *
- * The policy tells a provider which source purpose the rate serves; it does
- * not calculate dates or choose spot versus forward. There is no default:
- * every query names its policy. Period averages are not point queries; an
- * owner that needs one computes the oriented aggregate itself.
+ * Period-close conversion is the only supported policy. It must still be
+ * chosen explicitly before instruments of more than one currency are
+ * consolidated.
  */
-export type D_97Ce4Fbfee051Bc20729 = "cashflow_date" | "period_end";
+export type D_930Fc8236360A9964431 = "period_end";
 /**
  * One elected deduction from, or credit to, the excess-cash-flow measure.
  */
@@ -1095,11 +1093,11 @@ export interface DA11E44827Cd25F39A3A2 {
   /**
    * Optional FX conversion policy override.
    *
-   * When omitted, `cs.*` cash items and balances convert on the inclusive
-   * period-end date (`FxConversionPolicy::PeriodEnd`). Conversion applies to
-   * the already-aggregated period bucket, not per contractual cashflow date.
+   * Required to consolidate instruments of more than one currency: there
+   * is no default. `period_end` converts each period's native-currency
+   * totals on the inclusive period-close date.
    */
-  fx_policy?: D_97Ce4Fbfee051Bc20729 | null;
+  fx_policy?: D_930Fc8236360A9964431 | null;
   /**
    * Additional metadata
    */

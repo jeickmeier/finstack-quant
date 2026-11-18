@@ -253,11 +253,7 @@ pub(crate) fn evaluate_value(
         ExprNode::CsRef {
             component,
             instrument_or_total,
-        } => map_err_with_node(
-            context.get_cs_value(component, instrument_or_total),
-            node_id,
-        )
-        .map(Value::from_float),
+        } => map_err_with_node(context.get_cs(component, instrument_or_total), node_id),
         ExprNode::Column(name) => map_err_with_node(context.get_operand(name), node_id),
         ExprNode::Call(func, args) => {
             crate::evaluator::formula_dispatch::evaluate_function(func, args, context, node_id)

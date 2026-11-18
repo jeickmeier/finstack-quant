@@ -32,6 +32,9 @@ pub enum UnavailableReason {
     /// A correlated forecast needs the shocks of a peer whose forecast was
     /// itself unavailable on the path.
     MissingPeerShock,
+    /// A consolidated capital-structure value needs a period-close FX quote
+    /// that the market does not hold. Native-currency values are unaffected.
+    MissingFxQuote,
 }
 
 impl UnavailableReason {
@@ -45,6 +48,7 @@ impl UnavailableReason {
             Self::UndefinedBase => "undefined_base",
             Self::MissingForecastBase => "missing_forecast_base",
             Self::MissingPeerShock => "missing_peer_shock",
+            Self::MissingFxQuote => "missing_fx_quote",
         }
     }
 }

@@ -6658,6 +6658,12 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DateWire"
   },
   {
+    "path": "#/$defs/d_930fc8236360a9964431",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CapitalFxPolicy",
+    "const": "period_end",
+    "description": "How capital-structure totals are converted into the reporting currency.\n\nPeriod-close conversion is the only supported policy. It must still be\nchosen explicitly before instruments of more than one currency are\nconsolidated."
+  },
+  {
     "path": "#/$defs/d_9699cb3c9e4a8e981880",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec",
     "description": "A forecast method with its typed parameters.\n\nSerializes as `{ \"method\": ..., \"params\": { ... } }`. `params` may be\nomitted when the method needs none."
@@ -6837,23 +6843,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ForecastSpec/oneOf/9/properties/params",
     "ref": "#/$defs/BootstrapParams",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/BootstrapParams"
-  },
-  {
-    "path": "#/$defs/d_97ce4fbfee051bc20729",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FxConversionPolicy",
-    "description": "Provider-selection purpose of a point-date FX query (record\nCORE-CONVENTIONS-013 #1/#2).\n\nThe policy tells a provider which source purpose the rate serves; it does\nnot calculate dates or choose spot versus forward. There is no default:\nevery query names its policy. Period averages are not point queries; an\nowner that needs one computes the oriented aggregate itself."
-  },
-  {
-    "path": "#/$defs/d_97ce4fbfee051bc20729/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FxConversionPolicy/oneOf/0",
-    "const": "cashflow_date",
-    "description": "The rate applicable on a cashflow's own date."
-  },
-  {
-    "path": "#/$defs/d_97ce4fbfee051bc20729/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FxConversionPolicy/oneOf/1",
-    "const": "period_end",
-    "description": "The rate applicable on a reporting period's closing date."
   },
   {
     "path": "#/$defs/d_97dd811122ea3d1453e9",
@@ -7138,13 +7127,13 @@ export default [
   {
     "path": "#/$defs/d_a11e44827cd25f39a3a2/properties/fx_policy",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CapitalStructureSpec/properties/fx_policy",
-    "description": "Optional FX conversion policy override.\n\nWhen omitted, `cs.*` cash items and balances convert on the inclusive\nperiod-end date (`FxConversionPolicy::PeriodEnd`). Conversion applies to\nthe already-aggregated period bucket, not per contractual cashflow date."
+    "description": "Optional FX conversion policy override.\n\nRequired to consolidate instruments of more than one currency: there\nis no default. `period_end` converts each period's native-currency\ntotals on the inclusive period-close date."
   },
   {
     "path": "#/$defs/d_a11e44827cd25f39a3a2/properties/fx_policy/anyOf/0",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CapitalStructureSpec/properties/fx_policy/anyOf/0",
-    "ref": "#/$defs/FxConversionPolicy",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/FxConversionPolicy"
+    "ref": "#/$defs/CapitalFxPolicy",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CapitalFxPolicy"
   },
   {
     "path": "#/$defs/d_a11e44827cd25f39a3a2/properties/fx_policy/anyOf/1",

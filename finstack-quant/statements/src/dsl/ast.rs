@@ -57,15 +57,15 @@ pub enum StmtExpr {
         else_expr: Box<StmtExpr>,
     },
 
-    /// Capital structure reference (e.g., cs.interest_expense.total)
-    ///
-    /// Keeps the component/instrument tokens separate so the compiler can
-    /// rewrite them into encoded column names understood by the evaluator.
+    /// Capital structure reference: `cs.<component>.<scope>`, for example
+    /// `cs.interest_expense.total`, `cs.debt_balance.TL-A` or
+    /// `cs.debt_balance.total.EUR`.
     CsRef {
-        /// Component (interest_expense, principal_payment, debt_balance)
-        component: String,
-        /// Instrument ID or "total" for aggregate
-        instrument_or_total: String,
+        /// The reported amount read.
+        component: crate::capital_structure::CsComponent,
+        /// Whose amount it is: one instrument, one native currency's total
+        /// or the consolidated total.
+        scope: crate::capital_structure::CsScope,
     },
 }
 
@@ -174,10 +174,7 @@ impl std::fmt::Display for StmtExpr {
                 then_expr,
                 else_expr,
             } => write!(f, "if({condition}, {then_expr}, {else_expr})"),
-            Self::CsRef {
-                component,
-                instrument_or_total,
-            } => write!(f, "cs.{component}.{instrument_or_total}"),
+            Self::CsRef { component, scope } => write!(f, "cs.{component}.{scope}"),
         }
     }
 }

@@ -98,13 +98,9 @@ pub(crate) fn collect_identifiers_from_ast(
         StmtExpr::NodeRef(name) => {
             identifiers.insert(name.as_str().to_string());
         }
-        StmtExpr::CsRef {
-            component,
-            instrument_or_total,
-        } => {
+        StmtExpr::CsRef { component, scope } => {
             // Encode cs.* references in the same format as the evaluator
-            let encoded = format!("cs.{}.{}", component, instrument_or_total);
-            identifiers.insert(encoded);
+            identifiers.insert(format!("cs.{component}.{scope}"));
         }
         StmtExpr::BinOp { left, right, .. } => {
             collect_identifiers_from_ast(left, identifiers, ignore_lag);

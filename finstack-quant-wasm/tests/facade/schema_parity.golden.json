@@ -2333,14 +2333,14 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/dated_cell.schema.json",
             "type_name": "DatedCell",
             "kind": "output",
-            "bytes": 28114
+            "bytes": 28369
           },
           {
             "path": "schemas/statements/1/financial_model_spec.schema.json",
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 418305
+            "bytes": 417819
           },
           {
             "path": "schemas/statements/1/forecast_method.schema.json",
@@ -2396,7 +2396,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
             "type_name": "NormalizationResult",
             "kind": "output",
-            "bytes": 29486
+            "bytes": 29741
           },
           {
             "path": "schemas/statements/1/pricing_flow_selection.schema.json",
@@ -2417,7 +2417,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 104773
+            "bytes": 107012
           }
         ]
       },
@@ -2460,6 +2460,7 @@
           "CallPutSchedule",
           "CapFloor",
           "CapFloorVolType",
+          "CapitalFxPolicy",
           "CapitalStructureSpec",
           "CashFlow",
           "CashFlowAccrual",
@@ -2524,7 +2525,6 @@
           "ForecastFadeShape",
           "ForecastSpec",
           "ForecastTrendMethod",
-          "FxConversionPolicy",
           "GrowthPctParams",
           "Id",
           "ImMethodology",
@@ -2671,6 +2671,7 @@
           "CallPutSchedule",
           "CapFloor",
           "CapFloorVolType",
+          "CapitalFxPolicy",
           "CapitalStructureSpec",
           "CashFlow",
           "CashFlowAccrual",
@@ -2735,7 +2736,6 @@
           "ForecastFadeShape",
           "ForecastSpec",
           "ForecastTrendMethod",
-          "FxConversionPolicy",
           "GrowthPctParams",
           "Id",
           "ImMethodology",
@@ -5158,7 +5158,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/dated_cell.schema.json",
             "type_name": "DatedCell",
             "kind": "output",
-            "bytes": 28114
+            "bytes": 28369
           },
           {
             "domain": "statements",
@@ -5166,7 +5166,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 418305
+            "bytes": 417819
           },
           {
             "domain": "statements",
@@ -5230,7 +5230,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/normalization_result.schema.json",
             "type_name": "NormalizationResult",
             "kind": "output",
-            "bytes": 29486
+            "bytes": 29741
           },
           {
             "domain": "statements",
@@ -5254,7 +5254,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/statement_result.schema.json",
             "type_name": "StatementResult",
             "kind": "output",
-            "bytes": 104773
+            "bytes": 107012
           },
           {
             "domain": "valuations",

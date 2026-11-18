@@ -568,19 +568,18 @@ impl JsModelBuilder {
         Ok(())
     }
 
-    /// Set the FX conversion policy for capital-structure cashflows.
+    /// Choose how capital-structure totals are consolidated across currencies.
     ///
     /// Twin of Python `ModelBuilder.fx_policy` (Rust `ModelBuilder::fx_policy`).
     ///
-    /// @param policy - `"cashflow_date"` or `"period_end"`.
+    /// @param policy - `"period_end"`, the only policy: each period's native-currency totals convert at the rate of the inclusive period-close date. It must be set before instruments of more than one currency are consolidated; there is no default.
     /// @throws Error with kind `validation` if `policy` is not a known policy or the builder was consumed.
     #[wasm_bindgen(js_name = fxPolicy)]
     pub fn fx_policy(
         &mut self,
-        #[wasm_bindgen(unchecked_param_type = "'cashflow_date' | 'period_end'")] policy: JsValue,
+        #[wasm_bindgen(unchecked_param_type = "'period_end'")] policy: JsValue,
     ) -> Result<(), JsValue> {
-        let policy: finstack_quant_core::money::fx::FxConversionPolicy =
-            js_wire(&policy, "policy")?;
+        let policy: finstack_quant_statements::types::CapitalFxPolicy = js_wire(&policy, "policy")?;
         self.builder_mut()?.fx_policy(policy);
         Ok(())
     }

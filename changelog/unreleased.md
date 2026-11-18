@@ -1317,6 +1317,46 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements capital: typed `cs` selectors, three reporting scopes and period-close FX with provenance
+
+Breaking, with no compatibility path (STATEMENTS-CAPITAL-009,
+STATEMENTS-CONTRACTS-004, STATEMENTS-CONTRACTS-005).
+
+- A capital reference has three exact scopes: `cs.<component>.<instrument_id>`
+  (the instrument's native currency), `cs.<component>.total.<CCY>` (the total
+  of the instruments in one native currency, new) and `cs.<component>.total`
+  (the consolidated total in the reporting currency). `total` is reserved and
+  cannot be an instrument id.
+- New components: `net_interest_expense_cash`, `scheduled_principal`,
+  `mandatory_prepayment`, `voluntary_prepayment`, `sweep_prepayment` and
+  `opening_balance`.
+- An unknown component or a malformed scope fails when the formula is parsed.
+  An unknown instrument, a native currency no instrument uses, a consolidated
+  total with instruments in more than one currency and no reporting currency,
+  and any `cs` reference in a model without a capital structure fail when the
+  model is built (they failed at evaluation, or resolved to an unknown unit).
+- A `cs` reference evaluates to exact money in the scope's currency.
+- `capital_structure.fx_policy` accepts only `period_end`; `cashflow_date` is
+  removed. A model whose instruments differ from its reporting currency must
+  set it: there is no default.
+- Each native total converts at one rate read on the inclusive period-close
+  date. `CapitalStructureCashflows.fx_conversions` records the pair, rate,
+  date and source per period.
+- A missing quote or FX matrix no longer fails the run. The period's
+  consolidated total is unavailable (`consolidation_unavailable` gives the
+  reason), a formula reading it gets an unavailable cell with the new reason
+  `missing_fx_quote`, and per-instrument and native-currency values stay.
+- `CapitalStructureCashflows::set_period` replaces a period as a whole, clears
+  rows the replacement omits, returns an error for a conflicting reporting
+  currency and keeps periods in chronological order.
+- Rust: `CsComponent`, `CsScope`, `FxConversionRecord`,
+  `CapitalStructureCashflows::get_money` and `types::CapitalFxPolicy`;
+  `StmtExpr::CsRef` holds `{component, scope}`; `ModelBuilder::fx_policy`
+  takes `CapitalFxPolicy`.
+- Python: `CapitalStructureCashflows.fx_conversions` and
+  `consolidation_unavailable`; `get_component` accepts the new scopes and
+  components.
+
 ### Statements capital: PIK is elected per loan and applied by the loan's coupon terms
 
 Breaking, with no compatibility path (STATEMENTS-CAPITAL-008).

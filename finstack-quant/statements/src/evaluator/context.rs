@@ -309,6 +309,32 @@ impl EvaluationContext {
         cs_cashflows.get_component(component, instrument_or_total, &self.period_id)
     }
 
+    /// The typed value of a `cs.<component>.<scope>` reference this period.
+    ///
+    /// An exact amount in the scope's currency. A consolidated value whose
+    /// period could not be consolidated (a missing period-close FX quote, or
+    /// no reporting currency) is unavailable; native values still resolve.
+    pub(crate) fn get_cs(&self, component: &str, scope: &str) -> Result<super::value::Value> {
+        use crate::capital_structure::CsScope;
+        let cs_cashflows = self
+            .capital_structure_cashflows
+            .as_ref()
+            .ok_or_else(|| Error::capital_structure("No capital structure defined in model"))?;
+        let scope: CsScope = scope.parse()?;
+        if scope == CsScope::Consolidated
+            && cs_cashflows
+                .consolidation_unavailable
+                .contains_key(&self.period_id)
+        {
+            return Ok(super::value::Value::Unavailable(
+                super::UnavailableReason::MissingFxQuote,
+            ));
+        }
+        cs_cashflows
+            .get_money(component.parse()?, &scope, &self.period_id)
+            .map(super::value::Value::Money)
+    }
+
     /// Record which evaluation layer produced the current-period value of
     /// `node_id`. Unknown nodes are ignored: `set_value` has already rejected
     /// them by the time the evaluator records a source.

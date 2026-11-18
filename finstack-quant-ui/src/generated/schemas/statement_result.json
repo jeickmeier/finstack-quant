@@ -898,6 +898,11 @@
           "const": "missing_peer_shock",
           "description": "A correlated forecast needs the shocks of a peer whose forecast was\nitself unavailable on the path.",
           "type": "string"
+        },
+        {
+          "const": "missing_fx_quote",
+          "description": "A consolidated capital-structure value needs a period-close FX quote\nthat the market does not hold. Native-currency values are unaffected.",
+          "type": "string"
         }
       ]
     },
@@ -2265,6 +2270,41 @@
         }
       ]
     },
+    "d_c1b4ba8405b0bd5bf8d6": {
+      "additionalProperties": false,
+      "description": "One FX conversion applied to consolidate capital-structure totals.",
+      "properties": {
+        "date": {
+          "$ref": "#/$defs/d_11c7dbc9fa7cb6ce298a",
+          "description": "Inclusive period-close date the rate was read on."
+        },
+        "from": {
+          "$ref": "#/$defs/d_9e50e1b9698ebe0e1126",
+          "description": "Native currency converted from."
+        },
+        "rate": {
+          "description": "Units of `to` per unit of `from` (1.20 converts EUR 1 to USD 1.20).",
+          "format": "double",
+          "type": "number"
+        },
+        "source": {
+          "description": "How the rate was obtained: `direct` for a quoted pair, `triangulated`\nwhen it was built through the FX matrix's pivot currency.",
+          "type": "string"
+        },
+        "to": {
+          "$ref": "#/$defs/d_9e50e1b9698ebe0e1126",
+          "description": "Reporting currency converted to."
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "rate",
+        "date",
+        "source"
+      ],
+      "type": "object"
+    },
     "d_c44e4163513f1741db76": {
       "additionalProperties": false,
       "description": "Configuration for fiscal year periods.\n\nAlways holds a start month in `1..=12` and a start day in `1..=31`;\ndeserialization applies the same validation as [`FiscalConfig::new`].",
@@ -2717,6 +2757,13 @@
           "description": "Map of instrument_id → (period_id → cashflow_type → amount)",
           "type": "object"
         },
+        "consolidation_unavailable": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Why a period has no consolidated `totals`, when consolidation was\nrequested and could not be completed (for example a missing FX quote).\nPer-instrument and native-currency values of the period are\nunaffected.",
+          "type": "object"
+        },
         "distress_cash": {
           "additionalProperties": {
             "items": {
@@ -2732,6 +2779,16 @@
             "$ref": "#/$defs/d_1b5716dde9957a614f3c"
           },
           "description": "Residual cash distributed to equity per period: the cash left after\nfees, interest and principal when `Equity` is the waterfall's terminal\npriority, and zero when it is not.\n\nOnly populated for periods in which a waterfall ran. With the\nper-period allocations,\n`fees + cash interest + principal + equity + retained == available cash`\nexactly.",
+          "type": "object"
+        },
+        "fx_conversions": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/d_c1b4ba8405b0bd5bf8d6"
+            },
+            "type": "array"
+          },
+          "description": "Every FX conversion applied to form the consolidated `totals`, by\nperiod: the currency pair, the rate, the date it was read on and how\nit was obtained. Empty when every instrument is in the reporting\ncurrency.",
           "type": "object"
         },
         "prepayments": {

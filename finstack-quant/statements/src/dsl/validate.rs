@@ -9,7 +9,7 @@
 use crate::dsl::ast::StmtExpr;
 use crate::dsl::parser::MAX_FORMULA_TERMS;
 use crate::dsl::signatures::is_valid_identifier;
-use crate::dsl::signatures::{CS_COMPONENTS, FUNCTION_SIGNATURES, FunctionSignature};
+use crate::dsl::signatures::{FUNCTION_SIGNATURES, FunctionSignature};
 use crate::error::{Error, Result};
 use finstack_quant_core::expr::UnaryOp;
 
@@ -55,10 +55,9 @@ pub(crate) fn validate_ast(root: &StmtExpr) -> Result<()> {
                 }
             }
             StmtExpr::NodeRef(id) => validate_node_reference(id.as_str())?,
-            StmtExpr::CsRef {
-                component,
-                instrument_or_total,
-            } => validate_cs_reference(component, instrument_or_total)?,
+            // A capital reference is typed: its component and scope were
+            // checked when it was built.
+            StmtExpr::CsRef { .. } => {}
             StmtExpr::Call { func, args } => {
                 validate_call(func, args)?;
                 pending.extend(args.iter().map(|arg| (arg, depth + 1)));
@@ -94,27 +93,7 @@ fn validate_node_reference(id: &str) -> Result<()> {
     if id.starts_with("cs.") {
         return Err(Error::formula_parse(format!(
             "'{id}' is in the reserved capital-structure namespace; \
-             use the form cs.<component>.<instrument or total>"
-        )));
-    }
-    Ok(())
-}
-
-fn validate_cs_reference(component: &str, target: &str) -> Result<()> {
-    if !CS_COMPONENTS.contains(&component) {
-        return Err(Error::eval(format!(
-            "Unknown capital structure component: '{component}'. Valid components: {}",
-            CS_COMPONENTS.join(", ")
-        )));
-    }
-    let valid_target = !target.is_empty()
-        && target
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '_' || c == '-');
-    if !valid_target {
-        return Err(Error::formula_parse(format!(
-            "invalid capital-structure target '{target}' in cs.{component}: \
-             use letters, digits, underscores and hyphens"
+             use the form cs.<component>.<instrument, total or total.CCY>"
         )));
     }
     Ok(())

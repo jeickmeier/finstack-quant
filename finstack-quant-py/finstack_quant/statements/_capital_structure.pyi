@@ -913,6 +913,48 @@ class CapitalStructureCashflows:
         ...
 
     @property
+    def fx_conversions(self) -> dict[str, list[dict[str, Any]]]:
+        """
+        FX conversions applied to consolidate each period's totals.
+
+        Returns
+        -------
+        dict[str, list[dict[str, Any]]]
+            Period id to its conversions, each ``{"from": currency code,
+            "to": currency code, "rate": float, "date": ISO date, "source":
+            "direct" | "triangulated"}``. ``rate`` is units of ``to`` per unit
+            of ``from`` on the inclusive period-close ``date``. Empty when
+            every instrument is in the reporting currency.
+
+        Raises
+        ------
+        ValueError
+            If the stored records cannot be serialized.
+        """
+        ...
+
+    @property
+    def consolidation_unavailable(self) -> dict[str, str]:
+        """
+        Why a period has no consolidated total, by period id.
+
+        Returns
+        -------
+        dict[str, str]
+            Period id to the reason consolidation could not be completed, for
+            example a missing period-close FX quote or no reporting currency
+            for instruments in more than one currency. Per-instrument and
+            native-currency values of those periods are unaffected. Empty when
+            every period consolidated.
+
+        Raises
+        ------
+        ValueError
+            If the stored reasons cannot be serialized.
+        """
+        ...
+
+    @property
     def prepayments(self) -> dict[str, list[dict[str, Any]]]:
         """
         What each prepayment requested, paid and left unpaid, by period id.
@@ -997,43 +1039,48 @@ class CapitalStructureCashflows:
         ...
 
     def get_component(self, component: str, instrument_or_total: str, period_id: str) -> float:
-        """Read a capital-structure component for an instrument or reporting total.
+        """Read one reported capital-structure amount for a scope and period.
 
         Parameters
         ----------
         component : str
             One of ``interest_expense`` (cash plus PIK), ``interest_expense_cash``,
-            ``interest_expense_pik``, ``interest_income``, ``principal_payment``,
-            ``debt_balance``, ``fees``, ``accrued_interest`` (cash interest earned
-            and not yet due), ``interest_arrears`` (cash interest due and
-            unpaid), ``principal_pending`` (principal cash owed and not yet
-            due), ``principal_arrears`` (principal cash due and unpaid) or
-            ``principal_advance_reserve`` (face paid for and not yet
-            reduced). Flows are positive payment or receipt magnitudes; debt
-            balance is closing economic principal on the contract's effective
-            dates, whether or not the cash was paid.
-            Rate hedges have zero debt balance and debt accrued interest.
+            ``interest_expense_pik``, ``interest_income``,
+            ``net_interest_expense_cash`` (cash expense less cash income),
+            ``principal_payment`` and its parts ``scheduled_principal``,
+            ``mandatory_prepayment``, ``voluntary_prepayment`` and
+            ``sweep_prepayment``, ``fees``, ``opening_balance``,
+            ``debt_balance``, ``accrued_interest`` (cash interest earned and
+            not yet due), ``interest_arrears`` (cash interest due and unpaid),
+            ``principal_pending`` (principal cash owed and not yet due),
+            ``principal_arrears`` (principal cash due and unpaid) or
+            ``principal_advance_reserve`` (face paid for and not yet reduced).
+            Flows are positive payment or receipt magnitudes; balances are
+            period-close economic principal on the contract's effective dates.
         instrument_or_total : str
-            Instrument identifier for a native-currency amount, or ``"total"``
-            for the reporting-currency aggregate. No FX conversion is performed
-            by this accessor.
+            The scope: an instrument identifier for its native-currency
+            amount, ``"total"`` for the consolidated total in the reporting
+            currency, or ``"total.<CCY>"`` (for example ``"total.EUR"``) for
+            the total of the instruments in one native currency. No FX
+            conversion is performed by this accessor.
         period_id : str
             Reporting-period label such as ``"2025Q1"`` present in the result.
 
         Returns
         -------
         float
-            Requested component in major units of the selected currency.
-            Absent optional interest income is zero.
+            The amount in major units of the scope's currency. Absent optional
+            interest income is zero.
 
         Raises
         ------
         ValueError
             If ``period_id`` is not a valid reporting-period label.
         RuntimeError
-            If the component, instrument, or period is unknown, reporting totals
-            are unavailable for multiple currencies, or cash and PIK currencies
-            differ when requesting total interest expense.
+            If the component or scope is unknown or malformed, the scope has
+            no data for the period (including a consolidated total that could
+            not be formed, with the reason), or the breakdown does not record
+            the component: an unknown amount is never read as zero.
         """
         ...
 

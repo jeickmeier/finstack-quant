@@ -6282,6 +6282,11 @@
       ],
       "type": "object"
     },
+    "d_930fc8236360a9964431": {
+      "const": "period_end",
+      "description": "How capital-structure totals are converted into the reporting currency.\n\nPeriod-close conversion is the only supported policy. It must still be\nchosen explicitly before instruments of more than one currency are\nconsolidated.",
+      "type": "string"
+    },
     "d_9699cb3c9e4a8e981880": {
       "description": "A forecast method with its typed parameters.\n\nSerializes as `{ \"method\": ..., \"params\": { ... } }`. `params` may be\nomitted when the method needs none.",
       "oneOf": [
@@ -6470,21 +6475,6 @@
             "params"
           ],
           "type": "object"
-        }
-      ]
-    },
-    "d_97ce4fbfee051bc20729": {
-      "description": "Provider-selection purpose of a point-date FX query (record\nCORE-CONVENTIONS-013 #1/#2).\n\nThe policy tells a provider which source purpose the rate serves; it does\nnot calculate dates or choose spot versus forward. There is no default:\nevery query names its policy. Period averages are not point queries; an\nowner that needs one computes the oriented aggregate itself.",
-      "oneOf": [
-        {
-          "const": "cashflow_date",
-          "description": "The rate applicable on a cashflow's own date.",
-          "type": "string"
-        },
-        {
-          "const": "period_end",
-          "description": "The rate applicable on a reporting period's closing date.",
-          "type": "string"
         }
       ]
     },
@@ -6781,13 +6771,13 @@
         "fx_policy": {
           "anyOf": [
             {
-              "$ref": "#/$defs/d_97ce4fbfee051bc20729"
+              "$ref": "#/$defs/d_930fc8236360a9964431"
             },
             {
               "type": "null"
             }
           ],
-          "description": "Optional FX conversion policy override.\n\nWhen omitted, `cs.*` cash items and balances convert on the inclusive\nperiod-end date (`FxConversionPolicy::PeriodEnd`). Conversion applies to\nthe already-aggregated period bucket, not per contractual cashflow date."
+          "description": "Optional FX conversion policy override.\n\nRequired to consolidate instruments of more than one currency: there\nis no default. `period_end` converts each period's native-currency\ntotals on the inclusive period-close date."
         },
         "meta": {
           "additionalProperties": true,
