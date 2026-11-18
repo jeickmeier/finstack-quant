@@ -631,59 +631,112 @@ impl WaterfallSpec {
     }
 }
 
-/// PIK toggle specification.
+/// PIK toggle: the modeled exercise of a borrower's PIK election.
 ///
-/// Defines conditions for switching between cash and PIK interest modes.
+/// In each forecast period the liquidity metric is compared with the
+/// threshold. A metric below the threshold requests PIK and a metric at or
+/// above it requests the loan's base coupon terms. The request takes effect
+/// at the start of each listed loan's next coupon period after the period
+/// close, never on a coupon already running, and is applied through the
+/// loan's own coupon terms: the elected share of each covered coupon is zero
+/// cash and capitalizes once, on the coupon date. Overdue cash interest and
+/// fees stay cash claims and are never capitalized by an election.
 ///
-/// # Hysteresis
+/// Actual periods are not exercised: record a historical election on the
+/// loan itself (`covenants.pik_toggles`).
 ///
-/// Set `min_periods_in_pik` to prevent oscillation when the liquidity metric
-/// hovers near the threshold. Once PIK is triggered, it stays active for at
-/// least that many periods before it can switch back.
-///
-/// Thresholds use the same scalar units as the referenced `liquidity_metric`.
+/// The threshold is in the units of `liquidity_metric`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PikToggleSpec {
-    /// Node reference or formula for liquidity metric (e.g., "cash_balance" or "ebitda / interest_expense")
+    /// Node reference or formula for the liquidity metric (for example
+    /// `"cash_balance"` or `"ebitda / interest_expense"`). It must evaluate to
+    /// a finite number in every forecast period.
     pub liquidity_metric: String,
 
-    /// Threshold value: if metric < threshold, enable PIK; otherwise use cash
+    /// Finite threshold in the metric's units: a metric below it requests
+    /// PIK, a metric at or above it requests the base coupon terms.
     pub threshold: f64,
 
-    /// Borrowing debt IDs whose cash coupons capitalize when the toggle triggers.
-    ///
-    /// Must be a non-empty list: instrument-level PIK capability is not
-    /// modeled, so an empty list is rejected by [`PikToggleSpec::validate`]
-    /// rather than meaning "every instrument".
-    /// Swaps and options cannot be PIK targets.
+    /// The loans authorized to elect PIK, one entry each. Must not be empty.
     #[cfg_attr(feature = "json-schema", schemars(length(min = 1)))]
-    pub target_instrument_ids: Vec<String>,
+    pub elections: Vec<PikElectionSpec>,
+}
 
-    /// Minimum number of periods PIK must stay active once triggered (hysteresis).
-    /// Prevents oscillation when the metric hovers near the threshold.
-    /// Default: 0 (no hysteresis, PIK can toggle every period).
+/// One loan's PIK authorization under a [`PikToggleSpec`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct PikElectionSpec {
+    /// Term loan authorized to elect PIK.
+    pub instrument_id: String,
+
+    /// Share of each elected coupon that capitalizes, a decimal in `(0, 1]`
+    /// (`0.4` capitalizes 40% and pays 60% in cash; `1` is full PIK).
+    #[serde(with = "finstack_quant_core::wire::decimal")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DecimalWire")
+    )]
+    pub pik_fraction: rust_decimal::Decimal,
+
+    /// Minimum number of consecutive coupon periods a PIK election lasts,
+    /// counting the first elected period. `0` and `1` let the election end
+    /// after one coupon period.
     #[serde(default)]
-    pub min_periods_in_pik: usize,
+    pub min_coupon_periods: usize,
 }
 
 impl PikToggleSpec {
     /// Validate the toggle on its own.
     ///
-    /// `target_instrument_ids` must list at least one instrument explicitly.
     /// [`WaterfallSpec::validate`] calls this for a configured `pik_toggle`.
     ///
     /// # Errors
     ///
-    /// Returns a build error when `target_instrument_ids` is empty.
+    /// Returns a build error when the threshold is not finite, the metric is
+    /// empty, no election is listed, a loan is listed twice or with an empty
+    /// id, or a `pik_fraction` is outside `(0, 1]`.
     pub fn validate(&self) -> Result<()> {
-        if self.target_instrument_ids.is_empty() {
+        if !self.threshold.is_finite() {
+            return Err(Error::build(format!(
+                "PikToggleSpec: `threshold` must be finite, got {}",
+                self.threshold
+            )));
+        }
+        if self.liquidity_metric.trim().is_empty() {
             return Err(Error::build(
-                "PikToggleSpec: `target_instrument_ids` must explicitly list the \
-                 instruments that can PIK. Instrument-level PIK capability is not \
-                 modeled yet, so implicit all-instrument PIK targets are rejected.",
+                "PikToggleSpec: `liquidity_metric` must name a node or formula",
             ));
+        }
+        if self.elections.is_empty() {
+            return Err(Error::build(
+                "PikToggleSpec: `elections` must list each loan authorized to elect PIK; an \
+                 election is never implied for every instrument.",
+            ));
+        }
+        let mut seen = std::collections::HashSet::new();
+        for election in &self.elections {
+            if election.instrument_id.trim().is_empty() {
+                return Err(Error::build(
+                    "PikToggleSpec: an election has an empty `instrument_id`",
+                ));
+            }
+            if !seen.insert(election.instrument_id.as_str()) {
+                return Err(Error::build(format!(
+                    "PikToggleSpec: `elections` lists '{}' more than once",
+                    election.instrument_id
+                )));
+            }
+            if election.pik_fraction <= rust_decimal::Decimal::ZERO
+                || election.pik_fraction > rust_decimal::Decimal::ONE
+            {
+                return Err(Error::build(format!(
+                    "PikToggleSpec: `pik_fraction` for '{}' must be in (0, 1], got {}",
+                    election.instrument_id, election.pik_fraction
+                )));
+            }
         }
         Ok(())
     }
@@ -802,21 +855,32 @@ mod tests {
         assert!(err.to_string().contains("must be the last entry"));
     }
 
+    fn pik(elections: Vec<PikElectionSpec>) -> PikToggleSpec {
+        PikToggleSpec {
+            liquidity_metric: "liquidity".into(),
+            threshold: 100.0,
+            elections,
+        }
+    }
+
+    fn election(id: &str, fraction: rust_decimal::Decimal) -> PikElectionSpec {
+        PikElectionSpec {
+            instrument_id: id.into(),
+            pik_fraction: fraction,
+            min_coupon_periods: 0,
+        }
+    }
+
     #[test]
-    fn validate_rejects_implicit_pik_targets() {
+    fn validate_rejects_a_toggle_without_elections() {
         let spec = WaterfallSpec {
-            pik_toggle: Some(PikToggleSpec {
-                liquidity_metric: "liquidity".into(),
-                threshold: 100.0,
-                target_instrument_ids: Vec::new(),
-                min_periods_in_pik: 0,
-            }),
+            pik_toggle: Some(pik(Vec::new())),
             ..spec_with(default_priority_of_payments())
         };
         let err = spec
             .validate()
-            .expect_err("implicit PIK targets must be rejected");
-        assert!(err.to_string().contains("target_instrument_ids"));
+            .expect_err("an implied election must be rejected");
+        assert!(err.to_string().contains("elections"));
     }
 
     /// The sweep and PIK rules run on the sub-specs alone, so a host can
@@ -832,16 +896,35 @@ mod tests {
         sweep_spec(0.0).validate().expect("zero sweep is valid");
         sweep_spec(1.0).validate().expect("full sweep is valid");
 
-        let mut pik = PikToggleSpec {
-            liquidity_metric: "liquidity".into(),
-            threshold: 100.0,
-            target_instrument_ids: Vec::new(),
-            min_periods_in_pik: 0,
-        };
-        let err = pik.validate().expect_err("empty PIK targets are rejected");
-        assert!(err.to_string().contains("target_instrument_ids"), "{err}");
-        pik.target_instrument_ids = vec!["TL-PIK".into()];
-        pik.validate().expect("explicit PIK targets are valid");
+        use rust_decimal::Decimal;
+        let err = pik(Vec::new())
+            .validate()
+            .expect_err("no election is rejected");
+        assert!(err.to_string().contains("elections"), "{err}");
+        pik(vec![election("TL-PIK", Decimal::new(4, 1))])
+            .validate()
+            .expect("an explicit election is valid");
+        // The fraction is in (0, 1], a loan is listed once and the threshold
+        // is finite.
+        for fraction in [Decimal::ZERO, Decimal::new(-1, 1), Decimal::new(11, 1)] {
+            let err = pik(vec![election("TL-PIK", fraction)])
+                .validate()
+                .expect_err("fraction outside (0, 1]");
+            assert!(err.to_string().contains("pik_fraction"), "{err}");
+        }
+        let err = pik(vec![
+            election("TL-PIK", Decimal::ONE),
+            election("TL-PIK", Decimal::ONE),
+        ])
+        .validate()
+        .expect_err("a loan listed twice");
+        assert!(err.to_string().contains("more than once"), "{err}");
+        for threshold in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut spec = pik(vec![election("TL-PIK", Decimal::ONE)]);
+            spec.threshold = threshold;
+            let err = spec.validate().expect_err("non-finite threshold");
+            assert!(err.to_string().contains("threshold"), "{err}");
+        }
     }
 
     #[test]
@@ -959,26 +1042,36 @@ mod tests {
         assert!(err.to_string().contains("duplicate payment class id"));
     }
     #[test]
-    fn pik_targets_are_required_on_the_wire_and_nonempty_when_validated() {
+    fn pik_elections_are_required_on_the_wire_and_checked_when_validated() {
         for value in [
             serde_json::json!({"liquidity_metric":"cash","threshold":1.0}),
-            serde_json::json!({"liquidity_metric":"cash","threshold":1.0,"target_instrument_ids":null}),
+            serde_json::json!({"liquidity_metric":"cash","threshold":1.0,"elections":null}),
+            // The retired shape is not read.
+            serde_json::json!({"liquidity_metric":"cash","threshold":1.0,"target_instrument_ids":["TL"]}),
+            // A threshold the wire cannot state as a finite number.
+            serde_json::json!({"liquidity_metric":"cash","threshold":"nan","elections":[]}),
+            serde_json::json!({"liquidity_metric":"cash","threshold":null,"elections":[]}),
         ] {
             assert!(serde_json::from_value::<PikToggleSpec>(value).is_err());
         }
-        let mut value = serde_json::json!({"liquidity_metric":"cash","threshold":1.0,"target_instrument_ids":[]});
+        let mut value =
+            serde_json::json!({"liquidity_metric":"cash","threshold":1.0,"elections":[]});
         assert!(
             serde_json::from_value::<PikToggleSpec>(value.clone())
                 .expect("vector parses")
                 .validate()
                 .is_err()
         );
-        value["target_instrument_ids"] = serde_json::json!(["TL"]);
-        let spec: PikToggleSpec = serde_json::from_value(value.clone()).expect("explicit targets");
-        spec.validate().expect("valid targets");
+        value["elections"] = serde_json::json!([{"instrument_id":"TL","pik_fraction":"0.4"}]);
+        let spec: PikToggleSpec = serde_json::from_value(value.clone()).expect("explicit election");
+        spec.validate().expect("valid election");
+        assert_eq!(spec.elections[0].min_coupon_periods, 0);
         assert_eq!(
-            serde_json::to_value(spec).expect("serialize")["target_instrument_ids"],
-            value["target_instrument_ids"]
+            serde_json::to_value(&spec).expect("serialize")["elections"][0]["pik_fraction"],
+            serde_json::json!("0.4")
         );
+        // An unknown field of an election is rejected.
+        value["elections"][0]["min_periods_in_pik"] = serde_json::json!(2);
+        assert!(serde_json::from_value::<PikToggleSpec>(value).is_err());
     }
 }

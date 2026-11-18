@@ -129,21 +129,14 @@ wire_methods!(PyPikToggleSpec, PikToggleSpec, "PikToggleSpec");
 impl PyPikToggleSpec {
     #[doc = pydoc!("finstack_quant.statements._capital_structure", "PikToggleSpec.__init__")]
     #[new]
-    #[pyo3(signature = (liquidity_metric, threshold, target_instrument_ids, min_periods_in_pik=0))]
-    fn new(
-        liquidity_metric: String,
-        threshold: f64,
-        target_instrument_ids: Vec<String>,
-        min_periods_in_pik: usize,
-    ) -> Self {
-        Self {
-            inner: PikToggleSpec {
-                liquidity_metric,
-                threshold,
-                target_instrument_ids,
-                min_periods_in_pik,
-            },
-        }
+    #[pyo3(
+        signature = (**fields),
+        text_signature = "(*, liquidity_metric, threshold, elections)"
+    )]
+    fn new(py: Python<'_>, fields: Option<&Bound<'_, pyo3::types::PyDict>>) -> PyResult<Self> {
+        Ok(Self {
+            inner: crate::bindings::module_utils::fields_from_py(py, fields, "PikToggleSpec")?,
+        })
     }
 
     #[doc = pydoc!("finstack_quant.statements._capital_structure", "PikToggleSpec.validate")]
@@ -163,22 +156,18 @@ impl PyPikToggleSpec {
         self.inner.threshold
     }
 
-    #[doc = pydoc!("finstack_quant.statements._capital_structure", "PikToggleSpec.target_instrument_ids")]
+    #[doc = pydoc!("finstack_quant.statements._capital_structure", "PikToggleSpec.elections")]
     #[getter]
-    fn target_instrument_ids(&self) -> Vec<String> {
-        self.inner.target_instrument_ids.clone()
-    }
-
-    #[doc = pydoc!("finstack_quant.statements._capital_structure", "PikToggleSpec.min_periods_in_pik")]
-    #[getter]
-    fn min_periods_in_pik(&self) -> usize {
-        self.inner.min_periods_in_pik
+    fn elections<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.elections)
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "PikToggleSpec(liquidity_metric={:?}, threshold={}, min_periods_in_pik={})",
-            self.inner.liquidity_metric, self.inner.threshold, self.inner.min_periods_in_pik
+            "PikToggleSpec(liquidity_metric={:?}, threshold={}, elections={})",
+            self.inner.liquidity_metric,
+            self.inner.threshold,
+            self.inner.elections.len()
         )
     }
 }

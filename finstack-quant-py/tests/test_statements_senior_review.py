@@ -208,8 +208,14 @@ def test_model_rejects_rate_hedge_as_pik_target() -> None:
         }),
     )
     builder.periods("2025..2025", None).value_scalar("cash", {"2025": 10.0})
-    builder.waterfall(s.WaterfallSpec(pik_toggle=s.PikToggleSpec("cash", 20.0, ["IRS"])))
-    with pytest.raises(ValueError, match="only borrowing debt coupons can capitalize into principal"):
+    builder.waterfall(
+        s.WaterfallSpec(
+            pik_toggle=s.PikToggleSpec(
+                liquidity_metric="cash", threshold=20.0, elections=[{"instrument_id": "IRS", "pik_fraction": "1"}]
+            )
+        )
+    )
+    with pytest.raises(ValueError, match="not a term loan"):
         builder.build()
 
 

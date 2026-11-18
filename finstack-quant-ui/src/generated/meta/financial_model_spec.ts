@@ -1455,34 +1455,28 @@ export default [
   {
     "path": "#/$defs/d_321bf35b4a9ae99f3cf3",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikToggleSpec",
-    "description": "PIK toggle specification.\n\nDefines conditions for switching between cash and PIK interest modes.\n\n# Hysteresis\n\nSet `min_periods_in_pik` to prevent oscillation when the liquidity metric\nhovers near the threshold. Once PIK is triggered, it stays active for at\nleast that many periods before it can switch back.\n\nThresholds use the same scalar units as the referenced `liquidity_metric`."
+    "description": "PIK toggle: the modeled exercise of a borrower's PIK election.\n\nIn each forecast period the liquidity metric is compared with the\nthreshold. A metric below the threshold requests PIK and a metric at or\nabove it requests the loan's base coupon terms. The request takes effect\nat the start of each listed loan's next coupon period after the period\nclose, never on a coupon already running, and is applied through the\nloan's own coupon terms: the elected share of each covered coupon is zero\ncash and capitalizes once, on the coupon date. Overdue cash interest and\nfees stay cash claims and are never capitalized by an election.\n\nActual periods are not exercised: record a historical election on the\nloan itself (`covenants.pik_toggles`).\n\nThe threshold is in the units of `liquidity_metric`."
+  },
+  {
+    "path": "#/$defs/d_321bf35b4a9ae99f3cf3/properties/elections",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikToggleSpec/properties/elections",
+    "description": "The loans authorized to elect PIK, one entry each. Must not be empty."
+  },
+  {
+    "path": "#/$defs/d_321bf35b4a9ae99f3cf3/properties/elections/items",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikToggleSpec/properties/elections/items",
+    "ref": "#/$defs/PikElectionSpec",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikElectionSpec"
   },
   {
     "path": "#/$defs/d_321bf35b4a9ae99f3cf3/properties/liquidity_metric",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikToggleSpec/properties/liquidity_metric",
-    "description": "Node reference or formula for liquidity metric (e.g., \"cash_balance\" or \"ebitda / interest_expense\")"
-  },
-  {
-    "path": "#/$defs/d_321bf35b4a9ae99f3cf3/properties/min_periods_in_pik",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikToggleSpec/properties/min_periods_in_pik",
-    "default": 0,
-    "description": "Minimum number of periods PIK must stay active once triggered (hysteresis).\nPrevents oscillation when the metric hovers near the threshold.\nDefault: 0 (no hysteresis, PIK can toggle every period).",
-    "format": "uint",
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_321bf35b4a9ae99f3cf3/properties/target_instrument_ids",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikToggleSpec/properties/target_instrument_ids",
-    "description": "Borrowing debt IDs whose cash coupons capitalize when the toggle triggers.\n\nMust be a non-empty list: instrument-level PIK capability is not\nmodeled, so an empty list is rejected by [`PikToggleSpec::validate`]\nrather than meaning \"every instrument\".\nSwaps and options cannot be PIK targets."
-  },
-  {
-    "path": "#/$defs/d_321bf35b4a9ae99f3cf3/properties/target_instrument_ids/items",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikToggleSpec/properties/target_instrument_ids/items"
+    "description": "Node reference or formula for the liquidity metric (for example\n`\"cash_balance\"` or `\"ebitda / interest_expense\"`). It must evaluate to\na finite number in every forecast period."
   },
   {
     "path": "#/$defs/d_321bf35b4a9ae99f3cf3/properties/threshold",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikToggleSpec/properties/threshold",
-    "description": "Threshold value: if metric < threshold, enable PIK; otherwise use cash",
+    "description": "Finite threshold in the metric's units: a metric below it requests\nPIK, a metric at or above it requests the base coupon terms.",
     "format": "double"
   },
   {
@@ -7512,6 +7506,31 @@ export default [
     "description": "Periods per seasonal cycle.",
     "format": "uint64",
     "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_b19f3a94967e48a6e9b7",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikElectionSpec",
+    "description": "One loan's PIK authorization under a [`PikToggleSpec`]."
+  },
+  {
+    "path": "#/$defs/d_b19f3a94967e48a6e9b7/properties/instrument_id",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikElectionSpec/properties/instrument_id",
+    "description": "Term loan authorized to elect PIK."
+  },
+  {
+    "path": "#/$defs/d_b19f3a94967e48a6e9b7/properties/min_coupon_periods",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikElectionSpec/properties/min_coupon_periods",
+    "default": 0,
+    "description": "Minimum number of consecutive coupon periods a PIK election lasts,\ncounting the first elected period. `0` and `1` let the election end\nafter one coupon period.",
+    "format": "uint",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_b19f3a94967e48a6e9b7/properties/pik_fraction",
+    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/PikElectionSpec/properties/pik_fraction",
+    "description": "Share of each elected coupon that capitalizes, a decimal in `(0, 1]`\n(`0.4` capitalizes 40% and pays 60% in cash; `1` is full PIK).",
+    "ref": "#/$defs/DecimalWire",
+    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/DecimalWire"
   },
   {
     "path": "#/$defs/d_b375e274438ab847f1fc",

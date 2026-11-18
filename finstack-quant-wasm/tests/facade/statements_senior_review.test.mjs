@@ -221,11 +221,15 @@ test('model validation rejects PIK capitalization of a swap payment', () => {
   fixture.model.capital_structure.waterfall = {
     priority_of_payments: ['fees', 'interest', 'amortization', 'equity'],
     available_cash_node: 'cash',
-    pik_toggle: { liquidity_metric: 'cash', threshold: 20, target_instrument_ids: ['IRS'] },
+    pik_toggle: {
+      liquidity_metric: 'cash',
+      threshold: 20,
+      elections: [{ instrument_id: 'IRS', pik_fraction: '1' }],
+    },
   };
   assert.throws(
     () => statements.validateFinancialModelJson(JSON.stringify(fixture.model)),
-    /only borrowing debt coupons/
+    /not a term loan/
   );
 });
 

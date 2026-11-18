@@ -333,8 +333,13 @@ fn pik_toggle_rejects_hedge_targets_and_keeps_explicit_debt_targets() {
         pik_toggle: Some(PikToggleSpec {
             liquidity_metric: "cash".into(),
             threshold: 100.0,
-            target_instrument_ids: targets,
-            min_periods_in_pik: 0,
+            elections: Vec::<String>::into_iter(targets)
+                .map(|instrument_id| crate::capital_structure::PikElectionSpec {
+                    instrument_id,
+                    pik_fraction: rust_decimal::Decimal::ONE,
+                    min_coupon_periods: 0,
+                })
+                .collect(),
         }),
         ..Default::default()
     };
@@ -360,11 +365,14 @@ fn pik_toggle_rejects_hedge_targets_and_keeps_explicit_debt_targets() {
                 .build()
                 .expect_err("hedge payments cannot become borrowing principal")
         };
-        assert!(error.to_string().contains(if !targets.is_empty() {
-            "hedge or option"
-        } else {
-            "must explicitly list"
-        }));
+        assert!(
+            error.to_string().contains(if !targets.is_empty() {
+                "not a term loan"
+            } else {
+                "must list each loan"
+            }),
+            "{error}"
+        );
     }
     {
         let mut model_builder = ModelBuilder::new("debt-pik");

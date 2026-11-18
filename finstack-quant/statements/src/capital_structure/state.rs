@@ -1,6 +1,6 @@
 //! Mutable runtime state for waterfall evaluation.
 //!
-//! [`CapitalStructureState`] tracks opening/closing balances, PIK mode, and
+//! [`CapitalStructureState`] tracks opening/closing balances, coupon elections, and
 //! dated unpaid or advance claims across periods. It is mutated by the waterfall engine during
 //! sequential evaluation and is therefore the runtime counterpart to the
 //! static [`WaterfallSpec`](super::WaterfallSpec).
@@ -14,12 +14,14 @@ use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Period;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::PrincipalPosting;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::{
+    CouponElection, PrincipalPosting,
+};
 use indexmap::IndexMap;
 
 /// Capital structure state tracking for dynamic evaluation.
 ///
-/// Maintains balances, PIK mode, and dated unpaid or advance claims across periods.
+/// Maintains balances, coupon elections, and dated unpaid or advance claims across periods.
 ///
 /// This state is mutated by the waterfall engine during sequential evaluation
 /// and is therefore the runtime counterpart to the static [`WaterfallSpec`](super::WaterfallSpec).
@@ -31,12 +33,16 @@ pub(crate) struct CapitalStructureState {
     /// Closing balances by instrument ID at the end of the current period
     pub(crate) closing_balances: IndexMap<String, Money>,
 
-    /// Current PIK mode by instrument (true = PIK enabled, false = cash)
-    pub(crate) pik_mode: IndexMap<String, bool>,
+    /// Dated coupon elections the PIK toggle has made per loan, in effective
+    /// order. The owner recompiles the schedule from its terms and this
+    /// ledger; an election's duration is counted from these dates, so a
+    /// period evaluated again changes nothing.
+    pub(crate) coupon_elections: IndexMap<String, Vec<CouponElection>>,
 
-    /// Number of consecutive periods each instrument has been in PIK mode.
-    /// Used for hysteresis: PIK stays active until `min_periods_in_pik` is met.
-    pub(crate) pik_periods_active: IndexMap<String, usize>,
+    /// The PIK toggle's request in the current period: `Some(true)` asks for
+    /// PIK, `Some(false)` for the base coupon terms. Consumed when the
+    /// schedules are rebuilt.
+    pub(crate) period_pik_request: Option<bool>,
 
     /// Unpaid interest/fee shortfall per instrument from the prior period's
     /// available-cash cap. Carried forward as a claim in the next period's
@@ -105,6 +111,7 @@ impl CapitalStructureState {
         self.opening_balances = std::mem::take(&mut self.closing_balances);
         self.period_principal_flows.clear();
         self.period_postings.clear();
+        self.period_pik_request = None;
     }
 
     /// Set dated principal claims for the current waterfall period.

@@ -9598,10 +9598,11 @@ export interface StatementsNamespace {
    *
    * # Errors
    *
-   * Rejects malformed or schema-incompatible `json`, a missing or empty
-   * `target_instrument_ids` list, or failure to serialize the validated
-   * PIK-toggle specification.
-   * @param json - Canonical JSON string defining the object to deserialize or normalize.
+   * Rejects malformed or schema-incompatible `json`, a non-finite `threshold`,
+   * a missing or empty `elections` list, a loan listed twice, a `pik_fraction`
+   * outside `(0, 1]`, or failure to serialize the validated PIK-toggle
+   * specification.
+   * @param json - Canonical JSON string for a `PikToggleSpec`: `liquidity_metric` (a node or formula), `threshold` (finite, in the metric's units; a metric below it requests PIK) and `elections`, one `{instrument_id, pik_fraction, min_coupon_periods}` per term loan authorized to elect PIK, where `pik_fraction` is an exact decimal string in `(0, 1]` and `min_coupon_periods` counts the loan's coupon periods.
    * @returns Canonical PIK-toggle JSON after schema validation.
    */
   readonly validatePikToggleSpecJson: typeof wasm.validatePikToggleSpecJson;

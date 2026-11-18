@@ -611,39 +611,53 @@ fn the_contractual_split_applies_once_to_a_rebuilt_coupon() {
     assert_close(get("debt_balance", "2025Q3"), 61.0);
 }
 
-/// A coupon the toggle capitalizes at a close earns from the following day:
-/// the quarter already running still earns on the old principal.
-#[test]
-fn a_toggled_coupon_compounds_from_the_day_after_its_close() {
-    let mut loan = semiannual_loan(CouponType::Cash);
-    loan.frequency = Tenor::quarterly();
-    loan.rate = RateSpec::Fixed { rate: 0.08 };
-    let waterfall = WaterfallSpec {
+fn pik_toggle(fraction: Decimal, min_coupon_periods: usize) -> WaterfallSpec {
+    WaterfallSpec {
         pik_toggle: Some(crate::capital_structure::PikToggleSpec {
             liquidity_metric: "liquidity".into(),
             threshold: 100.0,
-            target_instrument_ids: vec![INSTRUMENT.into()],
-            min_periods_in_pik: 0,
+            elections: vec![crate::capital_structure::PikElectionSpec {
+                instrument_id: INSTRUMENT.into(),
+                pik_fraction: fraction,
+                min_coupon_periods,
+            }],
         }),
         ..Default::default()
-    };
+    }
+}
+
+/// An 8% quarterly loan of 100 on 30/360: 2.00 a quarter.
+fn quarterly_loan() -> TermLoan {
+    let mut loan = semiannual_loan(CouponType::Cash);
+    loan.frequency = Tenor::quarterly();
+    loan.rate = RateSpec::Fixed { rate: 0.08 };
+    loan
+}
+
+/// A PIK request takes effect at the start of the next coupon period, never
+/// on a coupon already running, and capitalizes once on each coupon date.
+#[test]
+fn a_pik_election_starts_with_the_next_coupon_period() {
     let result = evaluate_2025(
         "2025Q1..2025Q4",
-        FinancialStatementInstrument::TermLoan(loan),
-        waterfall,
+        FinancialStatementInstrument::TermLoan(quarterly_loan()),
+        pik_toggle(Decimal::ONE, 0),
         0.0,
         &[("liquidity", 10.0)],
     )
     .expect("evaluation");
     let get = |name: &str, period: &str| component(&result, name, INSTRUMENT, period);
-    // The 1 April coupon (2.00 on 100) is capitalized at the June close; the
-    // 1 July coupon was earned on 100; the 1 October coupon earns on 102.
-    assert_close(get("debt_balance", "2025Q1"), 100.0);
-    assert_close(get("debt_balance", "2025Q2"), 102.0);
+    // The first quarter's request covers coupon periods from 1 April. The
+    // January to March coupon, paid on 1 April, stays cash.
+    assert_close(get("interest_expense_cash", "2025Q2"), 2.0);
+    assert_close(get("interest_expense_pik", "2025Q2"), 0.0);
+    assert_close(get("debt_balance", "2025Q2"), 100.0);
+    // The April to June coupon capitalizes on 1 July, the next on 1 October.
+    assert_close(get("interest_expense_cash", "2025Q3"), 0.0);
     assert_close(get("interest_expense_pik", "2025Q3"), 2.0);
-    assert_close(get("debt_balance", "2025Q3"), 104.0);
+    assert_close(get("debt_balance", "2025Q3"), 102.0);
     assert_close(get("interest_expense_pik", "2025Q4"), 2.04);
-    assert_close(get("debt_balance", "2025Q4"), 106.04);
+    assert_close(get("debt_balance", "2025Q4"), 104.04);
 }
 
 /// A 200 commitment with 100 drawn at 8% on ACT/360, a 50 bp commitment fee
@@ -783,33 +797,30 @@ fn arrears_and_a_later_sweep_repay_the_face_once() {
     assert_close(paid.iter().sum::<f64>(), 100.0);
 }
 
-/// A coupon toggled to PIK in the period the loan matures has no later
-/// coupon to earn on and no schedule to post to: the period fails.
 #[test]
-fn a_coupon_toggled_in_the_maturity_period_fails_the_period() {
-    let mut loan = semiannual_loan(CouponType::Cash);
-    loan.frequency = Tenor::quarterly();
-    loan.maturity = date!(2025 - 10 - 01);
-    let waterfall = WaterfallSpec {
-        pik_toggle: Some(crate::capital_structure::PikToggleSpec {
-            liquidity_metric: "liquidity".into(),
-            threshold: 100.0,
-            target_instrument_ids: vec![INSTRUMENT.into()],
-            min_periods_in_pik: 0,
-        }),
-        ..Default::default()
-    };
-    let error = evaluate_2025(
+fn an_election_with_no_coupon_period_left_changes_nothing() {
+    // The loan matures on 1 July: requests made in the third and fourth
+    // quarters, after the full payoff, have no coupon period to cover.
+    let mut loan = quarterly_loan();
+    loan.maturity = date!(2025 - 07 - 01);
+    let result = evaluate_2025_with(
         "2025Q1..2025Q4",
         FinancialStatementInstrument::TermLoan(loan),
-        waterfall,
-        0.0,
+        pik_toggle(Decimal::ONE, 0),
+        &|_| 1_000.0,
+        &|_| 0.0,
         &[("liquidity", 10.0)],
+        &MarketContext::new(),
     )
-    .expect_err("capitalization after maturity")
-    .to_string();
-    assert!(error.contains("LOAN"), "{error}");
-    assert!(error.contains("outside the life"), "{error}");
+    .expect("evaluation");
+    let get = |name: &str, period: &str| component(&result, name, INSTRUMENT, period);
+    // The first quarter's request covers the April to June coupon, which
+    // capitalizes at maturity and is redeemed with the principal.
+    assert_close(get("interest_expense_pik", "2025Q3"), 2.0);
+    assert_close(get("principal_payment", "2025Q3"), 102.0);
+    assert_close(get("debt_balance", "2025Q3"), 0.0);
+    assert_close(get("debt_balance", "2025Q4"), 0.0);
+    assert_close(get("interest_expense_pik", "2025Q4"), 0.0);
 }
 
 /// A floating coupon rebuilt after a sweep keeps its locked observation: the
@@ -866,4 +877,135 @@ fn a_floating_coupon_keeps_its_rate_when_rebuilt_after_a_sweep() {
         april_coupon(40.0),
         plain * (100.0 * 31.0 + 60.0 * 59.0) / (100.0 * 90.0),
     );
+}
+
+// Contractual PIK elections (STATEMENTS-CAPITAL-008)
+
+/// The record's example: a 10 coupon with a 40% PIK election pays 6 in cash
+/// and capitalizes 4 on the coupon date. Overdue cash interest of 3 stays a
+/// cash claim: 9 of cash interest is due and nothing more capitalizes.
+#[test]
+fn an_elected_split_capitalizes_its_share_and_leaves_arrears_in_cash() {
+    // 40% on 100 with quarterly coupons: 10 a coupon.
+    let mut loan = quarterly_loan();
+    loan.rate = RateSpec::Fixed { rate: 0.40 };
+    // Cash covers only 7 of the first coupon, paid on 1 April, so 3 is
+    // overdue; the first quarter's request covers the coupon from 1 April.
+    let result = evaluate_2025_with(
+        "2025Q1..2025Q4",
+        FinancialStatementInstrument::TermLoan(loan),
+        pik_toggle(Decimal::new(4, 1), 0),
+        &|index| if index == 1 { 7.0 } else { 1_000.0 },
+        &|_| 0.0,
+        &[("liquidity", 10.0)],
+        &MarketContext::new(),
+    )
+    .expect("evaluation");
+    let get = |name: &str, period: &str| component(&result, name, INSTRUMENT, period);
+    assert_close(get("interest_expense_cash", "2025Q2"), 7.0);
+    assert_close(get("interest_arrears", "2025Q2"), 3.0);
+    assert_close(get("debt_balance", "2025Q2"), 100.0);
+    // The elected coupon, paid on 1 July: 6 in cash plus the 3 overdue, and
+    // 4 capitalized once.
+    assert_close(get("interest_expense_cash", "2025Q3"), 9.0);
+    assert_close(get("interest_expense_pik", "2025Q3"), 4.0);
+    assert_close(get("interest_arrears", "2025Q3"), 0.0);
+    assert_close(get("debt_balance", "2025Q3"), 104.0);
+}
+
+/// A PIK election lasts at least its minimum number of coupon periods,
+/// counted in coupon periods of the loan and not in reporting periods.
+#[test]
+fn a_pik_election_lasts_its_minimum_number_of_coupon_periods() {
+    // Liquidity is short in January only, in a monthly model of a
+    // quarterly-coupon loan.
+    let run = |min_coupon_periods: usize| {
+        let mut builder_periods = Vec::new();
+        for month in 1..=12 {
+            builder_periods.push(PeriodId::month(2025, month).expect("month"));
+        }
+        let mut loan = quarterly_loan();
+        loan.maturity = date!(2026 - 01 - 01);
+        let mut builder = ModelBuilder::new("pik-duration");
+        builder.periods("2025M01..2025M12", None).expect("periods");
+        let series = |value: &dyn Fn(usize) -> f64| -> Vec<_> {
+            builder_periods
+                .iter()
+                .enumerate()
+                .map(|(index, period)| (*period, AmountOrScalar::scalar(value(index))))
+                .collect()
+        };
+        builder.value("cash", &series(&|_| 1_000.0));
+        builder.value(
+            "liquidity",
+            &series(&|index| if index == 0 { 10.0 } else { 500.0 }),
+        );
+        builder.add_debt(INSTRUMENT, FinancialStatementInstrument::TermLoan(loan));
+        builder.waterfall(pik_toggle(Decimal::ONE, min_coupon_periods));
+        let model = builder.build().expect("model");
+        let result = Evaluator::new()
+            .evaluate_with_market(
+                &model,
+                &MarketContext::new(),
+                date!(2025 - 01 - 01),
+                crate::evaluator::ObservationCutoff::FullSnapshot,
+            )
+            .expect("evaluation");
+        // PIK capitalized on the 1 July, 1 October and 1 January coupons.
+        ["2025M07", "2025M10"]
+            .map(|period| component(&result, "interest_expense_pik", INSTRUMENT, period))
+    };
+    // January's request covers the coupon period from 1 April. February's
+    // request for cash ends it at once when no minimum applies: the election
+    // is replaced before its first period begins.
+    assert_eq!(run(0), [0.0, 0.0]);
+    // With a minimum of one coupon period the April to June coupon is PIK
+    // and the next is cash; with two, both are PIK.
+    assert_eq!(run(1), [2.0, 0.0]);
+    let two = run(2);
+    assert_close(two[0], 2.0);
+    assert_close(two[1], 2.04);
+}
+
+/// Actual periods are not exercised: a historical election is recorded on
+/// the loan itself.
+#[test]
+fn the_toggle_is_not_exercised_in_actual_periods() {
+    let mut builder = ModelBuilder::new("pik-actuals");
+    builder
+        .periods("2025Q1..2025Q4", Some("2025Q2"))
+        .expect("periods");
+    let quarters: Vec<PeriodId> = (1..=4)
+        .map(|quarter| PeriodId::quarter(2025, quarter).expect("quarter"))
+        .collect();
+    let series = |value: f64| -> Vec<_> {
+        quarters
+            .iter()
+            .map(|period| (*period, AmountOrScalar::scalar(value)))
+            .collect()
+    };
+    builder.value("cash", &series(1_000.0));
+    builder.value("liquidity", &series(10.0));
+    let mut loan = quarterly_loan();
+    loan.maturity = date!(2026 - 04 - 01);
+    builder.add_debt(INSTRUMENT, FinancialStatementInstrument::TermLoan(loan));
+    builder.waterfall(pik_toggle(Decimal::ONE, 0));
+    let model = builder.build().expect("model");
+    let result = Evaluator::new()
+        .evaluate_with_market(
+            &model,
+            &MarketContext::new(),
+            date!(2025 - 01 - 01),
+            crate::evaluator::ObservationCutoff::FullSnapshot,
+        )
+        .expect("evaluation");
+    let get = |name: &str, period: &str| component(&result, name, INSTRUMENT, period);
+    // The first forecast period is the third quarter; its request covers
+    // coupon periods from 1 October, so nothing capitalizes in 2025 except
+    // nothing at all: the 1 October coupon was earned before the election.
+    for period in ["2025Q2", "2025Q3", "2025Q4"] {
+        assert_close(get("interest_expense_pik", period), 0.0);
+        assert_close(get("interest_expense_cash", period), 2.0);
+    }
+    assert_close(get("debt_balance", "2025Q4"), 100.0);
 }

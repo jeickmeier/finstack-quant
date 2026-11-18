@@ -1317,6 +1317,37 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements capital: PIK is elected per loan and applied by the loan's coupon terms
+
+Breaking, with no compatibility path (STATEMENTS-CAPITAL-008).
+
+- `PikToggleSpec` is `{liquidity_metric, threshold, elections}`.
+  `target_instrument_ids` and `min_periods_in_pik` are removed. Each election
+  is `{instrument_id, pik_fraction, min_coupon_periods}`: `pik_fraction` is the
+  share of each elected coupon that capitalizes, an exact decimal in `(0, 1]`,
+  and `min_coupon_periods` (default 0) counts the loan's coupon periods, not
+  reporting periods.
+- An election may name only a term loan of the capital structure (it could
+  name a revolver or a bond). The threshold must be finite.
+- A request takes effect at the start of the loan's next coupon period after
+  the period that observes the metric. The waterfall no longer moves the
+  coupon due in the current period into PIK or capitalizes at the period
+  close: the elected share is zero cash and capitalizes once on the coupon
+  date, through the loan's own coupon terms.
+- Overdue cash interest is never transferred into PIK. It stays a cash claim
+  and is carried as arrears.
+- The toggle is not exercised in actual periods; record a historical election
+  on the loan (`covenants.pik_toggles`).
+- A request made when no coupon period is left, including after a full payoff,
+  elects nothing (in the maturity period it failed the run since the previous
+  entry).
+- Python: `PikToggleSpec` takes keyword-only `liquidity_metric`, `threshold`
+  and `elections`; the `elections` property replaces `target_instrument_ids`
+  and `min_periods_in_pik`.
+- Rust: `loan_terms::CouponElection` and `TermLoan::coupon_period_starts` in
+  `finstack-quant-valuations-fixed-income`;
+  `TermLoan::cashflow_schedule_with_postings` takes the elections.
+
 ### Statements capital: coupons are rebuilt by the instrument after a principal change
 
 Breaking, with no compatibility path (STATEMENTS-CAPITAL-005).

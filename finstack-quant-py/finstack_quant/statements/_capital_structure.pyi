@@ -231,53 +231,70 @@ class EcfSweepSpec:
 
 class PikToggleSpec:
     """
-    PIK toggle specification.
+    PIK toggle: the modeled exercise of a borrower's PIK election.
 
-    Controls when interest accrues as PIK versus cash based on a liquidity
-    signal crossing ``threshold``, with optional hysteresis.
+    In each forecast period the liquidity metric is compared with the
+    threshold: a metric below it requests PIK, a metric at or above it
+    requests the loan's base coupon terms. The request takes effect at the
+    start of each listed loan's next coupon period after the period close,
+    never on a coupon already running, through the loan's own coupon terms:
+    the elected share of each covered coupon is zero cash and capitalizes
+    once, on the coupon date. Overdue cash interest and fees stay cash claims.
+    Actual periods are not exercised; record a historical election on the
+    loan itself.
 
     Examples
     --------
     >>> from finstack_quant.statements import PikToggleSpec
-    >>> toggle = PikToggleSpec("cash", 100.0, ["TL"])
-    >>> (toggle.liquidity_metric, toggle.min_periods_in_pik)
-    ('cash', 0)
+    >>> toggle = PikToggleSpec(
+    ...     liquidity_metric="cash",
+    ...     threshold=100.0,
+    ...     elections=[{"instrument_id": "TL", "pik_fraction": "0.4"}],
+    ... )
+    >>> (toggle.liquidity_metric, toggle.elections[0]["instrument_id"])
+    ('cash', 'TL')
 
     """
 
     def __init__(
         self,
+        *,
         liquidity_metric: str,
         threshold: float,
-        target_instrument_ids: list[str],
-        min_periods_in_pik: int = 0,
+        elections: list[Mapping[str, Any]],
     ) -> None:
         """
-        Configure a liquidity-triggered payment-in-kind interest toggle.
+        Configure a liquidity-triggered PIK election.
+
+        The keywords are read as one mapping into the Rust ``PikToggleSpec``,
+        which rejects an unknown keyword.
 
         Parameters
         ----------
         liquidity_metric : str
-            Model metric or node identifier compared with the trigger threshold.
+            Node or formula compared with the threshold. It must evaluate to
+            a finite number in every forecast period.
         threshold : float
-            Liquidity threshold in the metric's units that activates PIK logic.
-        target_instrument_ids : list[str]
-            Explicit nonempty borrowing-debt identifiers whose cash coupons may
-            capitalize into principal. Instrument-level PIK capability is not
-            modeled, so an empty list is rejected by
-            :meth:`validate` and :meth:`WaterfallSpec.validate` (it does not
-            mean "every instrument"); model validation also rejects hedge or
-            option targets. Construction stores the specification unvalidated.
-        min_periods_in_pik : int, default 0
-            Hysteresis floor counted in **periods** on the model's own cadence
-            (not months): once triggered, PIK stays on for at least this many
-            periods. Default 0 lets PIK toggle every period.
+            Finite threshold in the metric's units: a metric below it requests
+            PIK, a metric at or above it requests the base coupon terms.
+        elections : list[Mapping[str, Any]]
+            One entry per term loan authorized to elect PIK:
+            ``{"instrument_id": str, "pik_fraction": str, "min_coupon_periods": int}``.
+            ``pik_fraction`` is the share of each elected coupon that
+            capitalizes, an exact decimal string in ``(0, 1]`` (``"0.4"`` is
+            40% PIK and 60% cash, ``"1"`` is full PIK). ``min_coupon_periods``
+            (default 0) is the minimum number of consecutive coupon periods an
+            election lasts, counting the first, measured in the loan's coupon
+            periods and not in reporting periods.
 
         Raises
         ------
-        TypeError
-            If targets are omitted or are not a list of strings. Domain validation
-            is performed by :meth:`validate`.
+        ValueError
+            If a required keyword is missing, a keyword or an election field
+            is unknown, or a value has the wrong type. The threshold, the
+            fractions and the list are checked by :meth:`validate`; model
+            validation rejects an election that does not name a term loan of
+            the capital structure.
         """
         ...
     @staticmethod
@@ -304,7 +321,9 @@ class PikToggleSpec:
         Examples
         --------
         >>> from finstack_quant.statements import PikToggleSpec
-        >>> toggle = PikToggleSpec("cash", 100.0, ["TL"])
+        >>> toggle = PikToggleSpec(
+        ...     liquidity_metric="cash", threshold=100.0, elections=[{"instrument_id": "TL", "pik_fraction": "0.4"}]
+        ... )
         >>> PikToggleSpec.from_json(toggle.to_json()).threshold
         100.0
 
@@ -319,7 +338,9 @@ class PikToggleSpec:
         Raises
         ------
         ValueError
-            If ``target_instrument_ids`` is empty.
+            If the threshold is not finite, the metric is empty, no election
+            is listed, a loan is listed twice, or a ``pik_fraction`` is
+            outside ``(0, 1]``.
         """
         ...
 
@@ -368,26 +389,8 @@ class PikToggleSpec:
         float
             Threshold in the **same units as the liquidity metric** — a
             currency amount when the metric is a balance, a unitless ratio
-            when it is a coverage ratio. PIK triggers when
+            when it is a coverage ratio. A period requests PIK when
             ``metric < threshold``.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def min_periods_in_pik(self) -> int:
-        """
-        Hysteresis floor: minimum time PIK stays on once triggered.
-
-        Returns
-        -------
-        int
-            Count in **periods** on the model's own cadence (quarters for a
-            quarterly model), not months. ``0`` disables hysteresis, letting
-            PIK toggle every period.
 
         Notes
         -----
@@ -397,18 +400,20 @@ class PikToggleSpec:
 
     def __repr__(self) -> str: ...
     @property
-    def target_instrument_ids(self) -> list[str]:
-        """Return explicit borrowing-debt targets for coupon capitalization.
+    def elections(self) -> list[dict[str, Any]]:
+        """
+        The loans authorized to elect PIK, one mapping each.
 
         Returns
         -------
-        list[str]
-            Stored identifiers. Empty lists fail waterfall validation; swaps and options fail model
-            validation because they cannot capitalize into borrowing principal.
+        list[dict[str, Any]]
+            ``instrument_id``, ``pik_fraction`` (an exact decimal string in
+            ``(0, 1]``) and ``min_coupon_periods`` (a count of the loan's
+            coupon periods) for each authorized term loan.
 
         Notes
         -----
-        This accessor does not raise; it returns stored or derived model data.
+        This accessor does not raise; it returns the stored value.
         """
         ...
 

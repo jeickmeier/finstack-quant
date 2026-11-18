@@ -73,16 +73,20 @@ class TestEcfSweepSpec:
 
 
 class TestPikToggleSpec:
-    def test_defaults_min_periods_to_zero(self) -> None:
-        pik = statements.PikToggleSpec(liquidity_metric="cash", threshold=1e6, target_instrument_ids=["TL"])
-        assert pik.min_periods_in_pik == 0
+    def test_defaults_min_coupon_periods_to_zero(self) -> None:
+        pik = statements.PikToggleSpec(
+            liquidity_metric="cash", threshold=1e6, elections=[{"instrument_id": "TL", "pik_fraction": "1"}]
+        )
+        assert pik.elections == [{"instrument_id": "TL", "pik_fraction": "1", "min_coupon_periods": 0}]
 
     def test_json_roundtrip(self) -> None:
         pik = statements.PikToggleSpec(
             liquidity_metric="cash",
             threshold=1e6,
-            target_instrument_ids=["A", "B"],
-            min_periods_in_pik=3,
+            elections=[
+                {"instrument_id": "A", "pik_fraction": "0.4", "min_coupon_periods": 3},
+                {"instrument_id": "B", "pik_fraction": "1"},
+            ],
         )
         restored = statements.PikToggleSpec.from_json(pik.to_json())
         assert restored.to_json() == pik.to_json()
@@ -126,7 +130,9 @@ class TestWaterfallSpec:
 
     def test_with_ecf_and_pik(self) -> None:
         ecf = statements.EcfSweepSpec(cash_measure="ebitda", sweep_percentage=0.5, facilities="all_eligible")
-        pik = statements.PikToggleSpec(liquidity_metric="cash", threshold=1e6, target_instrument_ids=["TL"])
+        pik = statements.PikToggleSpec(
+            liquidity_metric="cash", threshold=1e6, elections=[{"instrument_id": "TL", "pik_fraction": "1"}]
+        )
         ws = statements.WaterfallSpec(priority_of_payments=SWEEP_PRIORITIES, ecf_sweep=ecf, pik_toggle=pik)
         ws.validate()
         assert ws.has_ecf_sweep
@@ -355,19 +361,33 @@ class TestModelBuilderForecasts:
             )
 
 
-def test_pik_targets_are_required_and_nonempty() -> None:
+def test_pik_elections_are_required_and_checked() -> None:
     with pytest.raises(TypeError):
         statements.PikToggleSpec("cash", 1.0)
-    with pytest.raises(TypeError):
-        statements.PikToggleSpec("cash", 1.0, None)
+    with pytest.raises(ValueError, match="elections"):
+        statements.PikToggleSpec(liquidity_metric="cash", threshold=1.0)
+    with pytest.raises(ValueError, match="target_instrument_ids"):
+        statements.PikToggleSpec(liquidity_metric="cash", threshold=1.0, target_instrument_ids=["TL"])
     for payload in [
         '{"liquidity_metric":"cash","threshold":1.0}',
-        '{"liquidity_metric":"cash","threshold":1.0,"target_instrument_ids":null}',
+        '{"liquidity_metric":"cash","threshold":1.0,"elections":null}',
     ]:
         with pytest.raises(ValueError, match=r"field|sequence"):
             statements.PikToggleSpec.from_json(payload)
-    with pytest.raises(ValueError, match="target_instrument_ids"):
-        statements.PikToggleSpec("cash", 1.0, []).validate()
-    explicit = statements.PikToggleSpec("cash", 1.0, ["TL"])
+    with pytest.raises(ValueError, match="elections"):
+        statements.PikToggleSpec(liquidity_metric="cash", threshold=1.0, elections=[]).validate()
+    with pytest.raises(ValueError, match="pik_fraction"):
+        statements.PikToggleSpec(
+            liquidity_metric="cash",
+            threshold=1.0,
+            elections=[{"instrument_id": "TL", "pik_fraction": "1.5"}],
+        ).validate()
+    with pytest.raises(ValueError, match="threshold"):
+        statements.PikToggleSpec(
+            liquidity_metric="cash", threshold=float("nan"), elections=[{"instrument_id": "TL", "pik_fraction": "1"}]
+        ).validate()
+    explicit = statements.PikToggleSpec(
+        liquidity_metric="cash", threshold=1.0, elections=[{"instrument_id": "TL", "pik_fraction": "1"}]
+    )
     explicit.validate()
-    assert explicit.target_instrument_ids == ["TL"]
+    assert explicit.elections[0]["instrument_id"] == "TL"

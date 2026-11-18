@@ -343,9 +343,11 @@ def test_capital_structure_sub_specs_validate() -> None:
     with pytest.raises(ValueError, match="sweep_percentage"):
         EcfSweepSpec(cash_measure="ebitda", sweep_percentage=5.0, facilities="all_eligible").validate()
     EcfSweepSpec(cash_measure="ebitda", sweep_percentage=0.5, facilities="all_eligible").validate()
-    with pytest.raises(ValueError, match="target_instrument_ids"):
-        PikToggleSpec("cash", 1.0, []).validate()
-    PikToggleSpec("cash", 1.0, ["TL"]).validate()
+    with pytest.raises(ValueError, match="elections"):
+        PikToggleSpec(liquidity_metric="cash", threshold=1.0, elections=[]).validate()
+    PikToggleSpec(
+        liquidity_metric="cash", threshold=1.0, elections=[{"instrument_id": "TL", "pik_fraction": "1"}]
+    ).validate()
 
 
 def test_compute_multiple_treats_none_as_missing() -> None:

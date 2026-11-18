@@ -50,14 +50,13 @@ use crate::error::Result;
 use crate::evaluator::{CapitalStructureWarning, EvalWarning, EvaluationContext};
 use finstack_quant_core::money::Money;
 use indexmap::IndexMap;
-use std::collections::HashSet;
 
 use cash_distribution::{
     PrincipalComponent, StagedInstrumentFlow, allocate_by_class, apply_cash_cap_to_category,
     apply_prepayment,
 };
 use excess_cash_flow::{PaidAhead, calculate_ecf_sweep};
-use payment_in_kind::{apply_pik_transitions, evaluate_pik_toggle, is_pik_enabled};
+use payment_in_kind::evaluate_pik_toggle;
 use payment_stack::waterfall_currency;
 
 /// Result of executing the waterfall for a single period.
@@ -361,17 +360,14 @@ fn execute_waterfall_inner(
             }
         }
     }
-    if let Some(targets) = waterfall_spec
-        .pik_toggle
-        .as_ref()
-        .map(|p| &p.target_instrument_ids)
-    {
-        for target in targets {
-            if !contractual_flows.contains_key(target) {
+    if let Some(pik) = &waterfall_spec.pik_toggle {
+        for election in &pik.elections {
+            if !contractual_flows.contains_key(&election.instrument_id) {
                 return Err(crate::error::Error::build(format!(
-                    "WaterfallSpec: `pik_toggle.target_instrument_ids` entry '{target}' does not \
-                     match any debt instrument; that instrument would never PIK. Check for typos \
-                     or trailing whitespace."
+                    "WaterfallSpec: `pik_toggle.elections` entry '{}' does not match any debt \
+                     instrument; that loan would never elect PIK. Check for typos or trailing \
+                     whitespace.",
+                    election.instrument_id
                 )));
             }
         }
@@ -392,35 +388,14 @@ fn execute_waterfall_inner(
 
     // --- Step 1: PIK toggle ---
     //
-    // Evaluate PIK mode BEFORE ECF so that ECF cash-interest deduction
-    // correctly reflects actual cash interest paid (instruments in PIK mode
-    // pay zero cash interest that period).
-    let (pik_enable, pik_targets): (Option<bool>, HashSet<String>) =
-        if let Some(pik_spec) = &waterfall_spec.pik_toggle {
-            (
-                Some(evaluate_pik_toggle(context, pik_spec, &mut warnings)?),
-                pik_spec.target_instrument_ids.iter().cloned().collect(),
-            )
-        } else {
-            (None, HashSet::new())
-        };
-
-    // Apply PIK mode transitions to `state` before using it for ECF.
-    let min_periods_in_pik = waterfall_spec
-        .pik_toggle
-        .as_ref()
-        .map(|spec| spec.min_periods_in_pik)
-        .unwrap_or(0);
-
-    if let Some(enable_pik) = pik_enable {
-        apply_pik_transitions(
-            state,
-            contractual_flows,
-            enable_pik,
-            &pik_targets,
-            min_periods_in_pik,
-        );
-    }
+    // The toggle only records its request. It never moves this period's
+    // interest: an election takes effect at the start of a loan's next coupon
+    // period, through the loan's own coupon terms, when the schedules are
+    // rebuilt.
+    state.period_pik_request = match &waterfall_spec.pik_toggle {
+        Some(pik_spec) => Some(evaluate_pik_toggle(context, pik_spec, &mut warnings)?),
+        None => None,
+    };
 
     // --- Step 2: Available cash ---
     let available_cash = available_cash(context, waterfall_spec, cash_currency, &mut warnings)?;
@@ -491,26 +466,7 @@ fn execute_waterfall_inner(
             principal,
             class_rank,
             scheduled_principal,
-            toggled_pik_moved: Money::from((0_i64, currency)),
         });
-    }
-
-    // --- Step 4: Apply PIK mode (pre-cap) ---
-    // When the PIK toggle is active, the full contractual coupon is moved
-    // into the PIK bucket unconditionally BEFORE the available-cash caps in
-    // Step 5. PIK'd coupons must never consume cash, and the full contractual
-    // coupon capitalizes at period close regardless of where Interest ranks
-    // relative to the prepayment priorities. The moved amount is recorded so
-    // toggle-driven capitalization can be tracked in state at close.
-    for s in &mut staged {
-        let currency = s.breakdown.interest_expense_cash.currency();
-        if is_pik_enabled(state, &s.instrument_id) {
-            let moved = s.breakdown.interest_expense_cash;
-            s.toggled_pik_moved = moved;
-            s.breakdown.interest_expense_pik =
-                s.breakdown.interest_expense_pik.checked_add(moved)?;
-            s.breakdown.interest_expense_cash = Money::from((0_i64, currency));
-        }
     }
 
     // --- Step 5: Available cash caps ---
@@ -729,7 +685,6 @@ fn execute_waterfall_inner(
             principal,
             class_rank: _,
             scheduled_principal: _,
-            toggled_pik_moved,
         } = s;
         let currency = breakdown.interest_expense_cash.currency();
 
@@ -764,14 +719,14 @@ fn execute_waterfall_inner(
         } else {
             Money::new(post_pay_amount, currency)?
         };
-        // (d) Contractual PIK is already in payable principal. Only the
-        // coupon moved by the toggle still capitalizes at period close.
-        let closing_balance = post_sweep_balance.checked_add(toggled_pik_moved)?;
+        // Contractual and elected PIK are already in payable principal: the
+        // schedule capitalizes them on their coupon dates.
+        let closing_balance = post_sweep_balance;
         state.set_closing_balance(instrument_id.to_string(), closing_balance);
         breakdown.debt_balance = closing_balance;
         // The principal this waterfall changed outside the contractual
-        // schedule: prepayments paid and the coupon the toggle capitalized.
-        let mut posted = toggled_pik_moved;
+        // schedule: the prepayments it paid.
+        let mut posted = Money::from((0_i64, currency));
         for prepaid in [
             breakdown.mandatory_prepayment,
             breakdown.voluntary_prepayment,
@@ -1348,8 +1303,11 @@ mod tests {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "cash".into(),
                 threshold: 1_000_000.0, // always below => PIK on
-                min_periods_in_pik: 0,
-                target_instrument_ids: vec!["TL-1".to_string()],
+                elections: vec![crate::capital_structure::PikElectionSpec {
+                    instrument_id: "TL-1".to_string(),
+                    pik_fraction: rust_decimal::Decimal::ONE,
+                    min_coupon_periods: 0,
+                }],
             }),
             ..Default::default()
         };
@@ -1392,8 +1350,11 @@ mod tests {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "liquidity / 0".into(),
                 threshold: 1.0,
-                min_periods_in_pik: 0,
-                target_instrument_ids: vec!["TL-1".to_string()],
+                elections: vec![crate::capital_structure::PikElectionSpec {
+                    instrument_id: "TL-1".to_string(),
+                    pik_fraction: rust_decimal::Decimal::ONE,
+                    min_coupon_periods: 0,
+                }],
             }),
             ..Default::default()
         };
@@ -1455,135 +1416,6 @@ mod tests {
             tl.principal_payment.amount(),
             450.0,
             "fees paid ahead of sweep reduce ECF before the sweep percentage: (1000 - 100) * 50%"
-        );
-    }
-
-    #[test]
-    fn test_pik_toggle_updates_state() {
-        let period = PeriodId::quarter(2025, 2).expect("valid period fixture");
-        let mut context = build_context(period, &[("liquidity", 50.0)]);
-
-        let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
-        contractual_flows.insert(
-            "TL-PIK".to_string(),
-            CashflowBreakdown::with_currency(Currency::USD),
-        );
-
-        let mut state = CapitalStructureState::new();
-        state.opening_balances.insert(
-            "TL-PIK".to_string(),
-            Money::from((5_000_000_i64, Currency::USD)),
-        );
-
-        let waterfall = WaterfallSpec {
-            priority_of_payments: vec![
-                PaymentPriority::Fees,
-                PaymentPriority::Interest,
-                PaymentPriority::Amortization,
-                PaymentPriority::Equity,
-            ],
-            available_cash_node: "cash".into(),
-            ecf_sweep: None,
-            pik_toggle: Some(PikToggleSpec {
-                liquidity_metric: "liquidity".into(),
-                threshold: 100.0,
-                target_instrument_ids: vec!["TL-PIK".into()],
-                min_periods_in_pik: 0,
-            }),
-            ..Default::default()
-        };
-
-        execute_waterfall_same_period(&context, &waterfall, &mut state, &contractual_flows)
-            .expect("waterfall should execute");
-
-        assert_eq!(state.pik_mode.get("TL-PIK"), Some(&true));
-
-        context
-            .set_value("liquidity", 150.0)
-            .expect("should update liquidity for second evaluation");
-        execute_waterfall_same_period(&context, &waterfall, &mut state, &contractual_flows)
-            .expect("waterfall should execute");
-
-        assert_eq!(state.pik_mode.get("TL-PIK"), Some(&false));
-    }
-
-    #[test]
-    fn test_pik_hysteresis_holds_pik_active_for_min_periods() {
-        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-
-        let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
-        let mut tl_breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        tl_breakdown.interest_expense_cash = Money::from((10_000_i64, Currency::USD));
-        contractual_flows.insert("TL-PIK".to_string(), tl_breakdown);
-
-        let mut state = CapitalStructureState::new();
-        state.opening_balances.insert(
-            "TL-PIK".to_string(),
-            Money::from((5_000_000_i64, Currency::USD)),
-        );
-
-        let waterfall = WaterfallSpec {
-            priority_of_payments: vec![
-                PaymentPriority::Fees,
-                PaymentPriority::Interest,
-                PaymentPriority::Amortization,
-                PaymentPriority::Equity,
-            ],
-            available_cash_node: "cash".into(),
-            ecf_sweep: None,
-            pik_toggle: Some(PikToggleSpec {
-                liquidity_metric: "liquidity".into(),
-                threshold: 100.0,
-                target_instrument_ids: vec!["TL-PIK".into()],
-                min_periods_in_pik: 3,
-            }),
-            ..Default::default()
-        };
-
-        // Period 1: liquidity < threshold => PIK activates
-        let ctx_low = build_context(period, &[("liquidity", 50.0)]);
-        execute_waterfall_same_period(&ctx_low, &waterfall, &mut state, &contractual_flows)
-            .expect("waterfall should execute");
-
-        assert_eq!(state.pik_mode.get("TL-PIK"), Some(&true));
-        assert_eq!(state.pik_periods_active.get("TL-PIK"), Some(&1));
-
-        // Period 2: liquidity recovers above threshold, but hysteresis holds PIK
-        let ctx_high = build_context(period, &[("liquidity", 150.0)]);
-        execute_waterfall_same_period(&ctx_high, &waterfall, &mut state, &contractual_flows)
-            .expect("waterfall should execute");
-
-        assert_eq!(
-            state.pik_mode.get("TL-PIK"),
-            Some(&true),
-            "PIK should remain active due to hysteresis (periods_active=1 < 3)"
-        );
-        assert_eq!(state.pik_periods_active.get("TL-PIK"), Some(&2));
-
-        // Period 3: still above threshold, hysteresis still holds (periods_active=2 < 3)
-        execute_waterfall_same_period(&ctx_high, &waterfall, &mut state, &contractual_flows)
-            .expect("waterfall should execute");
-
-        assert_eq!(
-            state.pik_mode.get("TL-PIK"),
-            Some(&true),
-            "PIK should remain active due to hysteresis (periods_active=2 < 3)"
-        );
-        assert_eq!(state.pik_periods_active.get("TL-PIK"), Some(&3));
-
-        // Period 4: min_periods met (periods_active=3, which is not < 3), PIK releases
-        execute_waterfall_same_period(&ctx_high, &waterfall, &mut state, &contractual_flows)
-            .expect("waterfall should execute");
-
-        assert_eq!(
-            state.pik_mode.get("TL-PIK"),
-            Some(&false),
-            "PIK should release after min_periods_in_pik completed"
-        );
-        assert_eq!(
-            state.pik_periods_active.get("TL-PIK"),
-            Some(&0),
-            "counter should reset on PIK exit"
         );
     }
 
@@ -1664,85 +1496,6 @@ mod tests {
         assert_eq!(total_principal, 375_000.0);
         assert!((tl1.principal_payment.amount() - 150_000.0).abs() < 1e-9);
         assert!((tl2.principal_payment.amount() - 225_000.0).abs() < 1e-9);
-    }
-
-    #[test]
-    fn test_priority_of_payments_changes_pik_sweep_order() {
-        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let context = build_context(period, &[("ebitda", 2_100.0), ("liquidity", 50.0)]);
-
-        let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
-        let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.interest_expense_cash = Money::from((100_i64, Currency::USD));
-        contractual_flows.insert("TL-1".to_string(), breakdown);
-
-        let mut sweep_first_state = CapitalStructureState::new();
-        sweep_first_state
-            .opening_balances
-            .insert("TL-1".to_string(), Money::from((1_000_i64, Currency::USD)));
-        let mut interest_first_state = sweep_first_state.clone();
-
-        let sweep_first = WaterfallSpec {
-            priority_of_payments: vec![
-                PaymentPriority::Fees,
-                PaymentPriority::Amortization,
-                PaymentPriority::Sweep,
-                PaymentPriority::Interest,
-                PaymentPriority::Equity,
-            ],
-            available_cash_node: "cash".into(),
-            ecf_sweep: Some(EcfSweepSpec {
-                cash_measure: "ebitda".into(),
-                deductions: vec![
-                    crate::capital_structure::EcfTerm::PaidCashInterest,
-                    crate::capital_structure::EcfTerm::PaidFees,
-                    crate::capital_structure::EcfTerm::PaidScheduledPrincipal,
-                ],
-                credits: Vec::new(),
-                sweep_percentage: 0.5,
-                facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
-            }),
-            pik_toggle: Some(PikToggleSpec {
-                liquidity_metric: "liquidity".into(),
-                threshold: 100.0,
-                target_instrument_ids: vec!["TL-1".into()],
-                min_periods_in_pik: 0,
-            }),
-            ..Default::default()
-        };
-        let interest_first = WaterfallSpec {
-            priority_of_payments: vec![
-                PaymentPriority::Fees,
-                PaymentPriority::Amortization,
-                PaymentPriority::Interest,
-                PaymentPriority::Sweep,
-                PaymentPriority::Equity,
-            ],
-            available_cash_node: "cash".into(),
-            ecf_sweep: sweep_first.ecf_sweep.clone(),
-            pik_toggle: sweep_first.pik_toggle.clone(),
-            ..Default::default()
-        };
-
-        let sweep_first_result = execute_waterfall_same_period(
-            &context,
-            &sweep_first,
-            &mut sweep_first_state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
-        let interest_first_result = execute_waterfall_same_period(
-            &context,
-            &interest_first,
-            &mut interest_first_state,
-            &contractual_flows,
-        )
-        .expect("waterfall should execute");
-
-        let sweep_first_balance = sweep_first_result.flows["TL-1"].debt_balance.amount();
-        let interest_first_balance = interest_first_result.flows["TL-1"].debt_balance.amount();
-        assert_eq!(sweep_first_balance, 100.0);
-        assert_eq!(interest_first_balance, 100.0);
     }
 
     #[test]
@@ -2275,72 +2028,6 @@ mod tests {
         );
     }
 
-    /// With a priority stack lacking any prepayment entry, a PIK'd coupon must
-    /// still be moved into the PIK bucket BEFORE the cash caps: it consumes no
-    /// cash and the full contractual coupon capitalizes.
-    #[test]
-    fn test_pik_coupon_never_consumes_cash_without_prepayment_priority() {
-        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-        let context = build_context(period, &[("cash_available", 50.0), ("liquidity", 10.0)]);
-
-        let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
-        let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
-        breakdown.interest_expense_cash = Money::from((100_i64, Currency::USD));
-        contractual_flows.insert("TL-PIK".to_string(), breakdown);
-
-        let mut state = CapitalStructureState::new();
-        state.opening_balances.insert(
-            "TL-PIK".to_string(),
-            Money::from((1_000_i64, Currency::USD)),
-        );
-
-        // No MandatoryPrepayment/VoluntaryPrepayment/Sweep in the stack.
-        // (Amortization is listed because `available_cash_node` is set; it caps
-        // to zero here since the instrument has no scheduled principal.)
-        let waterfall = WaterfallSpec {
-            priority_of_payments: vec![
-                PaymentPriority::Fees,
-                PaymentPriority::Interest,
-                PaymentPriority::Amortization,
-                PaymentPriority::Equity,
-            ],
-            available_cash_node: "cash_available".into(),
-            ecf_sweep: None,
-            pik_toggle: Some(PikToggleSpec {
-                liquidity_metric: "liquidity".into(),
-                threshold: 100.0,
-                target_instrument_ids: vec!["TL-PIK".into()],
-                min_periods_in_pik: 0,
-            }),
-            ..Default::default()
-        };
-
-        let result =
-            execute_waterfall_same_period(&context, &waterfall, &mut state, &contractual_flows)
-                .expect("waterfall should execute");
-
-        let tl = result.flows.get("TL-PIK").expect("TL-PIK");
-        assert_eq!(
-            tl.interest_expense_cash.amount(),
-            0.0,
-            "PIK'd coupon must not consume cash"
-        );
-        assert_eq!(
-            tl.interest_expense_pik.amount(),
-            100.0,
-            "full contractual coupon must capitalize"
-        );
-        assert_eq!(tl.debt_balance.amount(), 1_100.0);
-        assert_eq!(
-            result
-                .equity_distribution
-                .expect("equity populated")
-                .amount(),
-            50.0,
-            "cash untouched by the PIK'd coupon flows to equity"
-        );
-    }
-
     #[test]
     fn payment_classes_pay_senior_interest_before_junior() {
         let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
@@ -2643,8 +2330,11 @@ mod tests {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "liquidity".into(),
                 threshold: 100.0,
-                target_instrument_ids: vec!["TL-1".into()],
-                min_periods_in_pik: 3,
+                elections: vec![crate::capital_structure::PikElectionSpec {
+                    instrument_id: "TL-1".into(),
+                    pik_fraction: rust_decimal::Decimal::ONE,
+                    min_coupon_periods: 3,
+                }],
             }),
             mandatory_prepayment: Some(crate::capital_structure::PrepaymentSpec {
                 amount: "0".into(),
@@ -2728,8 +2418,11 @@ mod tests {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "liquidity".into(),
                 threshold: 100.0,
-                target_instrument_ids: vec!["TL-1".into()],
-                min_periods_in_pik: 0,
+                elections: vec![crate::capital_structure::PikElectionSpec {
+                    instrument_id: "TL-1".into(),
+                    pik_fraction: rust_decimal::Decimal::ONE,
+                    min_coupon_periods: 0,
+                }],
             }),
             mandatory_prepayment: Some(crate::capital_structure::PrepaymentSpec {
                 amount: "200".into(),
@@ -2739,13 +2432,15 @@ mod tests {
         };
         let context = build_context(id, &[("liquidity", 50.0), ("cash", 1000.0)]);
 
-        // 200 prepaid and the 30 coupon capitalized by the toggle: -170.
+        // 200 prepaid. The toggle only records its request: the 30 coupon
+        // due now is paid in cash, not capitalized.
         let mut state = initial.clone();
         let before = format!("{state:?}");
         let error =
             execute_waterfall_then(&context, &spec, &mut state, &contractual, None, |staged| {
-                assert_eq!(staged.period_postings["TL-1"], usd(-170));
-                assert_eq!(staged.closing_balances["TL-1"], usd(830));
+                assert_eq!(staged.period_postings["TL-1"], usd(-200));
+                assert_eq!(staged.closing_balances["TL-1"], usd(800));
+                assert_eq!(staged.period_pik_request, Some(true));
                 Err(crate::error::Error::capital_structure("schedule rejected"))
             })
             .expect_err("a rejected rebuild fails the period");
@@ -2761,7 +2456,7 @@ mod tests {
             Ok(())
         })
         .expect("accepted rebuild");
-        assert_eq!(state.closing_balances["TL-1"], usd(830));
+        assert_eq!(state.closing_balances["TL-1"], usd(800));
         assert!(state.period_postings.is_empty());
     }
 }

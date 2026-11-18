@@ -7106,44 +7106,60 @@ export interface PaymentClassSpec {
   rank: number;
 }
 /**
- * PIK toggle specification.
+ * PIK toggle: the modeled exercise of a borrower's PIK election.
  *
- * Defines conditions for switching between cash and PIK interest modes.
+ * In each forecast period the liquidity metric is compared with the
+ * threshold. A metric below the threshold requests PIK and a metric at or
+ * above it requests the loan's base coupon terms. The request takes effect
+ * at the start of each listed loan's next coupon period after the period
+ * close, never on a coupon already running, and is applied through the
+ * loan's own coupon terms: the elected share of each covered coupon is zero
+ * cash and capitalizes once, on the coupon date. Overdue cash interest and
+ * fees stay cash claims and are never capitalized by an election.
  *
- * # Hysteresis
+ * Actual periods are not exercised: record a historical election on the
+ * loan itself (`covenants.pik_toggles`).
  *
- * Set `min_periods_in_pik` to prevent oscillation when the liquidity metric
- * hovers near the threshold. Once PIK is triggered, it stays active for at
- * least that many periods before it can switch back.
- *
- * Thresholds use the same scalar units as the referenced `liquidity_metric`.
+ * The threshold is in the units of `liquidity_metric`.
  */
 export interface PikToggleSpec {
   /**
-   * Node reference or formula for liquidity metric (e.g., "cash_balance" or "ebitda / interest_expense")
-   */
-  liquidity_metric: string;
-  /**
-   * Minimum number of periods PIK must stay active once triggered (hysteresis).
-   * Prevents oscillation when the metric hovers near the threshold.
-   * Default: 0 (no hysteresis, PIK can toggle every period).
-   */
-  min_periods_in_pik?: number;
-  /**
-   * Borrowing debt IDs whose cash coupons capitalize when the toggle triggers.
-   *
-   * Must be a non-empty list: instrument-level PIK capability is not
-   * modeled, so an empty list is rejected by [`PikToggleSpec::validate`]
-   * rather than meaning "every instrument".
-   * Swaps and options cannot be PIK targets.
+   * The loans authorized to elect PIK, one entry each. Must not be empty.
    *
    * @minItems 1
    */
-  target_instrument_ids: [string, ...string[]];
+  elections: [PikElectionSpec, ...PikElectionSpec[]];
   /**
-   * Threshold value: if metric < threshold, enable PIK; otherwise use cash
+   * Node reference or formula for the liquidity metric (for example
+   * `"cash_balance"` or `"ebitda / interest_expense"`). It must evaluate to
+   * a finite number in every forecast period.
+   */
+  liquidity_metric: string;
+  /**
+   * Finite threshold in the metric's units: a metric below it requests
+   * PIK, a metric at or above it requests the base coupon terms.
    */
   threshold: number;
+}
+/**
+ * One loan's PIK authorization under a [`PikToggleSpec`].
+ */
+export interface PikElectionSpec {
+  /**
+   * Term loan authorized to elect PIK.
+   */
+  instrument_id: string;
+  /**
+   * Minimum number of consecutive coupon periods a PIK election lasts,
+   * counting the first elected period. `0` and `1` let the election end
+   * after one coupon period.
+   */
+  min_coupon_periods?: number;
+  /**
+   * Share of each elected coupon that capitalizes, a decimal in `(0, 1]`
+   * (`0.4` capitalizes 40% and pays 60% in cash; `1` is full PIK).
+   */
+  pik_fraction: DecimalWire;
 }
 /**
  * The two numbers a check compared, and the tolerance it allowed.

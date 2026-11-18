@@ -7225,6 +7225,32 @@
       ],
       "type": "object"
     },
+    "PikElectionSpec": {
+      "additionalProperties": false,
+      "description": "One loan's PIK authorization under a [`PikToggleSpec`].",
+      "properties": {
+        "instrument_id": {
+          "description": "Term loan authorized to elect PIK.",
+          "type": "string"
+        },
+        "min_coupon_periods": {
+          "default": 0,
+          "description": "Minimum number of consecutive coupon periods a PIK election lasts,\ncounting the first elected period. `0` and `1` let the election end\nafter one coupon period.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pik_fraction": {
+          "$ref": "#/$defs/DecimalWire",
+          "description": "Share of each elected coupon that capitalizes, a decimal in `(0, 1]`\n(`0.4` capitalizes 40% and pays 60% in cash; `1` is full PIK)."
+        }
+      },
+      "required": [
+        "instrument_id",
+        "pik_fraction"
+      ],
+      "type": "object"
+    },
     "PikMode": {
       "description": "Per-coupon PIK behavior for the MC engine.\n\nDetermines how each coupon payment is handled: paid in cash, accreted\nto notional (PIK), split between cash and PIK, or decided dynamically\nby a [`ToggleExerciseModel`].",
       "oneOf": [
@@ -7340,29 +7366,22 @@
     },
     "PikToggleSpec": {
       "additionalProperties": false,
-      "description": "PIK toggle specification.\n\nDefines conditions for switching between cash and PIK interest modes.\n\n# Hysteresis\n\nSet `min_periods_in_pik` to prevent oscillation when the liquidity metric\nhovers near the threshold. Once PIK is triggered, it stays active for at\nleast that many periods before it can switch back.\n\nThresholds use the same scalar units as the referenced `liquidity_metric`.",
+      "description": "PIK toggle: the modeled exercise of a borrower's PIK election.\n\nIn each forecast period the liquidity metric is compared with the\nthreshold. A metric below the threshold requests PIK and a metric at or\nabove it requests the loan's base coupon terms. The request takes effect\nat the start of each listed loan's next coupon period after the period\nclose, never on a coupon already running, and is applied through the\nloan's own coupon terms: the elected share of each covered coupon is zero\ncash and capitalizes once, on the coupon date. Overdue cash interest and\nfees stay cash claims and are never capitalized by an election.\n\nActual periods are not exercised: record a historical election on the\nloan itself (`covenants.pik_toggles`).\n\nThe threshold is in the units of `liquidity_metric`.",
       "properties": {
-        "liquidity_metric": {
-          "description": "Node reference or formula for liquidity metric (e.g., \"cash_balance\" or \"ebitda / interest_expense\")",
-          "type": "string"
-        },
-        "min_periods_in_pik": {
-          "default": 0,
-          "description": "Minimum number of periods PIK must stay active once triggered (hysteresis).\nPrevents oscillation when the metric hovers near the threshold.\nDefault: 0 (no hysteresis, PIK can toggle every period).",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "target_instrument_ids": {
-          "description": "Borrowing debt IDs whose cash coupons capitalize when the toggle triggers.\n\nMust be a non-empty list: instrument-level PIK capability is not\nmodeled, so an empty list is rejected by [`PikToggleSpec::validate`]\nrather than meaning \"every instrument\".\nSwaps and options cannot be PIK targets.",
+        "elections": {
+          "description": "The loans authorized to elect PIK, one entry each. Must not be empty.",
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/PikElectionSpec"
           },
           "minItems": 1,
           "type": "array"
         },
+        "liquidity_metric": {
+          "description": "Node reference or formula for the liquidity metric (for example\n`\"cash_balance\"` or `\"ebitda / interest_expense\"`). It must evaluate to\na finite number in every forecast period.",
+          "type": "string"
+        },
         "threshold": {
-          "description": "Threshold value: if metric < threshold, enable PIK; otherwise use cash",
+          "description": "Finite threshold in the metric's units: a metric below it requests\nPIK, a metric at or above it requests the base coupon terms.",
           "format": "double",
           "type": "number"
         }
@@ -7370,7 +7389,7 @@
       "required": [
         "liquidity_metric",
         "threshold",
-        "target_instrument_ids"
+        "elections"
       ],
       "type": "object"
     },

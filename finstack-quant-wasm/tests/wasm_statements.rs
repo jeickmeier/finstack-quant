@@ -158,12 +158,11 @@ fn validate_ecf_sweep_spec_accepts_minimal() {
 }
 
 #[wasm_bindgen_test]
-fn validate_pik_toggle_spec_requires_explicit_targets() {
-    // Rust `PikToggleSpec::validate` rejects implicit all-instrument targets.
+fn validate_pik_toggle_spec_requires_explicit_elections() {
+    // Rust `PikToggleSpec::validate` rejects an implied election.
     let json = r#"{"liquidity_metric":"cash","threshold":1000000.0}"#;
     assert!(validate_pik_toggle_spec_json(JsValue::from(json)).is_err());
-    let json =
-        r#"{"liquidity_metric":"cash","threshold":1000000.0,"target_instrument_ids":["TL"]}"#;
+    let json = r#"{"liquidity_metric":"cash","threshold":1000000.0,"elections":[{"instrument_id":"TL","pik_fraction":"1"}]}"#;
     let out = validate_pik_toggle_spec_json(JsValue::from(json)).unwrap();
     assert!(out.contains("liquidity_metric"));
 }

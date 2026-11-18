@@ -2,8 +2,8 @@
 //!
 //! The instrument's owner recompiles the contractual schedule from its own
 //! terms and the ledger of principal changes the waterfall has posted
-//! (prepayments and toggled PIK). Statements infers no rate and rewrites no
-//! coupon row.
+//! (prepayments) and of the coupon elections its PIK toggle has made.
+//! Statements infers no rate and rewrites no coupon row.
 
 use crate::error::{Error, Result};
 use finstack_quant_cashflows::builder::CashFlowSchedule;
@@ -12,7 +12,9 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::fixed_income::loan_terms::PrincipalPosting;
+use finstack_quant_valuations::instruments::fixed_income::loan_terms::{
+    CouponElection, PrincipalPosting,
+};
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::RevolvingCredit;
 use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 
@@ -33,6 +35,8 @@ use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
 /// * `as_of` - Valuation date of the run, passed to the owner unchanged.
 /// * `postings` - Every principal change posted to the instrument so far, in
 ///   its currency, each with the first day it earns interest.
+/// * `elections` - Every dated coupon election made for the instrument so
+///   far; only a term loan can carry any.
 ///
 /// # Errors
 ///
@@ -45,11 +49,19 @@ pub(crate) fn rebuild_from_postings(
     market: &MarketContext,
     as_of: Date,
     postings: &[PrincipalPosting],
+    elections: &[CouponElection],
 ) -> Result<CashFlowSchedule> {
     let any = instrument.as_any();
     let rebuilt = if let Some(loan) = any.downcast_ref::<TermLoan>() {
-        loan.cashflow_schedule_with_postings(market, postings, &[])
+        loan.cashflow_schedule_with_postings(market, postings, elections)
     } else if let Some(revolver) = any.downcast_ref::<RevolvingCredit>() {
+        if !elections.is_empty() {
+            return Err(Error::capital_structure(format!(
+                "instrument '{}' is a revolving credit facility, which has no PIK coupon \
+                 terms to elect",
+                instrument.id()
+            )));
+        }
         revolver.cashflow_schedule_with_postings(market, as_of, postings)
     } else {
         return Err(Error::capital_structure(format!(

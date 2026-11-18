@@ -16110,44 +16110,65 @@ export interface D_411Aa4781B66Fb30F28D {
   rank: number;
 }
 /**
- * PIK toggle specification.
+ * PIK toggle: the modeled exercise of a borrower's PIK election.
  *
- * Defines conditions for switching between cash and PIK interest modes.
+ * In each forecast period the liquidity metric is compared with the
+ * threshold. A metric below the threshold requests PIK and a metric at or
+ * above it requests the loan's base coupon terms. The request takes effect
+ * at the start of each listed loan's next coupon period after the period
+ * close, never on a coupon already running, and is applied through the
+ * loan's own coupon terms: the elected share of each covered coupon is zero
+ * cash and capitalizes once, on the coupon date. Overdue cash interest and
+ * fees stay cash claims and are never capitalized by an election.
  *
- * # Hysteresis
+ * Actual periods are not exercised: record a historical election on the
+ * loan itself (`covenants.pik_toggles`).
  *
- * Set `min_periods_in_pik` to prevent oscillation when the liquidity metric
- * hovers near the threshold. Once PIK is triggered, it stays active for at
- * least that many periods before it can switch back.
- *
- * Thresholds use the same scalar units as the referenced `liquidity_metric`.
+ * The threshold is in the units of `liquidity_metric`.
  */
 export interface D_321Bf35B4A9Ae99F3Cf3 {
   /**
-   * Node reference or formula for liquidity metric (e.g., "cash_balance" or "ebitda / interest_expense")
-   */
-  liquidity_metric: string;
-  /**
-   * Minimum number of periods PIK must stay active once triggered (hysteresis).
-   * Prevents oscillation when the metric hovers near the threshold.
-   * Default: 0 (no hysteresis, PIK can toggle every period).
-   */
-  min_periods_in_pik?: number;
-  /**
-   * Borrowing debt IDs whose cash coupons capitalize when the toggle triggers.
-   *
-   * Must be a non-empty list: instrument-level PIK capability is not
-   * modeled, so an empty list is rejected by [`PikToggleSpec::validate`]
-   * rather than meaning "every instrument".
-   * Swaps and options cannot be PIK targets.
+   * The loans authorized to elect PIK, one entry each. Must not be empty.
    *
    * @minItems 1
    */
-  target_instrument_ids: [string, ...string[]];
+  elections: [DB19F3A94967E48A6E9B7, ...DB19F3A94967E48A6E9B7[]];
   /**
-   * Threshold value: if metric < threshold, enable PIK; otherwise use cash
+   * Node reference or formula for the liquidity metric (for example
+   * `"cash_balance"` or `"ebitda / interest_expense"`). It must evaluate to
+   * a finite number in every forecast period.
+   */
+  liquidity_metric: string;
+  /**
+   * Finite threshold in the metric's units: a metric below it requests
+   * PIK, a metric at or above it requests the base coupon terms.
    */
   threshold: number;
+}
+/**
+ * One loan's PIK authorization under a [`PikToggleSpec`].
+ */
+export interface DB19F3A94967E48A6E9B7 {
+  /**
+   * Term loan authorized to elect PIK.
+   */
+  instrument_id: string;
+  /**
+   * Minimum number of consecutive coupon periods a PIK election lasts,
+   * counting the first elected period. `0` and `1` let the election end
+   * after one coupon period.
+   */
+  min_coupon_periods?: number;
+  /**
+   * Exact decimal encoded only as a JSON string.
+   *
+   * Restoration routes through [`crate::decimal::parse_decimal`], the single
+   * exact text-admission rule: JSON numbers, malformed text and inexact values
+   * are rejected rather than rounded. Serialization writes canonical
+   * fixed-point text with trailing zeros removed and signed zero normalized
+   * (`"1.5"`, `"0"`), never scientific notation.
+   */
+  pik_fraction: string;
 }
 /**
  * Specification for a single node (metric/line item) in the financial model.

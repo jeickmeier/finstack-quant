@@ -283,9 +283,9 @@ test('capital-structure validators run the Rust validate()', () => {
       statements.validatePikToggleSpecJson({
         liquidity_metric: 'cash',
         threshold: 1.0,
-        target_instrument_ids: [],
+        elections: [],
       }),
-    (e) => e.kind === 'validation' && /target_instrument_ids/.test(e.message)
+    (e) => e.kind === 'validation' && /elections/.test(e.message)
   );
   const ok = JSON.parse(
     statements.validateEcfSweepSpecJson({
@@ -384,17 +384,30 @@ test('evaluateScenarioSet returns the ScenarioResults map', () => {
   assert.equal(out.up.cells.profit['2025Q1'].value, 100);
 });
 
-test('PIK target lists are required and nonempty', () => {
-  for (const targets of [undefined, null, []]) {
+test('PIK elections are required and nonempty', () => {
+  for (const elections of [undefined, null, []]) {
     const spec = { liquidity_metric: 'cash', threshold: 1 };
-    if (targets !== undefined) spec.target_instrument_ids = targets;
+    if (elections !== undefined) spec.elections = elections;
     assert.throws(
       () => statements.validatePikToggleSpecJson(spec),
       (e) => e.kind === 'validation'
     );
   }
-  const spec = { liquidity_metric: 'cash', threshold: 1, target_instrument_ids: ['TL'] };
-  assert.deepEqual(JSON.parse(statements.validatePikToggleSpecJson(spec)).target_instrument_ids, [
-    'TL',
+  assert.throws(
+    () =>
+      statements.validatePikToggleSpecJson({
+        liquidity_metric: 'cash',
+        threshold: 1,
+        elections: [{ instrument_id: 'TL', pik_fraction: '1.5' }],
+      }),
+    (e) => e.kind === 'validation' && /pik_fraction/.test(e.message)
+  );
+  const spec = {
+    liquidity_metric: 'cash',
+    threshold: 1,
+    elections: [{ instrument_id: 'TL', pik_fraction: '0.4' }],
+  };
+  assert.deepEqual(JSON.parse(statements.validatePikToggleSpecJson(spec)).elections, [
+    { instrument_id: 'TL', pik_fraction: '0.4', min_coupon_periods: 0 },
   ]);
 });

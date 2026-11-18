@@ -284,7 +284,8 @@ trigger, payment and principal-effective dates remain open.
 The Statements PIK election and carried-claims contract was accepted on
 2026-11-15. It covers contractual coupon elections, threshold and duration
 rules, dated capitalization, separate arrears and atomic replay.
-Implementation and independent qualification remain pending.
+The modeled forecast exercise is implemented and qualified; notice dates,
+amendments and authorized capitalization of arrears remain open.
 [STATEMENTS-CAPITAL-008](statements-capital/08-pik-and-carry-state.md#accepted-decision-for-contractual-pik-elections-and-carried-claims).
 
 The Statements capital reporting and FX contract was accepted on 2026-11-15.

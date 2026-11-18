@@ -267,13 +267,21 @@ on any same-period `cs` component, directly or through the formulas and masks
 of the nodes it names: every such component is an output of the waterfall the
 pool funds. Read a prior period with `lag(...)`.
 
-After a prepayment or a toggled PIK coupon, the term loan or revolver
-recompiles its schedule from its own terms and the dated principal changes:
-coupons, the contractual cash/PIK split, balance-based fees and later principal
-follow the new balance from the day after the period close, and interest
-already earned is preserved. The ledger and the rebuilt schedules commit
-together. Only term loans and revolvers rebuild, so a PIK toggle may target
-only those.
+After a prepayment, the term loan or revolver recompiles its schedule from its
+own terms and the dated principal changes: coupons, the contractual cash/PIK
+split, balance-based fees and later principal follow the new balance from the
+day after the period close, and interest already earned is preserved. The
+ledger and the rebuilt schedules commit together.
+
+A PIK toggle is the modeled exercise of a borrower's election. `pik_toggle` is
+`{liquidity_metric, threshold, elections}` and each election authorizes one
+term loan: `{instrument_id, pik_fraction, min_coupon_periods}`. In a forecast
+period a metric below the threshold requests PIK. The election starts with the
+loan's next coupon period, never on a coupon already running, lasts at least
+its minimum number of coupon periods, and is applied by the loan's own coupon
+terms: the elected share is zero cash and capitalizes once on the coupon date.
+Overdue cash interest and fees stay cash claims and are never capitalized.
+Actual periods are not exercised.
 
 Known limits (also stated in the module rustdoc): omitted `fx_policy` converts
 period-aggregated reporting totals on the inclusive period-end date

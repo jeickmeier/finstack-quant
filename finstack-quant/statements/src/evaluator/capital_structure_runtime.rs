@@ -144,7 +144,16 @@ impl Evaluator {
                 cs_state,
                 &contractual_flows,
                 model.capital_structure_currency()?,
-                |staged| settle_postings(staged, instruments, period, market_ctx, as_of),
+                |staged| {
+                    settle_postings(
+                        staged,
+                        instruments,
+                        waterfall_spec.pik_toggle.as_ref(),
+                        period,
+                        market_ctx,
+                        as_of,
+                    )
+                },
             )?;
 
             merge_updated_flows(&mut cs_cashflows, &waterfall_result.flows, period_id);
@@ -219,32 +228,43 @@ pub(crate) fn dependent_closure(
 }
 
 /// Rebuild the schedule of every instrument whose principal the waterfall
-/// changed this period.
+/// changed this period or whose coupon election the PIK toggle changed.
 ///
-/// Each change is appended to the instrument's posting ledger, effective the
-/// day after the period close, and the owner recompiles the schedule from the
-/// contract and the whole ledger. A schedule is accepted only when the
-/// principal it carries into the next period equals the ledger's closing
-/// balance; nothing is stored unless every instrument rebuilds.
+/// Each principal change is appended to the instrument's posting ledger,
+/// effective the day after the period close. In a forecast period the PIK
+/// toggle's request becomes a dated coupon election at the start of each
+/// authorized loan's next coupon period; an election lasts at least its
+/// minimum number of coupon periods, counted from the election dates, so a
+/// period evaluated again decides the same thing. The owner recompiles the
+/// schedule from the contract and both ledgers. A schedule is accepted only
+/// when the principal it carries into the next period equals the ledger's
+/// closing balance; nothing is stored unless every instrument rebuilds.
 fn settle_postings(
     state: &mut crate::capital_structure::CapitalStructureState,
     instruments: &Instruments,
+    pik_toggle: Option<&crate::capital_structure::PikToggleSpec>,
     period: &Period,
     market_ctx: &finstack_quant_core::market_data::context::MarketContext,
     as_of: Date,
 ) -> Result<()> {
     use crate::capital_structure::period_flows::scheduled_opening_principal;
-    use finstack_quant_valuations::instruments::fixed_income::loan_terms::PrincipalPosting;
+    use finstack_quant_cashflows::builder::CouponType;
+    use finstack_quant_valuations::instruments::fixed_income::loan_terms::{
+        CouponElection, PrincipalPosting,
+    };
+    use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
+    use rust_decimal::Decimal;
 
-    let posted = std::mem::take(&mut state.period_postings);
-    let mut rebuilt = Vec::with_capacity(posted.len());
-    for (instrument_id, delta) in posted {
-        let instrument = instruments.get(&instrument_id).ok_or_else(|| {
+    let find = |instrument_id: &str| {
+        instruments.get(instrument_id).ok_or_else(|| {
             crate::error::Error::capital_structure(format!(
-                "principal was posted to '{instrument_id}', which is not an instrument of the \
-                 capital structure"
+                "'{instrument_id}' is not an instrument of the capital structure"
             ))
-        })?;
+        })
+    };
+
+    let mut postings: IndexMap<String, Vec<PrincipalPosting>> = IndexMap::new();
+    for (instrument_id, delta) in std::mem::take(&mut state.period_postings) {
         let mut ledger = state
             .postings
             .get(&instrument_id)
@@ -254,11 +274,110 @@ fn settle_postings(
             effective_date: period.end,
             delta,
         });
+        postings.insert(instrument_id, ledger);
+    }
+
+    let mut elections: IndexMap<String, Vec<CouponElection>> = IndexMap::new();
+    let request = state.period_pik_request.take();
+    if let (Some(pik), Some(request), false) = (pik_toggle, request, period.is_actual) {
+        for election in &pik.elections {
+            let instrument = find(&election.instrument_id)?;
+            let loan = instrument
+                .as_any()
+                .downcast_ref::<TermLoan>()
+                .ok_or_else(|| {
+                    crate::error::Error::capital_structure(format!(
+                        "`pik_toggle.elections` names '{}', which is not a term loan and has \
+                         no PIK coupon terms to elect",
+                        election.instrument_id
+                    ))
+                })?;
+            // The election takes effect at the start of the next coupon
+            // period; a loan with none left has nothing to elect.
+            let starts = loan.coupon_period_starts()?;
+            let Some(effective) = starts.iter().copied().find(|start| *start >= period.end) else {
+                continue;
+            };
+            let current = state
+                .coupon_elections
+                .get(&election.instrument_id)
+                .cloned()
+                .unwrap_or_default();
+            // Elections are made in period order, so nothing is dated after
+            // this one; deciding from the dates alone means a period
+            // evaluated again reaches the same decision.
+            let mut ledger: Vec<CouponElection> = current
+                .iter()
+                .copied()
+                .filter(|made| made.effective_date <= effective)
+                .collect();
+            let in_pik_since = ledger
+                .last()
+                .filter(|made| made.coupon_type != loan.coupon_type)
+                .map(|made| made.effective_date);
+            let elected = match (request, in_pik_since) {
+                (true, None) => Some(if election.pik_fraction == Decimal::ONE {
+                    CouponType::Pik
+                } else {
+                    CouponType::Split {
+                        cash_fraction: Decimal::ONE - election.pik_fraction,
+                        pik_fraction: election.pik_fraction,
+                    }
+                }),
+                // A PIK election ends only after its minimum number of
+                // coupon periods, counting the first elected one.
+                (false, Some(since)) => {
+                    let elapsed = starts
+                        .iter()
+                        .filter(|start| **start >= since && **start < effective)
+                        .count();
+                    (elapsed >= election.min_coupon_periods).then_some(loan.coupon_type)
+                }
+                _ => None,
+            };
+            if let Some(coupon_type) = elected {
+                // One election per coupon period: a later request replaces
+                // an election that has not started, and an election that
+                // restores the terms already in force is no election.
+                ledger.retain(|made| made.effective_date != effective);
+                let in_force = ledger
+                    .last()
+                    .map_or(loan.coupon_type, |made| made.coupon_type);
+                if coupon_type != in_force {
+                    ledger.push(CouponElection {
+                        effective_date: effective,
+                        coupon_type,
+                    });
+                }
+            }
+            if ledger != current {
+                elections.insert(election.instrument_id.clone(), ledger);
+            }
+        }
+    }
+
+    let changed: Vec<String> = postings
+        .keys()
+        .chain(elections.keys().filter(|id| !postings.contains_key(*id)))
+        .cloned()
+        .collect();
+    let mut rebuilt = Vec::with_capacity(changed.len());
+    for instrument_id in changed {
+        let instrument = find(&instrument_id)?;
+        let posting_ledger = postings
+            .get(&instrument_id)
+            .or_else(|| state.postings.get(&instrument_id))
+            .map_or(&[][..], Vec::as_slice);
+        let election_ledger = elections
+            .get(&instrument_id)
+            .or_else(|| state.coupon_elections.get(&instrument_id))
+            .map_or(&[][..], Vec::as_slice);
         let schedule = crate::capital_structure::residual_schedule::rebuild_from_postings(
             instrument.as_ref(),
             market_ctx,
             as_of,
-            &ledger,
+            posting_ledger,
+            election_ledger,
         )?;
         let carried = scheduled_opening_principal(&schedule, period.end)?;
         let closing = state
@@ -275,12 +394,13 @@ fn settle_postings(
                 period.id, carried, closing
             )));
         }
-        rebuilt.push((instrument_id, ledger, schedule));
+        rebuilt.push((instrument_id, schedule));
     }
-    for (instrument_id, ledger, schedule) in rebuilt {
-        state.postings.insert(instrument_id.clone(), ledger);
+    for (instrument_id, schedule) in rebuilt {
         state.residual_schedules.insert(instrument_id, schedule);
     }
+    state.postings.extend(postings);
+    state.coupon_elections.extend(elections);
     Ok(())
 }
 
@@ -780,5 +900,86 @@ mod fx_policy_tests {
             eur
         );
         let _ = FxConversionPolicy::PeriodEnd;
+    }
+}
+
+#[cfg(test)]
+mod election_tests {
+    use super::{Instruments, settle_postings};
+    use crate::capital_structure::{CapitalStructureState, PikElectionSpec, PikToggleSpec};
+    use finstack_quant_cashflows::builder::CouponType;
+    use finstack_quant_core::dates::{Date, Period, PeriodId};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoan;
+    use std::sync::Arc;
+    use time::macros::date;
+
+    /// An election's duration is counted from its dates, so settling a
+    /// period again, in any number of retries, counts each coupon period
+    /// once and reaches the same decision.
+    #[test]
+    fn a_period_settled_again_makes_the_same_election() {
+        // The example loan pays quarterly from 1 January 2024.
+        let mut loan = TermLoan::example().expect("term loan");
+        loan.id = "TL".into();
+        let mut instruments = Instruments::new();
+        instruments.insert("TL".into(), Arc::new(loan));
+        let toggle = PikToggleSpec {
+            liquidity_metric: "liquidity".into(),
+            threshold: 1.0,
+            elections: vec![PikElectionSpec {
+                instrument_id: "TL".into(),
+                pik_fraction: rust_decimal::Decimal::ONE,
+                min_coupon_periods: 2,
+            }],
+        };
+        let market = MarketContext::new();
+        let mut state = CapitalStructureState::new();
+        let mut settle = |quarter: u8, start: Date, end: Date, request: bool| {
+            let period = Period {
+                id: PeriodId::quarter(2024, quarter).expect("quarter"),
+                start,
+                end,
+                is_actual: false,
+            };
+            for _ in 0..3 {
+                state.period_pik_request = Some(request);
+                settle_postings(
+                    &mut state,
+                    &instruments,
+                    Some(&toggle),
+                    &period,
+                    &market,
+                    date!(2024 - 01 - 01),
+                )
+                .expect("settlement");
+            }
+            state
+                .coupon_elections
+                .get("TL")
+                .map(|ledger| {
+                    ledger
+                        .iter()
+                        .map(|made| (made.effective_date, made.coupon_type))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default()
+        };
+        let pik = (date!(2024 - 04 - 01), CouponType::Pik);
+        // A request for PIK in the first quarter covers periods from 1 April.
+        assert_eq!(
+            settle(1, date!(2024 - 01 - 01), date!(2024 - 04 - 01), true),
+            vec![pik]
+        );
+        // One coupon period has run by 1 July: the minimum of two holds.
+        assert_eq!(
+            settle(2, date!(2024 - 04 - 01), date!(2024 - 07 - 01), false),
+            vec![pik]
+        );
+        // Two have run by 1 October: the election ends there.
+        assert_eq!(
+            settle(3, date!(2024 - 07 - 01), date!(2024 - 10 - 01), false),
+            vec![pik, (date!(2024 - 10 - 01), CouponType::Cash)]
+        );
     }
 }

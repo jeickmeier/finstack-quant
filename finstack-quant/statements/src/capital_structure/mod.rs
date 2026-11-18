@@ -129,8 +129,8 @@ pub(crate) use principal::PrincipalClaim;
 pub(crate) use state::CapitalStructureState;
 pub(crate) use waterfall_spec::reject_pool_output_dependence;
 pub use waterfall_spec::{
-    EcfSweepSpec, EcfTerm, FacilitySelection, PaymentClassSpec, PaymentPriority, PikToggleSpec,
-    PrepaymentSpec, WaterfallSpec, default_priority_of_payments,
+    EcfSweepSpec, EcfTerm, FacilitySelection, PaymentClassSpec, PaymentPriority, PikElectionSpec,
+    PikToggleSpec, PrepaymentSpec, WaterfallSpec, default_priority_of_payments,
 };
 
 #[cfg(test)]

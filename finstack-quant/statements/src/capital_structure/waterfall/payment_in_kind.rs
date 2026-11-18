@@ -1,16 +1,16 @@
-//! PIK toggle evaluation, target scoping, and hysteresis.
+//! PIK toggle request: the liquidity metric against its threshold.
 
-use crate::capital_structure::cashflows::CashflowBreakdown;
-use crate::capital_structure::state::CapitalStructureState;
 use crate::capital_structure::waterfall_spec::PikToggleSpec;
 use crate::error::Result;
 use crate::evaluator::EvaluationContext;
-use indexmap::IndexMap;
-use std::collections::HashSet;
 
 use super::eval_value_or_formula;
 
-/// Evaluate PIK toggle conditions and return whether PIK should be enabled.
+/// Evaluate the toggle and return whether the period requests PIK.
+///
+/// A metric below the threshold requests PIK; a metric at or above it
+/// requests the base coupon terms. A missing or non-finite metric is an
+/// error from the expression evaluator.
 pub(super) fn evaluate_pik_toggle(
     context: &EvaluationContext,
     pik_spec: &PikToggleSpec,
@@ -18,56 +18,4 @@ pub(super) fn evaluate_pik_toggle(
 ) -> Result<bool> {
     let metric_value = eval_value_or_formula(context, &pik_spec.liquidity_metric, warnings)?;
     Ok(metric_value < pik_spec.threshold)
-}
-
-/// Check whether PIK mode is currently active for an instrument.
-pub(super) fn is_pik_enabled(state: &CapitalStructureState, instrument_id: &str) -> bool {
-    state.pik_mode.get(instrument_id).copied().unwrap_or(false)
-}
-
-/// Apply PIK mode transitions to `state` for the active period.
-///
-/// Encapsulates the per-instrument hysteresis rule:
-/// - Honour `min_periods_in_pik`: an instrument that *was* PIK and is being
-///   asked to switch off this period must remain PIK if it has not yet
-///   accrued enough consecutive periods. This prevents a single noisy
-///   liquidity reading from flipping PIK off mid-cycle.
-/// - Reset the consecutive-PIK counter to zero whenever PIK turns off.
-///
-/// Extracted from `execute_waterfall` so the orchestrator stays focused on
-/// payment-priority application; this helper owns all PIK state mutation.
-pub(super) fn apply_pik_transitions(
-    state: &mut CapitalStructureState,
-    contractual_flows: &IndexMap<String, CashflowBreakdown>,
-    enable_pik: bool,
-    pik_targets: &HashSet<String>,
-    min_periods_in_pik: usize,
-) {
-    for instrument_id in contractual_flows.keys() {
-        if !pik_targets.contains(instrument_id) {
-            continue;
-        }
-        let periods_active = state
-            .pik_periods_active
-            .get(instrument_id.as_str())
-            .copied()
-            .unwrap_or(0);
-        let currently_pik = state
-            .pik_mode
-            .get(instrument_id.as_str())
-            .copied()
-            .unwrap_or(false);
-        let effective_pik = if currently_pik && !enable_pik && periods_active < min_periods_in_pik {
-            true
-        } else {
-            enable_pik
-        };
-        state
-            .pik_mode
-            .insert(instrument_id.to_string(), effective_pik);
-        state.pik_periods_active.insert(
-            instrument_id.to_string(),
-            if effective_pik { periods_active + 1 } else { 0 },
-        );
-    }
 }

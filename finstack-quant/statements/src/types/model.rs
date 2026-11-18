@@ -793,29 +793,33 @@ impl CapitalStructureSpec {
     ///
     /// # Errors
     ///
-    /// Returns a build error for an invalid waterfall, a hedge or option named
-    /// as a PIK target, or a bond or derivative instrument alongside a
-    /// prepayment rung.
+    /// Returns a build error for an invalid waterfall, a PIK election naming
+    /// anything but a term loan of the structure, or a bond or derivative
+    /// instrument alongside a prepayment rung.
     pub fn validate(&self) -> Result<()> {
         if let Some(waterfall) = &self.waterfall {
             waterfall.validate()?;
+            // An election is applied through a term loan's own coupon
+            // terms, so only a term loan of this structure can be authorized.
             if let Some(pik) = &waterfall.pik_toggle {
-                for debt in &self.debt_instruments {
-                    let selected = pik
-                        .target_instrument_ids
+                for election in &pik.elections {
+                    let Some(debt) = self
+                        .debt_instruments
                         .iter()
-                        .any(|target| target == &debt.id);
-                    if selected
-                        && matches!(
-                            debt.spec,
-                            FinancialStatementInstrument::InterestRateSwap(_)
-                                | FinancialStatementInstrument::CapFloor(_)
-                                | FinancialStatementInstrument::Swaption(_)
-                        )
-                    {
+                        .find(|debt| debt.id == election.instrument_id)
+                    else {
                         return Err(Error::build(format!(
-                            "WaterfallSpec: PIK target '{}' is a hedge or option; only borrowing debt coupons can capitalize into principal",
-                            debt.id
+                            "WaterfallSpec: `pik_toggle.elections` names '{}', which is not \
+                             a debt instrument of the capital structure.",
+                            election.instrument_id
+                        )));
+                    };
+                    if !matches!(debt.spec, FinancialStatementInstrument::TermLoan(_)) {
+                        return Err(Error::build(format!(
+                            "WaterfallSpec: `pik_toggle.elections` names '{}', which is not \
+                             a term loan. A PIK election is applied through a term loan's \
+                             coupon terms; no other instrument can elect PIK.",
+                            election.instrument_id
                         )));
                     }
                 }
@@ -854,29 +858,6 @@ impl CapitalStructureSpec {
                         }
                         FinancialStatementInstrument::TermLoan(_)
                         | FinancialStatementInstrument::RevolvingCredit(_) => {}
-                    }
-                }
-            }
-            // A toggled coupon is capitalized, and only a term loan or a
-            // revolver recompiles its schedule from a principal change.
-            if let Some(pik) = &waterfall.pik_toggle {
-                for target in &pik.target_instrument_ids {
-                    let rebuildable = self.debt_instruments.iter().any(|debt| {
-                        &debt.id == target
-                            && matches!(
-                                debt.spec,
-                                FinancialStatementInstrument::TermLoan(_)
-                                    | FinancialStatementInstrument::RevolvingCredit(_)
-                            )
-                    });
-                    let known = self.debt_instruments.iter().any(|debt| &debt.id == target);
-                    if known && !rebuildable {
-                        return Err(Error::build(format!(
-                            "WaterfallSpec: `pik_toggle.target_instrument_ids` names \
-                             '{target}', which is not a term loan or a revolving credit \
-                             facility. Capitalizing its coupon changes principal, and only \
-                             those instruments rebuild their schedule from a principal change."
-                        )));
                     }
                 }
             }
@@ -1396,11 +1377,11 @@ mod period_timeline_tests {
         }
     }
 
-    /// A PIK toggle capitalizes a coupon, so it may only target an
-    /// instrument that rebuilds its schedule from a principal change.
+    /// A PIK election is applied through a term loan's coupon terms, so it
+    /// may only name a term loan of the structure.
     #[test]
-    fn pik_toggle_targets_must_rebuild_from_principal_changes() {
-        use crate::capital_structure::{PikToggleSpec, WaterfallSpec};
+    fn pik_elections_may_only_name_term_loans() {
+        use crate::capital_structure::{PikElectionSpec, PikToggleSpec, WaterfallSpec};
 
         let bond = Bond::fixed(
             finstack_quant_core::types::InstrumentId::new("BOND-PIK"),
@@ -1435,13 +1416,21 @@ mod period_timeline_tests {
                 pik_toggle: Some(PikToggleSpec {
                     liquidity_metric: "cash".into(),
                     threshold: 1.0,
-                    target_instrument_ids: vec![target.into()],
-                    min_periods_in_pik: 0,
+                    elections: vec![PikElectionSpec {
+                        instrument_id: target.into(),
+                        pik_fraction: rust_decimal::Decimal::ONE,
+                        min_coupon_periods: 0,
+                    }],
                 }),
                 ..WaterfallSpec::default()
             }),
         };
         capital("TL-PIK").validate().expect("a term loan target");
+        let error = capital("TL-GHOST")
+            .validate()
+            .expect_err("an unknown loan")
+            .to_string();
+        assert!(error.contains("'TL-GHOST'"), "{error}");
         let error = capital("BOND-PIK")
             .validate()
             .expect_err("a bond target")

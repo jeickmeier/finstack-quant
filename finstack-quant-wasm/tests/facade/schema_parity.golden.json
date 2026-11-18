@@ -2340,7 +2340,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 417387
+            "bytes": 418305
           },
           {
             "path": "schemas/statements/1/forecast_method.schema.json",
@@ -2578,6 +2578,7 @@
           "PeriodId",
           "PeriodPlan",
           "PiecewiseConstantCurve",
+          "PikElectionSpec",
           "PikMode",
           "PikSchedule",
           "PikToggle",
@@ -2788,6 +2789,7 @@
           "PeriodId",
           "PeriodPlan",
           "PiecewiseConstantCurve",
+          "PikElectionSpec",
           "PikMode",
           "PikSchedule",
           "PikToggle",
@@ -5164,7 +5166,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 417387
+            "bytes": 418305
           },
           {
             "domain": "statements",

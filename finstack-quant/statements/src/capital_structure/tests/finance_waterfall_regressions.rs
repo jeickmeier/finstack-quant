@@ -301,8 +301,11 @@ fn full_principal_repayment_preserves_earned_unpaid_interest() {
     assert_eq!(loan.accrued_interest.amount(), 25.0);
 }
 
+/// A PIK request never touches the coupon due in the period it is made in:
+/// with no cash the coupon is overdue cash interest, carried as arrears and
+/// not capitalized, and earned accrual is untouched.
 #[test]
-fn pik_preserves_earned_accrual_in_coupon_and_noncoupon_periods() {
+fn a_pik_request_leaves_the_current_coupon_and_its_arrears_in_cash() {
     for due_coupon in [0, 50] {
         let (mut state, mut flows) = loans(&["loan"], 1_000);
         let loan = flows.get_mut("loan").expect("loan");
@@ -312,19 +315,24 @@ fn pik_preserves_earned_accrual_in_coupon_and_noncoupon_periods() {
             pik_toggle: Some(PikToggleSpec {
                 liquidity_metric: "cash".into(),
                 threshold: 100.0,
-                target_instrument_ids: vec!["loan".into()],
-                min_periods_in_pik: 0,
+                elections: vec![crate::capital_structure::PikElectionSpec {
+                    instrument_id: "loan".into(),
+                    pik_fraction: rust_decimal::Decimal::ONE,
+                    min_coupon_periods: 0,
+                }],
             }),
             ..Default::default()
         };
         let result =
             execute_waterfall_same_period(&context(&[("cash", 0.0)]), &spec, &mut state, &flows)
-                .expect("PIK coupon allocation");
+                .expect("waterfall with a PIK request");
         let loan = &result.flows["loan"];
-        assert_eq!(loan.debt_balance, usd(1_000 + due_coupon));
-        assert_eq!(loan.interest_expense_cash.amount(), 0.0);
-        assert_eq!(loan.interest_expense_pik, usd(due_coupon));
+        assert_eq!(loan.debt_balance, usd(1_000));
+        assert_eq!(loan.interest_expense_pik.amount(), 0.0);
+        assert_eq!(loan.interest_arrears, Some(usd(due_coupon)));
         assert_eq!(loan.accrued_interest.amount(), 25.0);
+        assert_eq!(state.period_pik_request, Some(true));
+        assert!(state.period_postings.is_empty());
     }
 }
 
