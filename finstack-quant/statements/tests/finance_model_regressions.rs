@@ -861,8 +861,12 @@ fn fixed_bond(
 // Typed capital selectors and reporting scopes (STATEMENTS-CAPITAL-009)
 
 fn two_currency_builder(reporting: Option<Currency>) -> ModelBuilder {
+    two_currency_builder_over("2025Q1..Q1", reporting)
+}
+
+fn two_currency_builder_over(periods: &str, reporting: Option<Currency>) -> ModelBuilder {
     let mut builder = ModelBuilder::new("capital-scopes");
-    builder.periods("2025Q1..Q1", None).unwrap();
+    builder.periods(periods, None).unwrap();
     for (id, currency, curve) in [
         ("euro", Currency::EUR, "EUR-OIS"),
         ("dollar", Currency::USD, "USD-OIS"),
@@ -884,6 +888,51 @@ fn two_currency_builder(reporting: Option<Currency>) -> ModelBuilder {
         builder.fx_policy(finstack_quant_statements::types::CapitalFxPolicy::PeriodEnd);
     }
     builder
+}
+
+/// With the period-close quote missing, a lagged consolidated reference is
+/// unavailable like the same-period one, the run completes, and the cash
+/// flows still list every period.
+#[test]
+fn a_missing_close_quote_leaves_lagged_totals_unavailable_and_periods_listed() {
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
+    use finstack_quant_statements::evaluator::{ObservationCutoff, UnavailableReason};
+    use std::sync::Arc;
+
+    let mut builder = two_currency_builder_over("2025Q1..Q2", Some(Currency::USD));
+    builder
+        .compute("prior_total", "lag(cs.debt_balance.total, 1)")
+        .unwrap();
+    builder
+        .compute("prior_euro", "lag(cs.debt_balance.total.EUR, 1)")
+        .unwrap();
+    let model = builder.build().unwrap();
+    // A matrix that cannot convert EUR to USD.
+    let provider = SimpleFxProvider::new();
+    provider
+        .set_quotes(&[(Currency::GBP, Currency::USD, 1.3)])
+        .unwrap();
+    let market = MarketContext::new().insert_fx(Arc::new(FxMatrix::new(Arc::new(provider), None)));
+    let result = Evaluator::new()
+        .evaluate_with_market(
+            &model,
+            &market,
+            date!(2025 - 01 - 01),
+            ObservationCutoff::FullSnapshot,
+        )
+        .expect("a missing quote does not fail the run");
+
+    let cell = result.get_cell("prior_total", &quarter(2)).expect("cell");
+    assert_eq!(cell.value, None);
+    assert_eq!(cell.reason, Some(UnavailableReason::MissingFxQuote));
+    assert_eq!(
+        result.get_money("prior_euro", &quarter(2)),
+        Some(Money::from((1_000_i64, Currency::EUR)))
+    );
+    let cashflows = result.cs_cashflows.as_ref().expect("capital cash flows");
+    assert!(cashflows.totals.is_empty());
+    assert_eq!(cashflows.periods(), vec![quarter(1), quarter(2)]);
 }
 
 /// Each selector parses, renders and compiles, and an unknown component,

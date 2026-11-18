@@ -71,7 +71,7 @@ pub(crate) struct CapitalStructureState {
     pub(crate) residual_schedules: IndexMap<String, CashFlowSchedule>,
 
     /// Every principal change the waterfall has posted to an instrument
-    /// (prepayments and toggled PIK), each effective the day after its period
+    /// (prepayments and sweeps), each effective the day after its period
     /// close. The owner recompiles the schedule from its terms and this ledger.
     pub(crate) postings: IndexMap<String, Vec<PrincipalPosting>>,
 

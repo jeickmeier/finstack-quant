@@ -9,9 +9,8 @@ use indexmap::IndexMap;
 /// Also checks each breakdown's *internal* currency invariant. Comparing only
 /// `interest_expense_cash` across instruments would let a breakdown whose other
 /// legs carry a different currency through to the allocation steps, where
-/// `Money`'s asserting `AddAssign` aborts the process (e.g. the Step 4b PIK
-/// move). `execute_waterfall` is public and `CashflowBreakdown`'s fields are
-/// `pub`, so an inconsistent breakdown is reachable input and must produce an
+/// `Money`'s asserting `AddAssign` aborts the process. `CashflowBreakdown`'s
+/// fields are `pub`, so an inconsistent breakdown is reachable input and must produce an
 /// error rather than a panic (INVARIANTS.md §5).
 pub(super) fn waterfall_currency(
     flows: &IndexMap<String, CashflowBreakdown>,

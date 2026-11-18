@@ -1368,7 +1368,7 @@ Breaking, with no compatibility path (STATEMENTS-CONTRACTS-016).
   forecast seeds and the result seed already were; the number `42` is
   rejected. The Python constructor still takes an `int`.
 - `GoalSeekResult::from_json` parses under the same limits, rejects repeated
-  keys and loads its embedded model through the model loader.
+  keys and validates its embedded model, which must carry `schema_version: 1`.
 - The published `financial_model_spec` schema example is a runnable model with
   a value node and a formula node.
 

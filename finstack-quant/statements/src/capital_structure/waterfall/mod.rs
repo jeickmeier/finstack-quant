@@ -205,10 +205,10 @@ fn apply_named_prepay(
 /// Execute waterfall logic for a single period.
 ///
 /// This function:
-/// 1. Checks PIK toggle conditions and updates interest mode
-/// 2. Calculates contractual flows (interest, amortization)
-/// 3. Allocates available cash according to the priority stack
-/// 4. Sizes ECF at its sweep rung using debt service already paid
+/// 1. Records whether the PIK liquidity metric requests PIK (the election
+///    itself is decided when the period's postings are settled)
+/// 2. Allocates available cash according to the priority stack
+/// 3. Sizes ECF at its sweep rung using debt service already paid
 ///
 /// # Arguments
 ///
@@ -669,14 +669,11 @@ fn execute_waterfall_inner(
     // priorities, each bounded by the principal remaining at that rung.
     // (b) Dated principal accounting keeps economic balance changes separate
     // from settlement cash, including unpaid and early-settled installments.
-    // (c) PIK capitalization: the coupon was already moved into the PIK
-    // bucket in Step 4 when the toggle is active.
-    // Toggle PIK capitalizes at period close even when principal was fully
-    // paid down during the period; contractual PIK is already dated principal.
-    // (d) closing_balance = post_sweep_balance + toggle PIK.
-    // (e) accrued_interest retains interest earned but not yet due. Paying
+    // (c) PIK is dated principal in the loan's own schedule; an elected
+    // coupon capitalizes there, never in this close.
+    // (d) accrued_interest retains interest earned but not yet due. Paying
     // principal or toggling a coupon does not extinguish that separate claim.
-    // Any cash shortfall from Step 5 is interest already due: it is reported
+    // Any cash shortfall in the allocation is interest already due: it is reported
     // as interest_arrears, not accrued, and carried into the next period.
     for s in staged {
         let StagedInstrumentFlow {
@@ -1417,6 +1414,47 @@ mod tests {
             450.0,
             "fees paid ahead of sweep reduce ECF before the sweep percentage: (1000 - 100) * 50%"
         );
+    }
+
+    /// The swept fraction is rounded to the minor unit, half away from zero:
+    /// 50% of 100.03 is 50.015, requested and paid as 50.02.
+    #[test]
+    fn test_ecf_sweep_request_is_rounded_to_the_minor_unit() {
+        let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+        let context = build_context(period, &[("ebitda", 100.03)]);
+        let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
+        contractual_flows.insert(
+            "TL-1".to_string(),
+            CashflowBreakdown::with_currency(Currency::USD),
+        );
+        let mut state = CapitalStructureState::new();
+        state
+            .opening_balances
+            .insert("TL-1".to_string(), Money::from((10_000_i64, Currency::USD)));
+        let waterfall = WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Amortization,
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Sweep,
+                PaymentPriority::Equity,
+            ],
+            available_cash_node: "ebitda".into(),
+            ecf_sweep: Some(EcfSweepSpec {
+                cash_measure: "ebitda".into(),
+                deductions: Vec::new(),
+                credits: Vec::new(),
+                sweep_percentage: 0.5,
+                facilities: crate::capital_structure::FacilitySelection::Named(vec!["TL-1".into()]),
+            }),
+            pik_toggle: None,
+            ..Default::default()
+        };
+        let result =
+            execute_waterfall_same_period(&context, &waterfall, &mut state, &contractual_flows)
+                .expect("waterfall should execute");
+        let paid = result.flows.get("TL-1").expect("TL-1").principal_payment;
+        assert_eq!(paid.amount_decimal().to_string(), "50.02");
     }
 
     #[test]

@@ -381,8 +381,9 @@ pub fn scheduled_opening_principal(
 ///   schedule and identify historical versus projected amounts.
 /// * `residual_schedule` - Rebuilt remaining schedule after a prior outstanding
 ///   change; `None` reads the instrument's raw schedule instead. Period flows
-///   are read from this schedule (the interest engine) and a warning is raised if
-///   `opening / scheduled_opening` diverges from 1 by more than `1e-6`.
+///   are read from this schedule (the interest engine), and an opening
+///   balance that disagrees with it by more than half a minor unit is an
+///   error.
 ///
 /// # Returns
 ///

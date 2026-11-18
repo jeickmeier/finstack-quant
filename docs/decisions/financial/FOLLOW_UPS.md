@@ -4,7 +4,7 @@
 identified in linked records; runtime-change authorization is not implied. **Audit:** 2026-11-05, source revision
 `7e82fd03ad98346727769e88dd5ac5d84b56e9fc`.
 
-This backlog consolidates **621 review items across 33 source scopes with open items**
+This backlog consolidates **624 review items across 33 source scopes with open items**
 in the [algorithm catalogue](README.md). Accepted methodology is identified
 in the owning records; other pending decisions retain their labels.
 Owning records provide formulas, source/test/reference evidence and scope
@@ -21,12 +21,12 @@ The labels distinguish the work required:
 
 - **Observed** (53): a static implementation, contract, dispatch or
   documentation difference. Its financial impact is not necessarily reproduced.
-- **Investigate** (16): a source-derived numerical or economic concern
+- **Investigate** (17): a source-derived numerical or economic concern
   requiring targeted reproduction, an independent reference or convergence
   study before a defect conclusion.
 - **Decision** (38): a financial convention, supported domain, approximation,
   failure policy or result meaning requiring explicit agreement.
-- **Reconciliation** (478): implementation and verification work against an
+- **Reconciliation** (480): implementation and verification work against an
   accepted contract, without reopening that contract for adoption.
 - **Evidence** (36): a particular primary-reference, empirical-calibration,
   independent-fixture or numerical-qualification gap.
@@ -67,8 +67,8 @@ product consequences remain in their product scope.
 | [Calibration: quotes and curve/smile targets](#calibration-quotes-and-curvesmile-targets) | 18 |
 | [Calibration: Hull–White and LMM](#calibration-hullwhite-and-lmm) | 18 |
 | [Margin: collateral and initial margin](#margin-collateral-and-initial-margin) | 22 |
-| [Statements: capital structure](#statements-capital-structure) | 4 |
-| [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 3 |
+| [Statements: capital structure](#statements-capital-structure) | 6 |
+| [Statements: model, formula and check contracts](#statements-model-formula-and-check-contracts) | 4 |
 | [Statements: evaluation, forecasts and reporting](#statements-evaluation-forecasts-and-reporting) | 3 |
 | [Statements analytics: valuation, comparisons and templates](#statements-analytics-valuation-comparisons-and-templates) | 18 |
 | [Statements analytics: credit checks and impairment](#statements-analytics-credit-checks-and-impairment) | 18 |
@@ -1022,6 +1022,10 @@ product consequences remain in their product scope.
 
 - **Investigate — Margin aggregation under extreme and offsetting inputs.** Quantify overflow, cancellation and insertion-order effects in ordinary sensitivity sums, concentration-adjusted SIMM quadratics and schedule gross-by-class/notional totals. Include large cancelling IR/FX inputs and floored quadratic sums; deterministic serialization alone does not establish numerical accuracy or invariance. Qualify affected outputs against independent scaled/offsetting cases before drawing an impact conclusion. Records: [MARGIN-COLLATERAL-IM-003](margin-collateral-im/03-sensitivity-inputs.md), [MARGIN-COLLATERAL-IM-004](margin-collateral-im/04-simm-interest-rate.md), [MARGIN-COLLATERAL-IM-008](margin-collateral-im/08-simm-fx.md), [MARGIN-COLLATERAL-IM-010](margin-collateral-im/10-simm-curvature.md), [MARGIN-COLLATERAL-IM-011](margin-collateral-im/11-simm-total-and-mpor.md), [MARGIN-COLLATERAL-IM-013](margin-collateral-im/13-schedule-net-gross.md).
 
+- **Reconciliation — Rebuilt loan schedules after a waterfall posting.** A revolver with a fixed contractual repayment dated after a sweep fails the run when the swept balance is below that repayment, while a term loan caps its later amortization; make the two owners agree. On a term loan that capitalizes interest the amortization cap counts funded principal only, so amortization after a posting stops at the funded balance and the capitalized interest is redeemed at maturity; size it on the full balance. Found in the branch review (2026-11-18). [Residual schedules](statements-capital/05-residual-coupons.md) · [PIK](statements-capital/08-pik-and-carry-state.md).
+
+- **Investigate — Contractual PIK toggles and the waterfall currency.** The forecast PIK exercise reads only its own election ledger and the loan's coupon type, so a historical toggle recorded in `covenants.pik_toggles` that is still in force at the first forecast period is neither ended by a recovered metric nor counted toward the minimum duration. With instruments present, available cash and sizing expressions are tagged with the instruments' currency and the reporting currency is not checked against it, so a node in another currency would be allocated without conversion or error. Confirm each against its record and fix or state the constraint. Found in the branch review (2026-11-18). [PIK](statements-capital/08-pik-and-carry-state.md) · [Allocation](statements-capital/06-priority-allocation.md).
+
 ## Statements: model, formula and check contracts
 
 [Scope inventory](statements-contracts/README.md).
@@ -1031,6 +1035,8 @@ product consequences remain in their product scope.
 - **Reconciliation — Located diagnostics for semantic model failures.** Give a model that decodes but is not runnable a diagnostic code and the JSON pointer of the offending node, period or capital-structure field; today a semantic failure is the typed Statements error with its kind (validation, lookup or computation) and message only, because Statements errors carry text and no location. The single bounded loading path, exact version, number, money and seed admission, identity after validation with separate run provenance, instrument eligibility, the runnable schema example and one decode-error shape across Rust, Python and WASM are reconciled. [Accepted STATEMENTS-CONTRACTS-016](statements-contracts/16-wire-schema-and-errors.md#accepted-decision-for-statements-wire-admission-schemas-and-errors).
 
 - **Reconciliation — Typed comparison values and coverage in analytics checks.** Record a comparison's actual, expected, difference and tolerance as typed values (exact `Money` or scalar) at the compared precision; today they are floats in the compared nodes' units, with compatible units checked for identity inputs, and a [formula check's](statements-contracts/15-formula-checks.md#accepted-decision-for-formula-checks-and-coverage) residual and its tolerance are floats in the residual's units. The accounting identities already sum exactly (money) or with compensation (scalars) and compare one exact residual; the recorded values are its float views, and a relative residual that is undefined (a zero reference) is recorded as zero. Define, with their owning records, when a statements-analytics check that lacks an input is incomplete rather than not applicable; today those checks report the periods they examined and never a coverage finding. Zero default tolerance with the inclusive `max(absolute, relative × reference)` allowance and absolute override, pass, fail, incomplete and unevaluated verdicts from unfiltered outcomes, advisory-only filters, declared order with unique identifiers, compatible merges, and supplied results accepted only as a verified run under the requested cutoff are reconciled. [Accepted STATEMENTS-CONTRACTS-014](statements-contracts/14-comparison-and-suite-policy.md#accepted-decision-for-numerical-comparisons-and-check-suites).
+
+- **Reconciliation — Host `get_node` returns a numeric series.** Python `StatementResult.get_node` and WASM `statementResultGetNode` return a node's numeric series, while Rust `StatementResult::get_node` now returns its typed cells; rename the host members to the Rust accessor they wrap or return the typed cells, and update the parity ledger's reason. The ledger's module notes also still name builder members that no longer exist. Found in the branch review (2026-11-18). [Typed results](statements-evaluation/13-result-units-and-exports.md#accepted-decision-for-typed-results-and-exports).
 
 ## Statements: evaluation, forecasts and reporting
 

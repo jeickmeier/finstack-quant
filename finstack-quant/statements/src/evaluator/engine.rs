@@ -1196,7 +1196,7 @@ impl Evaluator {
 
     /// Evaluate a single period.
     ///
-    /// `mc` carries the Monte Carlo seed offset and per-path z-score cache;
+    /// `mc` carries the Monte Carlo path identity and per-path z-score cache;
     /// `None` is the single-run path.
     fn evaluate_period(
         &mut self,

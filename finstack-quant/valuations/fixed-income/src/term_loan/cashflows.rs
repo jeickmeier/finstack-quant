@@ -297,8 +297,10 @@ pub(crate) fn generate_cashflows_with_postings(
     //
     // This pass sees funded principal only. On a loan that can capitalize
     // interest the balance a posting repays includes PIK the builder has not
-    // produced yet, so a posting neither enters the running balance nor is
-    // judged here; the builder refuses one that takes the balance negative.
+    // produced yet, so a posting beyond the funded balance is not refused
+    // here: the builder refuses one that takes the full balance negative.
+    // Amortization stays capped at the funded balance, and capitalized
+    // interest left after it is redeemed at maturity.
     let capitalizes = loan.coupon_type != CouponType::Cash
         || !elections.is_empty()
         || loan
@@ -321,9 +323,9 @@ pub(crate) fn generate_cashflows_with_postings(
                     }
                     running -= capped;
                 }
-                CFKind::PrePayment if !capitalizes => {
+                CFKind::PrePayment => {
                     running += event.delta.amount();
-                    if running < -1e-9 {
+                    if running < -1e-9 && !capitalizes {
                         return Err(finstack_quant_core::Error::Validation(format!(
                             "term loan '{}': the principal posting of {} effective {} exceeds \
                              the principal outstanding",

@@ -189,6 +189,28 @@ fn a_term_loan_rejects_postings_it_cannot_apply() {
     assert!(error.contains("EUR"), "{error}");
 }
 
+/// On a loan that capitalizes interest, amortization after a posting is still
+/// sized on what remains and the loan redeems to zero.
+#[test]
+fn a_capitalizing_loan_amortizes_what_remains_after_a_posting() {
+    let mut loan = semiannual_loan(CouponType::Split {
+        cash_fraction: rust_decimal::Decimal::new(5, 1),
+        pik_fraction: rust_decimal::Decimal::new(5, 1),
+    });
+    loan.frequency = Tenor::quarterly();
+    loan.amortization = AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.30 };
+    let rebuilt = loan
+        .cashflow_schedule_with_postings(
+            &MarketContext::new(),
+            &[posting(date!(2025 - 02 - 15), -50.0)],
+            &[],
+        )
+        .expect("rebuilt schedule");
+    let path = rebuilt.outstanding_by_date().expect("principal path");
+    assert_close(path.last().expect("final balance").1.amount(), 0.0);
+    assert!(path.iter().all(|(_, balance)| balance.amount() >= -1e-9));
+}
+
 /// A PIK loan's balance includes its capitalized interest: 100 at 10% is 105
 /// after the first semi-annual coupon, so 105 repays it and 106 is refused.
 #[test]

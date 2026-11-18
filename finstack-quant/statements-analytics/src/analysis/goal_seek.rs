@@ -576,6 +576,30 @@ mod tests {
         assert!(
             GoalSeekResult::from_json(r#"{"solved_value": 1.0, "model": null, "x": 1}"#).is_err()
         );
+        // The embedded model is held to the model loader's rules: the exact
+        // version, and no repeated key.
+        let model = {
+            let mut builder = finstack_quant_statements::builder::ModelBuilder::new("m");
+            builder.periods("2025Q1..Q1", None).expect("periods");
+            builder.value_scalar("revenue", &[]);
+            serde_json::to_string(&builder.build().expect("model")).expect("json")
+        };
+        let document = |model: &str| format!(r#"{{"solved_value": 1.0, "model": {model}}}"#);
+        GoalSeekResult::from_json(&document(&model)).expect("a runnable embedded model");
+        for version in ["2", "\"1\"", "1.0"] {
+            let wrong = model.replace(
+                "\"schema_version\":1",
+                &format!("\"schema_version\":{version}"),
+            );
+            assert_ne!(wrong, model);
+            assert!(
+                GoalSeekResult::from_json(&document(&wrong)).is_err(),
+                "{version}"
+            );
+        }
+        let repeated = model.replacen("{\"id\":", "{\"id\":\"shadow\",\"id\":", 1);
+        assert_ne!(repeated, model);
+        assert!(GoalSeekResult::from_json(&document(&repeated)).is_err());
     }
 
     #[test]
