@@ -40,7 +40,48 @@ pub(crate) fn generate_cashflows(
     loan: &TermLoan,
     market: &MarketContext,
 ) -> finstack_quant_core::Result<CashFlowSchedule> {
+    generate_cashflows_with_postings(loan, market, &[])
+}
+
+/// Generate the schedule of a term loan with principal postings applied.
+///
+/// Each posting is a zero-cash `PrePayment` principal row on its effective
+/// date. Coupons and balance-based fees accrue on the changed principal from
+/// that date, and later amortization and the maturity redemption are sized
+/// on what remains.
+pub(crate) fn generate_cashflows_with_postings(
+    loan: &TermLoan,
+    market: &MarketContext,
+    postings: &[crate::loan_terms::PrincipalPosting],
+) -> finstack_quant_core::Result<CashFlowSchedule> {
     let mut principal_events: Vec<PrincipalEventSpec> = Vec::new();
+    for posting in postings {
+        if posting.delta.currency() != loan.currency {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "term loan '{}': a principal posting effective {} is in {}, not the loan \
+                 currency {}",
+                loan.id,
+                posting.effective_date,
+                posting.delta.currency(),
+                loan.currency
+            )));
+        }
+        if posting.effective_date <= loan.issue_date || posting.effective_date > loan.maturity {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "term loan '{}': a principal posting effective {} is outside the life of the \
+                 loan ({} to {})",
+                loan.id, posting.effective_date, loan.issue_date, loan.maturity
+            )));
+        }
+        // The posting's cash settled outside the schedule.
+        principal_events.push(PrincipalEventSpec {
+            date: posting.effective_date,
+            payment_date: posting.effective_date,
+            delta: posting.delta,
+            cash: Some(Money::from((0_i64, loan.currency))),
+            kind: CFKind::PrePayment,
+        });
+    }
     let mut fees: Vec<FeeSpec> = Vec::new();
 
     // Draw stop date (if any)
@@ -230,7 +271,9 @@ pub(crate) fn generate_cashflows(
         }
     }
 
-    principal_events.sort_by_key(|e| e.date);
+    // A posting was made at the prior day's close, so it precedes the
+    // contractual events of its effective date.
+    principal_events.sort_by_key(|e| (e.date, e.kind != CFKind::PrePayment));
 
     // Cap amortization events to prevent negative outstanding balance.
     // Track running outstanding from funding events and cap each amort at
@@ -252,6 +295,18 @@ pub(crate) fn generate_cashflows(
                         event.cash = Some(Money::new(capped, event.delta.currency())?);
                     }
                     running -= capped;
+                }
+                CFKind::PrePayment => {
+                    running += event.delta.amount();
+                    if running < -1e-9 {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "term loan '{}': the principal posting of {} effective {} exceeds \
+                             the principal outstanding",
+                            loan.id,
+                            event.delta.amount(),
+                            event.date
+                        )));
+                    }
                 }
                 _ => {}
             }

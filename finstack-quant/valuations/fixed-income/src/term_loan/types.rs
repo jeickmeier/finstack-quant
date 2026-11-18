@@ -950,6 +950,44 @@ impl finstack_quant_cashflows::CashflowScheduleSource for TermLoan {
     }
 }
 
+impl TermLoan {
+    /// Recompile the contractual schedule with principal postings applied.
+    ///
+    /// The schedule is rebuilt from the loan's own terms, not adjusted row by
+    /// row: each affected coupon accrues on the dated principal under the
+    /// loan's rate, day count and cash/PIK split, balance-based fees follow
+    /// the changed balance, and later amortization and the maturity
+    /// redemption are sized on what remains. With no postings this is the
+    /// loan's ordinary projected schedule.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market the loan's floating coupons and fixings are read
+    ///   from; a fixed-rate loan needs none of it.
+    /// * `postings` - Principal changes already settled outside the schedule,
+    ///   in the loan currency. Each takes effect at the start of its
+    ///   `effective_date`, which must be after issue and no later than
+    ///   maturity, and appears as a zero-cash `PrePayment` row carrying the
+    ///   principal change.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when a posting is in another currency, is
+    /// effective outside the life of the loan or repays more than the
+    /// principal outstanding on its date, and propagates schedule errors.
+    pub fn cashflow_schedule_with_postings(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        postings: &[crate::loan_terms::PrincipalPosting],
+    ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
+        let schedule =
+            crate::term_loan::cashflows::generate_cashflows_with_postings(self, market, postings)?;
+        Ok(schedule.with_representation(
+            finstack_quant_cashflows::builder::CashflowRepresentation::Projected,
+        ))
+    }
+}
+
 impl finstack_quant_covenants::InstrumentMutator for TermLoan {
     fn set_default_status(
         &mut self,

@@ -152,6 +152,9 @@ pub struct CashflowEngine<'a> {
     /// When present and a reset date falls before `as_of`, the observed
     /// fixing is used instead of projecting from the forward curve.
     fixing_series: Option<&'a ScalarTimeSeries>,
+    /// Principal changes already settled outside the schedule. They move the
+    /// drawn balance like draws and repayments but emit no cash.
+    postings: &'a [crate::loan_terms::PrincipalPosting],
 }
 
 impl<'a> CashflowEngine<'a> {
@@ -232,18 +235,23 @@ impl<'a> CashflowEngine<'a> {
             day_count,
             as_of,
             fixing_series,
+            postings: &[],
         })
     }
 
     /// Deterministic schedule of `facility` on `market`, with the index's
-    /// historical fixings applied to resets before `as_of`.
+    /// historical fixings applied to resets before `as_of` and `postings`
+    /// applied to the drawn balance.
     pub(crate) fn deterministic(
         facility: &'a RevolvingCredit,
         market: &'a MarketContext,
         as_of: Date,
+        postings: &'a [crate::loan_terms::PrincipalPosting],
     ) -> Result<PathAwareCashflowSchedule> {
         let fixings = super::utils::resolve_fixings(facility, market);
-        Self::new(facility, Some(market), as_of, fixings)?.generate_deterministic()
+        let mut engine = Self::new(facility, Some(market), as_of, fixings)?;
+        engine.postings = postings;
+        engine.generate_deterministic()
     }
 
     /// Generate deterministic cashflows (no path data).
@@ -292,7 +300,7 @@ impl<'a> CashflowEngine<'a> {
     /// the original `cashflows.rs::generate_deterministic_cashflows_internal`.
     fn build_deterministic_schedule(&self) -> Result<CashFlowSchedule> {
         let mut projected_fixings = Vec::new();
-        let mut draw_repay_events = match &self.facility.draw_repay_spec {
+        let draw_repay_events = match &self.facility.draw_repay_spec {
             DrawRepaySpec::Deterministic(events) => events.clone(),
             DrawRepaySpec::Stochastic(_) => {
                 return Err(finstack_quant_core::Error::Validation(
@@ -300,6 +308,30 @@ impl<'a> CashflowEngine<'a> {
                 ));
             }
         };
+        // Postings move the drawn balance like the facility's own events; only
+        // the facility's events are cash rows. A posting was made at the
+        // prior day's close, so it precedes the facility's events of its
+        // effective date: postings go first and the date sort is stable.
+        let contract_events = draw_repay_events;
+        let ccy = self.facility.commitment.currency();
+        let mut draw_repay_events = Vec::with_capacity(self.postings.len() + contract_events.len());
+        for posting in self.postings {
+            if posting.delta.currency() != ccy {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "RevolvingCredit '{}': a principal posting effective {} is in {}, not the \
+                     facility currency {ccy}",
+                    self.facility.id,
+                    posting.effective_date,
+                    posting.delta.currency()
+                )));
+            }
+            draw_repay_events.push(super::types::DrawRepayEvent {
+                date: posting.effective_date,
+                amount: posting.delta.abs(),
+                is_draw: posting.delta.amount() > 0.0,
+            });
+        }
+        draw_repay_events.extend(contract_events.iter().cloned());
         draw_repay_events.sort_by_key(|event| event.date);
 
         // `drawn` is the balance at the simulation anchor (the later of
@@ -321,7 +353,6 @@ impl<'a> CashflowEngine<'a> {
         let step_dates = self.facility.step_dates();
         let mut flows = Vec::new();
         let rc = RoundingContext::default();
-        let ccy = self.facility.commitment.currency();
 
         // Add initial draw at issue_date (from lender perspective: negative cashflow)
         if self.facility.issue_date > self.as_of
@@ -651,8 +682,26 @@ impl<'a> CashflowEngine<'a> {
             fees.emit(&mut flows, payment_date, total_accrual, &rc)?;
         }
 
+        // A posting is a zero-cash principal row: its cash settled outside
+        // the schedule.
+        for posting in self.postings {
+            flows.push(
+                CashFlowParams::new(
+                    posting.effective_date,
+                    None,
+                    Money::from((0_i64, ccy)),
+                    CFKind::PrePayment,
+                    0.0,
+                    None,
+                )
+                .with_principal_delta(posting.delta)
+                .with_principal_date(posting.effective_date)
+                .build()?,
+            );
+        }
+
         // Add principal flows from draw/repay events
-        for event in draw_repay_events.iter() {
+        for event in contract_events.iter() {
             if event.date > self.as_of {
                 flows.push({
                     // The par change equals the cash (record CORE-CONVENTIONS-015 #4).
