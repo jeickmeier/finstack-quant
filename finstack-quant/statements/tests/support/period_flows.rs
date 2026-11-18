@@ -118,7 +118,7 @@ pub fn aggregate_period_flows(
             None => Money::new(0.0, currency).expect("valid money fixture"),
         };
         for period in periods {
-            let (breakdown, closing, _net_new_funding, _warnings) = calculate_period_flows(
+            let (breakdown, closing, _net_new_funding) = calculate_period_flows(
                 instrument.as_ref(),
                 period,
                 opening,

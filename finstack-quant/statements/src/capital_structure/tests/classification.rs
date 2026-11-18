@@ -55,7 +55,7 @@ fn face_reduction_and_repayment_cash_keep_their_own_periods() {
     )]);
     let periods = months("2025M3..2025M4");
     let market = MarketContext::new();
-    let (march, march_close, _, _) = calculate_period_flows(
+    let (march, march_close, _) = calculate_period_flows(
         &instrument,
         &periods[0],
         usd(100.0),
@@ -66,7 +66,7 @@ fn face_reduction_and_repayment_cash_keep_their_own_periods() {
     .expect("march");
     assert_eq!(march.principal_payment, usd(0.0));
     assert_eq!(march_close, usd(0.0));
-    let (april, april_close, _, _) = calculate_period_flows(
+    let (april, april_close, _) = calculate_period_flows(
         &instrument,
         &periods[1],
         march_close,
@@ -94,7 +94,7 @@ fn distress_cash_is_reported_outside_scheduled_debt_service() {
         row(CFKind::Recovery, date!(2025 - 02 - 20), 15.0, None),
     ]);
     let period = months("2025M2..2025M2").remove(0);
-    let (flows, close, _, warnings) = calculate_period_flows(
+    let (flows, close, _) = calculate_period_flows(
         &instrument,
         &period,
         usd(100.0),
@@ -107,7 +107,6 @@ fn distress_cash_is_reported_outside_scheduled_debt_service() {
     assert_eq!(flows.fees, usd(0.0));
     assert_eq!(flows.interest_expense_cash, usd(0.0));
     assert_eq!(close, usd(60.0));
-    assert!(warnings.is_empty(), "{warnings:?}");
     // The settlement is reported on its own, as company cash of -15.
     let distress = crate::capital_structure::period_flows::period_distress_cash(
         "TL",
@@ -232,7 +231,7 @@ fn every_kind_is_classified_with_its_sign() {
     };
     let on = date!(2025 - 02 - 10);
     // The lender receives a 2 fee and a 3 inflation-linked coupon.
-    let (paid, _, _, _) = flows(vec![
+    let (paid, _, _) = flows(vec![
         row(CFKind::Fee, on, 2.0, None),
         row(CFKind::InflationCoupon, on, 3.0, None),
     ])
@@ -252,7 +251,7 @@ fn every_kind_is_classified_with_its_sign() {
         "{margin}"
     );
     // A PIK correction reduces the capitalized total with its sign.
-    let (pik, _, _, _) = flows(vec![
+    let (pik, _, _) = flows(vec![
         row(CFKind::Pik, on, 0.0, Some((5.0, on))),
         row(CFKind::Pik, on, 0.0, Some((-1.0, on))),
     ])

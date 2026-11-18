@@ -107,13 +107,11 @@ impl Evaluator {
         let mut staged_state = committed_state.clone();
         let cs_state = &mut staged_state;
 
-        // The period is validated before any schedule is read.
-        crate::capital_structure::period_flows::validate_period(period)?;
         let ContractualFlows {
             flows: contractual_flows,
             distress: distress_cash,
-            warnings: mut contractual_warnings,
         } = compute_contractual_flows(instruments, cs_state, period, market_ctx, as_of)?;
+        let mut waterfall_warnings = Vec::new();
 
         let fx_ctx = build_fx_context(model, market_ctx, period)?;
         let mut cs_cashflows = crate::capital_structure::CapitalStructureCashflows::new();
@@ -143,22 +141,24 @@ impl Evaluator {
             && let Some(waterfall_spec) = &cs_spec.waterfall
         {
             // The debt ledger and the schedules the owners rebuild from
-            // this period's principal changes commit together.
-            let waterfall_result = crate::capital_structure::waterfall::execute_waterfall_then(
+            // this period's principal changes live on the staged state, so
+            // they commit together or not at all.
+            let waterfall_result = crate::capital_structure::waterfall::execute_waterfall(
                 &context,
                 waterfall_spec,
                 cs_state,
                 &contractual_flows,
                 model.capital_structure_currency()?,
-                |staged| {
-                    settle_postings(
-                        staged,
-                        instruments,
-                        waterfall_spec.pik_toggle.as_ref(),
-                        period,
-                        market_ctx,
-                        as_of,
-                    )
+            )?;
+            settle_postings(
+                cs_state,
+                instruments,
+                waterfall_spec.pik_toggle.as_ref(),
+                period,
+                (market_ctx, as_of),
+                PeriodChanges {
+                    postings: &waterfall_result.postings,
+                    pik_request: waterfall_result.pik_request,
                 },
             )?;
 
@@ -178,7 +178,7 @@ impl Evaluator {
             if let Some(cash) = waterfall_result.available_cash {
                 cs_cashflows.available_cash.insert(period_id, cash);
             }
-            contractual_warnings.extend(waterfall_result.warnings);
+            waterfall_warnings = waterfall_result.warnings;
             context.set_capital_structure_cashflows(cs_cashflows);
             waterfall_replaced_flows = true;
         }
@@ -208,7 +208,7 @@ impl Evaluator {
         // Deduplicate while preserving first-occurrence order.
         let mut seen: HashSet<String> = HashSet::with_capacity(warnings.len());
         warnings.retain(|w| seen.insert(format!("{w:?}")));
-        warnings.append(&mut contractual_warnings);
+        warnings.append(&mut waterfall_warnings);
         *committed_state = staged_state;
         Ok((values, row, warnings, period_cs_cashflows))
     }
@@ -234,6 +234,15 @@ pub(crate) fn dependent_closure(
     visited
 }
 
+/// What one period's waterfall changed: its principal postings and the PIK
+/// toggle's request.
+struct PeriodChanges<'a> {
+    /// Net principal change per instrument, in exact money.
+    postings: &'a IndexMap<String, Money>,
+    /// `Some(true)` asks for PIK, `Some(false)` for the base coupon terms.
+    pik_request: Option<bool>,
+}
+
 /// Rebuild the schedule of every instrument whose principal the waterfall
 /// changed this period or whose coupon election the PIK toggle changed.
 ///
@@ -245,14 +254,18 @@ pub(crate) fn dependent_closure(
 /// period evaluated again decides the same thing. The owner recompiles the
 /// schedule from the contract and both ledgers. A schedule is accepted only
 /// when the principal it carries into the next period equals the ledger's
-/// closing balance; nothing is stored unless every instrument rebuilds.
+/// closing balance. `state` is the period's staged copy: on an error the
+/// caller discards it, so nothing here needs its own staging.
 fn settle_postings(
     state: &mut crate::capital_structure::CapitalStructureState,
     instruments: &Instruments,
     pik_toggle: Option<&crate::capital_structure::PikToggleSpec>,
     period: &Period,
-    market_ctx: &finstack_quant_core::market_data::context::MarketContext,
-    as_of: Date,
+    (market_ctx, as_of): (
+        &finstack_quant_core::market_data::context::MarketContext,
+        Date,
+    ),
+    changes: PeriodChanges<'_>,
 ) -> Result<()> {
     use crate::capital_structure::period_flows::scheduled_opening_principal;
     use finstack_quant_cashflows::builder::CouponType;
@@ -270,23 +283,20 @@ fn settle_postings(
         })
     };
 
-    let mut postings: IndexMap<String, Vec<PrincipalPosting>> = IndexMap::new();
-    for (instrument_id, delta) in std::mem::take(&mut state.period_postings) {
-        let mut ledger = state
+    let mut changed: indexmap::IndexSet<String> = indexmap::IndexSet::new();
+    for (instrument_id, delta) in changes.postings {
+        state
             .postings
-            .get(&instrument_id)
-            .cloned()
-            .unwrap_or_default();
-        ledger.push(PrincipalPosting {
-            effective_date: period.end,
-            delta,
-        });
-        postings.insert(instrument_id, ledger);
+            .entry(instrument_id.clone())
+            .or_default()
+            .push(PrincipalPosting {
+                effective_date: period.end,
+                delta: *delta,
+            });
+        changed.insert(instrument_id.clone());
     }
 
-    let mut elections: IndexMap<String, Vec<CouponElection>> = IndexMap::new();
-    let request = state.period_pik_request.take();
-    if let (Some(pik), Some(request), false) = (pik_toggle, request, period.is_actual) {
+    if let (Some(pik), Some(request), false) = (pik_toggle, changes.pik_request, period.is_actual) {
         for election in &pik.elections {
             let instrument = find(&election.instrument_id)?;
             let loan = instrument
@@ -359,33 +369,28 @@ fn settle_postings(
                 }
             }
             if ledger != current {
-                elections.insert(election.instrument_id.clone(), ledger);
+                state
+                    .coupon_elections
+                    .insert(election.instrument_id.clone(), ledger);
+                changed.insert(election.instrument_id.clone());
             }
         }
     }
 
-    let changed: Vec<String> = postings
-        .keys()
-        .chain(elections.keys().filter(|id| !postings.contains_key(*id)))
-        .cloned()
-        .collect();
-    let mut rebuilt = Vec::with_capacity(changed.len());
     for instrument_id in changed {
         let instrument = find(&instrument_id)?;
-        let posting_ledger = postings
-            .get(&instrument_id)
-            .or_else(|| state.postings.get(&instrument_id))
-            .map_or(&[][..], Vec::as_slice);
-        let election_ledger = elections
-            .get(&instrument_id)
-            .or_else(|| state.coupon_elections.get(&instrument_id))
-            .map_or(&[][..], Vec::as_slice);
         let schedule = crate::capital_structure::residual_schedule::rebuild_from_postings(
             instrument.as_ref(),
             market_ctx,
             as_of,
-            posting_ledger,
-            election_ledger,
+            state
+                .postings
+                .get(&instrument_id)
+                .map_or(&[][..], Vec::as_slice),
+            state
+                .coupon_elections
+                .get(&instrument_id)
+                .map_or(&[][..], Vec::as_slice),
         )?;
         let carried = scheduled_opening_principal(&schedule, period.end)?;
         let closing = state
@@ -402,13 +407,8 @@ fn settle_postings(
                 period.id, carried, closing
             )));
         }
-        rebuilt.push((instrument_id, schedule));
-    }
-    for (instrument_id, schedule) in rebuilt {
         state.residual_schedules.insert(instrument_id, schedule);
     }
-    state.postings.extend(postings);
-    state.coupon_elections.extend(elections);
     Ok(())
 }
 
@@ -428,8 +428,6 @@ struct ContractualFlows {
     flows: IndexMap<String, crate::capital_structure::CashflowBreakdown>,
     /// Distress cash rows of the period, outside debt service.
     distress: Vec<crate::capital_structure::DistressCashflow>,
-    /// Warnings raised while reading the schedules.
-    warnings: Vec<EvalWarning>,
 }
 
 fn compute_contractual_flows(
@@ -443,22 +441,25 @@ fn compute_contractual_flows(
         SuppliedSchedule, calculate_period_flows, is_debt_kind, period_distress_cash,
     };
 
+    // The period is validated before any schedule is read.
     crate::capital_structure::period_flows::validate_period(period)?;
     let mut flows = IndexMap::new();
     let mut distress = Vec::new();
-    let mut warnings = Vec::new();
     for (instrument_id, instrument) in instruments {
-        let opening_balance =
-            if let Some(balance) = cs_state.opening_balances.get(instrument_id).copied() {
-                balance
-            } else {
-                let schedule = instrument.raw_cashflow_schedule(market_ctx, as_of)?;
-                Money::from((0_i64, schedule.get_notional().initial.currency()))
-            };
-
-        if crate::capital_structure::period_flows::is_debt_kind(instrument.key())?
-            && !cs_state.residual_schedules.contains_key(instrument_id)
-        {
+        // The run seeds every opening balance and each period carries its
+        // close forward, so a missing one is a broken invariant.
+        let opening_balance = cs_state
+            .opening_balances
+            .get(instrument_id)
+            .copied()
+            .ok_or_else(|| {
+                crate::error::Error::capital_structure(format!(
+                    "instrument '{instrument_id}' has no opening balance in period {}",
+                    period.id
+                ))
+            })?;
+        let is_debt = is_debt_kind(instrument.key())?;
+        if is_debt && !cs_state.residual_schedules.contains_key(instrument_id) {
             let schedule = instrument.raw_cashflow_schedule(market_ctx, as_of)?;
             cs_state
                 .residual_schedules
@@ -470,7 +471,7 @@ fn compute_contractual_flows(
             .residual_schedules
             .get(instrument_id.as_str())
             .map(SuppliedSchedule::holder);
-        let (breakdown, closing_balance, _, period_warnings) = calculate_period_flows(
+        let (breakdown, closing_balance, _) = calculate_period_flows(
             instrument.as_ref(),
             period,
             opening_balance,
@@ -478,7 +479,6 @@ fn compute_contractual_flows(
             as_of,
             residual,
         )?;
-        let is_debt = is_debt_kind(instrument.key())?;
         let raw;
         let source = match residual {
             Some(supplied) => supplied,
@@ -501,16 +501,11 @@ fn compute_contractual_flows(
             crate::capital_structure::period_flows::period_principal_claims(schedule, period)
         });
         cs_state.set_period_principal_flows(instrument_id.clone(), period, principal_claims)?;
-        warnings.extend(period_warnings);
 
-        flows.insert(instrument_id.to_string(), breakdown.clone());
+        flows.insert(instrument_id.to_string(), breakdown);
         cs_state.set_closing_balance(instrument_id.to_string(), closing_balance);
     }
-    Ok(ContractualFlows {
-        flows,
-        distress,
-        warnings,
-    })
+    Ok(ContractualFlows { flows, distress })
 }
 
 /// Build the reporting-FX context for one period's `cs.*` totals.
@@ -966,14 +961,16 @@ mod election_tests {
                 is_actual: false,
             };
             for _ in 0..3 {
-                state.period_pik_request = Some(request);
                 settle_postings(
                     &mut state,
                     &instruments,
                     Some(&toggle),
                     &period,
-                    &market,
-                    date!(2024 - 01 - 01),
+                    (&market, date!(2024 - 01 - 01)),
+                    super::PeriodChanges {
+                        postings: &indexmap::IndexMap::new(),
+                        pik_request: Some(request),
+                    },
                 )
                 .expect("settlement");
             }

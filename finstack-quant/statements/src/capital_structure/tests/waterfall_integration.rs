@@ -322,10 +322,9 @@ mod period_flow_waterfall_integration {
         );
 
         let opening = state.opening_balances["TL-1"];
-        let (breakdown, _, _, warnings) =
+        let (breakdown, _, _) =
             calculate_period_flows(&instrument, &period, opening, &market_ctx, issue, None)
                 .expect("period flows");
-        assert!(warnings.is_empty());
 
         let mut contractual: IndexMap<
             String,

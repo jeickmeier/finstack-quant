@@ -87,6 +87,12 @@ pub(crate) struct WaterfallPeriodResult {
     /// `fees + cash interest + principal + equity + retained == available cash`.
     /// `None` as for `equity_distribution`.
     pub(crate) available_cash: Option<Money>,
+    /// Net principal change the waterfall posted, by instrument, in exact
+    /// money: what the owners' schedules are rebuilt from.
+    pub(crate) postings: IndexMap<String, Money>,
+    /// The PIK toggle's request this period: `Some(true)` asks for PIK,
+    /// `Some(false)` for the base coupon terms, `None` without a toggle.
+    pub(crate) pik_request: Option<bool>,
 }
 
 /// Evaluate a node reference or inline DSL expression against the current context.
@@ -223,9 +229,10 @@ fn apply_named_prepay(
 /// # Returns
 ///
 /// Returns a [`WaterfallPeriodResult`] with per-instrument cashflow breakdowns
-/// after sweep, PIK, and priority-of-payments allocation have been applied,
-/// plus shortfall warnings and the equity residual. `state` is updated
-/// in-place with opening/closing balances and carried claims.
+/// after sweep and priority-of-payments allocation have been applied, the
+/// shortfall warnings, the equity residual, the principal it posted and the
+/// PIK toggle's request. `state` is updated in place with closing balances
+/// and carried claims.
 ///
 /// # Limitations
 ///
@@ -239,12 +246,12 @@ fn apply_named_prepay(
 /// Returns an error if required statement nodes are missing, if the waterfall
 /// references inconsistent currencies, if sweep / PIK calculations fail, or if
 /// computed allocations or balances cannot be represented as monetary values.
-/// On any error, `state` is unchanged; warnings and flows are published only on success.
+/// On an error `state` may be partly updated: the caller runs the period on
+/// a staged copy and discards it.
 ///
 /// # References
 ///
 /// - Fixed-income capital structure context: `docs/REFERENCES.md#tuckman-serrat-fixed-income`
-#[cfg(test)]
 pub(crate) fn execute_waterfall(
     context: &EvaluationContext,
     waterfall_spec: &WaterfallSpec,
@@ -252,57 +259,8 @@ pub(crate) fn execute_waterfall(
     contractual_flows: &IndexMap<String, CashflowBreakdown>,
     pool_currency: Option<finstack_quant_core::currency::Currency>,
 ) -> Result<WaterfallPeriodResult> {
-    execute_waterfall_then(
-        context,
-        waterfall_spec,
-        state,
-        contractual_flows,
-        pool_currency,
-        |_| Ok(()),
-    )
-}
-
-/// Execute the waterfall, then run `settle` on the staged state before
-/// anything is committed.
-///
-/// `settle` rebuilds the schedules of the instruments whose principal the
-/// waterfall changed (`CapitalStructureState::period_postings`). The debt
-/// ledger and the rebuilt schedules are committed together, and neither is
-/// when the waterfall or `settle` fails.
-///
-/// # Errors
-///
-/// Returns the waterfall's error or `settle`'s; `state` is unchanged then.
-pub(crate) fn execute_waterfall_then(
-    context: &EvaluationContext,
-    waterfall_spec: &WaterfallSpec,
-    state: &mut CapitalStructureState,
-    contractual_flows: &IndexMap<String, CashflowBreakdown>,
-    pool_currency: Option<finstack_quant_core::currency::Currency>,
-    settle: impl FnOnce(&mut CapitalStructureState) -> Result<()>,
-) -> Result<WaterfallPeriodResult> {
-    let mut staged_state = state.clone();
-    staged_state.period_postings.clear();
-    let result = execute_waterfall_inner(
-        context,
-        waterfall_spec,
-        &mut staged_state,
-        contractual_flows,
-        pool_currency,
-    )?;
-    settle(&mut staged_state)?;
-    *state = staged_state;
-    Ok(result)
-}
-
-fn execute_waterfall_inner(
-    context: &EvaluationContext,
-    waterfall_spec: &WaterfallSpec,
-    state: &mut CapitalStructureState,
-    contractual_flows: &IndexMap<String, CashflowBreakdown>,
-    pool_currency: Option<finstack_quant_core::currency::Currency>,
-) -> Result<WaterfallPeriodResult> {
-    waterfall_spec.validate()?;
+    // The specification was validated with the model; it is not re-validated
+    // (and its sizing formulas re-parsed) every period.
     // Equity receives the residual only when it is the terminal priority;
     // otherwise the company retains it.
     let terminal_equity =
@@ -328,6 +286,8 @@ fn execute_waterfall_inner(
                 retained_cash: None,
                 prepayments: Vec::new(),
                 available_cash: None,
+                postings: IndexMap::new(),
+                pik_request: None,
             });
         };
         let mut warnings = Vec::new();
@@ -340,6 +300,8 @@ fn execute_waterfall_inner(
             retained_cash: Some(retained),
             prepayments: Vec::new(),
             available_cash: Some(available_cash),
+            postings: IndexMap::new(),
+            pik_request: None,
         });
     }
 
@@ -392,7 +354,7 @@ fn execute_waterfall_inner(
     // interest: an election takes effect at the start of a loan's next coupon
     // period, through the loan's own coupon terms, when the schedules are
     // rebuilt.
-    state.period_pik_request = match &waterfall_spec.pik_toggle {
+    let pik_request = match &waterfall_spec.pik_toggle {
         Some(pik_spec) => Some(evaluate_pik_toggle(context, pik_spec, &mut warnings)?),
         None => None,
     };
@@ -479,6 +441,7 @@ fn execute_waterfall_inner(
     let equity_distribution: Money;
     let retained_cash: Money;
     let mut prepayments = Vec::new();
+    let mut postings = IndexMap::new();
     {
         let mut remaining_cash = available_cash;
         // Snapshot planned interest and fees so every unpaid amount, however
@@ -735,7 +698,7 @@ fn execute_waterfall_inner(
             posted = posted.checked_sub(prepaid)?;
         }
         if posted != Money::from((0_i64, currency)) {
-            state.period_postings.insert(instrument_id.clone(), posted);
+            postings.insert(instrument_id.clone(), posted);
         }
 
         // Unpaid interest from the available-cash cap is overdue: it is
@@ -782,6 +745,8 @@ fn execute_waterfall_inner(
         retained_cash: Some(retained_cash),
         prepayments,
         available_cash: Some(available_cash),
+        postings,
+        pik_request,
     })
 }
 
@@ -809,52 +774,10 @@ fn available_cash(
     money_from_expr(cash.max(0.0), currency, node)
 }
 
-/// Test-only: run the waterfall for fixtures that state one aggregate
-/// principal amount per instrument, by dating that amount inside the
-/// allocation period (due and effective together) and setting the economic
-/// close to `opening + PIK - scheduled principal`. An instrument whose dated
-/// claims the test already supplied is left as it is.
 #[cfg(test)]
-pub(crate) fn execute_waterfall_same_period(
-    context: &EvaluationContext,
-    waterfall_spec: &WaterfallSpec,
-    state: &mut CapitalStructureState,
-    contractual_flows: &IndexMap<String, CashflowBreakdown>,
-) -> Result<WaterfallPeriodResult> {
-    use finstack_quant_core::dates::{Date, Period};
-    let period = Period {
-        id: context.period_id,
-        start: Date::MIN,
-        end: Date::MAX,
-        is_actual: false,
-    };
-    let mut dated = contractual_flows.clone();
-    // Staged, so a failed run leaves the caller's state as it was.
-    let mut staged = state.clone();
-    for (instrument_id, breakdown) in &mut dated {
-        if staged.period_principal_flows.contains_key(instrument_id) {
-            continue;
-        }
-        let currency = breakdown.interest_expense_cash.currency();
-        breakdown.debt_balance = staged
-            .get_opening_balance(instrument_id, currency)
-            .checked_add(breakdown.interest_expense_pik)?
-            .checked_sub(breakdown.principal_payment)?;
-        let claims = if breakdown.principal_payment.amount() == 0.0 {
-            Vec::new()
-        } else {
-            vec![crate::capital_structure::PrincipalClaim::at_par(
-                Date::MIN,
-                Date::MIN,
-                breakdown.principal_payment,
-            )]
-        };
-        staged.set_period_principal_flows(instrument_id.clone(), &period, claims)?;
-    }
-    let result = execute_waterfall(context, waterfall_spec, &mut staged, &dated, None)?;
-    *state = staged;
-    Ok(result)
-}
+mod test_support;
+#[cfg(test)]
+pub(crate) use test_support::{execute_waterfall_same_period, execute_waterfall_staged};
 
 #[cfg(test)]
 mod tests {
@@ -2422,10 +2345,10 @@ mod tests {
         }
     }
 
-    /// The waterfall reports the principal it changed in exact money, and the
-    /// ledger commits only when the schedules rebuilt from it are accepted.
+    /// The waterfall reports the principal it changed in exact money and the
+    /// PIK toggle's request; the evaluator rebuilds the schedules from them.
     #[test]
-    fn the_ledger_and_the_rebuilt_schedules_commit_together() {
+    fn the_waterfall_reports_its_postings_and_pik_request() {
         use finstack_quant_core::dates::{Date, Period};
         let id = PeriodId::quarter(2025, 1).unwrap();
         let period = Period {
@@ -2472,29 +2395,11 @@ mod tests {
 
         // 200 prepaid. The toggle only records its request: the 30 coupon
         // due now is paid in cash, not capitalized.
-        let mut state = initial.clone();
-        let before = format!("{state:?}");
-        let error =
-            execute_waterfall_then(&context, &spec, &mut state, &contractual, None, |staged| {
-                assert_eq!(staged.period_postings["TL-1"], usd(-200));
-                assert_eq!(staged.closing_balances["TL-1"], usd(800));
-                assert_eq!(staged.period_pik_request, Some(true));
-                Err(crate::error::Error::capital_structure("schedule rejected"))
-            })
-            .expect_err("a rejected rebuild fails the period");
-        assert!(error.to_string().contains("schedule rejected"));
-        assert_eq!(
-            format!("{state:?}"),
-            before,
-            "a failed rebuild changed state"
-        );
-
-        execute_waterfall_then(&context, &spec, &mut state, &contractual, None, |staged| {
-            staged.period_postings.clear();
-            Ok(())
-        })
-        .expect("accepted rebuild");
+        let mut state = initial;
+        let result =
+            execute_waterfall(&context, &spec, &mut state, &contractual, None).expect("waterfall");
+        assert_eq!(result.postings["TL-1"], usd(-200));
+        assert_eq!(result.pik_request, Some(true));
         assert_eq!(state.closing_balances["TL-1"], usd(800));
-        assert!(state.period_postings.is_empty());
     }
 }

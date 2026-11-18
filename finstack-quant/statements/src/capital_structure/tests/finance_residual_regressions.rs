@@ -210,7 +210,7 @@ fn newly_funded_balance_closes_on_economic_principal_dates() {
                 CFKind::Amortization,
             );
         let instrument = ScheduleInstrument::new(builder.build(None).expect("schedule"));
-        let (_, closing, funding, _) = calculate_period_flows(
+        let (_, closing, funding) = calculate_period_flows(
             &instrument,
             &periods[0],
             usd(0.0),

@@ -110,7 +110,7 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
         }
         let expected_expense = (-net).max(0.0);
         let expected_income = net.max(0.0);
-        let (flows, closing, funding, _) =
+        let (flows, closing, funding) =
             calculate_period_flows(&swap, &period, swap.notional, &market, as_of, None)
                 .expect("declared IRS period flows");
         assert_eq!(closing.amount(), 0.0);
@@ -129,7 +129,7 @@ fn declared_swap_kind_nets_negative_rates_and_zero_fixed_legs() {
             raw.get_day_count(),
             dated_meta,
         );
-        let (_, closing, funding, _) = calculate_period_flows(
+        let (_, closing, funding) = calculate_period_flows(
             &swap,
             &period,
             Money::from((0_i64, Currency::USD)),
@@ -788,7 +788,7 @@ fn oid_funding_preserves_loan_face_and_cash_at_boundaries() {
             } else {
                 zero
             };
-            let (_, closing, funding, _) = calculate_period_flows(
+            let (_, closing, funding) = calculate_period_flows(
                 &loan,
                 &periods[0],
                 opening,
@@ -995,7 +995,7 @@ fn schedule_without_funding_books_issuance_once_and_does_not_resurrect_paid_debt
             } else {
                 zero
             };
-            let (flows, closing, funding, _) = calculate_period_flows(
+            let (flows, closing, funding) = calculate_period_flows(
                 &instrument,
                 &periods[0],
                 opening,
@@ -1063,7 +1063,7 @@ fn implicit_issuance_rejects_negative_principal_and_keeps_zero_at_zero() {
     )
     .expect_err("negative principal cannot imply a funding receipt");
     assert!(error.to_string().contains("nonnegative initial principal"));
-    let (_, closing, funding, _) = calculate_period_flows(
+    let (_, closing, funding) = calculate_period_flows(
         &no_funding_schedule(0.0, date!(2025 - 01 - 15)),
         &period,
         zero,
@@ -1472,7 +1472,7 @@ fn newly_funded_balance_capitalizes_pik_on_its_effective_date() {
             periods[0].start,
             None,
         )
-        .map(|(_, closing, _, _)| closing.amount())
+        .map(|(_, closing, _)| closing.amount())
     };
     // Funded on the period boundary: the ledger opens at zero and closes on
     // the dated schedule, face plus the capitalized coupon.

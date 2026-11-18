@@ -250,7 +250,7 @@ fn new_funding_and_redraws_close_on_balance_dates_not_cash_dates() {
     // repayment cash and the early redraw cash do not move the balance.
     let opening = scheduled_opening_principal(&schedule, periods[0].start).expect("opening");
     assert_eq!(opening.amount(), 0.0);
-    let (q1, q1_close, q1_funding, _) = flows_of(0, opening).expect("Q1");
+    let (q1, q1_close, q1_funding) = flows_of(0, opening).expect("Q1");
     assert_eq!(q1_close.amount(), 5.0);
     assert_eq!(q1_funding.amount(), 100.0);
     assert_eq!(q1.principal_payment.amount(), 0.0);
@@ -264,7 +264,7 @@ fn new_funding_and_redraws_close_on_balance_dates_not_cash_dates() {
             .amount(),
         5.0
     );
-    let (q2, q2_close, q2_funding, _) = flows_of(1, q1_close).expect("Q2");
+    let (q2, q2_close, q2_funding) = flows_of(1, q1_close).expect("Q2");
     assert_eq!(q2_close.amount(), 65.0);
     assert_eq!(q2_funding.amount(), 60.0);
     assert_eq!(q2.principal_payment.amount(), 100.0);
@@ -334,7 +334,7 @@ fn principal_cash_and_face_are_reported_on_their_own_dates() {
 
     // March: the 20 reduction is effective, its cash is owed and not yet
     // due; the 10 was paid ahead of its reduction and is reserved.
-    let (march, march_close, _, _) = read(0, usd(100.0));
+    let (march, march_close, _) = read(0, usd(100.0));
     assert_eq!(march_close.amount(), 80.0);
     assert_eq!(march.principal_payment.amount(), 10.0);
     assert_eq!(march.principal_pending, Some(usd(20.0)));
@@ -343,7 +343,7 @@ fn principal_cash_and_face_are_reported_on_their_own_dates() {
 
     // April: the 20 is paid without moving the balance again, and the 10
     // reduction takes effect and releases its reserve.
-    let (april, april_close, _, _) = read(1, march_close);
+    let (april, april_close, _) = read(1, march_close);
     assert_eq!(april_close.amount(), 70.0);
     assert_eq!(april.principal_payment.amount(), 20.0);
     assert_eq!(april.principal_pending, Some(usd(0.0)));

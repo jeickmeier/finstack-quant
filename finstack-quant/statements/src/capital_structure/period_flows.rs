@@ -16,7 +16,6 @@
 
 use crate::capital_structure::cashflows::CashflowBreakdown;
 use crate::error::Result;
-use crate::evaluator::EvalWarning;
 use finstack_quant_cashflows::accrual::accrued_interest_amount;
 use finstack_quant_cashflows::builder::{CashFlowSchedule, CashflowRepresentation};
 use finstack_quant_core::cashflow::CFKind;
@@ -392,7 +391,6 @@ pub fn scheduled_opening_principal(
 /// - closing balance after scheduled flows
 /// - newly funded principal, using explicit principal deltas rather than net cash
 ///   proceeds, and implicit initial face for a schedule without a funding leg
-/// - evaluation warnings for ignored or unsupported cashflow kinds
 ///
 /// # Errors
 ///
@@ -413,7 +411,7 @@ pub fn calculate_period_flows(
     market_ctx: &MarketContext,
     as_of: Date,
     residual_schedule: Option<SuppliedSchedule<'_>>,
-) -> Result<(CashflowBreakdown, Money, Money, Vec<EvalWarning>)> {
+) -> Result<(CashflowBreakdown, Money, Money)> {
     validate_period(period)?;
     let is_debt = is_debt_kind(instrument.key())?;
     // The instrument's own schedule is in the holder perspective by the
@@ -451,7 +449,6 @@ pub fn calculate_period_flows(
         ));
     }
     let mut breakdown = CashflowBreakdown::with_currency(currency);
-    let warnings = Vec::new();
     let snapshot_date = period_snapshot_date(period);
     let outstanding_path = if is_debt {
         full_schedule.outstanding_by_date()?
@@ -721,7 +718,6 @@ pub fn calculate_period_flows(
         breakdown,
         closing_balance,
         Money::new(net_new_funding, currency)?,
-        warnings,
     ))
 }
 
@@ -854,7 +850,7 @@ mod tests {
         ));
 
         let market_ctx = MarketContext::new();
-        let (breakdown, _, _, warnings) = calculate_period_flows(
+        let (breakdown, _, _) = calculate_period_flows(
             &instrument,
             &period,
             Money::from((1_000_000_i64, Currency::USD)),
@@ -864,7 +860,6 @@ mod tests {
         )
         .expect("period flow calculation should succeed");
 
-        assert!(warnings.is_empty());
         assert_eq!(breakdown.interest_expense_cash.amount(), 0.0);
         assert_eq!(breakdown.interest_income_cash_or_zero().amount(), 50_000.0);
     }
@@ -920,7 +915,7 @@ mod tests {
         let swap = finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::example()
             .expect("valid IRS fixture");
         let market_ctx = MarketContext::new();
-        let (breakdown, _, _, _) = calculate_period_flows(
+        let (breakdown, _, _) = calculate_period_flows(
             &swap,
             &period,
             Money::from((1_000_000_i64, Currency::USD)),
@@ -994,7 +989,7 @@ mod tests {
         let swap = finstack_quant_valuations::instruments::rates::irs::InterestRateSwap::example()
             .expect("valid IRS fixture");
         let market_ctx = MarketContext::new();
-        let (breakdown, _, _, _) = calculate_period_flows(
+        let (breakdown, _, _) = calculate_period_flows(
             &swap,
             &period,
             Money::from((1_000_000_i64, Currency::USD)),
@@ -1042,7 +1037,7 @@ mod tests {
         ));
 
         let market_ctx = MarketContext::new();
-        let (breakdown, closing_balance, _, warnings) = calculate_period_flows(
+        let (breakdown, closing_balance, _) = calculate_period_flows(
             &instrument,
             &period,
             Money::from((0_i64, Currency::USD)),
@@ -1052,7 +1047,6 @@ mod tests {
         )
         .expect("period flow calculation should succeed");
 
-        assert!(warnings.is_empty());
         assert_eq!(breakdown.interest_expense_cash.amount(), 0.0);
         assert_eq!(breakdown.principal_payment.amount(), 0.0);
         assert_eq!(breakdown.debt_balance.amount(), 100_000.0);
@@ -1124,14 +1118,10 @@ mod tests {
                 end,
                 is_actual: false,
             };
-            let (breakdown, closing, _, warnings) =
+            let (breakdown, closing, _) =
                 calculate_period_flows(&instrument, &period, opening, &market_ctx, issue, None)
                     .expect("period flow calculation should succeed");
 
-            assert!(
-                warnings.is_empty(),
-                "no scale warning expected in Q{q}, got {warnings:?}"
-            );
             assert!(
                 (breakdown.interest_expense_cash.amount() - expected_interest[idx]).abs() < 1e-9,
                 "Q{q} interest should equal the raw schedule ({}), got {}",
@@ -1189,10 +1179,9 @@ mod tests {
         };
 
         // Agreement: the coupon is read from the schedule as it stands.
-        let (breakdown, closing, _, warnings) = flows(1_000_000).expect("agreeing opening");
+        let (breakdown, closing, _) = flows(1_000_000).expect("agreeing opening");
         assert_eq!(breakdown.interest_expense_cash.amount(), 50_000.0);
         assert_eq!(closing.amount(), 1_000_000.0);
-        assert!(warnings.is_empty());
 
         // Half the scheduled principal used to halve the coupon.
         for opening in [500_000, 0, 1_100_000] {
@@ -1276,7 +1265,7 @@ mod tests {
             "the < start snapshot is the pre-payment outstanding"
         );
 
-        let (breakdown, _, _, warnings) = calculate_period_flows(
+        let (breakdown, _, _) = calculate_period_flows(
             &instrument,
             &period,
             scheduled_opening,
@@ -1286,10 +1275,6 @@ mod tests {
         )
         .expect("period flow calculation should succeed");
 
-        assert!(
-            warnings.is_empty(),
-            "contractual Jan 1 flows at the < start opening must not scale, got {warnings:?}"
-        );
         assert_eq!(breakdown.interest_expense_cash.amount(), 20_000.0);
         assert_eq!(breakdown.principal_payment.amount(), 100_000.0);
     }

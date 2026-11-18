@@ -331,8 +331,8 @@ fn a_pik_request_leaves_the_current_coupon_and_its_arrears_in_cash() {
         assert_eq!(loan.interest_expense_pik.amount(), 0.0);
         assert_eq!(loan.interest_arrears, Some(usd(due_coupon)));
         assert_eq!(loan.accrued_interest.amount(), 25.0);
-        assert_eq!(state.period_pik_request, Some(true));
-        assert!(state.period_postings.is_empty());
+        assert_eq!(result.pik_request, Some(true));
+        assert!(result.postings.is_empty());
     }
 }
 
@@ -893,7 +893,7 @@ fn principal_paid_ahead_is_reserved_until_its_effective_date() {
 /// contractual cash by a cent is rejected.
 #[test]
 fn scheduled_principal_needs_dated_claims_that_reconcile_exactly() {
-    use crate::capital_structure::waterfall::execute_waterfall;
+    use crate::capital_structure::waterfall::execute_waterfall_staged;
     let (mut state, mut flows) = loans(&["loan"], 80);
     let april = dated_period(date!(2025 - 04 - 01), date!(2025 - 05 - 01));
     let loan = flows.get_mut("loan").expect("loan");
@@ -901,7 +901,7 @@ fn scheduled_principal_needs_dated_claims_that_reconcile_exactly() {
     loan.principal_payment = usd(20);
     let context = context_for(april.id, &[("cash", 100.0)]);
 
-    let error = execute_waterfall(
+    let error = execute_waterfall_staged(
         &context,
         &WaterfallSpec::default(),
         &mut state,
@@ -924,7 +924,7 @@ fn scheduled_principal_needs_dated_claims_that_reconcile_exactly() {
             )],
         )
         .expect("claim");
-    let error = execute_waterfall(
+    let error = execute_waterfall_staged(
         &context,
         &WaterfallSpec::default(),
         &mut state,
@@ -1045,12 +1045,12 @@ fn a_negative_pool_allocates_nothing_and_reports_the_shortfall() {
 /// residual. Only a structure with no currency at all has nothing to run.
 #[test]
 fn a_debt_free_period_still_evaluates_the_pool() {
-    use crate::capital_structure::waterfall::execute_waterfall;
+    use crate::capital_structure::waterfall::execute_waterfall_staged;
     let empty = IndexMap::new();
     let context = context(&[("cash", 40.0)]);
     let mut state = CapitalStructureState::new();
 
-    let with_equity = execute_waterfall(
+    let with_equity = execute_waterfall_staged(
         &context,
         &WaterfallSpec::default(),
         &mut state,
@@ -1062,7 +1062,7 @@ fn a_debt_free_period_still_evaluates_the_pool() {
     assert_eq!(with_equity.equity_distribution, Some(usd(40)));
     assert_eq!(with_equity.retained_cash, Some(usd(0)));
 
-    let retained = execute_waterfall(
+    let retained = execute_waterfall_staged(
         &context,
         &no_equity(),
         &mut state,
@@ -1072,7 +1072,7 @@ fn a_debt_free_period_still_evaluates_the_pool() {
     .expect("debt-free, no equity");
     assert_eq!(retained.retained_cash, Some(usd(40)));
 
-    let nothing = execute_waterfall(
+    let nothing = execute_waterfall_staged(
         &context,
         &WaterfallSpec::default(),
         &mut state,

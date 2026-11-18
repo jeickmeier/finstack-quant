@@ -39,11 +39,6 @@ pub(crate) struct CapitalStructureState {
     /// period evaluated again changes nothing.
     pub(crate) coupon_elections: IndexMap<String, Vec<CouponElection>>,
 
-    /// The PIK toggle's request in the current period: `Some(true)` asks for
-    /// PIK, `Some(false)` for the base coupon terms. Consumed when the
-    /// schedules are rebuilt.
-    pub(crate) period_pik_request: Option<bool>,
-
     /// Unpaid interest/fee shortfall per instrument from the prior period's
     /// available-cash cap. Carried forward as a claim in the next period's
     /// interest category and re-recorded if it remains unpaid.
@@ -74,10 +69,6 @@ pub(crate) struct CapitalStructureState {
     /// (prepayments and sweeps), each effective the day after its period
     /// close. The owner recompiles the schedule from its terms and this ledger.
     pub(crate) postings: IndexMap<String, Vec<PrincipalPosting>>,
-
-    /// Net principal change the waterfall posted in the current period, by
-    /// instrument, in exact money. Consumed when the schedules are rebuilt.
-    pub(crate) period_postings: IndexMap<String, Money>,
 
     /// Dated current-period claims, supplied by market-aware evaluation or
     /// explicitly by callers allocating schedules with separate cash dates.
@@ -110,8 +101,6 @@ impl CapitalStructureState {
     pub(crate) fn advance_period(&mut self) {
         self.opening_balances = std::mem::take(&mut self.closing_balances);
         self.period_principal_flows.clear();
-        self.period_postings.clear();
-        self.period_pik_request = None;
     }
 
     /// Set dated principal claims for the current waterfall period.
