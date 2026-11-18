@@ -96,8 +96,8 @@ impl JsEvaluator {
         &mut self,
         #[wasm_bindgen(unchecked_param_type = "JsonInput")] model: JsValue,
     ) -> Result<JsValue, JsValue> {
-        let model =
-            FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
+        let model = FinancialModelSpec::from_json(&json_text(&model, "model")?)
+            .map_err(crate::utils::contract_to_js_err)?;
         to_js_value(&self.inner.evaluate(&model).map_err(to_js_err)?)
     }
 
@@ -125,8 +125,8 @@ impl JsEvaluator {
     ) -> Result<JsValue, JsValue> {
         use finstack_quant_statements::evaluator::ObservationCutoff;
 
-        let model =
-            FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
+        let model = FinancialModelSpec::from_json(&json_text(&model, "model")?)
+            .map_err(crate::utils::contract_to_js_err)?;
         let market: finstack_quant_core::market_data::context::MarketContext =
             from_js_json(&market, "market")?;
         let as_of = crate::utils::wire::js_date(&as_of, "asOf")?;
@@ -154,7 +154,7 @@ impl JsEvaluator {
     /// metrics are aggregated into R-7 sample quantiles per forecast period.
     ///
     /// @param model - `FinancialModelSpec` whose stochastic forecast nodes are simulated (object or JSON). It needs at least one forecast period.
-    /// @param config - `MonteCarloConfig`: `n_paths` (1 to 4294967295), `seed` (unsigned 64-bit integer; pass the config as JSON text to keep a seed above 2^53 exact), `metrics` (the node identifiers to report: at least one, each a node of the model, none repeated), optional `percentiles` (distinct fractions in `[0, 1]`) and `include_path_data` (object or JSON).
+    /// @param config - `MonteCarloConfig`: `n_paths` (1 to 4294967295), `seed` (unsigned 64-bit integer as a canonical decimal string such as `"42"`), `metrics` (the node identifiers to report: at least one, each a node of the model, none repeated), optional `percentiles` (distinct fractions in `[0, 1]`) and `include_path_data` (object or JSON).
     /// @param market - Optional `MarketContext` state the capital structure is projected on, as for `evaluateWithMarket` (object or JSON). Omit it to evaluate as `evaluate` does: the full snapshot on an empty market as of the first period's start. Give `market` and `asOf` together.
     /// @param asOf - ISO 8601 valuation date of the capital structure's contractual flows; required with `market`.
     /// @param observationCutoff - `"full_snapshot"` (the default with a market) or the ISO 8601 date through which explicit observations are visible.
@@ -177,8 +177,8 @@ impl JsEvaluator {
         use finstack_quant_statements::evaluator::{MonteCarloContext, ObservationCutoff};
 
         let absent = |value: &JsValue| value.is_undefined() || value.is_null();
-        let model =
-            FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
+        let model = FinancialModelSpec::from_json(&json_text(&model, "model")?)
+            .map_err(crate::utils::contract_to_js_err)?;
         let config: MonteCarloConfig = from_js_json(&config, "config")?;
         let run = match (absent(&market), absent(&as_of)) {
             (false, false) => {

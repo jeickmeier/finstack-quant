@@ -8154,10 +8154,10 @@ export interface MonteCarloConfig {
   percentiles?: number[];
   /**
    * Base random seed used to derive per-path streams: an exact unsigned
-   * 64-bit integer. A JavaScript host must pass the configuration as JSON
-   * text to keep a seed above 2^53 exact.
+   * 64-bit integer, a canonical decimal string in JSON (`"42"`, never the
+   * number `42`) so every host carries it exactly.
    */
-  seed: number;
+  seed: string;
 }
 /**
  * Why a Monte Carlo run published no statistics.

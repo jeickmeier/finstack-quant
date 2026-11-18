@@ -83,7 +83,8 @@ pub fn statement_result_rollup(
     spec: JsValue,
 ) -> Result<JsValue, JsValue> {
     let result: StatementResult = from_js_json(&result_json, "resultJson")?;
-    let model = FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
+    let model = FinancialModelSpec::from_json(&json_text(&model, "model")?)
+        .map_err(crate::utils::contract_to_js_err)?;
     let spec: RollupSpec = from_js_json(&spec, "spec")?;
     to_js_value(&result.rollup(&model, &spec).map_err(to_js_err)?)
 }
@@ -108,7 +109,8 @@ pub fn rollup_spec_declared_methods(
     #[wasm_bindgen(unchecked_param_type = "'quarterly' | 'semi_annual' | 'annual'")]
     frequency: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let model = FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
+    let model = FinancialModelSpec::from_json(&json_text(&model, "model")?)
+        .map_err(crate::utils::contract_to_js_err)?;
     let frequency: PeriodKind = js_wire(&frequency, "frequency")?;
     to_js_value(&RollupSpec::declared_methods(&model, frequency))
 }
@@ -335,8 +337,8 @@ pub fn financial_model_has_node(
     #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
     #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
 ) -> Result<bool, JsValue> {
-    let model =
-        FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?).map_err(to_js_err)?;
+    let model = FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?)
+        .map_err(crate::utils::contract_to_js_err)?;
     Ok(model.has_node(&js_string(&node_id, "nodeId")?))
 }
 
@@ -357,8 +359,8 @@ pub fn financial_model_get_node(
     #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
     #[wasm_bindgen(js_name = "nodeId", unchecked_param_type = "string")] node_id: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let model =
-        FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?).map_err(to_js_err)?;
+    let model = FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?)
+        .map_err(crate::utils::contract_to_js_err)?;
     match model.get_node(&js_string(&node_id, "nodeId")?) {
         Some(node) => to_js_value(node),
         None => Ok(JsValue::UNDEFINED),

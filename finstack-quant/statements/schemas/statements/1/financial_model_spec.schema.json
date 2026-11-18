@@ -9224,7 +9224,27 @@
   "examples": [
     {
       "id": "example_model",
-      "nodes": {},
+      "nodes": {
+        "gross_profit": {
+          "formula_text": "revenue * 0.4",
+          "node_id": "gross_profit",
+          "node_type": "calculated",
+          "value_type": {
+            "type": "scalar"
+          }
+        },
+        "revenue": {
+          "node_id": "revenue",
+          "node_type": "value",
+          "value_type": {
+            "type": "scalar"
+          },
+          "values": {
+            "2024Q1": 100.0,
+            "2024Q2": 110.0
+          }
+        }
+      },
       "periods": {
         "calendar": "gregorian",
         "periods": [

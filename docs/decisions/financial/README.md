@@ -393,8 +393,10 @@ comparison values are typed.
 
 The Statements wire admission, schema and error contract was accepted on
 2026-11-15. It covers bounded loading, exact wire values, validated model
-identity, canonical schemas and structured errors. Implementation and
-independent qualification remain pending.
+identity, canonical schemas and structured errors. It is reconciled and
+qualified across Rust, Python and WASM on one shared document set; a semantic
+failure carries its kind and message but not yet a diagnostic code or
+location.
 [STATEMENTS-CONTRACTS-016](statements-contracts/16-wire-schema-and-errors.md#accepted-decision-for-statements-wire-admission-schemas-and-errors).
 
 The Statements dependency graph, cell precedence and prepared evaluation

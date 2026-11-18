@@ -78,7 +78,7 @@ export interface StatementMonteCarloProps {
 }
 /**
  * Edits a Rust MonteCarloConfig with the schema form over the generated
- * contract (the uint64 seed stays an exact integer) and presents native
+ * contract (the uint64 seed is an exact decimal string) and presents native
  * MonteCarloResults as returned: for the chosen metric, a fan of bands
  * between the returned percentiles paired from the outside in, with the
  * unpaired middle percentile as a line, across the forecast periods, the percentile table, the breach

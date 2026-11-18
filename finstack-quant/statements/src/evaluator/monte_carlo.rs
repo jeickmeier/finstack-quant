@@ -64,8 +64,10 @@ pub struct MonteCarloConfig {
     /// `u32::MAX`, the path-identifier domain.
     pub n_paths: usize,
     /// Base random seed used to derive per-path streams: an exact unsigned
-    /// 64-bit integer. A JavaScript host must pass the configuration as JSON
-    /// text to keep a seed above 2^53 exact.
+    /// 64-bit integer, a canonical decimal string in JSON (`"42"`, never the
+    /// number `42`) so every host carries it exactly.
+    #[serde(with = "crate::types::forecast_seed")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
     pub seed: u64,
     /// Node identifiers to report. Required: at least one, each a node of
     /// the model, none repeated. Only these are sampled and stored.
@@ -1263,7 +1265,7 @@ mod tests {
     fn config_wire_form_is_exact_and_closed() {
         let config: MonteCarloConfig = serde_json::from_value(serde_json::json!({
             "n_paths": 16,
-            "seed": 18446744073709551615_u64,
+            "seed": "18446744073709551615",
             "metrics": ["ratio"]
         }))
         .expect("config");
@@ -1272,12 +1274,13 @@ mod tests {
         assert!(!config.include_path_data);
         assert_eq!(
             serde_json::to_value(&config).expect("serialize")["seed"],
-            serde_json::json!(18446744073709551615_u64)
+            serde_json::json!("18446744073709551615")
         );
         for invalid in [
-            serde_json::json!({"n_paths": 16, "seed": 7}),
-            serde_json::json!({"n_paths": 16, "seed": -7, "metrics": ["ratio"]}),
-            serde_json::json!({"n_paths": 16, "seed": 7, "metrics": ["ratio"], "extra": 1}),
+            serde_json::json!({"n_paths": 16, "seed": "7"}),
+            serde_json::json!({"n_paths": 16, "seed": 7, "metrics": ["ratio"]}),
+            serde_json::json!({"n_paths": 16, "seed": "-7", "metrics": ["ratio"]}),
+            serde_json::json!({"n_paths": 16, "seed": "7", "metrics": ["ratio"], "extra": 1}),
         ] {
             assert!(serde_json::from_value::<MonteCarloConfig>(invalid).is_err());
         }

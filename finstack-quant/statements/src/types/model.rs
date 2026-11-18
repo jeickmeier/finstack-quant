@@ -2,9 +2,7 @@
 
 use crate::error::{Error, Result};
 use crate::types::{ForecastSpec, NodeId, NodeSpec, NodeType};
-use finstack_quant_core::contract::{
-    ContractDescriptor, ContractError, LoadLimits, ValidationReport,
-};
+use finstack_quant_core::contract::{ContractDescriptor, ContractError, LoadLimits};
 use finstack_quant_core::dates::{PeriodId, PeriodPlan};
 use finstack_quant_core::wire::SchemaVersion;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
@@ -260,27 +258,22 @@ impl FinancialModelSpec {
         }
     }
 
-    /// Parse a model from JSON text and run [`Self::validate_semantics`].
+    /// Load a model from JSON text with the default [`LoadLimits`].
     ///
-    /// This is the one entry point host bindings use to ingest a model, so a
-    /// JSON document is accepted or rejected identically from Python and
-    /// JavaScript. Unknown fields are rejected and `schema_version` must be
-    /// `1`. Semantic validation may fill in `value_type` on nodes whose
-    /// explicit values determine it.
+    /// This is [`Self::from_slice_strict`] under the shared limits (64 MiB of
+    /// input, JSON nesting depth 96, 256 retained diagnostics). Rust, Python
+    /// and JavaScript all ingest a model here, so a document is accepted or
+    /// rejected identically from every host.
     ///
     /// # Arguments
     ///
     /// * `json` - Complete JSON encoding of a financial model in its serde
     ///   wire form (`id`, ordered `periods`, `nodes`, optional
-    ///   `capital_structure` and `meta`, and `schema_version`).
+    ///   `capital_structure` and `meta`, and the integer `schema_version: 1`).
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Serde`] when `json` is malformed or does not match the
-    /// model schema, and the [`Self::validate_semantics`] error (an empty or
-    /// out-of-order period timeline, reserved node ids, incompatible node
-    /// fields or value types, invalid formulas, or an invalid capital
-    /// structure) otherwise.
+    /// The [`Self::from_slice_strict`] errors.
     ///
     /// # Examples
     ///
@@ -293,48 +286,19 @@ impl FinancialModelSpec {
     /// .expect_err("a model needs at least one period");
     /// assert!(err.to_string().contains("at least one period"));
     /// ```
-    pub fn from_json(json: &str) -> Result<Self> {
-        let mut model: Self = serde_json::from_str(json)
-            .map_err(|e| Error::Serde(format!("invalid FinancialModelSpec JSON: {e}")))?;
-        model.validate_semantics()?;
-        Ok(model)
+    pub fn from_json(json: &str) -> std::result::Result<Self, ContractError> {
+        Self::from_slice_strict(json.as_bytes(), &LoadLimits::default())
     }
 
-    /// Load and validate a financial model already parsed into a JSON value.
+    /// Load a model from its JSON bytes: the one admission path.
     ///
-    /// Same contract as [`Self::from_json`] for a model embedded in a larger
-    /// document (a scenario application or goal-seek result): serde plus
-    /// [`Self::validate_semantics`], so an embedded model is never handed out
-    /// unvalidated.
-    ///
-    /// # Arguments
-    ///
-    /// * `value` - The model's serde form (`{"id", "periods", "nodes", ...}`).
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::Serde`] when `value` does not match the model schema,
-    /// and the [`Self::validate_semantics`] error otherwise.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_statements::types::FinancialModelSpec;
-    ///
-    /// let value = serde_json::json!({"id": "m", "periods": {"calendar": "gregorian", "periods": []}, "nodes": {}, "schema_version": 1});
-    /// assert!(FinancialModelSpec::from_value(value).is_err());
-    /// ```
-    pub fn from_value(value: serde_json::Value) -> Result<Self> {
-        let mut model: Self = serde_json::from_value(value)
-            .map_err(|e| Error::Serde(format!("invalid FinancialModelSpec JSON: {e}")))?;
-        model.validate_semantics()?;
-        Ok(model)
-    }
-
-    /// Load and validate a persisted financial model.
-    ///
-    /// This strict entry point requires `schema_version: 1` and runs
-    /// [`Self::validate_semantics`] before returning the model.
+    /// Decoding is bounded and exact: the input may not exceed the byte and
+    /// nesting limits, an object may not repeat a key, a closed object may
+    /// not carry an unknown field, and `schema_version` must be the integer
+    /// `1` (not `"1"`, `1.0` or another version). The decoded model then
+    /// passes [`Self::validate_semantics`], which may fill in `value_type` on
+    /// nodes whose explicit values determine it, before it is returned, so a
+    /// loaded model is always runnable.
     ///
     /// # Arguments
     ///
@@ -344,27 +308,51 @@ impl FinancialModelSpec {
     ///
     /// # Errors
     ///
-    /// Returns [`ContractError`] for malformed JSON, resource-limit failures,
-    /// missing or unsupported versions, invalid model shape, or semantic
-    /// validation failures.
+    /// * [`ContractError::LimitExceeded`] when the input is longer or more
+    ///   deeply nested than `limits` allows.
+    /// * [`ContractError::Report`] for malformed JSON, a duplicate key, an
+    ///   absent or different `schema_version`, or a document that does not
+    ///   match the model shape. Its first diagnostic carries the failure
+    ///   code and, where one exists, the JSON pointer of the offending field.
+    /// * [`ContractError::Core`] when the decoded model fails
+    ///   [`Self::validate_semantics`]: the statements error converted to the
+    ///   core error, which keeps its kind (validation, lookup or computation)
+    ///   and its message.
     pub fn from_slice_strict(
         bytes: &[u8],
         limits: &LoadLimits,
-    ) -> std::result::Result<(Self, ValidationReport), ContractError> {
+    ) -> std::result::Result<Self, ContractError> {
         let mut model: Self = FINANCIAL_MODEL_CONTRACT.decode_versioned(bytes, limits)?;
         model
             .validate_semantics()
-            .map_err(|error| FINANCIAL_MODEL_CONTRACT.semantic_error(error, limits))?;
-        Ok((model, ValidationReport::default()))
+            .map_err(|error| ContractError::Core(error.into()))?;
+        Ok(model)
     }
 
-    /// Compute the versioned SHA-256 hash of this model's canonical JSON.
+    /// Compute the content identity of this model after validating it.
+    ///
+    /// The model is validated first ([`Self::validate_semantics`] on a copy,
+    /// which also fills in inferred `value_type` fields), and the identity is
+    /// the versioned SHA-256 of that validated model's canonical JSON. A model
+    /// that is not runnable therefore has no identity, and a model hashes the
+    /// same before and after it has been validated.
     ///
     /// # Errors
     ///
-    /// Returns an error if the model contains a non-finite number or cannot be
-    /// serialized to the core canonical JSON representation.
+    /// Returns the validation error (converted to the core error, keeping its
+    /// kind) when the model is not runnable, and an error if it contains a
+    /// non-finite number or cannot be serialized to canonical JSON.
     pub fn content_hash(&self) -> finstack_quant_core::Result<String> {
+        let mut validated = self.clone();
+        validated.validate_semantics()?;
+        validated.canonical_hash()
+    }
+
+    /// Hash this model's canonical JSON without validating it.
+    ///
+    /// For a model the caller has just validated: the evaluator validates in
+    /// `prepare` and must not pay for a second semantic analysis per run.
+    pub(crate) fn canonical_hash(&self) -> finstack_quant_core::Result<String> {
         finstack_quant_core::canonical::content_hash(self)
     }
 
@@ -1556,20 +1544,24 @@ mod period_timeline_tests {
         spec.validate().expect("Receive swaps are supported");
     }
 
-    /// `from_json` is serde plus `validate_semantics`: a document serde
-    /// accepts but the semantic rules reject fails, and a valid one parses.
+    /// `from_json` decodes and then validates: a document that decodes but
+    /// is not runnable fails with its validation kind, and a valid one loads.
     #[test]
     fn from_json_runs_semantic_validation() {
         let err = FinancialModelSpec::from_json(
             r#"{"id": "m", "periods": {"calendar": "gregorian", "periods": []}, "nodes": {}, "schema_version": 1}"#,
         )
         .expect_err("empty timeline is rejected");
-        assert!(matches!(err, Error::Build(_)), "{err:?}");
+        assert!(
+            matches!(&err, ContractError::Core(core) if core.kind() == finstack_quant_core::ErrorKind::Validation),
+            "{err:?}"
+        );
+        assert!(err.to_string().contains("at least one period"), "{err}");
 
         let err =
             FinancialModelSpec::from_json("{\"id\": ").expect_err("malformed JSON is rejected");
         assert!(
-            matches!(&err, Error::Serde(message) if message.starts_with("invalid FinancialModelSpec JSON")),
+            matches!(&err, ContractError::Report(report) if report.diagnostics[0].code == "contract/parse-error"),
             "{err:?}"
         );
 

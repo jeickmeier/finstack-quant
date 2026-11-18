@@ -1317,6 +1317,37 @@ STATEMENTS-CONTRACTS-010, -011 and -012. **Breaking.**
   references have no floor. A sum that cannot be represented is an error
   instead of a failed finding.
 
+### Statements models: one bounded loading path, identity after validation, decimal-string seeds
+
+Breaking, with no compatibility path (STATEMENTS-CONTRACTS-016).
+
+- `FinancialModelSpec::from_json` is now the bounded loader every host uses:
+  at most 64 MiB and 96 levels of nesting, no repeated key, no unknown field,
+  and `schema_version` as the integer `1`. It returns `ContractError`
+  (it returned the statements `Error`), and `from_slice_strict` returns the
+  model alone (it returned a pair with an empty report).
+  `FinancialModelSpec::from_value` is removed.
+- A decode failure is a contract diagnostic with a code and, where one exists,
+  a JSON pointer: Python raises `ContractValidationError` (a `ValueError`)
+  with `report`, and `ContractLimitExceededError` for an oversized or
+  over-nested input; WASM throws `ContractValidationError` with `code` and
+  `report`. A model that decodes but is not runnable still raises by kind
+  (`ValueError`, `KeyError`, `RuntimeError`; `kind` in WASM), now through the
+  core error, so its message gains the core prefix.
+- A document that repeats a key inside a map (for example two entries for one
+  node) is rejected; the last entry used to win silently.
+- `FinancialModelSpec.content_hash` validates the model first and hashes the
+  validated model. A model that is not runnable has no hash (it used to hash),
+  and a hand-built model whose value types were not yet inferred now hashes
+  the same as its validated form.
+- `MonteCarloConfig.seed` is a canonical decimal string in JSON (`"42"`), as
+  forecast seeds and the result seed already were; the number `42` is
+  rejected. The Python constructor still takes an `int`.
+- `GoalSeekResult::from_json` parses under the same limits, rejects repeated
+  keys and loads its embedded model through the model loader.
+- The published `financial_model_spec` schema example is a runnable model with
+  a value node and a formula node.
+
 ### Statements Monte Carlo: explicit metrics, one entry point with the evaluation context, typed samples
 
 Breaking, with no compatibility path (STATEMENTS-EVALUATION-011).

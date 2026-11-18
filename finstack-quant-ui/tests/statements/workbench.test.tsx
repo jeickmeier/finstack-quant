@@ -1122,9 +1122,9 @@ it("simulates the current model in the Monte Carlo tab only once a config is sub
   expect(lastCall("evaluateMonteCarlo")).toBeUndefined();
   fireEvent.click(simulate);
   await waitFor(() => expect(lastCall("evaluateMonteCarlo")).toBeDefined());
-  // The seed beyond 2^53 reaches the worker as its exact integer token.
+  // The seed beyond 2^53 reaches the worker as its exact decimal string.
   expect(lastCall("evaluateMonteCarlo").configJson).toBe(
-    '{"n_paths":8,"seed":9007199254740993,"metrics":["revenue"]}',
+    '{"n_paths":8,"seed":"9007199254740993","metrics":["revenue"]}',
   );
   expect(
     await within(simulation).findByRole("table", {

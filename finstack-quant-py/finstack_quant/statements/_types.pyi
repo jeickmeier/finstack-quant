@@ -1129,7 +1129,13 @@ class FinancialModelSpec:
     @staticmethod
     def from_json(json: str) -> FinancialModelSpec:
         """
-        Deserialize a model specification from JSON text.
+        Load and validate a model specification from JSON text.
+
+        This is the one loading path Rust, Python and JavaScript share
+        (Rust ``FinancialModelSpec::from_json``): the document may be at most
+        64 MiB and nested 96 levels deep, an object may not repeat a key or
+        carry an unknown field, ``schema_version`` must be the integer ``1``,
+        and the decoded model must be runnable.
 
         Parameters
         ----------
@@ -1139,12 +1145,22 @@ class FinancialModelSpec:
         Returns
         -------
         FinancialModelSpec
-            Parsed specification.
+            The validated specification.
 
         Raises
         ------
+        finstack_quant.portfolio.ContractValidationError
+            A ``ValueError``. If ``json`` is malformed, repeats a key, has a
+            missing or different ``schema_version``, or does not match the
+            model schema; ``report`` lists the diagnostics with their ``code``
+            and JSON ``pointer``. An input over a size or depth limit raises
+            the subclass ``ContractLimitExceededError``.
         ValueError
-            If ``json`` is not valid JSON or fails schema validation.
+            If the decoded model is not runnable: an empty or out-of-order
+            timeline, a reserved node id, an invalid formula or units, or an
+            invalid capital structure.
+        RuntimeError
+            If the model's formulas form a dependency cycle.
 
         Examples
         --------
@@ -1189,12 +1205,14 @@ class FinancialModelSpec:
 
     def content_hash(self) -> str:
         """
-        Versioned SHA-256 content hash of the canonical model JSON.
+        Versioned SHA-256 content hash of the validated model's canonical JSON.
 
         Mirrors Rust ``FinancialModelSpec::content_hash`` (WASM
-        ``statements.financialModelContentHash``). The hash is taken over the
-        canonical JSON, so it does not depend on key order or on how typed
-        numbers were spelled in the source document.
+        ``statements.financialModelContentHash``). The model is validated
+        first, and the hash is taken over the canonical JSON of the validated
+        model, so it does not depend on key order or on how typed numbers
+        were spelled in the source document, and a model that is not runnable
+        has no hash.
 
         Returns
         -------
@@ -1204,7 +1222,9 @@ class FinancialModelSpec:
         Raises
         ------
         ValueError
-            If the model contains a non-finite number.
+            If the model is not runnable or contains a non-finite number.
+        RuntimeError
+            If the model's formulas form a dependency cycle.
 
         Examples
         --------

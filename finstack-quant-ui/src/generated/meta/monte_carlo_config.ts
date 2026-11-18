@@ -16,7 +16,7 @@ export default [
           0.5,
           0.95
         ],
-        "seed": 42
+        "seed": "42"
       }
     ],
     "title": "MonteCarloConfig"
@@ -61,8 +61,6 @@ export default [
   {
     "path": "#/properties/seed",
     "source": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json#/properties/seed",
-    "description": "Base random seed used to derive per-path streams: an exact unsigned\n64-bit integer. A JavaScript host must pass the configuration as JSON\ntext to keep a seed above 2^53 exact.",
-    "format": "uint64",
-    "minimum": 0
+    "description": "Base random seed used to derive per-path streams: an exact unsigned\n64-bit integer, a canonical decimal string in JSON (`\"42\"`, never the\nnumber `42`) so every host carries it exactly."
   }
 ];

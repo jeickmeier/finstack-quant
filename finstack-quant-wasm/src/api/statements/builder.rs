@@ -115,7 +115,8 @@ impl JsModelBuilder {
     pub fn from_spec(
         #[wasm_bindgen(unchecked_param_type = "JsonInput")] spec: JsValue,
     ) -> Result<JsModelBuilder, JsValue> {
-        let spec = FinancialModelSpec::from_json(&json_text(&spec, "spec")?).map_err(to_js_err)?;
+        let spec = FinancialModelSpec::from_json(&json_text(&spec, "spec")?)
+            .map_err(crate::utils::contract_to_js_err)?;
         let builder = ModelBuilder::from_spec(spec).map_err(to_js_err)?;
         Ok(JsModelBuilder {
             inner: Some(builder),

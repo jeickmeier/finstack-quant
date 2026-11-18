@@ -251,7 +251,7 @@ pub fn extract_model_ref<'py>(obj: &Bound<'py, PyAny>) -> PyResult<ModelAccess<'
     }
     let json: String = obj.extract()?;
     let inner = finstack_quant_statements::types::FinancialModelSpec::from_json(&json)
-        .map_err(crate::errors::statements_to_py)?;
+        .map_err(|error| crate::errors::contract_to_py(obj.py(), error))?;
     Ok(ModelAccess::Owned(Box::new(inner)))
 }
 

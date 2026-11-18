@@ -1,6 +1,6 @@
 //! Financial-model input boundaries that must hold before execution or import.
 
-use finstack_quant_core::contract::{ContractError, LoadLimits, LoadPhase, Severity};
+use finstack_quant_core::contract::{ContractError, LoadLimits};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::money::Money;
@@ -37,20 +37,13 @@ fn strict_json_rejects_node_identity_that_would_share_another_forecast_cache() {
 
     let error = FinancialModelSpec::from_slice_strict(&bytes, &LoadLimits::default())
         .expect_err("two map entries must not share an embedded forecast-cache identity");
-    let ContractError::Report(report) = error else {
-        panic!("expected a structured semantic-validation report, got {error:?}");
+    let ContractError::Core(core) = &error else {
+        panic!("expected the typed validation error, got {error:?}");
     };
-    assert_eq!(report.diagnostics.len(), 1);
-    let diagnostic = &report.diagnostics[0];
-    assert_eq!(diagnostic.code, "contract/semantic-invalid");
-    assert_eq!(diagnostic.phase, LoadPhase::Semantic);
-    assert_eq!(diagnostic.severity, Severity::Error);
-    assert_eq!(
-        diagnostic.contract.as_deref(),
-        Some("finstack_quant.financial_model")
-    );
-    assert!(diagnostic.message.contains("Node map key 'cost'"));
-    assert!(diagnostic.message.contains("embedded node_id 'revenue'"));
+    assert_eq!(core.kind(), finstack_quant_core::ErrorKind::Validation);
+    let message = error.to_string();
+    assert!(message.contains("Node map key 'cost'"), "{message}");
+    assert!(message.contains("embedded node_id 'revenue'"), "{message}");
 
     let model: FinancialModelSpec = serde_json::from_value(payload).unwrap();
     let evaluation_error = Evaluator::new()
@@ -435,11 +428,9 @@ fn runnable_model_keeps_missing_cells_and_rejects_plan_gaps_and_open_references(
     // The same model without Q2 in its plan is rejected by every load path.
     let mut gap = serde_json::to_value(&model).unwrap();
     gap["periods"]["periods"].as_array_mut().unwrap().remove(1);
-    let error = FinancialModelSpec::from_value(gap.clone()).expect_err("a plan gap is rejected");
+    let error =
+        FinancialModelSpec::from_json(&gap.to_string()).expect_err("a plan gap is rejected");
     assert!(error.to_string().contains("contiguous"), "{error}");
-    FinancialModelSpec::from_json(&gap.to_string()).expect_err("from_json rejects the gap");
-    FinancialModelSpec::from_slice_strict(gap.to_string().as_bytes(), &LoadLimits::default())
-        .expect_err("the strict loader rejects the gap");
     let mut direct = model;
     direct.periods.periods.remove(1);
     Evaluator::new()

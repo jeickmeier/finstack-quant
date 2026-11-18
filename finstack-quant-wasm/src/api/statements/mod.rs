@@ -45,7 +45,7 @@ pub fn validate_financial_model_json(
     #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
 ) -> Result<String, JsValue> {
     let json: &str = &json_text(&json, "json")?;
-    let model = FinancialModelSpec::from_json(json).map_err(to_js_err)?;
+    let model = FinancialModelSpec::from_json(json).map_err(crate::utils::contract_to_js_err)?;
     serde_json::to_string(&model).map_err(to_js_err)
 }
 
@@ -68,7 +68,7 @@ pub fn model_node_ids(
     #[wasm_bindgen(unchecked_param_type = "JsonInput")] json: JsValue,
 ) -> Result<JsValue, JsValue> {
     let json: &str = &json_text(&json, "json")?;
-    let model = FinancialModelSpec::from_json(json).map_err(to_js_err)?;
+    let model = FinancialModelSpec::from_json(json).map_err(crate::utils::contract_to_js_err)?;
     let ids: Vec<&str> = model.nodes.keys().map(|k| k.as_str()).collect();
     crate::utils::to_js_value(&ids)
 }
@@ -90,8 +90,8 @@ pub fn apply_model_edits(
     #[wasm_bindgen(unchecked_param_type = "generated.statements.ModelEdit[] | string")]
     edits: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let mut model =
-        FinancialModelSpec::from_json(&json_text(&model, "model")?).map_err(to_js_err)?;
+    let mut model = FinancialModelSpec::from_json(&json_text(&model, "model")?)
+        .map_err(crate::utils::contract_to_js_err)?;
     let edits: Vec<finstack_quant_statements::types::ModelEdit> = from_js_json(&edits, "edits")?;
     model.apply_edits(&edits).map_err(to_js_err)?;
     crate::utils::to_js_value(&model)
@@ -450,7 +450,7 @@ pub fn financial_model_content_hash(
     #[wasm_bindgen(js_name = "modelJson", unchecked_param_type = "JsonInput")] model_json: JsValue,
 ) -> Result<String, JsValue> {
     FinancialModelSpec::from_json(&json_text(&model_json, "modelJson")?)
-        .map_err(to_js_err)?
+        .map_err(crate::utils::contract_to_js_err)?
         .content_hash()
         .map_err(to_js_err)
 }

@@ -459,7 +459,7 @@ test('Evaluator.evaluateWithMarket and evaluateMonteCarlo keep their Rust twins'
     (e) => e.kind === 'validation'
   );
   assert.throws(
-    () => evaluator.evaluateMonteCarlo(MODEL, { n_paths: 0, seed: 1, metrics: ['revenue'] }),
+    () => evaluator.evaluateMonteCarlo(MODEL, { n_paths: 0, seed: '1', metrics: ['revenue'] }),
     (e) => e.kind === 'validation'
   );
   assert.throws(
@@ -468,7 +468,7 @@ test('Evaluator.evaluateWithMarket and evaluateMonteCarlo keep their Rust twins'
   );
   const results = evaluator.evaluateMonteCarlo(MODEL, {
     n_paths: 4,
-    seed: 1,
+    seed: '1',
     metrics: ['revenue'],
   });
   assert.equal(results.n_paths, 4);

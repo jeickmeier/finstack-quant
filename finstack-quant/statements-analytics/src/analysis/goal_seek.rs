@@ -46,6 +46,7 @@
 //! # }
 //! ```
 
+use finstack_quant_core::contract::{LoadLimits, deserialize_json_value, parse_json_value};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_statements::evaluator::Evaluator;
@@ -138,9 +139,10 @@ pub struct GoalSeekResult {
 impl GoalSeekResult {
     /// Load a goal-seek result from its canonical JSON, validating the model.
     ///
-    /// The embedded model goes through [`FinancialModelSpec::from_value`], so a
-    /// persisted or hand-edited result cannot carry a model that
-    /// [`FinancialModelSpec::from_json`] would reject.
+    /// The document is parsed under the default [`LoadLimits`] with duplicate
+    /// keys rejected, and the embedded model goes through
+    /// [`FinancialModelSpec::from_slice_strict`], so a persisted or
+    /// hand-edited result cannot carry a model the model loader would reject.
     ///
     /// # Arguments
     ///
@@ -150,9 +152,10 @@ impl GoalSeekResult {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Serde`] for malformed JSON, a missing field or an
-    /// unknown field, and the model's validation error when the embedded model
-    /// is invalid.
+    /// Returns [`Error::Serde`] for malformed or oversized JSON, a duplicate,
+    /// missing or unknown field, or an embedded model of the wrong shape or
+    /// version, and the model's validation error when the embedded model is
+    /// not runnable.
     pub fn from_json(json: &str) -> Result<Self> {
         #[derive(serde::Deserialize)]
         #[serde(deny_unknown_fields)]
@@ -168,11 +171,19 @@ impl GoalSeekResult {
             #[serde(default)]
             converged: bool,
         }
-        let wire: Wire = serde_json::from_str(json)
-            .map_err(|e| Error::Serde(format!("invalid GoalSeekResult JSON: {e}")))?;
+        let limits = LoadLimits::default();
+        let wire: Wire =
+            deserialize_json_value(parse_json_value(json.as_bytes(), &limits)?, &limits)?;
+        let model = wire
+            .model
+            .map(|model| {
+                let bytes = serde_json::to_vec(&model)?;
+                Ok::<_, Error>(FinancialModelSpec::from_slice_strict(&bytes, &limits)?)
+            })
+            .transpose()?;
         Ok(Self {
             solved_value: wire.solved_value,
-            model: wire.model.map(FinancialModelSpec::from_value).transpose()?,
+            model,
             residual: wire.residual,
             tolerance: wire.tolerance,
             evaluations: wire.evaluations,

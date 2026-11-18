@@ -446,7 +446,7 @@ impl RunProvenance {
         };
         let mut provenance = Self {
             model_id: model.id.clone(),
-            model_content_hash: model.content_hash().map_err(hash_error)?,
+            model_content_hash: model.canonical_hash().map_err(hash_error)?,
             source_snapshot: model.source_snapshot.clone(),
             observation_cutoff,
             valuation_date,

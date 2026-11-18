@@ -11,7 +11,8 @@ use finstack_quant_statements_analytics::templates::{real_estate, roll_forward, 
 use wasm_bindgen::prelude::*;
 
 fn builder(model: &JsValue) -> Result<ModelBuilder, JsValue> {
-    let model = FinancialModelSpec::from_json(&json_text(model, "model")?).map_err(to_js_err)?;
+    let model = FinancialModelSpec::from_json(&json_text(model, "model")?)
+        .map_err(crate::utils::contract_to_js_err)?;
     ModelBuilder::from_spec(model).map_err(to_js_err)
 }
 

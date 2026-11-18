@@ -69,6 +69,8 @@ mod senior_review_dsl;
 mod senior_review_engine_checks;
 #[path = "spec_tests.rs"]
 mod spec_tests;
+#[path = "wire_admission.rs"]
+mod wire_admission;
 
 #[path = "support/rates.rs"]
 mod rates_support;

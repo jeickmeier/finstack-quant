@@ -435,7 +435,7 @@ export interface BacktestForecastRequest {
 /** A Monte Carlo evaluation of a model's stochastic forecasts under Rust MonteCarloConfig JSON. */
 export interface EvaluateMonteCarloRequest {
   readonly modelJson: string;
-  /** Rust MonteCarloConfig JSON; the uint64 seed stays an exact integer token. */
+  /** Rust MonteCarloConfig JSON; the uint64 seed is an exact decimal string. */
   readonly configJson: string;
 }
 /** Breach test of one metric over host-serialized MonteCarloResults. */

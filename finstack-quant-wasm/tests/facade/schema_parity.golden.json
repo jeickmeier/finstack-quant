@@ -2340,7 +2340,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 417819
+            "bytes": 418301
           },
           {
             "path": "schemas/statements/1/forecast_method.schema.json",
@@ -2375,7 +2375,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
             "type_name": "MonteCarloConfig",
             "kind": "input",
-            "bytes": 1939
+            "bytes": 1905
           },
           {
             "path": "schemas/statements/1/monte_carlo_results.schema.json",
@@ -5166,7 +5166,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 417819
+            "bytes": 418301
           },
           {
             "domain": "statements",
@@ -5206,7 +5206,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
             "type_name": "MonteCarloConfig",
             "kind": "input",
-            "bytes": 1939
+            "bytes": 1905
           },
           {
             "domain": "statements",

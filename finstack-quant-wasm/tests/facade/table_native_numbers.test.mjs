@@ -74,7 +74,7 @@ test('Monte Carlo nested path table retains numeric storage and literal metric i
   try {
     const output = evaluator.evaluateMonteCarlo(model(), {
       n_paths: 2,
-      seed: 7,
+      seed: '7',
       metrics: ['nan', 'other'],
       include_path_data: true,
     });

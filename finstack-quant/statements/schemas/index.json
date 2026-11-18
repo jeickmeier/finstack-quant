@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
-      "bytes": 417819,
+      "bytes": 418301,
       "kind": "input",
       "path": "schemas/statements/1/financial_model_spec.schema.json",
       "summary": "Statement model graph: periods, nodes and the Value > Forecast > Formula precedence.",
@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/statements/1/monte_carlo_config.schema.json",
-      "bytes": 1939,
+      "bytes": 1905,
       "kind": "input",
       "path": "schemas/statements/1/monte_carlo_config.schema.json",
       "summary": "Path count, seed and reported percentiles of a Monte Carlo statement-model evaluation.",

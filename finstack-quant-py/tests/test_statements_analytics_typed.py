@@ -77,7 +77,7 @@ def test_typed_configs_round_trip_structured_fields() -> None:
 
 def test_monte_carlo_config_json_uses_canonical_omitted_field_defaults() -> None:
     structured = MonteCarloConfig(n_paths=8, seed=17, metrics=["revenue"])
-    compatible_json = MonteCarloConfig.from_json('{"n_paths":8,"seed":17,"metrics":["revenue"]}')
+    compatible_json = MonteCarloConfig.from_json('{"n_paths":8,"seed":"17","metrics":["revenue"]}')
 
     expected_percentiles = [0.05, 0.5, 0.95]
     assert structured.percentiles == expected_percentiles

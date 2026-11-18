@@ -112,12 +112,12 @@ it(
         "evaluateMonteCarlo",
         "monteCarloBreachProbability",
       ]);
-      // The full uint64 seed range reaches Rust as an exact integer token.
+      // The full uint64 seed range reaches Rust as an exact decimal string.
       const wide = await query.fetchQuery(
         evaluateMonteCarloOptions(client, 1, {
           modelJson,
           configJson:
-            '{"n_paths":4,"seed":18446744073709551615,"metrics":["revenue"]}',
+            '{"n_paths":4,"seed":"18446744073709551615","metrics":["revenue"]}',
         }),
       );
       expect(wide.n_paths).toBe(4);
@@ -126,7 +126,7 @@ it(
         query.fetchQuery(
           evaluateMonteCarloOptions(client, 1, {
             modelJson,
-            configJson: '{"n_paths":0,"seed":1,"metrics":["revenue"]}',
+            configJson: '{"n_paths":0,"seed":"1","metrics":["revenue"]}',
           }),
         ),
       ).rejects.toMatchObject({ kind: "validation" });
@@ -134,7 +134,7 @@ it(
         query.fetchQuery(
           evaluateMonteCarloOptions(client, 1, {
             modelJson,
-            configJson: '{"n_paths":1,"seed":1,"metrics":["revenue"],"bogus":1}',
+            configJson: '{"n_paths":1,"seed":"1","metrics":["revenue"],"bogus":1}',
           }),
         ),
       ).rejects.toThrow(/unknown field `bogus`/);
@@ -174,7 +174,7 @@ it("keys both queries by every request field and the worker session, and keeps a
   );
 });
 
-it("starts the config empty and submits the uint64 seed as an exact integer token", async () => {
+it("starts the config empty and submits the uint64 seed as an exact decimal string", async () => {
   const submit = vi.fn<(json: string) => void>();
   render(<StatementMonteCarlo onSubmit={submit} results={null} />);
   const paths = screen.getByRole("textbox", { name: "N paths" });
@@ -196,7 +196,7 @@ it("starts the config empty and submits the uint64 seed as an exact integer toke
   fireEvent.click(simulate);
   await waitFor(() => expect(submit).toHaveBeenCalled());
   expect(submit.mock.lastCall![0]).toBe(
-    '{"n_paths":200,"seed":18446744073709551615,"metrics":["revenue"]}',
+    '{"n_paths":200,"seed":"18446744073709551615","metrics":["revenue"]}',
   );
   // A seed above the uint64 range is rejected before submission.
   fireEvent.change(seed, { target: { value: "18446744073709551616" } });

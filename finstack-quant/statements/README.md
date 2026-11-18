@@ -455,6 +455,22 @@ strictly above it.
   formulas are compiled on rayon workers with a 2 MiB default stack during Monte
   Carlo, and a stack overflow aborts the process rather than unwinding.
 
+## Loading a model
+
+`FinancialModelSpec::from_json(text)` is the one loading path, shared by Rust,
+Python and WASM; `from_slice_strict(bytes, &limits)` is the same path with
+explicit limits. The input may be at most 64 MiB and 96 levels deep, an object
+may not repeat a key or carry an unknown field, and `schema_version` must be
+the integer `1`. A decode failure is a `ContractError` whose diagnostic carries
+a code and, where one exists, the JSON pointer; a model that decodes but is not
+runnable fails with the typed error and its kind. Money is a decimal-string
+amount with its currency, and seeds are canonical decimal strings.
+
+`content_hash()` validates the model and returns the versioned SHA-256 of the
+validated model's canonical JSON, so a model that is not runnable has no
+identity. A run's provenance records that identity beside its own run
+identity, source snapshot and observation cutoff.
+
 ## Schemas
 
 Checked-in JSON Schema artifacts live under `schemas/statements/1/`:

@@ -1008,9 +1008,9 @@ impl PyFinancialModelSpec {
     ///     mixed currencies, invalid waterfall).
     #[staticmethod]
     #[pyo3(text_signature = "(json, /)")]
-    fn from_json(json: &str) -> PyResult<Self> {
+    fn from_json(py: Python<'_>, json: &str) -> PyResult<Self> {
         let inner = finstack_quant_statements::types::FinancialModelSpec::from_json(json)
-            .map_err(statements_to_py)?;
+            .map_err(|error| crate::errors::contract_to_py(py, error))?;
         Ok(Self { inner })
     }
 

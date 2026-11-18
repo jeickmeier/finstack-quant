@@ -615,7 +615,7 @@ test('monteCarloBreachProbability reads the serialized path table', () => {
   });
   const config = {
     n_paths: 200,
-    seed: 42,
+    seed: '42',
     metrics: ['revenue'],
     percentiles: [0.05, 0.5, 0.95],
   };

@@ -675,7 +675,7 @@
     {
       "name": "statement-monte-carlo",
       "type": "registry:component",
-      "docs": "Edit a MonteCarloConfig with the schema form over the generated monte_carlo_config contract (path count, the uint64 seed kept as an exact integer, percentiles and include path data; the form starts empty, Rust's example is not preloaded); Simulate passes the structurally valid JSON to the caller (usually the useEvaluateMonteCarlo request), and Rust validates it. The native MonteCarloResults (statements.Evaluator.evaluateMonteCarlo) are shown as returned: for the chosen metric (the first returned by default), a fan of bands between the returned percentiles paired from the outside in, with the unpaired middle percentile as a line, over the forecast periods, the percentile table (percentiles shown as percents of Rust's fractions), the breach probability Rust reports for a threshold (statements.monteCarloBreachProbability; null when the results carry no path data) and the simulation warnings in a collapsed list. Nothing is simulated, interpolated or summed. Accepts defaultConfig, onSubmit, results, loading, error, defaultBreach, onBreach, breachProbability, breachLoading, breachError, formatValue and density props.",
+      "docs": "Edit a MonteCarloConfig with the schema form over the generated monte_carlo_config contract (path count, the uint64 seed as an exact decimal string, percentiles and include path data; the form starts empty, Rust's example is not preloaded); Simulate passes the structurally valid JSON to the caller (usually the useEvaluateMonteCarlo request), and Rust validates it. The native MonteCarloResults (statements.Evaluator.evaluateMonteCarlo) are shown as returned: for the chosen metric (the first returned by default), a fan of bands between the returned percentiles paired from the outside in, with the unpaired middle percentile as a line, over the forecast periods, the percentile table (percentiles shown as percents of Rust's fractions), the breach probability Rust reports for a threshold (statements.monteCarloBreachProbability; null when the results carry no path data) and the simulation warnings in a collapsed list. Nothing is simulated, interpolated or summed. Accepts defaultConfig, onSubmit, results, loading, error, defaultBreach, onBreach, breachProbability, breachLoading, breachError, formatValue and density props.",
       "worker": "none"
     },
     {
@@ -1876,7 +1876,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-result.json",
-      "sha256": "2016f23668115f1a15a58a558be36a58b1a1fa8b050ade5eedd0f25ebeb2ec18"
+      "sha256": "8a19768211e509b26ed0c66673f955a9e1c6089e286d1fe1e4d2940910da4c7f"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-check-report.json",
@@ -1916,7 +1916,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-sensitivity.json",
-      "sha256": "dc3eb7e36d0d7a94f260bbe7063229533f08e65b591e0813b023ca5ef7c6f661"
+      "sha256": "9f5d72fd106ad19e33921faecdcea335047518ba8038042f5084b4a9c579510f"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-goal-seek-run.json",
@@ -1936,7 +1936,7 @@
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo-config.json",
-      "sha256": "8798c9ecdbe738f7b96a02c554685c164e3e9caed5c76a27d1957f7af64e3c0d"
+      "sha256": "277e3c70588c8eb0f7a1e5ee349b48a0a297a4011d59bc6aef4bd68d8c8e5085"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/statements/analyst-monte-carlo.json",
@@ -1976,7 +1976,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/statements/capital-structure/cases.json",
-      "sha256": "b6837f1cbecc3c2986c4392e4c3b9dfd4c9853331d399c7bb0a9e7f016f04cdf"
+      "sha256": "7be527724c23d6aecdc7f820609b353c41adf4d523c824ed43cf426fa3f74ae8"
     },
     {
       "path": "finstack-quant-ui/tests/statements/relative-value/cases.json",
@@ -1984,7 +1984,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/statements/export/cases.json",
-      "sha256": "3d7fb52ba51d1f30059a13cd10dcd2a9f4d51c69fd02784e6d62de6d3d22836d"
+      "sha256": "4d4dc73dbe0611c0a5505136f2b918946ff22235b47c4d8c1858256d4fb30c7b"
     },
     {
       "path": "finstack-quant-ui/src/fixtures/covenants/analyst-covenant-series.json",

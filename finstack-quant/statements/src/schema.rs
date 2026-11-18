@@ -14,50 +14,24 @@ use crate::types::{FinancialModelSpec, ForecastMethod, ForecastSpec, ModelEdit};
 /// Stable base URI for statements-owned schemas.
 pub const STATEMENTS_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/statements/1/";
 
-/// A canonical two-period model with one value node and one formula node.
+/// A runnable two-quarter model with one value node and one formula node.
 ///
-/// Small on purpose: it shows the graph shape and the Value > Forecast >
-/// Formula precedence without carrying a worked forecast.
+/// Built with the model builder, so the published example is a model the
+/// loader admits and the evaluator runs.
 fn financial_model_examples() -> finstack_quant_core::Result<Vec<Value>> {
-    use finstack_quant_core::dates::{Date, Period, PeriodId};
+    use finstack_quant_core::dates::PeriodId;
 
-    let quarter = |label: &str, start: (i32, time::Month, u8), end: (i32, time::Month, u8)| {
-        let id: PeriodId = label.parse().map_err(|error| {
-            finstack_quant_core::Error::Internal(format!("parse example period {label}: {error}"))
-        })?;
-        let start = Date::from_calendar_date(start.0, start.1, start.2).map_err(|error| {
-            finstack_quant_core::Error::Internal(format!("build example start date: {error}"))
-        })?;
-        let end = Date::from_calendar_date(end.0, end.1, end.2).map_err(|error| {
-            finstack_quant_core::Error::Internal(format!("build example end date: {error}"))
-        })?;
-        Ok::<Period, finstack_quant_core::Error>(Period {
-            id,
-            start,
-            end,
-            is_actual: false,
-        })
-    };
-
-    let periods = vec![
-        quarter(
-            "2024Q1",
-            (2024, time::Month::January, 1),
-            (2024, time::Month::April, 1),
-        )?,
-        quarter(
-            "2024Q2",
-            (2024, time::Month::April, 1),
-            (2024, time::Month::July, 1),
-        )?,
-    ];
-    let model = crate::types::FinancialModelSpec::new(
-        "example_model",
-        finstack_quant_core::dates::PeriodPlan::try_new(
-            finstack_quant_core::dates::PeriodCalendar::Gregorian,
-            periods,
-        )?,
+    let mut builder = crate::builder::ModelBuilder::new("example_model");
+    builder.periods("2024Q1..Q2", None)?;
+    builder.value(
+        "revenue",
+        &[
+            (PeriodId::quarter(2024, 1)?, 100.0.into()),
+            (PeriodId::quarter(2024, 2)?, 110.0.into()),
+        ],
     );
+    builder.compute("gross_profit", "revenue * 0.4")?;
+    let model = builder.build()?;
 
     let value = serde_json::to_value(&model).map_err(|error| {
         finstack_quant_core::Error::Internal(format!("serialize financial model example: {error}"))
@@ -238,7 +212,7 @@ fn monte_carlo_config_examples() -> finstack_quant_core::Result<Vec<Value>> {
     finstack_quant_core::schema::example_from_json::<crate::evaluator::MonteCarloConfig>(
         serde_json::json!({
             "n_paths": 1000,
-            "seed": 42,
+            "seed": "42",
             "metrics": ["revenue"],
             "percentiles": [0.05, 0.5, 0.95]
         }),
@@ -300,7 +274,9 @@ fn normalization_result_examples() -> finstack_quant_core::Result<Vec<Value>> {
     )
 }
 
-/// The crate's complete schema registry, sorted by artifact path.
+/// The crate's complete schema registry, in declaration order.
+///
+/// The shared renderer owns the order artifacts are published in.
 ///
 /// This lives in the library, not the generator binary, so the generator, the
 /// contract tests and the bindings all render from one definition. Render an

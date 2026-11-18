@@ -19,9 +19,9 @@ fn model_bytes(meta: &str) -> Vec<u8> {
 fn financial_model_has_golden_canonical_bytes_hash_and_order_invariance() {
     let first_bytes = model_bytes(r#"{"desk":"corp","source":"golden"}"#);
     let second_bytes = model_bytes(r#"{"source":"golden","desk":"corp"}"#);
-    let (first, _) = FinancialModelSpec::from_slice_strict(&first_bytes, &LoadLimits::default())
+    let first = FinancialModelSpec::from_slice_strict(&first_bytes, &LoadLimits::default())
         .expect("first financial model is strictly valid");
-    let (second, _) = FinancialModelSpec::from_slice_strict(&second_bytes, &LoadLimits::default())
+    let second = FinancialModelSpec::from_slice_strict(&second_bytes, &LoadLimits::default())
         .expect("second financial model is strictly valid");
 
     let canonical = to_canonical_bytes(&first).expect("financial model canonicalizes");
