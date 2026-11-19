@@ -274,7 +274,7 @@ impl PyFiCarinoLinkedResult {
 ///
 /// Parameters
 /// ----------
-/// portfolio_json : str | dict | list | pandas.DataFrame
+/// portfolio : str | dict | list | pandas.DataFrame
 ///     JSON array of ``FiPositionSnapshot`` objects (``sector``, ``weight``,
 ///     ``total_return``, ``yield_annual``, ``modified_duration``,
 ///     ``spread_duration``, ``spread``, ``delta_treasury_yield``,
@@ -284,10 +284,10 @@ impl PyFiCarinoLinkedResult {
 ///     G-spread, and discount-margin values must not be mixed into these
 ///     fields. Because the direct JSON shape carries numeric values but no
 ///     metric IDs, the binding cannot detect mislabeled spread provenance.
-/// benchmark_json : str | dict | list | pandas.DataFrame
+/// benchmark : str | dict | list | pandas.DataFrame
 ///     JSON array of ``FiPositionSnapshot`` objects for the benchmark, subject
 ///     to the same quote-reproducing Z-spread basis contract.
-/// config_json : str | dict | list | pandas.DataFrame
+/// config : str | dict | list | pandas.DataFrame
 ///     JSON ``FiAttributionConfig``; ``period_years`` is its only field and is
 ///     required (no default). Unknown keys are rejected.
 ///
@@ -307,28 +307,26 @@ impl PyFiCarinoLinkedResult {
 /// ValueError
 ///     If an input JSON string is malformed or does not match its schema.
 #[pyfunction]
-#[pyo3(text_signature = "(portfolio_json, benchmark_json, config_json)")]
+#[pyo3(text_signature = "(portfolio, benchmark, config)")]
 fn campisi_attribution(
     py: Python<'_>,
-    portfolio_json: &Bound<'_, PyAny>,
-    benchmark_json: &Bound<'_, PyAny>,
-    config_json: &Bound<'_, PyAny>,
+    portfolio: &Bound<'_, PyAny>,
+    benchmark: &Bound<'_, PyAny>,
+    config: &Bound<'_, PyAny>,
 ) -> PyResult<PyFiAttributionResult> {
-    let portfolio_json =
-        crate::bindings::extract::extract_records_json(py, portfolio_json, "portfolio")?;
-    let benchmark_json =
-        crate::bindings::extract::extract_records_json(py, benchmark_json, "benchmark")?;
-    let config_json = crate::bindings::extract::extract_records_json(py, config_json, "config")?;
+    let portfolio = crate::bindings::extract::extract_records_json(py, portfolio, "portfolio")?;
+    let benchmark = crate::bindings::extract::extract_records_json(py, benchmark, "benchmark")?;
+    let config = crate::bindings::extract::extract_records_json(py, config, "config")?;
     Ok(PyFiAttributionResult {
         inner: py.detach(move || {
             let portfolio: Vec<finstack_quant_portfolio::fi_attribution::FiPositionSnapshot> =
-                serde_json::from_str(&portfolio_json)
+                serde_json::from_str(&portfolio)
                     .map_err(|err| serde_json_to_py(err, "invalid Campisi portfolio JSON"))?;
             let benchmark: Vec<finstack_quant_portfolio::fi_attribution::FiPositionSnapshot> =
-                serde_json::from_str(&benchmark_json)
+                serde_json::from_str(&benchmark)
                     .map_err(|err| serde_json_to_py(err, "invalid Campisi benchmark JSON"))?;
             let config: finstack_quant_portfolio::fi_attribution::FiAttributionConfig =
-                serde_json::from_str(&config_json)
+                serde_json::from_str(&config)
                     .map_err(|err| serde_json_to_py(err, "invalid Campisi config JSON"))?;
             finstack_quant_portfolio::fi_attribution::campisi_attribution(
                 &portfolio, &benchmark, &config,
@@ -346,7 +344,7 @@ fn campisi_attribution(
 ///
 /// Parameters
 /// ----------
-/// periods_json : list[FiAttributionResult] | str | list[dict]
+/// periods : list[FiAttributionResult] | str | list[dict]
 ///     Chronological ``FiAttributionResult`` values (typed results from
 ///     :func:`campisi_attribution`, or their JSON).
 ///
@@ -369,19 +367,19 @@ fn campisi_attribution(
 ///     reconciliation residual is non-finite; or a return is outside the
 ///     Carino domain.
 /// ValueError
-///     If ``periods_json`` is malformed or does not match the
+///     If ``periods`` is malformed or does not match the
 ///     ``FiAttributionResult`` schema.
 #[pyfunction]
-#[pyo3(text_signature = "(periods_json)")]
+#[pyo3(text_signature = "(periods)")]
 fn campisi_carino_link(
     py: Python<'_>,
-    periods_json: &Bound<'_, PyAny>,
+    periods: &Bound<'_, PyAny>,
 ) -> PyResult<PyFiCarinoLinkedResult> {
-    let periods_json = crate::bindings::extract::extract_records_json(py, periods_json, "periods")?;
+    let periods = crate::bindings::extract::extract_records_json(py, periods, "periods")?;
     Ok(PyFiCarinoLinkedResult {
         inner: py.detach(move || {
             let periods: Vec<finstack_quant_portfolio::fi_attribution::FiAttributionResult> =
-                serde_json::from_str(&periods_json)
+                serde_json::from_str(&periods)
                     .map_err(|err| serde_json_to_py(err, "invalid Campisi period results JSON"))?;
             finstack_quant_portfolio::fi_attribution::campisi_carino_link(&periods)
                 .map_err(portfolio_to_py)

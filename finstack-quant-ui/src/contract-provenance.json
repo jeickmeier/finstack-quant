@@ -2050,7 +2050,7 @@
         "member": "twrrLinked",
         "inputs": [
           {
-            "name": "returnsJson",
+            "name": "returns",
             "type": "JsonInput",
             "optional": false
           },
@@ -2061,8 +2061,8 @@
           }
         ],
         "returns": "LinkedReturn",
-        "declaration": "/**\n * Geometrically link TWRR sub-period returns from returns JSON.\n * @param returnsJson - Numeric return-series JSON.\n * @param horizonYears - Full elapsed horizon in 365-day calendar years; must be finite (`NaN` or `Infinity` throws). Below one year, including zero and negative values, the linked return is not annualised (`annualised` mirrors `cumulative` and `is_annualised` is false).\n *\n * # Errors\n *\n * Throws a JavaScript exception if `returnsJson` is malformed, `horizonYears`\n * is `NaN` or infinite, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded\n * growth factor), or the linked result cannot be converted to a JavaScript\n * value.\n * @returns Linked time-weighted return object, including the annualized rate over `horizonYears`.\n */\nexport function twrrLinked(returnsJson: JsonInput, horizonYears: number): LinkedReturn;",
-        "sha256": "e963c60b721f3a46c93fb849c90f40b754851a4024f23d666d96b005476725f7"
+        "declaration": "/**\n * Geometrically link TWRR sub-period returns from returns JSON.\n * @param returns - Numeric return-series JSON.\n * @param horizonYears - Full elapsed horizon in 365-day calendar years; must be finite (`NaN` or `Infinity` throws). Below one year, including zero and negative values, the linked return is not annualised (`annualised` mirrors `cumulative` and `is_annualised` is false).\n *\n * # Errors\n *\n * Throws a JavaScript exception if `returns` is malformed, `horizonYears`\n * is `NaN` or infinite, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded\n * growth factor), or the linked result cannot be converted to a JavaScript\n * value.\n * @returns Linked time-weighted return object, including the annualized rate over `horizonYears`.\n */\nexport function twrrLinked(returns: JsonInput, horizonYears: number): LinkedReturn;",
+        "sha256": "d37c0e3cf9966a22cca3047a3ecb8452b5e21a86f2285fee4bd8cf9ced014145"
       }
     },
     {

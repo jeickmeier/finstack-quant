@@ -559,9 +559,9 @@ class FiCarinoLinkedResult:
         ...
 
 def campisi_attribution(
-    portfolio_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    benchmark_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    config_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    portfolio: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    benchmark: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    config: str | dict[str, Any] | list[Any] | pd.DataFrame,
 ) -> FiAttributionResult:
     """
     Compute single-period Campisi fixed-income benchmark attribution.
@@ -570,7 +570,7 @@ def campisi_attribution(
 
     Parameters
     ----------
-    portfolio_json : str | dict | list | pandas.DataFrame
+    portfolio : str | dict | list | pandas.DataFrame
         JSON array of ``FiPositionSnapshot`` objects with ``sector``,
         ``weight``, ``total_return``, ``yield_annual``, ``modified_duration``,
         ``spread_duration``, ``spread``, ``delta_treasury_yield``, and
@@ -581,10 +581,10 @@ def campisi_attribution(
         G-spread, and discount-margin values are incompatible. The direct JSON
         shape has no metric-ID provenance, so this binding cannot detect a
         mislabeled numeric spread basis.
-    benchmark_json : str | dict | list | pandas.DataFrame
+    benchmark : str | dict | list | pandas.DataFrame
         JSON array of ``FiPositionSnapshot`` objects for the benchmark, subject
         to the same quote-reproducing Z-spread basis contract.
-    config_json : str | dict | list | pandas.DataFrame
+    config : str | dict | list | pandas.DataFrame
         JSON object whose only field is ``period_years`` (e.g. ``0.25``). It is
         required — there is no default — and unknown keys are rejected. The
         spread convention is not configurable: the Campisi spread effect
@@ -652,7 +652,7 @@ def campisi_attribution(
     """
     ...
 
-def campisi_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -> FiCarinoLinkedResult:
+def campisi_carino_link(periods: str | dict[str, Any] | list[Any] | pd.DataFrame) -> FiCarinoLinkedResult:
     """
     Carino-link already-computed single-period Campisi attribution results.
 
@@ -666,7 +666,7 @@ def campisi_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.Data
 
     Parameters
     ----------
-    periods_json : list[FiAttributionResult] | str | list[dict]
+    periods : list[FiAttributionResult] | str | list[dict]
         Chronological list of typed ``FiAttributionResult`` objects (as
         returned by :func:`campisi_attribution`) or their JSON form
         (``FiAttributionResult.to_json()``). Every period must carry the same
@@ -682,7 +682,7 @@ def campisi_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.Data
     Raises
     ------
     PortfolioError
-        If ``periods_json`` is empty; sector orderings differ; a consumed
+        If ``periods`` is empty; sector orderings differ; a consumed
         top-level return/effect, per-sector linked effect, or sector
         ``total_active`` is non-finite; ``active_return`` disagrees with the
         portfolio-minus-benchmark return; a sector ``total_active`` disagrees
@@ -692,7 +692,7 @@ def campisi_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.Data
         reconciliation residual is non-finite; or a return is at or below
         -100% (outside the Carino domain).
     ValueError
-        If ``periods_json`` is malformed or does not match the
+        If ``periods`` is malformed or does not match the
         ``FiAttributionResult`` schema.
 
     Sources

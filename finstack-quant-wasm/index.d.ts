@@ -11419,11 +11419,11 @@ export interface PortfolioNamespace {
    *
    * Accepts a JSON array of `SectorPeriod` objects and returns a structured
    * `BrinsonPeriodResult` object.
-   * @param sectorsJson - Sector-classification JSON.
+   * @param sectors - Sector-classification JSON.
    *
    * # Errors
    *
-   * Throws a JavaScript exception if `sectorsJson` is malformed, contains no
+   * Throws a JavaScript exception if `sectors` is malformed, contains no
    * sectors or a non-finite weight or return, portfolio or benchmark weights do
    * not sum to one, or the result cannot be converted to a JavaScript value.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
@@ -11437,11 +11437,11 @@ export interface PortfolioNamespace {
    * returns a structured `CarinoLinkedAttribution` object whose linked effects
    * reconstruct the geometrically compounded active return. To link raw sector
    * inputs, attribute each period with `brinsonFachler` first.
-   * @param periodsJson - Chronological JSON array of `BrinsonPeriodResult` objects with identical sector ordering in every period.
+   * @param periods - Chronological JSON array of `BrinsonPeriodResult` objects with identical sector ordering in every period.
    *
    * # Errors
    *
-   * Throws a JavaScript exception if `periodsJson` is malformed, the sequence is
+   * Throws a JavaScript exception if `periods` is malformed, the sequence is
    * empty or changes sector ordering, or a period return is non-finite or at
    * most `-1`.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
@@ -11490,9 +11490,9 @@ export interface PortfolioNamespace {
    * present on either side has `|net sector weight| <= 1e-6 * gross absolute
    * sector weight`. Spread-basis provenance cannot be validated from numeric
    * JSON alone.
-   * @param portfolioJson - Canonical JSON array of `FiPositionSnapshot` objects describing the portfolio side on the quote-reproducing Z-spread basis; weights must sum to 1.
-   * @param benchmarkJson - Canonical JSON array of `FiPositionSnapshot` objects describing the benchmark side on the quote-reproducing Z-spread basis; weights must sum to 1.
-   * @param configJson - Canonical JSON `FiAttributionConfig`; `period_years` is its only field, is required (no default), and unknown keys are rejected.
+   * @param portfolio - Array or JSON text containing `FiPositionSnapshot` objects describing the portfolio side on the quote-reproducing Z-spread basis; weights must sum to 1.
+   * @param benchmark - Array or JSON text containing `FiPositionSnapshot` objects describing the benchmark side on the quote-reproducing Z-spread basis; weights must sum to 1.
+   * @param config - `FiAttributionConfig` object or JSON text; `period_years` is its only field, is required (no default), and unknown keys are rejected.
    *
    * # Errors
    *
@@ -11519,11 +11519,11 @@ export interface PortfolioNamespace {
    * totals do not reconcile to `active_return` within the overflow-safe
    * scaled-L1 tolerance, a reconciliation residual is non-finite, or a return
    * is outside the Carino domain.
-   * @param periodsJson - Canonical JSON array of `FiAttributionResult` objects in chronological order, as returned by `campisiAttribution`.
+   * @param periods - Array or JSON text containing `FiAttributionResult` objects in chronological order, as returned by `campisiAttribution`.
    *
    * # Errors
    *
-   * Throws a JavaScript exception if `periodsJson` is malformed, the sequence is
+   * Throws a JavaScript exception if `periods` is malformed, the sequence is
    * empty or changes sector ordering, a consumed value or reconciliation is
    * non-finite or inconsistent, a return is at most `-1`, or the linked result
    * cannot be converted to a JavaScript value.
@@ -11555,14 +11555,14 @@ export interface PortfolioNamespace {
    * Build a duration-cell base-return table from a reference universe.
    *
    * Binds Rust `cell_returns_from_reference` (Dynkin, Hyman & Vankudre 1998,
-   * Appendix B): buckets `referenceJson` into fixed-width duration cells and
+   * Appendix B): buckets `reference` into fixed-width duration cells and
    * averages each cell's member total returns, interpolating interior gaps
    * and flat-extrapolating leading/trailing gaps. Returns a structured
    * `DurationCellTable` object; `JSON.stringify` it to chain into
    * `excessReturns`.
-   * @param referenceJson - Canonical JSON array of `ReferenceReturn` objects (`duration`, `total_return`, both decimals with duration in years); must be non-empty.
+   * @param reference - Canonical JSON array of `ReferenceReturn` objects (`duration`, `total_return`, both decimals with duration in years); must be non-empty.
    * @param baseLabel - Label identifying the resulting curve (e.g. `"UST"`), carried through to the output's `base_label` for policy visibility.
-   * @param configJson - Canonical JSON `CellConfig`; `width` is its only field (cell width in years, finite and positive) and is required, with no default.
+   * @param config - Canonical JSON `CellConfig`; `width` is its only field (cell width in years, finite and positive) and is required, with no default.
    *
    * # Errors
    *
@@ -11588,11 +11588,11 @@ export interface PortfolioNamespace {
    * @param horizonYears - Length of the holding period, in years; must be finite and positive.
    * @param maxDuration - Upper bound of the duration grid, in years; must be finite and strictly greater than `horizonYears`.
    * @param baseLabel - Label identifying the base curve (e.g. `"UST"`, `"USD-SOFR"`), stamped into the result purely for policy visibility.
-   * @param configJson - Canonical JSON `CellConfig`; `width` is its only field and is required, with no default.
+   * @param config - Canonical JSON `CellConfig`; `width` is its only field and is required, with no default.
    *
    * # Errors
    *
-   * Throws a JavaScript exception if `configJson` is malformed; the width,
+   * Throws a JavaScript exception if `config` is malformed; the width,
    * horizon, or maximum duration is invalid; a cell matures within the holding
    * period; the grid is too large or has duplicate labels; a required discount
    * factor is not finite and positive; or the result cannot be converted to a
@@ -11605,13 +11605,13 @@ export interface PortfolioNamespace {
    *
    * Binds Rust `excess_returns` (Dynkin, Hyman & Vankudre 1998, Appendix B):
    * each position's `duration` is matched to its duration cell in
-   * `tableJson` and the position's excess return is `total_return -
+   * `table` and the position's excess return is `total_return -
    * cell.base_return`, the credit-specific component of performance isolated
    * from the general level/shape move of the base curve. Returns a structured
    * `ExcessReturnResult` object with per-position and portfolio-level totals.
    *
-   * @param positionsJson - Canonical JSON array of `ExcessReturnPosition` objects (`id`, `weight`, `duration`, `total_return`); weights must sum to 1.
-   * @param tableJson - Canonical JSON `DurationCellTable`; `JSON.stringify` the structured table returned by `cellReturnsFromReference` or `cellReturnsFromCurves`.
+   * @param positions - Canonical JSON array of `ExcessReturnPosition` objects (`id`, `weight`, `duration`, `total_return`); weights must sum to 1.
+   * @param table - Canonical JSON `DurationCellTable`; `JSON.stringify` the structured table returned by `cellReturnsFromReference` or `cellReturnsFromCurves`.
    *
    * # Errors
    *
@@ -11635,8 +11635,8 @@ export interface PortfolioNamespace {
    * among accepted inputs, the reconciliation residual grows the closer any
    * bucket's net weight sits to the near-zero-net-weight rejection boundary
    * (see the Rust module docs for measured magnitudes).
-   * @param portfolioJson - Canonical JSON array of `GridPosition` objects (`cell`, `sector`, `weight`, `total_return`) for the portfolio side; weights must sum to 1.
-   * @param benchmarkJson - Canonical JSON array of `GridPosition` objects for the benchmark side; same weight-sum requirement.
+   * @param portfolio - Canonical JSON array of `GridPosition` objects (`cell`, `sector`, `weight`, `total_return`) for the portfolio side; weights must sum to 1.
+   * @param benchmark - Canonical JSON array of `GridPosition` objects for the benchmark side; same weight-sum requirement.
    *
    * # Errors
    *
@@ -11657,11 +11657,11 @@ export interface PortfolioNamespace {
    * return. Only the three top-level effects are linked; per-cell /
    * per-(cell, sector) multi-period linking is out of scope. Returns a structured
    * `GridCarinoLinkedResult` object.
-   * @param periodsJson - Canonical JSON array of `GridAttributionResult` objects, in chronological order; `JSON.stringify` the structured results returned by `gridAttribution`.
+   * @param periods - Canonical JSON array of `GridAttributionResult` objects, in chronological order; `JSON.stringify` the structured results returned by `gridAttribution`.
    *
    * # Errors
    *
-   * Throws a JavaScript exception if `periodsJson` is malformed, the sequence is
+   * Throws a JavaScript exception if `periods` is malformed, the sequence is
    * empty, a consumed value is non-finite or inconsistent, a return is at most
    * `-1`, or the linked result cannot be converted to a JavaScript value.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
@@ -11676,12 +11676,12 @@ export interface PortfolioNamespace {
    * caller-supplied benchmark factor-return vector. Returns a structured
    * `FactorBrinsonResult` object with `allocation`, `selection`, and their
    * per-factor / per-asset breakdowns.
-   * @param inputJson - Canonical JSON `FactorBrinsonInput` with `asset_ids`, `asset_returns`, `exposures` (row-major n_assets x n_factors), `factor_names`, `portfolio_weights` and `benchmark_weights`; each weight vector must sum to 1.
+   * @param input - Canonical JSON `FactorBrinsonInput` with `asset_ids`, `asset_returns`, `exposures` (row-major n_assets x n_factors), `factor_names`, `portfolio_weights` and `benchmark_weights`; each weight vector must sum to 1.
    * @param factorReturns - Caller-supplied benchmark factor returns `f_b` as a `number[]` or `Float64Array`, length `input.factor_names`; the `Float64Array` returned by `analytics.constrainedLeastSquares` can be passed directly.
    *
    * # Errors
    *
-   * Throws a JavaScript exception if `inputJson` is malformed; the asset or
+   * Throws a JavaScript exception if `input` is malformed; the asset or
    * factor sets are empty; dimensions disagree; a value is non-finite; either
    * weight vector does not sum to one; benchmark factor completeness is outside
    * tolerance; or the result cannot be converted to a JavaScript value.
@@ -11702,12 +11702,12 @@ export interface PortfolioNamespace {
   readonly twrrModifiedDietz: typeof wasm.twrrModifiedDietz;
   /**
    * Geometrically link TWRR sub-period returns from returns JSON.
-   * @param returnsJson - Numeric return-series JSON.
+   * @param returns - Numeric return-series JSON.
    * @param horizonYears - Full elapsed horizon in 365-day calendar years; must be finite (`NaN` or `Infinity` throws). Below one year, including zero and negative values, the linked return is not annualised (`annualised` mirrors `cumulative` and `is_annualised` is false).
    *
    * # Errors
    *
-   * Throws a JavaScript exception if `returnsJson` is malformed, `horizonYears`
+   * Throws a JavaScript exception if `returns` is malformed, `horizonYears`
    * is `NaN` or infinite, the return series is invalid (non-finite sub-period return or return at most -1, non-positive compounded
    * growth factor), or the linked result cannot be converted to a JavaScript
    * value.

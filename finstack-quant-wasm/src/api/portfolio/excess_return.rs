@@ -10,14 +10,14 @@ use wasm_bindgen::prelude::*;
 /// Build a duration-cell base-return table from a reference universe.
 ///
 /// Binds Rust `cell_returns_from_reference` (Dynkin, Hyman & Vankudre 1998,
-/// Appendix B): buckets `referenceJson` into fixed-width duration cells and
+/// Appendix B): buckets `reference` into fixed-width duration cells and
 /// averages each cell's member total returns, interpolating interior gaps
 /// and flat-extrapolating leading/trailing gaps. Returns a structured
 /// `DurationCellTable` object; `JSON.stringify` it to chain into
 /// `excessReturns`.
-/// @param referenceJson - Canonical JSON array of `ReferenceReturn` objects (`duration`, `total_return`, both decimals with duration in years); must be non-empty.
+/// @param reference - Canonical JSON array of `ReferenceReturn` objects (`duration`, `total_return`, both decimals with duration in years); must be non-empty.
 /// @param baseLabel - Label identifying the resulting curve (e.g. `"UST"`), carried through to the output's `base_label` for policy visibility.
-/// @param configJson - Canonical JSON `CellConfig`; `width` is its only field (cell width in years, finite and positive) and is required, with no default.
+/// @param config - Canonical JSON `CellConfig`; `width` is its only field (cell width in years, finite and positive) and is required, with no default.
 ///
 /// # Errors
 ///
@@ -28,17 +28,15 @@ use wasm_bindgen::prelude::*;
 /// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
 #[wasm_bindgen(js_name = cellReturnsFromReference, unchecked_return_type = "DurationCellTable")]
 pub fn cell_returns_from_reference(
-    #[wasm_bindgen(js_name = "referenceJson", unchecked_param_type = "JsonInput")]
-    reference_json: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] reference: JsValue,
     #[wasm_bindgen(js_name = "baseLabel", unchecked_param_type = "string")] base_label: JsValue,
-    #[wasm_bindgen(js_name = "configJson", unchecked_param_type = "JsonInput")]
-    config_json: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] config: JsValue,
 ) -> Result<JsValue, JsValue> {
     let base_label: &str = &js_string(&base_label, "baseLabel")?;
     let reference: Vec<finstack_quant_portfolio::excess_return::ReferenceReturn> =
-        from_js_json(&reference_json, "referenceJson")?;
+        from_js_json(&reference, "reference")?;
     let config: finstack_quant_portfolio::excess_return::CellConfig =
-        from_js_json(&config_json, "configJson")?;
+        from_js_json(&config, "config")?;
     let table = finstack_quant_portfolio::excess_return::cell_returns_from_reference(
         &reference, base_label, &config,
     )
@@ -60,11 +58,11 @@ pub fn cell_returns_from_reference(
 /// @param horizonYears - Length of the holding period, in years; must be finite and positive.
 /// @param maxDuration - Upper bound of the duration grid, in years; must be finite and strictly greater than `horizonYears`.
 /// @param baseLabel - Label identifying the base curve (e.g. `"UST"`, `"USD-SOFR"`), stamped into the result purely for policy visibility.
-/// @param configJson - Canonical JSON `CellConfig`; `width` is its only field and is required, with no default.
+/// @param config - Canonical JSON `CellConfig`; `width` is its only field and is required, with no default.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `configJson` is malformed; the width,
+/// Throws a JavaScript exception if `config` is malformed; the width,
 /// horizon, or maximum duration is invalid; a cell matures within the holding
 /// period; the grid is too large or has duplicate labels; a required discount
 /// factor is not finite and positive; or the result cannot be converted to a
@@ -78,14 +76,13 @@ pub fn cell_returns_from_curves(
     horizon_years: JsValue,
     #[wasm_bindgen(js_name = "maxDuration", unchecked_param_type = "number")] max_duration: JsValue,
     #[wasm_bindgen(js_name = "baseLabel", unchecked_param_type = "string")] base_label: JsValue,
-    #[wasm_bindgen(js_name = "configJson", unchecked_param_type = "JsonInput")]
-    config_json: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] config: JsValue,
 ) -> Result<JsValue, JsValue> {
     let horizon_years = js_f64(&horizon_years, "horizonYears")?;
     let max_duration = js_f64(&max_duration, "maxDuration")?;
     let base_label: &str = &js_string(&base_label, "baseLabel")?;
     let config: finstack_quant_portfolio::excess_return::CellConfig =
-        from_js_json(&config_json, "configJson")?;
+        from_js_json(&config, "config")?;
     let table = finstack_quant_portfolio::excess_return::cell_returns_from_curves(
         &start.inner,
         &end.inner,
@@ -102,13 +99,13 @@ pub fn cell_returns_from_curves(
 ///
 /// Binds Rust `excess_returns` (Dynkin, Hyman & Vankudre 1998, Appendix B):
 /// each position's `duration` is matched to its duration cell in
-/// `tableJson` and the position's excess return is `total_return -
+/// `table` and the position's excess return is `total_return -
 /// cell.base_return`, the credit-specific component of performance isolated
 /// from the general level/shape move of the base curve. Returns a structured
 /// `ExcessReturnResult` object with per-position and portfolio-level totals.
 ///
-/// @param positionsJson - Canonical JSON array of `ExcessReturnPosition` objects (`id`, `weight`, `duration`, `total_return`); weights must sum to 1.
-/// @param tableJson - Canonical JSON `DurationCellTable`; `JSON.stringify` the structured table returned by `cellReturnsFromReference` or `cellReturnsFromCurves`.
+/// @param positions - Canonical JSON array of `ExcessReturnPosition` objects (`id`, `weight`, `duration`, `total_return`); weights must sum to 1.
+/// @param table - Canonical JSON `DurationCellTable`; `JSON.stringify` the structured table returned by `cellReturnsFromReference` or `cellReturnsFromCurves`.
 ///
 /// # Errors
 ///
@@ -119,14 +116,13 @@ pub fn cell_returns_from_curves(
 /// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
 #[wasm_bindgen(js_name = excessReturns, unchecked_return_type = "ExcessReturnResult")]
 pub fn excess_returns(
-    #[wasm_bindgen(js_name = "positionsJson", unchecked_param_type = "JsonInput")]
-    positions_json: JsValue,
-    #[wasm_bindgen(js_name = "tableJson", unchecked_param_type = "JsonInput")] table_json: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] positions: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] table: JsValue,
 ) -> Result<JsValue, JsValue> {
     let positions: Vec<finstack_quant_portfolio::excess_return::ExcessReturnPosition> =
-        from_js_json(&positions_json, "positionsJson")?;
+        from_js_json(&positions, "positions")?;
     let table: finstack_quant_portfolio::excess_return::DurationCellTable =
-        from_js_json(&table_json, "tableJson")?;
+        from_js_json(&table, "table")?;
     let result = finstack_quant_portfolio::excess_return::excess_returns(&positions, &table)
         .map_err(to_js_err)?;
     to_js_value(&result)

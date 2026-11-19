@@ -189,7 +189,7 @@ impl PyCarinoLinkedAttribution {
 ///
 /// Parameters
 /// ----------
-/// sectors_json : str | dict | list | pandas.DataFrame
+/// sectors : str | dict | list | pandas.DataFrame
 ///     JSON array of ``SectorPeriod`` objects with ``sector``,
 ///     ``portfolio_weight``, ``benchmark_weight``, ``portfolio_return``, and
 ///     ``benchmark_return`` fields.
@@ -201,16 +201,13 @@ impl PyCarinoLinkedAttribution {
 ///     ``to_dataframe()`` / ``to_json()`` exits. Use
 ///     :meth:`to_json` for the raw wire string.
 #[pyfunction]
-#[pyo3(text_signature = "(sectors_json)")]
-fn brinson_fachler(
-    py: Python<'_>,
-    sectors_json: &Bound<'_, PyAny>,
-) -> PyResult<PyBrinsonPeriodResult> {
-    let sectors_json = crate::bindings::extract::extract_records_json(py, sectors_json, "sectors")?;
+#[pyo3(text_signature = "(sectors)")]
+fn brinson_fachler(py: Python<'_>, sectors: &Bound<'_, PyAny>) -> PyResult<PyBrinsonPeriodResult> {
+    let sectors = crate::bindings::extract::extract_records_json(py, sectors, "sectors")?;
     Ok(PyBrinsonPeriodResult {
         inner: py.detach(move || {
             let sectors: Vec<finstack_quant_portfolio::brinson::SectorPeriod> =
-                serde_json::from_str(&sectors_json)
+                serde_json::from_str(&sectors)
                     .map_err(|err| serde_json_to_py(err, "invalid Brinson sectors JSON"))?;
             finstack_quant_portfolio::brinson::brinson_fachler(&sectors).map_err(portfolio_to_py)
         })?,
@@ -224,7 +221,7 @@ fn brinson_fachler(
 ///
 /// Parameters
 /// ----------
-/// periods_json : list[BrinsonPeriodResult] | str | list[dict]
+/// periods : list[BrinsonPeriodResult] | str | list[dict]
 ///     Chronological ``BrinsonPeriodResult`` values (typed results from
 ///     :func:`brinson_fachler`, or their JSON) with identical sector ordering
 ///     in every period.
@@ -243,16 +240,13 @@ fn brinson_fachler(
 ///     If the sequence is empty or changes sector ordering, or a period
 ///     return is non-finite or at most ``-1``.
 #[pyfunction]
-#[pyo3(text_signature = "(periods_json)")]
-fn carino_link(
-    py: Python<'_>,
-    periods_json: &Bound<'_, PyAny>,
-) -> PyResult<PyCarinoLinkedAttribution> {
-    let periods_json = crate::bindings::extract::extract_records_json(py, periods_json, "periods")?;
+#[pyo3(text_signature = "(periods)")]
+fn carino_link(py: Python<'_>, periods: &Bound<'_, PyAny>) -> PyResult<PyCarinoLinkedAttribution> {
+    let periods = crate::bindings::extract::extract_records_json(py, periods, "periods")?;
     Ok(PyCarinoLinkedAttribution {
         inner: py.detach(move || {
             let periods: Vec<finstack_quant_portfolio::brinson::BrinsonPeriodResult> =
-                serde_json::from_str(&periods_json)
+                serde_json::from_str(&periods)
                     .map_err(|err| serde_json_to_py(err, "invalid Brinson period results JSON"))?;
             finstack_quant_portfolio::brinson::carino_link(&periods).map_err(portfolio_to_py)
         })?,
@@ -293,11 +287,11 @@ fn brinson_linked(
     py: Python<'_>,
     periods: &Bound<'_, PyAny>,
 ) -> PyResult<PyCarinoLinkedAttribution> {
-    let periods_json = crate::bindings::extract::extract_records_json(py, periods, "periods")?;
+    let periods = crate::bindings::extract::extract_records_json(py, periods, "periods")?;
     Ok(PyCarinoLinkedAttribution {
         inner: py.detach(move || {
             let periods: Vec<Vec<finstack_quant_portfolio::brinson::SectorPeriod>> =
-                serde_json::from_str(&periods_json)
+                serde_json::from_str(&periods)
                     .map_err(|err| serde_json_to_py(err, "invalid Brinson sector periods JSON"))?;
             finstack_quant_portfolio::brinson::brinson_linked(&periods).map_err(portfolio_to_py)
         })?,

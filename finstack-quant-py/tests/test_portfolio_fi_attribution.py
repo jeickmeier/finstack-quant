@@ -119,9 +119,9 @@ def test_campisi_attribution_accepts_keyword_arguments() -> None:
 
     result = json.loads(
         campisi_attribution(
-            portfolio_json=json.dumps(_portfolio()),
-            benchmark_json=json.dumps(_benchmark()),
-            config_json=json.dumps(_CONFIG),
+            portfolio=json.dumps(_portfolio()),
+            benchmark=json.dumps(_benchmark()),
+            config=json.dumps(_CONFIG),
         ).to_json()
     )
     assert result["active_return"] == pytest.approx(0.00076, abs=1e-12)
@@ -278,7 +278,7 @@ def test_campisi_carino_link_accepts_keyword_arguments() -> None:
     period = json.loads(
         campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
     )
-    result = json.loads(campisi_carino_link(periods_json=json.dumps([period, period])).to_json())
+    result = json.loads(campisi_carino_link(periods=json.dumps([period, period])).to_json())
     assert len(result["linked_sectors"]) == 2
     assert result["linked_active_carry"] == pytest.approx(0.002091436875, abs=1e-12)
 

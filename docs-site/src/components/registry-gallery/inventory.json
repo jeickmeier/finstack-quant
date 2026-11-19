@@ -1848,7 +1848,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/returns/cases.json",
-      "sha256": "5779e0c3c6eb77804932de6723201997cb4a4c6d47196d1aa3de4e0df87e85b4"
+      "sha256": "56a5384b8e12812a5afd343937d2f60e14e3a8d954b1fd8c9ad8ea0b287926bc"
     },
     {
       "path": "finstack-quant-ui/tests/portfolio/brinson/cases.json",

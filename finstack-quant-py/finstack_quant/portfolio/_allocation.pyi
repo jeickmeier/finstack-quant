@@ -136,7 +136,7 @@ class WeightAllocationResult:
         """
         ...
 
-def allocate_weights(spec_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -> WeightAllocationResult:
+def allocate_weights(spec: str | dict[str, Any] | list[Any] | pd.DataFrame) -> WeightAllocationResult:
     """
     Allocate strategy weights from a JSON specification.
 
@@ -154,7 +154,7 @@ def allocate_weights(spec_json: str | dict[str, Any] | list[Any] | pd.DataFrame)
 
     Parameters
     ----------
-    spec_json : str | dict | list | pandas.DataFrame
+    spec : str | dict | list | pandas.DataFrame
         JSON-serialized ``WeightAllocationSpec`` with a scheme, finite signed
         total capital, strategy rows, and any required covariance data.
 

@@ -14,25 +14,25 @@ use wasm_bindgen::prelude::*;
 /// caller-supplied benchmark factor-return vector. Returns a structured
 /// `FactorBrinsonResult` object with `allocation`, `selection`, and their
 /// per-factor / per-asset breakdowns.
-/// @param inputJson - Canonical JSON `FactorBrinsonInput` with `asset_ids`, `asset_returns`, `exposures` (row-major n_assets x n_factors), `factor_names`, `portfolio_weights` and `benchmark_weights`; each weight vector must sum to 1.
+/// @param input - Canonical JSON `FactorBrinsonInput` with `asset_ids`, `asset_returns`, `exposures` (row-major n_assets x n_factors), `factor_names`, `portfolio_weights` and `benchmark_weights`; each weight vector must sum to 1.
 /// @param factorReturns - Caller-supplied benchmark factor returns `f_b` as a `number[]` or `Float64Array`, length `input.factor_names`; the `Float64Array` returned by `analytics.constrainedLeastSquares` can be passed directly.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `inputJson` is malformed; the asset or
+/// Throws a JavaScript exception if `input` is malformed; the asset or
 /// factor sets are empty; dimensions disagree; a value is non-finite; either
 /// weight vector does not sum to one; benchmark factor completeness is outside
 /// tolerance; or the result cannot be converted to a JavaScript value.
 /// @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
 #[wasm_bindgen(js_name = factorBrinsonAttribution, unchecked_return_type = "FactorBrinsonResult")]
 pub fn factor_brinson_attribution(
-    #[wasm_bindgen(js_name = "inputJson", unchecked_param_type = "JsonInput")] input_json: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "JsonInput")] input: JsValue,
     #[wasm_bindgen(js_name = "factorReturns", unchecked_param_type = "NumericArray")]
     factor_returns: JsValue,
 ) -> Result<JsValue, JsValue> {
     let factor_returns = js_f64_seq(&factor_returns, "factorReturns")?;
     let input: finstack_quant_portfolio::factor_brinson::FactorBrinsonInput =
-        from_js_json(&input_json, "inputJson")?;
+        from_js_json(&input, "input")?;
     let result = finstack_quant_portfolio::factor_brinson::factor_brinson_attribution(
         &input,
         &factor_returns,

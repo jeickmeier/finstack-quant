@@ -147,7 +147,7 @@ impl PyFactorBrinsonResult {
 ///
 /// Parameters
 /// ----------
-/// input_json : str | dict | list | pandas.DataFrame
+/// input : str | dict | list | pandas.DataFrame
 ///     JSON ``FactorBrinsonInput`` with ``asset_ids``, ``asset_returns``,
 ///     ``exposures`` (row-major ``n_assets x n_factors``), ``factor_names``,
 ///     ``portfolio_weights`` and ``benchmark_weights``. Each weight vector
@@ -179,7 +179,7 @@ impl PyFactorBrinsonResult {
 ///     error directs callers to
 ///     :func:`finstack_quant.analytics.constrained_least_squares`.
 /// ValueError
-///     If ``input_json`` is malformed or carries unknown fields.
+///     If ``input`` is malformed or carries unknown fields.
 ///
 /// Sources
 /// -------
@@ -201,17 +201,17 @@ impl PyFactorBrinsonResult {
 /// >>> result.active_return
 /// 0.0
 #[pyfunction]
-#[pyo3(text_signature = "(input_json, factor_returns)")]
+#[pyo3(text_signature = "(input, factor_returns)")]
 fn factor_brinson_attribution(
     py: Python<'_>,
-    input_json: &Bound<'_, PyAny>,
+    input: &Bound<'_, PyAny>,
     factor_returns: Vec<f64>,
 ) -> PyResult<PyFactorBrinsonResult> {
-    let input_json = crate::bindings::extract::extract_records_json(py, input_json, "input")?;
+    let input = crate::bindings::extract::extract_records_json(py, input, "input")?;
     Ok(PyFactorBrinsonResult {
         inner: py.detach(move || {
             let input: finstack_quant_portfolio::factor_brinson::FactorBrinsonInput =
-                serde_json::from_str(&input_json)
+                serde_json::from_str(&input)
                     .map_err(|err| serde_json_to_py(err, "invalid factor-Brinson input JSON"))?;
             finstack_quant_portfolio::factor_brinson::factor_brinson_attribution(
                 &input,

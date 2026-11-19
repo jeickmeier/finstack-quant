@@ -84,7 +84,7 @@ impl PyWeightAllocationResult {
 ///
 /// Parameters
 /// ----------
-/// spec_json : str | dict | list | pandas.DataFrame
+/// spec : str | dict | list | pandas.DataFrame
 ///     JSON-serialized ``WeightAllocationSpec`` with a scheme, finite signed
 ///     total capital, strategy rows, and any required covariance data.
 ///
@@ -101,16 +101,13 @@ impl PyWeightAllocationResult {
 ///     If the specification is malformed, violates scheme invariants, or its
 ///     capital is not representable at the requested rounding precision.
 #[pyfunction]
-#[pyo3(text_signature = "(spec_json)")]
-fn allocate_weights(
-    py: Python<'_>,
-    spec_json: &Bound<'_, PyAny>,
-) -> PyResult<PyWeightAllocationResult> {
-    let spec_json = crate::bindings::extract::extract_records_json(py, spec_json, "spec")?;
+#[pyo3(text_signature = "(spec)")]
+fn allocate_weights(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyWeightAllocationResult> {
+    let spec = crate::bindings::extract::extract_records_json(py, spec, "spec")?;
     let inner = py
         .detach(move || {
             let spec =
-                finstack_quant_portfolio::allocation::WeightAllocationSpec::from_json(&spec_json)?;
+                finstack_quant_portfolio::allocation::WeightAllocationSpec::from_json(&spec)?;
             finstack_quant_portfolio::allocation::allocate_weights(&spec)
         })
         .map_err(portfolio_to_py)?;

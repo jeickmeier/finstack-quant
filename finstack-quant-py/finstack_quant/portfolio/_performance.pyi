@@ -195,13 +195,13 @@ def twrr_modified_dietz(period: dict[str, Any] | str) -> float:
     """
     ...
 
-def twrr_linked(returns_json: str | dict[str, Any] | list[Any] | pd.DataFrame, horizon_years: float) -> LinkedReturn:
+def twrr_linked(returns: str | dict[str, Any] | list[Any] | pd.DataFrame, horizon_years: float) -> LinkedReturn:
     """
     Geometrically link TWRR sub-period returns over a horizon.
 
     Parameters
     ----------
-    returns_json : str | dict | list | pandas.DataFrame
+    returns : str | dict | list | pandas.DataFrame
         JSON array of sub-period decimal returns (e.g. from Modified Dietz).
     horizon_years : float
         Full elapsed horizon in 365-day calendar years; must be finite.
@@ -217,7 +217,7 @@ def twrr_linked(returns_json: str | dict[str, Any] | list[Any] | pd.DataFrame, h
     Raises
     ------
     ValueError
-        If ``returns_json`` is malformed, ``horizon_years`` is NaN or
+        If ``returns`` is malformed, ``horizon_years`` is NaN or
         infinite, any sub-period return is non-finite or at most -1, or the
         compounded growth factor is non-positive.
 
