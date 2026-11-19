@@ -9,7 +9,11 @@ use finstack_quant_margin::SimmVersion;
 use finstack_quant_margin::calculators::ImResult;
 use finstack_quant_margin::calculators::im::SimmCalculator;
 
-/// Compute SIMM for an explicitly selected netting set of instruments.
+/// Compute approximate SIMM for an explicitly selected netting set of instruments.
+///
+/// Each trade must price successfully on the selected market before its
+/// product-specific SIMM sensitivity estimator contributes to margin.
+/// Product sensitivity approximations carry through to the result.
 ///
 /// # Arguments
 /// * `instruments` - Contracts in one netting set. Each instrument contributes
@@ -26,7 +30,8 @@ use finstack_quant_margin::calculators::im::SimmCalculator;
 /// # Errors
 /// Rejects an empty set, a trade without a SIMM margin implementation,
 /// zero MPOR, unsupported calculation currencies or inconsistent sensitivity
-/// currencies. Pricing and sensitivity-model failures propagate.
+/// currencies. Base-price failures and errors returned by the sensitivity
+/// estimator propagate.
 pub fn calculate_simm(
     instruments: &[&dyn Instrument],
     market: &MarketContext,
@@ -39,12 +44,14 @@ pub fn calculate_simm(
     let marginable = instruments
         .iter()
         .map(|instrument| {
-            instrument.as_marginable().ok_or_else(|| {
+            let trade = instrument.as_marginable().ok_or_else(|| {
                 Error::Validation(format!(
                     "Instrument '{}' does not support SIMM margin",
                     instrument.id()
                 ))
-            })
+            })?;
+            instrument.value(market, as_of)?;
+            Ok(trade)
         })
         .collect::<Result<Vec<_>>>()?;
     let mut calculator = SimmCalculator::new(version.unwrap_or_default())?;

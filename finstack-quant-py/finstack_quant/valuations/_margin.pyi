@@ -19,6 +19,9 @@ def calculate_simm(
 ) -> ImResult:
     """Compute model SIMM for a set of trades already selected for netting.
 
+    Each trade must price successfully at the valuation date. The result
+    carries the approximation classification of the product estimators.
+
     Parameters
     ----------
     instruments : Sequence[_InstrumentInput]

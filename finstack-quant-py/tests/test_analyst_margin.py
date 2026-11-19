@@ -48,5 +48,7 @@ def test_standalone_simm_nets_trades_and_rejects_unsupported_inputs() -> None:
     assert calculate_simm([payer, receiver], market, as_of).amount == pytest.approx(0.0, abs=1e-5)
     with pytest.raises(ValueError, match="does not support SIMM"):
         calculate_simm([Deposit.example()], market, as_of)
+    with pytest.raises(KeyError, match="USD-"):
+        calculate_simm([payer], MarketContext(), as_of)
     with pytest.raises(ValueError, match="must be USD"):
         calculate_simm([payer], market, as_of, currency="EUR")
